@@ -2,13 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
- * Vite config
+ * Local dev:
+ * - frontend runs on 5173
+ * - /api is proxied to local backend on 3000
  *
- * IMPORTANT:
- * - Frontend runs on port 5173
- * - Any request to /api is proxied to the local backend on port 3000
- * - This removes the need to hardcode random LAN IPs in frontend code
- * - It also avoids local CORS headaches during development
+ * Production:
+ * - Vercel build uses .env.production
+ * - no proxy there, just real backend URL
  */
 export default defineConfig({
   plugins: [react()],

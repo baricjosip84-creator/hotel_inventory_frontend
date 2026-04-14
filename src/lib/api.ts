@@ -1,17 +1,15 @@
 import { clearAuthTokens, getAccessToken } from './auth';
 
 /**
- * IMPORTANT:
- * In local development we use a relative /api base.
+ * IMPORTANT
+ * ---------
+ * Local development:
+ * - .env uses /api
+ * - Vite proxy forwards /api -> local backend
  *
- * Why:
- * - Vite proxies /api -> http://127.0.0.1:3000
- * - No hardcoded LAN IPs
- * - No local CORS mess
- * - Matches your backend route structure: app.use('/api', routes)
- *
- * In deployment, you can override this with VITE_API_BASE_URL
- * if frontend and backend are hosted on different domains.
+ * Production:
+ * - .env.production points to Render backend:
+ *   https://hotel-inventory-backend.onrender.com/api
  */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
