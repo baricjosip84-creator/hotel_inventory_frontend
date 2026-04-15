@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
@@ -19,10 +20,17 @@ import { apiRequest, ApiError } from '../lib/api';
  *    - resolve matching shipment item inside the selected shipment
  *    - return to shipments page with shipment + matched item selected
  *
- * IMPORTANT FIX
+ * THIS VERSION ADDS
+ * -----------------
+ * - stronger 1D barcode support
+ * - larger/wider barcode scan region
+ * - manual code entry fallback
+ * - image upload decode fallback
+ *
+ * COMPATIBILITY
  * -------------
- * Product scanning now explicitly enables 1D barcode formats and uses a wider
- * scan box. The old config was acceptable for QR but too weak for real barcodes.
+ * This version avoids newer html5-qrcode options that may not exist in your
+ * installed package version.
  */
 
 type ShipmentLookupResponse = {
@@ -77,6 +85,8 @@ function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
 
 export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -89,6 +99,8 @@ export default function ScannerPage() {
   const [resolvedShipmentItemId, setResolvedShipmentItemId] = useState<string | null>(null);
   const [resolvedProductName, setResolvedProductName] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [isDecodingImage, setIsDecodingImage] = useState(false);
+  const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const stopScanner = async () => {
@@ -96,7 +108,7 @@ export default function ScannerPage() {
       try {
         await scannerRef.current.stop();
       } catch {
-        // Ignore stop errors if the scanner was already stopped.
+        // Ignore stop errors if the scanner is already stopped.
       }
 
       try {
@@ -141,8 +153,10 @@ export default function ScannerPage() {
     navigate(`/shipments?${params.toString()}`);
   };
 
-  const handleResolvedScan = async (decodedText: string) => {
-    setResult(decodedText);
+  const resolveDecodedValue = async (decodedText: string) => {
+    const cleanValue = decodedText.trim();
+
+    setResult(cleanValue);
     setResolvedShipmentId(null);
     setResolvedShipmentItemId(null);
     setResolvedProductName(null);
@@ -150,16 +164,10 @@ export default function ScannerPage() {
     setIsResolving(true);
 
     try {
-      /*
-        Stop the camera immediately after a successful decode so the same code
-        is not processed repeatedly.
-      */
-      await stopScanner();
-
       if (mode === 'product') {
-        await resolveProductBarcode(decodedText);
+        await resolveProductBarcode(cleanValue);
       } else {
-        await resolveShipmentCode(decodedText);
+        await resolveShipmentCode(cleanValue);
       }
     } catch (err) {
       if (err instanceof ApiError) {
@@ -174,6 +182,23 @@ export default function ScannerPage() {
     }
   };
 
+  const handleResolvedScan = async (decodedText: string) => {
+    try {
+      /*
+        Stop the camera immediately after a successful decode so the same code
+        is not processed repeatedly.
+      */
+      await stopScanner();
+      await resolveDecodedValue(decodedText);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to process scanned code.');
+      }
+    }
+  };
+
   const startScanner = async () => {
     setError(null);
     setResult(null);
@@ -182,10 +207,6 @@ export default function ScannerPage() {
     setResolvedProductName(null);
 
     try {
-      /*
-        Ensure any previous scanner instance is fully cleaned up before creating
-        a new one.
-      */
       await stopScanner();
 
       const scanner = new Html5Qrcode('scanner-container', {
@@ -201,14 +222,14 @@ export default function ScannerPage() {
         },
         mode === 'product'
           ? {
-              fps: 12,
+              fps: 15,
               aspectRatio: 1.7777778,
-              qrbox: { width: 320, height: 140 },
+              qrbox: { width: 360, height: 160 },
               disableFlip: false
             }
           : {
               fps: 10,
-              qrbox: 250,
+              qrbox: 280,
               disableFlip: false
             },
         (decodedText) => {
@@ -222,7 +243,8 @@ export default function ScannerPage() {
       setIsRunning(true);
     } catch {
       /*
-        Some devices reject exact environment mode. Fall back to a softer camera request.
+        Some devices reject exact rear-camera mode.
+        Fall back to a softer camera request.
       */
       try {
         await stopScanner();
@@ -238,14 +260,14 @@ export default function ScannerPage() {
           { facingMode: 'environment' },
           mode === 'product'
             ? {
-                fps: 12,
+                fps: 15,
                 aspectRatio: 1.7777778,
-                qrbox: { width: 320, height: 140 },
+                qrbox: { width: 360, height: 160 },
                 disableFlip: false
               }
             : {
                 fps: 10,
-                qrbox: 250,
+                qrbox: 280,
                 disableFlip: false
               },
           (decodedText) => {
@@ -264,6 +286,61 @@ export default function ScannerPage() {
           setError('Failed to start camera');
         }
       }
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    const trimmed = manualCode.trim();
+
+    if (!trimmed) {
+      setError('Enter a code first.');
+      return;
+    }
+
+    await stopScanner();
+    await resolveDecodedValue(trimmed);
+  };
+
+  const handleChooseImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    setIsDecodingImage(true);
+
+    try {
+      await stopScanner();
+
+      const imageScanner = new Html5Qrcode('scanner-container', {
+        formatsToSupport: getFormatsToSupport(mode),
+        verbose: false
+      });
+
+      const decodedText = await imageScanner.scanFile(file, true);
+
+      try {
+        await imageScanner.clear();
+      } catch {
+        // Ignore cleanup errors for temporary image scanner.
+      }
+
+      await resolveDecodedValue(decodedText);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message || 'Could not decode code from image.');
+      } else {
+        setError('Could not decode code from image.');
+      }
+    } finally {
+      setIsDecodingImage(false);
+      event.target.value = '';
     }
   };
 
@@ -316,17 +393,19 @@ export default function ScannerPage() {
             <div>Hold the barcode horizontally inside the wide scan area.</div>
             <div>Move a little farther back than you would for a QR code.</div>
             <div>Use strong light and avoid glare.</div>
+            <div>If live scan fails, use manual entry or image upload below.</div>
           </>
         ) : (
           <>
             <strong>QR scan tips:</strong>
             <div>Center the QR code inside the square scan area.</div>
+            <div>If live scan fails, use manual entry or image upload below.</div>
           </>
         )}
       </div>
 
       <div style={{ marginBottom: 10 }}>
-        <button onClick={() => void startScanner()} disabled={isRunning || isResolving}>
+        <button onClick={() => void startScanner()} disabled={isRunning || isResolving || isDecodingImage}>
           {isRunning ? 'Scanner Running' : 'Start Scanner'}
         </button>
 
@@ -353,18 +432,92 @@ export default function ScannerPage() {
         </div>
       )}
 
+      {isDecodingImage && (
+        <div style={{ marginBottom: 10, color: '#1d4ed8' }}>
+          Decoding image...
+        </div>
+      )}
+
       <div
         id="scanner-container"
         style={{
           width: '100%',
-          maxWidth: mode === 'product' ? 420 : 400,
-          margin: '0 auto'
+          maxWidth: mode === 'product' ? 460 : 400,
+          margin: '0 auto 20px'
         }}
       />
 
+      <div
+        style={{
+          marginTop: 10,
+          padding: 16,
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          background: '#ffffff'
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>
+          Manual / Fallback Options
+        </h3>
+
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <label
+              htmlFor="manual-code-input"
+              style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}
+            >
+              Enter code manually
+            </label>
+            <input
+              id="manual-code-input"
+              type="text"
+              value={manualCode}
+              onChange={(event) => setManualCode(event.target.value)}
+              placeholder={mode === 'product' ? 'Enter product barcode' : 'Enter shipment QR text'}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                border: '1px solid #d1d5db',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 14
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => void handleManualSubmit()}
+              disabled={isResolving || isDecodingImage}
+            >
+              Submit Manual Code
+            </button>
+
+            <button
+              type="button"
+              onClick={handleChooseImage}
+              disabled={isResolving || isDecodingImage}
+            >
+              Upload Image
+            </button>
+          </div>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            void handleImageFileChange(event);
+          }}
+        />
+      </div>
+
       {result && (
         <div style={{ marginTop: 20 }}>
-          <strong>Scanned Value:</strong>
+          <strong>Decoded Value:</strong>
           <div>{result}</div>
         </div>
       )}
