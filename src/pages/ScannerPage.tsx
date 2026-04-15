@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 
@@ -18,6 +18,11 @@ import { apiRequest, ApiError } from '../lib/api';
  *    - scan product barcode
  *    - resolve matching shipment item inside the selected shipment
  *    - return to shipments page with shipment + matched item selected
+ *
+ * IMPORTANT FIX
+ * -------------
+ * Product scanning now explicitly enables 1D barcode formats and uses a wider
+ * scan box. The old config was acceptable for QR but too weak for real barcodes.
  */
 
 type ShipmentLookupResponse = {
@@ -49,6 +54,25 @@ function modeDescription(mode: ScannerMode): string {
   return mode === 'product'
     ? 'Scan a product barcode for the currently selected shipment.'
     : 'Scan a shipment QR code to open that shipment directly.';
+}
+
+function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
+  if (mode === 'product') {
+    return [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ];
+  }
+
+  return [Html5QrcodeSupportedFormats.QR_CODE];
 }
 
 export default function ScannerPage() {
@@ -164,15 +188,29 @@ export default function ScannerPage() {
       */
       await stopScanner();
 
-      const scanner = new Html5Qrcode('scanner-container');
+      const scanner = new Html5Qrcode('scanner-container', {
+        formatsToSupport: getFormatsToSupport(mode),
+        verbose: false
+      });
+
       scannerRef.current = scanner;
 
       await scanner.start(
-        { facingMode: 'environment' },
         {
-          fps: 10,
-          qrbox: 250
+          facingMode: { exact: 'environment' }
         },
+        mode === 'product'
+          ? {
+              fps: 12,
+              aspectRatio: 1.7777778,
+              qrbox: { width: 320, height: 140 },
+              disableFlip: false
+            }
+          : {
+              fps: 10,
+              qrbox: 250,
+              disableFlip: false
+            },
         (decodedText) => {
           if (!isResolving) {
             void handleResolvedScan(decodedText);
@@ -182,11 +220,49 @@ export default function ScannerPage() {
       );
 
       setIsRunning(true);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message || 'Failed to start camera');
-      } else {
-        setError('Failed to start camera');
+    } catch {
+      /*
+        Some devices reject exact environment mode. Fall back to a softer camera request.
+      */
+      try {
+        await stopScanner();
+
+        const fallbackScanner = new Html5Qrcode('scanner-container', {
+          formatsToSupport: getFormatsToSupport(mode),
+          verbose: false
+        });
+
+        scannerRef.current = fallbackScanner;
+
+        await fallbackScanner.start(
+          { facingMode: 'environment' },
+          mode === 'product'
+            ? {
+                fps: 12,
+                aspectRatio: 1.7777778,
+                qrbox: { width: 320, height: 140 },
+                disableFlip: false
+              }
+            : {
+                fps: 10,
+                qrbox: 250,
+                disableFlip: false
+              },
+          (decodedText) => {
+            if (!isResolving) {
+              void handleResolvedScan(decodedText);
+            }
+          },
+          () => {}
+        );
+
+        setIsRunning(true);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message || 'Failed to start camera');
+        } else {
+          setError('Failed to start camera');
+        }
       }
     }
   };
@@ -223,6 +299,32 @@ export default function ScannerPage() {
         </div>
       ) : null}
 
+      <div
+        style={{
+          marginBottom: 14,
+          padding: 12,
+          borderRadius: 12,
+          background: mode === 'product' ? '#fff7ed' : '#eff6ff',
+          border: mode === 'product' ? '1px solid #fdba74' : '1px solid #bfdbfe',
+          color: mode === 'product' ? '#9a3412' : '#1d4ed8',
+          lineHeight: 1.6
+        }}
+      >
+        {mode === 'product' ? (
+          <>
+            <strong>Barcode scan tips:</strong>
+            <div>Hold the barcode horizontally inside the wide scan area.</div>
+            <div>Move a little farther back than you would for a QR code.</div>
+            <div>Use strong light and avoid glare.</div>
+          </>
+        ) : (
+          <>
+            <strong>QR scan tips:</strong>
+            <div>Center the QR code inside the square scan area.</div>
+          </>
+        )}
+      </div>
+
       <div style={{ marginBottom: 10 }}>
         <button onClick={() => void startScanner()} disabled={isRunning || isResolving}>
           {isRunning ? 'Scanner Running' : 'Start Scanner'}
@@ -255,7 +357,7 @@ export default function ScannerPage() {
         id="scanner-container"
         style={{
           width: '100%',
-          maxWidth: 400,
+          maxWidth: mode === 'product' ? 420 : 400,
           margin: '0 auto'
         }}
       />
