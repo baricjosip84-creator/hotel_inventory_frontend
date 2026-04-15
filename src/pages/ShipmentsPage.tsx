@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 
 /**
@@ -17,11 +17,24 @@ import { apiRequest, ApiError } from '../lib/api';
  * - partial receiving
  * - finalizing partially received shipments
  * - auto-selecting a shipment when scanner redirects with ?shipmentId=
+ * - highlighting and preparing a shipment item when product barcode scan returns
  *
  * MOBILE UPDATE
  * ----------------------------------------------------------------------------
- * This version fixes the phone layout by stacking the shipment list and the
- * selected shipment panel into a single column on smaller screens.
+ * This version improves mobile UX further by:
+ * - stacking major panels on small screens
+ * - converting shipment items from a wide table into tap-friendly cards on mobile
+ * - making receive controls more readable and easier to use on phone
+ *
+ * PRODUCT BARCODE SCAN UPDATE
+ * ----------------------------------------------------------------------------
+ * This version also supports product receiving prep flow:
+ * - user selects shipment
+ * - user opens scanner in product mode
+ * - scanner returns with shipmentId + itemId + scannedBarcode
+ * - page auto-selects shipment
+ * - matched shipment item is highlighted
+ * - receive quantity is prefilled to 1 when possible
  */
 
 /**
@@ -267,6 +280,7 @@ function useIsMobile(breakpoint = 1024): boolean {
 
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
 
@@ -274,6 +288,7 @@ export default function ShipmentsPage() {
    * UI state
    */
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
+  const [highlightedItemId, setHighlightedItemId] = useState('');
   const [shipmentSearch, setShipmentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -327,6 +342,7 @@ export default function ShipmentsPage() {
       setShipmentForm(emptyShipmentForm());
       setSelectedShipmentId(shipment.id);
       setReceiveDrafts({});
+      setHighlightedItemId('');
       setPageError(null);
       setPageMessage('Shipment created successfully.');
 
@@ -441,9 +457,10 @@ export default function ShipmentsPage() {
   /**
    * Scanner integration
    *
-   * If the page is opened with ?shipmentId=..., automatically select that
-   * shipment once the shipment list is available, then clear the query param
-   * so refreshes do not keep re-triggering the same selection behavior.
+   * Query params supported:
+   * - shipmentId
+   * - itemId
+   * - scannedBarcode
    */
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
@@ -466,12 +483,60 @@ export default function ShipmentsPage() {
     setSelectedShipmentId(matchedShipment.id);
     setReceiveDrafts({});
     setPageError(null);
-    setPageMessage('Shipment opened from scanner.');
+
+    const itemIdFromQuery = searchParams.get('itemId');
+    const scannedBarcode = searchParams.get('scannedBarcode');
+
+    if (itemIdFromQuery) {
+      setHighlightedItemId(itemIdFromQuery);
+      setPageMessage(
+        scannedBarcode
+          ? `Product barcode ${scannedBarcode} matched inside selected shipment.`
+          : 'Shipment item matched from scanner.'
+      );
+    } else {
+      setHighlightedItemId('');
+      setPageMessage('Shipment opened from scanner.');
+    }
 
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('shipmentId');
+    nextParams.delete('itemId');
+    nextParams.delete('scannedBarcode');
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
+
+  /**
+   * When shipment items load and a scanner-highlighted item exists,
+   * prefill the receive draft to quantity 1 when possible.
+   */
+  useEffect(() => {
+    if (!highlightedItemId || shipmentItems.length === 0) {
+      return;
+    }
+
+    const matchedItem = shipmentItems.find((item) => item.id === highlightedItemId);
+
+    if (!matchedItem) {
+      return;
+    }
+
+    const ordered = toNumber(matchedItem.quantity);
+    const received = toNumber(matchedItem.received_quantity);
+    const remaining = Math.max(ordered - received, 0);
+
+    setReceiveDrafts((current) => {
+      const existing = current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem);
+
+      return {
+        ...current,
+        [matchedItem.id]: {
+          ...existing,
+          quantity_received: remaining > 0 ? '1' : existing.quantity_received
+        }
+      };
+    });
+  }, [highlightedItemId, shipmentItems]);
 
   /**
    * Form helpers
@@ -588,8 +653,18 @@ export default function ShipmentsPage() {
   const selectShipment = (shipmentId: string) => {
     setSelectedShipmentId(shipmentId);
     setReceiveDrafts({});
+    setHighlightedItemId('');
     setPageError(null);
     setPageMessage(null);
+  };
+
+  const openProductScanner = () => {
+    if (!selectedShipmentId) {
+      setPageError('Select a shipment before opening product scanner.');
+      return;
+    }
+
+    navigate(`/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}`);
   };
 
   /**
@@ -914,23 +989,176 @@ export default function ShipmentsPage() {
               >
                 <h4 style={styles.sectionTitle}>Shipment Items</h4>
 
-                <button
-                  type="button"
-                  style={styles.finalizeButton}
-                  onClick={handleFinalizeShipment}
-                  disabled={
-                    finalizeShipmentMutation.isPending ||
-                    selectedShipment.status === 'received'
-                  }
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    gap: 10,
+                    width: isMobile ? '100%' : 'auto'
+                  }}
                 >
-                  {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
-                </button>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.scannerButton,
+                      width: isMobile ? '100%' : undefined
+                    }}
+                    onClick={openProductScanner}
+                  >
+                    Scan Product Barcode
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.finalizeButton,
+                      width: isMobile ? '100%' : undefined
+                    }}
+                    onClick={handleFinalizeShipment}
+                    disabled={
+                      finalizeShipmentMutation.isPending ||
+                      selectedShipment.status === 'received'
+                    }
+                  >
+                    {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
+                  </button>
+                </div>
               </div>
 
               {shipmentItemsQuery.isLoading ? (
                 <p style={styles.emptyState}>Loading shipment items...</p>
               ) : shipmentItems.length === 0 ? (
                 <p style={styles.emptyState}>No shipment items yet.</p>
+              ) : isMobile ? (
+                <div style={styles.mobileItemCardList}>
+                  {shipmentItems.map((item) => {
+                    const ordered = toNumber(item.quantity);
+                    const received = toNumber(item.received_quantity);
+                    const remaining = Math.max(ordered - received, 0);
+                    const draft = getReceiveDraft(item);
+                    const isHighlighted = item.id === highlightedItemId;
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          ...styles.mobileItemCard,
+                          ...(isHighlighted ? styles.mobileItemCardHighlighted : {})
+                        }}
+                      >
+                        <div style={styles.mobileItemCardHeader}>
+                          <div style={styles.mobileItemCardTitle}>
+                            {item.product_name || item.product_id}
+                          </div>
+                          <div style={styles.mobileBadgeRow}>
+                            {isHighlighted ? (
+                              <span style={styles.mobileScannedBadge}>Scanned Match</span>
+                            ) : null}
+
+                            <span
+                              style={
+                                remaining <= 0 ? styles.mobileDoneBadge : styles.mobilePendingBadge
+                              }
+                            >
+                              {remaining <= 0 ? 'Received' : `${remaining} remaining`}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={styles.mobileItemMetaGrid}>
+                          <div>
+                            <strong>Ordered</strong>
+                            <div>{ordered}</div>
+                          </div>
+                          <div>
+                            <strong>Received</strong>
+                            <div>{received}</div>
+                          </div>
+                          <div>
+                            <strong>Remaining</strong>
+                            <div>{remaining}</div>
+                          </div>
+                          <div>
+                            <strong>Product ID</strong>
+                            <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
+                          </div>
+                        </div>
+
+                        <div style={styles.mobileFieldGroup}>
+                          <label style={styles.label}>Storage Location</label>
+                          <select
+                            style={styles.input}
+                            value={draft.storage_location_id}
+                            onChange={(event) =>
+                              updateReceiveDraft(item.id, (current) => ({
+                                ...current,
+                                storage_location_id: event.target.value
+                              }))
+                            }
+                          >
+                            <option value="">Select location</option>
+                            {(storageLocationsQuery.data ?? []).map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div style={styles.mobileFieldGroup}>
+                          <label style={styles.label}>Receive Quantity</label>
+                          <input
+                            style={styles.input}
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={draft.quantity_received}
+                            onChange={(event) =>
+                              updateReceiveDraft(item.id, (current) => ({
+                                ...current,
+                                quantity_received: event.target.value
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div style={styles.mobileFieldGroup}>
+                          <label style={styles.label}>Discrepancy Reason</label>
+                          <input
+                            style={styles.input}
+                            type="text"
+                            placeholder="Optional discrepancy reason"
+                            value={draft.discrepancy_reason}
+                            onChange={(event) =>
+                              updateReceiveDraft(item.id, (current) => ({
+                                ...current,
+                                discrepancy_reason: event.target.value
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.mobileReceiveButton,
+                            ...(remaining <= 0 || selectedShipment.status === 'received'
+                              ? styles.mobileReceiveButtonDisabled
+                              : {})
+                          }}
+                          onClick={() => handleReceiveLine(item)}
+                          disabled={
+                            receiveShipmentMutation.isPending ||
+                            remaining <= 0 ||
+                            selectedShipment.status === 'received'
+                          }
+                        >
+                          {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
                 <div style={styles.itemTableWrapper}>
                   <table style={styles.itemTable}>
@@ -952,10 +1180,21 @@ export default function ShipmentsPage() {
                         const received = toNumber(item.received_quantity);
                         const remaining = Math.max(ordered - received, 0);
                         const draft = getReceiveDraft(item);
+                        const isHighlighted = item.id === highlightedItemId;
 
                         return (
-                          <tr key={item.id}>
-                            <td style={styles.td}>{item.product_name || item.product_id}</td>
+                          <tr
+                            key={item.id}
+                            style={isHighlighted ? styles.highlightedTableRow : undefined}
+                          >
+                            <td style={styles.td}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span>{item.product_name || item.product_id}</span>
+                                {isHighlighted ? (
+                                  <span style={styles.desktopScannedBadge}>Scanned Match</span>
+                                ) : null}
+                              </div>
+                            </td>
                             <td style={styles.td}>{ordered}</td>
                             <td style={styles.td}>{received}</td>
                             <td style={styles.td}>{remaining}</td>
@@ -1138,6 +1377,15 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer'
   },
+  scannerButton: {
+    border: 'none',
+    borderRadius: 10,
+    padding: '12px 16px',
+    background: '#2563eb',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
   errorBox: {
     marginBottom: 16,
     background: '#fef2f2',
@@ -1281,6 +1529,112 @@ const styles: Record<string, CSSProperties> = {
     verticalAlign: 'top',
     color: '#111827',
     fontSize: 14
+  },
+  highlightedTableRow: {
+    background: '#eff6ff'
+  },
+  desktopScannedBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '4px 8px',
+    fontSize: 11,
+    fontWeight: 700,
+    background: '#dbeafe',
+    color: '#1d4ed8'
+  },
+  mobileItemCardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 14
+  },
+  mobileItemCard: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    padding: 14,
+    background: '#ffffff'
+  },
+  mobileItemCardHighlighted: {
+    border: '1px solid #60a5fa',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.12)',
+    background: '#f8fbff'
+  },
+  mobileItemCardHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    marginBottom: 14
+  },
+  mobileItemCardTitle: {
+    fontSize: 16,
+    fontWeight: 800,
+    color: '#111827',
+    wordBreak: 'break-word'
+  },
+  mobileBadgeRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  mobileItemMetaGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+    marginBottom: 14,
+    color: '#374151',
+    fontSize: 13
+  },
+  mobileFieldGroup: {
+    marginBottom: 12
+  },
+  mobilePendingBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#fef3c7',
+    color: '#92400e'
+  },
+  mobileDoneBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#dcfce7',
+    color: '#166534'
+  },
+  mobileScannedBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#dbeafe',
+    color: '#1d4ed8'
+  },
+  mobileReceiveButton: {
+    width: '100%',
+    border: 'none',
+    borderRadius: 10,
+    padding: '12px 16px',
+    background: '#2563eb',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer',
+    marginTop: 6
+  },
+  mobileReceiveButtonDisabled: {
+    background: '#9ca3af',
+    cursor: 'not-allowed'
   },
   emptyState: {
     color: '#6b7280',
