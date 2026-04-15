@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { clearAuthTokens } from '../lib/auth';
+import { clearAuthTokens, getRefreshToken } from '../lib/auth';
+import { apiRequest } from '../lib/api';
 
 function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/dashboard')) return 'Dashboard';
@@ -13,6 +14,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/storage-locations')) return 'Storage Locations';
   if (pathname.startsWith('/shipments')) return 'Shipments';
   if (pathname.startsWith('/scanner')) return 'Scanner';
+  if (pathname.startsWith('/sessions')) return 'Sessions';
   return 'Inventory Management';
 }
 
@@ -44,6 +46,9 @@ function getPageSubtitle(pathname: string): string {
   if (pathname.startsWith('/scanner')) {
     return 'Use the device camera to scan QR codes and barcodes.';
   }
+  if (pathname.startsWith('/sessions')) {
+    return 'Review active sessions and revoke stale account access.';
+  }
   return 'Frontend connected to your production-ready backend';
 }
 
@@ -65,6 +70,7 @@ export default function AppLayout() {
   const isMobile = useIsMobile();
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard' },
@@ -75,16 +81,44 @@ export default function AppLayout() {
     { to: '/stock-movements', label: 'Stock Movements' },
     { to: '/storage-locations', label: 'Storage Locations' },
     { to: '/shipments', label: 'Shipments' },
-    { to: '/scanner', label: 'Scanner' }
+    { to: '/scanner', label: 'Scanner' },
+    { to: '/sessions', label: 'Sessions' }
   ];
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    clearAuthTokens();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    const refreshToken = getRefreshToken();
+
+    try {
+      /*
+        Revoke the current backend session when possible so the stored refresh
+        token cannot continue to be used after logout.
+      */
+      if (refreshToken) {
+        await apiRequest('/auth/logout', {
+          method: 'POST',
+          body: JSON.stringify({ refreshToken })
+        });
+      }
+    } catch {
+      /*
+        Even if the backend call fails, we still clear local auth state so the
+        user is logged out on this device.
+      */
+    } finally {
+      clearAuthTokens();
+      navigate('/login', { replace: true });
+      setIsLoggingOut(false);
+    }
   };
 
   const toggleMobileNav = () => {
@@ -126,8 +160,8 @@ export default function AppLayout() {
         </nav>
 
         <div style={styles.sidebarFooter}>
-          <button type="button" style={styles.logoutButton} onClick={handleLogout}>
-            Log out
+          <button type="button" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? 'Logging out…' : 'Log out'}
           </button>
         </div>
       </aside>
@@ -219,27 +253,25 @@ const styles: Record<string, CSSProperties> = {
   },
   brandSubtitle: {
     fontSize: '13px',
-    opacity: 0.75,
-    lineHeight: 1.4
+    color: 'rgba(255,255,255,0.72)'
   },
   nav: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px'
+    gap: '8px'
   },
   navItem: {
-    textDecoration: 'none',
-    color: '#d1d5db',
-    padding: '12px 14px',
+    display: 'block',
+    padding: '11px 12px',
     borderRadius: '10px',
+    color: 'rgba(255,255,255,0.84)',
+    textDecoration: 'none',
     fontWeight: 600,
-    transition: 'all 0.2s ease',
-    background: 'transparent'
+    transition: 'background 0.18s ease, color 0.18s ease'
   },
   navItemActive: {
-    background: '#2563eb',
-    color: '#ffffff',
-    boxShadow: '0 4px 10px rgba(37,99,235,0.25)'
+    background: 'rgba(59,130,246,0.22)',
+    color: '#ffffff'
   },
   sidebarFooter: {
     marginTop: 'auto',
@@ -247,71 +279,77 @@ const styles: Record<string, CSSProperties> = {
   },
   logoutButton: {
     width: '100%',
-    border: '1px solid rgba(255,255,255,0.15)',
-    background: 'transparent',
-    color: '#ffffff',
+    border: 'none',
     borderRadius: '10px',
-    padding: '12px 14px',
-    fontWeight: 600,
-    cursor: 'pointer'
+    padding: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    background: '#ef4444',
+    color: '#ffffff'
   },
   mainArea: {
-    display: 'flex',
-    flexDirection: 'column',
+    flex: 1,
     minWidth: 0,
-    flex: 1
+    display: 'flex',
+    flexDirection: 'column'
   },
   header: {
-    background: '#ffffff',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '20px 24px'
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '28px 32px 16px',
+    background: 'linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.96) 100%)',
+    borderBottom: '1px solid rgba(15,23,42,0.06)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 20
   },
   headerLeft: {
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: '14px'
+    alignItems: 'center',
+    gap: '16px'
+  },
+  menuButton: {
+    border: '1px solid rgba(15,23,42,0.1)',
+    background: '#ffffff',
+    borderRadius: '10px',
+    width: '42px',
+    height: '42px',
+    cursor: 'pointer',
+    fontSize: '20px'
   },
   headerTextBlock: {
-    maxWidth: '900px',
-    minWidth: 0
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px'
   },
   breadcrumb: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#6b7280',
     textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '8px'
+    letterSpacing: '0.08em',
+    color: '#64748b'
   },
   headerTitle: {
     margin: 0,
-    fontSize: '28px',
+    fontSize: '32px',
+    lineHeight: 1.1,
     fontWeight: 800,
-    lineHeight: 1.15
+    color: '#0f172a'
   },
   headerText: {
-    margin: '8px 0 0 0',
-    color: '#6b7280',
-    lineHeight: 1.5
-  },
-  menuButton: {
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    color: '#111827',
-    borderRadius: '10px',
-    padding: '10px 12px',
-    fontSize: '18px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    lineHeight: 1
+    margin: 0,
+    color: '#475569',
+    fontSize: '14px'
   },
   content: {
-    width: '100%'
+    width: '100%',
+    boxSizing: 'border-box'
   },
   contentDesktop: {
-    padding: '24px 28px'
+    padding: '24px 32px 40px'
   },
   contentMobile: {
-    padding: '16px'
+    padding: '16px 16px 28px'
   }
 };

@@ -10,6 +10,7 @@ import StockPage from '../pages/StockPage';
 import StorageLocationsPage from '../pages/StorageLocationsPage';
 import StockMovementsPage from '../pages/StockMovementsPage';
 import ScannerPage from '../pages/ScannerPage';
+import SessionsPage from '../pages/SessionsPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -64,6 +65,10 @@ const router = createBrowserRouter([
       {
         path: 'scanner',
         element: <ScannerPage />
+      },
+      {
+        path: 'sessions',
+        element: <SessionsPage />
       }
     ]
   },

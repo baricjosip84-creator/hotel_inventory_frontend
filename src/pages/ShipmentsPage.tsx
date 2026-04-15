@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 
 /**
@@ -15,6 +16,7 @@ import { apiRequest, ApiError } from '../lib/api';
  * - receiving shipment items line-by-line
  * - partial receiving
  * - finalizing partially received shipments
+ * - auto-selecting a shipment when scanner redirects with ?shipmentId=
  *
  * IMPORTANT BACKEND NOTES THIS FILE MATCHES
  * ----------------------------------------------------------------------------
@@ -277,6 +279,7 @@ function statusBadgeStyle(status: string): CSSProperties {
 
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   /**
    * UI state
@@ -445,6 +448,41 @@ export default function ShipmentsPage() {
       return matchesStatus && matchesSearch;
     });
   }, [shipments, shipmentSearch, statusFilter]);
+
+  /**
+   * Scanner integration
+   *
+   * If the page is opened with ?shipmentId=..., automatically select that
+   * shipment once the shipment list is available, then clear the query param
+   * so refreshes do not keep re-triggering the same selection behavior.
+   */
+  useEffect(() => {
+    const shipmentIdFromQuery = searchParams.get('shipmentId');
+
+    if (!shipmentIdFromQuery) {
+      return;
+    }
+
+    if (shipments.length === 0) {
+      return;
+    }
+
+    const matchedShipment = shipments.find((shipment) => shipment.id === shipmentIdFromQuery);
+
+    if (!matchedShipment) {
+      setPageError('Scanned shipment was not found in the current shipment list.');
+      return;
+    }
+
+    setSelectedShipmentId(matchedShipment.id);
+    setReceiveDrafts({});
+    setPageError(null);
+    setPageMessage('Shipment opened from scanner.');
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('shipmentId');
+    setSearchParams(nextParams, { replace: true });
+  }, [shipments, searchParams, setSearchParams]);
 
   /**
    * Form helpers
@@ -627,6 +665,7 @@ export default function ShipmentsPage() {
             <label style={styles.label}>PO Number</label>
             <input
               style={styles.input}
+              type="text"
               value={shipmentForm.po_number}
               onChange={(event) =>
                 setShipmentForm((current) => ({
@@ -638,7 +677,7 @@ export default function ShipmentsPage() {
             />
           </div>
 
-          <div style={styles.formActions}>
+          <div style={styles.formActionRow}>
             <button
               type="submit"
               style={styles.primaryButton}
@@ -650,337 +689,321 @@ export default function ShipmentsPage() {
         </form>
       </section>
 
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Shipment List</h3>
-
-        <div style={styles.filtersGrid}>
-          <input
-            style={styles.input}
-            value={shipmentSearch}
-            onChange={(event) => setShipmentSearch(event.target.value)}
-            placeholder="Search by PO number, supplier, status, or ID"
-          />
-
-          <select
-            style={styles.input}
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="partial">Partial</option>
-            <option value="received">Received</option>
-          </select>
-        </div>
-
-        {shipmentsQuery.isLoading ? <p>Loading shipments...</p> : null}
-        {shipmentsQuery.isError ? (
-          <p>Failed to load shipments: {(shipmentsQuery.error as Error).message || 'Unknown error'}</p>
-        ) : null}
-
-        {!shipmentsQuery.isLoading && !shipmentsQuery.isError ? (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>PO Number</th>
-                  <th style={styles.th}>Supplier</th>
-                  <th style={styles.th}>Delivery Date</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Version</th>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredShipments.length === 0 ? (
-                  <tr>
-                    <td style={styles.emptyCell} colSpan={7}>
-                      No shipments found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredShipments.map((shipment) => (
-                    <tr key={shipment.id}>
-                      <td style={styles.td}>{shipment.po_number || '-'}</td>
-                      <td style={styles.td}>{shipment.supplier_name || shipment.supplier_id}</td>
-                      <td style={styles.td}>{formatDate(shipment.delivery_date)}</td>
-                      <td style={styles.td}>
-                        <span style={statusBadgeStyle(shipment.status)}>{shipment.status}</span>
-                      </td>
-                      <td style={styles.td}>{shipment.version}</td>
-                      <td style={styles.td}>{shipment.id}</td>
-                      <td style={styles.td}>
-                        <button
-                          type="button"
-                          style={
-                            selectedShipmentId === shipment.id
-                              ? styles.primaryButton
-                              : styles.secondaryButton
-                          }
-                          onClick={() => selectShipment(shipment.id)}
-                        >
-                          {selectedShipmentId === shipment.id ? 'Selected' : 'Select'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
-
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Selected Shipment Overview</h3>
-
-        {!selectedShipment ? (
-          <p>No shipment selected.</p>
-        ) : (
-          <div style={styles.overviewGrid}>
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>Supplier</div>
-              <div style={styles.overviewValue}>
-                {selectedShipment.supplier_name || selectedShipment.supplier_id}
-              </div>
-            </div>
-
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>PO Number</div>
-              <div style={styles.overviewValue}>{selectedShipment.po_number || '-'}</div>
-            </div>
-
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>Delivery Date</div>
-              <div style={styles.overviewValue}>{formatDate(selectedShipment.delivery_date)}</div>
-            </div>
-
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>Status</div>
-              <div style={styles.overviewValue}>{selectedShipment.status}</div>
-            </div>
-
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>Version</div>
-              <div style={styles.overviewValue}>{selectedShipment.version}</div>
-            </div>
-
-            <div style={styles.overviewCard}>
-              <div style={styles.overviewLabel}>Shipment ID</div>
-              <div style={styles.overviewSmallValue}>{selectedShipment.id}</div>
+      <section style={styles.twoColumnGrid}>
+        <div style={styles.panel}>
+          <div style={styles.shipmentListHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>Shipment List</h3>
+              <p style={styles.panelSubtitle}>
+                Filter shipments and select one for line management and receiving.
+              </p>
             </div>
           </div>
-        )}
-      </section>
 
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Add Shipment Item</h3>
-
-        <form onSubmit={handleAddShipmentItem} style={styles.formGrid}>
-          <div>
-            <label style={styles.label}>Selected Shipment</label>
+          <div style={styles.filterGrid}>
             <input
               style={styles.input}
-              value={selectedShipmentId}
-              readOnly
-              placeholder="Select a shipment first"
+              type="text"
+              placeholder="Search by PO, supplier, shipment ID, status..."
+              value={shipmentSearch}
+              onChange={(event) => setShipmentSearch(event.target.value)}
             />
-          </div>
 
-          <div>
-            <label style={styles.label}>Product</label>
             <select
               style={styles.input}
-              value={itemForm.product_id}
-              onChange={(event) =>
-                setItemForm((current) => ({
-                  ...current,
-                  product_id: event.target.value
-                }))
-              }
-              required
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">Select product</option>
-              {(productsQuery.data ?? []).map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="partial">Partial</option>
+              <option value="received">Received</option>
             </select>
           </div>
 
-          <div>
-            <label style={styles.label}>Quantity</label>
-            <input
-              style={styles.input}
-              type="number"
-              min="1"
-              step="1"
-              value={itemForm.quantity}
-              onChange={(event) =>
-                setItemForm((current) => ({
-                  ...current,
-                  quantity: event.target.value
-                }))
-              }
-              required
-            />
+          <div style={styles.shipmentList}>
+            {shipmentsQuery.isLoading ? (
+              <p style={styles.emptyState}>Loading shipments...</p>
+            ) : filteredShipments.length === 0 ? (
+              <p style={styles.emptyState}>No shipments match the current filter.</p>
+            ) : (
+              filteredShipments.map((shipment) => {
+                const isSelected = shipment.id === selectedShipmentId;
+                const ordered = toNumber(shipment.total_ordered_quantity);
+                const received = toNumber(shipment.total_received_quantity);
+
+                return (
+                  <button
+                    key={shipment.id}
+                    type="button"
+                    onClick={() => selectShipment(shipment.id)}
+                    style={{
+                      ...styles.shipmentCard,
+                      ...(isSelected ? styles.shipmentCardSelected : {})
+                    }}
+                  >
+                    <div style={styles.shipmentCardTop}>
+                      <div style={styles.shipmentCardTitleBlock}>
+                        <div style={styles.shipmentCardTitle}>
+                          {shipment.po_number || 'No PO Number'}
+                        </div>
+                        <div style={styles.shipmentCardSubtle}>
+                          Shipment ID: {shipment.id}
+                        </div>
+                      </div>
+
+                      <span style={statusBadgeStyle(shipment.status)}>
+                        {shipment.status.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div style={styles.shipmentCardMeta}>
+                      <div>
+                        <strong>Supplier:</strong> {shipment.supplier_name || shipment.supplier_id}
+                      </div>
+                      <div>
+                        <strong>Delivery:</strong> {formatDate(shipment.delivery_date)}
+                      </div>
+                      <div>
+                        <strong>QR:</strong> {shipment.qr_code}
+                      </div>
+                      <div>
+                        <strong>Lines:</strong> {shipment.line_count ?? 0}
+                      </div>
+                      <div>
+                        <strong>Ordered:</strong> {ordered}
+                      </div>
+                      <div>
+                        <strong>Received:</strong> {received}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
-
-          <div style={styles.formActions}>
-            <button
-              type="submit"
-              style={styles.primaryButton}
-              disabled={addShipmentItemMutation.isPending}
-            >
-              {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Item'}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.panelHeaderRow}>
-          <h3 style={styles.panelTitleNoMargin}>Shipment Items & Receiving</h3>
-
-          {selectedShipment && selectedShipment.status !== 'received' ? (
-            <button
-              type="button"
-              style={styles.successButton}
-              onClick={handleFinalizeShipment}
-              disabled={finalizeShipmentMutation.isPending}
-            >
-              {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
-            </button>
-          ) : null}
         </div>
 
-        {!selectedShipmentId ? (
-          <p>Select a shipment to view items.</p>
-        ) : shipmentItemsQuery.isLoading ? (
-          <p>Loading shipment items...</p>
-        ) : shipmentItemsQuery.isError ? (
-          <p>Failed to load shipment items.</p>
-        ) : (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Product</th>
-                  <th style={styles.th}>Ordered</th>
-                  <th style={styles.th}>Received</th>
-                  <th style={styles.th}>Remaining</th>
-                  <th style={styles.th}>Quantity To Receive</th>
-                  <th style={styles.th}>Storage Location</th>
-                  <th style={styles.th}>Discrepancy Reason</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shipmentItems.length === 0 ? (
-                  <tr>
-                    <td style={styles.emptyCell} colSpan={8}>
-                      No items found for this shipment.
-                    </td>
-                  </tr>
-                ) : (
-                  shipmentItems.map((item) => {
-                    const ordered = toNumber(item.quantity);
-                    const received = toNumber(item.received_quantity);
-                    const remaining = Math.max(ordered - received, 0);
-                    const draft = getReceiveDraft(item);
-                    const isFullyReceived = remaining <= 0;
-                    const shipmentClosed = selectedShipment?.status === 'received';
-
-                    return (
-                      <tr key={item.id}>
-                        <td style={styles.td}>
-                          <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
-                          <div style={styles.rowSubtle}>Shipment item ID: {item.id}</div>
-                        </td>
-                        <td style={styles.td}>{ordered}</td>
-                        <td style={styles.td}>{received}</td>
-                        <td style={styles.td}>
-                          <span style={remaining > 0 ? styles.remainingBadge : styles.completeBadge}>
-                            {remaining}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <input
-                            style={styles.compactInput}
-                            type="number"
-                            min="1"
-                            max={remaining > 0 ? remaining : 1}
-                            step="1"
-                            value={draft.quantity_received}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                quantity_received: event.target.value
-                              }))
-                            }
-                            disabled={isFullyReceived || shipmentClosed}
-                          />
-                        </td>
-                        <td style={styles.td}>
-                          <select
-                            style={styles.compactInput}
-                            value={draft.storage_location_id}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                storage_location_id: event.target.value
-                              }))
-                            }
-                            disabled={isFullyReceived || shipmentClosed}
-                          >
-                            <option value="">Select location</option>
-                            {(storageLocationsQuery.data ?? []).map((location) => (
-                              <option key={location.id} value={location.id}>
-                                {location.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td style={styles.td}>
-                          <input
-                            style={styles.compactInput}
-                            value={draft.discrepancy_reason}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                discrepancy_reason: event.target.value
-                              }))
-                            }
-                            placeholder="Optional"
-                            disabled={isFullyReceived || shipmentClosed}
-                          />
-                        </td>
-                        <td style={styles.td}>
-                          {shipmentClosed ? (
-                            <span style={styles.completeBadge}>Shipment Closed</span>
-                          ) : isFullyReceived ? (
-                            <span style={styles.completeBadge}>Fully Received</span>
-                          ) : (
-                            <button
-                              type="button"
-                              style={styles.successButton}
-                              onClick={() => handleReceiveLine(item)}
-                              disabled={receiveShipmentMutation.isPending}
-                            >
-                              {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        <div style={styles.panel}>
+          <div style={styles.shipmentListHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>Selected Shipment</h3>
+              <p style={styles.panelSubtitle}>
+                Add shipment lines, receive stock into locations, and finalize the shipment.
+              </p>
+            </div>
           </div>
-        )}
+
+          {!selectedShipment ? (
+            <p style={styles.emptyState}>Select a shipment to continue.</p>
+          ) : (
+            <>
+              <div style={styles.selectedShipmentBox}>
+                <div style={styles.selectedShipmentGrid}>
+                  <div>
+                    <strong>Shipment ID</strong>
+                    <div>{selectedShipment.id}</div>
+                  </div>
+                  <div>
+                    <strong>Status</strong>
+                    <div>{selectedShipment.status}</div>
+                  </div>
+                  <div>
+                    <strong>Supplier</strong>
+                    <div>{selectedShipment.supplier_name || selectedShipment.supplier_id}</div>
+                  </div>
+                  <div>
+                    <strong>Delivery Date</strong>
+                    <div>{formatDate(selectedShipment.delivery_date)}</div>
+                  </div>
+                  <div>
+                    <strong>PO Number</strong>
+                    <div>{selectedShipment.po_number || '-'}</div>
+                  </div>
+                  <div>
+                    <strong>Version</strong>
+                    <div>{selectedShipment.version}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.sectionDivider} />
+
+              <h4 style={styles.sectionTitle}>Add Shipment Item</h4>
+              <form onSubmit={handleAddShipmentItem} style={styles.formGrid}>
+                <div>
+                  <label style={styles.label}>Product</label>
+                  <select
+                    style={styles.input}
+                    value={itemForm.product_id}
+                    onChange={(event) =>
+                      setItemForm((current) => ({
+                        ...current,
+                        product_id: event.target.value
+                      }))
+                    }
+                    required
+                  >
+                    <option value="">Select product</option>
+                    {(productsQuery.data ?? []).map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={styles.label}>Quantity</label>
+                  <input
+                    style={styles.input}
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={itemForm.quantity}
+                    onChange={(event) =>
+                      setItemForm((current) => ({
+                        ...current,
+                        quantity: event.target.value
+                      }))
+                    }
+                    required
+                  />
+                </div>
+
+                <div style={styles.formActionRow}>
+                  <button
+                    type="submit"
+                    style={styles.primaryButton}
+                    disabled={addShipmentItemMutation.isPending}
+                  >
+                    {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
+                  </button>
+                </div>
+              </form>
+
+              <div style={styles.sectionDivider} />
+
+              <div style={styles.itemsHeaderRow}>
+                <h4 style={styles.sectionTitle}>Shipment Items</h4>
+
+                <button
+                  type="button"
+                  style={styles.finalizeButton}
+                  onClick={handleFinalizeShipment}
+                  disabled={
+                    finalizeShipmentMutation.isPending ||
+                    selectedShipment.status === 'received'
+                  }
+                >
+                  {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
+                </button>
+              </div>
+
+              {shipmentItemsQuery.isLoading ? (
+                <p style={styles.emptyState}>Loading shipment items...</p>
+              ) : shipmentItems.length === 0 ? (
+                <p style={styles.emptyState}>No shipment items yet.</p>
+              ) : (
+                <div style={styles.itemTableWrapper}>
+                  <table style={styles.itemTable}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>Product</th>
+                        <th style={styles.th}>Ordered</th>
+                        <th style={styles.th}>Received</th>
+                        <th style={styles.th}>Remaining</th>
+                        <th style={styles.th}>Storage Location</th>
+                        <th style={styles.th}>Receive Quantity</th>
+                        <th style={styles.th}>Discrepancy Reason</th>
+                        <th style={styles.th}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shipmentItems.map((item) => {
+                        const ordered = toNumber(item.quantity);
+                        const received = toNumber(item.received_quantity);
+                        const remaining = Math.max(ordered - received, 0);
+                        const draft = getReceiveDraft(item);
+
+                        return (
+                          <tr key={item.id}>
+                            <td style={styles.td}>{item.product_name || item.product_id}</td>
+                            <td style={styles.td}>{ordered}</td>
+                            <td style={styles.td}>{received}</td>
+                            <td style={styles.td}>{remaining}</td>
+                            <td style={styles.td}>
+                              <select
+                                style={styles.inputCompact}
+                                value={draft.storage_location_id}
+                                onChange={(event) =>
+                                  updateReceiveDraft(item.id, (current) => ({
+                                    ...current,
+                                    storage_location_id: event.target.value
+                                  }))
+                                }
+                              >
+                                <option value="">Select location</option>
+                                {(storageLocationsQuery.data ?? []).map((location) => (
+                                  <option key={location.id} value={location.id}>
+                                    {location.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.inputCompact}
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={draft.quantity_received}
+                                onChange={(event) =>
+                                  updateReceiveDraft(item.id, (current) => ({
+                                    ...current,
+                                    quantity_received: event.target.value
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.inputCompact}
+                                type="text"
+                                placeholder="Optional discrepancy reason"
+                                value={draft.discrepancy_reason}
+                                onChange={(event) =>
+                                  updateReceiveDraft(item.id, (current) => ({
+                                    ...current,
+                                    discrepancy_reason: event.target.value
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <button
+                                type="button"
+                                style={styles.secondaryButton}
+                                onClick={() => handleReceiveLine(item)}
+                                disabled={
+                                  receiveShipmentMutation.isPending ||
+                                  remaining <= 0 ||
+                                  selectedShipment.status === 'received'
+                                }
+                              >
+                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -988,218 +1011,241 @@ export default function ShipmentsPage() {
 
 const styles: Record<string, CSSProperties> = {
   header: {
-    marginBottom: '20px'
+    marginBottom: 20
   },
   title: {
     margin: 0,
-    fontSize: '28px',
-    fontWeight: 700
+    fontSize: 28,
+    fontWeight: 800,
+    color: '#111827'
   },
   description: {
-    marginTop: '8px',
+    marginTop: 8,
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.6,
+    maxWidth: 860
   },
   panel: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    marginBottom: '20px'
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    marginBottom: 20
   },
   panelTitle: {
-    marginTop: 0,
-    marginBottom: '16px',
-    fontSize: '20px',
-    fontWeight: 700
-  },
-  panelTitleNoMargin: {
     margin: 0,
-    fontSize: '20px',
-    fontWeight: 700
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#111827'
   },
-  panelHeaderRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '16px',
-    flexWrap: 'wrap'
+  panelSubtitle: {
+    marginTop: 6,
+    color: '#6b7280',
+    fontSize: 14
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px',
+    gap: 16,
     alignItems: 'end'
   },
-  filtersGrid: {
-    display: 'grid',
-    gridTemplateColumns: '2fr 1fr',
-    gap: '14px',
-    marginBottom: '16px'
-  },
-  overviewGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px'
-  },
-  overviewCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: '12px',
-    padding: '14px',
-    background: '#fafafa'
-  },
-  overviewLabel: {
-    fontSize: '13px',
-    color: '#6b7280',
-    marginBottom: '8px',
-    fontWeight: 600
-  },
-  overviewValue: {
-    fontSize: '16px',
-    fontWeight: 700,
-    wordBreak: 'break-word'
-  },
-  overviewSmallValue: {
-    fontSize: '13px',
-    fontWeight: 600,
-    wordBreak: 'break-all',
-    lineHeight: 1.4
-  },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '14px',
-    fontWeight: 600
-  },
-  input: {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    outline: 'none'
-  },
-  compactInput: {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    outline: 'none',
-    minWidth: '140px'
-  },
-  formActions: {
+  formActionRow: {
     display: 'flex',
     alignItems: 'end'
   },
-  tableWrapper: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    overflowX: 'auto'
+  label: {
+    display: 'block',
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#374151'
   },
-  table: {
+  input: {
     width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '1180px'
+    boxSizing: 'border-box',
+    border: '1px solid #d1d5db',
+    borderRadius: 10,
+    padding: '10px 12px',
+    fontSize: 14,
+    background: '#ffffff'
   },
-  th: {
-    textAlign: 'left',
-    padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
-    fontSize: '13px',
-    color: '#6b7280'
-  },
-  td: {
-    padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
-    fontSize: '14px',
-    verticalAlign: 'top'
-  },
-  emptyCell: {
-    padding: '24px',
-    textAlign: 'center',
-    color: '#6b7280'
-  },
-  badgeBase: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  remainingBadge: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#fef3c7',
-    color: '#92400e',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  completeBadge: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#dcfce7',
-    color: '#166534',
-    fontWeight: 700,
-    fontSize: '12px'
+  inputCompact: {
+    width: '100%',
+    boxSizing: 'border-box',
+    border: '1px solid #d1d5db',
+    borderRadius: 8,
+    padding: '8px 10px',
+    fontSize: 13,
+    background: '#ffffff'
   },
   primaryButton: {
     border: 'none',
-    borderRadius: '10px',
-    padding: '10px 14px',
+    borderRadius: 10,
+    padding: '12px 16px',
     background: '#2563eb',
     color: '#ffffff',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer'
   },
   secondaryButton: {
     border: '1px solid #d1d5db',
-    borderRadius: '10px',
+    borderRadius: 10,
     padding: '10px 14px',
     background: '#ffffff',
     color: '#111827',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer'
   },
-  successButton: {
+  finalizeButton: {
     border: 'none',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    background: '#16a34a',
+    borderRadius: 10,
+    padding: '12px 16px',
+    background: '#059669',
     color: '#ffffff',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer'
   },
   errorBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
+    marginBottom: 16,
     background: '#fef2f2',
     border: '1px solid #fecaca',
-    color: '#b91c1c'
+    color: '#991b1b',
+    borderRadius: 12,
+    padding: '12px 14px'
   },
   successBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    color: '#166534'
+    marginBottom: 16,
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#065f46',
+    borderRadius: 12,
+    padding: '12px 14px'
   },
-  rowTitle: {
-    fontWeight: 700,
-    marginBottom: '6px'
+  twoColumnGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)',
+    gap: 20
   },
-  rowSubtle: {
-    fontSize: '12px',
+  shipmentListHeader: {
+    marginBottom: 16
+  },
+  filterGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 180px',
+    gap: 12,
+    marginBottom: 16
+  },
+  shipmentList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    maxHeight: 720,
+    overflowY: 'auto'
+  },
+  shipmentCard: {
+    textAlign: 'left',
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    padding: 14,
+    background: '#ffffff',
+    cursor: 'pointer'
+  },
+  shipmentCardSelected: {
+    border: '1px solid #2563eb',
+    boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.12)'
+  },
+  shipmentCardTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'flex-start',
+    marginBottom: 10
+  },
+  shipmentCardTitleBlock: {
+    minWidth: 0
+  },
+  shipmentCardTitle: {
+    fontWeight: 800,
+    color: '#111827',
+    marginBottom: 4
+  },
+  shipmentCardSubtle: {
     color: '#6b7280',
-    wordBreak: 'break-all',
-    lineHeight: 1.4
+    fontSize: 12,
+    wordBreak: 'break-all'
+  },
+  shipmentCardMeta: {
+    display: 'grid',
+    gap: 6,
+    color: '#374151',
+    fontSize: 13
+  },
+  badgeBase: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700
+  },
+  selectedShipmentBox: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    padding: 16,
+    background: '#f9fafb'
+  },
+  selectedShipmentGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 16,
+    color: '#111827'
+  },
+  sectionDivider: {
+    height: 1,
+    background: '#e5e7eb',
+    margin: '20px 0'
+  },
+  sectionTitle: {
+    margin: '0 0 14px',
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#111827'
+  },
+  itemsHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+    marginBottom: 14
+  },
+  itemTableWrapper: {
+    overflowX: 'auto'
+  },
+  itemTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    minWidth: 980
+  },
+  th: {
+    textAlign: 'left',
+    padding: '12px 10px',
+    borderBottom: '1px solid #e5e7eb',
+    color: '#6b7280',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    background: '#f9fafb'
+  },
+  td: {
+    padding: '12px 10px',
+    borderBottom: '1px solid #f1f5f9',
+    verticalAlign: 'top',
+    color: '#111827',
+    fontSize: 14
+  },
+  emptyState: {
+    color: '#6b7280',
+    margin: 0
   }
 };

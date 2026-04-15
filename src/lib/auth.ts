@@ -3,7 +3,7 @@
  *
  * PURPOSE
  * -------
- * Central token storage for the frontend.
+ * Central token storage and basic token inspection helpers for the frontend.
  *
  * IMPORTANT
  * ---------
@@ -66,8 +66,65 @@ export function clearAuth(): void {
 }
 
 /*
+  Decode a JWT payload safely without depending on an extra package.
+  This is used only for client-side expiry checks and UX decisions.
+*/
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const decoded = atob(padded);
+
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/*
+  Check whether a JWT is expired.
+  A small safety buffer helps avoid edge cases where the token expires while a
+  request is in flight.
+*/
+export function isAccessTokenExpired(token: string | null, bufferSeconds = 15): boolean {
+  if (!token) {
+    return true;
+  }
+
+  const payload = decodeJwtPayload(token);
+  const exp = payload?.exp;
+
+  if (typeof exp !== 'number') {
+    return true;
+  }
+
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  return exp <= nowInSeconds + bufferSeconds;
+}
+
+/*
   Basic auth presence check.
+
+  We consider the user authenticated when either:
+  - a non-expired access token exists, or
+  - a refresh token exists and the app can attempt silent session recovery
+
+  This prevents immediate hard redirects when only the access token has expired
+  but the refresh session is still valid on the backend.
 */
 export function isAuthenticated(): boolean {
-  return Boolean(getAccessToken());
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  if (accessToken && !isAccessTokenExpired(accessToken)) {
+    return true;
+  }
+
+  return Boolean(refreshToken);
 }
