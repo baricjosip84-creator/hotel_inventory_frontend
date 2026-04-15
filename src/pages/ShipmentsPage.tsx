@@ -18,34 +18,10 @@ import { apiRequest, ApiError } from '../lib/api';
  * - finalizing partially received shipments
  * - auto-selecting a shipment when scanner redirects with ?shipmentId=
  *
- * IMPORTANT BACKEND NOTES THIS FILE MATCHES
+ * MOBILE UPDATE
  * ----------------------------------------------------------------------------
- * 1) Add shipment item:
- *    POST /shipment-items
- *
- * 2) Receive shipment:
- *    POST /shipments/:id/receive
- *    Header: If-Match-Version
- *    Body:
- *    {
- *      items: [
- *        {
- *          product_id,
- *          quantity_received,
- *          storage_location_id,
- *          discrepancy_reason
- *        }
- *      ]
- *    }
- *
- * 3) Finalize shipment:
- *    POST /shipments/:id/finalize
- *    Header: If-Match-Version
- *
- * 4) Shipment lines are loaded from:
- *    GET /shipment-items/:shipmentId
- *
- * This file avoids guesswork and is intentionally explicit.
+ * This version fixes the phone layout by stacking the shipment list and the
+ * selected shipment panel into a single column on smaller screens.
  */
 
 /**
@@ -271,6 +247,18 @@ function statusBadgeStyle(status: string): CSSProperties {
   };
 }
 
+function useIsMobile(breakpoint = 1024): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 /**
  * ============================================================================
  * Component
@@ -280,6 +268,7 @@ function statusBadgeStyle(status: string): CSSProperties {
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isMobile = useIsMobile();
 
   /**
    * UI state
@@ -496,11 +485,13 @@ export default function ShipmentsPage() {
     updater: (current: ReceiveDraft) => ReceiveDraft
   ) => {
     setReceiveDrafts((current) => {
-      const base =
-        current[itemId] ??
-        makeDefaultReceiveDraft(
-          shipmentItems.find((item) => item.id === itemId) as ShipmentItem
-        );
+      const matchedItem = shipmentItems.find((item) => item.id === itemId);
+
+      if (!matchedItem) {
+        return current;
+      }
+
+      const base = current[itemId] ?? makeDefaultReceiveDraft(matchedItem);
 
       return {
         ...current,
@@ -689,7 +680,12 @@ export default function ShipmentsPage() {
         </form>
       </section>
 
-      <section style={styles.twoColumnGrid}>
+      <section
+        style={{
+          ...styles.twoColumnGrid,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 420px) minmax(0, 1fr)'
+        }}
+      >
         <div style={styles.panel}>
           <div style={styles.shipmentListHeader}>
             <div>
@@ -700,7 +696,12 @@ export default function ShipmentsPage() {
             </div>
           </div>
 
-          <div style={styles.filterGrid}>
+          <div
+            style={{
+              ...styles.filterGrid,
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 180px'
+            }}
+          >
             <input
               style={styles.input}
               type="text"
@@ -721,7 +722,12 @@ export default function ShipmentsPage() {
             </select>
           </div>
 
-          <div style={styles.shipmentList}>
+          <div
+            style={{
+              ...styles.shipmentList,
+              maxHeight: isMobile ? 'none' : 720
+            }}
+          >
             {shipmentsQuery.isLoading ? (
               <p style={styles.emptyState}>Loading shipments...</p>
             ) : filteredShipments.length === 0 ? (
@@ -742,7 +748,13 @@ export default function ShipmentsPage() {
                       ...(isSelected ? styles.shipmentCardSelected : {})
                     }}
                   >
-                    <div style={styles.shipmentCardTop}>
+                    <div
+                      style={{
+                        ...styles.shipmentCardTop,
+                        flexDirection: isMobile ? 'column' : 'row',
+                        alignItems: isMobile ? 'flex-start' : 'flex-start'
+                      }}
+                    >
                       <div style={styles.shipmentCardTitleBlock}>
                         <div style={styles.shipmentCardTitle}>
                           {shipment.po_number || 'No PO Number'}
@@ -764,7 +776,7 @@ export default function ShipmentsPage() {
                       <div>
                         <strong>Delivery:</strong> {formatDate(shipment.delivery_date)}
                       </div>
-                      <div>
+                      <div style={{ wordBreak: 'break-all' }}>
                         <strong>QR:</strong> {shipment.qr_code}
                       </div>
                       <div>
@@ -799,10 +811,17 @@ export default function ShipmentsPage() {
           ) : (
             <>
               <div style={styles.selectedShipmentBox}>
-                <div style={styles.selectedShipmentGrid}>
+                <div
+                  style={{
+                    ...styles.selectedShipmentGrid,
+                    gridTemplateColumns: isMobile
+                      ? '1fr'
+                      : 'repeat(auto-fit, minmax(180px, 1fr))'
+                  }}
+                >
                   <div>
                     <strong>Shipment ID</strong>
-                    <div>{selectedShipment.id}</div>
+                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.id}</div>
                   </div>
                   <div>
                     <strong>Status</strong>
@@ -810,7 +829,9 @@ export default function ShipmentsPage() {
                   </div>
                   <div>
                     <strong>Supplier</strong>
-                    <div>{selectedShipment.supplier_name || selectedShipment.supplier_id}</div>
+                    <div style={{ wordBreak: 'break-word' }}>
+                      {selectedShipment.supplier_name || selectedShipment.supplier_id}
+                    </div>
                   </div>
                   <div>
                     <strong>Delivery Date</strong>
@@ -818,7 +839,7 @@ export default function ShipmentsPage() {
                   </div>
                   <div>
                     <strong>PO Number</strong>
-                    <div>{selectedShipment.po_number || '-'}</div>
+                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.po_number || '-'}</div>
                   </div>
                   <div>
                     <strong>Version</strong>
@@ -884,7 +905,13 @@ export default function ShipmentsPage() {
 
               <div style={styles.sectionDivider} />
 
-              <div style={styles.itemsHeaderRow}>
+              <div
+                style={{
+                  ...styles.itemsHeaderRow,
+                  flexDirection: isMobile ? 'column' : 'row',
+                  alignItems: isMobile ? 'stretch' : 'center'
+                }}
+              >
                 <h4 style={styles.sectionTitle}>Shipment Items</h4>
 
                 <button
@@ -1031,7 +1058,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 16,
     padding: 20,
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    marginBottom: 20
+    marginBottom: 20,
+    minWidth: 0
   },
   panelTitle: {
     margin: 0,
@@ -1042,7 +1070,8 @@ const styles: Record<string, CSSProperties> = {
   panelSubtitle: {
     marginTop: 6,
     color: '#6b7280',
-    fontSize: 14
+    fontSize: 14,
+    lineHeight: 1.5
   },
   formGrid: {
     display: 'grid',
@@ -1068,7 +1097,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 10,
     padding: '10px 12px',
     fontSize: 14,
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 0
   },
   inputCompact: {
     width: '100%',
@@ -1077,7 +1107,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: '8px 10px',
     fontSize: 13,
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 120
   },
   primaryButton: {
     border: 'none',
@@ -1086,7 +1117,8 @@ const styles: Record<string, CSSProperties> = {
     background: '#2563eb',
     color: '#ffffff',
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    width: '100%'
   },
   secondaryButton: {
     border: '1px solid #d1d5db',
@@ -1124,8 +1156,9 @@ const styles: Record<string, CSSProperties> = {
   },
   twoColumnGrid: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)',
-    gap: 20
+    gridTemplateColumns: '1fr',
+    gap: 20,
+    alignItems: 'start'
   },
   shipmentListHeader: {
     marginBottom: 16
@@ -1140,8 +1173,8 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-    maxHeight: 720,
-    overflowY: 'auto'
+    overflowY: 'auto',
+    minWidth: 0
   },
   shipmentCard: {
     textAlign: 'left',
@@ -1149,7 +1182,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     padding: 14,
     background: '#ffffff',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    width: '100%'
   },
   shipmentCardSelected: {
     border: '1px solid #2563eb',
@@ -1168,7 +1202,8 @@ const styles: Record<string, CSSProperties> = {
   shipmentCardTitle: {
     fontWeight: 800,
     color: '#111827',
-    marginBottom: 4
+    marginBottom: 4,
+    wordBreak: 'break-word'
   },
   shipmentCardSubtle: {
     color: '#6b7280',
@@ -1193,13 +1228,15 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: 14,
     padding: 16,
-    background: '#f9fafb'
+    background: '#f9fafb',
+    minWidth: 0
   },
   selectedShipmentGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: 16,
-    color: '#111827'
+    color: '#111827',
+    minWidth: 0
   },
   sectionDivider: {
     height: 1,
@@ -1220,7 +1257,8 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 14
   },
   itemTableWrapper: {
-    overflowX: 'auto'
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch'
   },
   itemTable: {
     width: '100%',
