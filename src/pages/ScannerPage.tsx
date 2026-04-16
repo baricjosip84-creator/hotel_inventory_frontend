@@ -16,6 +16,7 @@ import { apiRequest, ApiError } from '../lib/api';
  *
  * 2. Product mode
  *    - requires shipmentId
+ *    - accepts locationId when launched from shipments page
  *    - scan product barcode
  *    - resolve matching shipment item inside the selected shipment
  *    - return to shipments page with shipment + matched item selected
@@ -92,6 +93,7 @@ export default function ScannerPage() {
 
   const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
   const shipmentId = searchParams.get('shipmentId') || '';
+  const locationId = searchParams.get('locationId') || '';
 
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -149,6 +151,10 @@ export default function ScannerPage() {
     params.set('shipmentId', match.shipment_id);
     params.set('itemId', match.shipment_item_id);
     params.set('scannedBarcode', decodedText);
+
+    if (locationId) {
+      params.set('locationId', locationId);
+    }
 
     navigate(`/shipments?${params.toString()}`);
   };
@@ -372,6 +378,12 @@ export default function ScannerPage() {
           <strong>Selected shipment:</strong>
           <div style={{ marginTop: 4, wordBreak: 'break-all' }}>
             {shipmentId || 'Missing shipment ID'}
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <strong>Default scan location:</strong>
+            <div style={{ marginTop: 4, wordBreak: 'break-all' }}>
+              {locationId || 'Missing default location'}
+            </div>
           </div>
         </div>
       ) : null}

@@ -37,6 +37,14 @@ import { apiRequest, ApiError } from '../lib/api';
  * - matched shipment item is highlighted
  * - receive quantity is prefilled to 1 when possible
  * - auto-receive runs when the system can safely determine storage location
+ *
+ * DEFAULT LOCATION FLOW
+ * ----------------------------------------------------------------------------
+ * This version adds a professional scan flow:
+ * - user selects a default storage location before scanning
+ * - the scanner receives that location in the URL
+ * - the shipments page restores that location from scanner return params
+ * - auto receive then uses the explicit location instead of guesswork
  */
 
 /**
@@ -298,6 +306,7 @@ export default function ShipmentsPage() {
   const [highlightedItemId, setHighlightedItemId] = useState('');
   const [shipmentSearch, setShipmentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedScannerLocationId, setSelectedScannerLocationId] = useState('');
 
   const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
@@ -362,6 +371,7 @@ export default function ShipmentsPage() {
       setReceiveDrafts({});
       setHighlightedItemId('');
       setPendingAutoReceive(null);
+      setSelectedScannerLocationId('');
       autoReceiveAttemptKeyRef.current = '';
       setPageError(null);
       setPageMessage('Shipment created successfully.');
@@ -485,6 +495,7 @@ export default function ShipmentsPage() {
    * - shipmentId
    * - itemId
    * - scannedBarcode
+   * - locationId
    */
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
@@ -510,6 +521,11 @@ export default function ShipmentsPage() {
 
     const itemIdFromQuery = searchParams.get('itemId');
     const scannedBarcode = searchParams.get('scannedBarcode');
+    const locationIdFromQuery = searchParams.get('locationId');
+
+    if (locationIdFromQuery) {
+      setSelectedScannerLocationId(locationIdFromQuery);
+    }
 
     if (itemIdFromQuery) {
       setHighlightedItemId(itemIdFromQuery);
@@ -535,6 +551,7 @@ export default function ShipmentsPage() {
     nextParams.delete('shipmentId');
     nextParams.delete('itemId');
     nextParams.delete('scannedBarcode');
+    nextParams.delete('locationId');
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
@@ -569,6 +586,31 @@ export default function ShipmentsPage() {
       };
     });
   }, [highlightedItemId, shipmentItems]);
+
+  /**
+   * If scanner returned a default location, preload it into the matched item draft.
+   * This allows the existing auto-receive flow to use a professional, explicit
+   * storage location instead of falling back to guesswork.
+   */
+  useEffect(() => {
+    if (!highlightedItemId || !selectedScannerLocationId || shipmentItems.length === 0) {
+      return;
+    }
+
+    const matchedItem = shipmentItems.find((item) => item.id === highlightedItemId);
+
+    if (!matchedItem) {
+      return;
+    }
+
+    setReceiveDrafts((current) => ({
+      ...current,
+      [matchedItem.id]: {
+        ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
+        storage_location_id: selectedScannerLocationId
+      }
+    }));
+  }, [highlightedItemId, selectedScannerLocationId, shipmentItems]);
 
   /**
    * Auto receive from scanner.
@@ -815,6 +857,7 @@ export default function ShipmentsPage() {
     setReceiveDrafts({});
     setHighlightedItemId('');
     setPendingAutoReceive(null);
+    setSelectedScannerLocationId('');
     autoReceiveAttemptKeyRef.current = '';
     setPageError(null);
     setPageMessage(null);
@@ -826,7 +869,14 @@ export default function ShipmentsPage() {
       return;
     }
 
-    navigate(`/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}`);
+    if (!selectedScannerLocationId) {
+      setPageError('Select a default storage location before opening product scanner.');
+      return;
+    }
+
+    navigate(
+      `/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}&locationId=${encodeURIComponent(selectedScannerLocationId)}`
+    );
   };
 
   /**
@@ -1149,7 +1199,25 @@ export default function ShipmentsPage() {
                   alignItems: isMobile ? 'stretch' : 'center'
                 }}
               >
-                <h4 style={styles.sectionTitle}>Shipment Items</h4>
+                <div style={styles.itemsHeaderContent}>
+                  <h4 style={styles.sectionTitle}>Shipment Items</h4>
+
+                  <div style={styles.defaultLocationBlock}>
+                    <label style={styles.label}>Default Scan Location</label>
+                    <select
+                      style={styles.input}
+                      value={selectedScannerLocationId}
+                      onChange={(event) => setSelectedScannerLocationId(event.target.value)}
+                    >
+                      <option value="">Select location</option>
+                      {(storageLocationsQuery.data ?? []).map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
                 <div
                   style={{
@@ -1665,6 +1733,19 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
     alignItems: 'center',
     marginBottom: 14
+  },
+  itemsHeaderContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    minWidth: 0,
+    flex: 1
+  },
+  defaultLocationBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    maxWidth: 320
   },
   itemTableWrapper: {
     overflowX: 'auto',
