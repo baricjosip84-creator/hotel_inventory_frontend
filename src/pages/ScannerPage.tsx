@@ -5,6 +5,52 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 
 /**
+ * SUCCESS FEEDBACK (beep + vibration)
+ *
+ * WHY THIS EXISTS
+ * ----------------------------------------------------------------------------
+ * Gives immediate operator feedback after a successful scan:
+ * - short vibration on supported mobile devices
+ * - short beep using Web Audio API
+ */
+const playSuccessFeedback = () => {
+  try {
+    if (navigator.vibrate) {
+      navigator.vibrate(120);
+    }
+
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+
+    const audioCtx = new AudioContextClass();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15);
+
+    /**
+     * Close audio context shortly after beep to avoid piling up contexts
+     * over many scans.
+     */
+    window.setTimeout(() => {
+      void audioCtx.close().catch(() => {
+        // Ignore close errors.
+      });
+    }, 250);
+  } catch {
+    // Ignore feedback errors.
+  }
+};
+
+/**
  * PRODUCTION SCANNER
  *
  * SUPPORTED MODES
@@ -27,6 +73,7 @@ import { apiRequest, ApiError } from '../lib/api';
  * - larger/wider barcode scan region
  * - manual code entry fallback
  * - image upload decode fallback
+ * - success beep + vibration feedback
  *
  * COMPATIBILITY
  * -------------
@@ -190,6 +237,11 @@ export default function ScannerPage() {
 
   const handleResolvedScan = async (decodedText: string) => {
     try {
+      /**
+       * Give immediate warehouse-style feedback on successful decode.
+       */
+      playSuccessFeedback();
+
       /*
         Stop the camera immediately after a successful decode so the same code
         is not processed repeatedly.
@@ -303,6 +355,11 @@ export default function ScannerPage() {
       return;
     }
 
+    /**
+     * Treat manual submission like a successful scan and give the same feedback.
+     */
+    playSuccessFeedback();
+
     await stopScanner();
     await resolveDecodedValue(trimmed);
   };
@@ -336,6 +393,11 @@ export default function ScannerPage() {
       } catch {
         // Ignore cleanup errors for temporary image scanner.
       }
+
+      /**
+       * Treat image decode like a successful scan and give the same feedback.
+       */
+      playSuccessFeedback();
 
       await resolveDecodedValue(decodedText);
     } catch (err) {
