@@ -45,6 +45,13 @@ import { apiRequest, ApiError } from '../lib/api';
  * - the scanner receives that location in the URL
  * - the shipments page restores that location from scanner return params
  * - auto receive then uses the explicit location instead of guesswork
+ *
+ * UX IMPROVEMENT
+ * ----------------------------------------------------------------------------
+ * This version also makes scan requirements explicit:
+ * - the scan button is disabled until a default scan location is selected
+ * - inline guidance explains why scanning is disabled
+ * - the default location label clearly explains what it is used for
  */
 
 /**
@@ -1203,7 +1210,13 @@ export default function ShipmentsPage() {
                   <h4 style={styles.sectionTitle}>Shipment Items</h4>
 
                   <div style={styles.defaultLocationBlock}>
-                    <label style={styles.label}>Default Scan Location</label>
+                    <label style={styles.label}>
+                      Default Scan Location
+                      <div style={styles.inlineHint}>
+                        Required for barcode scanning and auto-receive
+                      </div>
+                    </label>
+
                     <select
                       style={styles.input}
                       value={selectedScannerLocationId}
@@ -1216,6 +1229,12 @@ export default function ShipmentsPage() {
                         </option>
                       ))}
                     </select>
+
+                    {!selectedScannerLocationId && (
+                      <div style={styles.scanWarningText}>
+                        Select a default scan location to enable barcode scanning.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1231,9 +1250,16 @@ export default function ShipmentsPage() {
                     type="button"
                     style={{
                       ...styles.scannerButton,
-                      width: isMobile ? '100%' : undefined
+                      width: isMobile ? '100%' : undefined,
+                      ...(selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
                     }}
                     onClick={openProductScanner}
+                    disabled={!selectedScannerLocationId}
+                    title={
+                      selectedScannerLocationId
+                        ? 'Open product barcode scanner'
+                        : 'Select a default scan location first'
+                    }
                   >
                     Scan Product Barcode
                   </button>
@@ -1616,6 +1642,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer'
   },
+  scannerButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed'
+  },
   errorBox: {
     marginBottom: 16,
     background: '#fef2f2',
@@ -1746,6 +1776,16 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     gap: 6,
     maxWidth: 320
+  },
+  inlineHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: 400,
+    marginTop: 4
+  },
+  scanWarningText: {
+    color: '#b45309',
+    fontSize: 13
   },
   itemTableWrapper: {
     overflowX: 'auto',
