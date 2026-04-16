@@ -54,12 +54,6 @@ import { apiRequest, ApiError } from '../lib/api';
  * - the default location label clearly explains what it is used for
  */
 
-/**
- * ============================================================================
- * Types
- * ============================================================================
- */
-
 type ShipmentSummary = {
   id: string;
   supplier_id: string;
@@ -124,12 +118,6 @@ type PendingAutoReceive = {
   itemId: string;
   scannedBarcode: string | null;
 };
-
-/**
- * ============================================================================
- * API helpers
- * ============================================================================
- */
 
 async function fetchShipments(): Promise<ShipmentSummary[]> {
   return apiRequest<ShipmentSummary[]>('/shipments');
@@ -210,12 +198,6 @@ async function finalizeShipment(input: {
   });
 }
 
-/**
- * ============================================================================
- * Utility helpers
- * ============================================================================
- */
-
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') return Number(value);
@@ -294,21 +276,12 @@ function useIsMobile(breakpoint = 1024): boolean {
   return isMobile;
 }
 
-/**
- * ============================================================================
- * Component
- * ============================================================================
- */
-
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
 
-  /**
-   * UI state
-   */
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
   const [highlightedItemId, setHighlightedItemId] = useState('');
   const [shipmentSearch, setShipmentSearch] = useState('');
@@ -317,30 +290,13 @@ export default function ShipmentsPage() {
 
   const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
-
-  /**
-   * One receive draft per shipment item row.
-   * Key = shipment_item.id
-   */
   const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
-
-  /**
-   * Scanner-triggered auto receive state.
-   * This is only set when scanner returns with a matched shipment item.
-   */
   const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
-
-  /**
-   * Prevent duplicate auto-receive execution for the same scanner result.
-   */
   const autoReceiveAttemptKeyRef = useRef<string>('');
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
-  /**
-   * Queries
-   */
   const shipmentsQuery = useQuery({
     queryKey: ['shipments'],
     queryFn: fetchShipments
@@ -367,9 +323,6 @@ export default function ShipmentsPage() {
     enabled: Boolean(selectedShipmentId)
   });
 
-  /**
-   * Mutations
-   */
   const createShipmentMutation = useMutation({
     mutationFn: createShipment,
     onSuccess: async (shipment) => {
@@ -459,9 +412,6 @@ export default function ShipmentsPage() {
     }
   });
 
-  /**
-   * Derived data
-   */
   const shipments = useMemo(() => shipmentsQuery.data ?? [], [shipmentsQuery.data]);
   const shipmentItems = useMemo(() => shipmentItemsQuery.data ?? [], [shipmentItemsQuery.data]);
   const storageLocations = useMemo(
@@ -495,15 +445,6 @@ export default function ShipmentsPage() {
     });
   }, [shipments, shipmentSearch, statusFilter]);
 
-  /**
-   * Scanner integration
-   *
-   * Query params supported:
-   * - shipmentId
-   * - itemId
-   * - scannedBarcode
-   * - locationId
-   */
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
 
@@ -562,10 +503,6 @@ export default function ShipmentsPage() {
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
-  /**
-   * When shipment items load and a scanner-highlighted item exists,
-   * prefill the receive draft to quantity 1 when possible.
-   */
   useEffect(() => {
     if (!highlightedItemId || shipmentItems.length === 0) {
       return;
@@ -594,11 +531,6 @@ export default function ShipmentsPage() {
     });
   }, [highlightedItemId, shipmentItems]);
 
-  /**
-   * If scanner returned a default location, preload it into the matched item draft.
-   * This allows the existing auto-receive flow to use a professional, explicit
-   * storage location instead of falling back to guesswork.
-   */
   useEffect(() => {
     if (!highlightedItemId || !selectedScannerLocationId || shipmentItems.length === 0) {
       return;
@@ -619,20 +551,6 @@ export default function ShipmentsPage() {
     }));
   }, [highlightedItemId, selectedScannerLocationId, shipmentItems]);
 
-  /**
-   * Auto receive from scanner.
-   *
-   * RULES
-   * ----------------------------------------------------------------------------
-   * - only runs for scanner-returned item matches
-   * - only runs once per scanner result
-   * - receives exactly 1 unit (or remaining quantity if less than 1)
-   * - uses safe storage location resolution:
-   *   1. draft-selected location
-   *   2. line storage location
-   *   3. only available storage location if exactly one exists
-   * - if location cannot be chosen safely, do not auto receive
-   */
   useEffect(() => {
     if (!pendingAutoReceive) {
       return;
@@ -687,12 +605,6 @@ export default function ShipmentsPage() {
 
     const draft = getReceiveDraft(matchedItem);
 
-    /**
-     * Safe storage location selection:
-     * - respect user-selected draft location first
-     * - otherwise use line storage location
-     * - otherwise use the only available location if exactly one exists
-     */
     const safeStorageLocationId =
       draft.storage_location_id ||
       matchedItem.storage_location_id ||
@@ -707,9 +619,6 @@ export default function ShipmentsPage() {
       return;
     }
 
-    /**
-     * Keep the draft aligned with what auto receive will use.
-     */
     setReceiveDrafts((current) => ({
       ...current,
       [matchedItem.id]: {
@@ -747,9 +656,6 @@ export default function ShipmentsPage() {
     receiveDrafts
   ]);
 
-  /**
-   * Form helpers
-   */
   const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
     return receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
   };
@@ -774,9 +680,6 @@ export default function ShipmentsPage() {
     });
   };
 
-  /**
-   * Submit handlers
-   */
   const handleCreateShipment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPageError(null);
@@ -886,9 +789,6 @@ export default function ShipmentsPage() {
     );
   };
 
-  /**
-   * Render
-   */
   return (
     <div>
       <div style={styles.header}>
