@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { apiRequest, ApiError } from '../lib/api';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiRequest, ApiError } from "../lib/api";
 
 /**
  * ============================================================================
@@ -59,7 +59,7 @@ type ShipmentSummary = {
   supplier_id: string;
   supplier_name?: string;
   delivery_date: string;
-  status: 'pending' | 'partial' | 'received' | string;
+  status: "pending" | "partial" | "received" | string;
   qr_code: string;
   po_number?: string | null;
   version: number;
@@ -120,33 +120,35 @@ type PendingAutoReceive = {
 };
 
 async function fetchShipments(): Promise<ShipmentSummary[]> {
-  return apiRequest<ShipmentSummary[]>('/shipments');
+  return apiRequest<ShipmentSummary[]>("/shipments");
 }
 
 async function fetchSuppliers(): Promise<SupplierOption[]> {
-  return apiRequest<SupplierOption[]>('/suppliers/available');
+  return apiRequest<SupplierOption[]>("/suppliers/available");
 }
 
 async function fetchProducts(): Promise<ProductOption[]> {
-  return apiRequest<ProductOption[]>('/products');
+  return apiRequest<ProductOption[]>("/products");
 }
 
 async function fetchStorageLocations(): Promise<StorageLocationOption[]> {
-  return apiRequest<StorageLocationOption[]>('/storage-locations');
+  return apiRequest<StorageLocationOption[]>("/storage-locations");
 }
 
 async function fetchShipmentItems(shipmentId: string): Promise<ShipmentItem[]> {
   return apiRequest<ShipmentItem[]>(`/shipment-items/${shipmentId}`);
 }
 
-async function createShipment(input: ShipmentFormState): Promise<ShipmentSummary> {
-  return apiRequest<ShipmentSummary>('/shipments', {
-    method: 'POST',
+async function createShipment(
+  input: ShipmentFormState,
+): Promise<ShipmentSummary> {
+  return apiRequest<ShipmentSummary>("/shipments", {
+    method: "POST",
     body: JSON.stringify({
       supplier_id: input.supplier_id,
       delivery_date: input.delivery_date,
-      po_number: input.po_number.trim() || null
-    })
+      po_number: input.po_number.trim() || null,
+    }),
   });
 }
 
@@ -155,13 +157,13 @@ async function addShipmentItem(input: {
   product_id: string;
   quantity: number;
 }): Promise<ShipmentItem> {
-  return apiRequest<ShipmentItem>('/shipment-items', {
-    method: 'POST',
+  return apiRequest<ShipmentItem>("/shipment-items", {
+    method: "POST",
     body: JSON.stringify({
       shipment_id: input.shipment_id,
       product_id: input.product_id,
-      quantity: input.quantity
-    })
+      quantity: input.quantity,
+    }),
   });
 }
 
@@ -175,47 +177,53 @@ async function receiveShipmentLine(input: {
     discrepancy_reason?: string | null;
   };
 }): Promise<{ message: string; status: string }> {
-  return apiRequest<{ message: string; status: string }>(`/shipments/${input.shipmentId}/receive`, {
-    method: 'POST',
-    headers: {
-      'If-Match-Version': String(input.version)
+  return apiRequest<{ message: string; status: string }>(
+    `/shipments/${input.shipmentId}/receive`,
+    {
+      method: "POST",
+      headers: {
+        "If-Match-Version": String(input.version),
+      },
+      body: JSON.stringify({
+        items: [input.item],
+      }),
     },
-    body: JSON.stringify({
-      items: [input.item]
-    })
-  });
+  );
 }
 
 async function finalizeShipment(input: {
   shipmentId: string;
   version: number;
 }): Promise<{ message: string; status: string }> {
-  return apiRequest<{ message: string; status: string }>(`/shipments/${input.shipmentId}/finalize`, {
-    method: 'POST',
-    headers: {
-      'If-Match-Version': String(input.version)
-    }
-  });
+  return apiRequest<{ message: string; status: string }>(
+    `/shipments/${input.shipmentId}/finalize`,
+    {
+      method: "POST",
+      headers: {
+        "If-Match-Version": String(input.version),
+      },
+    },
+  );
 }
 
 function toNumber(value: number | string | null | undefined): number {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") return Number(value);
   return 0;
 }
 
 function emptyShipmentForm(): ShipmentFormState {
   return {
-    supplier_id: '',
-    delivery_date: '',
-    po_number: ''
+    supplier_id: "",
+    delivery_date: "",
+    po_number: "",
   };
 }
 
 function emptyItemForm(): ItemFormState {
   return {
-    product_id: '',
-    quantity: '1'
+    product_id: "",
+    quantity: "1",
   };
 }
 
@@ -225,14 +233,14 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
   const remaining = Math.max(ordered - received, 0);
 
   return {
-    quantity_received: remaining > 0 ? String(remaining) : '1',
-    storage_location_id: item.storage_location_id || '',
-    discrepancy_reason: ''
+    quantity_received: remaining > 0 ? String(remaining) : "1",
+    storage_location_id: item.storage_location_id || "",
+    discrepancy_reason: "",
   };
 }
 
 function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
+  if (!dateString) return "-";
 
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return dateString;
@@ -241,36 +249,38 @@ function formatDate(dateString: string | null | undefined): string {
 }
 
 function statusBadgeStyle(status: string): CSSProperties {
-  if (status === 'received') {
+  if (status === "received") {
     return {
       ...styles.badgeBase,
-      background: '#dcfce7',
-      color: '#166534'
+      background: "#dcfce7",
+      color: "#166534",
     };
   }
 
-  if (status === 'partial') {
+  if (status === "partial") {
     return {
       ...styles.badgeBase,
-      background: '#fef3c7',
-      color: '#92400e'
+      background: "#fef3c7",
+      color: "#92400e",
     };
   }
 
   return {
     ...styles.badgeBase,
-    background: '#dbeafe',
-    color: '#1d4ed8'
+    background: "#dbeafe",
+    color: "#1d4ed8",
   };
 }
 
 function useIsMobile(breakpoint = 1024): boolean {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
+  const [isMobile, setIsMobile] = useState(
+    () => window.innerWidth <= breakpoint,
+  );
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= breakpoint);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
   }, [breakpoint]);
 
   return isMobile;
@@ -282,45 +292,50 @@ export default function ShipmentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
 
-  const [selectedShipmentId, setSelectedShipmentId] = useState('');
-  const [highlightedItemId, setHighlightedItemId] = useState('');
-  const [shipmentSearch, setShipmentSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [selectedScannerLocationId, setSelectedScannerLocationId] = useState('');
+  const [selectedShipmentId, setSelectedShipmentId] = useState("");
+  const [highlightedItemId, setHighlightedItemId] = useState("");
+  const [shipmentSearch, setShipmentSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selectedScannerLocationId, setSelectedScannerLocationId] =
+    useState("");
 
-  const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
+  const [shipmentForm, setShipmentForm] =
+    useState<ShipmentFormState>(emptyShipmentForm());
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
-  const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
-  const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
-  const autoReceiveAttemptKeyRef = useRef<string>('');
+  const [receiveDrafts, setReceiveDrafts] = useState<
+    Record<string, ReceiveDraft>
+  >({});
+  const [pendingAutoReceive, setPendingAutoReceive] =
+    useState<PendingAutoReceive | null>(null);
+  const autoReceiveAttemptKeyRef = useRef<string>("");
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
   const shipmentsQuery = useQuery({
-    queryKey: ['shipments'],
-    queryFn: fetchShipments
+    queryKey: ["shipments"],
+    queryFn: fetchShipments,
   });
 
   const suppliersQuery = useQuery({
-    queryKey: ['suppliers-available'],
-    queryFn: fetchSuppliers
+    queryKey: ["suppliers-available"],
+    queryFn: fetchSuppliers,
   });
 
   const productsQuery = useQuery({
-    queryKey: ['products'],
-    queryFn: fetchProducts
+    queryKey: ["products"],
+    queryFn: fetchProducts,
   });
 
   const storageLocationsQuery = useQuery({
-    queryKey: ['storage-locations'],
-    queryFn: fetchStorageLocations
+    queryKey: ["storage-locations"],
+    queryFn: fetchStorageLocations,
   });
 
   const shipmentItemsQuery = useQuery({
-    queryKey: ['shipment-items', selectedShipmentId],
+    queryKey: ["shipment-items", selectedShipmentId],
     queryFn: () => fetchShipmentItems(selectedShipmentId),
-    enabled: Boolean(selectedShipmentId)
+    enabled: Boolean(selectedShipmentId),
   });
 
   const createShipmentMutation = useMutation({
@@ -329,24 +344,24 @@ export default function ShipmentsPage() {
       setShipmentForm(emptyShipmentForm());
       setSelectedShipmentId(shipment.id);
       setReceiveDrafts({});
-      setHighlightedItemId('');
+      setHighlightedItemId("");
       setPendingAutoReceive(null);
-      setSelectedScannerLocationId('');
-      autoReceiveAttemptKeyRef.current = '';
+      setSelectedScannerLocationId("");
+      autoReceiveAttemptKeyRef.current = "";
       setPageError(null);
-      setPageMessage('Shipment created successfully.');
+      setPageMessage("Shipment created successfully.");
 
-      await queryClient.refetchQueries({ queryKey: ['shipments'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await queryClient.refetchQueries({ queryKey: ["shipments"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to create shipment.');
+        setPageError("Failed to create shipment.");
       }
       setPageMessage(null);
-    }
+    },
   });
 
   const addShipmentItemMutation = useMutation({
@@ -354,70 +369,95 @@ export default function ShipmentsPage() {
     onSuccess: async () => {
       setItemForm(emptyItemForm());
       setPageError(null);
-      setPageMessage('Shipment item added successfully.');
+      setPageMessage("Shipment item added successfully.");
 
-      await queryClient.refetchQueries({ queryKey: ['shipments'] });
-      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+      await queryClient.refetchQueries({ queryKey: ["shipments"] });
+      await queryClient.refetchQueries({
+        queryKey: ["shipment-items", selectedShipmentId],
+      });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to add shipment item.');
+        setPageError("Failed to add shipment item.");
       }
       setPageMessage(null);
-    }
+    },
   });
 
   const receiveShipmentMutation = useMutation({
     mutationFn: receiveShipmentLine,
     onSuccess: async () => {
       setPageError(null);
-      setPageMessage('Shipment item received successfully.');
+      setPageMessage("Shipment item received successfully.");
 
-      await queryClient.refetchQueries({ queryKey: ['shipments'] });
-      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
-      await queryClient.invalidateQueries({ queryKey: ['stock'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      await queryClient.refetchQueries({ queryKey: ["shipments"] });
+      await queryClient.refetchQueries({
+        queryKey: ["shipment-items", selectedShipmentId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["stock"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      await queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to receive shipment item.');
+        setPageError("Failed to receive shipment item.");
       }
       setPageMessage(null);
-    }
+    },
   });
 
   const finalizeShipmentMutation = useMutation({
     mutationFn: finalizeShipment,
     onSuccess: async () => {
       setPageError(null);
-      setPageMessage('Shipment finalized successfully.');
+      setPageMessage("Shipment finalized successfully.");
 
-      await queryClient.refetchQueries({ queryKey: ['shipments'] });
-      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      await queryClient.refetchQueries({ queryKey: ["shipments"] });
+      await queryClient.refetchQueries({
+        queryKey: ["shipment-items", selectedShipmentId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      await queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to finalize shipment.');
+        setPageError("Failed to finalize shipment.");
       }
       setPageMessage(null);
-    }
+    },
   });
 
-  const shipments = useMemo(() => shipmentsQuery.data ?? [], [shipmentsQuery.data]);
-  const shipmentItems = useMemo(() => shipmentItemsQuery.data ?? [], [shipmentItemsQuery.data]);
+  const shipments = useMemo(
+    () => shipmentsQuery.data ?? [],
+    [shipmentsQuery.data],
+  );
+  const shipmentItems = useMemo(
+    () => shipmentItemsQuery.data ?? [],
+    [shipmentItemsQuery.data],
+  );
   const storageLocations = useMemo(
     () => storageLocationsQuery.data ?? [],
-    [storageLocationsQuery.data]
+    [storageLocationsQuery.data],
   );
+
+  // This derived value makes the selected default scan location visible in the
+  // scanner readiness block. The goal is to remove any ambiguity on mobile
+  // about whether a location is selected and which location will be used.
+  const selectedScannerLocation =
+    storageLocations.find(
+      (location) => location.id === selectedScannerLocationId,
+    ) ?? null;
+
+  // This is used to render a hard operational empty state when the API returns
+  // no storage locations. The previous UI only showed an empty select, which
+  // made the feature look missing instead of blocked by missing data.
+  const hasStorageLocations = storageLocations.length > 0;
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
@@ -426,7 +466,9 @@ export default function ShipmentsPage() {
     const search = shipmentSearch.trim().toLowerCase();
 
     return shipments.filter((shipment) => {
-      const matchesStatus = statusFilter ? shipment.status === statusFilter : true;
+      const matchesStatus = statusFilter
+        ? shipment.status === statusFilter
+        : true;
 
       const haystack = [
         shipment.id,
@@ -434,10 +476,10 @@ export default function ShipmentsPage() {
         shipment.supplier_name,
         shipment.supplier_id,
         shipment.status,
-        shipment.delivery_date
+        shipment.delivery_date,
       ]
-        .map((value) => String(value ?? '').toLowerCase())
-        .join(' ');
+        .map((value) => String(value ?? "").toLowerCase())
+        .join(" ");
 
       const matchesSearch = search ? haystack.includes(search) : true;
 
@@ -446,7 +488,7 @@ export default function ShipmentsPage() {
   }, [shipments, shipmentSearch, statusFilter]);
 
   useEffect(() => {
-    const shipmentIdFromQuery = searchParams.get('shipmentId');
+    const shipmentIdFromQuery = searchParams.get("shipmentId");
 
     if (!shipmentIdFromQuery) {
       return;
@@ -456,10 +498,14 @@ export default function ShipmentsPage() {
       return;
     }
 
-    const matchedShipment = shipments.find((shipment) => shipment.id === shipmentIdFromQuery);
+    const matchedShipment = shipments.find(
+      (shipment) => shipment.id === shipmentIdFromQuery,
+    );
 
     if (!matchedShipment) {
-      setPageError('Scanned shipment was not found in the current shipment list.');
+      setPageError(
+        "Scanned shipment was not found in the current shipment list.",
+      );
       return;
     }
 
@@ -467,9 +513,9 @@ export default function ShipmentsPage() {
     setReceiveDrafts({});
     setPageError(null);
 
-    const itemIdFromQuery = searchParams.get('itemId');
-    const scannedBarcode = searchParams.get('scannedBarcode');
-    const locationIdFromQuery = searchParams.get('locationId');
+    const itemIdFromQuery = searchParams.get("itemId");
+    const scannedBarcode = searchParams.get("scannedBarcode");
+    const locationIdFromQuery = searchParams.get("locationId");
 
     if (locationIdFromQuery) {
       setSelectedScannerLocationId(locationIdFromQuery);
@@ -479,27 +525,27 @@ export default function ShipmentsPage() {
       setHighlightedItemId(itemIdFromQuery);
       setPendingAutoReceive({
         itemId: itemIdFromQuery,
-        scannedBarcode
+        scannedBarcode,
       });
-      autoReceiveAttemptKeyRef.current = '';
+      autoReceiveAttemptKeyRef.current = "";
 
       setPageMessage(
         scannedBarcode
           ? `Product barcode ${scannedBarcode} matched inside selected shipment.`
-          : 'Shipment item matched from scanner.'
+          : "Shipment item matched from scanner.",
       );
     } else {
-      setHighlightedItemId('');
+      setHighlightedItemId("");
       setPendingAutoReceive(null);
-      autoReceiveAttemptKeyRef.current = '';
-      setPageMessage('Shipment opened from scanner.');
+      autoReceiveAttemptKeyRef.current = "";
+      setPageMessage("Shipment opened from scanner.");
     }
 
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('shipmentId');
-    nextParams.delete('itemId');
-    nextParams.delete('scannedBarcode');
-    nextParams.delete('locationId');
+    nextParams.delete("shipmentId");
+    nextParams.delete("itemId");
+    nextParams.delete("scannedBarcode");
+    nextParams.delete("locationId");
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
@@ -508,7 +554,9 @@ export default function ShipmentsPage() {
       return;
     }
 
-    const matchedItem = shipmentItems.find((item) => item.id === highlightedItemId);
+    const matchedItem = shipmentItems.find(
+      (item) => item.id === highlightedItemId,
+    );
 
     if (!matchedItem) {
       return;
@@ -519,24 +567,31 @@ export default function ShipmentsPage() {
     const remaining = Math.max(ordered - received, 0);
 
     setReceiveDrafts((current) => {
-      const existing = current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem);
+      const existing =
+        current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem);
 
       return {
         ...current,
         [matchedItem.id]: {
           ...existing,
-          quantity_received: remaining > 0 ? '1' : existing.quantity_received
-        }
+          quantity_received: remaining > 0 ? "1" : existing.quantity_received,
+        },
       };
     });
   }, [highlightedItemId, shipmentItems]);
 
   useEffect(() => {
-    if (!highlightedItemId || !selectedScannerLocationId || shipmentItems.length === 0) {
+    if (
+      !highlightedItemId ||
+      !selectedScannerLocationId ||
+      shipmentItems.length === 0
+    ) {
       return;
     }
 
-    const matchedItem = shipmentItems.find((item) => item.id === highlightedItemId);
+    const matchedItem = shipmentItems.find(
+      (item) => item.id === highlightedItemId,
+    );
 
     if (!matchedItem) {
       return;
@@ -546,8 +601,8 @@ export default function ShipmentsPage() {
       ...current,
       [matchedItem.id]: {
         ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
-        storage_location_id: selectedScannerLocationId
-      }
+        storage_location_id: selectedScannerLocationId,
+      },
     }));
   }, [highlightedItemId, selectedScannerLocationId, shipmentItems]);
 
@@ -560,9 +615,9 @@ export default function ShipmentsPage() {
       return;
     }
 
-    if (selectedShipment.status === 'received') {
+    if (selectedShipment.status === "received") {
       setPendingAutoReceive(null);
-      autoReceiveAttemptKeyRef.current = '';
+      autoReceiveAttemptKeyRef.current = "";
       return;
     }
 
@@ -574,19 +629,21 @@ export default function ShipmentsPage() {
       return;
     }
 
-    const matchedItem = shipmentItems.find((item) => item.id === pendingAutoReceive.itemId);
+    const matchedItem = shipmentItems.find(
+      (item) => item.id === pendingAutoReceive.itemId,
+    );
 
     if (!matchedItem) {
       setPendingAutoReceive(null);
-      autoReceiveAttemptKeyRef.current = '';
+      autoReceiveAttemptKeyRef.current = "";
       return;
     }
 
     const attemptKey = [
       selectedShipment.id,
       matchedItem.id,
-      pendingAutoReceive.scannedBarcode || ''
-    ].join(':');
+      pendingAutoReceive.scannedBarcode || "",
+    ].join(":");
 
     if (autoReceiveAttemptKeyRef.current === attemptKey) {
       return;
@@ -599,7 +656,7 @@ export default function ShipmentsPage() {
     if (remaining <= 0) {
       autoReceiveAttemptKeyRef.current = attemptKey;
       setPendingAutoReceive(null);
-      setPageMessage('Scanned item is already fully received.');
+      setPageMessage("Scanned item is already fully received.");
       return;
     }
 
@@ -608,13 +665,13 @@ export default function ShipmentsPage() {
     const safeStorageLocationId =
       draft.storage_location_id ||
       matchedItem.storage_location_id ||
-      (storageLocations.length === 1 ? storageLocations[0].id : '');
+      (storageLocations.length === 1 ? storageLocations[0].id : "");
 
     if (!safeStorageLocationId) {
       autoReceiveAttemptKeyRef.current = attemptKey;
       setPendingAutoReceive(null);
       setPageMessage(
-        'Product matched. Quantity was set to 1, but auto receive stopped because you must choose a storage location first.'
+        "Product matched. Quantity was set to 1, but auto receive stopped because you must choose a storage location first.",
       );
       return;
     }
@@ -623,9 +680,9 @@ export default function ShipmentsPage() {
       ...current,
       [matchedItem.id]: {
         ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
-        quantity_received: remaining >= 1 ? '1' : String(remaining),
-        storage_location_id: safeStorageLocationId
-      }
+        quantity_received: remaining >= 1 ? "1" : String(remaining),
+        storage_location_id: safeStorageLocationId,
+      },
     }));
 
     autoReceiveAttemptKeyRef.current = attemptKey;
@@ -634,7 +691,7 @@ export default function ShipmentsPage() {
     setPageMessage(
       pendingAutoReceive.scannedBarcode
         ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving 1 unit...`
-        : 'Scanner matched item. Auto receiving 1 unit...'
+        : "Scanner matched item. Auto receiving 1 unit...",
     );
 
     receiveShipmentMutation.mutate({
@@ -644,8 +701,8 @@ export default function ShipmentsPage() {
         product_id: matchedItem.product_id,
         quantity_received: remaining >= 1 ? 1 : remaining,
         storage_location_id: safeStorageLocationId,
-        discrepancy_reason: draft.discrepancy_reason.trim() || null
-      }
+        discrepancy_reason: draft.discrepancy_reason.trim() || null,
+      },
     });
   }, [
     pendingAutoReceive,
@@ -653,7 +710,7 @@ export default function ShipmentsPage() {
     shipmentItems,
     storageLocations,
     receiveShipmentMutation,
-    receiveDrafts
+    receiveDrafts,
   ]);
 
   const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
@@ -662,7 +719,7 @@ export default function ShipmentsPage() {
 
   const updateReceiveDraft = (
     itemId: string,
-    updater: (current: ReceiveDraft) => ReceiveDraft
+    updater: (current: ReceiveDraft) => ReceiveDraft,
   ) => {
     setReceiveDrafts((current) => {
       const matchedItem = shipmentItems.find((item) => item.id === itemId);
@@ -675,7 +732,7 @@ export default function ShipmentsPage() {
 
       return {
         ...current,
-        [itemId]: updater(base)
+        [itemId]: updater(base),
       };
     });
   };
@@ -694,14 +751,14 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!selectedShipmentId) {
-      setPageError('Select a shipment first.');
+      setPageError("Select a shipment first.");
       return;
     }
 
     addShipmentItemMutation.mutate({
       shipment_id: selectedShipmentId,
       product_id: itemForm.product_id,
-      quantity: Number(itemForm.quantity)
+      quantity: Number(itemForm.quantity),
     });
   };
 
@@ -710,7 +767,7 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError("Select a shipment first.");
       return;
     }
 
@@ -721,17 +778,17 @@ export default function ShipmentsPage() {
     const remaining = ordered - received;
 
     if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-      setPageError('Quantity received must be greater than zero.');
+      setPageError("Quantity received must be greater than zero.");
       return;
     }
 
     if (quantityReceived > remaining) {
-      setPageError('Quantity received cannot exceed remaining quantity.');
+      setPageError("Quantity received cannot exceed remaining quantity.");
       return;
     }
 
     if (!draft.storage_location_id) {
-      setPageError('Select a storage location.');
+      setPageError("Select a storage location.");
       return;
     }
 
@@ -742,8 +799,8 @@ export default function ShipmentsPage() {
         product_id: item.product_id,
         quantity_received: quantityReceived,
         storage_location_id: draft.storage_location_id,
-        discrepancy_reason: draft.discrepancy_reason.trim() || null
-      }
+        discrepancy_reason: draft.discrepancy_reason.trim() || null,
+      },
     });
   };
 
@@ -752,40 +809,42 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError("Select a shipment first.");
       return;
     }
 
     finalizeShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
-      version: selectedShipment.version
+      version: selectedShipment.version,
     });
   };
 
   const selectShipment = (shipmentId: string) => {
     setSelectedShipmentId(shipmentId);
     setReceiveDrafts({});
-    setHighlightedItemId('');
+    setHighlightedItemId("");
     setPendingAutoReceive(null);
-    setSelectedScannerLocationId('');
-    autoReceiveAttemptKeyRef.current = '';
+    setSelectedScannerLocationId("");
+    autoReceiveAttemptKeyRef.current = "";
     setPageError(null);
     setPageMessage(null);
   };
 
   const openProductScanner = () => {
     if (!selectedShipmentId) {
-      setPageError('Select a shipment before opening product scanner.');
+      setPageError("Select a shipment before opening product scanner.");
       return;
     }
 
     if (!selectedScannerLocationId) {
-      setPageError('Select a default storage location before opening product scanner.');
+      setPageError(
+        "Select a default storage location before opening product scanner.",
+      );
       return;
     }
 
     navigate(
-      `/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}&locationId=${encodeURIComponent(selectedScannerLocationId)}`
+      `/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}&locationId=${encodeURIComponent(selectedScannerLocationId)}`,
     );
   };
 
@@ -795,8 +854,9 @@ export default function ShipmentsPage() {
         <div>
           <h2 style={styles.title}>Shipments</h2>
           <p style={styles.description}>
-            Create inbound shipments, add shipment items, receive lines partially
-            or fully, and finalize the shipment when operations are complete.
+            Create inbound shipments, add shipment items, receive lines
+            partially or fully, and finalize the shipment when operations are
+            complete.
           </p>
         </div>
       </div>
@@ -816,7 +876,7 @@ export default function ShipmentsPage() {
               onChange={(event) =>
                 setShipmentForm((current) => ({
                   ...current,
-                  supplier_id: event.target.value
+                  supplier_id: event.target.value,
                 }))
               }
               required
@@ -839,7 +899,7 @@ export default function ShipmentsPage() {
               onChange={(event) =>
                 setShipmentForm((current) => ({
                   ...current,
-                  delivery_date: event.target.value
+                  delivery_date: event.target.value,
                 }))
               }
               required
@@ -855,7 +915,7 @@ export default function ShipmentsPage() {
               onChange={(event) =>
                 setShipmentForm((current) => ({
                   ...current,
-                  po_number: event.target.value
+                  po_number: event.target.value,
                 }))
               }
               placeholder="Optional purchase order number"
@@ -868,7 +928,9 @@ export default function ShipmentsPage() {
               style={styles.primaryButton}
               disabled={createShipmentMutation.isPending}
             >
-              {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
+              {createShipmentMutation.isPending
+                ? "Creating..."
+                : "Create Shipment"}
             </button>
           </div>
         </form>
@@ -877,7 +939,9 @@ export default function ShipmentsPage() {
       <section
         style={{
           ...styles.twoColumnGrid,
-          gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 420px) minmax(0, 1fr)'
+          gridTemplateColumns: isMobile
+            ? "1fr"
+            : "minmax(320px, 420px) minmax(0, 1fr)",
         }}
       >
         <div style={styles.panel}>
@@ -885,7 +949,8 @@ export default function ShipmentsPage() {
             <div>
               <h3 style={styles.panelTitle}>Shipment List</h3>
               <p style={styles.panelSubtitle}>
-                Filter shipments and select one for line management and receiving.
+                Filter shipments and select one for line management and
+                receiving.
               </p>
             </div>
           </div>
@@ -893,7 +958,7 @@ export default function ShipmentsPage() {
           <div
             style={{
               ...styles.filterGrid,
-              gridTemplateColumns: isMobile ? '1fr' : '1fr 180px'
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 180px",
             }}
           >
             <input
@@ -919,13 +984,15 @@ export default function ShipmentsPage() {
           <div
             style={{
               ...styles.shipmentList,
-              maxHeight: isMobile ? 'none' : 720
+              maxHeight: isMobile ? "none" : 720,
             }}
           >
             {shipmentsQuery.isLoading ? (
               <p style={styles.emptyState}>Loading shipments...</p>
             ) : filteredShipments.length === 0 ? (
-              <p style={styles.emptyState}>No shipments match the current filter.</p>
+              <p style={styles.emptyState}>
+                No shipments match the current filter.
+              </p>
             ) : (
               filteredShipments.map((shipment) => {
                 const isSelected = shipment.id === selectedShipmentId;
@@ -939,19 +1006,19 @@ export default function ShipmentsPage() {
                     onClick={() => selectShipment(shipment.id)}
                     style={{
                       ...styles.shipmentCard,
-                      ...(isSelected ? styles.shipmentCardSelected : {})
+                      ...(isSelected ? styles.shipmentCardSelected : {}),
                     }}
                   >
                     <div
                       style={{
                         ...styles.shipmentCardTop,
-                        flexDirection: isMobile ? 'column' : 'row',
-                        alignItems: isMobile ? 'flex-start' : 'flex-start'
+                        flexDirection: isMobile ? "column" : "row",
+                        alignItems: isMobile ? "flex-start" : "flex-start",
                       }}
                     >
                       <div style={styles.shipmentCardTitleBlock}>
                         <div style={styles.shipmentCardTitle}>
-                          {shipment.po_number || 'No PO Number'}
+                          {shipment.po_number || "No PO Number"}
                         </div>
                         <div style={styles.shipmentCardSubtle}>
                           Shipment ID: {shipment.id}
@@ -965,12 +1032,14 @@ export default function ShipmentsPage() {
 
                     <div style={styles.shipmentCardMeta}>
                       <div>
-                        <strong>Supplier:</strong> {shipment.supplier_name || shipment.supplier_id}
+                        <strong>Supplier:</strong>{" "}
+                        {shipment.supplier_name || shipment.supplier_id}
                       </div>
                       <div>
-                        <strong>Delivery:</strong> {formatDate(shipment.delivery_date)}
+                        <strong>Delivery:</strong>{" "}
+                        {formatDate(shipment.delivery_date)}
                       </div>
-                      <div style={{ wordBreak: 'break-all' }}>
+                      <div style={{ wordBreak: "break-all" }}>
                         <strong>QR:</strong> {shipment.qr_code}
                       </div>
                       <div>
@@ -995,7 +1064,8 @@ export default function ShipmentsPage() {
             <div>
               <h3 style={styles.panelTitle}>Selected Shipment</h3>
               <p style={styles.panelSubtitle}>
-                Add shipment lines, receive stock into locations, and finalize the shipment.
+                Add shipment lines, receive stock into locations, and finalize
+                the shipment.
               </p>
             </div>
           </div>
@@ -1009,13 +1079,15 @@ export default function ShipmentsPage() {
                   style={{
                     ...styles.selectedShipmentGrid,
                     gridTemplateColumns: isMobile
-                      ? '1fr'
-                      : 'repeat(auto-fit, minmax(180px, 1fr))'
+                      ? "1fr"
+                      : "repeat(auto-fit, minmax(180px, 1fr))",
                   }}
                 >
                   <div>
                     <strong>Shipment ID</strong>
-                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.id}</div>
+                    <div style={{ wordBreak: "break-all" }}>
+                      {selectedShipment.id}
+                    </div>
                   </div>
                   <div>
                     <strong>Status</strong>
@@ -1023,8 +1095,9 @@ export default function ShipmentsPage() {
                   </div>
                   <div>
                     <strong>Supplier</strong>
-                    <div style={{ wordBreak: 'break-word' }}>
-                      {selectedShipment.supplier_name || selectedShipment.supplier_id}
+                    <div style={{ wordBreak: "break-word" }}>
+                      {selectedShipment.supplier_name ||
+                        selectedShipment.supplier_id}
                     </div>
                   </div>
                   <div>
@@ -1033,11 +1106,172 @@ export default function ShipmentsPage() {
                   </div>
                   <div>
                     <strong>PO Number</strong>
-                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.po_number || '-'}</div>
+                    <div style={{ wordBreak: "break-all" }}>
+                      {selectedShipment.po_number || "-"}
+                    </div>
                   </div>
                   <div>
                     <strong>Version</strong>
                     <div>{selectedShipment.version}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.sectionDivider} />
+
+              <div style={styles.scannerReadinessSection}>
+                <div style={styles.scannerReadinessHeader}>
+                  <div>
+                    <h4 style={styles.sectionTitle}>Scanner Readiness</h4>
+                    <p style={styles.scannerReadinessSubtitle}>
+                      Default scan location is mandatory before barcode scanning
+                      and scanner-driven auto-receive.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    ...styles.scannerReadinessGrid,
+                    gridTemplateColumns: isMobile
+                      ? "1fr"
+                      : "minmax(280px, 360px) minmax(0, 1fr)",
+                  }}
+                >
+                  <div style={styles.defaultLocationPanel}>
+                    <label style={styles.label}>
+                      Default Scan Location
+                      <div style={styles.inlineHint}>
+                        What changed: this control was moved into a dedicated
+                        scanner readiness block so it is visible earlier on
+                        mobile.
+                      </div>
+                      <div style={styles.inlineHint}>
+                        Why it changed: the previous placement inside the
+                        shipment items header made the control easy to miss on
+                        smaller screens.
+                      </div>
+                      <div style={styles.inlineHint}>
+                        What problem it solves: users can now configure scanner
+                        location before scrolling into line items, which removes
+                        the false impression that the feature is missing.
+                      </div>
+                    </label>
+
+                    <select
+                      style={styles.input}
+                      value={selectedScannerLocationId}
+                      onChange={(event) =>
+                        setSelectedScannerLocationId(event.target.value)
+                      }
+                      disabled={!hasStorageLocations}
+                    >
+                      <option value="">
+                        {hasStorageLocations
+                          ? "Select location"
+                          : "No locations available"}
+                      </option>
+                      {storageLocations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {!hasStorageLocations ? (
+                      <div style={styles.locationEmptyStateBox}>
+                        <div style={styles.locationEmptyStateTitle}>
+                          No storage locations are available.
+                        </div>
+                        <div style={styles.locationEmptyStateText}>
+                          Receiving and barcode scanning are blocked because the
+                          storage locations API returned no active locations for
+                          this tenant. Create at least one storage location
+                          before continuing.
+                        </div>
+                      </div>
+                    ) : !selectedScannerLocationId ? (
+                      <div style={styles.scanWarningText}>
+                        Select a default scan location to enable barcode
+                        scanning.
+                      </div>
+                    ) : (
+                      <div style={styles.scanReadyText}>
+                        Scanner default location is set to{" "}
+                        <strong>
+                          {selectedScannerLocation?.name || "selected location"}
+                        </strong>
+                        .
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={styles.scannerActionsPanel}>
+                    <div style={styles.scannerStatusCard}>
+                      <div style={styles.scannerStatusLabel}>Shipment</div>
+                      <div style={styles.scannerStatusValue}>
+                        {selectedShipment.po_number || selectedShipment.id}
+                      </div>
+                    </div>
+
+                    <div style={styles.scannerStatusCard}>
+                      <div style={styles.scannerStatusLabel}>Scanner Mode</div>
+                      <div style={styles.scannerStatusValue}>
+                        Product barcode receiving
+                      </div>
+                    </div>
+
+                    <div style={styles.scannerStatusCard}>
+                      <div style={styles.scannerStatusLabel}>
+                        Default Location
+                      </div>
+                      <div style={styles.scannerStatusValue}>
+                        {selectedScannerLocation?.name || "Not selected"}
+                      </div>
+                    </div>
+
+                    <div style={styles.scannerActionRow}>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.scannerButton,
+                          width: isMobile ? "100%" : undefined,
+                          ...(selectedScannerLocationId && hasStorageLocations
+                            ? {}
+                            : styles.scannerButtonDisabled),
+                        }}
+                        onClick={openProductScanner}
+                        disabled={
+                          !selectedScannerLocationId || !hasStorageLocations
+                        }
+                        title={
+                          selectedScannerLocationId && hasStorageLocations
+                            ? "Open product barcode scanner"
+                            : hasStorageLocations
+                              ? "Select a default scan location first"
+                              : "Create a storage location first"
+                        }
+                      >
+                        Scan Product Barcode
+                      </button>
+
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.finalizeButton,
+                          width: isMobile ? "100%" : undefined,
+                        }}
+                        onClick={handleFinalizeShipment}
+                        disabled={
+                          finalizeShipmentMutation.isPending ||
+                          selectedShipment.status === "received"
+                        }
+                      >
+                        {finalizeShipmentMutation.isPending
+                          ? "Finalizing..."
+                          : "Finalize Shipment"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1054,7 +1288,7 @@ export default function ShipmentsPage() {
                     onChange={(event) =>
                       setItemForm((current) => ({
                         ...current,
-                        product_id: event.target.value
+                        product_id: event.target.value,
                       }))
                     }
                     required
@@ -1079,7 +1313,7 @@ export default function ShipmentsPage() {
                     onChange={(event) =>
                       setItemForm((current) => ({
                         ...current,
-                        quantity: event.target.value
+                        quantity: event.target.value,
                       }))
                     }
                     required
@@ -1092,7 +1326,9 @@ export default function ShipmentsPage() {
                     style={styles.primaryButton}
                     disabled={addShipmentItemMutation.isPending}
                   >
-                    {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
+                    {addShipmentItemMutation.isPending
+                      ? "Adding..."
+                      : "Add Shipment Item"}
                   </button>
                 </div>
               </form>
@@ -1102,82 +1338,25 @@ export default function ShipmentsPage() {
               <div
                 style={{
                   ...styles.itemsHeaderRow,
-                  flexDirection: isMobile ? 'column' : 'row',
-                  alignItems: isMobile ? 'stretch' : 'center'
+                  flexDirection: isMobile ? "column" : "row",
+                  alignItems: isMobile ? "stretch" : "center",
                 }}
               >
                 <div style={styles.itemsHeaderContent}>
                   <h4 style={styles.sectionTitle}>Shipment Items</h4>
-
-                  <div style={styles.defaultLocationBlock}>
-                    <label style={styles.label}>
-                      Default Scan Location
-                      <div style={styles.inlineHint}>
-                        Required for barcode scanning and auto-receive
-                      </div>
-                    </label>
-
-                    <select
-                      style={styles.input}
-                      value={selectedScannerLocationId}
-                      onChange={(event) => setSelectedScannerLocationId(event.target.value)}
-                    >
-                      <option value="">Select location</option>
-                      {(storageLocationsQuery.data ?? []).map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    {!selectedScannerLocationId && (
-                      <div style={styles.scanWarningText}>
-                        Select a default scan location to enable barcode scanning.
-                      </div>
-                    )}
+                  <div style={styles.inlineHint}>
+                    What changed: scanner controls were moved above this section
+                    into a dedicated readiness block.
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: isMobile ? 'column' : 'row',
-                    gap: 10,
-                    width: isMobile ? '100%' : 'auto'
-                  }}
-                >
-                  <button
-                    type="button"
-                    style={{
-                      ...styles.scannerButton,
-                      width: isMobile ? '100%' : undefined,
-                      ...(selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
-                    }}
-                    onClick={openProductScanner}
-                    disabled={!selectedScannerLocationId}
-                    title={
-                      selectedScannerLocationId
-                        ? 'Open product barcode scanner'
-                        : 'Select a default scan location first'
-                    }
-                  >
-                    Scan Product Barcode
-                  </button>
-
-                  <button
-                    type="button"
-                    style={{
-                      ...styles.finalizeButton,
-                      width: isMobile ? '100%' : undefined
-                    }}
-                    onClick={handleFinalizeShipment}
-                    disabled={
-                      finalizeShipmentMutation.isPending ||
-                      selectedShipment.status === 'received'
-                    }
-                  >
-                    {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
-                  </button>
+                  <div style={styles.inlineHint}>
+                    Why it changed: shipment item controls should not hide
+                    scanner setup on mobile.
+                  </div>
+                  <div style={styles.inlineHint}>
+                    What problem it solves: users can now configure scanning
+                    before reaching the item list, while line-level receiving
+                    stays focused on line actions.
+                  </div>
                 </div>
               </div>
 
@@ -1199,7 +1378,9 @@ export default function ShipmentsPage() {
                         key={item.id}
                         style={{
                           ...styles.mobileItemCard,
-                          ...(isHighlighted ? styles.mobileItemCardHighlighted : {})
+                          ...(isHighlighted
+                            ? styles.mobileItemCardHighlighted
+                            : {}),
                         }}
                       >
                         <div style={styles.mobileItemCardHeader}>
@@ -1208,15 +1389,21 @@ export default function ShipmentsPage() {
                           </div>
                           <div style={styles.mobileBadgeRow}>
                             {isHighlighted ? (
-                              <span style={styles.mobileScannedBadge}>Scanned Match</span>
+                              <span style={styles.mobileScannedBadge}>
+                                Scanned Match
+                              </span>
                             ) : null}
 
                             <span
                               style={
-                                remaining <= 0 ? styles.mobileDoneBadge : styles.mobilePendingBadge
+                                remaining <= 0
+                                  ? styles.mobileDoneBadge
+                                  : styles.mobilePendingBadge
                               }
                             >
-                              {remaining <= 0 ? 'Received' : `${remaining} remaining`}
+                              {remaining <= 0
+                                ? "Received"
+                                : `${remaining} remaining`}
                             </span>
                           </div>
                         </div>
@@ -1236,7 +1423,9 @@ export default function ShipmentsPage() {
                           </div>
                           <div>
                             <strong>Product ID</strong>
-                            <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
+                            <div style={{ wordBreak: "break-all" }}>
+                              {item.product_id}
+                            </div>
                           </div>
                         </div>
 
@@ -1248,12 +1437,17 @@ export default function ShipmentsPage() {
                             onChange={(event) =>
                               updateReceiveDraft(item.id, (current) => ({
                                 ...current,
-                                storage_location_id: event.target.value
+                                storage_location_id: event.target.value,
                               }))
                             }
+                            disabled={!hasStorageLocations}
                           >
-                            <option value="">Select location</option>
-                            {(storageLocationsQuery.data ?? []).map((location) => (
+                            <option value="">
+                              {hasStorageLocations
+                                ? "Select location"
+                                : "No locations available"}
+                            </option>
+                            {storageLocations.map((location) => (
                               <option key={location.id} value={location.id}>
                                 {location.name}
                               </option>
@@ -1272,7 +1466,7 @@ export default function ShipmentsPage() {
                             onChange={(event) =>
                               updateReceiveDraft(item.id, (current) => ({
                                 ...current,
-                                quantity_received: event.target.value
+                                quantity_received: event.target.value,
                               }))
                             }
                           />
@@ -1288,7 +1482,7 @@ export default function ShipmentsPage() {
                             onChange={(event) =>
                               updateReceiveDraft(item.id, (current) => ({
                                 ...current,
-                                discrepancy_reason: event.target.value
+                                discrepancy_reason: event.target.value,
                               }))
                             }
                           />
@@ -1298,18 +1492,21 @@ export default function ShipmentsPage() {
                           type="button"
                           style={{
                             ...styles.mobileReceiveButton,
-                            ...(remaining <= 0 || selectedShipment.status === 'received'
+                            ...(remaining <= 0 ||
+                            selectedShipment.status === "received"
                               ? styles.mobileReceiveButtonDisabled
-                              : {})
+                              : {}),
                           }}
                           onClick={() => handleReceiveLine(item)}
                           disabled={
                             receiveShipmentMutation.isPending ||
                             remaining <= 0 ||
-                            selectedShipment.status === 'received'
+                            selectedShipment.status === "received"
                           }
                         >
-                          {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
+                          {receiveShipmentMutation.isPending
+                            ? "Receiving..."
+                            : "Receive Item"}
                         </button>
                       </div>
                     );
@@ -1341,13 +1538,27 @@ export default function ShipmentsPage() {
                         return (
                           <tr
                             key={item.id}
-                            style={isHighlighted ? styles.highlightedTableRow : undefined}
+                            style={
+                              isHighlighted
+                                ? styles.highlightedTableRow
+                                : undefined
+                            }
                           >
                             <td style={styles.td}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <span>{item.product_name || item.product_id}</span>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 6,
+                                }}
+                              >
+                                <span>
+                                  {item.product_name || item.product_id}
+                                </span>
                                 {isHighlighted ? (
-                                  <span style={styles.desktopScannedBadge}>Scanned Match</span>
+                                  <span style={styles.desktopScannedBadge}>
+                                    Scanned Match
+                                  </span>
                                 ) : null}
                               </div>
                             </td>
@@ -1361,12 +1572,17 @@ export default function ShipmentsPage() {
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
-                                    storage_location_id: event.target.value
+                                    storage_location_id: event.target.value,
                                   }))
                                 }
+                                disabled={!hasStorageLocations}
                               >
-                                <option value="">Select location</option>
-                                {(storageLocationsQuery.data ?? []).map((location) => (
+                                <option value="">
+                                  {hasStorageLocations
+                                    ? "Select location"
+                                    : "No locations available"}
+                                </option>
+                                {storageLocations.map((location) => (
                                   <option key={location.id} value={location.id}>
                                     {location.name}
                                   </option>
@@ -1383,7 +1599,7 @@ export default function ShipmentsPage() {
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
-                                    quantity_received: event.target.value
+                                    quantity_received: event.target.value,
                                   }))
                                 }
                               />
@@ -1397,7 +1613,7 @@ export default function ShipmentsPage() {
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
-                                    discrepancy_reason: event.target.value
+                                    discrepancy_reason: event.target.value,
                                   }))
                                 }
                               />
@@ -1410,10 +1626,12 @@ export default function ShipmentsPage() {
                                 disabled={
                                   receiveShipmentMutation.isPending ||
                                   remaining <= 0 ||
-                                  selectedShipment.status === 'received'
+                                  selectedShipment.status === "received"
                                 }
                               >
-                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
+                                {receiveShipmentMutation.isPending
+                                  ? "Receiving..."
+                                  : "Receive"}
                               </button>
                             </td>
                           </tr>
@@ -1433,394 +1651,474 @@ export default function ShipmentsPage() {
 
 const styles: Record<string, CSSProperties> = {
   header: {
-    marginBottom: 20
+    marginBottom: 20,
   },
   title: {
     margin: 0,
     fontSize: 28,
     fontWeight: 800,
-    color: '#111827'
+    color: "#111827",
   },
   description: {
     marginTop: 8,
-    color: '#6b7280',
+    color: "#6b7280",
     lineHeight: 1.6,
-    maxWidth: 860
+    maxWidth: 860,
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
     borderRadius: 16,
     padding: 20,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
     marginBottom: 20,
-    minWidth: 0
+    minWidth: 0,
   },
   panelTitle: {
     margin: 0,
     fontSize: 18,
     fontWeight: 700,
-    color: '#111827'
+    color: "#111827",
   },
   panelSubtitle: {
     marginTop: 6,
-    color: '#6b7280',
+    color: "#6b7280",
     fontSize: 14,
-    lineHeight: 1.5
+    lineHeight: 1.5,
   },
   formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 16,
-    alignItems: 'end'
+    alignItems: "end",
   },
   formActionRow: {
-    display: 'flex',
-    alignItems: 'end'
+    display: "flex",
+    alignItems: "end",
   },
   label: {
-    display: 'block',
+    display: "block",
     marginBottom: 8,
     fontSize: 14,
     fontWeight: 600,
-    color: '#374151'
+    color: "#374151",
   },
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    border: '1px solid #d1d5db',
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid #d1d5db",
     borderRadius: 10,
-    padding: '10px 12px',
+    padding: "10px 12px",
     fontSize: 14,
-    background: '#ffffff',
-    minWidth: 0
+    background: "#ffffff",
+    minWidth: 0,
   },
   inputCompact: {
-    width: '100%',
-    boxSizing: 'border-box',
-    border: '1px solid #d1d5db',
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid #d1d5db",
     borderRadius: 8,
-    padding: '8px 10px',
+    padding: "8px 10px",
     fontSize: 13,
-    background: '#ffffff',
-    minWidth: 120
+    background: "#ffffff",
+    minWidth: 120,
   },
   primaryButton: {
-    border: 'none',
+    border: "none",
     borderRadius: 10,
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
+    padding: "12px 16px",
+    background: "#2563eb",
+    color: "#ffffff",
     fontWeight: 700,
-    cursor: 'pointer',
-    width: '100%'
+    cursor: "pointer",
+    width: "100%",
   },
   secondaryButton: {
-    border: '1px solid #d1d5db',
+    border: "1px solid #d1d5db",
     borderRadius: 10,
-    padding: '10px 14px',
-    background: '#ffffff',
-    color: '#111827',
+    padding: "10px 14px",
+    background: "#ffffff",
+    color: "#111827",
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: "pointer",
   },
   finalizeButton: {
-    border: 'none',
+    border: "none",
     borderRadius: 10,
-    padding: '12px 16px',
-    background: '#059669',
-    color: '#ffffff',
+    padding: "12px 16px",
+    background: "#059669",
+    color: "#ffffff",
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: "pointer",
   },
   scannerButton: {
-    border: 'none',
+    border: "none",
     borderRadius: 10,
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
+    padding: "12px 16px",
+    background: "#2563eb",
+    color: "#ffffff",
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: "pointer",
   },
   scannerButtonDisabled: {
     opacity: 0.5,
-    cursor: 'not-allowed'
+    cursor: "not-allowed",
   },
   errorBox: {
     marginBottom: 16,
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#991b1b',
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    color: "#991b1b",
     borderRadius: 12,
-    padding: '12px 14px'
+    padding: "12px 14px",
   },
   successBox: {
     marginBottom: 16,
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#065f46',
+    background: "#ecfdf5",
+    border: "1px solid #a7f3d0",
+    color: "#065f46",
     borderRadius: 12,
-    padding: '12px 14px'
+    padding: "12px 14px",
   },
   twoColumnGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr',
+    display: "grid",
+    gridTemplateColumns: "1fr",
     gap: 20,
-    alignItems: 'start'
+    alignItems: "start",
   },
   shipmentListHeader: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   filterGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 180px',
+    display: "grid",
+    gridTemplateColumns: "1fr 180px",
     gap: 12,
-    marginBottom: 16
+    marginBottom: 16,
   },
   shipmentList: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gap: 12,
-    overflowY: 'auto',
-    minWidth: 0
+    overflowY: "auto",
+    minWidth: 0,
   },
   shipmentCard: {
-    textAlign: 'left',
-    border: '1px solid #e5e7eb',
+    textAlign: "left",
+    border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 14,
-    background: '#ffffff',
-    cursor: 'pointer',
-    width: '100%'
+    background: "#ffffff",
+    cursor: "pointer",
+    width: "100%",
   },
   shipmentCardSelected: {
-    border: '1px solid #2563eb',
-    boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.12)'
+    border: "1px solid #2563eb",
+    boxShadow: "0 0 0 3px rgba(37, 99, 235, 0.12)",
   },
   shipmentCardTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
+    display: "flex",
+    justifyContent: "space-between",
     gap: 12,
-    alignItems: 'flex-start',
-    marginBottom: 10
+    alignItems: "flex-start",
+    marginBottom: 10,
   },
   shipmentCardTitleBlock: {
-    minWidth: 0
+    minWidth: 0,
   },
   shipmentCardTitle: {
     fontWeight: 800,
-    color: '#111827',
+    color: "#111827",
     marginBottom: 4,
-    wordBreak: 'break-word'
+    wordBreak: "break-word",
   },
   shipmentCardSubtle: {
-    color: '#6b7280',
+    color: "#6b7280",
     fontSize: 12,
-    wordBreak: 'break-all'
+    wordBreak: "break-all",
   },
   shipmentCardMeta: {
-    display: 'grid',
+    display: "grid",
     gap: 6,
-    color: '#374151',
-    fontSize: 13
+    color: "#374151",
+    fontSize: 13,
   },
   badgeBase: {
-    display: 'inline-flex',
-    alignItems: 'center',
+    display: "inline-flex",
+    alignItems: "center",
     borderRadius: 999,
-    padding: '6px 10px',
+    padding: "6px 10px",
     fontSize: 12,
-    fontWeight: 700
+    fontWeight: 700,
   },
   selectedShipmentBox: {
-    border: '1px solid #e5e7eb',
+    border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 16,
-    background: '#f9fafb',
-    minWidth: 0
+    background: "#f9fafb",
+    minWidth: 0,
   },
   selectedShipmentGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
     gap: 16,
-    color: '#111827',
-    minWidth: 0
+    color: "#111827",
+    minWidth: 0,
   },
   sectionDivider: {
     height: 1,
-    background: '#e5e7eb',
-    margin: '20px 0'
+    background: "#e5e7eb",
+    margin: "20px 0",
   },
   sectionTitle: {
-    margin: '0 0 14px',
+    margin: "0 0 14px",
     fontSize: 16,
     fontWeight: 700,
-    color: '#111827'
+    color: "#111827",
   },
   itemsHeaderRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
+    display: "flex",
+    justifyContent: "space-between",
     gap: 12,
-    alignItems: 'center',
-    marginBottom: 14
+    alignItems: "center",
+    marginBottom: 14,
   },
   itemsHeaderContent: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gap: 10,
     minWidth: 0,
-    flex: 1
+    flex: 1,
   },
-  defaultLocationBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    maxWidth: 320
+  scannerReadinessSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+  scannerReadinessHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  scannerReadinessSubtitle: {
+    margin: "6px 0 0",
+    color: "#6b7280",
+    fontSize: 14,
+    lineHeight: 1.5,
+  },
+  scannerReadinessGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(280px, 360px) minmax(0, 1fr)",
+    gap: 14,
+    alignItems: "start",
+  },
+  defaultLocationPanel: {
+    border: "1px solid #dbeafe",
+    borderRadius: 14,
+    padding: 16,
+    background: "#f8fbff",
+  },
+  scannerActionsPanel: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: 12,
+    alignItems: "stretch",
+  },
+  scannerStatusCard: {
+    border: "1px solid #e5e7eb",
+    borderRadius: 14,
+    padding: 14,
+    background: "#ffffff",
+    minWidth: 0,
+  },
+  scannerStatusLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: "#6b7280",
+    marginBottom: 8,
+  },
+  scannerStatusValue: {
+    color: "#111827",
+    fontWeight: 700,
+    lineHeight: 1.5,
+    wordBreak: "break-word",
+  },
+  scannerActionRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    gridColumn: "1 / -1",
+  },
+  locationEmptyStateBox: {
+    marginTop: 8,
+    border: "1px solid #fecaca",
+    borderRadius: 12,
+    background: "#fef2f2",
+    padding: "12px 14px",
+  },
+  locationEmptyStateTitle: {
+    color: "#991b1b",
+    fontWeight: 800,
+    marginBottom: 6,
+  },
+  locationEmptyStateText: {
+    color: "#991b1b",
+    fontSize: 13,
+    lineHeight: 1.5,
   },
   inlineHint: {
     fontSize: 12,
-    color: '#6b7280',
+    color: "#6b7280",
     fontWeight: 400,
-    marginTop: 4
+    marginTop: 4,
   },
   scanWarningText: {
-    color: '#b45309',
-    fontSize: 13
+    color: "#b45309",
+    fontSize: 13,
+    marginTop: 8,
+  },
+  scanReadyText: {
+    color: "#065f46",
+    fontSize: 13,
+    marginTop: 8,
+    lineHeight: 1.5,
   },
   itemTableWrapper: {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch'
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
   },
   itemTable: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: 980
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: 980,
   },
   th: {
-    textAlign: 'left',
-    padding: '12px 10px',
-    borderBottom: '1px solid #e5e7eb',
-    color: '#6b7280',
+    textAlign: "left",
+    padding: "12px 10px",
+    borderBottom: "1px solid #e5e7eb",
+    color: "#6b7280",
     fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    background: '#f9fafb'
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    background: "#f9fafb",
   },
   td: {
-    padding: '12px 10px',
-    borderBottom: '1px solid #f1f5f9',
-    verticalAlign: 'top',
-    color: '#111827',
-    fontSize: 14
+    padding: "12px 10px",
+    borderBottom: "1px solid #f1f5f9",
+    verticalAlign: "top",
+    color: "#111827",
+    fontSize: 14,
   },
   highlightedTableRow: {
-    background: '#eff6ff'
+    background: "#eff6ff",
   },
   desktopScannedBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    display: "inline-flex",
+    alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: 999,
-    padding: '4px 8px',
+    padding: "4px 8px",
     fontSize: 11,
     fontWeight: 700,
-    background: '#dbeafe',
-    color: '#1d4ed8'
+    background: "#dbeafe",
+    color: "#1d4ed8",
   },
   mobileItemCardList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
   },
   mobileItemCard: {
-    border: '1px solid #e5e7eb',
+    border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 14,
-    background: '#ffffff'
+    background: "#ffffff",
   },
   mobileItemCardHighlighted: {
-    border: '1px solid #60a5fa',
-    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.12)',
-    background: '#f8fbff'
+    border: "1px solid #60a5fa",
+    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.12)",
+    background: "#f8fbff",
   },
   mobileItemCardHeader: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gap: 10,
-    marginBottom: 14
+    marginBottom: 14,
   },
   mobileItemCardTitle: {
     fontSize: 16,
     fontWeight: 800,
-    color: '#111827',
-    wordBreak: 'break-word'
+    color: "#111827",
+    wordBreak: "break-word",
   },
   mobileBadgeRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 8
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
   },
   mobileItemMetaGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
     gap: 12,
     marginBottom: 14,
-    color: '#374151',
-    fontSize: 13
+    color: "#374151",
+    fontSize: 13,
   },
   mobileFieldGroup: {
-    marginBottom: 12
+    marginBottom: 12,
   },
   mobilePendingBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    display: "inline-flex",
+    alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: 999,
-    padding: '6px 10px',
+    padding: "6px 10px",
     fontSize: 12,
     fontWeight: 700,
-    background: '#fef3c7',
-    color: '#92400e'
+    background: "#fef3c7",
+    color: "#92400e",
   },
   mobileDoneBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    display: "inline-flex",
+    alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: 999,
-    padding: '6px 10px',
+    padding: "6px 10px",
     fontSize: 12,
     fontWeight: 700,
-    background: '#dcfce7',
-    color: '#166534'
+    background: "#dcfce7",
+    color: "#166534",
   },
   mobileScannedBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    display: "inline-flex",
+    alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: 999,
-    padding: '6px 10px',
+    padding: "6px 10px",
     fontSize: 12,
     fontWeight: 700,
-    background: '#dbeafe',
-    color: '#1d4ed8'
+    background: "#dbeafe",
+    color: "#1d4ed8",
   },
   mobileReceiveButton: {
-    width: '100%',
-    border: 'none',
+    width: "100%",
+    border: "none",
     borderRadius: 10,
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
+    padding: "12px 16px",
+    background: "#2563eb",
+    color: "#ffffff",
     fontWeight: 700,
-    cursor: 'pointer',
-    marginTop: 6
+    cursor: "pointer",
+    marginTop: 6,
   },
   mobileReceiveButtonDisabled: {
-    background: '#9ca3af',
-    cursor: 'not-allowed'
+    background: "#9ca3af",
+    cursor: "not-allowed",
   },
   emptyState: {
-    color: '#6b7280',
-    margin: 0
-  }
+    color: "#6b7280",
+    margin: 0,
+  },
 };
