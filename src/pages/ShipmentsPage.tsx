@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { apiRequest, ApiError } from '../lib/api';
  * - finalizing partially received shipments
  * - auto-selecting a shipment when scanner redirects with ?shipmentId=
  * - highlighting and preparing a shipment item when product barcode scan returns
+ * - auto-receiving one unit from scanner when a safe storage location is known
  *
  * MOBILE UPDATE
  * ----------------------------------------------------------------------------
@@ -35,6 +36,7 @@ import { apiRequest, ApiError } from '../lib/api';
  * - page auto-selects shipment
  * - matched shipment item is highlighted
  * - receive quantity is prefilled to 1 when possible
+ * - auto-receive runs when the system can safely determine storage location
  */
 
 /**
@@ -101,6 +103,11 @@ type ReceiveDraft = {
   quantity_received: string;
   storage_location_id: string;
   discrepancy_reason: string;
+};
+
+type PendingAutoReceive = {
+  itemId: string;
+  scannedBarcode: string | null;
 };
 
 /**
@@ -301,6 +308,17 @@ export default function ShipmentsPage() {
    */
   const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
 
+  /**
+   * Scanner-triggered auto receive state.
+   * This is only set when scanner returns with a matched shipment item.
+   */
+  const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
+
+  /**
+   * Prevent duplicate auto-receive execution for the same scanner result.
+   */
+  const autoReceiveAttemptKeyRef = useRef<string>('');
+
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
@@ -343,6 +361,8 @@ export default function ShipmentsPage() {
       setSelectedShipmentId(shipment.id);
       setReceiveDrafts({});
       setHighlightedItemId('');
+      setPendingAutoReceive(null);
+      autoReceiveAttemptKeyRef.current = '';
       setPageError(null);
       setPageMessage('Shipment created successfully.');
 
@@ -427,6 +447,10 @@ export default function ShipmentsPage() {
    */
   const shipments = useMemo(() => shipmentsQuery.data ?? [], [shipmentsQuery.data]);
   const shipmentItems = useMemo(() => shipmentItemsQuery.data ?? [], [shipmentItemsQuery.data]);
+  const storageLocations = useMemo(
+    () => storageLocationsQuery.data ?? [],
+    [storageLocationsQuery.data]
+  );
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
@@ -489,6 +513,12 @@ export default function ShipmentsPage() {
 
     if (itemIdFromQuery) {
       setHighlightedItemId(itemIdFromQuery);
+      setPendingAutoReceive({
+        itemId: itemIdFromQuery,
+        scannedBarcode
+      });
+      autoReceiveAttemptKeyRef.current = '';
+
       setPageMessage(
         scannedBarcode
           ? `Product barcode ${scannedBarcode} matched inside selected shipment.`
@@ -496,6 +526,8 @@ export default function ShipmentsPage() {
       );
     } else {
       setHighlightedItemId('');
+      setPendingAutoReceive(null);
+      autoReceiveAttemptKeyRef.current = '';
       setPageMessage('Shipment opened from scanner.');
     }
 
@@ -537,6 +569,134 @@ export default function ShipmentsPage() {
       };
     });
   }, [highlightedItemId, shipmentItems]);
+
+  /**
+   * Auto receive from scanner.
+   *
+   * RULES
+   * ----------------------------------------------------------------------------
+   * - only runs for scanner-returned item matches
+   * - only runs once per scanner result
+   * - receives exactly 1 unit (or remaining quantity if less than 1)
+   * - uses safe storage location resolution:
+   *   1. draft-selected location
+   *   2. line storage location
+   *   3. only available storage location if exactly one exists
+   * - if location cannot be chosen safely, do not auto receive
+   */
+  useEffect(() => {
+    if (!pendingAutoReceive) {
+      return;
+    }
+
+    if (!selectedShipment) {
+      return;
+    }
+
+    if (selectedShipment.status === 'received') {
+      setPendingAutoReceive(null);
+      autoReceiveAttemptKeyRef.current = '';
+      return;
+    }
+
+    if (shipmentItems.length === 0) {
+      return;
+    }
+
+    if (receiveShipmentMutation.isPending) {
+      return;
+    }
+
+    const matchedItem = shipmentItems.find((item) => item.id === pendingAutoReceive.itemId);
+
+    if (!matchedItem) {
+      setPendingAutoReceive(null);
+      autoReceiveAttemptKeyRef.current = '';
+      return;
+    }
+
+    const attemptKey = [
+      selectedShipment.id,
+      matchedItem.id,
+      pendingAutoReceive.scannedBarcode || ''
+    ].join(':');
+
+    if (autoReceiveAttemptKeyRef.current === attemptKey) {
+      return;
+    }
+
+    const ordered = toNumber(matchedItem.quantity);
+    const received = toNumber(matchedItem.received_quantity);
+    const remaining = Math.max(ordered - received, 0);
+
+    if (remaining <= 0) {
+      autoReceiveAttemptKeyRef.current = attemptKey;
+      setPendingAutoReceive(null);
+      setPageMessage('Scanned item is already fully received.');
+      return;
+    }
+
+    const draft = getReceiveDraft(matchedItem);
+
+    /**
+     * Safe storage location selection:
+     * - respect user-selected draft location first
+     * - otherwise use line storage location
+     * - otherwise use the only available location if exactly one exists
+     */
+    const safeStorageLocationId =
+      draft.storage_location_id ||
+      matchedItem.storage_location_id ||
+      (storageLocations.length === 1 ? storageLocations[0].id : '');
+
+    if (!safeStorageLocationId) {
+      autoReceiveAttemptKeyRef.current = attemptKey;
+      setPendingAutoReceive(null);
+      setPageMessage(
+        'Product matched. Quantity was set to 1, but auto receive stopped because you must choose a storage location first.'
+      );
+      return;
+    }
+
+    /**
+     * Keep the draft aligned with what auto receive will use.
+     */
+    setReceiveDrafts((current) => ({
+      ...current,
+      [matchedItem.id]: {
+        ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
+        quantity_received: remaining >= 1 ? '1' : String(remaining),
+        storage_location_id: safeStorageLocationId
+      }
+    }));
+
+    autoReceiveAttemptKeyRef.current = attemptKey;
+    setPendingAutoReceive(null);
+    setPageError(null);
+    setPageMessage(
+      pendingAutoReceive.scannedBarcode
+        ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving 1 unit...`
+        : 'Scanner matched item. Auto receiving 1 unit...'
+    );
+
+    receiveShipmentMutation.mutate({
+      shipmentId: selectedShipment.id,
+      version: selectedShipment.version,
+      item: {
+        product_id: matchedItem.product_id,
+        quantity_received: remaining >= 1 ? 1 : remaining,
+        storage_location_id: safeStorageLocationId,
+        discrepancy_reason: draft.discrepancy_reason.trim() || null
+      }
+    });
+  }, [
+    pendingAutoReceive,
+    selectedShipment,
+    shipmentItems,
+    storageLocations,
+    receiveShipmentMutation,
+    receiveDrafts
+  ]);
 
   /**
    * Form helpers
@@ -654,6 +814,8 @@ export default function ShipmentsPage() {
     setSelectedShipmentId(shipmentId);
     setReceiveDrafts({});
     setHighlightedItemId('');
+    setPendingAutoReceive(null);
+    autoReceiveAttemptKeyRef.current = '';
     setPageError(null);
     setPageMessage(null);
   };
