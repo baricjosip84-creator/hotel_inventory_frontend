@@ -1,3 +1,22 @@
+/*
+  src/app/router.tsx
+
+  WHAT CHANGED
+  ------------
+  Added the reports route to surface the backend reporting and forecast module
+  that already exists in your API.
+
+  WHY IT CHANGED
+  --------------
+  The backend already ships management-grade reporting endpoints, but the
+  frontend router did not expose them.
+
+  WHAT PROBLEM IT SOLVES
+  ----------------------
+  This makes the reports module reachable through the authenticated app shell
+  without changing your existing route architecture.
+*/
+
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
@@ -11,6 +30,7 @@ import StorageLocationsPage from '../pages/StorageLocationsPage';
 import StockMovementsPage from '../pages/StockMovementsPage';
 import ScannerPage from '../pages/ScannerPage';
 import SessionsPage from '../pages/SessionsPage';
+import ReportsPage from '../pages/ReportsPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -69,6 +89,10 @@ const router = createBrowserRouter([
       {
         path: 'sessions',
         element: <SessionsPage />
+      },
+      {
+        path: 'reports',
+        element: <ReportsPage />
       }
     ]
   },

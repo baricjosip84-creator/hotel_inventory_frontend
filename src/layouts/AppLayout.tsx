@@ -1,3 +1,22 @@
+/*
+  src/layouts/AppLayout.tsx
+
+  WHAT CHANGED
+  ------------
+  Added the Reports navigation entry plus page title/subtitle handling for the
+  new management reporting module.
+
+  WHY IT CHANGED
+  --------------
+  Reports are now part of the authenticated frontend surface and must behave
+  like the rest of your existing application navigation.
+
+  WHAT PROBLEM IT SOLVES
+  ----------------------
+  This makes the reporting module discoverable on desktop and mobile without
+  introducing a separate layout pattern.
+*/
+
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
@@ -15,6 +34,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/shipments')) return 'Shipments';
   if (pathname.startsWith('/scanner')) return 'Scanner';
   if (pathname.startsWith('/sessions')) return 'Sessions';
+  if (pathname.startsWith('/reports')) return 'Reports';
   return 'Inventory Management';
 }
 
@@ -49,6 +69,9 @@ function getPageSubtitle(pathname: string): string {
   if (pathname.startsWith('/sessions')) {
     return 'Review active sessions and revoke stale account access.';
   }
+  if (pathname.startsWith('/reports')) {
+    return 'Review management reporting, valuation, procurement summary, and forecast data.';
+  }
   return 'Frontend connected to your production-ready backend';
 }
 
@@ -82,6 +105,7 @@ export default function AppLayout() {
     { to: '/storage-locations', label: 'Storage Locations' },
     { to: '/shipments', label: 'Shipments' },
     { to: '/scanner', label: 'Scanner' },
+    { to: '/reports', label: 'Reports' },
     { to: '/sessions', label: 'Sessions' }
   ];
 
