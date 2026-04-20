@@ -1,100 +1,59 @@
 import { useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
-import type { AlertItem } from '../types/inventory';
+import { getRoleCapabilities } from '../lib/permissions';
+import type { SupplierItem } from '../types/inventory';
 
-type AlertFilters = {
-  search: string;
-  severity: string;
-  resolved: string;
-  acknowledged: string;
+type SupplierFormState = {
+  name: string;
+  contact_info: string;
 };
 
-async function fetchAlerts(filters: AlertFilters): Promise<AlertItem[]> {
+async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
   const params = new URLSearchParams();
 
-  if (filters.search.trim()) {
-    params.set('search', filters.search.trim());
-  }
-
-  if (filters.severity) {
-    params.set('severity', filters.severity);
-  }
-
-  if (filters.resolved) {
-    params.set('resolved', filters.resolved);
-  }
-
-  if (filters.acknowledged) {
-    params.set('acknowledged', filters.acknowledged);
+  if (search.trim()) {
+    params.set('search', search.trim());
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest<AlertItem[]>(`/alerts${suffix}`);
+  return apiRequest<SupplierItem[]>(`/suppliers${suffix}`);
 }
 
-async function acknowledgeAlert(id: string): Promise<AlertItem> {
-  return apiRequest<AlertItem>(`/alerts/${id}/acknowledge`, {
-    method: 'POST'
-  });
-}
-
-async function resolveAlert(input: { id: string; resolution_note: string }): Promise<AlertItem> {
-  return apiRequest<AlertItem>(`/alerts/${input.id}/resolve`, {
+async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
+  return apiRequest<SupplierItem>('/suppliers', {
     method: 'POST',
     body: JSON.stringify({
-      resolution_note: input.resolution_note
+      name: input.name.trim(),
+      contact_info: input.contact_info.trim() || null
     })
   });
 }
 
-function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
-
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
-  return date.toLocaleString();
+async function updateSupplier(input: {
+  id: string;
+  values: SupplierFormState;
+}): Promise<SupplierItem> {
+  return apiRequest<SupplierItem>(`/suppliers/${input.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name: input.values.name.trim(),
+      contact_info: input.values.contact_info.trim() || null
+    })
+  });
 }
 
-function severityBadgeStyle(severity: AlertItem['severity']): CSSProperties {
-  if (severity === 'critical') {
-    return {
-      ...styles.badgeBase,
-      background: '#fee2e2',
-      color: '#991b1b'
-    };
-  }
-
-  if (severity === 'warning') {
-    return {
-      ...styles.badgeBase,
-      background: '#fef3c7',
-      color: '#92400e'
-    };
-  }
-
-  return {
-    ...styles.badgeBase,
-    background: '#dbeafe',
-    color: '#1d4ed8'
-  };
+async function deleteSupplier(id: string): Promise<void> {
+  await apiRequest(`/suppliers/${id}`, {
+    method: 'DELETE'
+  });
 }
 
-function stateBadgeStyle(label: 'Resolved' | 'Open' | 'Acknowledged' | 'Unacknowledged'): CSSProperties {
-  if (label === 'Resolved' || label === 'Acknowledged') {
-    return {
-      ...styles.badgeBase,
-      background: '#dcfce7',
-      color: '#166534'
-    };
-  }
-
+function emptyForm(): SupplierFormState {
   return {
-    ...styles.badgeBase,
-    background: '#e5e7eb',
-    color: '#374151'
+    name: '',
+    contact_info: ''
   };
 }
 
@@ -102,16 +61,9 @@ function StatCard(props: {
   title: string;
   value: number | string;
   subtitle: string;
-  tone?: 'default' | 'danger' | 'warn' | 'good';
+  tone?: 'default' | 'good';
 }) {
-  const toneStyle =
-    props.tone === 'danger'
-      ? styles.statValueDanger
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : props.tone === 'good'
-          ? styles.statValueGood
-          : styles.statValue;
+  const toneStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
 
   return (
     <div style={styles.statCard}>
@@ -122,339 +74,332 @@ function StatCard(props: {
   );
 }
 
-export default function AlertsPage() {
+export default function SuppliersPage() {
   const queryClient = useQueryClient();
 
-  const [filters, setFilters] = useState<AlertFilters>({
-    search: '',
-    severity: '',
-    resolved: '',
-    acknowledged: ''
+  const { role, canManageSuppliers } = getRoleCapabilities();
+
+  const [search, setSearch] = useState('');
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [form, setForm] = useState<SupplierFormState>(emptyForm());
+  const [formMessage, setFormMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const suppliersQuery = useQuery({
+    queryKey: ['suppliers', search],
+    queryFn: () => fetchSuppliers(search)
   });
 
-  const [pageMessage, setPageMessage] = useState<string | null>(null);
-  const [pageError, setPageError] = useState<string | null>(null);
-
-  const alertsQuery = useQuery({
-    queryKey: ['alerts', filters],
-    queryFn: () => fetchAlerts(filters)
-  });
-
-  const acknowledgeMutation = useMutation({
-    mutationFn: acknowledgeAlert,
+  const createMutation = useMutation({
+    mutationFn: createSupplier,
     onSuccess: async () => {
-      setPageError(null);
-      setPageMessage('Alert acknowledged.');
-      await queryClient.refetchQueries({ queryKey: ['alerts'] });
+      setEditingSupplier(null);
+      setForm(emptyForm());
+      setFormError(null);
+      setFormMessage('Supplier created successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setPageError(error.message);
+        setFormError(error.message);
       } else {
-        setPageError('Failed to acknowledge alert.');
+        setFormError('Failed to create supplier.');
       }
-      setPageMessage(null);
+      setFormMessage(null);
     }
   });
 
-  const resolveMutation = useMutation({
-    mutationFn: resolveAlert,
+  const updateMutation = useMutation({
+    mutationFn: updateSupplier,
     onSuccess: async () => {
-      setPageError(null);
-      setPageMessage('Alert resolved.');
-      await queryClient.refetchQueries({ queryKey: ['alerts'] });
+      setEditingSupplier(null);
+      setForm(emptyForm());
+      setFormError(null);
+      setFormMessage('Supplier updated successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setPageError(error.message);
+        setFormError(error.message);
       } else {
-        setPageError('Failed to resolve alert.');
+        setFormError('Failed to update supplier.');
       }
-      setPageMessage(null);
+      setFormMessage(null);
     }
   });
 
-  const alerts = useMemo(() => alertsQuery.data ?? [], [alertsQuery.data]);
+  const deleteMutation = useMutation({
+    mutationFn: deleteSupplier,
+    onSuccess: async () => {
+      setFormError(null);
+      setFormMessage('Supplier deleted successfully.');
+      if (editingSupplier) {
+        setEditingSupplier(null);
+        setForm(emptyForm());
+      }
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+      } else {
+        setFormError('Failed to delete supplier.');
+      }
+      setFormMessage(null);
+    }
+  });
+
+  const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
 
   const summary = useMemo(() => {
-    const total = alerts.length;
-    const critical = alerts.filter((alert) => alert.severity === 'critical').length;
-    const open = alerts.filter((alert) => !alert.resolved).length;
-    const unacknowledged = alerts.filter((alert) => !alert.acknowledged).length;
+    const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
+    const withContact = suppliers.filter(
+      (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
+    ).length;
 
     return {
-      total,
-      critical,
-      open,
-      unacknowledged
+      total: suppliers.length,
+      active,
+      withContact
     };
-  }, [alerts]);
+  }, [suppliers]);
 
-  const handleAcknowledge = (id: string) => {
-    setPageError(null);
-    setPageMessage(null);
-    acknowledgeMutation.mutate(id);
-  };
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError(null);
+    setFormMessage(null);
 
-  const handleResolve = (alert: AlertItem) => {
-    const note = window.prompt(
-      `Resolve alert "${alert.type}". Enter an optional resolution note:`,
-      alert.resolution_note || ''
-    );
-
-    if (note === null) {
+    if (!canManageSuppliers) {
+      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
       return;
     }
 
-    setPageError(null);
-    setPageMessage(null);
+    if (editingSupplier) {
+      updateMutation.mutate({
+        id: editingSupplier.id,
+        values: form
+      });
+      return;
+    }
 
-    resolveMutation.mutate({
-      id: alert.id,
-      resolution_note: note
+    createMutation.mutate(form);
+  };
+
+  const handleStartEdit = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot edit suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
+    setEditingSupplier(supplier);
+    setFormMessage(null);
+    setFormError(null);
+    setForm({
+      name: supplier.name,
+      contact_info: supplier.contact_info || ''
     });
   };
 
+  const handleCancelEdit = () => {
+    setEditingSupplier(null);
+    setForm(emptyForm());
+    setFormMessage(null);
+    setFormError(null);
+  };
+
+  const handleDelete = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot delete suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setFormError(null);
+    setFormMessage(null);
+    deleteMutation.mutate(supplier.id);
+  };
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
   return (
     <div>
-      <div style={styles.header}>
-        <div>
-          <h2 style={styles.title}>Alerts</h2>
-          <p style={styles.description}>
-            Operational alert console for triage, acknowledgement, and resolution.
-          </p>
-        </div>
-      </div>
-
-      {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
-      {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
-
       <div style={styles.statsGrid}>
         <StatCard
-          title="Visible Alerts"
+          title="Suppliers"
           value={summary.total}
-          subtitle="Rows matching current filters"
+          subtitle="Visible suppliers"
         />
         <StatCard
-          title="Open Alerts"
-          value={summary.open}
-          subtitle="Still requiring action"
-          tone={summary.open > 0 ? 'warn' : 'good'}
+          title="Active"
+          value={summary.active}
+          subtitle="Currently active supplier records"
+          tone="good"
         />
         <StatCard
-          title="Critical Alerts"
-          value={summary.critical}
-          subtitle="Highest priority items"
-          tone={summary.critical > 0 ? 'danger' : 'good'}
-        />
-        <StatCard
-          title="Unacknowledged"
-          value={summary.unacknowledged}
-          subtitle="Not yet claimed by an operator"
-          tone={summary.unacknowledged > 0 ? 'warn' : 'good'}
+          title="With Contact Info"
+          value={summary.withContact}
+          subtitle="Suppliers with saved contact details"
         />
       </div>
 
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Filters</h3>
+      {!canManageSuppliers ? (
+        <div style={styles.warningBox}>
+          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
+        </div>
+      ) : null}
 
-        <div style={styles.filtersGrid}>
+      <section style={styles.panel}>
+        <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
+        <p style={styles.panelSubtitle}>
+          {(canManageSuppliers
+            ? 'Maintain supplier master records used across purchasing and inbound operations.'
+            : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
+        </p>
+        <p style={styles.panelSubtitle}>
+          Maintain supplier master data used by products, shipments, and procurement operations.
+        </p>
+
+        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
+        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
+
+        <form onSubmit={handleSubmit} style={styles.formGrid}>
           <div>
-            <label style={styles.label}>Search</label>
+            <label style={styles.label}>Supplier Name</label>
             <input
               style={styles.input}
-              type="text"
-              placeholder="Search by type, message, product, severity..."
-              value={filters.search}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  search: event.target.value
-                }))
-              }
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Example: Metro Wholesale"
+              required
             />
           </div>
 
           <div>
-            <label style={styles.label}>Severity</label>
-            <select
+            <label style={styles.label}>Contact Info</label>
+            <input
               style={styles.input}
-              value={filters.severity}
+              value={form.contact_info}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  severity: event.target.value
-                }))
+                setForm((current) => ({ ...current, contact_info: event.target.value }))
               }
-            >
-              <option value="">All severities</option>
-              <option value="info">Info</option>
-              <option value="warning">Warning</option>
-              <option value="critical">Critical</option>
-            </select>
+              placeholder="Phone, email, or notes"
+            />
           </div>
 
-          <div>
-            <label style={styles.label}>Resolution State</label>
-            <select
-              style={styles.input}
-              value={filters.resolved}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  resolved: event.target.value
-                }))
-              }
-            >
-              <option value="">Resolved + unresolved</option>
-              <option value="false">Open only</option>
-              <option value="true">Resolved only</option>
-            </select>
-          </div>
+          <div style={styles.formActions}>
+            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
+              {isSubmitting
+                ? editingSupplier
+                  ? 'Updating...'
+                  : 'Creating...'
+                : editingSupplier
+                  ? 'Update Supplier'
+                  : 'Create Supplier'}
+            </button>
 
-          <div>
-            <label style={styles.label}>Acknowledgement State</label>
-            <select
-              style={styles.input}
-              value={filters.acknowledged}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  acknowledged: event.target.value
-                }))
-              }
-            >
-              <option value="">Acknowledged + unacknowledged</option>
-              <option value="false">Unacknowledged only</option>
-              <option value="true">Acknowledged only</option>
-            </select>
+            {editingSupplier ? (
+              <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
+                Cancel
+              </button>
+            ) : null}
           </div>
-        </div>
+        </form>
       </section>
 
-      <section style={styles.list}>
-        {alertsQuery.isLoading ? <p>Loading alerts...</p> : null}
+      <section style={styles.panel}>
+        <h3 style={styles.panelTitle}>Supplier List</h3>
+        <p style={styles.panelSubtitle}>
+          Search and review supplier records available to inventory and shipment workflows.
+        </p>
 
-        {alertsQuery.isError ? (
-          <p>Failed to load alerts: {(alertsQuery.error as Error)?.message || 'Unknown error'}</p>
+        <div style={styles.toolbar}>
+          <input
+            type="text"
+            placeholder="Search by supplier name or contact info..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
+
+        {suppliersQuery.isLoading ? <p>Loading suppliers...</p> : null}
+
+        {suppliersQuery.isError ? (
+          <p>Failed to load suppliers: {(suppliersQuery.error as Error).message || 'Unknown error'}</p>
         ) : null}
 
-        {!alertsQuery.isLoading && !alertsQuery.isError ? (
-          <>
-            {alerts.length === 0 ? (
-              <div style={styles.emptyState}>
-                <div style={styles.emptyStateTitle}>No alerts match the current filters</div>
-                <div style={styles.emptyStateText}>
-                  Try broadening the search or clearing one of the filter conditions.
-                </div>
-              </div>
-            ) : (
-              alerts.map((alert) => {
-                const isOpen = !alert.resolved;
-                const isUnacknowledged = !alert.acknowledged;
-
-                return (
-                  <div key={alert.id} style={styles.card}>
-                    <div style={styles.cardTop}>
-                      <div style={styles.cardTopLeft}>
-                        <div style={styles.cardHeadingRow}>
-                          <h3 style={styles.cardTitle}>{alert.type}</h3>
-                          <span style={severityBadgeStyle(alert.severity)}>
-                            {alert.severity}
-                          </span>
-                        </div>
-
-                        <p style={styles.cardMeta}>
-                          Created: {formatDateTime(alert.created_at)}
-                        </p>
-
-                        <div style={styles.metaBadgeRow}>
-                          <span style={stateBadgeStyle(isOpen ? 'Open' : 'Resolved')}>
-                            {isOpen ? 'Open' : 'Resolved'}
-                          </span>
-
-                          <span
-                            style={stateBadgeStyle(
-                              isUnacknowledged ? 'Unacknowledged' : 'Acknowledged'
-                            )}
+        {!suppliersQuery.isLoading && !suppliersQuery.isError ? (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Name</th>
+                  <th style={styles.th}>Contact Info</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.length === 0 ? (
+                  <tr>
+                    <td style={styles.emptyCell} colSpan={4}>
+                      No suppliers found.
+                    </td>
+                  </tr>
+                ) : (
+                  suppliers.map((supplier) => (
+                    <tr key={supplier.id}>
+                      <td style={styles.td}>
+                        <div style={styles.rowTitle}>{supplier.name}</div>
+                        <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
+                      </td>
+                      <td style={styles.td}>{supplier.contact_info || '-'}</td>
+                      <td style={styles.td}>
+                        <span style={supplier.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
+                          {supplier.deleted_at ? 'Deleted' : 'Active'}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.actionGroup}>
+                          <button
+                            type="button"
+                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
+                            onClick={() => handleStartEdit(supplier)}
+                            disabled={!canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
                           >
-                            {isUnacknowledged ? 'Unacknowledged' : 'Acknowledged'}
-                          </span>
+                            Edit
+                          </button>
 
-                          <span style={styles.metaChip}>
-                            Escalation Level: {alert.escalation_level}
-                          </span>
+                          <button
+                            type="button"
+                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
+                            onClick={() => handleDelete(supplier)}
+                            disabled={deleteMutation.isPending || !canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
+                          >
+                            Delete
+                          </button>
                         </div>
-                      </div>
-                    </div>
-
-                    <div style={styles.messageBox}>{alert.message}</div>
-
-                    <div style={styles.detailsGrid}>
-                      <div style={styles.detailCard}>
-                        <div style={styles.detailLabel}>Product</div>
-                        <div style={styles.detailValue}>{alert.product_name || '-'}</div>
-                      </div>
-
-                      <div style={styles.detailCard}>
-                        <div style={styles.detailLabel}>Acknowledged At</div>
-                        <div style={styles.detailValue}>
-                          {formatDateTime(alert.acknowledged_at)}
-                        </div>
-                      </div>
-
-                      <div style={styles.detailCard}>
-                        <div style={styles.detailLabel}>Resolved At</div>
-                        <div style={styles.detailValue}>
-                          {formatDateTime(alert.resolved_at)}
-                        </div>
-                      </div>
-
-                      <div style={styles.detailCard}>
-                        <div style={styles.detailLabel}>Last Escalated</div>
-                        <div style={styles.detailValue}>
-                          {formatDateTime(alert.last_escalated_at)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {alert.resolution_note ? (
-                      <div style={styles.noteBox}>
-                        <div style={styles.noteTitle}>Resolution Note</div>
-                        <div style={styles.noteText}>{alert.resolution_note}</div>
-                      </div>
-                    ) : null}
-
-                    <div style={styles.cardActions}>
-                      {!alert.acknowledged && !alert.resolved ? (
-                        <button
-                          type="button"
-                          style={styles.secondaryButton}
-                          onClick={() => handleAcknowledge(alert.id)}
-                          disabled={acknowledgeMutation.isPending}
-                        >
-                          {acknowledgeMutation.isPending ? 'Working...' : 'Acknowledge'}
-                        </button>
-                      ) : null}
-
-                      {!alert.resolved ? (
-                        <button
-                          type="button"
-                          style={styles.primaryButton}
-                          onClick={() => handleResolve(alert)}
-                          disabled={resolveMutation.isPending}
-                        >
-                          {resolveMutation.isPending ? 'Working...' : 'Resolve'}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </section>
     </div>
@@ -462,19 +407,6 @@ export default function AlertsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  header: {
-    marginBottom: '20px'
-  },
-  title: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: 700
-  },
-  description: {
-    marginTop: '8px',
-    color: '#6b7280',
-    lineHeight: 1.5
-  },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -505,18 +437,6 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '8px',
     color: '#166534'
   },
-  statValueWarn: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#92400e'
-  },
-  statValueDanger: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#991b1b'
-  },
   statSubtitle: {
     fontSize: '13px',
     color: '#6b7280',
@@ -532,14 +452,21 @@ const styles: Record<string, CSSProperties> = {
   },
   panelTitle: {
     marginTop: 0,
-    marginBottom: '16px',
+    marginBottom: '8px',
     fontSize: '20px',
     fontWeight: 700
   },
-  filtersGrid: {
+  panelSubtitle: {
+    marginTop: 0,
+    marginBottom: '16px',
+    color: '#6b7280',
+    lineHeight: 1.5
+  },
+  formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px'
+    gap: '14px',
+    alignItems: 'end'
   },
   label: {
     display: 'block',
@@ -555,129 +482,28 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff',
     outline: 'none'
   },
-  list: {
-    display: 'grid',
-    gap: '16px'
-  },
-  card: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-  },
-  cardTop: {
+  formActions: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: '16px',
-    alignItems: 'flex-start',
-    marginBottom: '12px'
-  },
-  cardTopLeft: {
-    flex: 1
-  },
-  cardHeadingRow: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: '8px'
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: '18px',
-    fontWeight: 700
-  },
-  cardMeta: {
-    margin: '0 0 10px 0',
-    color: '#6b7280',
-    fontSize: '13px'
-  },
-  metaBadgeRow: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  badgeBase: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    fontWeight: 700,
-    fontSize: '12px',
-    whiteSpace: 'nowrap'
-  },
-  metaChip: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    fontWeight: 700,
-    fontSize: '12px',
-    background: '#f3f4f6',
-    color: '#374151'
-  },
-  messageBox: {
-    marginTop: '6px',
-    marginBottom: '14px',
-    padding: '14px',
-    borderRadius: '12px',
-    background: '#fafafa',
-    border: '1px solid #e5e7eb',
-    color: '#374151',
-    lineHeight: 1.6
-  },
-  detailsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '12px',
-    marginBottom: '14px'
-  },
-  detailCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: '12px',
-    padding: '12px',
-    background: '#fcfcfc'
-  },
-  detailLabel: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginBottom: '6px',
-    fontWeight: 600
-  },
-  detailValue: {
-    fontSize: '14px',
-    fontWeight: 600,
-    lineHeight: 1.4,
-    wordBreak: 'break-word'
-  },
-  noteBox: {
-    marginBottom: '14px',
-    padding: '14px',
-    borderRadius: '12px',
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb'
-  },
-  noteTitle: {
-    fontSize: '13px',
-    fontWeight: 700,
-    marginBottom: '6px'
-  },
-  noteText: {
-    color: '#374151',
-    lineHeight: 1.6
-  },
-  cardActions: {
-    display: 'flex',
+    alignItems: 'end',
     gap: '10px',
     flexWrap: 'wrap'
   },
   primaryButton: {
     border: 'none',
     borderRadius: '10px',
-    padding: '10px 14px',
+    padding: '12px 16px',
     background: '#2563eb',
     color: '#ffffff',
     fontWeight: 600,
     cursor: 'pointer'
+  },
+  disabledButton: {
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid #d1d5db',
+    background: '#e5e7eb',
+    color: '#6b7280',
+    cursor: 'not-allowed'
   },
   secondaryButton: {
     border: '1px solid #d1d5db',
@@ -688,22 +514,91 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
-  emptyState: {
+  dangerButton: {
+    border: '1px solid #fecaca',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    background: '#fef2f2',
+    color: '#b91c1c',
+    fontWeight: 600,
+    cursor: 'pointer'
+  },
+  toolbar: {
+    marginBottom: '16px'
+  },
+  searchInput: {
+    width: '100%',
+    maxWidth: '420px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    border: '1px solid #d1d5db',
+    outline: 'none',
+    fontSize: '14px',
+    background: '#ffffff'
+  },
+  tableWrapper: {
     background: '#ffffff',
-    border: '1px dashed #d1d5db',
+    border: '1px solid #e5e7eb',
     borderRadius: '14px',
-    padding: '28px',
-    color: '#6b7280',
-    textAlign: 'center'
+    overflow: 'hidden',
+    overflowX: 'auto'
   },
-  emptyStateTitle: {
-    fontSize: '16px',
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    minWidth: '840px'
+  },
+  th: {
+    textAlign: 'left',
+    padding: '14px',
+    background: '#f9fafb',
+    borderBottom: '1px solid #e5e7eb',
+    fontSize: '13px',
+    color: '#6b7280'
+  },
+  td: {
+    padding: '14px',
+    borderBottom: '1px solid #f3f4f6',
+    fontSize: '14px',
+    verticalAlign: 'top'
+  },
+  emptyCell: {
+    padding: '24px',
+    textAlign: 'center',
+    color: '#6b7280'
+  },
+  rowTitle: {
     fontWeight: 700,
-    marginBottom: '8px',
-    color: '#374151'
+    marginBottom: '6px'
   },
-  emptyStateText: {
-    lineHeight: 1.5
+  rowSubtle: {
+    fontSize: '12px',
+    color: '#6b7280',
+    lineHeight: 1.4,
+    wordBreak: 'break-all'
+  },
+  badgeActive: {
+    display: 'inline-block',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: '#f0fdf4',
+    color: '#166534',
+    fontWeight: 700,
+    fontSize: '12px'
+  },
+  badgeDeleted: {
+    display: 'inline-block',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: '#fee2e2',
+    color: '#991b1b',
+    fontWeight: 700,
+    fontSize: '12px'
+  },
+  actionGroup: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   errorBox: {
     marginBottom: '14px',
@@ -712,6 +607,14 @@ const styles: Record<string, CSSProperties> = {
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#b91c1c'
+  },
+  warningBox: {
+    marginBottom: '16px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412'
   },
   successBox: {
     marginBottom: '14px',

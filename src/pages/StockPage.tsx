@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import { getAccessToken } from '../lib/auth';
+import { getRoleCapabilities } from '../lib/permissions';
 
 type StockItem = {
   id: string;
@@ -36,7 +36,6 @@ type StockMovement = {
 };
 
 type StockActionType = 'consume' | 'count' | 'adjust';
-type UserRole = 'admin' | 'manager' | 'staff' | 'unknown';
 
 type StockMutationResponse = {
   message: string;
@@ -55,10 +54,6 @@ type StockActionDraft = {
   quantity: string;
   change: string;
   reason: string;
-};
-
-type JwtPayload = {
-  role?: string;
 };
 
 async function fetchStock(): Promise<StockItem[]> {
@@ -89,59 +84,6 @@ function formatDateTime(dateString: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return dateString;
 
   return date.toLocaleString();
-}
-
-function decodeJwtPayload(token: string | null): JwtPayload | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const parts = token.split('.');
-
-    if (parts.length !== 3) {
-      return null;
-    }
-
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    const decoded = atob(padded);
-
-    return JSON.parse(decoded) as JwtPayload;
-  } catch {
-    return null;
-  }
-}
-
-function getCurrentUserRole(): UserRole {
-  /*
-    WHAT CHANGED
-    ------------
-    This page now reads the existing JWT payload already used by your backend
-    auth middleware so stock actions can be shown or blocked according to the
-    real backend role model.
-
-    WHY IT CHANGED
-    --------------
-    Your backend already enforces:
-    - staff/manager can consume
-    - manager/admin can count and adjust
-
-    The stock page previously exposed no action layer at all.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    This keeps the frontend aligned with the current backend authorization
-    contract instead of exposing unsafe or misleading actions.
-  */
-  const payload = decodeJwtPayload(getAccessToken());
-  const role = payload?.role;
-
-  if (role === 'admin' || role === 'manager' || role === 'staff') {
-    return role;
-  }
-
-  return 'unknown';
 }
 
 function getDefaultDraft(action: StockActionType): StockActionDraft {
@@ -279,7 +221,7 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
-  const role = useMemo(() => getCurrentUserRole(), []);
+  const { role, canConsumeStock: canConsume, canCountStock: canCount, canAdjustStock: canAdjust } = useMemo(() => getRoleCapabilities(), []);
 
   /*
     WHAT CHANGED
@@ -366,9 +308,6 @@ export default function StockPage() {
     };
   }, [rows]);
 
-  const canConsume = role === 'staff' || role === 'manager' || role === 'admin';
-  const canCount = role === 'manager' || role === 'admin';
-  const canAdjust = role === 'manager' || role === 'admin';
 
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
   const currentMinimum = selectedRow

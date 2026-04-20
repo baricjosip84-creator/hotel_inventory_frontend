@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 
 type SupplierFormState = {
@@ -75,6 +76,8 @@ function StatCard(props: {
 
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
+
+  const { role, canManageSuppliers } = getRoleCapabilities();
 
   const [search, setSearch] = useState('');
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
@@ -172,6 +175,11 @@ export default function SuppliersPage() {
     setFormError(null);
     setFormMessage(null);
 
+    if (!canManageSuppliers) {
+      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
+      return;
+    }
+
     if (editingSupplier) {
       updateMutation.mutate({
         id: editingSupplier.id,
@@ -184,6 +192,12 @@ export default function SuppliersPage() {
   };
 
   const handleStartEdit = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot edit suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
     setEditingSupplier(supplier);
     setFormMessage(null);
     setFormError(null);
@@ -201,6 +215,12 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot delete suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
     const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
     if (!confirmed) {
       return;
@@ -234,8 +254,19 @@ export default function SuppliersPage() {
         />
       </div>
 
+      {!canManageSuppliers ? (
+        <div style={styles.warningBox}>
+          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
+        </div>
+      ) : null}
+
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
+        <p style={styles.panelSubtitle}>
+          {(canManageSuppliers
+            ? 'Maintain supplier master records used across purchasing and inbound operations.'
+            : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
+        </p>
         <p style={styles.panelSubtitle}>
           Maintain supplier master data used by products, shipments, and procurement operations.
         </p>
@@ -268,7 +299,7 @@ export default function SuppliersPage() {
           </div>
 
           <div style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={isSubmitting}>
+            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
               {isSubmitting
                 ? editingSupplier
                   ? 'Updating...'
@@ -344,17 +375,20 @@ export default function SuppliersPage() {
                         <div style={styles.actionGroup}>
                           <button
                             type="button"
-                            style={styles.secondaryButton}
+                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
                             onClick={() => handleStartEdit(supplier)}
+                            disabled={!canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
                           >
                             Edit
                           </button>
 
                           <button
                             type="button"
-                            style={styles.dangerButton}
+                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
                             onClick={() => handleDelete(supplier)}
-                            disabled={deleteMutation.isPending}
+                            disabled={deleteMutation.isPending || !canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
                           >
                             Delete
                           </button>
@@ -463,6 +497,14 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
+  disabledButton: {
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid #d1d5db',
+    background: '#e5e7eb',
+    color: '#6b7280',
+    cursor: 'not-allowed'
+  },
   secondaryButton: {
     border: '1px solid #d1d5db',
     borderRadius: '10px',
@@ -565,6 +607,14 @@ const styles: Record<string, CSSProperties> = {
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#b91c1c'
+  },
+  warningBox: {
+    marginBottom: '16px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412'
   },
   successBox: {
     marginBottom: '14px',

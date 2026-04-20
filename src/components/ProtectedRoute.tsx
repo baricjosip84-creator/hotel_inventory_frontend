@@ -2,9 +2,15 @@ import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { getAccessToken, getRefreshToken, isAuthenticated } from '../lib/auth';
+import type { UserRole } from '../lib/permissions';
+import { hasAnyRole } from '../lib/permissions';
 import { apiRequest } from '../lib/api';
 
-export function ProtectedRoute({ children }: PropsWithChildren) {
+type ProtectedRouteProps = PropsWithChildren<{
+  allowedRoles?: UserRole[];
+}>;
+
+export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const location = useLocation();
 
   /*
@@ -75,6 +81,35 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
 
   if (status === 'denied') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  /*
+    WHAT CHANGED
+    ------------
+    ProtectedRoute now supports optional role-based authorization on top of the
+    existing authenticated-session guard.
+
+    WHY IT CHANGED
+    --------------
+    Your backend already enforces role restrictions. The frontend now mirrors
+    those restrictions at route level so management pages do not appear
+    accessible until the user clicks into them.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This prevents unauthorized navigation to protected management routes such as
+    reports while still keeping the backend as the real security boundary.
+  */
+  if (allowedRoles && !hasAnyRole(allowedRoles)) {
+    return (
+      <div style={{ padding: '24px', maxWidth: 720 }}>
+        <h2 style={{ marginTop: 0 }}>Access denied</h2>
+        <p style={{ marginBottom: 0, color: '#4b5563' }}>
+          Your current role does not have access to this route. The frontend is
+          aligned to the backend authorization model already enforced by the API.
+        </p>
+      </div>
+    );
   }
 
   return <>{children}</>;

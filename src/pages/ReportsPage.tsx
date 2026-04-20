@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
-import { getAccessToken } from '../lib/auth';
+import { getRoleCapabilities } from '../lib/permissions';
 
 type ReportTab = 'inventory-valuation' | 'stock-by-location' | 'product-movements' | 'procurement-summary' | 'forecast';
 
@@ -68,10 +68,6 @@ type ForecastRow = {
   avg_daily_usage: number | string;
 };
 
-type JwtPayload = {
-  role?: string;
-};
-
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') {
     return value;
@@ -111,28 +107,6 @@ function formatDateTime(value: string | null | undefined): string {
   }
 
   return parsed.toLocaleString();
-}
-
-function decodeJwtPayload(token: string | null): JwtPayload | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const parts = token.split('.');
-
-    if (parts.length !== 3) {
-      return null;
-    }
-
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    const decoded = atob(padded);
-
-    return JSON.parse(decoded) as JwtPayload;
-  } catch {
-    return null;
-  }
 }
 
 function buildQueryString(params: Record<string, string | number | null | undefined>): string {
@@ -263,10 +237,7 @@ export default function ReportsPage() {
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
   const [movementLimit, setMovementLimit] = useState(50);
 
-  const currentUserRole = useMemo(() => {
-    const payload = decodeJwtPayload(getAccessToken());
-    return payload?.role?.toLowerCase() || null;
-  }, []);
+  const { role: currentUserRole } = getRoleCapabilities();
 
   const inventoryValuationQuery = useQuery({
     queryKey: ['reports', 'inventory-valuation'],

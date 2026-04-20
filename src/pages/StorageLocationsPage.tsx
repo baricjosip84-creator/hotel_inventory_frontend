@@ -2,22 +2,15 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
+import type { SupplierItem } from '../types/inventory';
 
-type StorageLocationItem = {
-  id: string;
-  tenant_id: string;
+type SupplierFormState = {
   name: string;
-  temperature_zone: string | null;
-  created_at?: string;
-  deleted_at?: string | null;
+  contact_info: string;
 };
 
-type StorageLocationFormState = {
-  name: string;
-  temperature_zone: string;
-};
-
-async function fetchStorageLocations(search: string): Promise<StorageLocationItem[]> {
+async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
   const params = new URLSearchParams();
 
   if (search.trim()) {
@@ -25,134 +18,257 @@ async function fetchStorageLocations(search: string): Promise<StorageLocationIte
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest<StorageLocationItem[]>(`/storage-locations${suffix}`);
+  return apiRequest<SupplierItem[]>(`/suppliers${suffix}`);
 }
 
-async function createStorageLocation(input: StorageLocationFormState): Promise<StorageLocationItem> {
-  return apiRequest<StorageLocationItem>('/storage-locations', {
+async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
+  return apiRequest<SupplierItem>('/suppliers', {
     method: 'POST',
     body: JSON.stringify({
       name: input.name.trim(),
-      temperature_zone: input.temperature_zone.trim() || null
+      contact_info: input.contact_info.trim() || null
     })
   });
 }
 
-function emptyForm(): StorageLocationFormState {
-  return {
-    name: '',
-    temperature_zone: ''
-  };
+async function updateSupplier(input: {
+  id: string;
+  values: SupplierFormState;
+}): Promise<SupplierItem> {
+  return apiRequest<SupplierItem>(`/suppliers/${input.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name: input.values.name.trim(),
+      contact_info: input.values.contact_info.trim() || null
+    })
+  });
 }
 
-function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
+async function deleteSupplier(id: string): Promise<void> {
+  await apiRequest(`/suppliers/${id}`, {
+    method: 'DELETE'
+  });
+}
 
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
-  return date.toLocaleString();
+function emptyForm(): SupplierFormState {
+  return {
+    name: '',
+    contact_info: ''
+  };
 }
 
 function StatCard(props: {
   title: string;
   value: number | string;
   subtitle: string;
+  tone?: 'default' | 'good';
 }) {
+  const toneStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
+
   return (
     <div style={styles.statCard}>
       <div style={styles.statTitle}>{props.title}</div>
-      <div style={styles.statValue}>{props.value}</div>
+      <div style={toneStyle}>{props.value}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
   );
 }
 
-export default function StorageLocationsPage() {
+export default function SuppliersPage() {
   const queryClient = useQueryClient();
 
+  const { role, canManageSuppliers } = getRoleCapabilities();
+
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [form, setForm] = useState<SupplierFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const locationsQuery = useQuery({
-    queryKey: ['storage-locations', search],
-    queryFn: () => fetchStorageLocations(search)
+  const suppliersQuery = useQuery({
+    queryKey: ['suppliers', search],
+    queryFn: () => fetchSuppliers(search)
   });
 
   const createMutation = useMutation({
-    mutationFn: createStorageLocation,
+    mutationFn: createSupplier,
     onSuccess: async () => {
+      setEditingSupplier(null);
       setForm(emptyForm());
       setFormError(null);
-      setFormMessage('Storage location created successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['storage-locations'] });
+      setFormMessage('Supplier created successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setFormError(error.message);
       } else {
-        setFormError('Failed to create storage location.');
+        setFormError('Failed to create supplier.');
       }
       setFormMessage(null);
     }
   });
 
-  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
+  const updateMutation = useMutation({
+    mutationFn: updateSupplier,
+    onSuccess: async () => {
+      setEditingSupplier(null);
+      setForm(emptyForm());
+      setFormError(null);
+      setFormMessage('Supplier updated successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+      } else {
+        setFormError('Failed to update supplier.');
+      }
+      setFormMessage(null);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteSupplier,
+    onSuccess: async () => {
+      setFormError(null);
+      setFormMessage('Supplier deleted successfully.');
+      if (editingSupplier) {
+        setEditingSupplier(null);
+        setForm(emptyForm());
+      }
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+      } else {
+        setFormError('Failed to delete supplier.');
+      }
+      setFormMessage(null);
+    }
+  });
+
+  const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
 
   const summary = useMemo(() => {
-    const active = locations.filter((location) => !location.deleted_at).length;
-    const deleted = locations.filter((location) => Boolean(location.deleted_at)).length;
-    const ambient = locations.filter(
-      (location) => (location.temperature_zone || '').toLowerCase() === 'ambient'
+    const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
+    const withContact = suppliers.filter(
+      (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
     ).length;
 
     return {
-      total: locations.length,
+      total: suppliers.length,
       active,
-      deleted,
-      ambient
+      withContact
     };
-  }, [locations]);
+  }, [suppliers]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
     setFormMessage(null);
+
+    if (!canManageSuppliers) {
+      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
+      return;
+    }
+
+    if (editingSupplier) {
+      updateMutation.mutate({
+        id: editingSupplier.id,
+        values: form
+      });
+      return;
+    }
+
     createMutation.mutate(form);
   };
+
+  const handleStartEdit = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot edit suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
+    setEditingSupplier(supplier);
+    setFormMessage(null);
+    setFormError(null);
+    setForm({
+      name: supplier.name,
+      contact_info: supplier.contact_info || ''
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSupplier(null);
+    setForm(emptyForm());
+    setFormMessage(null);
+    setFormError(null);
+  };
+
+  const handleDelete = (supplier: SupplierItem) => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot delete suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setFormError(null);
+    setFormMessage(null);
+    deleteMutation.mutate(supplier.id);
+  };
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div>
       <div style={styles.statsGrid}>
         <StatCard
-          title="Locations"
+          title="Suppliers"
           value={summary.total}
-          subtitle="Visible storage locations"
+          subtitle="Visible suppliers"
         />
         <StatCard
           title="Active"
           value={summary.active}
-          subtitle="Currently usable locations"
+          subtitle="Currently active supplier records"
+          tone="good"
         />
         <StatCard
-          title="Ambient"
-          value={summary.ambient}
-          subtitle="Locations tagged ambient"
-        />
-        <StatCard
-          title="Deleted"
-          value={summary.deleted}
-          subtitle="Soft-deleted locations"
+          title="With Contact Info"
+          value={summary.withContact}
+          subtitle="Suppliers with saved contact details"
         />
       </div>
 
+      {!canManageSuppliers ? (
+        <div style={styles.warningBox}>
+          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
+        </div>
+      ) : null}
+
       <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Create Storage Location</h3>
+        <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
         <p style={styles.panelSubtitle}>
-          Maintain receiving and storage areas used across stock and shipment workflows.
+          {(canManageSuppliers
+            ? 'Maintain supplier master records used across purchasing and inbound operations.'
+            : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
+        </p>
+        <p style={styles.panelSubtitle}>
+          Maintain supplier master data used by products, shipments, and procurement operations.
         </p>
 
         {formError ? <div style={styles.errorBox}>{formError}</div> : null}
@@ -160,92 +276,123 @@ export default function StorageLocationsPage() {
 
         <form onSubmit={handleSubmit} style={styles.formGrid}>
           <div>
-            <label style={styles.label}>Name</label>
+            <label style={styles.label}>Supplier Name</label>
             <input
               style={styles.input}
               value={form.name}
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Example: Main Warehouse"
+              placeholder="Example: Metro Wholesale"
               required
             />
           </div>
 
           <div>
-            <label style={styles.label}>Temperature Zone</label>
+            <label style={styles.label}>Contact Info</label>
             <input
               style={styles.input}
-              value={form.temperature_zone}
+              value={form.contact_info}
               onChange={(event) =>
-                setForm((current) => ({ ...current, temperature_zone: event.target.value }))
+                setForm((current) => ({ ...current, contact_info: event.target.value }))
               }
-              placeholder="Example: ambient, chilled, frozen"
+              placeholder="Phone, email, or notes"
             />
           </div>
 
           <div style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating...' : 'Create Storage Location'}
+            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
+              {isSubmitting
+                ? editingSupplier
+                  ? 'Updating...'
+                  : 'Creating...'
+                : editingSupplier
+                  ? 'Update Supplier'
+                  : 'Create Supplier'}
             </button>
+
+            {editingSupplier ? (
+              <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
+                Cancel
+              </button>
+            ) : null}
           </div>
         </form>
       </section>
 
       <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Storage Location List</h3>
+        <h3 style={styles.panelTitle}>Supplier List</h3>
         <p style={styles.panelSubtitle}>
-          Search and review storage areas currently available to inventory operations.
+          Search and review supplier records available to inventory and shipment workflows.
         </p>
 
         <div style={styles.toolbar}>
           <input
             type="text"
-            placeholder="Search by name or temperature zone..."
+            placeholder="Search by supplier name or contact info..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             style={styles.searchInput}
           />
         </div>
 
-        {locationsQuery.isLoading ? <p>Loading storage locations...</p> : null}
+        {suppliersQuery.isLoading ? <p>Loading suppliers...</p> : null}
 
-        {locationsQuery.isError ? (
-          <p>
-            Failed to load storage locations:{' '}
-            {(locationsQuery.error as Error).message || 'Unknown error'}
-          </p>
+        {suppliersQuery.isError ? (
+          <p>Failed to load suppliers: {(suppliersQuery.error as Error).message || 'Unknown error'}</p>
         ) : null}
 
-        {!locationsQuery.isLoading && !locationsQuery.isError ? (
+        {!suppliersQuery.isLoading && !suppliersQuery.isError ? (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Temperature Zone</th>
-                  <th style={styles.th}>Created</th>
+                  <th style={styles.th}>Contact Info</th>
                   <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {locations.length === 0 ? (
+                {suppliers.length === 0 ? (
                   <tr>
                     <td style={styles.emptyCell} colSpan={4}>
-                      No storage locations found.
+                      No suppliers found.
                     </td>
                   </tr>
                 ) : (
-                  locations.map((location) => (
-                    <tr key={location.id}>
+                  suppliers.map((supplier) => (
+                    <tr key={supplier.id}>
                       <td style={styles.td}>
-                        <div style={styles.rowTitle}>{location.name}</div>
-                        <div style={styles.rowSubtle}>Location ID: {location.id}</div>
+                        <div style={styles.rowTitle}>{supplier.name}</div>
+                        <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
                       </td>
-                      <td style={styles.td}>{location.temperature_zone || '-'}</td>
-                      <td style={styles.td}>{formatDateTime(location.created_at)}</td>
+                      <td style={styles.td}>{supplier.contact_info || '-'}</td>
                       <td style={styles.td}>
-                        <span style={location.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
-                          {location.deleted_at ? 'Deleted' : 'Active'}
+                        <span style={supplier.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
+                          {supplier.deleted_at ? 'Deleted' : 'Active'}
                         </span>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.actionGroup}>
+                          <button
+                            type="button"
+                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
+                            onClick={() => handleStartEdit(supplier)}
+                            disabled={!canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
+                            onClick={() => handleDelete(supplier)}
+                            disabled={deleteMutation.isPending || !canManageSuppliers}
+                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -283,6 +430,12 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px'
+  },
+  statValueGood: {
+    fontSize: '32px',
+    fontWeight: 700,
+    marginBottom: '8px',
+    color: '#166534'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -331,7 +484,9 @@ const styles: Record<string, CSSProperties> = {
   },
   formActions: {
     display: 'flex',
-    alignItems: 'end'
+    alignItems: 'end',
+    gap: '10px',
+    flexWrap: 'wrap'
   },
   primaryButton: {
     border: 'none',
@@ -342,7 +497,35 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
-  toolbar: { marginBottom: '16px' },
+  disabledButton: {
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid #d1d5db',
+    background: '#e5e7eb',
+    color: '#6b7280',
+    cursor: 'not-allowed'
+  },
+  secondaryButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    background: '#ffffff',
+    color: '#111827',
+    fontWeight: 600,
+    cursor: 'pointer'
+  },
+  dangerButton: {
+    border: '1px solid #fecaca',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    background: '#fef2f2',
+    color: '#b91c1c',
+    fontWeight: 600,
+    cursor: 'pointer'
+  },
+  toolbar: {
+    marginBottom: '16px'
+  },
   searchInput: {
     width: '100%',
     maxWidth: '420px',
@@ -363,7 +546,7 @@ const styles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '820px'
+    minWidth: '840px'
   },
   th: {
     textAlign: 'left',
@@ -412,6 +595,11 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     fontSize: '12px'
   },
+  actionGroup: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
+  },
   errorBox: {
     marginBottom: '14px',
     padding: '12px 14px',
@@ -419,6 +607,14 @@ const styles: Record<string, CSSProperties> = {
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#b91c1c'
+  },
+  warningBox: {
+    marginBottom: '16px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412'
   },
   successBox: {
     marginBottom: '14px',

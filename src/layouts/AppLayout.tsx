@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { clearAuthTokens, getRefreshToken } from '../lib/auth';
+import { getCurrentUserRole } from '../lib/permissions';
 import { apiRequest } from '../lib/api';
 
 function getPageTitle(pathname: string): string {
@@ -29,12 +30,12 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/suppliers')) return 'Suppliers';
   if (pathname.startsWith('/alerts')) return 'Alerts';
   if (pathname.startsWith('/stock-movements')) return 'Stock Movements';
+  if (pathname.startsWith('/reports')) return 'Reports';
   if (pathname.startsWith('/stock')) return 'Stock';
   if (pathname.startsWith('/storage-locations')) return 'Storage Locations';
   if (pathname.startsWith('/shipments')) return 'Shipments';
   if (pathname.startsWith('/scanner')) return 'Scanner';
   if (pathname.startsWith('/sessions')) return 'Sessions';
-  if (pathname.startsWith('/reports')) return 'Reports';
   return 'Inventory Management';
 }
 
@@ -53,6 +54,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/stock-movements')) {
     return 'Trace the full movement ledger behind current stock positions.';
+  }
+  if (pathname.startsWith('/reports')) {
+    return 'Management reporting for valuation, location balances, movements, procurement, and forecast.';
   }
   if (pathname.startsWith('/stock')) {
     return 'View stock by product and location, with low-stock visibility.';
@@ -95,19 +99,21 @@ export default function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const currentRole = getCurrentUserRole();
+
   const navItems = [
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/products', label: 'Products' },
-    { to: '/suppliers', label: 'Suppliers' },
-    { to: '/alerts', label: 'Alerts' },
-    { to: '/stock', label: 'Stock' },
-    { to: '/stock-movements', label: 'Stock Movements' },
-    { to: '/storage-locations', label: 'Storage Locations' },
-    { to: '/shipments', label: 'Shipments' },
-    { to: '/scanner', label: 'Scanner' },
-    { to: '/reports', label: 'Reports' },
-    { to: '/sessions', label: 'Sessions' }
-  ];
+    { to: '/dashboard', label: 'Dashboard', visible: true },
+    { to: '/products', label: 'Products', visible: true },
+    { to: '/suppliers', label: 'Suppliers', visible: true },
+    { to: '/alerts', label: 'Alerts', visible: true },
+    { to: '/stock', label: 'Stock', visible: true },
+    { to: '/stock-movements', label: 'Stock Movements', visible: true },
+    { to: '/storage-locations', label: 'Storage Locations', visible: true },
+    { to: '/shipments', label: 'Shipments', visible: true },
+    { to: '/scanner', label: 'Scanner', visible: true },
+    { to: '/reports', label: 'Reports', visible: currentRole === 'admin' || currentRole === 'manager' },
+    { to: '/sessions', label: 'Sessions', visible: true }
+  ].filter((item) => item.visible);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -166,6 +172,7 @@ export default function AppLayout() {
         <div style={styles.brandBlock}>
           <div style={styles.brandTitle}>Inventory Platform</div>
           <div style={styles.brandSubtitle}>Multi-tenant control center</div>
+          <div style={styles.roleChip}>ROLE: {currentRole.toUpperCase()}</div>
         </div>
 
         <nav style={styles.nav}>
@@ -296,6 +303,18 @@ const styles: Record<string, CSSProperties> = {
   navItemActive: {
     background: 'rgba(59,130,246,0.22)',
     color: '#ffffff'
+  },
+  roleChip: {
+    marginTop: '12px',
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: 'rgba(255,255,255,0.12)',
+    color: '#e2e8f0',
+    fontSize: '12px',
+    fontWeight: 700,
+    letterSpacing: '0.04em'
   },
   sidebarFooter: {
     marginTop: 'auto',
