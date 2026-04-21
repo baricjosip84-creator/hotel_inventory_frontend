@@ -3,58 +3,40 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { SupplierItem } from '../types/inventory';
 
-type SupplierFormState = {
+type StorageLocationItem = {
+  id: string;
+  tenant_id: string;
   name: string;
-  contact_info: string;
+  temperature_zone: string | null;
+  created_at: string;
+  deleted_at: string | null;
 };
 
-async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
-  const params = new URLSearchParams();
+type StorageLocationFormState = {
+  name: string;
+  temperature_zone: string;
+};
 
-  if (search.trim()) {
-    params.set('search', search.trim());
-  }
-
-  const suffix = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest<SupplierItem[]>(`/suppliers${suffix}`);
-}
-
-async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
-  return apiRequest<SupplierItem>('/suppliers', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: input.name.trim(),
-      contact_info: input.contact_info.trim() || null
-    })
-  });
-}
-
-async function updateSupplier(input: {
-  id: string;
-  values: SupplierFormState;
-}): Promise<SupplierItem> {
-  return apiRequest<SupplierItem>(`/suppliers/${input.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      name: input.values.name.trim(),
-      contact_info: input.values.contact_info.trim() || null
-    })
-  });
-}
-
-async function deleteSupplier(id: string): Promise<void> {
-  await apiRequest(`/suppliers/${id}`, {
-    method: 'DELETE'
-  });
-}
-
-function emptyForm(): SupplierFormState {
+function emptyForm(): StorageLocationFormState {
   return {
     name: '',
-    contact_info: ''
+    temperature_zone: ''
   };
+}
+
+async function fetchStorageLocations(): Promise<StorageLocationItem[]> {
+  return apiRequest<StorageLocationItem[]>('/storage-locations');
+}
+
+async function createStorageLocation(values: StorageLocationFormState): Promise<StorageLocationItem> {
+  return apiRequest<StorageLocationItem>('/storage-locations', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: values.name.trim(),
+      temperature_zone: values.temperature_zone.trim() || null
+    })
+  });
 }
 
 function StatCard(props: {
@@ -63,565 +45,290 @@ function StatCard(props: {
   subtitle: string;
   tone?: 'default' | 'good';
 }) {
-  const toneStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
+  const valueStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
 
   return (
     <div style={styles.statCard}>
       <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
+      <div style={valueStyle}>{props.value}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
   );
 }
 
-export default function SuppliersPage() {
+export default function StorageLocationsPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    The current zip snapshot contained a broken StorageLocationsPage that was
+    effectively a duplicate supplier page. This file restores storage locations
+    as their own frontend surface using the actual backend storage-location
+    contract from the current backend zip.
+
+    WHY IT CHANGED
+    --------------
+    Storage locations are critical for receiving, scanning, stock placement, and
+    reporting. The frontend needs a clear and mobile-safe location page that
+    matches the backend route surface actually exposed today.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This restores a correct storage-locations page that:
+    - lists current locations from /storage-locations
+    - creates new locations through /storage-locations
+    - reflects the real backend fields: name and temperature_zone
+    - clearly explains that update/delete are not exposed by the current route set
+  */
+
   const queryClient = useQueryClient();
+  const { role, canManageStorageLocations } = getRoleCapabilities();
 
-  const { role, canManageSuppliers } = getRoleCapabilities();
-
-  const [search, setSearch] = useState('');
-  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
-  const [form, setForm] = useState<SupplierFormState>(emptyForm());
+  const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const suppliersQuery = useQuery({
-    queryKey: ['suppliers', search],
-    queryFn: () => fetchSuppliers(search)
+  const locationsQuery = useQuery({
+    queryKey: ['storage-locations'],
+    queryFn: fetchStorageLocations
   });
 
   const createMutation = useMutation({
-    mutationFn: createSupplier,
+    mutationFn: createStorageLocation,
     onSuccess: async () => {
-      setEditingSupplier(null);
       setForm(emptyForm());
       setFormError(null);
-      setFormMessage('Supplier created successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      setFormMessage('Storage location created successfully.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['storage-locations'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+      ]);
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to create supplier.');
-      }
       setFormMessage(null);
+      setFormError(error instanceof ApiError ? error.message : 'Failed to create storage location.');
     }
   });
 
-  const updateMutation = useMutation({
-    mutationFn: updateSupplier,
-    onSuccess: async () => {
-      setEditingSupplier(null);
-      setForm(emptyForm());
-      setFormError(null);
-      setFormMessage('Supplier updated successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    },
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to update supplier.');
-      }
-      setFormMessage(null);
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteSupplier,
-    onSuccess: async () => {
-      setFormError(null);
-      setFormMessage('Supplier deleted successfully.');
-      if (editingSupplier) {
-        setEditingSupplier(null);
-        setForm(emptyForm());
-      }
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    },
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to delete supplier.');
-      }
-      setFormMessage(null);
-    }
-  });
-
-  const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
+  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
 
   const summary = useMemo(() => {
-    const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
-    const withContact = suppliers.filter(
-      (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
-    ).length;
+    const temperatureTagged = locations.filter((location) => Boolean(location.temperature_zone && location.temperature_zone.trim())).length;
+    const active = locations.filter((location) => !location.deleted_at).length;
 
     return {
-      total: suppliers.length,
+      total: locations.length,
       active,
-      withContact
+      temperatureTagged
     };
-  }, [suppliers]);
+  }, [locations]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
     setFormMessage(null);
 
-    if (!canManageSuppliers) {
-      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
+    if (!canManageStorageLocations) {
+      setFormError(
+        'Your current role is read-only for storage locations. Location writes are restricted to manager and admin roles by the existing backend.'
+      );
       return;
     }
 
-    if (editingSupplier) {
-      updateMutation.mutate({
-        id: editingSupplier.id,
-        values: form
-      });
+    if (!form.name.trim()) {
+      setFormError('Storage location name is required.');
       return;
     }
 
     createMutation.mutate(form);
   };
 
-  const handleStartEdit = (supplier: SupplierItem) => {
-    if (!canManageSuppliers) {
-      setFormError('Your current role cannot edit suppliers.');
-      setFormMessage(null);
-      return;
-    }
+  if (locationsQuery.isLoading) {
+    return <p>Loading storage locations...</p>;
+  }
 
-    setEditingSupplier(supplier);
-    setFormMessage(null);
-    setFormError(null);
-    setForm({
-      name: supplier.name,
-      contact_info: supplier.contact_info || ''
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingSupplier(null);
-    setForm(emptyForm());
-    setFormMessage(null);
-    setFormError(null);
-  };
-
-  const handleDelete = (supplier: SupplierItem) => {
-    if (!canManageSuppliers) {
-      setFormError('Your current role cannot delete suppliers.');
-      setFormMessage(null);
-      return;
-    }
-
-    const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setFormError(null);
-    setFormMessage(null);
-    deleteMutation.mutate(supplier.id);
-  };
-
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  if (locationsQuery.isError) {
+    return <p>Failed to load storage locations: {(locationsQuery.error as Error).message}</p>;
+  }
 
   return (
-    <div>
+    <div style={styles.page}>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Storage Locations</h1>
+          <p style={styles.description}>
+            Manage the named storage areas used by receiving, scanning, stock placement, and operational reporting.
+          </p>
+        </div>
+      </header>
+
+      <section style={styles.workflowPanel}>
+        <h2 style={styles.workflowTitle}>Workflow clarity</h2>
+        <p style={styles.workflowText}>
+          Create locations before receiving inventory so shipment intake, scanner defaults, and stock placement all have a safe destination.
+        </p>
+        <div style={styles.stepGrid}>
+          <div style={styles.stepCard}>
+            <div style={styles.stepNumber}>1</div>
+            <div style={styles.stepHeading}>Create location</div>
+            <div style={styles.stepText}>Define a clear, operator-friendly storage location name.</div>
+          </div>
+          <div style={styles.stepCard}>
+            <div style={styles.stepNumber}>2</div>
+            <div style={styles.stepHeading}>Tag temperature zone</div>
+            <div style={styles.stepText}>Use temperature information when the location has handling constraints.</div>
+          </div>
+          <div style={styles.stepCard}>
+            <div style={styles.stepNumber}>3</div>
+            <div style={styles.stepHeading}>Use in receiving</div>
+            <div style={styles.stepText}>Locations then become available for stock placement and scanner-ready defaults.</div>
+          </div>
+        </div>
+      </section>
+
       <div style={styles.statsGrid}>
+        <StatCard title="Locations" value={summary.total} subtitle="Visible storage locations" />
+        <StatCard title="Active" value={summary.active} subtitle="Active operational location records" tone="good" />
         <StatCard
-          title="Suppliers"
-          value={summary.total}
-          subtitle="Visible suppliers"
-        />
-        <StatCard
-          title="Active"
-          value={summary.active}
-          subtitle="Currently active supplier records"
-          tone="good"
-        />
-        <StatCard
-          title="With Contact Info"
-          value={summary.withContact}
-          subtitle="Suppliers with saved contact details"
+          title="Temperature Tagged"
+          value={summary.temperatureTagged}
+          subtitle="Locations with a temperature zone value"
         />
       </div>
 
-      {!canManageSuppliers ? (
+      {!canManageStorageLocations ? (
         <div style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
+          Current role: {role.toUpperCase()}. Storage locations are read-only in the frontend because your backend only allows manager and admin users to create locations.
         </div>
       ) : null}
 
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
-        <p style={styles.panelSubtitle}>
-          {(canManageSuppliers
-            ? 'Maintain supplier master records used across purchasing and inbound operations.'
-            : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
-        </p>
-        <p style={styles.panelSubtitle}>
-          Maintain supplier master data used by products, shipments, and procurement operations.
-        </p>
+      <div style={styles.layoutGrid}>
+        <section style={styles.panel}>
+          <h2 style={styles.panelTitle}>Create Storage Location</h2>
+          <p style={styles.panelSubtitle}>
+            Keep location names simple and operational so receiving and stock placement stay obvious to warehouse users.
+          </p>
 
-        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
+          {formError ? <div style={styles.errorBox}>{formError}</div> : null}
+          {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
 
-        <form onSubmit={handleSubmit} style={styles.formGrid}>
-          <div>
-            <label style={styles.label}>Supplier Name</label>
-            <input
-              style={styles.input}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Example: Metro Wholesale"
-              required
-            />
-          </div>
+          <form onSubmit={handleSubmit} style={styles.formGrid}>
+            <div>
+              <label style={styles.label}>Location Name</label>
+              <input
+                style={styles.input}
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Main Warehouse"
+              />
+            </div>
 
-          <div>
-            <label style={styles.label}>Contact Info</label>
-            <input
-              style={styles.input}
-              value={form.contact_info}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, contact_info: event.target.value }))
-              }
-              placeholder="Phone, email, or notes"
-            />
-          </div>
+            <div>
+              <label style={styles.label}>Temperature Zone</label>
+              <input
+                style={styles.input}
+                value={form.temperature_zone}
+                onChange={(event) => setForm((current) => ({ ...current, temperature_zone: event.target.value }))}
+                placeholder="ambient / chilled / frozen"
+              />
+            </div>
 
-          <div style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
-              {isSubmitting
-                ? editingSupplier
-                  ? 'Updating...'
-                  : 'Creating...'
-                : editingSupplier
-                  ? 'Update Supplier'
-                  : 'Create Supplier'}
-            </button>
-
-            {editingSupplier ? (
-              <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
-                Cancel
+            <div style={styles.actionsRow}>
+              <button type="submit" style={styles.primaryButton} disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Saving...' : 'Create Location'}
               </button>
-            ) : null}
+            </div>
+          </form>
+
+          <div style={styles.infoBox}>
+            The current backend route surface exposed in your zip supports listing and creating storage locations. Update and delete routes are not currently mounted, so this page reflects that exact backend state instead of inventing unsupported actions.
           </div>
-        </form>
-      </section>
+        </section>
 
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Supplier List</h3>
-        <p style={styles.panelSubtitle}>
-          Search and review supplier records available to inventory and shipment workflows.
-        </p>
+        <section style={styles.panel}>
+          <h2 style={styles.panelTitle}>Location List</h2>
+          <p style={styles.panelSubtitle}>
+            Review active locations used by shipments, scanning, and stock placement.
+          </p>
 
-        <div style={styles.toolbar}>
-          <input
-            type="text"
-            placeholder="Search by supplier name or contact info..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={styles.searchInput}
-          />
-        </div>
+          {locations.length === 0 ? (
+            <div style={styles.emptyState}>
+              <strong>No storage locations found.</strong>
+              <span>Create the first location before scanning or receiving inventory.</span>
+            </div>
+          ) : (
+            <div style={styles.cardList}>
+              {locations.map((location) => (
+                <article key={location.id} style={styles.recordCard}>
+                  <div style={styles.cardTopRow}>
+                    <div>
+                      <h3 style={styles.recordTitle}>{location.name}</h3>
+                      <div style={styles.recordMeta}>
+                        {location.temperature_zone ? `Temperature zone: ${location.temperature_zone}` : 'No temperature zone assigned'}
+                      </div>
+                    </div>
+                    <span style={styles.badgeGood}>Active</span>
+                  </div>
 
-        {suppliersQuery.isLoading ? <p>Loading suppliers...</p> : null}
-
-        {suppliersQuery.isError ? (
-          <p>Failed to load suppliers: {(suppliersQuery.error as Error).message || 'Unknown error'}</p>
-        ) : null}
-
-        {!suppliersQuery.isLoading && !suppliersQuery.isError ? (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Contact Info</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.length === 0 ? (
-                  <tr>
-                    <td style={styles.emptyCell} colSpan={4}>
-                      No suppliers found.
-                    </td>
-                  </tr>
-                ) : (
-                  suppliers.map((supplier) => (
-                    <tr key={supplier.id}>
-                      <td style={styles.td}>
-                        <div style={styles.rowTitle}>{supplier.name}</div>
-                        <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
-                      </td>
-                      <td style={styles.td}>{supplier.contact_info || '-'}</td>
-                      <td style={styles.td}>
-                        <span style={supplier.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
-                          {supplier.deleted_at ? 'Deleted' : 'Active'}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.actionGroup}>
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
-                            onClick={() => handleStartEdit(supplier)}
-                            disabled={!canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
-                            onClick={() => handleDelete(supplier)}
-                            disabled={deleteMutation.isPending || !canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
+                  <div style={styles.recordGrid}>
+                    <div>
+                      <div style={styles.metaLabel}>Created</div>
+                      <div style={styles.metaValue}>{new Date(location.created_at).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={styles.metaLabel}>Tenant</div>
+                      <div style={styles.metaValue}>{location.tenant_id}</div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
-  },
-  statCard: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-  },
-  statTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#6b7280',
-    marginBottom: '10px'
-  },
-  statValue: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px'
-  },
-  statValueGood: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#166534'
-  },
-  statSubtitle: {
-    fontSize: '13px',
-    color: '#6b7280',
-    lineHeight: 1.4
-  },
-  panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-  },
-  panelTitle: {
-    marginTop: 0,
-    marginBottom: '8px',
-    fontSize: '20px',
-    fontWeight: 700
-  },
-  panelSubtitle: {
-    marginTop: 0,
-    marginBottom: '16px',
-    color: '#6b7280',
-    lineHeight: 1.5
-  },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px',
-    alignItems: 'end'
-  },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '14px',
-    fontWeight: 600
-  },
-  input: {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    outline: 'none'
-  },
-  formActions: {
-    display: 'flex',
-    alignItems: 'end',
-    gap: '10px',
-    flexWrap: 'wrap'
-  },
-  primaryButton: {
-    border: 'none',
-    borderRadius: '10px',
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  disabledButton: {
-    padding: '10px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#e5e7eb',
-    color: '#6b7280',
-    cursor: 'not-allowed'
-  },
-  secondaryButton: {
-    border: '1px solid #d1d5db',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    background: '#ffffff',
-    color: '#111827',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  dangerButton: {
-    border: '1px solid #fecaca',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    background: '#fef2f2',
-    color: '#b91c1c',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  toolbar: {
-    marginBottom: '16px'
-  },
-  searchInput: {
-    width: '100%',
-    maxWidth: '420px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    outline: 'none',
-    fontSize: '14px',
-    background: '#ffffff'
-  },
-  tableWrapper: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    overflowX: 'auto'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '840px'
-  },
-  th: {
-    textAlign: 'left',
-    padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
-    fontSize: '13px',
-    color: '#6b7280'
-  },
-  td: {
-    padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
-    fontSize: '14px',
-    verticalAlign: 'top'
-  },
-  emptyCell: {
-    padding: '24px',
-    textAlign: 'center',
-    color: '#6b7280'
-  },
-  rowTitle: {
-    fontWeight: 700,
-    marginBottom: '6px'
-  },
-  rowSubtle: {
-    fontSize: '12px',
-    color: '#6b7280',
-    lineHeight: 1.4,
-    wordBreak: 'break-all'
-  },
-  badgeActive: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#f0fdf4',
-    color: '#166534',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  badgeDeleted: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#fee2e2',
-    color: '#991b1b',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  actionGroup: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  errorBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#b91c1c'
-  },
-  warningBox: {
-    marginBottom: '16px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412'
-  },
-  successBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    color: '#166534'
-  }
+  page: { display: 'grid', gap: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  title: { margin: 0, fontSize: '1.9rem', color: '#0f172a' },
+  description: { margin: '6px 0 0', color: '#475569', maxWidth: 760, lineHeight: 1.5 },
+  workflowPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16 },
+  workflowTitle: { margin: 0, fontSize: '1.05rem', color: '#0f172a' },
+  workflowText: { margin: '6px 0 0', color: '#475569', lineHeight: 1.5 },
+  stepGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 14 },
+  stepCard: { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14 },
+  stepNumber: { width: 28, height: 28, borderRadius: 999, background: '#dbeafe', color: '#1d4ed8', display: 'grid', placeItems: 'center', fontWeight: 700, marginBottom: 10 },
+  stepHeading: { fontWeight: 700, color: '#0f172a', marginBottom: 6 },
+  stepText: { color: '#475569', lineHeight: 1.45, fontSize: '0.95rem' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  statCard: { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16 },
+  statTitle: { fontSize: '0.85rem', color: '#64748b', marginBottom: 8 },
+  statValue: { fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' },
+  statValueGood: { fontSize: '1.6rem', fontWeight: 800, color: '#166534' },
+  statSubtitle: { marginTop: 6, color: '#64748b', lineHeight: 1.4, fontSize: '0.92rem' },
+  warningBox: { background: '#fff7ed', color: '#9a3412', border: '1px solid #fdba74', borderRadius: 14, padding: 14, lineHeight: 1.5 },
+  layoutGrid: { display: 'grid', gridTemplateColumns: 'minmax(280px, 420px) minmax(0, 1fr)', gap: 16 },
+  panel: { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, minWidth: 0 },
+  panelTitle: { margin: 0, fontSize: '1.1rem', color: '#0f172a' },
+  panelSubtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
+  infoBox: { marginTop: 14, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 12, padding: 12, lineHeight: 1.5 },
+  errorBox: { marginTop: 12, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 12, padding: 12 },
+  successBox: { marginTop: 12, background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 12, padding: 12 },
+  formGrid: { display: 'grid', gap: 12, marginTop: 14 },
+  label: { display: 'block', marginBottom: 6, color: '#334155', fontWeight: 600, fontSize: '0.95rem' },
+  input: { width: '100%', padding: '0.8rem 0.9rem', borderRadius: 12, border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', boxSizing: 'border-box' },
+  actionsRow: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 },
+  primaryButton: { border: 'none', borderRadius: 12, background: '#2563eb', color: '#ffffff', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer' },
+  emptyState: { marginTop: 14, background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 14, padding: 18, display: 'grid', gap: 6, color: '#475569' },
+  cardList: { display: 'grid', gap: 12, marginTop: 14 },
+  recordCard: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#ffffff' },
+  cardTopRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
+  recordTitle: { margin: 0, fontSize: '1rem', color: '#0f172a' },
+  recordMeta: { marginTop: 4, color: '#64748b', lineHeight: 1.4 },
+  badgeGood: { padding: '0.35rem 0.6rem', borderRadius: 999, background: '#dcfce7', color: '#166534', fontSize: '0.8rem', fontWeight: 700 },
+  recordGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginTop: 14 },
+  metaLabel: { color: '#64748b', fontSize: '0.82rem', marginBottom: 4 },
+  metaValue: { color: '#0f172a', fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.5 }
 };
