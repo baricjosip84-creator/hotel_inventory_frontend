@@ -240,7 +240,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: 'Operational health needs review',
         detail: `Current tenant health is ${healthTier}. Review low stock, overdue shipments, and unresolved alerts first.`,
-        route: '/dashboard',
+        route: '/dashboard?panel=operational-health',
         linkLabel: 'Open Dashboard',
         tone: healthTier === 'critical' ? 'bad' : 'warn'
       });
@@ -251,7 +251,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: 'Reorder highest urgency product',
         detail: `${reorderTop.product_name} currently recommends a reorder quantity of ${formatNumber(reorderTop.recommended_reorder_quantity)}.`,
-        route: '/reports',
+        route: reorderTop ? `/products?search=${encodeURIComponent(reorderTop.product_name)}` : '/products',
         linkLabel: 'Open Reports',
         tone: reorderTop.urgency === 'critical' ? 'bad' : 'warn'
       });
@@ -262,7 +262,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: 'Protect depletion-risk stock',
         detail: `${depletionTop.product_name} at ${depletionTop.storage_location_name} is currently one of the highest depletion-risk rows.`,
-        route: '/stock',
+        route: depletionTop ? `/stock?productId=${encodeURIComponent(depletionTop.product_id)}` : '/stock',
         linkLabel: 'Open Stock',
         tone: depletionTop.risk_tier === 'critical' ? 'bad' : 'warn'
       });
@@ -273,7 +273,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: 'Review unusual outbound activity',
         detail: `${anomalyTop.product_name} is showing an anomaly spike ratio of ${formatNumber(anomalyTop.spike_ratio)} against baseline demand.`,
-        route: '/stock-movements',
+        route: anomalyTop ? `/stock-movements?productId=${encodeURIComponent(anomalyTop.product_id)}` : '/stock-movements',
         linkLabel: 'Open Stock Movements',
         tone: anomalyTop.anomaly_tier === 'critical' ? 'bad' : 'warn'
       });
@@ -286,7 +286,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: 'Follow up lowest-trust supplier',
         detail: `${supplierBottom.supplier_name} currently scores ${formatNumber(supplierBottom.trust_score, 0)} on supplier trust.`,
-        route: '/suppliers',
+        route: supplierBottom ? `/suppliers?search=${encodeURIComponent(supplierBottom.supplier_name)}` : '/suppliers',
         linkLabel: 'Open Suppliers',
         tone: toNumber(supplierBottom.trust_score) < 50 ? 'bad' : 'warn'
       });
@@ -379,6 +379,7 @@ export default function InsightsPage() {
                   <div style={styles.itemTitle}>{row.supplier_name}</div>
                   <div style={styles.itemMeta}>Trust {formatNumber(row.trust_score, 0)} · Tier {row.trust_tier}</div>
                   <div style={styles.itemText}>Completion {formatNumber(row.completion_rate_pct)}% · Overdue {formatNumber(row.overdue_rate_pct)}% · Fill {formatNumber(row.fill_rate_pct)}%</div>
+                  <Link to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} style={styles.inlineActionLink}>Open Supplier</Link>
                 </article>
               ))}
             </div>
@@ -397,6 +398,7 @@ export default function InsightsPage() {
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>{row.storage_location_name} · Risk {formatNumber(row.risk_score, 0)} · Tier {row.risk_tier}</div>
                   <div style={styles.itemText}>Qty {formatNumber(row.current_quantity)} · Min {formatNumber(row.configured_min_quantity)} · Coverage {row.estimated_days_of_coverage == null ? '-' : formatNumber(row.estimated_days_of_coverage)} days</div>
+                  <Link to={`/stock?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>Open in Stock</Link>
                 </article>
               ))}
             </div>
@@ -413,6 +415,7 @@ export default function InsightsPage() {
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>Urgency {row.urgency} · Reorder {formatNumber(row.recommended_reorder_quantity)}</div>
                   <div style={styles.itemText}>Current {formatNumber(row.current_quantity)} · Min {formatNumber(row.min_stock)} · Avg Daily Usage {formatNumber(row.average_daily_usage)}</div>
+                  <Link to={`/products?search=${encodeURIComponent(row.product_name)}`} style={styles.inlineActionLink}>Open Product</Link>
                 </article>
               ))}
             </div>
@@ -430,6 +433,7 @@ export default function InsightsPage() {
                 <div style={styles.itemTitle}>{row.product_name}</div>
                 <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {row.anomaly_tier}</div>
                 <div style={styles.itemText}>Recent Daily {formatNumber(row.recent_daily_outbound)} · Baseline Daily {formatNumber(row.baseline_daily_outbound)} · Spike Ratio {formatNumber(row.spike_ratio)}</div>
+                <Link to={`/stock-movements?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>Open Movements</Link>
               </article>
             ))}
           </div>
@@ -464,5 +468,6 @@ const styles: Record<string, CSSProperties> = {
   itemText: { color: '#334155', lineHeight: 1.5 },
   keyValueRow: { display: 'flex', justifyContent: 'space-between', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' },
   infoState: { background: '#f8fafc', color: '#475569', borderRadius: '12px', padding: '12px 14px' },
-  errorState: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 }
+  errorState: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 },
+  inlineActionLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none', fontSize: '0.92rem' }
 };

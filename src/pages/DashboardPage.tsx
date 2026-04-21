@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 
@@ -381,6 +382,15 @@ function PremiumEmptyState(props: {
   );
 }
 
+
+function ActionLink(props: { to: string; label: string }) {
+  return (
+    <Link to={props.to} style={styles.actionLink}>
+      {props.label}
+    </Link>
+  );
+}
+
 function StatCard(props: {
   title: string;
   value: number | string;
@@ -518,6 +528,35 @@ export default function DashboardPage() {
             the current tenant.
           </p>
         </div>
+      </div>
+
+      {/*
+        WHAT CHANGED
+        ------------
+        Added direct next-step navigation so dashboard signals now drive users
+        into the exact operational surface that matches the alert, shipment,
+        stock, or master-data issue.
+
+        WHY IT CHANGED
+        --------------
+        The current project already had strong operational data, but the
+        dashboard mostly informed without directing action.
+
+        WHAT PROBLEM IT SOLVES
+        ----------------------
+        This turns the dashboard into a control center instead of a passive
+        report by giving users fast routes into Stock, Shipments, Alerts,
+        Products, Suppliers, Storage Locations, Reports, and Insights.
+      */}
+      <div style={styles.quickActionRow}>
+        <ActionLink to="/stock" label="Open Stock" />
+        <ActionLink to="/shipments" label="Open Shipments" />
+        <ActionLink to="/alerts?resolved=false" label="Review Alerts" />
+        <ActionLink to="/products" label="Manage Products" />
+        <ActionLink to="/suppliers" label="Open Suppliers" />
+        <ActionLink to="/storage-locations" label="Open Locations" />
+        <ActionLink to="/reports" label="Open Reports" />
+        <ActionLink to="/insights" label="Open Insights" />
       </div>
 
       <div style={styles.kpiGrid}>
@@ -857,7 +896,10 @@ export default function DashboardPage() {
                     (overdueShipmentsQuery.data ?? []).map((row) => (
                       <tr key={row.id}>
                         <td style={styles.td}>{row.po_number || '-'}</td>
-                        <td style={styles.td}>{row.supplier_name}</td>
+                        <td style={styles.td}>
+                          <div style={styles.rowTitle}>{row.supplier_name}</div>
+                          <ActionLink to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} label="Open Supplier" />
+                        </td>
                         <td style={styles.td}>{formatDate(row.delivery_date)}</td>
                         <td style={styles.td}>
                           <span style={urgencyBadgeStyle(row.status)}>{row.status}</span>
@@ -911,6 +953,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.cardText}>{alert.message}</div>
+                    <ActionLink to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`} label="Open in Alerts" />
 
                     <div style={styles.metricRow}>
                       <span>Escalation Level</span>
@@ -1081,7 +1124,10 @@ export default function DashboardPage() {
                   ) : (
                     (supplierPerformanceQuery.data ?? []).map((row) => (
                       <tr key={row.supplier_id}>
-                        <td style={styles.td}>{row.supplier_name}</td>
+                        <td style={styles.td}>
+                          <div style={styles.rowTitle}>{row.supplier_name}</div>
+                          <ActionLink to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} label="Open Supplier" />
+                        </td>
                         <td style={styles.td}>{row.total_shipments}</td>
                         <td style={styles.td}>{row.pending_shipments}</td>
                         <td style={styles.td}>{row.partial_shipments}</td>
@@ -1378,5 +1424,24 @@ const styles: Record<string, CSSProperties> = {
     color: '#b91c1c',
     borderRadius: '10px',
     padding: '12px 14px'
+  },
+  quickActionRow: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+    marginBottom: '18px'
+  },
+  actionLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid #cbd5e1',
+    borderRadius: '10px',
+    padding: '8px 12px',
+    background: '#ffffff',
+    color: '#1d4ed8',
+    fontWeight: 700,
+    textDecoration: 'none',
+    fontSize: '13px'
   }
 };

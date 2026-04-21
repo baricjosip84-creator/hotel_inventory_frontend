@@ -1,627 +1,273 @@
 import { useMemo, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, ApiError } from '../lib/api';
+import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { SupplierItem } from '../types/inventory';
 
-type SupplierFormState = {
-  name: string;
-  contact_info: string;
+type AlertSeverity = 'info' | 'warning' | 'critical';
+
+type AlertRow = {
+  id: string;
+  tenant_id: string;
+  product_id?: string | null;
+  product_name?: string | null;
+  product_category?: string | null;
+  product_unit?: string | null;
+  type: string;
+  message: string;
+  resolved: boolean;
+  created_at: string;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolved_by_name?: string | null;
+  resolution_note?: string | null;
+  severity: AlertSeverity;
+  escalation_level: number;
+  acknowledged: boolean;
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
+  acknowledged_by_name?: string | null;
+  last_escalated_at?: string | null;
 };
 
-async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
-  const params = new URLSearchParams();
+type AlertFilters = {
+  search: string;
+  severity: string;
+  resolved: string;
+  acknowledged: string;
+};
 
-  if (search.trim()) {
-    params.set('search', search.trim());
+async function fetchAlerts(filters: AlertFilters): Promise<AlertRow[]> {
+  const params = new URLSearchParams();
+  if (filters.search.trim()) params.set('search', filters.search.trim());
+  if (filters.severity.trim()) params.set('severity', filters.severity.trim());
+  if (filters.resolved.trim()) params.set('resolved', filters.resolved.trim());
+  if (filters.acknowledged.trim()) params.set('acknowledged', filters.acknowledged.trim());
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<AlertRow[]>(`/alerts${suffix}`);
+}
+
+async function acknowledgeAlert(id: string): Promise<AlertRow> {
+  return apiRequest<AlertRow>(`/alerts/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+async function resolveAlert(id: string): Promise<AlertRow> {
+  return apiRequest<AlertRow>(`/alerts/${id}/resolve`, { method: 'POST', body: JSON.stringify({ resolution_note: 'Resolved from Alerts page' }) });
+}
+
+async function reopenAlert(id: string): Promise<AlertRow> {
+  return apiRequest<AlertRow>(`/alerts/${id}/reopen`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+async function escalateAlert(id: string): Promise<AlertRow> {
+  return apiRequest<AlertRow>(`/alerts/${id}/escalate`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function severityStyle(severity: string): CSSProperties {
+  if (severity === 'critical') return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  if (severity === 'warning') return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
+}
+
+function nextActionLink(alert: AlertRow): { to: string; label: string } {
+  if (alert.product_id) {
+    return { to: `/stock?productId=${encodeURIComponent(alert.product_id)}`, label: 'Open in Stock' };
   }
 
-  const suffix = params.toString() ? `?${params.toString()}` : '';
-  return apiRequest<SupplierItem[]>(`/suppliers${suffix}`);
+  if (alert.type.toLowerCase().includes('shipment')) {
+    return { to: '/shipments', label: 'Open Shipments' };
+  }
+
+  return { to: `/dashboard?alertId=${encodeURIComponent(alert.id)}`, label: 'Open Dashboard' };
 }
 
-async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
-  return apiRequest<SupplierItem>('/suppliers', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: input.name.trim(),
-      contact_info: input.contact_info.trim() || null
-    })
-  });
-}
+export default function AlertsPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    The current frontend zip had an AlertsPage that was actually duplicated
+    supplier CRUD logic. This file restores Alerts as a real operational queue
+    based on the current backend alert routes.
 
-async function updateSupplier(input: {
-  id: string;
-  values: SupplierFormState;
-}): Promise<SupplierItem> {
-  return apiRequest<SupplierItem>(`/suppliers/${input.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      name: input.values.name.trim(),
-      contact_info: input.values.contact_info.trim() || null
-    })
-  });
-}
+    WHY IT CHANGED
+    --------------
+    Your backend already exposes a complete alert workflow with list, filter,
+    acknowledge, resolve, reopen, and escalate actions. The frontend needed to
+    surface that exact operational model instead of a broken duplicate page.
 
-async function deleteSupplier(id: string): Promise<void> {
-  await apiRequest(`/suppliers/${id}`, {
-    method: 'DELETE'
-  });
-}
-
-function emptyForm(): SupplierFormState {
-  return {
-    name: '',
-    contact_info: ''
-  };
-}
-
-function StatCard(props: {
-  title: string;
-  value: number | string;
-  subtitle: string;
-  tone?: 'default' | 'good';
-}) {
-  const toneStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
-
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
-}
-
-export default function SuppliersPage() {
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This gives the product a real action queue for operational alerts and links
+    each alert to the next relevant page so users can move from signal to action.
+  */
   const queryClient = useQueryClient();
+  const { role, canManageAlerts } = getRoleCapabilities();
+  const [filters, setFilters] = useState<AlertFilters>({ search: '', severity: '', resolved: 'false', acknowledged: '' });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  const { role, canManageSuppliers } = getRoleCapabilities();
-
-  const [search, setSearch] = useState('');
-  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
-  const [form, setForm] = useState<SupplierFormState>(emptyForm());
-  const [formMessage, setFormMessage] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const suppliersQuery = useQuery({
-    queryKey: ['suppliers', search],
-    queryFn: () => fetchSuppliers(search)
+  const alertsQuery = useQuery({
+    queryKey: ['alerts', filters],
+    queryFn: () => fetchAlerts(filters)
   });
 
-  const createMutation = useMutation({
-    mutationFn: createSupplier,
+  const makeMutation = (mutationFn: (id: string) => Promise<AlertRow>) => useMutation({
+    mutationFn,
     onSuccess: async () => {
-      setEditingSupplier(null);
-      setForm(emptyForm());
-      setFormError(null);
-      setFormMessage('Supplier created successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      setActionError(null);
+      setActionMessage('Alert action completed successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to create supplier.');
-      }
-      setFormMessage(null);
+      setActionMessage(null);
+      setActionError(error instanceof ApiError ? error.message : 'Failed to update alert.');
     }
   });
 
-  const updateMutation = useMutation({
-    mutationFn: updateSupplier,
-    onSuccess: async () => {
-      setEditingSupplier(null);
-      setForm(emptyForm());
-      setFormError(null);
-      setFormMessage('Supplier updated successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    },
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to update supplier.');
-      }
-      setFormMessage(null);
-    }
-  });
+  const acknowledgeMutation = makeMutation(acknowledgeAlert);
+  const resolveMutation = makeMutation(resolveAlert);
+  const reopenMutation = makeMutation(reopenAlert);
+  const escalateMutation = makeMutation(escalateAlert);
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteSupplier,
-    onSuccess: async () => {
-      setFormError(null);
-      setFormMessage('Supplier deleted successfully.');
-      if (editingSupplier) {
-        setEditingSupplier(null);
-        setForm(emptyForm());
-      }
-      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    },
-    onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to delete supplier.');
-      }
-      setFormMessage(null);
-    }
-  });
+  const alerts = useMemo(() => alertsQuery.data ?? [], [alertsQuery.data]);
+  const summary = useMemo(() => ({
+    total: alerts.length,
+    unresolved: alerts.filter((a) => !a.resolved).length,
+    critical: alerts.filter((a) => !a.resolved && a.severity === 'critical').length,
+    unacknowledged: alerts.filter((a) => !a.acknowledged).length
+  }), [alerts]);
 
-  const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
-
-  const summary = useMemo(() => {
-    const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
-    const withContact = suppliers.filter(
-      (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
-    ).length;
-
-    return {
-      total: suppliers.length,
-      active,
-      withContact
-    };
-  }, [suppliers]);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setFormError(null);
-    setFormMessage(null);
-
-    if (!canManageSuppliers) {
-      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
-      return;
-    }
-
-    if (editingSupplier) {
-      updateMutation.mutate({
-        id: editingSupplier.id,
-        values: form
-      });
-      return;
-    }
-
-    createMutation.mutate(form);
-  };
-
-  const handleStartEdit = (supplier: SupplierItem) => {
-    if (!canManageSuppliers) {
-      setFormError('Your current role cannot edit suppliers.');
-      setFormMessage(null);
-      return;
-    }
-
-    setEditingSupplier(supplier);
-    setFormMessage(null);
-    setFormError(null);
-    setForm({
-      name: supplier.name,
-      contact_info: supplier.contact_info || ''
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingSupplier(null);
-    setForm(emptyForm());
-    setFormMessage(null);
-    setFormError(null);
-  };
-
-  const handleDelete = (supplier: SupplierItem) => {
-    if (!canManageSuppliers) {
-      setFormError('Your current role cannot delete suppliers.');
-      setFormMessage(null);
-      return;
-    }
-
-    const confirmed = window.confirm(`Delete supplier "${supplier.name}"?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setFormError(null);
-    setFormMessage(null);
-    deleteMutation.mutate(supplier.id);
-  };
-
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  if (alertsQuery.isLoading) return <p>Loading alerts...</p>;
+  if (alertsQuery.isError) return <p>Failed to load alerts: {(alertsQuery.error as Error).message}</p>;
 
   return (
-    <div>
+    <div style={styles.page}>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Alerts</h1>
+          <p style={styles.description}>Review tenant-scoped operational alerts, acknowledge ownership, resolve when complete, and route directly into the next operational page.</p>
+        </div>
+      </header>
+
+      <section style={styles.workflowPanel}>
+        <h2 style={styles.workflowTitle}>Workflow clarity</h2>
+        <p style={styles.workflowText}>Treat alerts as an action queue: review severity, open the linked operational page, then acknowledge, resolve, reopen, or escalate based on the real situation.</p>
+      </section>
+
       <div style={styles.statsGrid}>
-        <StatCard
-          title="Suppliers"
-          value={summary.total}
-          subtitle="Visible suppliers"
-        />
-        <StatCard
-          title="Active"
-          value={summary.active}
-          subtitle="Currently active supplier records"
-          tone="good"
-        />
-        <StatCard
-          title="With Contact Info"
-          value={summary.withContact}
-          subtitle="Suppliers with saved contact details"
-        />
+        <div style={styles.statCard}><div style={styles.statTitle}>Visible Alerts</div><div style={styles.statValue}>{summary.total}</div><div style={styles.statSubtitle}>Current filter result set</div></div>
+        <div style={styles.statCard}><div style={styles.statTitle}>Unresolved</div><div style={styles.statValueWarn}>{summary.unresolved}</div><div style={styles.statSubtitle}>Still requiring action</div></div>
+        <div style={styles.statCard}><div style={styles.statTitle}>Critical</div><div style={styles.statValueDanger}>{summary.critical}</div><div style={styles.statSubtitle}>Highest operational urgency</div></div>
+        <div style={styles.statCard}><div style={styles.statTitle}>Unacknowledged</div><div style={styles.statValue}>{summary.unacknowledged}</div><div style={styles.statSubtitle}>Not yet owned by an operator</div></div>
       </div>
 
-      {!canManageSuppliers ? (
-        <div style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
-        </div>
-      ) : null}
+      {!canManageAlerts ? <div style={styles.warningBox}>Current role: {role.toUpperCase()}. Alerts can still be reviewed, but acknowledge / resolve / reopen / escalate actions are restricted to manager and admin roles.</div> : null}
+      {actionError ? <div style={styles.errorBox}>{actionError}</div> : null}
+      {actionMessage ? <div style={styles.successBox}>{actionMessage}</div> : null}
 
       <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
-        <p style={styles.panelSubtitle}>
-          {(canManageSuppliers
-            ? 'Maintain supplier master records used across purchasing and inbound operations.'
-            : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
-        </p>
-        <p style={styles.panelSubtitle}>
-          Maintain supplier master data used by products, shipments, and procurement operations.
-        </p>
-
-        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
-
-        <form onSubmit={handleSubmit} style={styles.formGrid}>
-          <div>
-            <label style={styles.label}>Supplier Name</label>
-            <input
-              style={styles.input}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Example: Metro Wholesale"
-              required
-            />
-          </div>
-
-          <div>
-            <label style={styles.label}>Contact Info</label>
-            <input
-              style={styles.input}
-              value={form.contact_info}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, contact_info: event.target.value }))
-              }
-              placeholder="Phone, email, or notes"
-            />
-          </div>
-
-          <div style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
-              {isSubmitting
-                ? editingSupplier
-                  ? 'Updating...'
-                  : 'Creating...'
-                : editingSupplier
-                  ? 'Update Supplier'
-                  : 'Create Supplier'}
-            </button>
-
-            {editingSupplier ? (
-              <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </form>
+        <h2 style={styles.panelTitle}>Filters</h2>
+        <div style={styles.filterGrid}>
+          <input style={styles.input} value={filters.search} onChange={(e) => setFilters((c) => ({ ...c, search: e.target.value }))} placeholder="Search message, type, or product" />
+          <select style={styles.input} value={filters.severity} onChange={(e) => setFilters((c) => ({ ...c, severity: e.target.value }))}>
+            <option value="">All severities</option><option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option>
+          </select>
+          <select style={styles.input} value={filters.resolved} onChange={(e) => setFilters((c) => ({ ...c, resolved: e.target.value }))}>
+            <option value="">All states</option><option value="false">Unresolved</option><option value="true">Resolved</option>
+          </select>
+          <select style={styles.input} value={filters.acknowledged} onChange={(e) => setFilters((c) => ({ ...c, acknowledged: e.target.value }))}>
+            <option value="">Acknowledged + unacknowledged</option><option value="false">Unacknowledged</option><option value="true">Acknowledged</option>
+          </select>
+        </div>
       </section>
 
       <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Supplier List</h3>
-        <p style={styles.panelSubtitle}>
-          Search and review supplier records available to inventory and shipment workflows.
-        </p>
-
-        <div style={styles.toolbar}>
-          <input
-            type="text"
-            placeholder="Search by supplier name or contact info..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={styles.searchInput}
-          />
-        </div>
-
-        {suppliersQuery.isLoading ? <p>Loading suppliers...</p> : null}
-
-        {suppliersQuery.isError ? (
-          <p>Failed to load suppliers: {(suppliersQuery.error as Error).message || 'Unknown error'}</p>
-        ) : null}
-
-        {!suppliersQuery.isLoading && !suppliersQuery.isError ? (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Contact Info</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.length === 0 ? (
-                  <tr>
-                    <td style={styles.emptyCell} colSpan={4}>
-                      No suppliers found.
-                    </td>
-                  </tr>
-                ) : (
-                  suppliers.map((supplier) => (
-                    <tr key={supplier.id}>
-                      <td style={styles.td}>
-                        <div style={styles.rowTitle}>{supplier.name}</div>
-                        <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
-                      </td>
-                      <td style={styles.td}>{supplier.contact_info || '-'}</td>
-                      <td style={styles.td}>
-                        <span style={supplier.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
-                          {supplier.deleted_at ? 'Deleted' : 'Active'}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.actionGroup}>
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
-                            onClick={() => handleStartEdit(supplier)}
-                            disabled={!canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
-                            onClick={() => handleDelete(supplier)}
-                            disabled={deleteMutation.isPending || !canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <h2 style={styles.panelTitle}>Alert Queue</h2>
+        {alerts.length === 0 ? (
+          <div style={styles.emptyState}><strong>No alerts found.</strong><span>Adjust filters or continue operating if the current tenant is clean.</span></div>
+        ) : (
+          <div style={styles.cardList}>
+            {alerts.map((alert) => {
+              const next = nextActionLink(alert);
+              return (
+                <article key={alert.id} style={styles.card}>
+                  <div style={styles.cardTop}>
+                    <div>
+                      <div style={styles.cardTitle}>{alert.type}</div>
+                      <div style={styles.cardMeta}>{alert.product_name || 'No product linked'} · {formatDateTime(alert.created_at)}</div>
+                    </div>
+                    <div style={styles.badgeRow}>
+                      <span style={severityStyle(alert.severity)}>{alert.severity}</span>
+                      <span style={styles.badge}>{alert.resolved ? 'Resolved' : 'Open'}</span>
+                    </div>
+                  </div>
+                  <div style={styles.cardText}>{alert.message}</div>
+                  <div style={styles.keyGrid}>
+                    <div><strong>Acknowledged</strong><div>{alert.acknowledged ? 'Yes' : 'No'}</div></div>
+                    <div><strong>Escalation</strong><div>{alert.escalation_level}</div></div>
+                    <div><strong>Resolved By</strong><div>{alert.resolved_by_name || '-'}</div></div>
+                  </div>
+                  <div style={styles.actionRow}>
+                    <Link to={next.to} style={styles.linkButton}>{next.label}</Link>
+                    {canManageAlerts && !alert.acknowledged ? <button style={styles.secondaryButton} onClick={() => acknowledgeMutation.mutate(alert.id)} disabled={acknowledgeMutation.isPending}>Acknowledge</button> : null}
+                    {canManageAlerts && !alert.resolved ? <button style={styles.primaryButton} onClick={() => resolveMutation.mutate(alert.id)} disabled={resolveMutation.isPending}>Resolve</button> : null}
+                    {canManageAlerts && alert.resolved ? <button style={styles.secondaryButton} onClick={() => reopenMutation.mutate(alert.id)} disabled={reopenMutation.isPending}>Reopen</button> : null}
+                    {canManageAlerts && !alert.resolved ? <button style={styles.warnButton} onClick={() => escalateMutation.mutate(alert.id)} disabled={escalateMutation.isPending}>Escalate</button> : null}
+                  </div>
+                </article>
+              );
+            })}
           </div>
-        ) : null}
+        )}
       </section>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
-  },
-  statCard: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-  },
-  statTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#6b7280',
-    marginBottom: '10px'
-  },
-  statValue: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px'
-  },
-  statValueGood: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#166534'
-  },
-  statSubtitle: {
-    fontSize: '13px',
-    color: '#6b7280',
-    lineHeight: 1.4
-  },
-  panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-  },
-  panelTitle: {
-    marginTop: 0,
-    marginBottom: '8px',
-    fontSize: '20px',
-    fontWeight: 700
-  },
-  panelSubtitle: {
-    marginTop: 0,
-    marginBottom: '16px',
-    color: '#6b7280',
-    lineHeight: 1.5
-  },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px',
-    alignItems: 'end'
-  },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '14px',
-    fontWeight: 600
-  },
-  input: {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    outline: 'none'
-  },
-  formActions: {
-    display: 'flex',
-    alignItems: 'end',
-    gap: '10px',
-    flexWrap: 'wrap'
-  },
-  primaryButton: {
-    border: 'none',
-    borderRadius: '10px',
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  disabledButton: {
-    padding: '10px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#e5e7eb',
-    color: '#6b7280',
-    cursor: 'not-allowed'
-  },
-  secondaryButton: {
-    border: '1px solid #d1d5db',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    background: '#ffffff',
-    color: '#111827',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  dangerButton: {
-    border: '1px solid #fecaca',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    background: '#fef2f2',
-    color: '#b91c1c',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  toolbar: {
-    marginBottom: '16px'
-  },
-  searchInput: {
-    width: '100%',
-    maxWidth: '420px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    outline: 'none',
-    fontSize: '14px',
-    background: '#ffffff'
-  },
-  tableWrapper: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    overflowX: 'auto'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '840px'
-  },
-  th: {
-    textAlign: 'left',
-    padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
-    fontSize: '13px',
-    color: '#6b7280'
-  },
-  td: {
-    padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
-    fontSize: '14px',
-    verticalAlign: 'top'
-  },
-  emptyCell: {
-    padding: '24px',
-    textAlign: 'center',
-    color: '#6b7280'
-  },
-  rowTitle: {
-    fontWeight: 700,
-    marginBottom: '6px'
-  },
-  rowSubtle: {
-    fontSize: '12px',
-    color: '#6b7280',
-    lineHeight: 1.4,
-    wordBreak: 'break-all'
-  },
-  badgeActive: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#f0fdf4',
-    color: '#166534',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  badgeDeleted: {
-    display: 'inline-block',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: '#fee2e2',
-    color: '#991b1b',
-    fontWeight: 700,
-    fontSize: '12px'
-  },
-  actionGroup: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  errorBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#b91c1c'
-  },
-  warningBox: {
-    marginBottom: '16px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412'
-  },
-  successBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    color: '#166534'
-  }
+  page: { display: 'grid', gap: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  title: { margin: 0, fontSize: '1.9rem', color: '#0f172a' },
+  description: { margin: '6px 0 0', color: '#475569', maxWidth: 760, lineHeight: 1.5 },
+  workflowPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16 },
+  workflowTitle: { margin: 0, fontSize: '1.05rem', color: '#0f172a' },
+  workflowText: { margin: '6px 0 0', color: '#475569', lineHeight: 1.5 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16 },
+  statTitle: { fontSize: '0.85rem', color: '#64748b', marginBottom: 8 },
+  statValue: { fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' },
+  statValueWarn: { fontSize: '1.6rem', fontWeight: 800, color: '#b45309' },
+  statValueDanger: { fontSize: '1.6rem', fontWeight: 800, color: '#b91c1c' },
+  statSubtitle: { marginTop: 6, color: '#64748b', lineHeight: 1.4, fontSize: '0.92rem' },
+  warningBox: { background: '#fff7ed', color: '#9a3412', border: '1px solid #fdba74', borderRadius: 14, padding: 14, lineHeight: 1.5 },
+  errorBox: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 12, padding: 12 },
+  successBox: { background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 12, padding: 12 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, display: 'grid', gap: 14 },
+  panelTitle: { margin: 0, fontSize: '1.1rem', color: '#0f172a' },
+  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  input: { width: '100%', padding: '0.8rem 0.9rem', borderRadius: 12, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', boxSizing: 'border-box' },
+  emptyState: { background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 14, padding: 18, display: 'grid', gap: 6, color: '#475569' },
+  cardList: { display: 'grid', gap: 12 },
+  card: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#fff', display: 'grid', gap: 12 },
+  cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  cardTitle: { fontWeight: 800, color: '#0f172a' },
+  cardMeta: { color: '#64748b', fontSize: '0.9rem', marginTop: 4 },
+  cardText: { color: '#334155', lineHeight: 1.5 },
+  keyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, color: '#334155' },
+  actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  linkButton: { border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#1d4ed8', padding: '0.8rem 1rem', fontWeight: 700, textDecoration: 'none' },
+  primaryButton: { border: 'none', borderRadius: 12, background: '#2563eb', color: '#fff', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer' },
+  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#0f172a', padding: '0.8rem 1rem', fontWeight: 600, cursor: 'pointer' },
+  warnButton: { border: '1px solid #fde68a', borderRadius: 12, background: '#fffbeb', color: '#92400e', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer' },
+  badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  badge: { display: 'inline-block', padding: '6px 10px', borderRadius: '999px', fontWeight: 700, fontSize: '12px', background: '#e5e7eb', color: '#374151' }
 };
