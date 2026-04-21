@@ -1,198 +1,273 @@
-import { useMemo, useState } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getAccessToken } from '../lib/auth';
 
-type UserRoleOption = 'admin' | 'manager' | 'staff';
+type UserRole = 'admin' | 'manager' | 'staff';
 
-type UserRow = {
+type UserItem = {
   id: string;
   tenant_id: string;
   name: string;
-  role: UserRoleOption;
+  role: UserRole;
   email: string;
   created_at: string;
 };
 
-type UserDraft = {
+type UserFormState = {
   name: string;
   email: string;
-  role: UserRoleOption;
+  role: UserRole;
   password: string;
 };
 
-const emptyDraft: UserDraft = {
-  name: '',
-  email: '',
-  role: 'staff',
-  password: ''
-};
+function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
+  if (!token) {
+    return null;
+  }
 
-async function fetchUsers(): Promise<UserRow[]> {
-  return apiRequest<UserRow[]>('/users');
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
-async function createUser(payload: UserDraft): Promise<UserRow> {
-  return apiRequest<UserRow>('/users', {
+function getCurrentUserRole(): UserRole | null {
+  const payload = decodeJwtPayload(getAccessToken());
+  const role = payload?.role;
+
+  if (role === 'admin' || role === 'manager' || role === 'staff') {
+    return role;
+  }
+
+  return null;
+}
+
+function emptyForm(): UserFormState {
+  return {
+    name: '',
+    email: '',
+    role: 'staff',
+    password: ''
+  };
+}
+
+async function fetchUsers(): Promise<UserItem[]> {
+  return apiRequest<UserItem[]>('/users');
+}
+
+async function createUser(input: UserFormState): Promise<UserItem> {
+  return apiRequest<UserItem>('/users', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      role: input.role,
+      password: input.password
+    })
   });
 }
 
-async function updateUser(payload: UserDraft & { id: string }): Promise<UserRow> {
-  return apiRequest<UserRow>(`/users/${payload.id}`, {
+async function updateUser(input: { id: string; values: UserFormState }): Promise<UserItem> {
+  return apiRequest<UserItem>(`/users/${input.id}`, {
     method: 'PUT',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      name: input.values.name.trim(),
+      email: input.values.email.trim().toLowerCase(),
+      role: input.values.role,
+      password: input.values.password.trim() ? input.values.password : undefined
+    })
   });
 }
 
-async function deleteUser(userId: string): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/users/${userId}`, {
+async function deleteUser(id: string): Promise<void> {
+  await apiRequest(`/users/${id}`, {
     method: 'DELETE'
   });
 }
 
-function toReadableError(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message;
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Unknown error';
+  return date.toLocaleString();
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) {
-    return '-';
-  }
+function useIsMobile(breakpoint = 960): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return '-';
-  }
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [breakpoint]);
 
-  return parsed.toLocaleString();
+  return isMobile;
 }
 
-function roleBadgeStyle(role: UserRoleOption): CSSProperties {
-  if (role === 'admin') {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
+function StatCard(props: {
+  title: string;
+  value: number | string;
+  subtitle: string;
+  tone?: 'default' | 'good' | 'warn';
+}) {
+  const valueStyle =
+    props.tone === 'good'
+      ? styles.statValueGood
+      : props.tone === 'warn'
+        ? styles.statValueWarn
+        : styles.statValue;
 
-  if (role === 'manager') {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-
-  return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
-}
-
-function StatCard(props: { title: string; value: string; subtitle: string }) {
   return (
     <div style={styles.statCard}>
       <div style={styles.statTitle}>{props.title}</div>
-      <div style={styles.statValue}>{props.value}</div>
+      <div style={valueStyle}>{props.value}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
   );
 }
 
 export default function UsersPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    Added a frontend user-management surface on top of the existing /users
-    backend routes already present in your API.
-
-    WHY IT CHANGED
-    --------------
-    The backend already supports tenant-scoped user lifecycle management, but
-    the frontend snapshot had no Users page at all.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    This closes a major product gap by letting managers/admins review users,
-    while admins can create, edit, and delete accounts from the UI.
-  */
   const queryClient = useQueryClient();
-  const capabilities = getRoleCapabilities();
+  const isMobile = useIsMobile();
+  const currentRole = useMemo(() => getCurrentUserRole(), []);
+  const canWrite = currentRole === 'admin';
 
-  const [draft, setDraft] = useState<UserDraft>(emptyDraft);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string>('');
+  const [form, setForm] = useState<UserFormState>(emptyForm());
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [pageMessage, setPageMessage] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: fetchUsers
   });
 
-  const createUserMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: createUser,
     onSuccess: async () => {
-      setFeedback('User created successfully.');
-      setDraft(emptyDraft);
+      /*
+        What changed:
+        - Reset the form cleanly after creation.
+        - Keep the page width stable by avoiding any post-submit layout branching.
+
+        Why:
+        - The user reported that the create form felt unstable and visually messy on mobile.
+
+        What problem this solves:
+        - Keeps the page predictable after user creation.
+      */
+      setForm(emptyForm());
+      setEditingUser(null);
+      setPageError(null);
+      setPageMessage('User created successfully.');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to create user.');
     }
   });
 
-  const updateUserMutation = useMutation({
+  const updateMutation = useMutation({
     mutationFn: updateUser,
     onSuccess: async () => {
-      setFeedback('User updated successfully.');
-      setDraft(emptyDraft);
-      setEditingUserId(null);
+      setForm(emptyForm());
+      setEditingUser(null);
+      setPageError(null);
+      setPageMessage('User updated successfully.');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to update user.');
     }
   });
 
-  const deleteUserMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: async () => {
-      setFeedback('User deleted successfully.');
-      if (editingUserId) {
-        setDraft(emptyDraft);
-        setEditingUserId(null);
+      setPageError(null);
+      setPageMessage('User deleted successfully.');
+      if (editingUser) {
+        setEditingUser(null);
+        setForm(emptyForm());
       }
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to delete user.');
     }
   });
 
-  const rows = usersQuery.data ?? [];
+  const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
+
+  const filteredUsers = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+
+    if (!needle) {
+      return users;
+    }
+
+    return users.filter((user) =>
+      [user.name, user.email, user.role].some((value) => value.toLowerCase().includes(needle))
+    );
+  }, [search, users]);
 
   const summary = useMemo(() => {
-    const admins = rows.filter((row) => row.role === 'admin').length;
-    const managers = rows.filter((row) => row.role === 'manager').length;
-    const staff = rows.filter((row) => row.role === 'staff').length;
+    return {
+      total: users.length,
+      admins: users.filter((user) => user.role === 'admin').length,
+      managers: users.filter((user) => user.role === 'manager').length,
+      staff: users.filter((user) => user.role === 'staff').length
+    };
+  }, [users]);
 
-    return { admins, managers, staff };
-  }, [rows]);
-
-  const mutationError =
-    createUserMutation.error || updateUserMutation.error || deleteUserMutation.error || null;
-
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFeedback('');
+    setPageError(null);
+    setPageMessage(null);
 
-    if (!capabilities.canManageUsers) {
+    if (!canWrite) {
+      setPageError('Only admins can create or update users.');
       return;
     }
 
-    if (editingUserId) {
-      await updateUserMutation.mutateAsync({ id: editingUserId, ...draft });
+    if (editingUser) {
+      updateMutation.mutate({
+        id: editingUser.id,
+        values: form
+      });
       return;
     }
 
-    await createUserMutation.mutateAsync(draft);
+    createMutation.mutate(form);
   };
 
-  const handleEdit = (user: UserRow) => {
-    setFeedback('');
-    setEditingUserId(user.id);
-    setDraft({
+  const handleEdit = (user: UserItem) => {
+    if (!canWrite) {
+      return;
+    }
+
+    setEditingUser(user);
+    setPageError(null);
+    setPageMessage(null);
+    setForm({
       name: user.name,
       email: user.email,
       role: user.role,
@@ -200,211 +275,526 @@ export default function UsersPage() {
     });
   };
 
-  const handleCancelEdit = () => {
-    setEditingUserId(null);
-    setDraft(emptyDraft);
-    setFeedback('');
+  const handleDelete = (user: UserItem) => {
+    if (!canWrite) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete user "${user.name}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    deleteMutation.mutate(user.id);
   };
+
+  const handleCancelEdit = () => {
+    setEditingUser(null);
+    setForm(emptyForm());
+    setPageError(null);
+    setPageMessage(null);
+  };
+
+  if (usersQuery.isLoading) {
+    return <p>Loading users...</p>;
+  }
+
+  if (usersQuery.isError) {
+    return <p>Failed to load users: {(usersQuery.error as Error).message || 'Unknown error'}</p>;
+  }
 
   return (
     <div style={styles.page}>
-      <section style={styles.statsGrid}>
-        <StatCard title="Total Users" value={String(rows.length)} subtitle="Tenant-scoped accounts visible through /users." />
-        <StatCard title="Admins" value={String(summary.admins)} subtitle="Highest-privilege accounts." />
-        <StatCard title="Managers" value={String(summary.managers)} subtitle="Supervisory and reporting access." />
-        <StatCard title="Staff" value={String(summary.staff)} subtitle="Operational day-to-day users." />
-      </section>
+      <div style={styles.summaryGrid}>
+        <StatCard title="Users" value={summary.total} subtitle="Tenant user accounts" />
+        <StatCard title="Admins" value={summary.admins} subtitle="Full platform control" tone="warn" />
+        <StatCard title="Managers" value={summary.managers} subtitle="Operational supervisors" />
+        <StatCard title="Staff" value={summary.staff} subtitle="Daily execution users" tone="good" />
+      </div>
 
-      <section style={styles.grid}>
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
+      <div
+        style={{
+          ...styles.contentGrid,
+          ...(isMobile ? styles.contentGridMobile : styles.contentGridDesktop)
+        }}
+      >
+        <section style={styles.panel}>
+          <div style={styles.sectionHeader}>
             <div>
-              <h3 style={styles.panelTitle}>Tenant Users</h3>
-              <p style={styles.panelSubtitle}>
-                Managers can review users. Admins can create, edit, and delete accounts.
+              <h2 style={styles.sectionTitle}>{editingUser ? 'Edit User' : 'Create User'}</h2>
+              <p style={styles.sectionDescription}>
+                {canWrite
+                  ? 'Create and maintain tenant users with controlled roles.'
+                  : 'Managers can review users, but only admins can change access.'}
               </p>
             </div>
           </div>
 
-          {usersQuery.isLoading ? <div style={styles.infoState}>Loading users...</div> : null}
-          {usersQuery.isError ? <div style={styles.errorState}>{toReadableError(usersQuery.error)}</div> : null}
-
-          {!usersQuery.isLoading && !usersQuery.isError ? (
-            rows.length > 0 ? (
-              <div style={styles.list}>
-                {rows.map((user) => (
-                  <article key={user.id} style={styles.userCard}>
-                    <div style={styles.userCardTop}>
-                      <div>
-                        <div style={styles.userName}>{user.name}</div>
-                        <div style={styles.userEmail}>{user.email}</div>
-                      </div>
-                      <span style={roleBadgeStyle(user.role)}>{user.role.toUpperCase()}</span>
-                    </div>
-
-                    <div style={styles.metaGrid}>
-                      <div>
-                        <div style={styles.metaLabel}>Created</div>
-                        <div style={styles.metaValue}>{formatDateTime(user.created_at)}</div>
-                      </div>
-                      <div>
-                        <div style={styles.metaLabel}>User ID</div>
-                        <div style={styles.metaValueMono}>{user.id}</div>
-                      </div>
-                    </div>
-
-                    {capabilities.canManageUsers ? (
-                      <div style={styles.actionRow}>
-                        <button type="button" style={styles.secondaryButton} onClick={() => handleEdit(user)}>
-                          Edit User
-                        </button>
-                        <button
-                          type="button"
-                          style={styles.dangerButton}
-                          onClick={() => deleteUserMutation.mutate(user.id)}
-                          disabled={deleteUserMutation.isPending}
-                        >
-                          Delete User
-                        </button>
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div style={styles.infoState}>No users were returned for this tenant.</div>
-            )
-          ) : null}
-        </div>
-
-        <div style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <h3 style={styles.panelTitle}>{editingUserId ? 'Edit User' : 'Create User'}</h3>
-              <p style={styles.panelSubtitle}>
-                {capabilities.canManageUsers
-                  ? 'Admin-only write actions stay aligned with the backend role model.'
-                  : 'Your current role can review users but cannot change them.'}
-              </p>
-            </div>
-          </div>
-
-          {!capabilities.canManageUsers ? (
-            <div style={styles.warningState}>
-              Create, update, and delete actions are admin-only. This page still shows the current tenant user list for review.
+          {!canWrite ? (
+            <div style={styles.infoBanner}>
+              You can review tenant users here, but only admins can create, edit, or delete accounts.
             </div>
           ) : null}
 
-          {feedback ? <div style={styles.successState}>{feedback}</div> : null}
-          {mutationError ? <div style={styles.errorState}>{toReadableError(mutationError)}</div> : null}
+          {pageMessage ? <div style={styles.successBanner}>{pageMessage}</div> : null}
+          {pageError ? <div style={styles.errorBanner}>{pageError}</div> : null}
 
           <form style={styles.form} onSubmit={handleSubmit}>
-            <label style={styles.label}>
-              Full Name
+            <div style={styles.formField}>
+              <label htmlFor="user-name" style={styles.label}>
+                Name
+              </label>
               <input
+                id="user-name"
                 style={styles.input}
-                value={draft.name}
-                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                disabled={!capabilities.canManageUsers}
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Full user name"
                 required
+                disabled={!canWrite}
               />
-            </label>
+            </div>
 
-            <label style={styles.label}>
-              Email
+            <div style={styles.formField}>
+              <label htmlFor="user-email" style={styles.label}>
+                Email
+              </label>
               <input
-                style={styles.input}
+                id="user-email"
                 type="email"
-                value={draft.email}
-                onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
-                disabled={!capabilities.canManageUsers}
+                style={styles.input}
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                placeholder="user@example.com"
                 required
+                disabled={!canWrite}
               />
-            </label>
+            </div>
 
-            <label style={styles.label}>
-              Role
+            <div style={styles.formField}>
+              <label htmlFor="user-role" style={styles.label}>
+                Role
+              </label>
               <select
-                style={styles.input}
-                value={draft.role}
-                onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value as UserRoleOption }))}
-                disabled={!capabilities.canManageUsers}
+                id="user-role"
+                style={styles.select}
+                value={form.role}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, role: event.target.value as UserRole }))
+                }
+                disabled={!canWrite}
               >
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
                 <option value="staff">Staff</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
               </select>
-            </label>
+            </div>
 
-            <label style={styles.label}>
-              {editingUserId ? 'Password (leave blank to keep current password)' : 'Password'}
+            <div style={styles.formField}>
+              <label htmlFor="user-password" style={styles.label}>
+                {editingUser ? 'New Password (optional)' : 'Password'}
+              </label>
               <input
-                style={styles.input}
+                id="user-password"
                 type="password"
-                value={draft.password}
-                onChange={(event) => setDraft((current) => ({ ...current, password: event.target.value }))}
-                disabled={!capabilities.canManageUsers}
-                required={!editingUserId}
+                style={styles.input}
+                value={form.password}
+                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                placeholder={editingUser ? 'Leave blank to keep current password' : 'Create a password'}
+                required={!editingUser}
+                disabled={!canWrite}
               />
-            </label>
+            </div>
 
-            <div style={styles.actionRow}>
+            <div style={styles.formActions}>
               <button
                 type="submit"
                 style={styles.primaryButton}
-                disabled={!capabilities.canManageUsers || createUserMutation.isPending || updateUserMutation.isPending}
+                disabled={!canWrite || createMutation.isPending || updateMutation.isPending}
               >
-                {editingUserId ? 'Save User' : 'Create User'}
+                {editingUser
+                  ? updateMutation.isPending
+                    ? 'Saving…'
+                    : 'Save User'
+                  : createMutation.isPending
+                    ? 'Creating…'
+                    : 'Create User'}
               </button>
 
-              {editingUserId ? (
+              {editingUser ? (
                 <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
-                  Cancel Edit
+                  Cancel
                 </button>
               ) : null}
             </div>
           </form>
-        </div>
-      </section>
+        </section>
+
+        <section style={styles.panel}>
+          <div
+            style={{
+              ...styles.sectionHeader,
+              ...(isMobile ? styles.sectionHeaderMobile : styles.sectionHeaderDesktop)
+            }}
+          >
+            <div>
+              <h2 style={styles.sectionTitle}>Tenant Users</h2>
+              <p style={styles.sectionDescription}>
+                Review all user accounts for the current tenant and filter by name, email, or role.
+              </p>
+            </div>
+
+            <input
+              style={{ ...styles.input, ...styles.searchInput }}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search users"
+            />
+          </div>
+
+          {filteredUsers.length === 0 ? (
+            <div style={styles.emptyState}>No users matched the current search.</div>
+          ) : (
+            <div style={styles.userList}>
+              {filteredUsers.map((user) => (
+                <article key={user.id} style={styles.userCard}>
+                  <div style={styles.userCardTop}>
+                    <div>
+                      <div style={styles.userName}>{user.name}</div>
+                      <div style={styles.userEmail}>{user.email}</div>
+                    </div>
+
+                    <span
+                      style={{
+                        ...styles.roleBadge,
+                        ...(user.role === 'admin'
+                          ? styles.roleBadgeAdmin
+                          : user.role === 'manager'
+                            ? styles.roleBadgeManager
+                            : styles.roleBadgeStaff)
+                      }}
+                    >
+                      {user.role.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div style={styles.userMetaGrid}>
+                    <div style={styles.metaItem}>
+                      <div style={styles.metaLabel}>Created</div>
+                      <div style={styles.metaValue}>{formatDateTime(user.created_at)}</div>
+                    </div>
+
+                    <div style={styles.metaItem}>
+                      <div style={styles.metaLabel}>Tenant</div>
+                      <div style={styles.metaValue}>{user.tenant_id}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.userCardActions}>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={() => handleEdit(user)}
+                      disabled={!canWrite}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      style={styles.deleteButton}
+                      onClick={() => handleDelete(user)}
+                      disabled={!canWrite || deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? 'Working…' : 'Delete'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: '20px' },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '16px'
+  page: {
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0
   },
-  statCard: { background: '#fff', borderRadius: '16px', padding: '18px', border: '1px solid #e5e7eb' },
-  statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  statValue: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#0f172a' },
-  statSubtitle: { marginTop: '8px', color: '#475569', lineHeight: 1.5 },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.9fr)', gap: '20px' },
-  panel: { background: '#fff', borderRadius: '18px', border: '1px solid #e5e7eb', padding: '20px', display: 'grid', gap: '16px' },
-  panelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' },
-  panelTitle: { margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' },
-  panelSubtitle: { margin: '8px 0 0 0', color: '#475569', lineHeight: 1.5 },
-  list: { display: 'grid', gap: '14px' },
-  userCard: { border: '1px solid #e5e7eb', borderRadius: '14px', padding: '16px', display: 'grid', gap: '14px' },
-  userCardTop: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' },
-  userName: { fontWeight: 800, color: '#0f172a', fontSize: '1rem' },
-  userEmail: { marginTop: '4px', color: '#475569' },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
-  metaLabel: { color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' },
-  metaValue: { marginTop: '4px', color: '#0f172a' },
-  metaValueMono: { marginTop: '4px', color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all' },
-  badge: { display: 'inline-flex', alignItems: 'center', padding: '6px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.05em' },
-  form: { display: 'grid', gap: '14px' },
-  label: { display: 'grid', gap: '8px', color: '#334155', fontWeight: 600 },
-  input: { border: '1px solid #cbd5e1', borderRadius: '12px', padding: '12px 14px', fontSize: '0.95rem' },
-  actionRow: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
-  primaryButton: { border: 'none', background: '#0f172a', color: '#fff', borderRadius: '12px', padding: '12px 16px', fontWeight: 700, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '12px', padding: '12px 16px', fontWeight: 700, cursor: 'pointer' },
-  dangerButton: { border: 'none', background: '#dc2626', color: '#fff', borderRadius: '12px', padding: '12px 16px', fontWeight: 700, cursor: 'pointer' },
-  successState: { background: '#dcfce7', color: '#166534', borderRadius: '12px', padding: '12px 14px', fontWeight: 700 },
-  warningState: { background: '#fef3c7', color: '#92400e', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 },
-  errorState: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 },
-  infoState: { background: '#f8fafc', color: '#475569', borderRadius: '12px', padding: '12px 14px' }
+  summaryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: '12px',
+    marginBottom: '20px'
+  },
+  statCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '16px'
+  },
+  statTitle: {
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    fontWeight: 700,
+    color: '#64748b',
+    marginBottom: '8px'
+  },
+  statValue: {
+    fontSize: '30px',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  statValueGood: {
+    fontSize: '30px',
+    fontWeight: 800,
+    color: '#047857'
+  },
+  statValueWarn: {
+    fontSize: '30px',
+    fontWeight: 800,
+    color: '#b45309'
+  },
+  statSubtitle: {
+    marginTop: '8px',
+    fontSize: '13px',
+    color: '#64748b',
+    lineHeight: 1.4
+  },
+  contentGrid: {
+    display: 'grid',
+    gap: '20px',
+    width: '100%',
+    minWidth: 0,
+    alignItems: 'start'
+  },
+  contentGridDesktop: {
+    gridTemplateColumns: 'minmax(0, 380px) minmax(0, 1fr)'
+  },
+  contentGridMobile: {
+    gridTemplateColumns: '1fr'
+  },
+  panel: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '18px',
+    padding: '16px',
+    minWidth: 0,
+    overflow: 'hidden'
+  },
+  sectionHeader: {
+    display: 'flex',
+    gap: '14px',
+    justifyContent: 'space-between',
+    marginBottom: '16px'
+  },
+  sectionHeaderDesktop: {
+    alignItems: 'center'
+  },
+  sectionHeaderMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch'
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: '22px',
+    lineHeight: 1.1
+  },
+  sectionDescription: {
+    margin: '8px 0 0 0',
+    color: '#475569',
+    lineHeight: 1.5
+  },
+  infoBanner: {
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    marginBottom: '14px',
+    lineHeight: 1.5
+  },
+  successBanner: {
+    background: '#ecfdf5',
+    color: '#047857',
+    border: '1px solid #a7f3d0',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    marginBottom: '14px',
+    lineHeight: 1.5
+  },
+  errorBanner: {
+    background: '#fef2f2',
+    color: '#b91c1c',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    marginBottom: '14px',
+    lineHeight: 1.5
+  },
+  form: {
+    display: 'grid',
+    gap: '14px',
+    width: '100%',
+    minWidth: 0
+  },
+  formField: {
+    display: 'grid',
+    gap: '8px',
+    minWidth: 0
+  },
+  label: {
+    fontWeight: 700,
+    color: '#334155'
+  },
+  input: {
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    padding: '12px 14px',
+    borderRadius: '12px',
+    border: '1px solid #cbd5e1',
+    background: '#ffffff',
+    fontSize: '15px',
+    boxSizing: 'border-box'
+  },
+  select: {
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    padding: '12px 14px',
+    borderRadius: '12px',
+    border: '1px solid #cbd5e1',
+    background: '#ffffff',
+    fontSize: '15px',
+    boxSizing: 'border-box'
+  },
+  formActions: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+    marginTop: '4px'
+  },
+  primaryButton: {
+    border: 'none',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#2563eb',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  secondaryButton: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#ffffff',
+    color: '#0f172a',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  deleteButton: {
+    border: 'none',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#ef4444',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  searchInput: {
+    maxWidth: '320px'
+  },
+  emptyState: {
+    border: '1px dashed #cbd5e1',
+    borderRadius: '14px',
+    padding: '18px',
+    color: '#64748b',
+    background: '#f8fafc'
+  },
+  userList: {
+    display: 'grid',
+    gap: '14px'
+  },
+  userCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '16px',
+    background: '#f8fafc',
+    minWidth: 0
+  },
+  userCardTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    alignItems: 'flex-start',
+    marginBottom: '14px'
+  },
+  userName: {
+    fontSize: '18px',
+    fontWeight: 800,
+    color: '#0f172a',
+    wordBreak: 'break-word'
+  },
+  userEmail: {
+    marginTop: '6px',
+    color: '#475569',
+    wordBreak: 'break-word'
+  },
+  roleBadge: {
+    padding: '8px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    flexShrink: 0
+  },
+  roleBadgeAdmin: {
+    background: '#fee2e2',
+    color: '#b91c1c'
+  },
+  roleBadgeManager: {
+    background: '#fef3c7',
+    color: '#b45309'
+  },
+  roleBadgeStaff: {
+    background: '#dcfce7',
+    color: '#047857'
+  },
+  userMetaGrid: {
+    display: 'grid',
+    gap: '10px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    marginBottom: '14px',
+    minWidth: 0
+  },
+  metaItem: {
+    minWidth: 0
+  },
+  metaLabel: {
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: '#64748b',
+    marginBottom: '6px',
+    fontWeight: 700
+  },
+  metaValue: {
+    color: '#0f172a',
+    lineHeight: 1.45,
+    wordBreak: 'break-word'
+  },
+  userCardActions: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap'
+  }
 };
