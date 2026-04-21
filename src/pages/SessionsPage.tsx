@@ -100,6 +100,37 @@ function StatCard(props: {
 }
 
 export default function SessionsPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your actual current SessionsPage.
+
+    The real session flows are intentionally unchanged:
+    - list account sessions
+    - revoke one session
+    - revoke all sessions
+    - clear local auth state after revoke-all
+
+    This pass is UI-only:
+    - added width guards across the page and panel containers
+    - improved wrapping for long device/user-agent values
+    - improved table resilience on medium-width screens
+    - aligned spacing and header behavior with the recently polished pages
+
+    WHY IT CHANGED
+    --------------
+    Sessions is a real account-security surface and should match the visual
+    consistency of the rest of the polished admin/system pages.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Improves readability and responsiveness without changing:
+    - backend contract
+    - session revoke behavior
+    - query keys
+    - current-session heuristic
+    - auth/logout flow
+  */
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -209,9 +240,9 @@ export default function SessionsPage() {
   }
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={styles.header}>
-        <div>
+        <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Sessions</h2>
           <p style={styles.description}>
             Review active and revoked sessions for your account and remotely revoke stale access.
@@ -254,7 +285,7 @@ export default function SessionsPage() {
 
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
-          <div>
+          <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Session Inventory</h3>
             <p style={styles.panelSubtitle}>
               Sessions are ordered by last activity so likely-current sessions appear first.
@@ -337,38 +368,61 @@ export default function SessionsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    /*
+      What changed:
+      - Added width guards to the page root.
+
+      Why:
+      - This page sits inside the shared layout container and renders a wide session table.
+
+      What problem this solves:
+      - Prevents unnecessary overflow pressure and keeps the page stable on narrower widths.
+    */
+    width: '100%',
+    minWidth: 0
+  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: '16px',
     alignItems: 'flex-start',
     marginBottom: '20px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  headerTextBlock: {
+    minWidth: 0
   },
   title: {
     margin: 0,
     fontSize: '28px',
     fontWeight: 800,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   description: {
     margin: '8px 0 0',
     color: '#6b7280',
     lineHeight: 1.6,
-    maxWidth: '760px'
+    maxWidth: '760px',
+    wordBreak: 'break-word'
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '16px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0
   },
   statTitle: {
     fontSize: '14px',
@@ -379,25 +433,33 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px'
+    marginBottom: '8px',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueGood: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#166534'
+    color: '#166534',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueWarn: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#92400e'
+    color: '#92400e',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueDanger: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#991b1b'
+    color: '#991b1b',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -409,33 +471,53 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '16px',
     boxShadow: '0 3px 14px rgba(15, 23, 42, 0.04)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    minWidth: 0
   },
   panelHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: '16px',
-    padding: '20px 20px 14px'
+    padding: '20px 20px 14px',
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  panelHeaderText: {
+    minWidth: 0
   },
   panelTitle: {
     margin: 0,
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   panelSubtitle: {
     margin: '6px 0 0',
     color: '#6b7280',
-    fontSize: '14px'
+    fontSize: '14px',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   tableWrapper: {
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width.
+
+      Why:
+      - This table is legitimately wide, but the earlier width threshold was more aggressive than necessary.
+
+      What problem this solves:
+      - Eases horizontal scrolling pressure on medium-width screens without changing the actual columns.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '1120px'
+    minWidth: '1020px'
   },
   th: {
     textAlign: 'left',
@@ -452,20 +534,33 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
     color: '#111827',
-    fontSize: '14px'
+    fontSize: '14px',
+    wordBreak: 'break-word'
   },
   tdWide: {
+    /*
+      What changed:
+      - Preserved the dedicated device column width, but improved wrapping behavior.
+
+      Why:
+      - User-agent strings are often the longest content on this page.
+
+      What problem this solves:
+      - Keeps long device strings readable without forcing more width than necessary.
+    */
     padding: '16px',
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
     color: '#111827',
     fontSize: '14px',
-    minWidth: '320px',
-    lineHeight: 1.5
+    minWidth: '280px',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   rowTitle: {
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     marginTop: '4px',

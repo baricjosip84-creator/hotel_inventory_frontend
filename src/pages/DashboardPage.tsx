@@ -499,7 +499,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isLoading) {
     return (
-      <div>
+      <div style={styles.page}>
         <h2 style={styles.title}>Dashboard</h2>
         <p style={styles.description}>Loading production dashboard...</p>
       </div>
@@ -508,7 +508,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isError || !summary) {
     return (
-      <div>
+      <div style={styles.page}>
         <h2 style={styles.title}>Dashboard</h2>
         <p style={styles.description}>
           Failed to load dashboard summary:{' '}
@@ -519,7 +519,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={styles.header}>
         <div>
           <h2 style={styles.title}>Dashboard</h2>
@@ -1147,8 +1147,23 @@ export default function DashboardPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    /*
+      What changed:
+      - Added width guards to the dashboard root container.
+
+      Why:
+      - This page renders multiple large grids, tables, and operational cards.
+
+      What problem this solves:
+      - Reduces overflow pressure and keeps the dashboard stable inside the shared app layout.
+    */
+    width: '100%',
+    minWidth: 0
+  },
   header: {
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
   },
   title: {
     margin: 0,
@@ -1158,20 +1173,24 @@ const styles: Record<string, CSSProperties> = {
   description: {
     marginTop: '8px',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   kpiGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '16px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0
   },
   statTitle: {
     fontSize: '14px',
@@ -1182,25 +1201,33 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px'
+    marginBottom: '8px',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueGood: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#166534'
+    color: '#166534',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueWarn: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#92400e'
+    color: '#92400e',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueDanger: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#991b1b'
+    color: '#991b1b',
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -1212,7 +1239,8 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0
   },
   healthHeader: {
     display: 'flex',
@@ -1231,7 +1259,8 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     color: '#6b7280',
     lineHeight: 1.5,
-    maxWidth: '700px'
+    maxWidth: '700px',
+    wordBreak: 'break-word'
   },
   healthScore: {
     fontSize: '56px',
@@ -1242,13 +1271,15 @@ const styles: Record<string, CSSProperties> = {
   healthMetricsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '14px'
+    gap: '14px',
+    minWidth: 0
   },
   healthMetric: {
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
     padding: '14px',
-    background: '#fafafa'
+    background: '#fafafa',
+    minWidth: 0
   },
   healthMetricLabel: {
     fontSize: '13px',
@@ -1261,17 +1292,31 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700
   },
   twoColumnGrid: {
+    /*
+      What changed:
+      - Hardened the dashboard split-grid with width-safe minmax behavior.
+
+      Why:
+      - This page mixes cards, tables, and longer operational text in side-by-side sections.
+
+      What problem this solves:
+      - Prevents columns from pushing wider than the page on tablets and smaller laptops.
+    */
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
     gap: '20px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
   },
   panel: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0,
+    overflow: 'hidden'
   },
   sectionHeader: {
     marginBottom: '16px',
@@ -1284,12 +1329,14 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: {
     margin: 0,
     fontSize: '20px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   sectionSubtitle: {
     margin: '8px 0 0 0',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   sectionHint: {
     fontSize: '12px',
@@ -1303,39 +1350,48 @@ const styles: Record<string, CSSProperties> = {
   },
   list: {
     display: 'grid',
-    gap: '14px'
+    gap: '14px',
+    minWidth: 0
   },
   listCard: {
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
     padding: '14px',
-    background: '#fafafa'
+    background: '#fafafa',
+    minWidth: 0
   },
   listCardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'flex-start',
-    marginBottom: '12px'
+    marginBottom: '12px',
+    flexWrap: 'wrap',
+    minWidth: 0
   },
   listCardTitle: {
     fontSize: '16px',
     fontWeight: 700,
-    marginBottom: '4px'
+    marginBottom: '4px',
+    wordBreak: 'break-word'
   },
   listCardMeta: {
     fontSize: '12px',
     color: '#6b7280',
-    lineHeight: 1.4
+    lineHeight: 1.4,
+    wordBreak: 'break-word'
   },
   cardText: {
     color: '#374151',
     lineHeight: 1.6,
-    marginBottom: '12px'
+    marginBottom: '12px',
+    wordBreak: 'break-word'
   },
   metricRow: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: '12px',
     fontSize: '14px',
     padding: '6px 0',
@@ -1346,12 +1402,23 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width while preserving all existing dashboard table columns.
+
+      Why:
+      - The dashboard tables are dense, but the earlier threshold was harsher than necessary.
+
+      What problem this solves:
+      - Eases medium-screen horizontal scrolling pressure without changing table structure or data.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '760px'
+    minWidth: '720px'
   },
   th: {
     textAlign: 'left',
@@ -1365,7 +1432,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    wordBreak: 'break-word'
   },
   emptyCell: {
     padding: '24px',
@@ -1382,12 +1450,14 @@ const styles: Record<string, CSSProperties> = {
   },
   rowTitle: {
     fontWeight: 700,
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
     color: '#6b7280',
-    lineHeight: 1.4
+    lineHeight: 1.4,
+    wordBreak: 'break-word'
   },
   emptyStateNeutral: {
     border: '1px dashed #d1d5db',
@@ -1395,7 +1465,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '24px',
     textAlign: 'center',
     color: '#6b7280',
-    background: '#fafafa'
+    background: '#fafafa',
+    minWidth: 0
   },
   emptyStateGood: {
     border: '1px solid #bbf7d0',
@@ -1403,7 +1474,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '24px',
     textAlign: 'center',
     color: '#166534',
-    background: '#f0fdf4'
+    background: '#f0fdf4',
+    minWidth: 0
   },
   emptyStateTitle: {
     fontWeight: 700,
@@ -1426,10 +1498,22 @@ const styles: Record<string, CSSProperties> = {
     padding: '12px 14px'
   },
   quickActionRow: {
-    display: 'flex',
+    /*
+      What changed:
+      - Switched quick actions to a responsive grid.
+
+      Why:
+      - The dashboard action links are part of the control-center feel and should align more cleanly on smaller widths.
+
+      What problem this solves:
+      - Keeps the action area orderly and avoids awkward wrapping patterns without changing destinations or behavior.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '10px',
-    flexWrap: 'wrap',
-    marginBottom: '18px'
+    marginBottom: '18px',
+    width: '100%',
+    minWidth: 0
   },
   actionLink: {
     display: 'inline-flex',
@@ -1442,6 +1526,8 @@ const styles: Record<string, CSSProperties> = {
     color: '#1d4ed8',
     fontWeight: 700,
     textDecoration: 'none',
-    fontSize: '13px'
+    fontSize: '13px',
+    minWidth: 0,
+    textAlign: 'center'
   }
 };

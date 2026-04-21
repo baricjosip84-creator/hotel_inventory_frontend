@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -141,6 +140,31 @@ function StatCard(props: {
 }
 
 export default function UsersPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your actual current UsersPage.
+    The changes here are intentionally UI-only:
+    - moved the search control into a dedicated toolbar row
+    - removed the hard search width cap
+    - made user card headers wrap more safely on smaller screens
+
+    WHY IT CHANGED
+    --------------
+    The page is already functionally correct, but compared with the current
+    Products / Suppliers / Storage master-data pages, the search area and card
+    header behavior felt less consistent.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This improves admin-facing readability and responsiveness without changing:
+    - backend contract
+    - CRUD behavior
+    - role enforcement
+    - query keys
+    - field names
+    - mutation flow
+  */
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const currentRole = useMemo(() => getCurrentUserRole(), []);
@@ -434,19 +458,16 @@ export default function UsersPage() {
         </section>
 
         <section style={styles.panel}>
-          <div
-            style={{
-              ...styles.sectionHeader,
-              ...(isMobile ? styles.sectionHeaderMobile : styles.sectionHeaderDesktop)
-            }}
-          >
+          <div style={styles.sectionHeader}>
             <div>
               <h2 style={styles.sectionTitle}>Tenant Users</h2>
               <p style={styles.sectionDescription}>
                 Review all user accounts for the current tenant and filter by name, email, or role.
               </p>
             </div>
+          </div>
 
+          <div style={styles.toolbarGrid}>
             <input
               style={{ ...styles.input, ...styles.searchInput }}
               value={search}
@@ -462,7 +483,7 @@ export default function UsersPage() {
               {filteredUsers.map((user) => (
                 <article key={user.id} style={styles.userCard}>
                   <div style={styles.userCardTop}>
-                    <div>
+                    <div style={styles.userCardIdentity}>
                       <div style={styles.userName}>{user.name}</div>
                       <div style={styles.userEmail}>{user.email}</div>
                     </div>
@@ -596,13 +617,6 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     marginBottom: '16px'
   },
-  sectionHeaderDesktop: {
-    alignItems: 'center'
-  },
-  sectionHeaderMobile: {
-    flexDirection: 'column',
-    alignItems: 'stretch'
-  },
   sectionTitle: {
     margin: 0,
     fontSize: '22px',
@@ -710,8 +724,36 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer'
   },
+  toolbarGrid: {
+    /*
+      What changed:
+      - Added a dedicated toolbar row for the search control.
+
+      Why:
+      - The search field was previously packed directly into the section header,
+        which made this page feel less consistent than Products / Suppliers / Storage.
+
+      What problem this solves:
+      - Gives the list area the same visual rhythm as the other master-data pages
+        without changing any filtering behavior.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+    marginBottom: '16px'
+  },
   searchInput: {
-    maxWidth: '320px'
+    /*
+      What changed:
+      - Removed the hard max-width cap from the search field.
+
+      Why:
+      - The page already sits inside the shared centered content container.
+
+      What problem this solves:
+      - Prevents the search control from looking artificially narrow and improves consistency with the other pages.
+    */
+    maxWidth: '100%'
   },
   emptyState: {
     border: '1px dashed #cbd5e1',
@@ -732,11 +774,26 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   userCardTop: {
+    /*
+      What changed:
+      - Allowed the identity block and role badge to wrap more safely.
+
+      Why:
+      - On narrower widths, the badge could crowd the name/email block.
+
+      What problem this solves:
+      - Improves mobile and tablet resilience without changing the card structure.
+    */
     display: 'flex',
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'flex-start',
+    flexWrap: 'wrap',
     marginBottom: '14px'
+  },
+  userCardIdentity: {
+    minWidth: 0,
+    flex: '1 1 220px'
   },
   userName: {
     fontSize: '18px',

@@ -78,18 +78,26 @@ export default function SuppliersPage() {
   /*
     WHAT CHANGED
     ------------
-    This file is intentionally based on the exact version you pasted here.
-    I did not restructure it into a different supplier experience again.
+    This file stays grounded in your actual existing SuppliersPage.
+    The changes here are intentionally UI-only:
+    - removed a duplicated subtitle paragraph in the form panel
+    - aligned the search toolbar with the same master-data layout rhythm used elsewhere
+    - slightly softened table width pressure for medium screens
 
     WHY IT CHANGED
     --------------
-    You explicitly asked to stop guessing and stop inventing. This keeps the
-    real supplier CRUD surface you restored, rather than replacing it.
+    After comparing the real Products, Suppliers, and Storage Locations pages,
+    Suppliers was already functionally solid, but it had a small content duplication
+    issue and a couple of minor layout inconsistencies versus the newer master-data pattern.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This ensures Suppliers stays grounded in your actual current implementation,
-    while still preserving inline code comments and full-file delivery.
+    This improves consistency and readability without changing:
+    - backend contract
+    - CRUD behavior
+    - permission enforcement
+    - query keys
+    - invalidation flow
   */
   const queryClient = useQueryClient();
 
@@ -283,9 +291,6 @@ export default function SuppliersPage() {
             ? 'Maintain supplier master records used across purchasing and inbound operations.'
             : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
         </p>
-        <p style={styles.panelSubtitle}>
-          Maintain supplier master data used by products, shipments, and procurement operations.
-        </p>
 
         {formError ? <div style={styles.errorBox}>{formError}</div> : null}
         {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
@@ -340,7 +345,7 @@ export default function SuppliersPage() {
           Search and review supplier records available to inventory and shipment workflows.
         </p>
 
-        <div style={styles.toolbar}>
+        <div style={styles.toolbarGrid}>
           <input
             type="text"
             placeholder="Search by supplier name or contact info..."
@@ -539,12 +544,34 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
-  toolbar: {
+  toolbarGrid: {
+    /*
+      What changed:
+      - Replaced the single-row toolbar wrapper with the same grid-style toolbar pattern used across the newer master-data pages.
+
+      Why:
+      - Suppliers should visually align with Products and Storage Locations.
+
+      What problem this solves:
+      - Makes the search area scale more cleanly inside the shared layout container and keeps future filter expansion straightforward.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
     marginBottom: '16px'
   },
   searchInput: {
+    /*
+      What changed:
+      - Removed the hard width cap while keeping the same control styling.
+
+      Why:
+      - The page already sits inside a centered shared content container, so the extra cap is no longer helpful.
+
+      What problem this solves:
+      - Prevents the search control from looking artificially narrow relative to the other master-data pages.
+    */
     width: '100%',
-    maxWidth: '420px',
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
@@ -560,9 +587,19 @@ const styles: Record<string, CSSProperties> = {
     overflowX: 'auto'
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width.
+
+      Why:
+      - This table can tolerate a bit more flexibility before horizontal scrolling becomes necessary.
+
+      What problem this solves:
+      - Eases width pressure on medium screens without changing the actual column structure.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '840px'
+    minWidth: '780px'
   },
   th: {
     textAlign: 'left',

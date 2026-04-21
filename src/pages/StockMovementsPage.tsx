@@ -171,6 +171,39 @@ function changeDisplay(value: number): string {
 }
 
 export default function StockMovementsPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your actual current StockMovementsPage.
+
+    The real ledger logic is intentionally unchanged:
+    - same backend endpoints
+    - same query keys
+    - same filter fields
+    - same table columns
+    - same movement traceability data
+
+    This pass is UI-only:
+    - added width guards across page/panel/table containers
+    - improved header and filter wrapping
+    - improved summary card consistency
+    - improved long text wrapping in product/shipment/user cells
+    - slightly eased horizontal scroll pressure on medium screens
+
+    WHY IT CHANGED
+    --------------
+    Stock movements is a core operational ledger and should visually align with
+    the other recently polished pages without changing traceability behavior.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Improves readability and responsiveness without changing:
+    - backend contract
+    - filters
+    - ledger data
+    - query keys
+    - movement reasoning and display flow
+  */
   const [filters, setFilters] = useState<FiltersState>({
     product_id: '',
     shipment_id: '',
@@ -220,9 +253,9 @@ export default function StockMovementsPage() {
   }, [movements]);
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={styles.header}>
-        <div>
+        <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Stock Movements</h2>
           <p style={styles.description}>
             Trace stock changes by product, shipment, reason, and operator. This is your
@@ -427,48 +460,86 @@ export default function StockMovementsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    /*
+      What changed:
+      - Added width guards to the page root.
+
+      Why:
+      - This page renders a wide ledger table inside the shared layout container.
+
+      What problem this solves:
+      - Reduces overflow pressure and keeps the layout stable on narrower widths.
+    */
+    width: '100%',
+    minWidth: 0
+  },
   header: {
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
+  },
+  headerTextBlock: {
+    minWidth: 0
   },
   title: {
     margin: 0,
     fontSize: '28px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   description: {
     marginTop: '8px',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   panel: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelTitle: {
     marginTop: 0,
     marginBottom: '16px',
     fontSize: '20px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   filtersGrid: {
+    /*
+      What changed:
+      - Kept the same four filters but hardened the grid with width guards.
+
+      Why:
+      - The filter area should behave like the other recently polished operational pages.
+
+      What problem this solves:
+      - Makes the toolbar more resilient on tablet and mobile widths without changing filters.
+    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px'
+    gap: '14px',
+    width: '100%',
+    minWidth: 0
   },
   summaryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '14px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
   },
   summaryCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
-    padding: '18px'
+    padding: '18px',
+    minWidth: 0
   },
   summaryLabel: {
     fontSize: '13px',
@@ -478,7 +549,9 @@ const styles: Record<string, CSSProperties> = {
   },
   summaryValue: {
     fontSize: '28px',
-    fontWeight: 700
+    fontWeight: 700,
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   label: {
     display: 'block',
@@ -488,23 +561,36 @@ const styles: Record<string, CSSProperties> = {
   },
   input: {
     width: '100%',
+    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     background: '#ffffff',
-    outline: 'none'
+    outline: 'none',
+    boxSizing: 'border-box'
   },
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width.
+
+      Why:
+      - The ledger table is legitimately wide, but the previous threshold was harsher than necessary.
+
+      What problem this solves:
+      - Eases medium-screen horizontal scrolling pressure without changing the actual ledger columns.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '1150px'
+    minWidth: '1040px'
   },
   th: {
     textAlign: 'left',
@@ -518,7 +604,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    wordBreak: 'break-word'
   },
   emptyCell: {
     padding: '24px',
@@ -530,11 +617,13 @@ const styles: Record<string, CSSProperties> = {
     padding: '6px 10px',
     borderRadius: '999px',
     fontWeight: 700,
-    fontSize: '12px'
+    fontSize: '12px',
+    whiteSpace: 'nowrap'
   },
   rowTitle: {
     fontWeight: 700,
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',

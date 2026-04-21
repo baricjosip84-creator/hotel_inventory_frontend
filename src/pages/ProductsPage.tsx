@@ -132,26 +132,30 @@ export default function ProductsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file is rebuilt from the actual current ProductsPage in your latest zip,
-    but now follows the simpler, more consistent page pattern you restored for
-    Suppliers and Storage Locations.
+    This file stays grounded in your actual current ProductsPage.
+    The changes here are intentionally surgical and UI-only:
+    - removed the duplicated subtitle block in the product form panel
+    - kept the existing toolbar/filter structure intact
+    - slightly reduced table width pressure for medium screens
 
     WHY IT CHANGED
     --------------
-    You asked for ProductsPage to be redone based on the direction we were taking,
-    without inventing unrelated page behavior or replacing it with something that
-    no longer felt like your project.
+    After comparing the real Products, Suppliers, and Storage Locations pages,
+    Products was already the strongest reference page functionally and structurally.
+    It only needed a final consistency pass to remove duplicated text and smooth a small
+    layout rough edge.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This keeps the real product CRUD contract you already have:
-    - GET /products
-    - POST /products
-    - PATCH /products/:id with If-Match-Version
-    - DELETE /products/:id with If-Match-Version
-
-    It also keeps supplier linkage and product filtering, but presents them in the
-    same operationally simple structure now used by your restored master-data pages.
+    This improves consistency and readability without changing:
+    - backend contract
+    - CRUD behavior
+    - If-Match-Version handling
+    - query keys
+    - invalidation flow
+    - role enforcement
+    - filters
+    - field names
   */
 
   const queryClient = useQueryClient();
@@ -388,9 +392,6 @@ export default function ProductsPage() {
           {(canManageProducts
             ? 'Maintain product master records used across stock, shipments, receiving, alerts, and reporting.'
             : 'This form stays visible for context, but product writes are blocked for your current role.') as string}
-        </p>
-        <p style={styles.panelSubtitle}>
-          Maintain product master data and link suppliers so operational workflows stay accurate.
         </p>
 
         {formError ? <div style={styles.errorBox}>{formError}</div> : null}
@@ -749,9 +750,20 @@ const styles: Record<string, CSSProperties> = {
     overflowX: 'auto'
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width while preserving the same columns and data density.
+
+      Why:
+      - Products genuinely needs a wider table than Suppliers and Storage Locations,
+        but the previous threshold was a bit more aggressive than necessary.
+
+      What problem this solves:
+      - Eases horizontal scrolling pressure on medium-width screens without changing table structure or behavior.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '1040px'
+    minWidth: '980px'
   },
   th: {
     textAlign: 'left',

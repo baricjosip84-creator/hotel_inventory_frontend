@@ -19,51 +19,6 @@ type StockItem = {
   product_min_stock?: number | string | null;
   updated_at?: string;
   version?: number | string;
-
-  workflowGuideGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
-    marginBottom: '20px'
-  },
-  workflowStepCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '16px',
-    padding: '14px',
-    display: 'grid',
-    gap: '8px'
-  },
-  workflowStepCardComplete: {
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: '16px',
-    padding: '14px',
-    display: 'grid',
-    gap: '8px'
-  },
-  workflowStepLabel: {
-    fontSize: '0.86rem',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  workflowStepText: {
-    color: '#475569',
-    lineHeight: 1.5,
-    fontSize: '0.92rem'
-  },
-  readinessList: {
-    display: 'grid',
-    gap: '10px'
-  },
-  readinessRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px',
-    borderBottom: '1px solid #f1f5f9',
-    paddingBottom: '10px',
-    color: '#334155'
-  },
 };
 
 type StockMovement = {
@@ -577,7 +532,7 @@ export default function StockPage() {
   }
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={styles.header}>
         <div>
           <h2 style={styles.title}>Stock Operations</h2>
@@ -1159,8 +1114,35 @@ export default function StockPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your actual current StockPage.
+
+    The real stock operation flows are intentionally unchanged:
+    - same stock listing and selection flow
+    - same consume / count / adjust mutations
+    - same latest movement verification
+    - same query keys and backend routes
+
+    This pass is mostly structural cleanup plus low-risk UI polish:
+    - removed misplaced style objects accidentally embedded inside StockItem
+    - restored those missing styles to the real styles object
+    - added width guards to key layout containers
+    - improved wrapping in cards, rows, and workbench panels
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Keeps the page functionally identical while fixing a real file issue and
+    making the dense stock workbench more resilient on smaller widths.
+  */
+  page: {
+    width: '100%',
+    minWidth: 0
+  },
   header: {
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
   },
   title: {
     margin: 0,
@@ -1172,20 +1154,62 @@ const styles: Record<string, CSSProperties> = {
     margin: '8px 0 0 0',
     color: '#6b7280',
     lineHeight: 1.6,
-    maxWidth: '820px'
+    maxWidth: '820px',
+    wordBreak: 'break-word'
+  },
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
+  },
+  workflowStepCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '14px',
+    display: 'grid',
+    gap: '8px',
+    minWidth: 0
+  },
+  workflowStepCardComplete: {
+    background: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    borderRadius: '16px',
+    padding: '14px',
+    display: 'grid',
+    gap: '8px',
+    minWidth: 0
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a',
+    wordBreak: 'break-word'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem',
+    wordBreak: 'break-word'
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '16px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    width: '100%',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0
   },
   statTitle: {
     fontSize: '14px',
@@ -1220,7 +1244,9 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelHeaderWithActions: {
     display: 'flex',
@@ -1259,13 +1285,16 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
     gap: '16px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    width: '100%',
+    minWidth: 0
   },
   roleCard: {
     background: '#f9fafb',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
-    padding: '16px'
+    padding: '16px',
+    minWidth: 0
   },
   roleCardTitle: {
     fontSize: '13px',
@@ -1290,7 +1319,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '14px',
     padding: '16px',
     display: 'grid',
-    gap: '10px'
+    gap: '10px',
+    minWidth: 0
   },
   permissionRow: {
     display: 'flex',
@@ -1368,20 +1398,25 @@ const styles: Record<string, CSSProperties> = {
   },
   workbenchGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
     gap: '16px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    width: '100%',
+    minWidth: 0
   },
   workbenchColumn: {
     display: 'grid',
     gap: '16px',
-    alignContent: 'start'
+    alignContent: 'start',
+    minWidth: 0
   },
   innerPanel: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
-    padding: '16px'
+    padding: '16px',
+    minWidth: 0,
+    overflow: 'hidden'
   },
   sectionTitle: {
     margin: 0,
@@ -1413,13 +1448,16 @@ const styles: Record<string, CSSProperties> = {
   selectionGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '12px'
+    gap: '12px',
+    width: '100%',
+    minWidth: 0
   },
   selectionItem: {
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
     padding: '12px',
-    background: '#f9fafb'
+    background: '#f9fafb',
+    minWidth: 0
   },
   selectionLabel: {
     fontSize: '12px',
@@ -1437,7 +1475,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: '10px',
     marginTop: '16px',
-    marginBottom: '14px'
+    marginBottom: '14px',
+    width: '100%',
+    minWidth: 0
   },
   actionTypeButton: {
     minHeight: '46px',
@@ -1510,7 +1550,8 @@ const styles: Record<string, CSSProperties> = {
     background: '#f9fafb',
     padding: '14px',
     display: 'grid',
-    gap: '10px'
+    gap: '10px',
+    minWidth: 0
   },
   previewRow: {
     display: 'flex',
@@ -1553,16 +1594,32 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer'
   },
+  readinessList: {
+    display: 'grid',
+    gap: '10px',
+    minWidth: 0
+  },
+  readinessRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    borderBottom: '1px solid #f1f5f9',
+    paddingBottom: '10px',
+    color: '#334155',
+    flexWrap: 'wrap'
+  },
   movementList: {
     display: 'grid',
     gap: '12px',
-    marginTop: '14px'
+    marginTop: '14px',
+    minWidth: 0
   },
   movementCard: {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '14px',
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 0
   },
   movementTopRow: {
     display: 'flex',
@@ -1592,12 +1649,13 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '920px'
+    minWidth: '860px'
   },
   th: {
     textAlign: 'left',
@@ -1611,7 +1669,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     verticalAlign: 'top',
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   selectedRow: {
     background: '#eff6ff'
@@ -1619,12 +1678,14 @@ const styles: Record<string, CSSProperties> = {
   rowTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
     color: '#6b7280',
-    marginTop: '4px'
+    marginTop: '4px',
+    wordBreak: 'break-word'
   },
   rowActionButton: {
     minHeight: '38px',

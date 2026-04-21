@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
@@ -294,7 +293,20 @@ export default function AppLayout() {
 
 const styles: Record<string, CSSProperties> = {
   shell: {
+    /*
+      What changed:
+      - Added an explicit viewport height anchor while preserving the existing flex shell.
+      - Kept overflow hidden at the shell level so the layout still clips off-canvas mobile drawer transitions cleanly.
+
+      Why:
+      - The existing shell already had the right structure, but height propagation was not strict enough for consistent scrolling.
+      - This layout is intended to let the main content pane own vertical scrolling.
+
+      What problem this solves:
+      - Reduces layout instability and inconsistent scroll behavior across pages and device sizes.
+    */
     minHeight: '100vh',
+    height: '100vh',
     display: 'flex',
     background: '#f5f7fb',
     color: '#1f2937',
@@ -319,8 +331,18 @@ const styles: Record<string, CSSProperties> = {
     borderRight: '1px solid rgba(255,255,255,0.06)'
   },
   sidebarMobile: {
-    width: '286px',
-    maxWidth: '84vw',
+    /*
+      What changed:
+      - Slightly normalized the drawer width while preserving the same mobile drawer approach.
+
+      Why:
+      - The prior values were close, but slightly inconsistent across narrower devices.
+
+      What problem this solves:
+      - Makes the drawer feel a bit more stable on small screens without changing behavior or structure.
+    */
+    width: '280px',
+    maxWidth: '85vw',
     position: 'fixed',
     left: 0,
     top: 0,
@@ -409,13 +431,38 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   mainArea: {
+    /*
+      What changed:
+      - Made the main pane the explicit vertical scroll container.
+      - Added minHeight: 0 so flex children can shrink correctly inside the fixed-height shell.
+
+      Why:
+      - The shell already clips global overflow, so the main area needs to own scrolling.
+      - Without this, large pages can produce clipped content or inconsistent scroll behavior.
+
+      What problem this solves:
+      - Fixes page-level scroll handling without rewriting the existing layout structure.
+    */
     flex: 1,
     minWidth: 0,
+    minHeight: 0,
+    height: '100vh',
+    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column'
   },
   header: {
-    padding: '24px 24px 0 24px',
+    /*
+      What changed:
+      - Added a small bottom padding to balance the spacing between the header block and the page content.
+
+      Why:
+      - The previous header/content padding combination could look uneven across pages.
+
+      What problem this solves:
+      - Improves visual rhythm without changing the header structure.
+    */
+    padding: '24px 24px 16px 24px',
     flexShrink: 0
   },
   headerLeft: {
@@ -456,8 +503,22 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5
   },
   content: {
+    /*
+      What changed:
+      - Added a shared max width and centering while preserving the existing mobile/desktop padding split.
+
+      Why:
+      - Several pages are very wide and currently inherit full available width.
+      - Products/Suppliers-style pages benefit from a more controlled content measure.
+
+      What problem this solves:
+      - Reduces over-wide layouts and improves consistency across pages without changing page internals.
+    */
     flex: 1,
     minWidth: 0,
+    width: '100%',
+    maxWidth: '1400px',
+    margin: '0 auto',
     overflowX: 'hidden'
   },
   contentDesktop: {

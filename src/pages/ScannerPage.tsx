@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, CSSProperties } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
@@ -132,6 +132,38 @@ function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
 }
 
 export default function ScannerPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your actual current ScannerPage.
+
+    The scanner logic is intentionally untouched:
+    - same shipment/product modes
+    - same manual submit flow
+    - same image decode flow
+    - same resolve/navigation behavior
+    - same html5-qrcode setup
+
+    The changes here are UI-only:
+    - moved the page into the same panel/card rhythm as the rest of the polished app
+    - improved action button wrapping and small-screen resilience
+    - improved status / result presentation
+    - improved wrapping for long IDs and decoded values
+
+    WHY IT CHANGED
+    --------------
+    The real file was operationally correct but visually looser than the rest
+    of the app after the recent page polish passes.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This improves operator usability and consistency without changing:
+    - backend contract
+    - scanner flow
+    - routing behavior
+    - query/search params
+    - barcode/QR decode behavior
+  */
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const manualInputRef = useRef<HTMLInputElement | null>(null);
@@ -422,127 +454,122 @@ export default function ScannerPage() {
   }, []);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>{modeLabel(mode)}</h2>
-
-      <p style={{ marginBottom: 16, color: '#4b5563', lineHeight: 1.6 }}>
-        {modeDescription(mode)}
-      </p>
-
-      {mode === 'product' ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: 12,
-            borderRadius: 12,
-            background: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            color: '#1d4ed8'
-          }}
-        >
-          <strong>Selected shipment:</strong>
-          <div style={{ marginTop: 4, wordBreak: 'break-all' }}>
-            {shipmentId || 'Missing shipment ID'}
+    <div style={styles.page}>
+      <section style={styles.heroPanel}>
+        <div style={styles.heroHeader}>
+          <div style={styles.heroTextBlock}>
+            <h2 style={styles.title}>{modeLabel(mode)}</h2>
+            <p style={styles.description}>{modeDescription(mode)}</p>
           </div>
-          <div style={{ marginTop: 8 }}>
-            <strong>Default scan location:</strong>
-            <div style={{ marginTop: 4, wordBreak: 'break-all' }}>
-              {locationId || 'Missing default location'}
+
+          <span style={mode === 'product' ? styles.modeBadgeWarn : styles.modeBadgeInfo}>
+            {mode === 'product' ? 'PRODUCT MODE' : 'SHIPMENT MODE'}
+          </span>
+        </div>
+
+        {mode === 'product' ? (
+          <div style={styles.contextPanel}>
+            <div style={styles.contextGrid}>
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>Selected shipment</div>
+                <div style={styles.contextValue}>{shipmentId || 'Missing shipment ID'}</div>
+              </div>
+
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>Default scan location</div>
+                <div style={styles.contextValue}>{locationId || 'Missing default location'}</div>
+              </div>
             </div>
           </div>
+        ) : null}
+
+        <div style={mode === 'product' ? styles.tipBannerWarn : styles.tipBannerInfo}>
+          {mode === 'product' ? (
+            <>
+              <strong>Barcode scan tips:</strong>
+              <div>Hold the barcode horizontally inside the wide scan area.</div>
+              <div>Move a little farther back than you would for a QR code.</div>
+              <div>Use strong light and avoid glare.</div>
+              <div>If live scan fails, use manual entry or image upload below.</div>
+            </>
+          ) : (
+            <>
+              <strong>QR scan tips:</strong>
+              <div>Center the QR code inside the square scan area.</div>
+              <div>If live scan fails, use manual entry or image upload below.</div>
+            </>
+          )}
         </div>
-      ) : null}
 
-      <div
-        style={{
-          marginBottom: 14,
-          padding: 12,
-          borderRadius: 12,
-          background: mode === 'product' ? '#fff7ed' : '#eff6ff',
-          border: mode === 'product' ? '1px solid #fdba74' : '1px solid #bfdbfe',
-          color: mode === 'product' ? '#9a3412' : '#1d4ed8',
-          lineHeight: 1.6
-        }}
-      >
-        {mode === 'product' ? (
-          <>
-            <strong>Barcode scan tips:</strong>
-            <div>Hold the barcode horizontally inside the wide scan area.</div>
-            <div>Move a little farther back than you would for a QR code.</div>
-            <div>Use strong light and avoid glare.</div>
-            <div>If live scan fails, use manual entry or image upload below.</div>
-          </>
-        ) : (
-          <>
-            <strong>QR scan tips:</strong>
-            <div>Center the QR code inside the square scan area.</div>
-            <div>If live scan fails, use manual entry or image upload below.</div>
-          </>
-        )}
-      </div>
+        <div style={styles.actionGrid}>
+          <button
+            onClick={() => void startScanner()}
+            disabled={isRunning || isResolving || isDecodingImage}
+            style={styles.primaryButton}
+          >
+            {isRunning ? 'Scanner Running' : 'Start Scanner'}
+          </button>
 
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={() => void startScanner()} disabled={isRunning || isResolving || isDecodingImage}>
-          {isRunning ? 'Scanner Running' : 'Start Scanner'}
-        </button>
+          <button
+            onClick={() => void stopScanner()}
+            disabled={!isRunning}
+            style={styles.secondaryButton}
+          >
+            Stop Scanner
+          </button>
 
-        <button
-          onClick={() => void stopScanner()}
-          disabled={!isRunning}
-          style={{ marginLeft: 10 }}
-        >
-          Stop Scanner
-        </button>
-      </div>
-
-      {error && (
-        <div style={{ color: 'red', marginBottom: 10 }}>
-          <strong>Error:</strong> {error}
+          <button
+            type="button"
+            onClick={handleChooseImage}
+            disabled={isResolving || isDecodingImage}
+            style={styles.secondaryButton}
+          >
+            Upload Image
+          </button>
         </div>
-      )}
 
-      {isResolving && (
-        <div style={{ marginBottom: 10, color: '#1d4ed8' }}>
-          {mode === 'product'
-            ? 'Resolving product barcode in selected shipment...'
-            : 'Resolving shipment from scanned QR code...'}
+        {error ? (
+          <div style={styles.errorBanner}>
+            <strong>Error:</strong> {error}
+          </div>
+        ) : null}
+
+        {isResolving ? (
+          <div style={styles.infoBanner}>
+            {mode === 'product'
+              ? 'Resolving product barcode in selected shipment...'
+              : 'Resolving shipment from scanned QR code...'}
+          </div>
+        ) : null}
+
+        {isDecodingImage ? (
+          <div style={styles.infoBanner}>Decoding image...</div>
+        ) : null}
+
+        <div style={styles.scannerShell}>
+          <div
+            id="scanner-container"
+            style={{
+              ...styles.scannerContainer,
+              ...(mode === 'product' ? styles.scannerContainerWide : styles.scannerContainerSquare)
+            }}
+          />
         </div>
-      )}
+      </section>
 
-      {isDecodingImage && (
-        <div style={{ marginBottom: 10, color: '#1d4ed8' }}>
-          Decoding image...
-        </div>
-      )}
-
-      <div
-        id="scanner-container"
-        style={{
-          width: '100%',
-          maxWidth: mode === 'product' ? 460 : 400,
-          margin: '0 auto 20px'
-        }}
-      />
-
-      <div
-        style={{
-          marginTop: 10,
-          padding: 16,
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          background: '#ffffff'
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>
-          Manual / Fallback Options
-        </h3>
-
-        <div style={{ display: 'grid', gap: 12 }}>
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
           <div>
-            <label
-              htmlFor="manual-code-input"
-              style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}
-            >
+            <h3 style={styles.panelTitle}>Manual / Fallback Options</h3>
+            <p style={styles.panelSubtitle}>
+              Use this when live camera decoding is unreliable in current warehouse conditions.
+            </p>
+          </div>
+        </div>
+
+        <div style={styles.formGrid}>
+          <div style={styles.formField}>
+            <label htmlFor="manual-code-input" style={styles.label}>
               Enter code manually
             </label>
             <input
@@ -552,22 +579,16 @@ export default function ScannerPage() {
               value={manualCode}
               onChange={(event) => setManualCode(event.target.value)}
               placeholder={mode === 'product' ? 'Enter product barcode' : 'Enter shipment QR text'}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                border: '1px solid #d1d5db',
-                borderRadius: 10,
-                padding: '10px 12px',
-                fontSize: 14
-              }}
+              style={styles.input}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={styles.formActions}>
             <button
               type="button"
               onClick={() => void handleManualSubmit()}
               disabled={isResolving || isDecodingImage}
+              style={styles.primaryButton}
             >
               Submit Manual Code
             </button>
@@ -576,6 +597,7 @@ export default function ScannerPage() {
               type="button"
               onClick={handleChooseImage}
               disabled={isResolving || isDecodingImage}
+              style={styles.secondaryButton}
             >
               Upload Image
             </button>
@@ -591,35 +613,323 @@ export default function ScannerPage() {
             void handleImageFileChange(event);
           }}
         />
-      </div>
+      </section>
 
-      {result && (
-        <div style={{ marginTop: 20 }}>
-          <strong>Decoded Value:</strong>
-          <div>{result}</div>
-        </div>
-      )}
+      {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName ? (
+        <section style={styles.panel}>
+          <div style={styles.panelHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>Latest Scan Result</h3>
+              <p style={styles.panelSubtitle}>
+                Real-time decode and resolution output from the existing scanner flow.
+              </p>
+            </div>
+          </div>
 
-      {resolvedShipmentId && (
-        <div style={{ marginTop: 12, color: '#166534' }}>
-          <strong>Resolved Shipment ID:</strong>
-          <div>{resolvedShipmentId}</div>
-        </div>
-      )}
+          <div style={styles.resultGrid}>
+            {result ? (
+              <div style={styles.resultCard}>
+                <div style={styles.resultLabel}>Decoded value</div>
+                <div style={styles.resultValue}>{result}</div>
+              </div>
+            ) : null}
 
-      {resolvedShipmentItemId && (
-        <div style={{ marginTop: 12, color: '#166534' }}>
-          <strong>Resolved Shipment Item ID:</strong>
-          <div>{resolvedShipmentItemId}</div>
-        </div>
-      )}
+            {resolvedShipmentId ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>Resolved shipment ID</div>
+                <div style={styles.resultValue}>{resolvedShipmentId}</div>
+              </div>
+            ) : null}
 
-      {resolvedProductName && (
-        <div style={{ marginTop: 12, color: '#166534' }}>
-          <strong>Matched Product:</strong>
-          <div>{resolvedProductName}</div>
-        </div>
-      )}
+            {resolvedShipmentItemId ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>Resolved shipment item ID</div>
+                <div style={styles.resultValue}>{resolvedShipmentItemId}</div>
+              </div>
+            ) : null}
+
+            {resolvedProductName ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>Matched product</div>
+                <div style={styles.resultValue}>{resolvedProductName}</div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    display: 'grid',
+    gap: '20px',
+    width: '100%',
+    minWidth: 0
+  },
+  heroPanel: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '16px',
+    padding: '20px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    display: 'grid',
+    gap: '16px',
+    minWidth: 0,
+    overflow: 'hidden'
+  },
+  heroHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '12px',
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  heroTextBlock: {
+    minWidth: 0
+  },
+  title: {
+    margin: 0,
+    fontSize: '28px',
+    fontWeight: 700,
+    wordBreak: 'break-word'
+  },
+  description: {
+    margin: '8px 0 0 0',
+    color: '#4b5563',
+    lineHeight: 1.6,
+    wordBreak: 'break-word'
+  },
+  modeBadgeInfo: {
+    display: 'inline-flex',
+    padding: '8px 10px',
+    borderRadius: '999px',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    whiteSpace: 'nowrap'
+  },
+  modeBadgeWarn: {
+    display: 'inline-flex',
+    padding: '8px 10px',
+    borderRadius: '999px',
+    background: '#fff7ed',
+    color: '#9a3412',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    whiteSpace: 'nowrap'
+  },
+  contextPanel: {
+    minWidth: 0
+  },
+  contextGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '12px',
+    minWidth: 0
+  },
+  contextCard: {
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  contextLabel: {
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#1d4ed8',
+    marginBottom: '8px'
+  },
+  contextValue: {
+    color: '#1e3a8a',
+    lineHeight: 1.5,
+    wordBreak: 'break-all'
+  },
+  tipBannerInfo: {
+    padding: '12px 14px',
+    borderRadius: '12px',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+    lineHeight: 1.6
+  },
+  tipBannerWarn: {
+    padding: '12px 14px',
+    borderRadius: '12px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412',
+    lineHeight: 1.6
+  },
+  actionGrid: {
+    /*
+      What changed:
+      - Switched the top scanner actions into a responsive grid.
+
+      Why:
+      - The original action row wrapped loosely and felt less stable on narrower screens.
+
+      What problem this solves:
+      - Keeps operator controls aligned and reachable without changing behavior.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '10px',
+    width: '100%',
+    minWidth: 0
+  },
+  primaryButton: {
+    border: 'none',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#2563eb',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  secondaryButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#ffffff',
+    color: '#111827',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  errorBanner: {
+    background: '#fef2f2',
+    color: '#b91c1c',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  },
+  infoBanner: {
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  },
+  scannerShell: {
+    width: '100%',
+    minWidth: 0
+  },
+  scannerContainer: {
+    width: '100%',
+    margin: '0 auto',
+    minWidth: 0,
+    overflow: 'hidden',
+    borderRadius: '14px',
+    border: '1px solid #e5e7eb',
+    background: '#f8fafc'
+  },
+  scannerContainerWide: {
+    maxWidth: 460
+  },
+  scannerContainerSquare: {
+    maxWidth: 400
+  },
+  panel: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '16px',
+    padding: '18px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0,
+    overflow: 'hidden'
+  },
+  panelHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '12px',
+    marginBottom: '16px',
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  panelTitle: {
+    margin: 0,
+    fontSize: '20px',
+    fontWeight: 700,
+    wordBreak: 'break-word'
+  },
+  panelSubtitle: {
+    margin: '8px 0 0 0',
+    color: '#6b7280',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
+  },
+  formGrid: {
+    display: 'grid',
+    gap: '14px',
+    minWidth: 0
+  },
+  formField: {
+    display: 'grid',
+    gap: '8px',
+    minWidth: 0
+  },
+  label: {
+    fontWeight: 700,
+    color: '#334155'
+  },
+  input: {
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    border: '1px solid #d1d5db',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    fontSize: '14px',
+    background: '#ffffff'
+  },
+  formActions: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  resultGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '12px',
+    minWidth: 0
+  },
+  resultCard: {
+    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  resultCardSuccess: {
+    border: '1px solid #bbf7d0',
+    background: '#f0fdf4',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  resultLabel: {
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#64748b',
+    marginBottom: '8px'
+  },
+  resultValue: {
+    color: '#0f172a',
+    lineHeight: 1.5,
+    wordBreak: 'break-all'
+  }
+};

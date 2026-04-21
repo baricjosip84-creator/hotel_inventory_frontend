@@ -68,54 +68,6 @@ type ShipmentSummary = {
   total_ordered_quantity?: number | string;
   total_received_quantity?: number | string;
 
-  guidedEmptyState: {
-    display: 'grid',
-    gap: 14,
-    border: '1px dashed #cbd5e1',
-    borderRadius: 18,
-    background: '#f8fafc',
-    padding: 18
-  },
-  guidedEmptyStateTitle: {
-    fontSize: '1rem',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  guidedEmptyStateText: {
-    color: '#475569',
-    lineHeight: 1.6
-  },
-  workflowGuideGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12
-  },
-  workflowStepCard: {
-    border: '1px solid #e2e8f0',
-    borderRadius: 16,
-    background: '#ffffff',
-    padding: 14,
-    display: 'grid',
-    gap: 8
-  },
-  workflowStepCardComplete: {
-    border: '1px solid #bbf7d0',
-    borderRadius: 16,
-    background: '#f0fdf4',
-    padding: 14,
-    display: 'grid',
-    gap: 8
-  },
-  workflowStepLabel: {
-    fontSize: '0.86rem',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  workflowStepText: {
-    color: '#475569',
-    lineHeight: 1.5,
-    fontSize: '0.92rem'
-  },
 };
 
 type ShipmentItem = {
@@ -1685,7 +1637,8 @@ export default function ShipmentsPage() {
 
 const styles: Record<string, CSSProperties> = {
   header: {
-    marginBottom: 20
+    marginBottom: 20,
+    minWidth: 0
   },
   title: {
     margin: 0,
@@ -1697,7 +1650,8 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 8,
     color: '#6b7280',
     lineHeight: 1.6,
-    maxWidth: 860
+    maxWidth: 860,
+    wordBreak: 'break-word'
   },
   panel: {
     background: '#ffffff',
@@ -1830,16 +1784,20 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: '1fr',
     gap: 20,
-    alignItems: 'start'
+    alignItems: 'start',
+    width: '100%',
+    minWidth: 0
   },
   shipmentListHeader: {
-    marginBottom: 16
+    marginBottom: 16,
+    minWidth: 0
   },
   filterGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 180px',
     gap: 12,
-    marginBottom: 16
+    marginBottom: 16,
+    minWidth: 0
   },
   shipmentList: {
     display: 'flex',
@@ -1855,7 +1813,8 @@ const styles: Record<string, CSSProperties> = {
     padding: 14,
     background: '#ffffff',
     cursor: 'pointer',
-    width: '100%'
+    width: '100%',
+    minWidth: 0
   },
   shipmentCardSelected: {
     border: '1px solid #2563eb',
@@ -1886,7 +1845,9 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gap: 6,
     color: '#374151',
-    fontSize: 13
+    fontSize: 13,
+    minWidth: 0,
+    wordBreak: 'break-word'
   },
   badgeBase: {
     display: 'inline-flex',
@@ -1926,7 +1887,8 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     gap: 12,
     alignItems: 'center',
-    marginBottom: 14
+    marginBottom: 14,
+    minWidth: 0
   },
   itemsHeaderContent: {
     display: 'flex',
@@ -1953,12 +1915,13 @@ const styles: Record<string, CSSProperties> = {
   },
   itemTableWrapper: {
     overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch'
+    WebkitOverflowScrolling: 'touch',
+    minWidth: 0
   },
   itemTable: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: 980
+    minWidth: 900
   },
   th: {
     textAlign: 'left',
@@ -1975,7 +1938,8 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
     color: '#111827',
-    fontSize: 14
+    fontSize: 14,
+    wordBreak: 'break-word'
   },
   highlightedTableRow: {
     background: '#eff6ff'
@@ -2000,7 +1964,8 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: 14,
     padding: 14,
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 0
   },
   mobileItemCardHighlighted: {
     border: '1px solid #60a5fa',
@@ -2082,6 +2047,183 @@ const styles: Record<string, CSSProperties> = {
   mobileReceiveButtonDisabled: {
     background: '#9ca3af',
     cursor: 'not-allowed'
+  },
+
+  guidedEmptyState: {
+    display: 'grid',
+    gap: 14,
+    border: '1px dashed #cbd5e1',
+    borderRadius: 18,
+    background: '#f8fafc',
+    padding: 18,
+    minWidth: 0
+  },
+  guidedEmptyStateTitle: {
+    fontSize: '1rem',
+    fontWeight: 800,
+    color: '#0f172a',
+    wordBreak: 'break-word'
+  },
+  guidedEmptyStateText: {
+    color: '#475569',
+    lineHeight: 1.6,
+    wordBreak: 'break-word'
+  },
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12,
+    minWidth: 0
+  },
+  workflowStepCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    background: '#ffffff',
+    padding: 14,
+    display: 'grid',
+    gap: 8,
+    minWidth: 0
+  },
+  workflowStepCardComplete: {
+    border: '1px solid #bbf7d0',
+    borderRadius: 16,
+    background: '#f0fdf4',
+    padding: 14,
+    display: 'grid',
+    gap: 8,
+    minWidth: 0
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a',
+    wordBreak: 'break-word'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem',
+    wordBreak: 'break-word'
+  },
+  scannerReadinessSection: {
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: 16,
+    minWidth: 0,
+    alignItems: 'stretch'
+  },
+  readinessCard: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    background: '#ffffff',
+    padding: 16,
+    display: 'grid',
+    gap: 14,
+    minWidth: 0
+  },
+  readinessHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  readinessStatusReady: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#dcfce7',
+    color: '#166534'
+  },
+  readinessStatusBlocked: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#fef3c7',
+    color: '#92400e'
+  },
+  progressBadgeComplete: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#dcfce7',
+    color: '#166534'
+  },
+  progressBadgePending: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#eff6ff',
+    color: '#1d4ed8'
+  },
+  progressSummaryRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: 12,
+    minWidth: 0
+  },
+  progressMetricBox: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    background: '#f8fafc',
+    padding: 12,
+    display: 'grid',
+    gap: 6,
+    minWidth: 0,
+    color: '#111827'
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 10,
+    borderRadius: 999,
+    background: '#e5e7eb',
+    overflow: 'hidden'
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)'
+  },
+  defaultLocationSummary: {
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
+  },
+  scanReadyBanner: {
+    borderRadius: 12,
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#065f46',
+    padding: '12px 14px',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
+  },
+  scanWarningBanner: {
+    borderRadius: 12,
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412',
+    padding: '12px 14px',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   emptyState: {
     color: '#6b7280',

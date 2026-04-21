@@ -127,7 +127,7 @@ function Section(props: { title: string; subtitle: string; children: React.React
   return (
     <section style={styles.panel}>
       <div style={styles.panelHeader}>
-        <div>
+        <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
           <p style={styles.panelSubtitle}>{props.subtitle}</p>
         </div>
@@ -141,18 +141,27 @@ export default function AdminSystemPage() {
   /*
     WHAT CHANGED
     ------------
-    Added one admin/system surface that consolidates system status, diagnostics,
-    and system-health endpoints already present in the backend.
+    This file stays grounded in your actual current AdminSystemPage.
+    The changes here are intentionally UI-only:
+    - improved panel/grid resilience with safer min-width handling
+    - improved wrapping for long operational strings
+    - improved key/value row behavior on narrower screens
 
     WHY IT CHANGED
     --------------
-    The backend snapshot already contains meaningful admin/control-plane APIs,
-    but the frontend had no place to expose them.
+    This page already uses the correct backend diagnostics endpoints and role gating,
+    but operational/admin surfaces often contain long IDs, timestamps, keys, and messages.
+    Those were the biggest visual pressure points in the real file.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This turns backend operational visibility into a reachable frontend module
-    for managers and admins, while keeping deeper diagnostics admin-only.
+    This improves readability and responsiveness without changing:
+    - backend contract
+    - endpoints
+    - query keys
+    - admin/manager access rules
+    - section order
+    - data flow
   */
   const capabilities = getRoleCapabilities();
 
@@ -204,29 +213,67 @@ export default function AdminSystemPage() {
   return (
     <div style={styles.page}>
       <section style={styles.statsGrid}>
-        <StatCard title="Write Status" value={overview.writeLock} subtitle="Current system write-lock posture." tone={overview.writeLock === 'Locked' ? 'bad' : 'default'} />
-        <StatCard title="Maintenance" value={overview.maintenance} subtitle="Maintenance-mode visibility from system flags." tone={overview.maintenance === 'Enabled' ? 'warn' : 'default'} />
-        <StatCard title="Blocking Alerts" value={String(overview.blockingAlerts)} subtitle="Tenant-scoped blocking alerts from /system-status." tone={overview.blockingAlerts > 0 ? 'bad' : 'default'} />
-        <StatCard title="Tenant Health Rows" value={String(overview.tenantHealthRows)} subtitle="Cross-tenant health snapshots for admins." />
+        <StatCard
+          title="Write Status"
+          value={overview.writeLock}
+          subtitle="Current system write-lock posture."
+          tone={overview.writeLock === 'Locked' ? 'bad' : 'default'}
+        />
+        <StatCard
+          title="Maintenance"
+          value={overview.maintenance}
+          subtitle="Maintenance-mode visibility from system flags."
+          tone={overview.maintenance === 'Enabled' ? 'warn' : 'default'}
+        />
+        <StatCard
+          title="Blocking Alerts"
+          value={String(overview.blockingAlerts)}
+          subtitle="Tenant-scoped blocking alerts from /system-status."
+          tone={overview.blockingAlerts > 0 ? 'bad' : 'default'}
+        />
+        <StatCard
+          title="Tenant Health Rows"
+          value={String(overview.tenantHealthRows)}
+          subtitle="Cross-tenant health snapshots for admins."
+        />
       </section>
 
       <div style={styles.grid}>
-        <Section title="System Status" subtitle="Manager/admin visibility into system flags and tenant blocking alerts.">
+        <Section
+          title="System Status"
+          subtitle="Manager/admin visibility into system flags and tenant blocking alerts."
+        >
           {systemStatusQuery.isLoading ? <div style={styles.infoState}>Loading system status...</div> : null}
           {systemStatusQuery.isError ? <div style={styles.errorState}>{toReadableError(systemStatusQuery.error)}</div> : null}
           {systemStatusQuery.data ? (
             <div style={styles.list}>
-              <div style={styles.keyValueRow}><strong>Tenant ID</strong><span>{systemStatusQuery.data.tenant_id ?? '-'}</span></div>
-              <div style={styles.keyValueRow}><strong>Timestamp</strong><span>{formatDateTime(systemStatusQuery.data.timestamp)}</span></div>
-              <div style={styles.keyValueRow}><strong>System Write Lock</strong><span>{systemStatusQuery.data.system_write_locked ? 'Enabled' : 'Disabled'}</span></div>
-              <div style={styles.keyValueRow}><strong>Maintenance Mode</strong><span>{systemStatusQuery.data.maintenance_mode ? 'Enabled' : 'Disabled'}</span></div>
+              <div style={styles.keyValueRow}>
+                <strong style={styles.keyLabel}>Tenant ID</strong>
+                <span style={styles.keyValue}>{systemStatusQuery.data.tenant_id ?? '-'}</span>
+              </div>
+              <div style={styles.keyValueRow}>
+                <strong style={styles.keyLabel}>Timestamp</strong>
+                <span style={styles.keyValue}>{formatDateTime(systemStatusQuery.data.timestamp)}</span>
+              </div>
+              <div style={styles.keyValueRow}>
+                <strong style={styles.keyLabel}>System Write Lock</strong>
+                <span style={styles.keyValue}>{systemStatusQuery.data.system_write_locked ? 'Enabled' : 'Disabled'}</span>
+              </div>
+              <div style={styles.keyValueRow}>
+                <strong style={styles.keyLabel}>Maintenance Mode</strong>
+                <span style={styles.keyValue}>{systemStatusQuery.data.maintenance_mode ? 'Enabled' : 'Disabled'}</span>
+              </div>
+
               <div style={styles.sectionSubheading}>Blocking Alerts</div>
+
               {systemStatusQuery.data.blocking_alerts?.length ? (
                 systemStatusQuery.data.blocking_alerts.map((alert) => (
                   <article key={alert.id} style={styles.itemCard}>
                     <div style={styles.itemTitle}>{alert.type}</div>
                     <div style={styles.itemText}>{alert.message}</div>
-                    <div style={styles.itemMeta}>{alert.severity.toUpperCase()} · {formatDateTime(alert.created_at)}</div>
+                    <div style={styles.itemMeta}>
+                      {alert.severity.toUpperCase()} · {formatDateTime(alert.created_at)}
+                    </div>
                   </article>
                 ))
               ) : (
@@ -236,9 +283,14 @@ export default function AdminSystemPage() {
           ) : null}
         </Section>
 
-        <Section title="Admin Diagnostics" subtitle="Admin-only read surface for operational integrity checks already exposed by the backend.">
+        <Section
+          title="Admin Diagnostics"
+          subtitle="Admin-only read surface for operational integrity checks already exposed by the backend."
+        >
           {!capabilities.isAdmin ? (
-            <div style={styles.warningState}>Diagnostics and cross-tenant health are intentionally limited to admins. Managers still retain the system-status view above.</div>
+            <div style={styles.warningState}>
+              Diagnostics and cross-tenant health are intentionally limited to admins. Managers still retain the system-status view above.
+            </div>
           ) : null}
 
           {capabilities.isAdmin ? (
@@ -246,59 +298,100 @@ export default function AdminSystemPage() {
               <div style={styles.sectionSubheading}>Blocking Diagnostics</div>
               {blockingAlertsQuery.isError ? <div style={styles.errorState}>{toReadableError(blockingAlertsQuery.error)}</div> : null}
               {blockingAlertsQuery.isLoading ? <div style={styles.infoState}>Loading blocking diagnostics...</div> : null}
-              {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.type}</div>
-                  <div style={styles.itemText}>{row.message}</div>
-                  <div style={styles.itemMeta}>{row.severity.toUpperCase()} · {formatDateTime(row.created_at)}</div>
-                </article>
-              )) : !blockingAlertsQuery.isLoading ? <div style={styles.infoState}>No blocking diagnostics returned.</div> : null}
+              {blockingAlertsQuery.data?.length
+                ? blockingAlertsQuery.data.map((row) => (
+                    <article key={row.id} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>{row.type}</div>
+                      <div style={styles.itemText}>{row.message}</div>
+                      <div style={styles.itemMeta}>
+                        {row.severity.toUpperCase()} · {formatDateTime(row.created_at)}
+                      </div>
+                    </article>
+                  ))
+                : !blockingAlertsQuery.isLoading
+                  ? <div style={styles.infoState}>No blocking diagnostics returned.</div>
+                  : null}
 
               <div style={styles.sectionSubheading}>Stuck Idempotency Keys</div>
-              {idempotencyQuery.data?.length ? idempotencyQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.method} {row.path}</div>
-                  <div style={styles.itemTextMono}>{row.idempotency_key}</div>
-                  <div style={styles.itemMeta}>Created {formatDateTime(row.created_at)} · Expires {formatDateTime(row.expires_at)}</div>
-                </article>
-              )) : !idempotencyQuery.isLoading ? <div style={styles.infoState}>No stuck idempotency rows returned.</div> : null}
+              {idempotencyQuery.data?.length
+                ? idempotencyQuery.data.map((row) => (
+                    <article key={row.id} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>
+                        {row.method} {row.path}
+                      </div>
+                      <div style={styles.itemTextMono}>{row.idempotency_key}</div>
+                      <div style={styles.itemMeta}>
+                        Created {formatDateTime(row.created_at)} · Expires {formatDateTime(row.expires_at)}
+                      </div>
+                    </article>
+                  ))
+                : !idempotencyQuery.isLoading
+                  ? <div style={styles.infoState}>No stuck idempotency rows returned.</div>
+                  : null}
 
               <div style={styles.sectionSubheading}>Stock Integrity</div>
-              {stockIntegrityQuery.data?.length ? stockIntegrityQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>Negative Stock Row</div>
-                  <div style={styles.itemTextMono}>Product {row.product_id} · Location {row.storage_location_id}</div>
-                  <div style={styles.itemMeta}>Quantity {row.quantity} · Updated {formatDateTime(row.updated_at)}</div>
-                </article>
-              )) : !stockIntegrityQuery.isLoading ? <div style={styles.infoState}>No negative stock integrity issues returned.</div> : null}
+              {stockIntegrityQuery.data?.length
+                ? stockIntegrityQuery.data.map((row) => (
+                    <article key={row.id} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>Negative Stock Row</div>
+                      <div style={styles.itemTextMono}>
+                        Product {row.product_id} · Location {row.storage_location_id}
+                      </div>
+                      <div style={styles.itemMeta}>
+                        Quantity {row.quantity} · Updated {formatDateTime(row.updated_at)}
+                      </div>
+                    </article>
+                  ))
+                : !stockIntegrityQuery.isLoading
+                  ? <div style={styles.infoState}>No negative stock integrity issues returned.</div>
+                  : null}
 
               <div style={styles.sectionSubheading}>Broken Shipments</div>
-              {brokenShipmentsQuery.data?.length ? brokenShipmentsQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>Shipment {row.id}</div>
-                  <div style={styles.itemText}>Status {row.status}</div>
-                  <div style={styles.itemMeta}>Ordered {row.total_ordered_quantity} · Received {row.total_received_quantity}</div>
-                </article>
-              )) : !brokenShipmentsQuery.isLoading ? <div style={styles.infoState}>No broken shipments returned.</div> : null}
+              {brokenShipmentsQuery.data?.length
+                ? brokenShipmentsQuery.data.map((row) => (
+                    <article key={row.id} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>Shipment {row.id}</div>
+                      <div style={styles.itemText}>Status {row.status}</div>
+                      <div style={styles.itemMeta}>
+                        Ordered {row.total_ordered_quantity} · Received {row.total_received_quantity}
+                      </div>
+                    </article>
+                  ))
+                : !brokenShipmentsQuery.isLoading
+                  ? <div style={styles.infoState}>No broken shipments returned.</div>
+                  : null}
             </div>
           ) : null}
         </Section>
       </div>
 
-      <Section title="System Health" subtitle="Cross-tenant health snapshots exposed by the admin system-health endpoint.">
-        {!capabilities.isAdmin ? <div style={styles.warningState}>System health snapshots are admin-only because they span all tenants.</div> : null}
+      <Section
+        title="System Health"
+        subtitle="Cross-tenant health snapshots exposed by the admin system-health endpoint."
+      >
+        {!capabilities.isAdmin ? (
+          <div style={styles.warningState}>System health snapshots are admin-only because they span all tenants.</div>
+        ) : null}
+
         {capabilities.isAdmin && systemHealthQuery.isLoading ? <div style={styles.infoState}>Loading system health...</div> : null}
         {capabilities.isAdmin && systemHealthQuery.isError ? <div style={styles.errorState}>{toReadableError(systemHealthQuery.error)}</div> : null}
+
         {capabilities.isAdmin && systemHealthQuery.data ? (
           systemHealthQuery.data.tenants.length ? (
             <div style={styles.list}>
               {systemHealthQuery.data.tenants.map((tenant) => (
                 <article key={tenant.tenant_id} style={styles.itemCard}>
                   <div style={styles.itemTitle}>{tenant.tenant_name}</div>
-                  <div style={styles.itemMeta}>Status {tenant.status.toUpperCase()} · Issues {tenant.issue_count}</div>
-                  {tenant.issues.length ? tenant.issues.map((issue, index) => (
-                    <div key={`${tenant.tenant_id}-${index}`} style={styles.itemText}>{issue.type}: {issue.message}</div>
-                  )) : <div style={styles.itemText}>No issues reported.</div>}
+                  <div style={styles.itemMeta}>
+                    Status {tenant.status.toUpperCase()} · Issues {tenant.issue_count}
+                  </div>
+                  {tenant.issues.length
+                    ? tenant.issues.map((issue, index) => (
+                        <div key={`${tenant.tenant_id}-${index}`} style={styles.itemText}>
+                          {issue.type}: {issue.message}
+                        </div>
+                      ))
+                    : <div style={styles.itemText}>No issues reported.</div>}
                 </article>
               ))}
             </div>
@@ -312,28 +405,213 @@ export default function AdminSystemPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: '20px' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' },
-  statCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '18px' },
-  statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  statValue: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#0f172a' },
-  statValueWarn: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#b45309' },
-  statValueBad: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#b91c1c' },
-  statSubtitle: { marginTop: '8px', color: '#475569', lineHeight: 1.5 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' },
-  panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '18px', padding: '20px', display: 'grid', gap: '16px' },
-  panelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' },
-  panelTitle: { margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' },
-  panelSubtitle: { margin: '8px 0 0 0', color: '#475569', lineHeight: 1.5 },
-  list: { display: 'grid', gap: '12px' },
-  itemCard: { border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '8px' },
-  itemTitle: { fontWeight: 800, color: '#0f172a' },
-  itemText: { color: '#334155', lineHeight: 1.5 },
-  itemTextMono: { color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all' },
-  itemMeta: { color: '#64748b', fontSize: '0.88rem' },
-  sectionSubheading: { color: '#0f172a', fontWeight: 800, marginTop: '4px' },
-  keyValueRow: { display: 'flex', justifyContent: 'space-between', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' },
-  infoState: { background: '#f8fafc', color: '#475569', borderRadius: '12px', padding: '12px 14px' },
-  warningState: { background: '#fef3c7', color: '#92400e', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 },
-  errorState: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px 14px', lineHeight: 1.5 }
+  page: {
+    display: 'grid',
+    gap: '20px',
+    width: '100%',
+    minWidth: 0
+  },
+  statsGrid: {
+    /*
+      What changed:
+      - Preserved the card layout, but made the stat grid use the same page-wide rhythm as the other polished surfaces.
+
+      Why:
+      - This page belongs to the admin/control-plane family and should visually sit well beside Users and the master-data pages.
+
+      What problem this solves:
+      - Keeps the top summary area stable across viewport widths.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '16px',
+    width: '100%',
+    minWidth: 0
+  },
+  statCard: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '16px',
+    padding: '18px',
+    minWidth: 0
+  },
+  statTitle: {
+    color: '#64748b',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em'
+  },
+  statValue: {
+    marginTop: '10px',
+    fontSize: '1.8rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  statValueWarn: {
+    marginTop: '10px',
+    fontSize: '1.8rem',
+    fontWeight: 800,
+    color: '#b45309'
+  },
+  statValueBad: {
+    marginTop: '10px',
+    fontSize: '1.8rem',
+    fontWeight: 800,
+    color: '#b91c1c'
+  },
+  statSubtitle: {
+    marginTop: '8px',
+    color: '#475569',
+    lineHeight: 1.5
+  },
+  grid: {
+    /*
+      What changed:
+      - Switched the responsive columns to minmax(0, 1fr).
+
+      Why:
+      - Operational/admin pages often contain long IDs and diagnostics strings.
+      - Without a zero-based min width, panels can push the grid wider than intended.
+
+      What problem this solves:
+      - Prevents layout overflow pressure and keeps the two-column split resilient on tablet and smaller laptop widths.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
+    gap: '20px',
+    width: '100%',
+    minWidth: 0
+  },
+  panel: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '18px',
+    padding: '20px',
+    display: 'grid',
+    gap: '16px',
+    minWidth: 0,
+    overflow: 'hidden'
+  },
+  panelHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '12px',
+    minWidth: 0
+  },
+  panelHeaderText: {
+    minWidth: 0
+  },
+  panelTitle: {
+    margin: 0,
+    fontSize: '1.15rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  panelSubtitle: {
+    margin: '8px 0 0 0',
+    color: '#475569',
+    lineHeight: 1.5
+  },
+  list: {
+    display: 'grid',
+    gap: '12px',
+    minWidth: 0
+  },
+  itemCard: {
+    /*
+      What changed:
+      - Kept the existing diagnostic card structure, but added width guards.
+
+      Why:
+      - This page frequently renders long IDs, keys, and issue messages.
+
+      What problem this solves:
+      - Stops cards from visually breaking when content is unusually long.
+    */
+    border: '1px solid #e5e7eb',
+    borderRadius: '14px',
+    padding: '14px',
+    display: 'grid',
+    gap: '8px',
+    minWidth: 0
+  },
+  itemTitle: {
+    fontWeight: 800,
+    color: '#0f172a',
+    wordBreak: 'break-word'
+  },
+  itemText: {
+    color: '#334155',
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
+  },
+  itemTextMono: {
+    color: '#0f172a',
+    fontFamily: 'monospace',
+    wordBreak: 'break-all',
+    overflowWrap: 'anywhere'
+  },
+  itemMeta: {
+    color: '#64748b',
+    fontSize: '0.88rem',
+    lineHeight: 1.45,
+    wordBreak: 'break-word'
+  },
+  sectionSubheading: {
+    color: '#0f172a',
+    fontWeight: 800,
+    marginTop: '4px'
+  },
+  keyValueRow: {
+    /*
+      What changed:
+      - Allowed the key/value rows to wrap and align from the top.
+
+      Why:
+      - Long tenant IDs and timestamps can crowd the row badly on small widths.
+
+      What problem this solves:
+      - Keeps status rows readable without changing the actual data shown.
+    */
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: '12px',
+    borderBottom: '1px solid #f1f5f9',
+    paddingBottom: '10px',
+    minWidth: 0
+  },
+  keyLabel: {
+    flexShrink: 0
+  },
+  keyValue: {
+    minWidth: 0,
+    flex: '1 1 220px',
+    textAlign: 'right',
+    wordBreak: 'break-word'
+  },
+  infoState: {
+    background: '#f8fafc',
+    color: '#475569',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  },
+  warningState: {
+    background: '#fef3c7',
+    color: '#92400e',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  },
+  errorState: {
+    background: '#fee2e2',
+    color: '#991b1b',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  }
 };

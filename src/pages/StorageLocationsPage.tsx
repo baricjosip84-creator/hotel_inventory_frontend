@@ -72,18 +72,26 @@ export default function StorageLocationsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file is intentionally restored from the exact version you pasted.
-    I am preserving your actual storage location page instead of replacing it
-    with a guessed interpretation again.
+    This file stays grounded in your actual current StorageLocationsPage.
+    The only changes here are UI/UX polish adjustments to better align it with
+    the current Products and Suppliers master-data page pattern.
 
     WHY IT CHANGED
     --------------
-    You explicitly asked for no assumptions and no invented structure.
+    After comparing the real files, Storage Locations was the most visually
+    inconsistent of the three master-data pages:
+    - the search area was narrower and behaved differently
+    - the form action row was less responsive on small screens
+    - the table width was a bit harsher than necessary on tablet/mobile
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This keeps Storage Locations aligned to your real current implementation,
-    while still returning the full file with inline comments.
+    This improves page-level consistency and responsiveness without changing:
+    - backend contract
+    - query keys
+    - mutation flow
+    - fields
+    - business logic
   */
   const queryClient = useQueryClient();
 
@@ -212,7 +220,7 @@ export default function StorageLocationsPage() {
           Search and review storage areas currently available to inventory operations.
         </p>
 
-        <div style={styles.toolbar}>
+        <div style={styles.toolbarGrid}>
           <input
             type="text"
             placeholder="Search by name or temperature zone..."
@@ -346,8 +354,20 @@ const styles: Record<string, CSSProperties> = {
     outline: 'none'
   },
   formActions: {
+    /*
+      What changed:
+      - Matched the more resilient action-row pattern already used in Products and Suppliers.
+
+      Why:
+      - The previous version could feel cramped when the form wrapped on smaller widths.
+
+      What problem this solves:
+      - Keeps the submit area stable and responsive without changing form behavior.
+    */
     display: 'flex',
-    alignItems: 'end'
+    alignItems: 'end',
+    gap: '10px',
+    flexWrap: 'wrap'
   },
   primaryButton: {
     border: 'none',
@@ -358,10 +378,34 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
-  toolbar: { marginBottom: '16px' },
+  toolbarGrid: {
+    /*
+      What changed:
+      - Replaced the single-purpose toolbar wrapper with the same grid-style toolbar pattern used by Products.
+
+      Why:
+      - This page sits in the same master-data family and should follow the same layout rhythm.
+
+      What problem this solves:
+      - Makes the search area align more naturally with the shared page container and future filter growth.
+    */
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+    marginBottom: '16px'
+  },
   searchInput: {
+    /*
+      What changed:
+      - Removed the hard maxWidth cap so the search control behaves like the other master-data pages.
+
+      Why:
+      - The page now already lives inside the shared centered content container from AppLayout.
+
+      What problem this solves:
+      - Prevents the search row from looking artificially narrow compared with Products and Suppliers.
+    */
     width: '100%',
-    maxWidth: '420px',
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
@@ -377,9 +421,19 @@ const styles: Record<string, CSSProperties> = {
     overflowX: 'auto'
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width.
+
+      Why:
+      - This table has fewer columns than Products and can tolerate a smaller minimum width.
+
+      What problem this solves:
+      - Reduces unnecessary horizontal scrolling pressure on tablets and smaller laptops.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '820px'
+    minWidth: '720px'
   },
   th: {
     textAlign: 'left',

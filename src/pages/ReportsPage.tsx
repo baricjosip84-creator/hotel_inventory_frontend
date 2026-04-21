@@ -175,7 +175,7 @@ function ReportPanel(props: {
   return (
     <section style={styles.panel}>
       <div style={styles.panelHeader}>
-        <div>
+        <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
           <p style={styles.panelSubtitle}>{props.subtitle}</p>
         </div>
@@ -218,20 +218,28 @@ export default function ReportsPage() {
   /*
     WHAT CHANGED
     ------------
-    Added a dedicated frontend reporting surface that uses the backend routes
-    already present in your existing codebase.
+    This file stays grounded in your actual current ReportsPage.
+
+    Changes made:
+    - hardened layout containers with width guards
+    - improved wrapping in headers, insight cards, tables, and summary rows
+    - kept the tab system, controls, endpoints, and report logic unchanged
 
     WHY IT CHANGED
     --------------
-    Your backend already exposes management-grade reporting and forecast data,
-    but the frontend router/navigation did not surface it. That left existing
-    sellable product value invisible.
+    The real file already uses the correct reporting endpoints and tab flows,
+    but dense management/reporting surfaces tend to contain longer labels,
+    locations, and product names that can pressure layout width.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This page turns your existing /reports and /forecast endpoints into a
-    production-facing management module with mobile-safe layout, clear empty
-    states, and report-specific controls.
+    This improves readability and responsiveness without changing:
+    - backend contracts
+    - query keys
+    - report tabs
+    - filtering logic
+    - data flow
+    - management access behavior
   */
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
@@ -332,7 +340,7 @@ export default function ReportsPage() {
     <div style={styles.pageStack}>
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
-          <div>
+          <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Management Reporting</h3>
             <p style={styles.panelSubtitle}>
               Frontend reporting surface built directly on the backend routes already present in your existing
@@ -728,16 +736,30 @@ export default function ReportsPage() {
 
 const styles: Record<string, CSSProperties> = {
   pageStack: {
+    /*
+      What changed:
+      - Added width guards to the root page stack.
+
+      Why:
+      - This page renders multiple dense report surfaces, tables, and tab panels.
+
+      What problem this solves:
+      - Reduces overflow pressure and keeps the report layout stable inside the shared app shell.
+    */
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px'
+    gap: '20px',
+    width: '100%',
+    minWidth: 0
   },
   panel: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelHeader: {
     display: 'flex',
@@ -745,7 +767,11 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'flex-start',
     gap: '16px',
     marginBottom: '16px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    minWidth: 0
+  },
+  panelHeaderText: {
+    minWidth: 0
   },
   panelTitle: {
     margin: 0,
@@ -756,26 +782,31 @@ const styles: Record<string, CSSProperties> = {
     margin: '8px 0 0 0',
     color: '#6b7280',
     lineHeight: 1.5,
-    maxWidth: '820px'
+    maxWidth: '820px',
+    wordBreak: 'break-word'
   },
   panelActions: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    minWidth: 0
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '16px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    width: '100%',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    minWidth: 0
   },
   statTitle: {
     fontSize: '14px',
@@ -787,21 +818,24 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '26px',
     fontWeight: 700,
     marginBottom: '8px',
-    lineHeight: 1.2
+    lineHeight: 1.2,
+    wordBreak: 'break-word'
   },
   statValueGood: {
     fontSize: '26px',
     fontWeight: 700,
     marginBottom: '8px',
     lineHeight: 1.2,
-    color: '#166534'
+    color: '#166534',
+    wordBreak: 'break-word'
   },
   statValueWarn: {
     fontSize: '26px',
     fontWeight: 700,
     marginBottom: '8px',
     lineHeight: 1.2,
-    color: '#92400e'
+    color: '#92400e',
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -811,13 +845,16 @@ const styles: Record<string, CSSProperties> = {
   insightGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px'
+    gap: '16px',
+    width: '100%',
+    minWidth: 0
   },
   insightCard: {
     background: '#f8fafc',
     border: '1px solid #e2e8f0',
     borderRadius: '12px',
-    padding: '16px'
+    padding: '16px',
+    minWidth: 0
   },
   insightLabel: {
     fontSize: '12px',
@@ -831,15 +868,18 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: '#0f172a',
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   insightText: {
     color: '#475569',
     lineHeight: 1.45,
-    fontSize: '14px'
+    fontSize: '14px',
+    wordBreak: 'break-word'
   },
   tabSection: {
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   tabBar: {
     display: 'flex',
@@ -866,12 +906,23 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
+    /*
+      What changed:
+      - Slightly reduced the forced minimum width while preserving all report columns.
+
+      Why:
+      - This report page needs wide tables, but the prior threshold was more aggressive than necessary.
+
+      What problem this solves:
+      - Eases medium-screen horizontal scrolling pressure without changing table structure or data density.
+    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '840px'
+    minWidth: '780px'
   },
   th: {
     textAlign: 'left',
@@ -885,43 +936,51 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
-    fontSize: '14px'
+    fontSize: '14px',
+    wordBreak: 'break-word'
   },
   rowTitle: {
     fontWeight: 700,
     color: '#111827',
-    marginBottom: '4px'
+    marginBottom: '4px',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
-    color: '#64748b'
+    color: '#64748b',
+    wordBreak: 'break-all'
   },
   mobileCards: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
     gap: '12px',
-    marginTop: '14px'
+    marginTop: '14px',
+    minWidth: 0
   },
   mobileCard: {
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
     padding: '14px',
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 0
   },
   mobileCardTitle: {
     fontWeight: 700,
     fontSize: '16px',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    wordBreak: 'break-word'
   },
   mobileCardText: {
     color: '#475569',
     lineHeight: 1.5,
-    fontSize: '14px'
+    fontSize: '14px',
+    wordBreak: 'break-word'
   },
   filterRow: {
     display: 'flex',
     gap: '12px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    minWidth: 0
   },
   fieldLabel: {
     display: 'flex',
@@ -929,22 +988,30 @@ const styles: Record<string, CSSProperties> = {
     gap: '6px',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#475569'
+    color: '#475569',
+    minWidth: 0,
+    flex: '1 1 220px'
   },
   textInput: {
     minWidth: '220px',
-    borderRadius: '10px',
-    border: '1px solid #cbd5e1',
-    padding: '10px 12px',
-    fontSize: '14px'
-  },
-  selectInput: {
-    minWidth: '120px',
+    maxWidth: '100%',
+    width: '100%',
     borderRadius: '10px',
     border: '1px solid #cbd5e1',
     padding: '10px 12px',
     fontSize: '14px',
-    background: '#ffffff'
+    boxSizing: 'border-box'
+  },
+  selectInput: {
+    minWidth: '120px',
+    maxWidth: '100%',
+    width: '100%',
+    borderRadius: '10px',
+    border: '1px solid #cbd5e1',
+    padding: '10px 12px',
+    fontSize: '14px',
+    background: '#ffffff',
+    boxSizing: 'border-box'
   },
   emptyState: {
     border: '1px dashed #cbd5e1',
@@ -963,21 +1030,36 @@ const styles: Record<string, CSSProperties> = {
   summaryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '16px'
+    gap: '16px',
+    width: '100%',
+    minWidth: 0
   },
   summaryCard: {
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
     padding: '16px',
-    background: '#ffffff'
+    background: '#ffffff',
+    minWidth: 0
   },
   summaryCardTitle: {
     margin: '0 0 12px 0',
     fontSize: '18px'
   },
   summaryRow: {
+    /*
+      What changed:
+      - Allowed summary rows to wrap instead of forcing both ends onto one line.
+
+      Why:
+      - Shipment labels and values can become crowded on narrower widths.
+
+      What problem this solves:
+      - Keeps procurement summary cards readable without changing the metrics shown.
+    */
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: '16px',
     padding: '10px 0',
     borderBottom: '1px solid #f1f5f9'
