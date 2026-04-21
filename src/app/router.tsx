@@ -3,18 +3,19 @@
 
   WHAT CHANGED
   ------------
-  Added the reports route to surface the backend reporting and forecast module
-  that already exists in your API.
+  Added route surfaces for users, admin/system operations, and insights on top
+  of the already-existing reports and role-aware routing.
 
   WHY IT CHANGED
   --------------
-  The backend already ships management-grade reporting endpoints, but the
-  frontend router did not expose them.
+  Your backend already exposes these capabilities, but the frontend snapshot in
+  the zip did not surface them. These routes make that existing backend value
+  reachable without changing the routing architecture.
 
   WHAT PROBLEM IT SOLVES
   ----------------------
-  This makes the reports module reachable through the authenticated app shell
-  without changing your existing route architecture.
+  This closes the biggest frontend-to-backend product gaps: user management,
+  system/admin visibility, and management insights.
 */
 
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
@@ -31,6 +32,9 @@ import StockMovementsPage from '../pages/StockMovementsPage';
 import ScannerPage from '../pages/ScannerPage';
 import SessionsPage from '../pages/SessionsPage';
 import ReportsPage from '../pages/ReportsPage';
+import UsersPage from '../pages/UsersPage';
+import AdminSystemPage from '../pages/AdminSystemPage';
+import InsightsPage from '../pages/InsightsPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -95,6 +99,30 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'manager']}>
             <ReportsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'users',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <UsersPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'admin-system',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <AdminSystemPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'insights',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <InsightsPage />
           </ProtectedRoute>
         )
       }

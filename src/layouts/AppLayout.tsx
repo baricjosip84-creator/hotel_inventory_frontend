@@ -3,25 +3,26 @@
 
   WHAT CHANGED
   ------------
-  Added the Reports navigation entry plus page title/subtitle handling for the
-  new management reporting module.
+  Added navigation, page titles, and subtitles for the new Users,
+  Admin/System, and Insights surfaces.
 
   WHY IT CHANGED
   --------------
-  Reports are now part of the authenticated frontend surface and must behave
-  like the rest of your existing application navigation.
+  The latest frontend snapshot already contains reports and role-aware routing.
+  These additions extend the same app-shell pattern to the next product areas
+  that already exist in the backend.
 
   WHAT PROBLEM IT SOLVES
   ----------------------
-  This makes the reporting module discoverable on desktop and mobile without
-  introducing a separate layout pattern.
+  This makes the newly surfaced management/admin modules discoverable on both
+  desktop and mobile without introducing another layout pattern.
 */
 
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { clearAuthTokens, getRefreshToken } from '../lib/auth';
-import { getCurrentUserRole } from '../lib/permissions';
+import { getCurrentUserRole, getRoleCapabilities } from '../lib/permissions';
 import { apiRequest } from '../lib/api';
 
 function getPageTitle(pathname: string): string {
@@ -31,6 +32,9 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/alerts')) return 'Alerts';
   if (pathname.startsWith('/stock-movements')) return 'Stock Movements';
   if (pathname.startsWith('/reports')) return 'Reports';
+  if (pathname.startsWith('/insights')) return 'Insights';
+  if (pathname.startsWith('/users')) return 'Users';
+  if (pathname.startsWith('/admin-system')) return 'Admin / System';
   if (pathname.startsWith('/stock')) return 'Stock';
   if (pathname.startsWith('/storage-locations')) return 'Storage Locations';
   if (pathname.startsWith('/shipments')) return 'Shipments';
@@ -58,6 +62,15 @@ function getPageSubtitle(pathname: string): string {
   if (pathname.startsWith('/reports')) {
     return 'Management reporting for valuation, location balances, movements, procurement, and forecast.';
   }
+  if (pathname.startsWith('/insights')) {
+    return 'Decision-support analytics for depletion risk, reorder priorities, anomalies, supplier trust, and health score.';
+  }
+  if (pathname.startsWith('/users')) {
+    return 'Manage tenant users, roles, and account lifecycle from the same backend authorization model already in place.';
+  }
+  if (pathname.startsWith('/admin-system')) {
+    return 'Operational visibility into system status, diagnostics, and tenant-wide health signals.';
+  }
   if (pathname.startsWith('/stock')) {
     return 'View stock by product and location, with low-stock visibility.';
   }
@@ -72,9 +85,6 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/sessions')) {
     return 'Review active sessions and revoke stale account access.';
-  }
-  if (pathname.startsWith('/reports')) {
-    return 'Review management reporting, valuation, procurement summary, and forecast data.';
   }
   return 'Frontend connected to your production-ready backend';
 }
@@ -100,6 +110,7 @@ export default function AppLayout() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const currentRole = getCurrentUserRole();
+  const capabilities = getRoleCapabilities(currentRole);
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', visible: true },
@@ -111,7 +122,10 @@ export default function AppLayout() {
     { to: '/storage-locations', label: 'Storage Locations', visible: true },
     { to: '/shipments', label: 'Shipments', visible: true },
     { to: '/scanner', label: 'Scanner', visible: true },
-    { to: '/reports', label: 'Reports', visible: currentRole === 'admin' || currentRole === 'manager' },
+    { to: '/reports', label: 'Reports', visible: capabilities.canViewReports },
+    { to: '/insights', label: 'Insights', visible: capabilities.canViewInsights },
+    { to: '/users', label: 'Users', visible: capabilities.canViewUsers },
+    { to: '/admin-system', label: 'Admin / System', visible: capabilities.canViewAdminSystem },
     { to: '/sessions', label: 'Sessions', visible: true }
   ].filter((item) => item.visible);
 
@@ -129,10 +143,6 @@ export default function AppLayout() {
     const refreshToken = getRefreshToken();
 
     try {
-      /*
-        Revoke the current backend session when possible so the stored refresh
-        token cannot continue to be used after logout.
-      */
       if (refreshToken) {
         await apiRequest('/auth/logout', {
           method: 'POST',
@@ -140,10 +150,7 @@ export default function AppLayout() {
         });
       }
     } catch {
-      /*
-        Even if the backend call fails, we still clear local auth state so the
-        user is logged out on this device.
-      */
+      // Ignore backend logout errors and always clear local state.
     } finally {
       clearAuthTokens();
       navigate('/login', { replace: true });
@@ -199,15 +206,14 @@ export default function AppLayout() {
 
       <div style={styles.mainArea}>
         <header style={styles.header}>
-          <div style={styles.headerLeft}>
+          <div style={styles.headerInner}>
             {isMobile ? (
-              <button type="button" style={styles.menuButton} onClick={toggleMobileNav}>
-                ☰
+              <button type="button" style={styles.mobileMenuButton} onClick={toggleMobileNav}>
+                {mobileNavOpen ? 'Close' : 'Menu'}
               </button>
             ) : null}
-
-            <div style={styles.headerTextBlock}>
-              <div style={styles.breadcrumb}>Operations / {getPageTitle(location.pathname)}</div>
+            <div>
+              <div style={styles.headerEyebrow}>Operations / {getPageTitle(location.pathname)}</div>
               <h1 style={styles.headerTitle}>{getPageTitle(location.pathname)}</h1>
               <p style={styles.headerText}>{getPageSubtitle(location.pathname)}</p>
             </div>
@@ -258,7 +264,7 @@ const styles: Record<string, CSSProperties> = {
     bottom: 0,
     borderRight: '1px solid rgba(255,255,255,0.08)',
     boxShadow: '0 18px 50px rgba(0,0,0,0.35)',
-    transition: 'transform 0.22s ease'
+    transition: 'transform 0.2s ease'
   },
   sidebarMobileOpen: {
     transform: 'translateX(0)'
@@ -269,52 +275,52 @@ const styles: Record<string, CSSProperties> = {
   mobileOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.45)',
+    background: 'rgba(15, 23, 42, 0.4)',
     zIndex: 30
   },
   brandBlock: {
-    marginBottom: '24px',
-    paddingBottom: '16px',
-    borderBottom: '1px solid rgba(255,255,255,0.10)'
+    paddingBottom: '20px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)'
   },
   brandTitle: {
-    fontSize: '22px',
+    fontSize: '1.15rem',
     fontWeight: 800,
-    marginBottom: '6px'
+    letterSpacing: '0.02em'
   },
   brandSubtitle: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.72)'
+    marginTop: '6px',
+    color: '#cbd5e1',
+    fontSize: '0.92rem'
+  },
+  roleChip: {
+    marginTop: '14px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: 'rgba(96, 165, 250, 0.18)',
+    color: '#bfdbfe',
+    fontSize: '0.74rem',
+    fontWeight: 700,
+    letterSpacing: '0.06em'
   },
   nav: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '8px',
+    paddingTop: '20px'
   },
   navItem: {
-    display: 'block',
-    padding: '11px 12px',
-    borderRadius: '10px',
-    color: 'rgba(255,255,255,0.84)',
+    color: '#cbd5e1',
     textDecoration: 'none',
+    padding: '10px 12px',
+    borderRadius: '10px',
     fontWeight: 600,
-    transition: 'background 0.18s ease, color 0.18s ease'
+    transition: 'background 0.15s ease, color 0.15s ease'
   },
   navItemActive: {
-    background: 'rgba(59,130,246,0.22)',
+    background: 'rgba(148, 163, 184, 0.18)',
     color: '#ffffff'
-  },
-  roleChip: {
-    marginTop: '12px',
-    display: 'inline-flex',
-    alignSelf: 'flex-start',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.12)',
-    color: '#e2e8f0',
-    fontSize: '12px',
-    fontWeight: 700,
-    letterSpacing: '0.04em'
   },
   sidebarFooter: {
     marginTop: 'auto',
@@ -322,13 +328,13 @@ const styles: Record<string, CSSProperties> = {
   },
   logoutButton: {
     width: '100%',
-    border: 'none',
+    padding: '12px 14px',
     borderRadius: '10px',
-    padding: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
+    border: 'none',
     background: '#ef4444',
-    color: '#ffffff'
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
   },
   mainArea: {
     flex: 1,
@@ -337,62 +343,55 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column'
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '28px 32px 16px',
-    background: 'linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.96) 100%)',
-    borderBottom: '1px solid rgba(15,23,42,0.06)',
     position: 'sticky',
     top: 0,
-    zIndex: 20
+    zIndex: 20,
+    background: 'rgba(245, 247, 251, 0.92)',
+    backdropFilter: 'blur(8px)',
+    borderBottom: '1px solid #e5e7eb'
   },
-  headerLeft: {
+  headerInner: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px'
+    gap: '14px',
+    padding: '20px 24px'
   },
-  menuButton: {
-    border: '1px solid rgba(15,23,42,0.1)',
+  mobileMenuButton: {
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     borderRadius: '10px',
-    width: '42px',
-    height: '42px',
-    cursor: 'pointer',
-    fontSize: '20px'
-  },
-  headerTextBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
-  },
-  breadcrumb: {
-    fontSize: '12px',
+    padding: '10px 12px',
     fontWeight: 700,
+    cursor: 'pointer'
+  },
+  headerEyebrow: {
+    fontSize: '0.78rem',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: '#64748b'
+    color: '#64748b',
+    fontWeight: 700,
+    marginBottom: '6px'
   },
   headerTitle: {
     margin: 0,
-    fontSize: '32px',
-    lineHeight: 1.1,
+    fontSize: '1.8rem',
     fontWeight: 800,
     color: '#0f172a'
   },
   headerText: {
-    margin: 0,
+    margin: '8px 0 0 0',
     color: '#475569',
-    fontSize: '14px'
+    maxWidth: '860px',
+    lineHeight: 1.5
   },
   content: {
     width: '100%',
     boxSizing: 'border-box'
   },
   contentDesktop: {
-    padding: '24px 32px 40px'
+    padding: '24px'
   },
   contentMobile: {
-    padding: '16px 16px 28px'
+    padding: '16px'
   }
 };

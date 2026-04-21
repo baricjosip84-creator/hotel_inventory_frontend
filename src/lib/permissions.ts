@@ -65,6 +65,23 @@ export function hasAnyRole(allowedRoles: UserRole[]): boolean {
 }
 
 export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
+  /*
+    WHAT CHANGED
+    ------------
+    Added capability flags for the new users, admin/system, and insights
+    surfaces that are being layered on top of the existing role-aware router.
+
+    WHY IT CHANGED
+    --------------
+    The backend already exposes users, system-status, diagnostics, and advanced
+    insight endpoints. The frontend needs explicit capability flags so those
+    pages and actions stay aligned with the backend authorization model.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    This keeps navigation, route guards, and per-page actions consistent as the
+    product surface expands beyond basic CRUD pages.
+  */
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
   const isStaff = role === 'staff';
@@ -76,6 +93,10 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     isManager,
     isStaff,
     canViewReports: isAdmin || isManager,
+    canViewInsights: isAdmin || isManager,
+    canViewUsers: isAdmin || isManager,
+    canManageUsers: isAdmin,
+    canViewAdminSystem: isAdmin || isManager,
     canManageProducts: canManageMasterData,
     canManageSuppliers: canManageMasterData,
     canManageStorageLocations: canManageMasterData,
