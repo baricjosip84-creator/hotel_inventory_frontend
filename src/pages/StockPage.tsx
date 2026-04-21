@@ -19,6 +19,51 @@ type StockItem = {
   product_min_stock?: number | string | null;
   updated_at?: string;
   version?: number | string;
+
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
+    marginBottom: '20px'
+  },
+  workflowStepCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '14px',
+    display: 'grid',
+    gap: '8px'
+  },
+  workflowStepCardComplete: {
+    background: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    borderRadius: '16px',
+    padding: '14px',
+    display: 'grid',
+    gap: '8px'
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem'
+  },
+  readinessList: {
+    display: 'grid',
+    gap: '10px'
+  },
+  readinessRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    borderBottom: '1px solid #f1f5f9',
+    paddingBottom: '10px',
+    color: '#334155'
+  },
 };
 
 type StockMovement = {
@@ -309,6 +354,8 @@ export default function StockPage() {
   }, [rows]);
 
 
+
+
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
   const currentMinimum = selectedRow
     ? Math.max(toNumber(selectedRow.min_quantity), toNumber(selectedRow.product_min_stock))
@@ -453,6 +500,41 @@ export default function StockPage() {
     return currentQuantity + change;
   }, [currentQuantity, draft.action, draft.change, draft.quantity, selectedRow]);
 
+  const stockWorkflowSteps = [
+    {
+      label: '1. Select Stock Row',
+      detail: selectedRow
+        ? `${selectedRow.product_name || selectedRow.product_id} is selected for review.`
+        : 'Choose the product/location row you want to operate on.',
+      complete: Boolean(selectedRow)
+    },
+    {
+      label: '2. Choose Action',
+      detail:
+        draft.action === 'consume'
+          ? 'Consume removes stock for day-to-day operational usage.'
+          : draft.action === 'count'
+            ? 'Count sets stock to the physically verified quantity.'
+            : 'Adjust applies a positive or negative correction delta.',
+      complete: Boolean(selectedRow)
+    },
+    {
+      label: '3. Verify Preview',
+      detail:
+        nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
+          ? 'Enter quantities to preview the resulting stock balance.'
+          : `Projected quantity after submit: ${nextQuantityPreview}.`,
+      complete: nextQuantityPreview !== null && Number.isFinite(nextQuantityPreview)
+    },
+    {
+      label: '4. Confirm in Ledger',
+      detail: recentMovements.length > 0
+        ? 'Use recent stock movements below to verify the latest posted change.'
+        : 'Recent movement history will appear here after stock changes are posted.',
+      complete: Boolean(lastResult)
+    }
+  ];
+
   const submitAction = async () => {
     setOperationFeedback('');
     setOperationError('');
@@ -505,6 +587,18 @@ export default function StockPage() {
           </p>
         </div>
       </div>
+
+      <section style={styles.workflowGuideGrid}>
+        {stockWorkflowSteps.map((step) => (
+          <article
+            key={step.label}
+            style={step.complete ? styles.workflowStepCardComplete : styles.workflowStepCard}
+          >
+            <div style={styles.workflowStepLabel}>{step.label}</div>
+            <div style={styles.workflowStepText}>{step.detail}</div>
+          </article>
+        ))}
+      </section>
 
       <div style={styles.statsGrid}>
         <StatCard
@@ -699,6 +793,32 @@ export default function StockPage() {
                   ) : (
                     <div style={styles.emptyPanel}>Select a stock row to begin.</div>
                   )}
+                </div>
+
+                <div style={styles.innerPanel}>
+                  <h4 style={styles.sectionTitle}>Action Readiness</h4>
+                  <div style={styles.readinessList}>
+                    <div style={styles.readinessRow}>
+                      <span>Selected row</span>
+                      <strong>{selectedRow ? 'Ready' : 'Required'}</strong>
+                    </div>
+                    <div style={styles.readinessRow}>
+                      <span>Current action</span>
+                      <strong>{getActionLabel(draft.action)}</strong>
+                    </div>
+                    <div style={styles.readinessRow}>
+                      <span>Projected quantity</span>
+                      <strong>
+                        {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
+                          ? '-'
+                          : nextQuantityPreview}
+                      </strong>
+                    </div>
+                    <div style={styles.readinessRow}>
+                      <span>Ledger verification</span>
+                      <strong>{recentMovements.length > 0 ? 'Available' : 'Pending new action'}</strong>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={styles.innerPanel}>

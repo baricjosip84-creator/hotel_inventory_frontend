@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 
@@ -22,6 +23,14 @@ type DepletionRiskResponse = {
     risk_score: number | string;
     risk_tier: string;
   }>;
+
+  actionAgendaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' },
+  actionCardBad: { border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '14px', padding: '14px', display: 'grid', gap: '10px' },
+  actionCardWarn: { border: '1px solid #fde68a', background: '#fffbeb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '10px' },
+  actionCardGood: { border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: '14px', padding: '14px', display: 'grid', gap: '10px' },
+  actionCardTitle: { fontWeight: 800, color: '#0f172a' },
+  actionCardText: { color: '#334155', lineHeight: 1.5 },
+  actionCardLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
 };
 
 type ReorderRecommendationsResponse = {
@@ -217,6 +226,75 @@ export default function InsightsPage() {
     queryFn: fetchSupplierTrust
   });
 
+  const actionAgenda = useMemo(() => {
+    const nextActions: Array<{
+      title: string;
+      detail: string;
+      route: string;
+      linkLabel: string;
+      tone: 'good' | 'warn' | 'bad';
+    }> = [];
+
+    const healthTier = healthQuery.data?.health_tier;
+    if (healthTier === 'critical' || healthTier === 'watch') {
+      nextActions.push({
+        title: 'Operational health needs review',
+        detail: `Current tenant health is ${healthTier}. Review low stock, overdue shipments, and unresolved alerts first.`,
+        route: '/dashboard',
+        linkLabel: 'Open Dashboard',
+        tone: healthTier === 'critical' ? 'bad' : 'warn'
+      });
+    }
+
+    const reorderTop = reorderQuery.data?.rows?.[0];
+    if (reorderTop) {
+      nextActions.push({
+        title: 'Reorder highest urgency product',
+        detail: `${reorderTop.product_name} currently recommends a reorder quantity of ${formatNumber(reorderTop.recommended_reorder_quantity)}.`,
+        route: '/reports',
+        linkLabel: 'Open Reports',
+        tone: reorderTop.urgency === 'critical' ? 'bad' : 'warn'
+      });
+    }
+
+    const depletionTop = depletionRiskQuery.data?.rows?.[0];
+    if (depletionTop) {
+      nextActions.push({
+        title: 'Protect depletion-risk stock',
+        detail: `${depletionTop.product_name} at ${depletionTop.storage_location_name} is currently one of the highest depletion-risk rows.`,
+        route: '/stock',
+        linkLabel: 'Open Stock',
+        tone: depletionTop.risk_tier === 'critical' ? 'bad' : 'warn'
+      });
+    }
+
+    const anomalyTop = anomaliesQuery.data?.rows?.[0];
+    if (anomalyTop) {
+      nextActions.push({
+        title: 'Review unusual outbound activity',
+        detail: `${anomalyTop.product_name} is showing an anomaly spike ratio of ${formatNumber(anomalyTop.spike_ratio)} against baseline demand.`,
+        route: '/stock-movements',
+        linkLabel: 'Open Stock Movements',
+        tone: anomalyTop.anomaly_tier === 'critical' ? 'bad' : 'warn'
+      });
+    }
+
+    const supplierBottom = [...(supplierTrustQuery.data?.rows ?? [])]
+      .sort((a, b) => toNumber(a.trust_score) - toNumber(b.trust_score))[0];
+
+    if (supplierBottom) {
+      nextActions.push({
+        title: 'Follow up lowest-trust supplier',
+        detail: `${supplierBottom.supplier_name} currently scores ${formatNumber(supplierBottom.trust_score, 0)} on supplier trust.`,
+        route: '/suppliers',
+        linkLabel: 'Open Suppliers',
+        tone: toNumber(supplierBottom.trust_score) < 50 ? 'bad' : 'warn'
+      });
+    }
+
+    return nextActions.slice(0, 4);
+  }, [anomaliesQuery.data?.rows, depletionRiskQuery.data?.rows, healthQuery.data?.health_tier, reorderQuery.data?.rows, supplierTrustQuery.data?.rows]);
+
   return (
     <div style={styles.page}>
       <section style={styles.statsGrid}>
@@ -242,6 +320,24 @@ export default function InsightsPage() {
           subtitle="Suppliers scored from real shipment behavior." 
         />
       </section>
+
+      <Section title="What needs action next" subtitle="Use these recommendations to move from analytics into operational decisions.">
+        {actionAgenda.length ? (
+          <div style={styles.actionAgendaGrid}>
+            {actionAgenda.map((item) => (
+              <article key={item.title} style={item.tone === 'bad' ? styles.actionCardBad : item.tone === 'warn' ? styles.actionCardWarn : styles.actionCardGood}>
+                <div style={styles.actionCardTitle}>{item.title}</div>
+                <div style={styles.actionCardText}>{item.detail}</div>
+                <Link to={item.route} style={styles.actionCardLink}>{item.linkLabel}</Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div style={styles.infoState}>
+            No urgent action agenda is available yet. As data accumulates, this section will point managers to the next best operational decisions.
+          </div>
+        )}
+      </Section>
 
       <Section title="Insight Controls" subtitle="Tune the lookback window for depletion and reorder recommendations.">
         <div style={styles.controlRow}>

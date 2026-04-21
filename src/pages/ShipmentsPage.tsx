@@ -67,6 +67,55 @@ type ShipmentSummary = {
   line_count?: number;
   total_ordered_quantity?: number | string;
   total_received_quantity?: number | string;
+
+  guidedEmptyState: {
+    display: 'grid',
+    gap: 14,
+    border: '1px dashed #cbd5e1',
+    borderRadius: 18,
+    background: '#f8fafc',
+    padding: 18
+  },
+  guidedEmptyStateTitle: {
+    fontSize: '1rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  guidedEmptyStateText: {
+    color: '#475569',
+    lineHeight: 1.6
+  },
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12
+  },
+  workflowStepCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    background: '#ffffff',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepCardComplete: {
+    border: '1px solid #bbf7d0',
+    borderRadius: 16,
+    background: '#f0fdf4',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem'
+  },
 };
 
 type ShipmentItem = {
@@ -461,6 +510,43 @@ export default function ShipmentsPage() {
   const selectedScannerLocationName =
     storageLocations.find((location) => location.id === selectedScannerLocationId)?.name ?? '';
   const hasStorageLocations = storageLocations.length > 0;
+  const hasShipmentItems = shipmentItems.length > 0;
+  const hasRemainingQuantity = selectedShipmentRemainingTotal > 0;
+  const shipmentWorkflowSteps = [
+    {
+      label: '1. Select Shipment',
+      detail: selectedShipment ? 'Shipment selected and ready for receiving.' : 'Choose the inbound shipment you want to process.',
+      complete: Boolean(selectedShipment)
+    },
+    {
+      label: '2. Set Scan Location',
+      detail: selectedScannerLocationId
+        ? `Scanning into ${selectedScannerLocationName}.`
+        : hasStorageLocations
+          ? 'Choose the default storage location before scanning.'
+          : 'Create a storage location before receiving or scanning.',
+      complete: Boolean(selectedScannerLocationId)
+    },
+    {
+      label: '3. Receive Items',
+      detail: hasShipmentItems
+        ? hasRemainingQuantity
+          ? 'Receive lines manually or through the product barcode scanner.'
+          : 'All current shipment lines are fully received.'
+        : 'Add shipment items before receiving inventory.',
+      complete: hasShipmentItems && !hasRemainingQuantity
+    },
+    {
+      label: '4. Finalize Shipment',
+      detail:
+        selectedShipment?.status === 'received'
+          ? 'Shipment already finalized.'
+          : selectedShipmentProgress >= 100
+            ? 'Shipment is ready to finalize.'
+            : 'Finalize after all expected quantities are received.',
+      complete: selectedShipment?.status === 'received'
+    }
+  ];
 
   const filteredShipments = useMemo(() => {
     const search = shipmentSearch.trim().toLowerCase();
@@ -1063,9 +1149,38 @@ export default function ShipmentsPage() {
           </div>
 
           {!selectedShipment ? (
-            <p style={styles.emptyState}>Select a shipment to continue.</p>
+            <div style={styles.guidedEmptyState}>
+              <div style={styles.guidedEmptyStateTitle}>Select a shipment to continue</div>
+              <div style={styles.guidedEmptyStateText}>
+                Use the shipment list on the left to open one pending or partial shipment.
+                After that, operators can choose a scan location, receive line items, and finalize the shipment.
+              </div>
+              <div style={styles.workflowGuideGrid}>
+                {shipmentWorkflowSteps.map((step) => (
+                  <article
+                    key={step.label}
+                    style={step.complete ? styles.workflowStepCardComplete : styles.workflowStepCard}
+                  >
+                    <div style={styles.workflowStepLabel}>{step.label}</div>
+                    <div style={styles.workflowStepText}>{step.detail}</div>
+                  </article>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
+              <div style={styles.workflowGuideGrid}>
+                {shipmentWorkflowSteps.map((step) => (
+                  <article
+                    key={step.label}
+                    style={step.complete ? styles.workflowStepCardComplete : styles.workflowStepCard}
+                  >
+                    <div style={styles.workflowStepLabel}>{step.label}</div>
+                    <div style={styles.workflowStepText}>{step.detail}</div>
+                  </article>
+                ))}
+              </div>
+
               <div style={styles.selectedShipmentBox}>
                 <div
                   style={{
