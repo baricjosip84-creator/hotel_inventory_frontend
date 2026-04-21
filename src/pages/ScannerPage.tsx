@@ -134,6 +134,7 @@ function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
 export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -413,6 +414,8 @@ export default function ScannerPage() {
   };
 
   useEffect(() => {
+    manualInputRef.current?.focus();
+
     return () => {
       void stopScanner();
     };
@@ -543,6 +546,7 @@ export default function ScannerPage() {
               Enter code manually
             </label>
             <input
+              ref={manualInputRef}
               id="manual-code-input"
               type="text"
               value={manualCode}

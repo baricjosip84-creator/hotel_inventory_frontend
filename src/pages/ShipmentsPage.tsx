@@ -205,6 +205,16 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
+
+function formatQuantity(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function clampPercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
 function emptyShipmentForm(): ShipmentFormState {
   return {
     supplier_id: '',
@@ -374,9 +384,14 @@ export default function ShipmentsPage() {
 
   const receiveShipmentMutation = useMutation({
     mutationFn: receiveShipmentLine,
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
       setPageError(null);
-      setPageMessage('Shipment item received successfully.');
+
+      const matchedItem = shipmentItems.find((item) => item.product_id === variables.item.product_id);
+      const quantityLabel = formatQuantity(variables.item.quantity_received);
+      const productLabel = matchedItem?.product_name || matchedItem?.product_id || variables.item.product_id;
+
+      setPageMessage(`✔ ${productLabel} +${quantityLabel} received into stock.`);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
@@ -398,7 +413,7 @@ export default function ShipmentsPage() {
     mutationFn: finalizeShipment,
     onSuccess: async () => {
       setPageError(null);
-      setPageMessage('Shipment finalized successfully.');
+      setPageMessage('✔ Shipment finalized and locked for receiving.');
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
@@ -424,6 +439,28 @@ export default function ShipmentsPage() {
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
+
+
+  const selectedShipmentOrderedTotal = shipmentItems.reduce(
+    (sum, item) => sum + toNumber(item.quantity),
+    0
+  );
+  const selectedShipmentReceivedTotal = shipmentItems.reduce(
+    (sum, item) => sum + toNumber(item.received_quantity),
+    0
+  );
+  const selectedShipmentRemainingTotal = Math.max(
+    selectedShipmentOrderedTotal - selectedShipmentReceivedTotal,
+    0
+  );
+  const selectedShipmentProgress = clampPercentage(
+    selectedShipmentOrderedTotal > 0
+      ? (selectedShipmentReceivedTotal / selectedShipmentOrderedTotal) * 100
+      : 0
+  );
+  const selectedScannerLocationName =
+    storageLocations.find((location) => location.id === selectedScannerLocationId)?.name ?? '';
+  const hasStorageLocations = storageLocations.length > 0;
 
   const filteredShipments = useMemo(() => {
     const search = shipmentSearch.trim().toLowerCase();
@@ -1067,6 +1104,97 @@ export default function ShipmentsPage() {
                 </div>
               </div>
 
+              <div
+                style={{
+                  ...styles.scannerReadinessSection,
+                  gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr'
+                }}
+              >
+                <div style={styles.readinessCard}>
+                  <div style={styles.readinessHeaderRow}>
+                    <div>
+                      <h4 style={styles.sectionTitle}>Receiving Progress</h4>
+                      <div style={styles.inlineHint}>
+                        Keep operators oriented while partially receiving the shipment.
+                      </div>
+                    </div>
+                    <span style={selectedShipmentProgress >= 100 ? styles.progressBadgeComplete : styles.progressBadgePending}>
+                      {selectedShipmentProgress >= 100 ? 'Ready to finalize' : `${Math.round(selectedShipmentProgress)}% received`}
+                    </span>
+                  </div>
+
+                  <div style={styles.progressSummaryRow}>
+                    <div style={styles.progressMetricBox}>
+                      <strong>Received</strong>
+                      <div>{formatQuantity(selectedShipmentReceivedTotal)}</div>
+                    </div>
+                    <div style={styles.progressMetricBox}>
+                      <strong>Ordered</strong>
+                      <div>{formatQuantity(selectedShipmentOrderedTotal)}</div>
+                    </div>
+                    <div style={styles.progressMetricBox}>
+                      <strong>Remaining</strong>
+                      <div>{formatQuantity(selectedShipmentRemainingTotal)}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.progressBarTrack} aria-label="Shipment receive progress">
+                    <div
+                      style={{
+                        ...styles.progressBarFill,
+                        width: `${selectedShipmentProgress}%`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={styles.readinessCard}>
+                  <div style={styles.readinessHeaderRow}>
+                    <div>
+                      <h4 style={styles.sectionTitle}>Scanner Readiness</h4>
+                      <div style={styles.inlineHint}>
+                        Make scan destination explicit before operators open the scanner.
+                      </div>
+                    </div>
+                    <span style={selectedScannerLocationId ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
+                      {selectedScannerLocationId ? 'Ready to scan' : 'Location required'}
+                    </span>
+                  </div>
+
+                  <label style={styles.label}>
+                    Default Scan Location
+                    <div style={styles.inlineHint}>Required for barcode scanning and auto-receive</div>
+                  </label>
+
+                  <select
+                    style={styles.input}
+                    value={selectedScannerLocationId}
+                    onChange={(event) => setSelectedScannerLocationId(event.target.value)}
+                  >
+                    <option value="">Select location</option>
+                    {storageLocations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {!hasStorageLocations ? (
+                    <div style={styles.scanWarningBanner}>
+                      No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
+                    </div>
+                  ) : selectedScannerLocationId ? (
+                    <div style={styles.scanReadyBanner}>
+                      Scanning into: <strong>{selectedScannerLocationName}</strong>
+                    </div>
+                  ) : (
+                    <div style={styles.scanWarningBanner}>
+                      Default Scan Location required before scanning.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div style={styles.sectionDivider} />
 
               <h4 style={styles.sectionTitle}>Add Shipment Item</h4>
@@ -1135,32 +1263,12 @@ export default function ShipmentsPage() {
                 <div style={styles.itemsHeaderContent}>
                   <h4 style={styles.sectionTitle}>Shipment Items</h4>
 
-                  <div style={styles.defaultLocationBlock}>
-                    <label style={styles.label}>
-                      Default Scan Location
-                      <div style={styles.inlineHint}>
-                        Required for barcode scanning and auto-receive
-                      </div>
-                    </label>
-
-                    <select
-                      style={styles.input}
-                      value={selectedScannerLocationId}
-                      onChange={(event) => setSelectedScannerLocationId(event.target.value)}
-                    >
-                      <option value="">Select location</option>
-                      {(storageLocationsQuery.data ?? []).map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    {!selectedScannerLocationId && (
-                      <div style={styles.scanWarningText}>
-                        Select a default scan location to enable barcode scanning.
-                      </div>
-                    )}
+                  <div style={styles.defaultLocationSummary}>
+                    <strong>Default Scan Location:</strong>{' '}
+                    {selectedScannerLocationId ? selectedScannerLocationName : 'Not selected'}
+                    <div style={styles.inlineHint}>
+                      Barcode scanning stays disabled until a scan destination is chosen above.
+                    </div>
                   </div>
                 </div>
 
