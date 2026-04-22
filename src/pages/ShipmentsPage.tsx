@@ -67,7 +67,6 @@ type ShipmentSummary = {
   line_count?: number;
   total_ordered_quantity?: number | string;
   total_received_quantity?: number | string;
-
 };
 
 type ShipmentItem = {
@@ -206,7 +205,6 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-
 function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
@@ -289,6 +287,32 @@ function useIsMobile(breakpoint = 1024): boolean {
 }
 
 export default function ShipmentsPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in the ShipmentsPage you sent.
+
+    Existing real behavior is preserved:
+    - same endpoints
+    - same query keys
+    - same create/add/receive/finalize flows
+    - same scanner return handling
+    - same auto-receive behavior
+    - same role enforcement
+    - same shipment and item state model
+
+    This pass is UI-only and applies the shared shell/page consistency carefully:
+    - major panels now use app-panel/app-panel--padded
+    - page-level states now align with shared warning/error/success surfaces
+    - action rows align more closely with the shared app-actions rhythm
+    - width guards and wrapping were tightened for dense shipment content
+    - no shipment logic or backend contract was changed
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Makes Shipments visually consistent with the other polished operational pages
+    while preserving the full receiving workflow and scanner integration exactly as implemented.
+  */
   const queryClient = useQueryClient();
 
   const { role, canManageShipments, canReceiveShipments } = getRoleCapabilities();
@@ -440,7 +464,6 @@ export default function ShipmentsPage() {
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
-
 
   const selectedShipmentOrderedTotal = shipmentItems.reduce(
     (sum, item) => sum + toNumber(item.quantity),
@@ -883,9 +906,9 @@ export default function ShipmentsPage() {
   };
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={styles.header}>
-        <div>
+        <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Shipments</h2>
           <p style={styles.description}>
             Create inbound shipments, add shipment items, receive lines partially
@@ -894,16 +917,16 @@ export default function ShipmentsPage() {
         </div>
       </div>
 
-      {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
-      {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
+      {pageError ? <div className="app-error-state" style={styles.errorBox}>{pageError}</div> : null}
+      {pageMessage ? <div className="app-success-state" style={styles.successBox}>{pageMessage}</div> : null}
 
       {!canManageShipments ? (
-        <div style={styles.warningBox}>
+        <div className="app-warning-state" style={styles.warningBox}>
           Current role: {role.toUpperCase()}. Shipment creation, shipment item changes, and finalization are blocked in the frontend because your backend only allows manager and admin users to perform those writes. Receiving remains available according to the existing backend access model.
         </div>
       ) : null}
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Shipment</h3>
 
         <form onSubmit={handleCreateShipment} style={styles.formGrid}>
@@ -961,7 +984,7 @@ export default function ShipmentsPage() {
             />
           </div>
 
-          <div style={styles.formActionRow}>
+          <div className="app-actions" style={styles.formActionRow}>
             <button
               type="submit"
               style={styles.primaryButton}
@@ -980,9 +1003,9 @@ export default function ShipmentsPage() {
           gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 420px) minmax(0, 1fr)'
         }}
       >
-        <div style={styles.panel}>
+        <div className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.shipmentListHeader}>
-            <div>
+            <div style={styles.shipmentListHeaderText}>
               <h3 style={styles.panelTitle}>Shipment List</h3>
               <p style={styles.panelSubtitle}>
                 Filter shipments and select one for line management and receiving.
@@ -991,6 +1014,7 @@ export default function ShipmentsPage() {
           </div>
 
           <div
+            className="app-grid-toolbar"
             style={{
               ...styles.filterGrid,
               gridTemplateColumns: isMobile ? '1fr' : '1fr 180px'
@@ -1090,9 +1114,9 @@ export default function ShipmentsPage() {
           </div>
         </div>
 
-        <div style={styles.panel}>
+        <div className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.shipmentListHeader}>
-            <div>
+            <div style={styles.shipmentListHeaderText}>
               <h3 style={styles.panelTitle}>Selected Shipment</h3>
               <p style={styles.panelSubtitle}>
                 Add shipment lines, receive stock into locations, and finalize the shipment.
@@ -1179,7 +1203,7 @@ export default function ShipmentsPage() {
               >
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
-                    <div>
+                    <div style={styles.readinessHeaderText}>
                       <h4 style={styles.sectionTitle}>Receiving Progress</h4>
                       <div style={styles.inlineHint}>
                         Keep operators oriented while partially receiving the shipment.
@@ -1217,7 +1241,7 @@ export default function ShipmentsPage() {
 
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
-                    <div>
+                    <div style={styles.readinessHeaderText}>
                       <h4 style={styles.sectionTitle}>Scanner Readiness</h4>
                       <div style={styles.inlineHint}>
                         Make scan destination explicit before operators open the scanner.
@@ -1247,15 +1271,15 @@ export default function ShipmentsPage() {
                   </select>
 
                   {!hasStorageLocations ? (
-                    <div style={styles.scanWarningBanner}>
+                    <div className="app-warning-state" style={styles.scanWarningBanner}>
                       No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
                     </div>
                   ) : selectedScannerLocationId ? (
-                    <div style={styles.scanReadyBanner}>
+                    <div className="app-success-state" style={styles.scanReadyBanner}>
                       Scanning into: <strong>{selectedScannerLocationName}</strong>
                     </div>
                   ) : (
-                    <div style={styles.scanWarningBanner}>
+                    <div className="app-warning-state" style={styles.scanWarningBanner}>
                       Default Scan Location required before scanning.
                     </div>
                   )}
@@ -1306,7 +1330,7 @@ export default function ShipmentsPage() {
                   />
                 </div>
 
-                <div style={styles.formActionRow}>
+                <div className="app-actions" style={styles.formActionRow}>
                   <button
                     type="submit"
                     style={styles.primaryButton}
@@ -1340,10 +1364,10 @@ export default function ShipmentsPage() {
                 </div>
 
                 <div
+                  className="app-actions"
                   style={{
-                    display: 'flex',
+                    ...styles.itemsHeaderActions,
                     flexDirection: isMobile ? 'column' : 'row',
-                    gap: 10,
                     width: isMobile ? '100%' : 'auto'
                   }}
                 >
@@ -1636,15 +1660,23 @@ export default function ShipmentsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    width: '100%',
+    minWidth: 0
+  },
   header: {
     marginBottom: 20,
+    minWidth: 0
+  },
+  headerTextBlock: {
     minWidth: 0
   },
   title: {
     margin: 0,
     fontSize: 28,
     fontWeight: 800,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   description: {
     marginTop: 8,
@@ -1654,35 +1686,34 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 16,
-    padding: 20,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     marginBottom: 20,
-    minWidth: 0
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelTitle: {
     margin: 0,
     fontSize: 18,
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   panelSubtitle: {
     marginTop: 6,
     color: '#6b7280',
     fontSize: 14,
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 16,
-    alignItems: 'end'
+    alignItems: 'end',
+    minWidth: 0
   },
   formActionRow: {
-    display: 'flex',
-    alignItems: 'end'
+    alignItems: 'end',
+    minWidth: 0
   },
   label: {
     display: 'block',
@@ -1757,28 +1788,13 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'not-allowed'
   },
   errorBox: {
-    marginBottom: 16,
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#991b1b',
-    borderRadius: 12,
-    padding: '12px 14px'
+    marginBottom: 16
   },
   warningBox: {
-    marginBottom: '16px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412'
+    marginBottom: '16px'
   },
   successBox: {
-    marginBottom: 16,
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#065f46',
-    borderRadius: 12,
-    padding: '12px 14px'
+    marginBottom: 16
   },
   twoColumnGrid: {
     display: 'grid',
@@ -1792,9 +1808,10 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 16,
     minWidth: 0
   },
+  shipmentListHeaderText: {
+    minWidth: 0
+  },
   filterGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 180px',
     gap: 12,
     marginBottom: 16,
     minWidth: 0
@@ -1880,7 +1897,8 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 0 14px',
     fontSize: 16,
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   itemsHeaderRow: {
     display: 'flex',
@@ -1896,6 +1914,10 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
     minWidth: 0,
     flex: 1
+  },
+  itemsHeaderActions: {
+    gap: 10,
+    minWidth: 0
   },
   defaultLocationBlock: {
     display: 'flex',
@@ -2129,6 +2151,9 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     minWidth: 0
   },
+  readinessHeaderText: {
+    minWidth: 0
+  },
   readinessStatusReady: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -2208,20 +2233,10 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   scanReadyBanner: {
-    borderRadius: 12,
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#065f46',
-    padding: '12px 14px',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
   scanWarningBanner: {
-    borderRadius: 12,
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412',
-    padding: '12px 14px',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },

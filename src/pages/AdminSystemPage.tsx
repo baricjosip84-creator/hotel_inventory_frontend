@@ -110,9 +110,18 @@ async function fetchSystemHealth(): Promise<SystemHealthResponse> {
   return apiRequest<SystemHealthResponse>('/admin/system-health/system-health');
 }
 
-function StatCard(props: { title: string; value: string; subtitle: string; tone?: 'default' | 'warn' | 'bad' }) {
+function StatCard(props: {
+  title: string;
+  value: string;
+  subtitle: string;
+  tone?: 'default' | 'warn' | 'bad';
+}) {
   const valueStyle =
-    props.tone === 'bad' ? styles.statValueBad : props.tone === 'warn' ? styles.statValueWarn : styles.statValue;
+    props.tone === 'bad'
+      ? styles.statValueBad
+      : props.tone === 'warn'
+        ? styles.statValueWarn
+        : styles.statValue;
 
   return (
     <div style={styles.statCard}>
@@ -123,9 +132,13 @@ function StatCard(props: { title: string; value: string; subtitle: string; tone?
   );
 }
 
-function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
+function Section(props: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section style={styles.panel}>
+    <section className="app-panel app-panel--padded" style={styles.panel}>
       <div style={styles.panelHeader}>
         <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
@@ -141,27 +154,25 @@ export default function AdminSystemPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current AdminSystemPage.
-    The changes here are intentionally UI-only:
-    - improved panel/grid resilience with safer min-width handling
-    - improved wrapping for long operational strings
-    - improved key/value row behavior on narrower screens
+    This file stays grounded in the AdminSystemPage you sent.
 
-    WHY IT CHANGED
-    --------------
-    This page already uses the correct backend diagnostics endpoints and role gating,
-    but operational/admin surfaces often contain long IDs, timestamps, keys, and messages.
-    Those were the biggest visual pressure points in the real file.
+    Existing real behavior is preserved:
+    - same backend endpoints
+    - same query keys
+    - same manager/admin visibility rules
+    - same section order
+    - same diagnostics and system-health rendering
+
+    This pass applies the shared UI foundation carefully:
+    - summary cards now align with the shared app-grid-stats layer
+    - sections now use app-panel/app-panel--padded
+    - info/warning/error surfaces align with the shared state layer
+    - no diagnostics logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves readability and responsiveness without changing:
-    - backend contract
-    - endpoints
-    - query keys
-    - admin/manager access rules
-    - section order
-    - data flow
+    Makes Admin System visually consistent with the rest of the polished admin
+    pages without changing contracts, access rules, or data flow.
   */
   const capabilities = getRoleCapabilities();
 
@@ -212,7 +223,7 @@ export default function AdminSystemPage() {
 
   return (
     <div style={styles.page}>
-      <section style={styles.statsGrid}>
+      <section className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Write Status"
           value={overview.writeLock}
@@ -243,8 +254,18 @@ export default function AdminSystemPage() {
           title="System Status"
           subtitle="Manager/admin visibility into system flags and tenant blocking alerts."
         >
-          {systemStatusQuery.isLoading ? <div style={styles.infoState}>Loading system status...</div> : null}
-          {systemStatusQuery.isError ? <div style={styles.errorState}>{toReadableError(systemStatusQuery.error)}</div> : null}
+          {systemStatusQuery.isLoading ? (
+            <div className="app-empty-state" style={styles.infoState}>
+              Loading system status...
+            </div>
+          ) : null}
+
+          {systemStatusQuery.isError ? (
+            <div className="app-error-state" style={styles.errorState}>
+              {toReadableError(systemStatusQuery.error)}
+            </div>
+          ) : null}
+
           {systemStatusQuery.data ? (
             <div style={styles.list}>
               <div style={styles.keyValueRow}>
@@ -253,15 +274,21 @@ export default function AdminSystemPage() {
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>Timestamp</strong>
-                <span style={styles.keyValue}>{formatDateTime(systemStatusQuery.data.timestamp)}</span>
+                <span style={styles.keyValue}>
+                  {formatDateTime(systemStatusQuery.data.timestamp)}
+                </span>
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>System Write Lock</strong>
-                <span style={styles.keyValue}>{systemStatusQuery.data.system_write_locked ? 'Enabled' : 'Disabled'}</span>
+                <span style={styles.keyValue}>
+                  {systemStatusQuery.data.system_write_locked ? 'Enabled' : 'Disabled'}
+                </span>
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>Maintenance Mode</strong>
-                <span style={styles.keyValue}>{systemStatusQuery.data.maintenance_mode ? 'Enabled' : 'Disabled'}</span>
+                <span style={styles.keyValue}>
+                  {systemStatusQuery.data.maintenance_mode ? 'Enabled' : 'Disabled'}
+                </span>
               </div>
 
               <div style={styles.sectionSubheading}>Blocking Alerts</div>
@@ -277,7 +304,9 @@ export default function AdminSystemPage() {
                   </article>
                 ))
               ) : (
-                <div style={styles.infoState}>No blocking alerts were returned for the current tenant.</div>
+                <div className="app-empty-state" style={styles.infoState}>
+                  No blocking alerts were returned for the current tenant.
+                </div>
               )}
             </div>
           ) : null}
@@ -288,16 +317,28 @@ export default function AdminSystemPage() {
           subtitle="Admin-only read surface for operational integrity checks already exposed by the backend."
         >
           {!capabilities.isAdmin ? (
-            <div style={styles.warningState}>
-              Diagnostics and cross-tenant health are intentionally limited to admins. Managers still retain the system-status view above.
+            <div className="app-warning-state" style={styles.warningState}>
+              Diagnostics and cross-tenant health are intentionally limited to admins.
+              Managers still retain the system-status view above.
             </div>
           ) : null}
 
           {capabilities.isAdmin ? (
             <div style={styles.list}>
               <div style={styles.sectionSubheading}>Blocking Diagnostics</div>
-              {blockingAlertsQuery.isError ? <div style={styles.errorState}>{toReadableError(blockingAlertsQuery.error)}</div> : null}
-              {blockingAlertsQuery.isLoading ? <div style={styles.infoState}>Loading blocking diagnostics...</div> : null}
+
+              {blockingAlertsQuery.isError ? (
+                <div className="app-error-state" style={styles.errorState}>
+                  {toReadableError(blockingAlertsQuery.error)}
+                </div>
+              ) : null}
+
+              {blockingAlertsQuery.isLoading ? (
+                <div className="app-empty-state" style={styles.infoState}>
+                  Loading blocking diagnostics...
+                </div>
+              ) : null}
+
               {blockingAlertsQuery.data?.length
                 ? blockingAlertsQuery.data.map((row) => (
                     <article key={row.id} style={styles.itemCard}>
@@ -309,10 +350,27 @@ export default function AdminSystemPage() {
                     </article>
                   ))
                 : !blockingAlertsQuery.isLoading
-                  ? <div style={styles.infoState}>No blocking diagnostics returned.</div>
+                  ? (
+                    <div className="app-empty-state" style={styles.infoState}>
+                      No blocking diagnostics returned.
+                    </div>
+                    )
                   : null}
 
               <div style={styles.sectionSubheading}>Stuck Idempotency Keys</div>
+
+              {idempotencyQuery.isError ? (
+                <div className="app-error-state" style={styles.errorState}>
+                  {toReadableError(idempotencyQuery.error)}
+                </div>
+              ) : null}
+
+              {idempotencyQuery.isLoading ? (
+                <div className="app-empty-state" style={styles.infoState}>
+                  Loading stuck idempotency rows...
+                </div>
+              ) : null}
+
               {idempotencyQuery.data?.length
                 ? idempotencyQuery.data.map((row) => (
                     <article key={row.id} style={styles.itemCard}>
@@ -321,15 +379,33 @@ export default function AdminSystemPage() {
                       </div>
                       <div style={styles.itemTextMono}>{row.idempotency_key}</div>
                       <div style={styles.itemMeta}>
-                        Created {formatDateTime(row.created_at)} · Expires {formatDateTime(row.expires_at)}
+                        Created {formatDateTime(row.created_at)} · Expires{' '}
+                        {formatDateTime(row.expires_at)}
                       </div>
                     </article>
                   ))
                 : !idempotencyQuery.isLoading
-                  ? <div style={styles.infoState}>No stuck idempotency rows returned.</div>
+                  ? (
+                    <div className="app-empty-state" style={styles.infoState}>
+                      No stuck idempotency rows returned.
+                    </div>
+                    )
                   : null}
 
               <div style={styles.sectionSubheading}>Stock Integrity</div>
+
+              {stockIntegrityQuery.isError ? (
+                <div className="app-error-state" style={styles.errorState}>
+                  {toReadableError(stockIntegrityQuery.error)}
+                </div>
+              ) : null}
+
+              {stockIntegrityQuery.isLoading ? (
+                <div className="app-empty-state" style={styles.infoState}>
+                  Loading stock integrity issues...
+                </div>
+              ) : null}
+
               {stockIntegrityQuery.data?.length
                 ? stockIntegrityQuery.data.map((row) => (
                     <article key={row.id} style={styles.itemCard}>
@@ -343,22 +419,44 @@ export default function AdminSystemPage() {
                     </article>
                   ))
                 : !stockIntegrityQuery.isLoading
-                  ? <div style={styles.infoState}>No negative stock integrity issues returned.</div>
+                  ? (
+                    <div className="app-empty-state" style={styles.infoState}>
+                      No negative stock integrity issues returned.
+                    </div>
+                    )
                   : null}
 
               <div style={styles.sectionSubheading}>Broken Shipments</div>
+
+              {brokenShipmentsQuery.isError ? (
+                <div className="app-error-state" style={styles.errorState}>
+                  {toReadableError(brokenShipmentsQuery.error)}
+                </div>
+              ) : null}
+
+              {brokenShipmentsQuery.isLoading ? (
+                <div className="app-empty-state" style={styles.infoState}>
+                  Loading broken shipments...
+                </div>
+              ) : null}
+
               {brokenShipmentsQuery.data?.length
                 ? brokenShipmentsQuery.data.map((row) => (
                     <article key={row.id} style={styles.itemCard}>
                       <div style={styles.itemTitle}>Shipment {row.id}</div>
                       <div style={styles.itemText}>Status {row.status}</div>
                       <div style={styles.itemMeta}>
-                        Ordered {row.total_ordered_quantity} · Received {row.total_received_quantity}
+                        Ordered {row.total_ordered_quantity} · Received{' '}
+                        {row.total_received_quantity}
                       </div>
                     </article>
                   ))
                 : !brokenShipmentsQuery.isLoading
-                  ? <div style={styles.infoState}>No broken shipments returned.</div>
+                  ? (
+                    <div className="app-empty-state" style={styles.infoState}>
+                      No broken shipments returned.
+                    </div>
+                    )
                   : null}
             </div>
           ) : null}
@@ -370,11 +468,22 @@ export default function AdminSystemPage() {
         subtitle="Cross-tenant health snapshots exposed by the admin system-health endpoint."
       >
         {!capabilities.isAdmin ? (
-          <div style={styles.warningState}>System health snapshots are admin-only because they span all tenants.</div>
+          <div className="app-warning-state" style={styles.warningState}>
+            System health snapshots are admin-only because they span all tenants.
+          </div>
         ) : null}
 
-        {capabilities.isAdmin && systemHealthQuery.isLoading ? <div style={styles.infoState}>Loading system health...</div> : null}
-        {capabilities.isAdmin && systemHealthQuery.isError ? <div style={styles.errorState}>{toReadableError(systemHealthQuery.error)}</div> : null}
+        {capabilities.isAdmin && systemHealthQuery.isLoading ? (
+          <div className="app-empty-state" style={styles.infoState}>
+            Loading system health...
+          </div>
+        ) : null}
+
+        {capabilities.isAdmin && systemHealthQuery.isError ? (
+          <div className="app-error-state" style={styles.errorState}>
+            {toReadableError(systemHealthQuery.error)}
+          </div>
+        ) : null}
 
         {capabilities.isAdmin && systemHealthQuery.data ? (
           systemHealthQuery.data.tenants.length ? (
@@ -387,7 +496,10 @@ export default function AdminSystemPage() {
                   </div>
                   {tenant.issues.length
                     ? tenant.issues.map((issue, index) => (
-                        <div key={`${tenant.tenant_id}-${index}`} style={styles.itemText}>
+                        <div
+                          key={`${tenant.tenant_id}-${index}`}
+                          style={styles.itemText}
+                        >
                           {issue.type}: {issue.message}
                         </div>
                       ))
@@ -396,7 +508,9 @@ export default function AdminSystemPage() {
               ))}
             </div>
           ) : (
-            <div style={styles.infoState}>No tenant health rows were returned.</div>
+            <div className="app-empty-state" style={styles.infoState}>
+              No tenant health rows were returned.
+            </div>
           )
         ) : null}
       </Section>
@@ -422,9 +536,6 @@ const styles: Record<string, CSSProperties> = {
       What problem this solves:
       - Keeps the top summary area stable across viewport widths.
     */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '16px',
     width: '100%',
     minWidth: 0
   },
@@ -484,12 +595,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   panel: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '18px',
-    padding: '20px',
-    display: 'grid',
-    gap: '16px',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -512,7 +617,8 @@ const styles: Record<string, CSSProperties> = {
   panelSubtitle: {
     margin: '8px 0 0 0',
     color: '#475569',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   list: {
     display: 'grid',
@@ -594,24 +700,12 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   infoState: {
-    background: '#f8fafc',
-    color: '#475569',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    lineHeight: 1.5
+    margin: 0
   },
   warningState: {
-    background: '#fef3c7',
-    color: '#92400e',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    lineHeight: 1.5
+    margin: 0
   },
   errorState: {
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    lineHeight: 1.5
+    margin: 0
   }
 };

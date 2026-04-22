@@ -143,27 +143,28 @@ export default function UsersPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current UsersPage.
-    The changes here are intentionally UI-only:
-    - moved the search control into a dedicated toolbar row
-    - removed the hard search width cap
-    - made user card headers wrap more safely on smaller screens
+    This file stays grounded in the UsersPage you sent.
 
-    WHY IT CHANGED
-    --------------
-    The page is already functionally correct, but compared with the current
-    Products / Suppliers / Storage master-data pages, the search area and card
-    header behavior felt less consistent.
+    Existing real behavior is preserved:
+    - same backend endpoints
+    - same query key
+    - same JWT role detection
+    - same create / update / delete flow
+    - same role enforcement
+    - same search filtering
+    - same field names and form state
+
+    This pass applies the shared UI foundation carefully:
+    - summary cards now align with the shared app-grid-stats layer
+    - main sections now use app-panel/app-panel--padded
+    - banners and empty state align with the shared state styles
+    - action rows align with the shared app-actions rhythm
+    - no CRUD logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves admin-facing readability and responsiveness without changing:
-    - backend contract
-    - CRUD behavior
-    - role enforcement
-    - query keys
-    - field names
-    - mutation flow
+    Makes Users visually consistent with the rest of the polished admin/master-data
+    pages without changing contracts, permissions, or mutation behavior.
   */
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -332,7 +333,7 @@ export default function UsersPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.summaryGrid}>
+      <div className="app-grid-stats" style={styles.summaryGrid}>
         <StatCard title="Users" value={summary.total} subtitle="Tenant user accounts" />
         <StatCard title="Admins" value={summary.admins} subtitle="Full platform control" tone="warn" />
         <StatCard title="Managers" value={summary.managers} subtitle="Operational supervisors" />
@@ -345,9 +346,9 @@ export default function UsersPage() {
           ...(isMobile ? styles.contentGridMobile : styles.contentGridDesktop)
         }}
       >
-        <section style={styles.panel}>
+        <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <div>
+            <div style={styles.sectionHeaderText}>
               <h2 style={styles.sectionTitle}>{editingUser ? 'Edit User' : 'Create User'}</h2>
               <p style={styles.sectionDescription}>
                 {canWrite
@@ -358,13 +359,22 @@ export default function UsersPage() {
           </div>
 
           {!canWrite ? (
-            <div style={styles.infoBanner}>
+            <div className="app-warning-state" style={styles.infoBanner}>
               You can review tenant users here, but only admins can create, edit, or delete accounts.
             </div>
           ) : null}
 
-          {pageMessage ? <div style={styles.successBanner}>{pageMessage}</div> : null}
-          {pageError ? <div style={styles.errorBanner}>{pageError}</div> : null}
+          {pageMessage ? (
+            <div className="app-success-state" style={styles.successBanner}>
+              {pageMessage}
+            </div>
+          ) : null}
+
+          {pageError ? (
+            <div className="app-error-state" style={styles.errorBanner}>
+              {pageError}
+            </div>
+          ) : null}
 
           <form style={styles.form} onSubmit={handleSubmit}>
             <div style={styles.formField}>
@@ -433,7 +443,7 @@ export default function UsersPage() {
               />
             </div>
 
-            <div style={styles.formActions}>
+            <div className="app-actions" style={styles.formActions}>
               <button
                 type="submit"
                 style={styles.primaryButton}
@@ -457,9 +467,9 @@ export default function UsersPage() {
           </form>
         </section>
 
-        <section style={styles.panel}>
+        <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <div>
+            <div style={styles.sectionHeaderText}>
               <h2 style={styles.sectionTitle}>Tenant Users</h2>
               <p style={styles.sectionDescription}>
                 Review all user accounts for the current tenant and filter by name, email, or role.
@@ -467,7 +477,7 @@ export default function UsersPage() {
             </div>
           </div>
 
-          <div style={styles.toolbarGrid}>
+          <div className="app-grid-toolbar" style={styles.toolbarGrid}>
             <input
               style={{ ...styles.input, ...styles.searchInput }}
               value={search}
@@ -477,7 +487,9 @@ export default function UsersPage() {
           </div>
 
           {filteredUsers.length === 0 ? (
-            <div style={styles.emptyState}>No users matched the current search.</div>
+            <div className="app-empty-state" style={styles.emptyState}>
+              No users matched the current search.
+            </div>
           ) : (
             <div style={styles.userList}>
               {filteredUsers.map((user) => (
@@ -514,7 +526,7 @@ export default function UsersPage() {
                     </div>
                   </div>
 
-                  <div style={styles.userCardActions}>
+                  <div className="app-actions" style={styles.userCardActions}>
                     <button
                       type="button"
                       style={styles.secondaryButton}
@@ -550,10 +562,8 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '12px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
@@ -604,10 +614,6 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: '1fr'
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '18px',
-    padding: '16px',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -615,7 +621,11 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     gap: '14px',
     justifyContent: 'space-between',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    minWidth: 0
+  },
+  sectionHeaderText: {
+    minWidth: 0
   },
   sectionTitle: {
     margin: 0,
@@ -625,34 +635,17 @@ const styles: Record<string, CSSProperties> = {
   sectionDescription: {
     margin: '8px 0 0 0',
     color: '#475569',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   infoBanner: {
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    marginBottom: '14px',
-    lineHeight: 1.5
+    marginBottom: '14px'
   },
   successBanner: {
-    background: '#ecfdf5',
-    color: '#047857',
-    border: '1px solid #a7f3d0',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    marginBottom: '14px',
-    lineHeight: 1.5
+    marginBottom: '14px'
   },
   errorBanner: {
-    background: '#fef2f2',
-    color: '#b91c1c',
-    border: '1px solid #fecaca',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    marginBottom: '14px',
-    lineHeight: 1.5
+    marginBottom: '14px'
   },
   form: {
     display: 'grid',
@@ -692,10 +685,8 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   formActions: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
-    marginTop: '4px'
+    marginTop: '4px',
+    minWidth: 0
   },
   primaryButton: {
     border: 'none',
@@ -737,10 +728,8 @@ const styles: Record<string, CSSProperties> = {
       - Gives the list area the same visual rhythm as the other master-data pages
         without changing any filtering behavior.
     */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '12px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    minWidth: 0
   },
   searchInput: {
     /*
@@ -756,11 +745,7 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: '100%'
   },
   emptyState: {
-    border: '1px dashed #cbd5e1',
-    borderRadius: '14px',
-    padding: '18px',
-    color: '#64748b',
-    background: '#f8fafc'
+    margin: 0
   },
   userList: {
     display: 'grid',
@@ -850,8 +835,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   userCardActions: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap'
+    minWidth: 0
   }
 };

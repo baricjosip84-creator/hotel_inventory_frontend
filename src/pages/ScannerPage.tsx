@@ -135,34 +135,27 @@ export default function ScannerPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current ScannerPage.
+    This file stays grounded in the ScannerPage you sent.
 
-    The scanner logic is intentionally untouched:
+    The real scanner behavior is intentionally unchanged:
     - same shipment/product modes
     - same manual submit flow
     - same image decode flow
     - same resolve/navigation behavior
     - same html5-qrcode setup
+    - same success feedback behavior
 
-    The changes here are UI-only:
-    - moved the page into the same panel/card rhythm as the rest of the polished app
-    - improved action button wrapping and small-screen resilience
-    - improved status / result presentation
-    - improved wrapping for long IDs and decoded values
-
-    WHY IT CHANGED
-    --------------
-    The real file was operationally correct but visually looser than the rest
-    of the app after the recent page polish passes.
+    This pass is UI-only and aligns the page with the shared polished shell:
+    - main sections now use app-panel/app-panel--padded
+    - state banners align with the shared success/error/warning styles
+    - action rows align more closely with the shared app-actions rhythm
+    - width guards and wrapping were tightened for long IDs / decoded values
+    - no scanning logic or routing behavior was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves operator usability and consistency without changing:
-    - backend contract
-    - scanner flow
-    - routing behavior
-    - query/search params
-    - barcode/QR decode behavior
+    Makes ScannerPage feel like part of the same operational app as Shipments,
+    Products, and the admin pages without changing decode behavior or backend contracts.
   */
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -455,7 +448,7 @@ export default function ScannerPage() {
 
   return (
     <div style={styles.page}>
-      <section style={styles.heroPanel}>
+      <section className="app-panel app-panel--padded" style={styles.heroPanel}>
         <div style={styles.heroHeader}>
           <div style={styles.heroTextBlock}>
             <h2 style={styles.title}>{modeLabel(mode)}</h2>
@@ -501,7 +494,7 @@ export default function ScannerPage() {
           )}
         </div>
 
-        <div style={styles.actionGrid}>
+        <div className="app-actions" style={styles.actionGrid}>
           <button
             onClick={() => void startScanner()}
             disabled={isRunning || isResolving || isDecodingImage}
@@ -529,13 +522,13 @@ export default function ScannerPage() {
         </div>
 
         {error ? (
-          <div style={styles.errorBanner}>
+          <div className="app-error-state" style={styles.errorBanner}>
             <strong>Error:</strong> {error}
           </div>
         ) : null}
 
         {isResolving ? (
-          <div style={styles.infoBanner}>
+          <div className="app-warning-state" style={styles.infoBanner}>
             {mode === 'product'
               ? 'Resolving product barcode in selected shipment...'
               : 'Resolving shipment from scanned QR code...'}
@@ -543,7 +536,7 @@ export default function ScannerPage() {
         ) : null}
 
         {isDecodingImage ? (
-          <div style={styles.infoBanner}>Decoding image...</div>
+          <div className="app-warning-state" style={styles.infoBanner}>Decoding image...</div>
         ) : null}
 
         <div style={styles.scannerShell}>
@@ -557,9 +550,9 @@ export default function ScannerPage() {
         </div>
       </section>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeader}>
-          <div>
+          <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Manual / Fallback Options</h3>
             <p style={styles.panelSubtitle}>
               Use this when live camera decoding is unreliable in current warehouse conditions.
@@ -583,7 +576,7 @@ export default function ScannerPage() {
             />
           </div>
 
-          <div style={styles.formActions}>
+          <div className="app-actions" style={styles.formActions}>
             <button
               type="button"
               onClick={() => void handleManualSubmit()}
@@ -616,9 +609,9 @@ export default function ScannerPage() {
       </section>
 
       {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName ? (
-        <section style={styles.panel}>
+        <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.panelHeader}>
-            <div>
+            <div style={styles.panelHeaderText}>
               <h3 style={styles.panelTitle}>Latest Scan Result</h3>
               <p style={styles.panelSubtitle}>
                 Real-time decode and resolution output from the existing scanner flow.
@@ -669,11 +662,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   heroPanel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '16px',
-    padding: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     display: 'grid',
     gap: '16px',
     minWidth: 0,
@@ -805,19 +793,9 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   errorBanner: {
-    background: '#fef2f2',
-    color: '#b91c1c',
-    border: '1px solid #fecaca',
-    borderRadius: '12px',
-    padding: '12px 14px',
     lineHeight: 1.5
   },
   infoBanner: {
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-    borderRadius: '12px',
-    padding: '12px 14px',
     lineHeight: 1.5
   },
   scannerShell: {
@@ -840,11 +818,6 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: 400
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '16px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -855,6 +828,9 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     marginBottom: '16px',
     flexWrap: 'wrap',
+    minWidth: 0
+  },
+  panelHeaderText: {
     minWidth: 0
   },
   panelTitle: {
@@ -895,9 +871,7 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff'
   },
   formActions: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap'
+    minWidth: 0
   },
   resultGrid: {
     display: 'grid',

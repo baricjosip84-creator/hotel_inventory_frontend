@@ -345,9 +345,9 @@ function Section(props: {
   children: React.ReactNode;
 }) {
   return (
-    <section style={styles.panel}>
+    <section className="app-panel app-panel--padded" style={styles.panel}>
       <div style={styles.sectionHeader}>
-        <div>
+        <div style={styles.sectionHeaderText}>
           <h3 style={styles.sectionTitle}>{props.title}</h3>
           <p style={styles.sectionSubtitle}>{props.subtitle}</p>
         </div>
@@ -359,7 +359,7 @@ function Section(props: {
 }
 
 function SectionError(props: { message: string }) {
-  return <div style={styles.errorInline}>{props.message}</div>;
+  return <div className="app-error-state" style={styles.errorInline}>{props.message}</div>;
 }
 
 function PremiumEmptyState(props: {
@@ -368,20 +368,24 @@ function PremiumEmptyState(props: {
   tone?: 'good' | 'neutral';
   meta?: string;
 }) {
+  const toneClassName =
+    props.tone === 'good'
+      ? 'app-success-state'
+      : 'app-empty-state';
+
   const toneStyle =
     props.tone === 'good'
       ? styles.emptyStateGood
       : styles.emptyStateNeutral;
 
   return (
-    <div style={toneStyle}>
+    <div className={toneClassName} style={toneStyle}>
       <div style={styles.emptyStateTitle}>{props.title}</div>
       <div style={styles.emptyStateMessage}>{props.message}</div>
       {props.meta ? <div style={styles.emptyStateMeta}>{props.meta}</div> : null}
     </div>
   );
 }
-
 
 function ActionLink(props: { to: string; label: string }) {
   return (
@@ -422,6 +426,30 @@ function StatCard(props: {
  */
 
 export default function DashboardPage() {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in the DashboardPage you sent.
+
+    Existing real behavior is preserved:
+    - same dashboard queries
+    - same section structure
+    - same quick links
+    - same operational health, depletion, reorder, alerts, anomalies, activity,
+      and supplier performance rendering
+    - same helper logic and routing
+
+    This pass applies the shared UI foundation carefully:
+    - dashboard sections now use app-panel/app-panel--padded
+    - KPI grids now use app-grid-stats
+    - empty/error states align with the shared foundation
+    - no business logic was changed
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Makes the dashboard consume the same shared visual layer as the other pages
+    without simplifying or rewriting any of its operational content.
+  */
   const summaryQuery = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: fetchDashboardSummary
@@ -521,7 +549,7 @@ export default function DashboardPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <div>
+        <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Dashboard</h2>
           <p style={styles.description}>
             Operational overview, intelligent inventory signals, and recent activity for
@@ -530,24 +558,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/*
-        WHAT CHANGED
-        ------------
-        Added direct next-step navigation so dashboard signals now drive users
-        into the exact operational surface that matches the alert, shipment,
-        stock, or master-data issue.
-
-        WHY IT CHANGED
-        --------------
-        The current project already had strong operational data, but the
-        dashboard mostly informed without directing action.
-
-        WHAT PROBLEM IT SOLVES
-        ----------------------
-        This turns the dashboard into a control center instead of a passive
-        report by giving users fast routes into Stock, Shipments, Alerts,
-        Products, Suppliers, Storage Locations, Reports, and Insights.
-      */}
       <div style={styles.quickActionRow}>
         <ActionLink to="/stock" label="Open Stock" />
         <ActionLink to="/shipments" label="Open Shipments" />
@@ -559,7 +569,7 @@ export default function DashboardPage() {
         <ActionLink to="/insights" label="Open Insights" />
       </div>
 
-      <div style={styles.kpiGrid}>
+      <div className="app-grid-stats" style={styles.kpiGrid}>
         <StatCard
           title="Products"
           value={summary.master_data.total_products}
@@ -607,10 +617,10 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div style={styles.kpiGrid}>
-        <div style={styles.healthCard}>
+      <div className="app-grid-stats" style={styles.kpiGrid}>
+        <div className="app-panel app-panel--padded" style={styles.healthCard}>
           <div style={styles.healthHeader}>
-            <div>
+            <div style={styles.healthHeaderText}>
               <div style={styles.healthTitle}>Operational Health</div>
               <div style={styles.healthSubtitle}>
                 Tenant-level health based on alerts, overdue shipments, low stock, and discrepancy pressure.
@@ -697,9 +707,9 @@ export default function DashboardPage() {
                 />
               ) : (
                 topDepletionRows.map((row) => (
-                  <div key={row.stock_id} style={styles.listCard}>
+                  <div style={styles.listCard} key={row.stock_id}>
                     <div style={styles.listCardHeader}>
-                      <div>
+                      <div style={styles.listCardHeaderText}>
                         <div style={styles.listCardTitle}>{row.product_name}</div>
                         <div style={styles.listCardMeta}>
                           {row.storage_location_name} · {row.product_unit || '-'}
@@ -768,9 +778,9 @@ export default function DashboardPage() {
                 />
               ) : (
                 topReorderRows.map((row) => (
-                  <div key={row.product_id} style={styles.listCard}>
+                  <div style={styles.listCard} key={row.product_id}>
                     <div style={styles.listCardHeader}>
-                      <div>
+                      <div style={styles.listCardHeaderText}>
                         <div style={styles.listCardTitle}>{row.product_name}</div>
                         <div style={styles.listCardMeta}>{row.unit}</div>
                       </div>
@@ -898,7 +908,10 @@ export default function DashboardPage() {
                         <td style={styles.td}>{row.po_number || '-'}</td>
                         <td style={styles.td}>
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          <ActionLink to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} label="Open Supplier" />
+                          <ActionLink
+                            to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                            label="Open Supplier"
+                          />
                         </td>
                         <td style={styles.td}>{formatDate(row.delivery_date)}</td>
                         <td style={styles.td}>
@@ -941,9 +954,9 @@ export default function DashboardPage() {
                 />
               ) : (
                 (unresolvedAlertsQuery.data ?? []).map((alert) => (
-                  <div key={alert.id} style={styles.listCard}>
+                  <div style={styles.listCard} key={alert.id}>
                     <div style={styles.listCardHeader}>
-                      <div>
+                      <div style={styles.listCardHeaderText}>
                         <div style={styles.listCardTitle}>{alert.type}</div>
                         <div style={styles.listCardMeta}>
                           {alert.product_name || 'No product linked'} · {formatDateTime(alert.created_at)}
@@ -953,7 +966,10 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.cardText}>{alert.message}</div>
-                    <ActionLink to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`} label="Open in Alerts" />
+                    <ActionLink
+                      to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
+                      label="Open in Alerts"
+                    />
 
                     <div style={styles.metricRow}>
                       <span>Escalation Level</span>
@@ -991,9 +1007,9 @@ export default function DashboardPage() {
                 />
               ) : (
                 topAnomalies.map((row) => (
-                  <div key={row.product_id} style={styles.listCard}>
+                  <div style={styles.listCard} key={row.product_id}>
                     <div style={styles.listCardHeader}>
-                      <div>
+                      <div style={styles.listCardHeaderText}>
                         <div style={styles.listCardTitle}>{row.product_name}</div>
                         <div style={styles.listCardMeta}>
                           {row.product_category || '-'} · {row.product_unit || '-'}
@@ -1126,7 +1142,10 @@ export default function DashboardPage() {
                       <tr key={row.supplier_id}>
                         <td style={styles.td}>
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          <ActionLink to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} label="Open Supplier" />
+                          <ActionLink
+                            to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                            label="Open Supplier"
+                          />
                         </td>
                         <td style={styles.td}>{row.total_shipments}</td>
                         <td style={styles.td}>{row.pending_shipments}</td>
@@ -1148,21 +1167,14 @@ export default function DashboardPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: {
-    /*
-      What changed:
-      - Added width guards to the dashboard root container.
-
-      Why:
-      - This page renders multiple large grids, tables, and operational cards.
-
-      What problem this solves:
-      - Reduces overflow pressure and keeps the dashboard stable inside the shared app layout.
-    */
     width: '100%',
     minWidth: 0
   },
   header: {
     marginBottom: '20px',
+    minWidth: 0
+  },
+  headerTextBlock: {
     minWidth: 0
   },
   title: {
@@ -1177,9 +1189,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   kpiGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
     marginBottom: '20px',
     width: '100%',
     minWidth: 0
@@ -1235,11 +1244,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4
   },
   healthCard: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     minWidth: 0
   },
   healthHeader: {
@@ -1249,6 +1253,9 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'flex-start',
     marginBottom: '16px',
     flexWrap: 'wrap'
+  },
+  healthHeaderText: {
+    minWidth: 0
   },
   healthTitle: {
     fontSize: '20px',
@@ -1292,16 +1299,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700
   },
   twoColumnGrid: {
-    /*
-      What changed:
-      - Hardened the dashboard split-grid with width-safe minmax behavior.
-
-      Why:
-      - This page mixes cards, tables, and longer operational text in side-by-side sections.
-
-      What problem this solves:
-      - Prevents columns from pushing wider than the page on tablets and smaller laptops.
-    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
     gap: '20px',
@@ -1310,11 +1307,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -1325,6 +1317,9 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     alignItems: 'flex-start',
     flexWrap: 'wrap'
+  },
+  sectionHeaderText: {
+    minWidth: 0
   },
   sectionTitle: {
     margin: 0,
@@ -1369,6 +1364,9 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     minWidth: 0
   },
+  listCardHeaderText: {
+    minWidth: 0
+  },
   listCardTitle: {
     fontSize: '16px',
     fontWeight: 700,
@@ -1406,16 +1404,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width while preserving all existing dashboard table columns.
-
-      Why:
-      - The dashboard tables are dense, but the earlier threshold was harsher than necessary.
-
-      What problem this solves:
-      - Eases medium-screen horizontal scrolling pressure without changing table structure or data.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '720px'
@@ -1460,21 +1448,9 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   emptyStateNeutral: {
-    border: '1px dashed #d1d5db',
-    borderRadius: '12px',
-    padding: '24px',
-    textAlign: 'center',
-    color: '#6b7280',
-    background: '#fafafa',
     minWidth: 0
   },
   emptyStateGood: {
-    border: '1px solid #bbf7d0',
-    borderRadius: '12px',
-    padding: '24px',
-    textAlign: 'center',
-    color: '#166534',
-    background: '#f0fdf4',
     minWidth: 0
   },
   emptyStateTitle: {
@@ -1491,23 +1467,9 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.85
   },
   errorInline: {
-    border: '1px solid #fecaca',
-    background: '#fef2f2',
-    color: '#b91c1c',
-    borderRadius: '10px',
-    padding: '12px 14px'
+    margin: 0
   },
   quickActionRow: {
-    /*
-      What changed:
-      - Switched quick actions to a responsive grid.
-
-      Why:
-      - The dashboard action links are part of the control-center feel and should align more cleanly on smaller widths.
-
-      What problem this solves:
-      - Keeps the action area orderly and avoids awkward wrapping patterns without changing destinations or behavior.
-    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '10px',

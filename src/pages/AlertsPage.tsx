@@ -118,32 +118,24 @@ export default function AlertsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current AlertsPage.
+    This file stays grounded in your current AlertsPage from the new ZIP.
 
-    The real alert workflow was already correct and kept intact:
-    - list alerts with backend-backed filters
-    - acknowledge / resolve / reopen / escalate actions
-    - route users from signal to the next operational page
+    Existing real behavior is preserved:
+    - same alert list endpoint
+    - same filter model
+    - same acknowledge / resolve / reopen / escalate actions
+    - same role-based restrictions
+    - same route-to-next-action behavior
 
-    This pass is UI-only:
-    - hardened layout containers with width guards
-    - aligned filters and cards with the newer page rhythm
-    - improved wrapping for long titles, messages, and timestamps
-    - improved small-screen action layout
-
-    WHY IT CHANGED
-    --------------
-    Alerts is a real operational queue and should feel visually consistent with
-    the polished dashboard / admin / master-data surfaces.
+    This pass applies the new shared UI layer from App.css:
+    - uses shared panel, grid, action, and state helpers
+    - keeps the page visually aligned with the rest of the app
+    - does not change business logic
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Improves readability and responsiveness without changing:
-    - backend contract
-    - alert action flow
-    - filters
-    - query keys
-    - role restrictions
+    Turns Alerts into one of the first pages to actually consume the new shared
+    design foundation instead of relying only on page-local styles.
   */
   const queryClient = useQueryClient();
   const { role, canManageAlerts } = getRoleCapabilities();
@@ -208,21 +200,21 @@ export default function AlertsPage() {
         <div style={styles.headerTextBlock}>
           <h1 style={styles.title}>Alerts</h1>
           <p style={styles.description}>
-            Review tenant-scoped operational alerts, acknowledge ownership, resolve when complete,
-            and route directly into the next operational page.
+            Review tenant-scoped operational alerts, acknowledge ownership, resolve when
+            complete, and route directly into the next operational page.
           </p>
         </div>
       </header>
 
-      <section style={styles.workflowPanel}>
+      <section className="app-panel app-panel--padded" style={styles.workflowPanel}>
         <h2 style={styles.workflowTitle}>Workflow clarity</h2>
         <p style={styles.workflowText}>
-          Treat alerts as an action queue: review severity, open the linked operational page, then
-          acknowledge, resolve, reopen, or escalate based on the real situation.
+          Treat alerts as an action queue: review severity, open the linked operational page,
+          then acknowledge, resolve, reopen, or escalate based on the real situation.
         </p>
       </section>
 
-      <div style={styles.statsGrid}>
+      <div className="app-grid-stats" style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Visible Alerts</div>
           <div style={styles.statValue}>{summary.total}</div>
@@ -249,19 +241,29 @@ export default function AlertsPage() {
       </div>
 
       {!canManageAlerts ? (
-        <div style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Alerts can still be reviewed, but acknowledge /
-          resolve / reopen / escalate actions are restricted to manager and admin roles.
+        <div className="app-warning-state" style={styles.messageBox}>
+          Current role: {role.toUpperCase()}. Alerts can still be reviewed, but
+          acknowledge / resolve / reopen / escalate actions are restricted to manager and
+          admin roles.
         </div>
       ) : null}
 
-      {actionError ? <div style={styles.errorBox}>{actionError}</div> : null}
-      {actionMessage ? <div style={styles.successBox}>{actionMessage}</div> : null}
+      {actionError ? (
+        <div className="app-error-state" style={styles.messageBox}>
+          {actionError}
+        </div>
+      ) : null}
 
-      <section style={styles.panel}>
+      {actionMessage ? (
+        <div className="app-success-state" style={styles.messageBox}>
+          {actionMessage}
+        </div>
+      ) : null}
+
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h2 style={styles.panelTitle}>Filters</h2>
 
-        <div style={styles.filterGrid}>
+        <div className="app-grid-toolbar" style={styles.filterGrid}>
           <input
             style={styles.input}
             value={filters.search}
@@ -302,11 +304,11 @@ export default function AlertsPage() {
         </div>
       </section>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h2 style={styles.panelTitle}>Alert Queue</h2>
 
         {alerts.length === 0 ? (
-          <div style={styles.emptyState}>
+          <div className="app-empty-state" style={styles.emptyState}>
             <strong>No alerts found.</strong>
             <span>Adjust filters or continue operating if the current tenant is clean.</span>
           </div>
@@ -316,12 +318,13 @@ export default function AlertsPage() {
               const next = nextActionLink(alert);
 
               return (
-                <article key={alert.id} style={styles.card}>
+                <article style={styles.card} key={alert.id}>
                   <div style={styles.cardTop}>
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alert.type}</div>
                       <div style={styles.cardMeta}>
-                        {alert.product_name || 'No product linked'} · {formatDateTime(alert.created_at)}
+                        {alert.product_name || 'No product linked'} ·{' '}
+                        {formatDateTime(alert.created_at)}
                       </div>
                     </div>
 
@@ -350,7 +353,7 @@ export default function AlertsPage() {
                     </div>
                   </div>
 
-                  <div style={styles.actionRow}>
+                  <div className="app-actions" style={styles.actionRow}>
                     <Link to={next.to} style={styles.linkButton}>
                       {next.label}
                     </Link>
@@ -360,6 +363,7 @@ export default function AlertsPage() {
                         style={styles.secondaryButton}
                         onClick={() => acknowledgeMutation.mutate(alert.id)}
                         disabled={acknowledgeMutation.isPending}
+                        type="button"
                       >
                         Acknowledge
                       </button>
@@ -370,6 +374,7 @@ export default function AlertsPage() {
                         style={styles.primaryButton}
                         onClick={() => resolveMutation.mutate(alert.id)}
                         disabled={resolveMutation.isPending}
+                        type="button"
                       >
                         Resolve
                       </button>
@@ -380,6 +385,7 @@ export default function AlertsPage() {
                         style={styles.secondaryButton}
                         onClick={() => reopenMutation.mutate(alert.id)}
                         disabled={reopenMutation.isPending}
+                        type="button"
                       >
                         Reopen
                       </button>
@@ -390,6 +396,7 @@ export default function AlertsPage() {
                         style={styles.warnButton}
                         onClick={() => escalateMutation.mutate(alert.id)}
                         disabled={escalateMutation.isPending}
+                        type="button"
                       >
                         Escalate
                       </button>
@@ -437,10 +444,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   workflowPanel: {
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderRadius: 16,
-    padding: 16,
     minWidth: 0
   },
   workflowTitle: {
@@ -456,9 +459,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
     width: '100%',
     minWidth: 0
   },
@@ -498,64 +498,23 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4,
     fontSize: '0.92rem'
   },
-  warningBox: {
-    background: '#fff7ed',
-    color: '#9a3412',
-    border: '1px solid #fdba74',
-    borderRadius: 14,
-    padding: 14,
-    lineHeight: 1.5
-  },
-  errorBox: {
-    background: '#fef2f2',
-    color: '#b91c1c',
-    border: '1px solid #fecaca',
-    borderRadius: 12,
-    padding: 12
-  },
-  successBox: {
-    background: '#ecfdf5',
-    color: '#166534',
-    border: '1px solid #bbf7d0',
-    borderRadius: 12,
-    padding: 12
+  messageBox: {
+    margin: 0
   },
   panel: {
-    background: '#fff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 16,
-    padding: 16,
-    display: 'grid',
-    gap: 14,
     minWidth: 0
   },
   panelTitle: {
     margin: 0,
     fontSize: '1.1rem',
-    color: '#0f172a',
-    wordBreak: 'break-word'
+    color: '#0f172a'
   },
   filterGrid: {
-    /*
-      What changed:
-      - Kept the exact same four filters, but aligned them to the same responsive toolbar rhythm
-        used elsewhere in the app.
-
-      Why:
-      - Alerts is an operational queue and should visually match the newer page system.
-
-      What problem this solves:
-      - Makes filter controls scale more cleanly on tablet and mobile widths.
-    */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
     width: '100%',
     minWidth: 0
   },
   input: {
     width: '100%',
-    minWidth: 0,
     padding: '0.8rem 0.9rem',
     borderRadius: 12,
     border: '1px solid #cbd5e1',
@@ -564,13 +523,8 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   emptyState: {
-    background: '#f8fafc',
-    border: '1px dashed #cbd5e1',
-    borderRadius: 14,
-    padding: 18,
     display: 'grid',
-    gap: 6,
-    color: '#475569'
+    gap: 6
   },
   cardList: {
     display: 'grid',
@@ -616,16 +570,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   keyGrid: {
-    /*
-      What changed:
-      - Preserved the same three detail fields, but rendered them as lightweight detail cards.
-
-      Why:
-      - The previous inline grid worked, but felt visually thin compared with the rest of the polished pages.
-
-      What problem this solves:
-      - Improves readability for operational details without changing any alert data.
-    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: 10,
@@ -651,9 +595,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   actionRow: {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
     minWidth: 0
   },
   linkButton: {

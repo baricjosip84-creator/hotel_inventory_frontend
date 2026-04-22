@@ -1,184 +1,369 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
+/*
+  src/App.css
 
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  WHAT CHANGED
+  ------------
+  This file is now a real app-wide polish layer instead of leftover Vite starter CSS.
+
+  WHY IT CHANGED
+  --------------
+  The current frontend already has many page-level inline styles, but shared polish
+  was still fragmented. This file gives the app a consistent visual baseline without
+  touching business logic or page structure.
+
+  WHAT PROBLEM IT SOLVES
+  ----------------------
+  Improves consistency across the whole app by normalizing:
+  - typography defaults
+  - focus visibility
+  - button/input/select/textarea behavior
+  - table readability helpers
+  - scrollbar appearance
+  - link and disabled-state behavior
+  - compact-screen rhythm
+*/
+
+/* ==========================================================================
+   Global polish foundation
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
 }
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
+body {
+  margin: 0;
+  color: #111827;
+  background: #f3f4f6;
 }
 
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
+#root {
   width: 100%;
+  min-height: 100dvh;
+}
 
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+strong {
+  font-weight: 700;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+input,
+select,
+textarea,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Focus visibility
+   ========================================================================== */
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Form control polish
+   ========================================================================== */
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* Remove iOS default inner shadows / strong appearance differences */
+input,
+select,
+textarea,
+button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Keep selects looking like selects while still normalized */
+select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+/* ==========================================================================
+   Media defaults
+   ========================================================================== */
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+table {
+  border-spacing: 0;
+}
+
+th,
+td {
+  min-width: 0;
+}
+
+/* ==========================================================================
+   Long-content safety
+   ========================================================================== */
+
+pre,
+code,
+samp,
+kbd {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+code,
+samp,
+kbd {
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   Scrollbar polish
+   ========================================================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ==========================================================================
+   Shared helper classes
+   These are intentionally lightweight and safe to use gradually.
+   ========================================================================== */
+
+.app-surface {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.app-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  min-width: 0;
+}
+
+.app-panel--padded {
+  padding: 18px;
+}
+
+.app-grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.app-grid-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-empty-state {
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 18px;
+  background: #f8fafc;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.app-error-state {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 12px;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+
+.app-success-state {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: 12px;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+
+.app-warning-state {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  border-radius: 12px;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-badge--info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.app-badge--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.app-badge--warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.app-badge--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.app-title-wrap,
+.app-text-wrap {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.app-mono-wrap {
+  min-width: 0;
+  word-break: break-all;
+}
+
+/* ==========================================================================
+   Compact screen adjustments
+   ========================================================================== */
+
+@media (max-width: 960px) {
+  body {
+    font-size: 15px;
   }
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
+  .app-panel--padded {
+    padding: 16px;
   }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
+
+  .app-grid-stats {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .app-grid-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .app-panel--padded {
+    padding: 14px;
+  }
+
+  .app-actions {
+    gap: 8px;
   }
 }

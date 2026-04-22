@@ -174,35 +174,24 @@ export default function StockMovementsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current StockMovementsPage.
+    This file stays grounded in your current StockMovementsPage from the new ZIP.
 
-    The real ledger logic is intentionally unchanged:
-    - same backend endpoints
+    Existing real behavior is preserved:
+    - same products, shipments, and stock movement endpoints
+    - same filter model
     - same query keys
-    - same filter fields
-    - same table columns
-    - same movement traceability data
+    - same ledger columns
+    - same movement traceability behavior
 
-    This pass is UI-only:
-    - added width guards across page/panel/table containers
-    - improved header and filter wrapping
-    - improved summary card consistency
-    - improved long text wrapping in product/shipment/user cells
-    - slightly eased horizontal scroll pressure on medium screens
-
-    WHY IT CHANGED
-    --------------
-    Stock movements is a core operational ledger and should visually align with
-    the other recently polished pages without changing traceability behavior.
+    This pass applies the new shared UI layer from App.css:
+    - uses shared panel, toolbar, stats, and state helpers
+    - keeps the page visually aligned with the rest of the polished app
+    - does not change data flow or backend contract
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Improves readability and responsiveness without changing:
-    - backend contract
-    - filters
-    - ledger data
-    - query keys
-    - movement reasoning and display flow
+    Makes Stock Movements part of the shared UI foundation instead of relying only
+    on page-local styling, while preserving the existing ledger workflow.
   */
   const [filters, setFilters] = useState<FiltersState>({
     product_id: '',
@@ -264,10 +253,10 @@ export default function StockMovementsPage() {
         </div>
       </div>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Filters</h3>
 
-        <div style={styles.filtersGrid}>
+        <div className="app-grid-toolbar" style={styles.filtersGrid}>
           <div>
             <label style={styles.label}>Product</label>
             <select
@@ -347,7 +336,7 @@ export default function StockMovementsPage() {
         </div>
       </section>
 
-      <section style={styles.summaryGrid}>
+      <section className="app-grid-stats" style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
           <div style={styles.summaryLabel}>Rows</div>
           <div style={styles.summaryValue}>{summary.rowCount}</div>
@@ -369,41 +358,39 @@ export default function StockMovementsPage() {
         </div>
       </section>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Movement Ledger</h3>
 
         {movementsQuery.isLoading ? <p>Loading stock movements...</p> : null}
 
         {movementsQuery.isError ? (
-          <p>
+          <div className="app-error-state">
             Failed to load stock movements:{' '}
             {(movementsQuery.error as Error).message || 'Unknown error'}
-          </p>
+          </div>
         ) : null}
 
         {!movementsQuery.isLoading && !movementsQuery.isError ? (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Created</th>
-                  <th style={styles.th}>Product</th>
-                  <th style={styles.th}>Change</th>
-                  <th style={styles.th}>Reason</th>
-                  <th style={styles.th}>Shipment</th>
-                  <th style={styles.th}>User</th>
-                  <th style={styles.th}>Movement ID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.length === 0 ? (
+          movements.length === 0 ? (
+            <div className="app-empty-state">
+              No stock movements found for the current filters.
+            </div>
+          ) : (
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
                   <tr>
-                    <td style={styles.emptyCell} colSpan={7}>
-                      No stock movements found for the current filters.
-                    </td>
+                    <th style={styles.th}>Created</th>
+                    <th style={styles.th}>Product</th>
+                    <th style={styles.th}>Change</th>
+                    <th style={styles.th}>Reason</th>
+                    <th style={styles.th}>Shipment</th>
+                    <th style={styles.th}>User</th>
+                    <th style={styles.th}>Movement ID</th>
                   </tr>
-                ) : (
-                  movements.map((movement) => {
+                </thead>
+                <tbody>
+                  {movements.map((movement) => {
                     const amount = toNumber(movement.change);
 
                     return (
@@ -442,17 +429,19 @@ export default function StockMovementsPage() {
                             '-'
                           )}
                         </td>
-                        <td style={styles.td}>{movement.user_name || movement.user_id || '-'}</td>
+                        <td style={styles.td}>
+                          {movement.user_name || movement.user_id || '-'}
+                        </td>
                         <td style={styles.td}>
                           <div style={styles.rowSubtle}>{movement.id}</div>
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : null}
       </section>
     </div>
@@ -461,16 +450,6 @@ export default function StockMovementsPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: {
-    /*
-      What changed:
-      - Added width guards to the page root.
-
-      Why:
-      - This page renders a wide ledger table inside the shared layout container.
-
-      What problem this solves:
-      - Reduces overflow pressure and keeps the layout stable on narrower widths.
-    */
     width: '100%',
     minWidth: 0
   },
@@ -494,13 +473,7 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    marginBottom: '20px',
-    minWidth: 0,
-    overflow: 'hidden'
+    minWidth: 0
   },
   panelTitle: {
     marginTop: 0,
@@ -510,26 +483,10 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   filtersGrid: {
-    /*
-      What changed:
-      - Kept the same four filters but hardened the grid with width guards.
-
-      Why:
-      - The filter area should behave like the other recently polished operational pages.
-
-      What problem this solves:
-      - Makes the toolbar more resilient on tablet and mobile widths without changing filters.
-    */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '14px',
     width: '100%',
     minWidth: 0
   },
   summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '14px',
     marginBottom: '20px',
     width: '100%',
     minWidth: 0
@@ -561,7 +518,6 @@ const styles: Record<string, CSSProperties> = {
   },
   input: {
     width: '100%',
-    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
@@ -578,16 +534,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width.
-
-      Why:
-      - The ledger table is legitimately wide, but the previous threshold was harsher than necessary.
-
-      What problem this solves:
-      - Eases medium-screen horizontal scrolling pressure without changing the actual ledger columns.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '1040px'
@@ -607,18 +553,12 @@ const styles: Record<string, CSSProperties> = {
     verticalAlign: 'top',
     wordBreak: 'break-word'
   },
-  emptyCell: {
-    padding: '24px',
-    textAlign: 'center',
-    color: '#6b7280'
-  },
   badgeBase: {
     display: 'inline-block',
     padding: '6px 10px',
     borderRadius: '999px',
     fontWeight: 700,
-    fontSize: '12px',
-    whiteSpace: 'nowrap'
+    fontSize: '12px'
   },
   rowTitle: {
     fontWeight: 700,

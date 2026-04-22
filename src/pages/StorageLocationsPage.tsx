@@ -72,26 +72,28 @@ export default function StorageLocationsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current StorageLocationsPage.
-    The only changes here are UI/UX polish adjustments to better align it with
-    the current Products and Suppliers master-data page pattern.
+    This file stays grounded in the StorageLocationsPage you sent.
 
-    WHY IT CHANGED
-    --------------
-    After comparing the real files, Storage Locations was the most visually
-    inconsistent of the three master-data pages:
-    - the search area was narrower and behaved differently
-    - the form action row was less responsive on small screens
-    - the table width was a bit harsher than necessary on tablet/mobile
+    Existing real behavior is preserved:
+    - same endpoint usage
+    - same query key
+    - same create mutation flow
+    - same fields
+    - same search behavior
+    - same soft-delete display logic
+
+    This pass applies the shared UI foundation carefully:
+    - stats now align with the shared app-grid-stats layer
+    - major sections now use app-panel/app-panel--padded
+    - success / error states align with the shared state layer
+    - toolbar and form actions align with the shared helper classes
+    - no business logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves page-level consistency and responsiveness without changing:
-    - backend contract
-    - query keys
-    - mutation flow
-    - fields
-    - business logic
+    Makes Storage Locations visually consistent with Products, Users, Reports,
+    and the rest of the polished admin/master-data pages without changing
+    contracts, flows, or data behavior.
   */
   const queryClient = useQueryClient();
 
@@ -149,8 +151,8 @@ export default function StorageLocationsPage() {
   };
 
   return (
-    <div>
-      <div style={styles.statsGrid}>
+    <div style={styles.page}>
+      <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Locations"
           value={summary.total}
@@ -173,14 +175,14 @@ export default function StorageLocationsPage() {
         />
       </div>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Storage Location</h3>
         <p style={styles.panelSubtitle}>
           Maintain receiving and storage areas used across stock and shipment workflows.
         </p>
 
-        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
+        {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
+        {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
 
         <form onSubmit={handleSubmit} style={styles.formGrid}>
           <div>
@@ -206,7 +208,7 @@ export default function StorageLocationsPage() {
             />
           </div>
 
-          <div style={styles.formActions}>
+          <div className="app-actions" style={styles.formActions}>
             <button type="submit" style={styles.primaryButton} disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Creating...' : 'Create Storage Location'}
             </button>
@@ -214,13 +216,13 @@ export default function StorageLocationsPage() {
         </form>
       </section>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Storage Location List</h3>
         <p style={styles.panelSubtitle}>
           Search and review storage areas currently available to inventory operations.
         </p>
 
-        <div style={styles.toolbarGrid}>
+        <div className="app-grid-toolbar" style={styles.toolbarGrid}>
           <input
             type="text"
             placeholder="Search by name or temperature zone..."
@@ -284,11 +286,13 @@ export default function StorageLocationsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    width: '100%',
+    minWidth: 0
+  },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
@@ -306,7 +310,8 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px'
+    marginBottom: '8px',
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -314,30 +319,30 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
     marginBottom: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelTitle: {
     marginTop: 0,
     marginBottom: '8px',
     fontSize: '20px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   panelSubtitle: {
     marginTop: 0,
     marginBottom: '16px',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '14px',
-    alignItems: 'end'
+    alignItems: 'end',
+    minWidth: 0
   },
   label: {
     display: 'block',
@@ -347,11 +352,13 @@ const styles: Record<string, CSSProperties> = {
   },
   input: {
     width: '100%',
+    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     background: '#ffffff',
-    outline: 'none'
+    outline: 'none',
+    boxSizing: 'border-box'
   },
   formActions: {
     /*
@@ -364,10 +371,8 @@ const styles: Record<string, CSSProperties> = {
       What problem this solves:
       - Keeps the submit area stable and responsive without changing form behavior.
     */
-    display: 'flex',
     alignItems: 'end',
-    gap: '10px',
-    flexWrap: 'wrap'
+    minWidth: 0
   },
   primaryButton: {
     border: 'none',
@@ -389,10 +394,8 @@ const styles: Record<string, CSSProperties> = {
       What problem this solves:
       - Makes the search area align more naturally with the shared page container and future filter growth.
     */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '12px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    minWidth: 0
   },
   searchInput: {
     /*
@@ -406,19 +409,22 @@ const styles: Record<string, CSSProperties> = {
       - Prevents the search row from looking artificially narrow compared with Products and Suppliers.
     */
     width: '100%',
+    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     outline: 'none',
     fontSize: '14px',
-    background: '#ffffff'
+    background: '#ffffff',
+    boxSizing: 'border-box'
   },
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
     /*
@@ -447,7 +453,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    wordBreak: 'break-word'
   },
   emptyCell: {
     padding: '24px',
@@ -456,7 +463,8 @@ const styles: Record<string, CSSProperties> = {
   },
   rowTitle: {
     fontWeight: 700,
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
@@ -483,19 +491,9 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px'
   },
   errorBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#b91c1c'
+    marginBottom: '14px'
   },
   successBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    color: '#166534'
+    marginBottom: '14px'
   }
 };

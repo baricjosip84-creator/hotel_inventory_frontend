@@ -142,7 +142,7 @@ async function fetchSupplierTrust(): Promise<SupplierTrustResponse> {
 
 function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <section style={styles.panel}>
+    <section className="app-panel app-panel--padded" style={styles.panel}>
       <div style={styles.panelHeader}>
         <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
@@ -177,27 +177,25 @@ export default function InsightsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current InsightsPage.
+    This file stays grounded in the InsightsPage you sent.
 
-    Changes made:
-    - restored the missing action-agenda styles to the real styles object
-    - removed the accidental style block that was embedded inside DepletionRiskResponse
-    - improved layout resilience for long labels, IDs, and analytical text
-    - kept all existing analytics flows, routes, endpoints, and query keys unchanged
+    Existing real behavior is preserved:
+    - same insight endpoints
+    - same query keys
+    - same action-agenda logic
+    - same operational health / supplier trust / depletion / reorder / anomaly rendering
+    - same route targets and analytics text
 
-    WHY IT CHANGED
-    --------------
-    The real file already had the correct analytics wiring, but it had:
-    - misplaced style definitions inside a response type
-    - missing corresponding style keys in the real styles object
-    - a few width/wrapping pressure points on grid and card layouts
+    This pass applies the shared UI foundation carefully:
+    - major sections now use app-panel/app-panel--padded
+    - stats now use app-grid-stats
+    - info/error states align with the shared state layer
+    - no analytics logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This keeps the page functionally the same while:
-    - restoring the action agenda styling in the correct place
-    - improving consistency with the rest of the admin/management pages
-    - reducing overflow and wrapping issues on tablet/mobile widths
+    Makes Insights consume the same shared visual system as the other polished
+    pages without changing backend contracts, flows, or decision logic.
   */
   const [lookbackDays, setLookbackDays] = useState(30);
 
@@ -303,7 +301,7 @@ export default function InsightsPage() {
 
   return (
     <div style={styles.page}>
-      <section style={styles.statsGrid}>
+      <section className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Operational Health"
           value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}
@@ -344,14 +342,14 @@ export default function InsightsPage() {
             ))}
           </div>
         ) : (
-          <div style={styles.infoState}>
+          <div className="app-empty-state" style={styles.infoState}>
             No urgent action agenda is available yet. As data accumulates, this section will point managers to the next best operational decisions.
           </div>
         )}
       </Section>
 
       <Section title="Insight Controls" subtitle="Tune the lookback window for depletion and reorder recommendations.">
-        <div style={styles.controlRow}>
+        <div className="app-actions" style={styles.controlRow}>
           <label style={styles.label}>
             Lookback Days
             <select style={styles.select} value={lookbackDays} onChange={(event) => setLookbackDays(Number(event.target.value))}>
@@ -366,8 +364,8 @@ export default function InsightsPage() {
 
       <div style={styles.grid}>
         <Section title="Operational Health Score" subtitle="Tenant-level health based on alerts, overdue shipments, low-stock pressure, and discrepancy pressure.">
-          {healthQuery.isLoading ? <div style={styles.infoState}>Loading health score...</div> : null}
-          {healthQuery.isError ? <div style={styles.errorState}>{toReadableError(healthQuery.error)}</div> : null}
+          {healthQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading health score...</div> : null}
+          {healthQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(healthQuery.error)}</div> : null}
           {healthQuery.data ? (
             <div style={styles.list}>
               <div style={styles.keyValueRow}>
@@ -399,8 +397,8 @@ export default function InsightsPage() {
         </Section>
 
         <Section title="Supplier Trust" subtitle="Supplier trust scores derived from completion, overdue, fill, and discrepancy behavior.">
-          {supplierTrustQuery.isLoading ? <div style={styles.infoState}>Loading supplier trust...</div> : null}
-          {supplierTrustQuery.isError ? <div style={styles.errorState}>{toReadableError(supplierTrustQuery.error)}</div> : null}
+          {supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier trust...</div> : null}
+          {supplierTrustQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustQuery.error)}</div> : null}
           {supplierTrustQuery.data?.rows.length ? (
             <div style={styles.list}>
               {supplierTrustQuery.data.rows.slice(0, 8).map((row) => (
@@ -416,14 +414,14 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !supplierTrustQuery.isLoading ? <div style={styles.infoState}>No supplier trust rows returned.</div> : null}
+          ) : !supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No supplier trust rows returned.</div> : null}
         </Section>
       </div>
 
       <div style={styles.grid}>
         <Section title="Depletion Risk" subtitle="Products and locations under the greatest consumption pressure relative to stock on hand.">
-          {depletionRiskQuery.isLoading ? <div style={styles.infoState}>Loading depletion risk...</div> : null}
-          {depletionRiskQuery.isError ? <div style={styles.errorState}>{toReadableError(depletionRiskQuery.error)}</div> : null}
+          {depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading depletion risk...</div> : null}
+          {depletionRiskQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRiskQuery.error)}</div> : null}
           {depletionRiskQuery.data?.rows.length ? (
             <div style={styles.list}>
               {depletionRiskQuery.data.rows.slice(0, 10).map((row) => (
@@ -442,12 +440,12 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !depletionRiskQuery.isLoading ? <div style={styles.infoState}>No depletion risk rows returned.</div> : null}
+          ) : !depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No depletion risk rows returned.</div> : null}
         </Section>
 
         <Section title="Reorder Recommendations" subtitle="Explainable reorder quantities based on current stock and recent outbound usage.">
-          {reorderQuery.isLoading ? <div style={styles.infoState}>Loading reorder recommendations...</div> : null}
-          {reorderQuery.isError ? <div style={styles.errorState}>{toReadableError(reorderQuery.error)}</div> : null}
+          {reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading reorder recommendations...</div> : null}
+          {reorderQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(reorderQuery.error)}</div> : null}
           {reorderQuery.data?.rows.length ? (
             <div style={styles.list}>
               {reorderQuery.data.rows.slice(0, 10).map((row) => (
@@ -463,13 +461,13 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !reorderQuery.isLoading ? <div style={styles.infoState}>No reorder recommendation rows returned.</div> : null}
+          ) : !reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No reorder recommendation rows returned.</div> : null}
         </Section>
       </div>
 
       <Section title="Inventory Anomalies" subtitle="Products whose recent outbound activity looks unusual compared to their own baseline.">
-        {anomaliesQuery.isLoading ? <div style={styles.infoState}>Loading anomaly signals...</div> : null}
-        {anomaliesQuery.isError ? <div style={styles.errorState}>{toReadableError(anomaliesQuery.error)}</div> : null}
+        {anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly signals...</div> : null}
+        {anomaliesQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(anomaliesQuery.error)}</div> : null}
         {anomaliesQuery.data?.rows.length ? (
           <div style={styles.list}>
             {anomaliesQuery.data.rows.slice(0, 10).map((row) => (
@@ -485,7 +483,7 @@ export default function InsightsPage() {
               </article>
             ))}
           </div>
-        ) : !anomaliesQuery.isLoading ? <div style={styles.infoState}>No anomaly rows returned.</div> : null}
+        ) : !anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No anomaly rows returned.</div> : null}
       </Section>
     </div>
   );
@@ -493,25 +491,12 @@ export default function InsightsPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: {
-    /*
-      What changed:
-      - Added width guards to the page container.
-
-      Why:
-      - This page has several nested grids and analytics cards with long text.
-
-      What problem this solves:
-      - Reduces overflow pressure and keeps the layout stable in the shared app shell.
-    */
     display: 'grid',
     gap: '20px',
     width: '100%',
     minWidth: 0
   },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '16px',
     width: '100%',
     minWidth: 0
   },
@@ -559,16 +544,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5
   },
   grid: {
-    /*
-      What changed:
-      - Hardened the responsive grid with width-safe minmax behavior.
-
-      Why:
-      - Insight cards often contain longer analytical text than standard CRUD pages.
-
-      What problem this solves:
-      - Prevents panels from forcing horizontal overflow on tighter widths.
-    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
     gap: '20px',
@@ -576,12 +551,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   panel: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '18px',
-    padding: '20px',
-    display: 'grid',
-    gap: '16px',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -608,9 +577,7 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   controlRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '12px'
+    minWidth: 0
   },
   label: {
     display: 'grid',
@@ -632,18 +599,6 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     minWidth: 0
   },
-
-  /*
-    What changed:
-    - Restored the missing action agenda styles into the real styles object.
-
-    Why:
-    - The actual file had these style entries misplaced inside DepletionRiskResponse,
-      while the component already referenced them via styles.*.
-
-    What problem this solves:
-    - Keeps the action agenda rendering consistent and places the styles where they belong.
-  */
   actionAgendaGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -692,7 +647,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     textDecoration: 'none'
   },
-
   itemCard: {
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
@@ -718,16 +672,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   keyValueRow: {
-    /*
-      What changed:
-      - Allowed the metric rows to wrap and align from the top.
-
-      Why:
-      - Health metrics and labels can crowd on smaller widths.
-
-      What problem this solves:
-      - Keeps the analytics summary rows readable without changing any metrics.
-    */
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -747,18 +691,10 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   infoState: {
-    background: '#f8fafc',
-    color: '#475569',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    lineHeight: 1.5
+    margin: 0
   },
   errorState: {
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    lineHeight: 1.5
+    margin: 0
   },
   inlineActionLink: {
     color: '#1d4ed8',

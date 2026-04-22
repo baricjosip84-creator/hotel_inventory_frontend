@@ -221,29 +221,35 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
-  const { role, canConsumeStock: canConsume, canCountStock: canCount, canAdjustStock: canAdjust } = useMemo(() => getRoleCapabilities(), []);
+  const {
+    role,
+    canConsumeStock: canConsume,
+    canCountStock: canCount,
+    canAdjustStock: canAdjust
+  } = useMemo(() => getRoleCapabilities(), []);
 
   /*
     WHAT CHANGED
     ------------
-    The stock page is no longer read-only. It now builds directly on your
-    existing backend stock routes:
-    - POST /stock/consume
-    - POST /stock/count
-    - POST /stock/adjust
-    - GET  /stock/movements
+    This file stays grounded in the StockPage you sent.
 
-    WHY IT CHANGED
-    --------------
-    Your backend already supports production-grade stock operations with role
-    control, transaction safety, and movement logging, but the frontend was only
-    exposing a stock table.
+    The real stock operation flows are intentionally unchanged:
+    - same stock listing and selection flow
+    - same consume / count / adjust mutations
+    - same latest movement verification
+    - same query keys and backend routes
+
+    This pass is UI-only and shared-layout alignment:
+    - major sections now use app-panel/app-panel--padded
+    - feedback and warning surfaces align with shared page states
+    - stat area aligns with the shared app-grid-stats rhythm
+    - action rows align more closely with the shared app-actions rhythm
+    - width guards and wrapping were tightened for dense workbench content
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This turns the stock page into an operational workbench so users can consume,
-    count, and adjust inventory from the existing stock rows without leaving the
-    main stock screen.
+    Keeps the page functionally identical while making the dense stock workbench
+    more consistent with the rest of the polished app shell.
   */
   const stockQuery = useQuery({
     queryKey: ['stock'],
@@ -307,9 +313,6 @@ export default function StockPage() {
       quantityTotal
     };
   }, [rows]);
-
-
-
 
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
   const currentMinimum = selectedRow
@@ -534,7 +537,7 @@ export default function StockPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <div>
+        <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Stock Operations</h2>
           <p style={styles.description}>
             Live stock balances, low-stock visibility, and controlled operational actions
@@ -555,7 +558,7 @@ export default function StockPage() {
         ))}
       </section>
 
-      <div style={styles.statsGrid}>
+      <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Stock Rows"
           value={summary.totalRows}
@@ -580,9 +583,9 @@ export default function StockPage() {
         />
       </div>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeaderWithActions}>
-          <div>
+          <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Operational Workbench</h3>
             <p style={styles.panelSubtitle}>
               Select a stock row, post a stock operation, and verify the latest movement
@@ -654,7 +657,7 @@ export default function StockPage() {
                     }}
                   >
                     <div style={styles.stockCardTopRow}>
-                      <div>
+                      <div style={styles.stockCardTitleBlock}>
                         <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
                         <div style={styles.rowSubtle}>
                           {item.storage_location_name || item.storage_location_id || '-'}
@@ -691,7 +694,7 @@ export default function StockPage() {
                   {selectedRow ? (
                     <div style={styles.selectionSummary}>
                       <div style={styles.selectionPrimaryRow}>
-                        <div>
+                        <div style={styles.selectionPrimaryText}>
                           <div style={styles.selectedTitle}>
                             {selectedRow.product_name || selectedRow.product_id}
                           </div>
@@ -837,21 +840,21 @@ export default function StockPage() {
                   </div>
 
                   {draft.action === 'consume' && !canConsume ? (
-                    <div style={styles.warningBox}>
+                    <div className="app-warning-state" style={styles.warningBox}>
                       Your current role cannot consume stock from the existing backend access
                       model.
                     </div>
                   ) : null}
 
                   {draft.action === 'count' && !canCount ? (
-                    <div style={styles.warningBox}>
+                    <div className="app-warning-state" style={styles.warningBox}>
                       Your current role cannot post physical counts from the existing backend
                       access model.
                     </div>
                   ) : null}
 
                   {draft.action === 'adjust' && !canAdjust ? (
-                    <div style={styles.warningBox}>
+                    <div className="app-warning-state" style={styles.warningBox}>
                       Your current role cannot apply manual adjustments from the existing
                       backend access model.
                     </div>
@@ -939,10 +942,18 @@ export default function StockPage() {
                     </div>
                   </div>
 
-                  {operationFeedback ? <div style={styles.successBox}>{operationFeedback}</div> : null}
-                  {operationError ? <div style={styles.errorBox}>{operationError}</div> : null}
+                  {operationFeedback ? (
+                    <div className="app-success-state" style={styles.successBox}>
+                      {operationFeedback}
+                    </div>
+                  ) : null}
+                  {operationError ? (
+                    <div className="app-error-state" style={styles.errorBox}>
+                      {operationError}
+                    </div>
+                  ) : null}
 
-                  <div style={styles.actionFooter}>
+                  <div className="app-actions" style={styles.actionFooter}>
                     <button
                       type="button"
                       style={styles.primaryButton}
@@ -1000,7 +1011,7 @@ export default function StockPage() {
                   {movementsQuery.isLoading ? (
                     <p style={styles.sectionDescription}>Loading stock movements...</p>
                   ) : movementsQuery.isError ? (
-                    <div style={styles.errorBox}>
+                    <div className="app-error-state" style={styles.errorBox}>
                       Failed to load stock movements:{' '}
                       {(movementsQuery.error as Error).message || 'Unknown error'}
                     </div>
@@ -1016,7 +1027,7 @@ export default function StockPage() {
                         return (
                           <div key={movement.id} style={styles.movementCard}>
                             <div style={styles.movementTopRow}>
-                              <div>
+                              <div style={styles.movementTitleBlock}>
                                 <div style={styles.movementTitle}>{movement.product_name}</div>
                                 <div style={styles.rowSubtle}>
                                   {formatDateTime(movement.created_at)}
@@ -1114,28 +1125,6 @@ export default function StockPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in your actual current StockPage.
-
-    The real stock operation flows are intentionally unchanged:
-    - same stock listing and selection flow
-    - same consume / count / adjust mutations
-    - same latest movement verification
-    - same query keys and backend routes
-
-    This pass is mostly structural cleanup plus low-risk UI polish:
-    - removed misplaced style objects accidentally embedded inside StockItem
-    - restored those missing styles to the real styles object
-    - added width guards to key layout containers
-    - improved wrapping in cards, rows, and workbench panels
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Keeps the page functionally identical while fixing a real file issue and
-    making the dense stock workbench more resilient on smaller widths.
-  */
   page: {
     width: '100%',
     minWidth: 0
@@ -1144,11 +1133,15 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '20px',
     minWidth: 0
   },
+  headerTextBlock: {
+    minWidth: 0
+  },
   title: {
     margin: 0,
     fontSize: '28px',
     fontWeight: 800,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   description: {
     margin: '8px 0 0 0',
@@ -1196,9 +1189,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
     marginBottom: '20px',
     width: '100%',
     minWidth: 0
@@ -1220,19 +1210,22 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px'
+    marginBottom: '8px',
+    wordBreak: 'break-word'
   },
   statValueGood: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#166534'
+    color: '#166534',
+    wordBreak: 'break-word'
   },
   statValueWarn: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#92400e'
+    color: '#92400e',
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -1240,11 +1233,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -1254,18 +1242,24 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'flex-start',
     gap: '16px',
     flexWrap: 'wrap',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    minWidth: 0
+  },
+  panelHeaderText: {
+    minWidth: 0
   },
   panelTitle: {
     margin: 0,
     fontSize: '20px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   panelSubtitle: {
     margin: '8px 0 0 0',
     color: '#6b7280',
     lineHeight: 1.5,
-    maxWidth: '880px'
+    maxWidth: '880px',
+    wordBreak: 'break-word'
   },
   secondaryLinkButton: {
     display: 'inline-flex',
@@ -1306,7 +1300,8 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '24px',
     fontWeight: 800,
     color: '#111827',
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   roleCardSubtitle: {
     color: '#6b7280',
@@ -1327,7 +1322,8 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'center',
-    fontSize: '14px'
+    fontSize: '14px',
+    flexWrap: 'wrap'
   },
   permissionAllowed: {
     color: '#166534',
@@ -1357,7 +1353,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '14px',
     padding: '16px',
     textAlign: 'left',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minWidth: 0
   },
   stockCardSelectedButton: {
     appearance: 'none',
@@ -1366,14 +1363,20 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '14px',
     padding: '16px',
     textAlign: 'left',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minWidth: 0
   },
   stockCardTopRow: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'flex-start',
-    marginBottom: '14px'
+    marginBottom: '14px',
+    flexWrap: 'wrap'
+  },
+  stockCardTitleBlock: {
+    minWidth: 0,
+    flex: '1 1 220px'
   },
   stockCardMetrics: {
     display: 'grid',
@@ -1384,7 +1387,8 @@ const styles: Record<string, CSSProperties> = {
     background: '#f9fafb',
     border: '1px solid #e5e7eb',
     borderRadius: '12px',
-    padding: '10px'
+    padding: '10px',
+    minWidth: 0
   },
   stockMetricLabel: {
     fontSize: '12px',
@@ -1394,7 +1398,8 @@ const styles: Record<string, CSSProperties> = {
   stockMetricValue: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   workbenchGrid: {
     display: 'grid',
@@ -1422,12 +1427,14 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   sectionDescription: {
     margin: '8px 0 0 0',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   selectionSummary: {
     display: 'grid',
@@ -1440,10 +1447,15 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     flexWrap: 'wrap'
   },
+  selectionPrimaryText: {
+    minWidth: 0,
+    flex: '1 1 220px'
+  },
   selectedTitle: {
     fontSize: '18px',
     fontWeight: 800,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   selectionGrid: {
     display: 'grid',
@@ -1507,25 +1519,22 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '15px',
     fontWeight: 700,
     color: '#111827',
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   actionInfoText: {
     color: '#6b7280',
     lineHeight: 1.5,
-    fontSize: '14px'
+    fontSize: '14px',
+    wordBreak: 'break-word'
   },
   warningBox: {
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412',
-    borderRadius: '12px',
-    padding: '12px',
-    marginBottom: '14px',
-    lineHeight: 1.5
+    marginBottom: '14px'
   },
   formGrid: {
     display: 'grid',
-    gap: '14px'
+    gap: '14px',
+    minWidth: 0
   },
   label: {
     display: 'block',
@@ -1558,29 +1567,17 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'center',
-    color: '#374151'
+    color: '#374151',
+    flexWrap: 'wrap'
   },
   successBox: {
-    background: '#ecfdf5',
-    border: '1px solid #86efac',
-    color: '#166534',
-    borderRadius: '12px',
-    padding: '12px',
-    marginTop: '14px',
-    lineHeight: 1.5
+    marginTop: '14px'
   },
   errorBox: {
-    background: '#fef2f2',
-    border: '1px solid #fca5a5',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px',
-    marginTop: '14px',
-    lineHeight: 1.5
+    marginTop: '14px'
   },
   actionFooter: {
     marginTop: '14px',
-    display: 'flex',
     justifyContent: 'flex-start'
   },
   primaryButton: {
@@ -1626,12 +1623,18 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'flex-start',
-    marginBottom: '10px'
+    marginBottom: '10px',
+    flexWrap: 'wrap'
+  },
+  movementTitleBlock: {
+    minWidth: 0,
+    flex: '1 1 220px'
   },
   movementTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    wordBreak: 'break-word'
   },
   movementMetaRow: {
     display: 'flex',

@@ -103,33 +103,24 @@ export default function SessionsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current SessionsPage.
+    This file stays grounded in your current SessionsPage from the new ZIP.
 
-    The real session flows are intentionally unchanged:
-    - list account sessions
-    - revoke one session
-    - revoke all sessions
-    - clear local auth state after revoke-all
+    Existing real behavior is preserved:
+    - same auth session list endpoint
+    - same revoke-one flow
+    - same revoke-all flow
+    - same logout-after-revoke-all behavior
+    - same current-session display heuristic
 
-    This pass is UI-only:
-    - added width guards across the page and panel containers
-    - improved wrapping for long device/user-agent values
-    - improved table resilience on medium-width screens
-    - aligned spacing and header behavior with the recently polished pages
-
-    WHY IT CHANGED
-    --------------
-    Sessions is a real account-security surface and should match the visual
-    consistency of the rest of the polished admin/system pages.
+    This pass applies the new shared UI layer from App.css:
+    - uses shared panel, stats, and state helpers
+    - keeps the page visually aligned with the rest of the polished app
+    - does not change session logic
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Improves readability and responsiveness without changing:
-    - backend contract
-    - session revoke behavior
-    - query keys
-    - current-session heuristic
-    - auth/logout flow
+    Makes Sessions one of the first pages to consume the shared foundation so
+    the app-wide style layer is actually reflected in real page markup.
   */
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -197,7 +188,9 @@ export default function SessionsPage() {
     const total = sessions.length;
     const active = sessions.filter((session) => !session.revoked).length;
     const revoked = sessions.filter((session) => session.revoked).length;
-    const expired = sessions.filter((session) => new Date(session.expires_at).getTime() <= Date.now()).length;
+    const expired = sessions.filter(
+      (session) => new Date(session.expires_at).getTime() <= Date.now()
+    ).length;
 
     return {
       total,
@@ -245,7 +238,8 @@ export default function SessionsPage() {
         <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Sessions</h2>
           <p style={styles.description}>
-            Review active and revoked sessions for your account and remotely revoke stale access.
+            Review active and revoked sessions for your account and remotely revoke stale
+            access.
           </p>
         </div>
 
@@ -259,11 +253,24 @@ export default function SessionsPage() {
         </button>
       </div>
 
-      {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
-      {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
+      {pageError ? (
+        <div className="app-error-state" style={styles.messageBox}>
+          {pageError}
+        </div>
+      ) : null}
 
-      <div style={styles.statsGrid}>
-        <StatCard title="Total Sessions" value={summary.total} subtitle="All visible sessions for this account" />
+      {pageMessage ? (
+        <div className="app-success-state" style={styles.messageBox}>
+          {pageMessage}
+        </div>
+      ) : null}
+
+      <div className="app-grid-stats" style={styles.statsGrid}>
+        <StatCard
+          title="Total Sessions"
+          value={summary.total}
+          subtitle="All visible sessions for this account"
+        />
         <StatCard
           title="Active Sessions"
           value={summary.active}
@@ -283,7 +290,7 @@ export default function SessionsPage() {
         />
       </div>
 
-      <section style={styles.panel}>
+      <section className="app-panel" style={styles.panel}>
         <div style={styles.panelHeader}>
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Session Inventory</h3>
@@ -334,17 +341,22 @@ export default function SessionsPage() {
                             {session.revoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
                           </span>
 
-                          {isCurrentHint ? <span style={styles.badgeInfo}>Likely current</span> : null}
+                          {isCurrentHint ? (
+                            <span style={styles.badgeInfo}>Likely current</span>
+                          ) : null}
                         </div>
                       </td>
+
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{formatIp(session.ip_address)}</div>
                         <div style={styles.rowSubtle}>Session ID: {session.id}</div>
                       </td>
+
                       <td style={styles.tdWide}>{formatUserAgent(session.user_agent)}</td>
                       <td style={styles.td}>{formatDateTime(session.created_at)}</td>
                       <td style={styles.td}>{formatDateTime(session.last_used_at)}</td>
                       <td style={styles.td}>{formatDateTime(session.expires_at)}</td>
+
                       <td style={styles.td}>
                         <button
                           type="button"
@@ -369,16 +381,6 @@ export default function SessionsPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: {
-    /*
-      What changed:
-      - Added width guards to the page root.
-
-      Why:
-      - This page sits inside the shared layout container and renders a wide session table.
-
-      What problem this solves:
-      - Prevents unnecessary overflow pressure and keeps the page stable on narrower widths.
-    */
     width: '100%',
     minWidth: 0
   },
@@ -409,9 +411,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
     marginBottom: '20px',
     width: '100%',
     minWidth: 0
@@ -466,13 +465,12 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     lineHeight: 1.4
   },
+  messageBox: {
+    marginBottom: '16px'
+  },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '16px',
-    boxShadow: '0 3px 14px rgba(15, 23, 42, 0.04)',
-    overflow: 'hidden',
-    minWidth: 0
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelHeader: {
     display: 'flex',
@@ -505,16 +503,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width.
-
-      Why:
-      - This table is legitimately wide, but the earlier width threshold was more aggressive than necessary.
-
-      What problem this solves:
-      - Eases horizontal scrolling pressure on medium-width screens without changing the actual columns.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '1020px'
@@ -538,16 +526,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   tdWide: {
-    /*
-      What changed:
-      - Preserved the dedicated device column width, but improved wrapping behavior.
-
-      Why:
-      - User-agent strings are often the longest content on this page.
-
-      What problem this solves:
-      - Keeps long device strings readable without forcing more width than necessary.
-    */
     padding: '16px',
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
@@ -645,21 +623,5 @@ const styles: Record<string, CSSProperties> = {
     padding: '24px',
     textAlign: 'center',
     color: '#6b7280'
-  },
-  errorBox: {
-    marginBottom: '16px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px 14px'
-  },
-  successBox: {
-    marginBottom: '16px',
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#065f46',
-    borderRadius: '12px',
-    padding: '12px 14px'
   }
 };

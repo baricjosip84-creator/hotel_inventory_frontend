@@ -4,7 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 
-type ReportTab = 'inventory-valuation' | 'stock-by-location' | 'product-movements' | 'procurement-summary' | 'forecast';
+type ReportTab =
+  | 'inventory-valuation'
+  | 'stock-by-location'
+  | 'product-movements'
+  | 'procurement-summary'
+  | 'forecast';
 
 type InventoryValuationRow = {
   product_id: string;
@@ -81,7 +86,10 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-function formatNumber(value: number | string | null | undefined, maximumFractionDigits = 2): string {
+function formatNumber(
+  value: number | string | null | undefined,
+  maximumFractionDigits = 2
+): string {
   return new Intl.NumberFormat(undefined, {
     maximumFractionDigits
   }).format(toNumber(value));
@@ -109,7 +117,9 @@ function formatDateTime(value: string | null | undefined): string {
   return parsed.toLocaleString();
 }
 
-function buildQueryString(params: Record<string, string | number | null | undefined>): string {
+function buildQueryString(
+  params: Record<string, string | number | null | undefined>
+): string {
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
@@ -129,11 +139,15 @@ async function fetchInventoryValuation(): Promise<InventoryValuationReport> {
 }
 
 async function fetchStockByLocation(category: string): Promise<StockByLocationRow[]> {
-  return apiRequest<StockByLocationRow[]>(`/reports/stock-by-location${buildQueryString({ category })}`);
+  return apiRequest<StockByLocationRow[]>(
+    `/reports/stock-by-location${buildQueryString({ category })}`
+  );
 }
 
 async function fetchProductMovements(limit: number): Promise<ProductMovementRow[]> {
-  return apiRequest<ProductMovementRow[]>(`/reports/product-movements${buildQueryString({ limit })}`);
+  return apiRequest<ProductMovementRow[]>(
+    `/reports/product-movements${buildQueryString({ limit })}`
+  );
 }
 
 async function fetchProcurementSummary(): Promise<ProcurementSummaryReport> {
@@ -173,7 +187,7 @@ function ReportPanel(props: {
   children: React.ReactNode;
 }) {
   return (
-    <section style={styles.panel}>
+    <section className="app-panel app-panel--padded" style={styles.panel}>
       <div style={styles.panelHeader}>
         <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
@@ -187,11 +201,19 @@ function ReportPanel(props: {
 }
 
 function EmptyState(props: { message: string }) {
-  return <div style={styles.emptyState}>{props.message}</div>;
+  return (
+    <div className="app-empty-state" style={styles.emptyState}>
+      {props.message}
+    </div>
+  );
 }
 
 function ErrorState(props: { message: string }) {
-  return <div style={styles.errorState}>{props.message}</div>;
+  return (
+    <div className="app-error-state" style={styles.errorState}>
+      {props.message}
+    </div>
+  );
 }
 
 function getReadableError(error: unknown): string {
@@ -218,28 +240,25 @@ export default function ReportsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current ReportsPage.
+    This file stays grounded in the ReportsPage you sent.
 
-    Changes made:
-    - hardened layout containers with width guards
-    - improved wrapping in headers, insight cards, tables, and summary rows
-    - kept the tab system, controls, endpoints, and report logic unchanged
+    Existing real behavior is preserved:
+    - same backend endpoints
+    - same query keys
+    - same tab structure
+    - same filters and report logic
+    - same management-access behavior
 
-    WHY IT CHANGED
-    --------------
-    The real file already uses the correct reporting endpoints and tab flows,
-    but dense management/reporting surfaces tend to contain longer labels,
-    locations, and product names that can pressure layout width.
+    This pass applies the shared UI foundation carefully:
+    - major sections now use app-panel/app-panel--padded
+    - stats now use app-grid-stats
+    - empty and error states align with the shared layer
+    - no reporting logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves readability and responsiveness without changing:
-    - backend contracts
-    - query keys
-    - report tabs
-    - filtering logic
-    - data flow
-    - management access behavior
+    Makes Reports consume the same shared visual system as the rest of the
+    polished pages without changing contracts, flows, or management gating.
   */
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
@@ -318,16 +337,17 @@ export default function ReportsPage() {
   if (anyForbidden) {
     return (
       <div style={styles.pageStack}>
-        <section style={styles.permissionPanel}>
+        <section className="app-warning-state" style={styles.permissionPanel}>
           <h2 style={styles.permissionTitle}>Management access required</h2>
           <p style={styles.permissionText}>
-            The reports and forecast module is backed by your existing management-only backend routes.
-            The current session role is <strong>{currentUserRole || 'unknown'}</strong>, and the backend is
+            The reports and forecast module is backed by your existing
+            management-only backend routes. The current session role is{' '}
+            <strong>{currentUserRole || 'unknown'}</strong>, and the backend is
             correctly denying access.
           </p>
           <p style={styles.permissionText}>
-            This protects valuation, procurement summary, movement analysis, and forecast data from being exposed
-            to unauthorized roles.
+            This protects valuation, procurement summary, movement analysis, and
+            forecast data from being exposed to unauthorized roles.
           </p>
         </section>
       </div>
@@ -338,18 +358,19 @@ export default function ReportsPage() {
 
   return (
     <div style={styles.pageStack}>
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeader}>
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Management Reporting</h3>
             <p style={styles.panelSubtitle}>
-              Frontend reporting surface built directly on the backend routes already present in your existing
-              codebase: valuation, stock distribution, movement analysis, procurement summary, and forecast.
+              Frontend reporting surface built directly on the backend routes already
+              present in your existing codebase: valuation, stock distribution,
+              movement analysis, procurement summary, and forecast.
             </p>
           </div>
         </div>
 
-        <div style={styles.statsGrid}>
+        <div className="app-grid-stats" style={styles.statsGrid}>
           <StatCard
             title="Estimated Inventory Value"
             value={formatCurrency(inventoryValuationQuery.data?.totals.estimated_inventory_value)}
@@ -364,7 +385,11 @@ export default function ReportsPage() {
             title="Overdue Shipments"
             value={formatNumber(procurementSummary?.shipments.overdue_shipments, 0)}
             subtitle="Inbound shipments past delivery date and not fully received"
-            tone={toNumber(procurementSummary?.shipments.overdue_shipments) > 0 ? 'warn' : 'good'}
+            tone={
+              toNumber(procurementSummary?.shipments.overdue_shipments) > 0
+                ? 'warn'
+                : 'good'
+            }
           />
           <StatCard
             title="Top Forecast Product"
@@ -380,7 +405,9 @@ export default function ReportsPage() {
         <div style={styles.insightGrid}>
           <div style={styles.insightCard}>
             <div style={styles.insightLabel}>Top quantity location</div>
-            <div style={styles.insightValue}>{topLocation?.storage_location_name || 'None'}</div>
+            <div style={styles.insightValue}>
+              {topLocation?.storage_location_name || 'None'}
+            </div>
             <div style={styles.insightText}>
               {topLocation
                 ? `${formatNumber(topLocation.total_quantity)} total units across ${formatNumber(
@@ -390,9 +417,12 @@ export default function ReportsPage() {
                 : 'No location stock rows returned from report.'}
             </div>
           </div>
+
           <div style={styles.insightCard}>
             <div style={styles.insightLabel}>Most active product</div>
-            <div style={styles.insightValue}>{mostActiveProduct?.product_name || 'None'}</div>
+            <div style={styles.insightValue}>
+              {mostActiveProduct?.product_name || 'None'}
+            </div>
             <div style={styles.insightText}>
               {mostActiveProduct
                 ? `${formatNumber(mostActiveProduct.movement_count, 0)} movements, ${formatNumber(
@@ -401,14 +431,20 @@ export default function ReportsPage() {
                 : 'No product movement rows returned from report.'}
             </div>
           </div>
+
           <div style={styles.insightCard}>
             <div style={styles.insightLabel}>Procurement coverage</div>
-            <div style={styles.insightValue}>{formatNumber(procurementSummary?.shipments.total_shipments, 0)}</div>
+            <div style={styles.insightValue}>
+              {formatNumber(procurementSummary?.shipments.total_shipments, 0)}
+            </div>
             <div style={styles.insightText}>
               {`${formatNumber(procurementSummary?.shipments.pending_shipments, 0)} pending, ${formatNumber(
                 procurementSummary?.shipments.partial_shipments,
                 0
-              )} partial, ${formatNumber(procurementSummary?.shipments.received_shipments, 0)} received`}
+              )} partial, ${formatNumber(
+                procurementSummary?.shipments.received_shipments,
+                0
+              )} received`}
             </div>
           </div>
         </div>
@@ -445,7 +481,9 @@ export default function ReportsPage() {
         >
           {inventoryValuationQuery.isLoading ? <div>Loading inventory valuation...</div> : null}
           {inventoryValuationQuery.isError ? (
-            <ErrorState message={`Failed to load inventory valuation: ${getReadableError(inventoryValuationQuery.error)}`} />
+            <ErrorState
+              message={`Failed to load inventory valuation: ${getReadableError(inventoryValuationQuery.error)}`}
+            />
           ) : null}
           {!inventoryValuationQuery.isLoading && !inventoryValuationQuery.isError ? (
             inventoryValuationRows.length === 0 ? (
@@ -473,10 +511,16 @@ export default function ReportsPage() {
                             <div style={styles.rowSubtle}>Product ID: {row.product_id}</div>
                           </td>
                           <td style={styles.td}>{row.product_category || '-'}</td>
-                          <td style={styles.td}>{row.storage_location_name || row.storage_location_id}</td>
+                          <td style={styles.td}>
+                            {row.storage_location_name || row.storage_location_id}
+                          </td>
                           <td style={styles.td}>{formatNumber(row.quantity)}</td>
-                          <td style={styles.td}>{formatCurrency(row.estimated_unit_cost)}</td>
-                          <td style={styles.td}>{formatCurrency(row.estimated_total_value)}</td>
+                          <td style={styles.td}>
+                            {formatCurrency(row.estimated_unit_cost)}
+                          </td>
+                          <td style={styles.td}>
+                            {formatCurrency(row.estimated_total_value)}
+                          </td>
                           <td style={styles.td}>{formatDateTime(row.updated_at)}</td>
                         </tr>
                       ))}
@@ -486,14 +530,31 @@ export default function ReportsPage() {
 
                 <div style={styles.mobileCards}>
                   {inventoryValuationRows.map((row) => (
-                    <div key={`mobile-${row.product_id}-${row.storage_location_id}`} style={styles.mobileCard}>
-                      <div style={styles.mobileCardTitle}>{row.product_name || row.product_id}</div>
-                      <div style={styles.mobileCardText}>Category: {row.product_category || '-'}</div>
-                      <div style={styles.mobileCardText}>Location: {row.storage_location_name || row.storage_location_id}</div>
-                      <div style={styles.mobileCardText}>Quantity: {formatNumber(row.quantity)}</div>
-                      <div style={styles.mobileCardText}>Unit Cost: {formatCurrency(row.estimated_unit_cost)}</div>
-                      <div style={styles.mobileCardText}>Estimated Value: {formatCurrency(row.estimated_total_value)}</div>
-                      <div style={styles.mobileCardText}>Updated: {formatDateTime(row.updated_at)}</div>
+                    <div
+                      key={`mobile-${row.product_id}-${row.storage_location_id}`}
+                      style={styles.mobileCard}
+                    >
+                      <div style={styles.mobileCardTitle}>
+                        {row.product_name || row.product_id}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Category: {row.product_category || '-'}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Location: {row.storage_location_name || row.storage_location_id}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Quantity: {formatNumber(row.quantity)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Unit Cost: {formatCurrency(row.estimated_unit_cost)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Estimated Value: {formatCurrency(row.estimated_total_value)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Updated: {formatDateTime(row.updated_at)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -508,7 +569,7 @@ export default function ReportsPage() {
           title="Stock by Location"
           subtitle="Grouped stock totals per storage location using the existing backend stock-by-location report."
           actions={
-            <div style={styles.filterRow}>
+            <div className="app-actions" style={styles.filterRow}>
               <label style={styles.fieldLabel}>
                 Category Filter
                 <input
@@ -524,7 +585,9 @@ export default function ReportsPage() {
         >
           {stockByLocationQuery.isLoading ? <div>Loading stock by location...</div> : null}
           {stockByLocationQuery.isError ? (
-            <ErrorState message={`Failed to load stock by location: ${getReadableError(stockByLocationQuery.error)}`} />
+            <ErrorState
+              message={`Failed to load stock by location: ${getReadableError(stockByLocationQuery.error)}`}
+            />
           ) : null}
           {!stockByLocationQuery.isLoading && !stockByLocationQuery.isError ? (
             stockByLocationRows.length === 0 ? (
@@ -544,9 +607,13 @@ export default function ReportsPage() {
                     <tbody>
                       {stockByLocationRows.map((row) => (
                         <tr key={row.storage_location_id}>
-                          <td style={styles.td}>{row.storage_location_name || row.storage_location_id}</td>
+                          <td style={styles.td}>
+                            {row.storage_location_name || row.storage_location_id}
+                          </td>
                           <td style={styles.td}>{row.temperature_zone || '-'}</td>
-                          <td style={styles.td}>{formatNumber(row.stock_row_count, 0)}</td>
+                          <td style={styles.td}>
+                            {formatNumber(row.stock_row_count, 0)}
+                          </td>
                           <td style={styles.td}>{formatNumber(row.total_quantity)}</td>
                         </tr>
                       ))}
@@ -556,11 +623,22 @@ export default function ReportsPage() {
 
                 <div style={styles.mobileCards}>
                   {stockByLocationRows.map((row) => (
-                    <div key={`location-mobile-${row.storage_location_id}`} style={styles.mobileCard}>
-                      <div style={styles.mobileCardTitle}>{row.storage_location_name || row.storage_location_id}</div>
-                      <div style={styles.mobileCardText}>Temperature Zone: {row.temperature_zone || '-'}</div>
-                      <div style={styles.mobileCardText}>Stock Rows: {formatNumber(row.stock_row_count, 0)}</div>
-                      <div style={styles.mobileCardText}>Total Quantity: {formatNumber(row.total_quantity)}</div>
+                    <div
+                      key={`location-mobile-${row.storage_location_id}`}
+                      style={styles.mobileCard}
+                    >
+                      <div style={styles.mobileCardTitle}>
+                        {row.storage_location_name || row.storage_location_id}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Temperature Zone: {row.temperature_zone || '-'}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Stock Rows: {formatNumber(row.stock_row_count, 0)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Total Quantity: {formatNumber(row.total_quantity)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -575,7 +653,7 @@ export default function ReportsPage() {
           title="Product Movements"
           subtitle="Product-level movement summary using your existing product movement report endpoint."
           actions={
-            <div style={styles.filterRow}>
+            <div className="app-actions" style={styles.filterRow}>
               <label style={styles.fieldLabel}>
                 Result Limit
                 <select
@@ -595,7 +673,9 @@ export default function ReportsPage() {
         >
           {productMovementsQuery.isLoading ? <div>Loading product movements...</div> : null}
           {productMovementsQuery.isError ? (
-            <ErrorState message={`Failed to load product movements: ${getReadableError(productMovementsQuery.error)}`} />
+            <ErrorState
+              message={`Failed to load product movements: ${getReadableError(productMovementsQuery.error)}`}
+            />
           ) : null}
           {!productMovementsQuery.isLoading && !productMovementsQuery.isError ? (
             productMovementRows.length === 0 ? (
@@ -622,7 +702,9 @@ export default function ReportsPage() {
                             <div style={styles.rowSubtle}>Product ID: {row.product_id}</div>
                           </td>
                           <td style={styles.td}>{row.product_category || '-'}</td>
-                          <td style={styles.td}>{formatNumber(row.movement_count, 0)}</td>
+                          <td style={styles.td}>
+                            {formatNumber(row.movement_count, 0)}
+                          </td>
                           <td style={styles.td}>{formatNumber(row.total_increase)}</td>
                           <td style={styles.td}>{formatNumber(row.total_decrease)}</td>
                           <td style={styles.td}>{formatDateTime(row.last_movement_at)}</td>
@@ -634,13 +716,28 @@ export default function ReportsPage() {
 
                 <div style={styles.mobileCards}>
                   {productMovementRows.map((row) => (
-                    <div key={`movement-mobile-${row.product_id}`} style={styles.mobileCard}>
-                      <div style={styles.mobileCardTitle}>{row.product_name || row.product_id}</div>
-                      <div style={styles.mobileCardText}>Category: {row.product_category || '-'}</div>
-                      <div style={styles.mobileCardText}>Movements: {formatNumber(row.movement_count, 0)}</div>
-                      <div style={styles.mobileCardText}>Increase: {formatNumber(row.total_increase)}</div>
-                      <div style={styles.mobileCardText}>Decrease: {formatNumber(row.total_decrease)}</div>
-                      <div style={styles.mobileCardText}>Last Movement: {formatDateTime(row.last_movement_at)}</div>
+                    <div
+                      key={`movement-mobile-${row.product_id}`}
+                      style={styles.mobileCard}
+                    >
+                      <div style={styles.mobileCardTitle}>
+                        {row.product_name || row.product_id}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Category: {row.product_category || '-'}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Movements: {formatNumber(row.movement_count, 0)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Increase: {formatNumber(row.total_increase)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Decrease: {formatNumber(row.total_decrease)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Last Movement: {formatDateTime(row.last_movement_at)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -657,24 +754,58 @@ export default function ReportsPage() {
         >
           {procurementSummaryQuery.isLoading ? <div>Loading procurement summary...</div> : null}
           {procurementSummaryQuery.isError ? (
-            <ErrorState message={`Failed to load procurement summary: ${getReadableError(procurementSummaryQuery.error)}`} />
+            <ErrorState
+              message={`Failed to load procurement summary: ${getReadableError(procurementSummaryQuery.error)}`}
+            />
           ) : null}
-          {!procurementSummaryQuery.isLoading && !procurementSummaryQuery.isError && procurementSummary ? (
+          {!procurementSummaryQuery.isLoading &&
+          !procurementSummaryQuery.isError &&
+          procurementSummary ? (
             <div style={styles.summaryGrid}>
               <div style={styles.summaryCard}>
                 <h4 style={styles.summaryCardTitle}>Shipments</h4>
-                <div style={styles.summaryRow}><span>Total</span><strong>{formatNumber(procurementSummary.shipments.total_shipments, 0)}</strong></div>
-                <div style={styles.summaryRow}><span>Pending</span><strong>{formatNumber(procurementSummary.shipments.pending_shipments, 0)}</strong></div>
-                <div style={styles.summaryRow}><span>Partial</span><strong>{formatNumber(procurementSummary.shipments.partial_shipments, 0)}</strong></div>
-                <div style={styles.summaryRow}><span>Received</span><strong>{formatNumber(procurementSummary.shipments.received_shipments, 0)}</strong></div>
-                <div style={styles.summaryRow}><span>Overdue</span><strong>{formatNumber(procurementSummary.shipments.overdue_shipments, 0)}</strong></div>
+                <div style={styles.summaryRow}>
+                  <span>Total</span>
+                  <strong>{formatNumber(procurementSummary.shipments.total_shipments, 0)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Pending</span>
+                  <strong>{formatNumber(procurementSummary.shipments.pending_shipments, 0)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Partial</span>
+                  <strong>{formatNumber(procurementSummary.shipments.partial_shipments, 0)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Received</span>
+                  <strong>{formatNumber(procurementSummary.shipments.received_shipments, 0)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Overdue</span>
+                  <strong>{formatNumber(procurementSummary.shipments.overdue_shipments, 0)}</strong>
+                </div>
               </div>
+
               <div style={styles.summaryCard}>
                 <h4 style={styles.summaryCardTitle}>Shipment Lines</h4>
-                <div style={styles.summaryRow}><span>Active Lines</span><strong>{formatNumber(procurementSummary.lines.total_active_shipment_lines, 0)}</strong></div>
-                <div style={styles.summaryRow}><span>Ordered Quantity</span><strong>{formatNumber(procurementSummary.lines.total_ordered_quantity)}</strong></div>
-                <div style={styles.summaryRow}><span>Received Quantity</span><strong>{formatNumber(procurementSummary.lines.total_received_quantity)}</strong></div>
-                <div style={styles.summaryRow}><span>Discrepancy</span><strong>{formatNumber(procurementSummary.lines.total_discrepancy)}</strong></div>
+                <div style={styles.summaryRow}>
+                  <span>Active Lines</span>
+                  <strong>
+                    {formatNumber(procurementSummary.lines.total_active_shipment_lines, 0)}
+                  </strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Ordered Quantity</span>
+                  <strong>{formatNumber(procurementSummary.lines.total_ordered_quantity)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Received Quantity</span>
+                  <strong>{formatNumber(procurementSummary.lines.total_received_quantity)}</strong>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span>Discrepancy</span>
+                  <strong>{formatNumber(procurementSummary.lines.total_discrepancy)}</strong>
+                </div>
               </div>
             </div>
           ) : null}
@@ -688,7 +819,9 @@ export default function ReportsPage() {
         >
           {forecastQuery.isLoading ? <div>Loading forecast...</div> : null}
           {forecastQuery.isError ? (
-            <ErrorState message={`Failed to load forecast: ${getReadableError(forecastQuery.error)}`} />
+            <ErrorState
+              message={`Failed to load forecast: ${getReadableError(forecastQuery.error)}`}
+            />
           ) : null}
           {!forecastQuery.isLoading && !forecastQuery.isError ? (
             forecastRows.length === 0 ? (
@@ -719,9 +852,16 @@ export default function ReportsPage() {
 
                 <div style={styles.mobileCards}>
                   {forecastRows.map((row) => (
-                    <div key={`forecast-mobile-${row.product_id}`} style={styles.mobileCard}>
-                      <div style={styles.mobileCardTitle}>{row.product_name || row.product_id}</div>
-                      <div style={styles.mobileCardText}>Average Daily Usage: {formatNumber(row.avg_daily_usage)}</div>
+                    <div
+                      key={`forecast-mobile-${row.product_id}`}
+                      style={styles.mobileCard}
+                    >
+                      <div style={styles.mobileCardTitle}>
+                        {row.product_name || row.product_id}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Average Daily Usage: {formatNumber(row.avg_daily_usage)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -736,16 +876,6 @@ export default function ReportsPage() {
 
 const styles: Record<string, CSSProperties> = {
   pageStack: {
-    /*
-      What changed:
-      - Added width guards to the root page stack.
-
-      Why:
-      - This page renders multiple dense report surfaces, tables, and tab panels.
-
-      What problem this solves:
-      - Reduces overflow pressure and keeps the report layout stable inside the shared app shell.
-    */
     display: 'flex',
     flexDirection: 'column',
     gap: '20px',
@@ -753,11 +883,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
     minWidth: 0,
     overflow: 'hidden'
   },
@@ -793,9 +918,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
     marginBottom: '16px',
     width: '100%',
     minWidth: 0
@@ -910,16 +1032,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width while preserving all report columns.
-
-      Why:
-      - This report page needs wide tables, but the prior threshold was more aggressive than necessary.
-
-      What problem this solves:
-      - Eases medium-screen horizontal scrolling pressure without changing table structure or data density.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '780px'
@@ -977,9 +1089,6 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   filterRow: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap',
     minWidth: 0
   },
   fieldLabel: {
@@ -1014,18 +1123,10 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   emptyState: {
-    border: '1px dashed #cbd5e1',
-    borderRadius: '12px',
-    padding: '20px',
-    color: '#64748b',
-    background: '#f8fafc'
+    margin: 0
   },
   errorState: {
-    border: '1px solid #fecaca',
-    borderRadius: '12px',
-    padding: '16px',
-    color: '#991b1b',
-    background: '#fef2f2'
+    margin: 0
   },
   summaryGrid: {
     display: 'grid',
@@ -1046,16 +1147,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '18px'
   },
   summaryRow: {
-    /*
-      What changed:
-      - Allowed summary rows to wrap instead of forcing both ends onto one line.
-
-      Why:
-      - Shipment labels and values can become crowded on narrower widths.
-
-      What problem this solves:
-      - Keeps procurement summary cards readable without changing the metrics shown.
-    */
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -1065,10 +1156,7 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: '1px solid #f1f5f9'
   },
   permissionPanel: {
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    borderRadius: '14px',
-    padding: '20px'
+    margin: 0
   },
   permissionTitle: {
     margin: '0 0 12px 0',

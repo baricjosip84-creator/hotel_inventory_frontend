@@ -40,6 +40,19 @@ body,
 body {
   background: var(--color-bg);
   color: var(--color-text);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  display: block;
 }
 
 a {
@@ -238,70 +251,4 @@ button {
 
 .form-input {
   width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: white;
-}
-
-.form-input:focus {
-  outline: 2px solid #bfdbfe;
-  border-color: #93c5fd;
-}
-
-.error-box {
-  margin-bottom: 16px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-
-.info-box {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  border-radius: 16px;
-  padding: 16px;
-}
-
-.stat-list {
-  display: grid;
-  gap: 12px;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.stat-row:last-child {
-  border-bottom: none;
-}
-
-.stat-row__label {
-  color: var(--color-text-soft);
-}
-
-.stat-row__value {
-  font-weight: 600;
-}
-
-.loading-text {
-  color: var(--color-text-soft);
-}
-
-@media (max-width: 900px) {
-  .page-shell {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-  }
 }

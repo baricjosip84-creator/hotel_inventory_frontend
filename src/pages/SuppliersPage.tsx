@@ -78,26 +78,29 @@ export default function SuppliersPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual existing SuppliersPage.
-    The changes here are intentionally UI-only:
-    - removed a duplicated subtitle paragraph in the form panel
-    - aligned the search toolbar with the same master-data layout rhythm used elsewhere
-    - slightly softened table width pressure for medium screens
+    This file stays grounded in the SuppliersPage you sent.
 
-    WHY IT CHANGED
-    --------------
-    After comparing the real Products, Suppliers, and Storage Locations pages,
-    Suppliers was already functionally solid, but it had a small content duplication
-    issue and a couple of minor layout inconsistencies versus the newer master-data pattern.
+    Existing real behavior is preserved:
+    - same endpoint usage
+    - same query key
+    - same create / update / delete flow
+    - same permission enforcement
+    - same form fields
+    - same search behavior
+    - same invalidation flow
+
+    This pass applies the shared UI foundation carefully:
+    - stats now align with the shared app-grid-stats layer
+    - major sections now use app-panel/app-panel--padded
+    - warning / error / success states align with the shared state layer
+    - toolbar and action rows align with the shared helper classes
+    - no CRUD logic was changed
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This improves consistency and readability without changing:
-    - backend contract
-    - CRUD behavior
-    - permission enforcement
-    - query keys
-    - invalidation flow
+    Makes Suppliers visually consistent with Products, Storage Locations, Users,
+    and the rest of the polished master-data/admin pages without changing
+    backend contracts, permissions, or data flow.
   */
   const queryClient = useQueryClient();
 
@@ -200,7 +203,9 @@ export default function SuppliersPage() {
     setFormMessage(null);
 
     if (!canManageSuppliers) {
-      setFormError('Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.');
+      setFormError(
+        'Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.'
+      );
       return;
     }
 
@@ -258,8 +263,8 @@ export default function SuppliersPage() {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div>
-      <div style={styles.statsGrid}>
+    <div style={styles.page}>
+      <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Suppliers"
           value={summary.total}
@@ -279,12 +284,12 @@ export default function SuppliersPage() {
       </div>
 
       {!canManageSuppliers ? (
-        <div style={styles.warningBox}>
+        <div className="app-warning-state" style={styles.warningBox}>
           Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
         </div>
       ) : null}
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
         <p style={styles.panelSubtitle}>
           {(canManageSuppliers
@@ -292,8 +297,8 @@ export default function SuppliersPage() {
             : 'This form stays visible for context, but supplier writes are blocked for your current role.') as string}
         </p>
 
-        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
+        {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
+        {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
 
         <form onSubmit={handleSubmit} style={styles.formGrid}>
           <div>
@@ -319,8 +324,12 @@ export default function SuppliersPage() {
             />
           </div>
 
-          <div style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageSuppliers}>
+          <div className="app-actions" style={styles.formActions}>
+            <button
+              type="submit"
+              style={styles.primaryButton}
+              disabled={isSubmitting || !canManageSuppliers}
+            >
               {isSubmitting
                 ? editingSupplier
                   ? 'Updating...'
@@ -339,13 +348,13 @@ export default function SuppliersPage() {
         </form>
       </section>
 
-      <section style={styles.panel}>
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Supplier List</h3>
         <p style={styles.panelSubtitle}>
           Search and review supplier records available to inventory and shipment workflows.
         </p>
 
-        <div style={styles.toolbarGrid}>
+        <div className="app-grid-toolbar" style={styles.toolbarGrid}>
           <input
             type="text"
             placeholder="Search by supplier name or contact info..."
@@ -393,7 +402,7 @@ export default function SuppliersPage() {
                         </span>
                       </td>
                       <td style={styles.td}>
-                        <div style={styles.actionGroup}>
+                        <div className="app-actions" style={styles.actionGroup}>
                           <button
                             type="button"
                             style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
@@ -428,11 +437,13 @@ export default function SuppliersPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  page: {
+    width: '100%',
+    minWidth: 0
+  },
   statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
+    marginBottom: '20px',
+    minWidth: 0
   },
   statCard: {
     background: '#ffffff',
@@ -450,13 +461,15 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px'
+    marginBottom: '8px',
+    wordBreak: 'break-word'
   },
   statValueGood: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#166534'
+    color: '#166534',
+    wordBreak: 'break-word'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -464,30 +477,30 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4
   },
   panel: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '18px',
     marginBottom: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    minWidth: 0,
+    overflow: 'hidden'
   },
   panelTitle: {
     marginTop: 0,
     marginBottom: '8px',
     fontSize: '20px',
-    fontWeight: 700
+    fontWeight: 700,
+    wordBreak: 'break-word'
   },
   panelSubtitle: {
     marginTop: 0,
     marginBottom: '16px',
     color: '#6b7280',
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    wordBreak: 'break-word'
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '14px',
-    alignItems: 'end'
+    alignItems: 'end',
+    minWidth: 0
   },
   label: {
     display: 'block',
@@ -497,17 +510,16 @@ const styles: Record<string, CSSProperties> = {
   },
   input: {
     width: '100%',
+    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     background: '#ffffff',
-    outline: 'none'
+    outline: 'none',
+    boxSizing: 'border-box'
   },
   formActions: {
-    display: 'flex',
-    alignItems: 'end',
-    gap: '10px',
-    flexWrap: 'wrap'
+    minWidth: 0
   },
   primaryButton: {
     border: 'none',
@@ -555,10 +567,8 @@ const styles: Record<string, CSSProperties> = {
       What problem this solves:
       - Makes the search area scale more cleanly inside the shared layout container and keeps future filter expansion straightforward.
     */
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '12px',
-    marginBottom: '16px'
+    marginBottom: '16px',
+    minWidth: 0
   },
   searchInput: {
     /*
@@ -572,19 +582,22 @@ const styles: Record<string, CSSProperties> = {
       - Prevents the search control from looking artificially narrow relative to the other master-data pages.
     */
     width: '100%',
+    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     outline: 'none',
     fontSize: '14px',
-    background: '#ffffff'
+    background: '#ffffff',
+    boxSizing: 'border-box'
   },
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    minWidth: 0
   },
   table: {
     /*
@@ -613,7 +626,8 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    wordBreak: 'break-word'
   },
   emptyCell: {
     padding: '24px',
@@ -622,7 +636,8 @@ const styles: Record<string, CSSProperties> = {
   },
   rowTitle: {
     fontWeight: 700,
-    marginBottom: '6px'
+    marginBottom: '6px',
+    wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
@@ -649,32 +664,15 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px'
   },
   actionGroup: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
+    minWidth: 0
   },
   errorBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    color: '#b91c1c'
+    marginBottom: '14px'
   },
   warningBox: {
-    marginBottom: '16px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#fff7ed',
-    border: '1px solid #fdba74',
-    color: '#9a3412'
+    marginBottom: '16px'
   },
   successBox: {
-    marginBottom: '14px',
-    padding: '12px 14px',
-    borderRadius: '10px',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    color: '#166534'
+    marginBottom: '14px'
   }
 };
