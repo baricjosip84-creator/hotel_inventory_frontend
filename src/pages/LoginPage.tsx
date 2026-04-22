@@ -1,9 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { saveAuthTokens } from '../lib/auth';
 import type { AuthTokens } from '../types/auth';
+
+function useIsCompactLayout(breakpoint = 920): boolean {
+  const [isCompact, setIsCompact] = useState(() => window.innerWidth <= breakpoint);
+
+  useEffect(() => {
+    const onResize = () => setIsCompact(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [breakpoint]);
+
+  return isCompact;
+}
 
 export function LoginPage() {
   /*
@@ -19,15 +31,16 @@ export function LoginPage() {
     - same ApiError handling
     - same preventDefault / stopPropagation protection
 
-    This pass is UI-only:
-    - modernized the page so it visually matches the rest of the app
-    - improved hierarchy, spacing, labels, and error presentation
-    - added a branded companion panel so the page feels like part of the same system
+    This pass is still UI-only, but specifically fixes the upright-phone issue:
+    - switches to a single-column stacked layout on narrower screens
+    - removes the too-tall desktop shell behavior on mobile
+    - reduces spacing/font pressure on compact screens
+    - keeps the page visually aligned with the rest of the app
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes login feel like a real part of the Hotel Inventory Management app
-    without changing any backend contract or authentication flow.
+    Fixes the portrait mobile layout where only part of the page felt visible,
+    while preserving the stronger desktop/landscape presentation.
   */
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +48,7 @@ export function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const isCompact = useIsCompactLayout();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     // 🔴 THIS IS THE CRITICAL FIX
@@ -69,20 +83,52 @@ export function LoginPage() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.shell}>
-        <section style={styles.brandPanel}>
+    <div
+      style={{
+        ...styles.page,
+        ...(isCompact ? styles.pageCompact : {})
+      }}
+    >
+      <div
+        style={{
+          ...styles.shell,
+          ...(isCompact ? styles.shellCompact : {})
+        }}
+      >
+        <section
+          style={{
+            ...styles.brandPanel,
+            ...(isCompact ? styles.brandPanelCompact : {})
+          }}
+        >
           <div style={styles.brandBadge}>HOTEL INVENTORY PLATFORM</div>
 
           <div style={styles.brandBlock}>
-            <h1 style={styles.brandTitle}>Operations with clarity.</h1>
-            <p style={styles.brandText}>
+            <h1
+              style={{
+                ...styles.brandTitle,
+                ...(isCompact ? styles.brandTitleCompact : {})
+              }}
+            >
+              Operations with clarity.
+            </h1>
+            <p
+              style={{
+                ...styles.brandText,
+                ...(isCompact ? styles.brandTextCompact : {})
+              }}
+            >
               Manage products, suppliers, storage, stock, shipments, alerts, reporting,
               and operational insights from one consistent platform.
             </p>
           </div>
 
-          <div style={styles.featureGrid}>
+          <div
+            style={{
+              ...styles.featureGrid,
+              ...(isCompact ? styles.featureGridCompact : {})
+            }}
+          >
             <div style={styles.featureCard}>
               <div style={styles.featureTitle}>Inventory control</div>
               <div style={styles.featureText}>
@@ -106,11 +152,28 @@ export function LoginPage() {
           </div>
         </section>
 
-        <section style={styles.loginPanel}>
-          <div style={styles.loginCard}>
+        <section
+          style={{
+            ...styles.loginPanel,
+            ...(isCompact ? styles.loginPanelCompact : {})
+          }}
+        >
+          <div
+            style={{
+              ...styles.loginCard,
+              ...(isCompact ? styles.loginCardCompact : {})
+            }}
+          >
             <div style={styles.loginHeader}>
               <div style={styles.loginEyebrow}>Secure access</div>
-              <h2 style={styles.loginTitle}>Sign in</h2>
+              <h2
+                style={{
+                  ...styles.loginTitle,
+                  ...(isCompact ? styles.loginTitleCompact : {})
+                }}
+              >
+                Sign in
+              </h2>
               <p style={styles.loginSubtitle}>
                 Use your tenant account to access the inventory platform.
               </p>
@@ -164,15 +227,39 @@ export function LoginPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: {
-    minHeight: '100vh',
+    /*
+      What changed:
+      - Uses flexible full-screen sizing and keeps content centered for desktop.
+
+      Why:
+      - The previous version was tuned mainly for large screens.
+
+      What problem this solves:
+      - Gives us a stable base for both desktop and compact/mobile layouts.
+    */
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'stretch',
     justifyContent: 'center',
     background:
       'linear-gradient(135deg, #eff6ff 0%, #f8fafc 45%, #eef2ff 100%)',
-    padding: '24px'
+    padding: '24px',
+    boxSizing: 'border-box'
+  },
+  pageCompact: {
+    padding: '12px'
   },
   shell: {
+    /*
+      What changed:
+      - Preserves the stronger desktop two-column presentation.
+
+      Why:
+      - Desktop and landscape tablet layouts already looked good.
+
+      What problem this solves:
+      - Keeps the upgraded login page feeling integrated with the rest of the app on larger screens.
+    */
     width: '100%',
     maxWidth: '1200px',
     display: 'grid',
@@ -184,6 +271,22 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: '0 24px 60px rgba(15, 23, 42, 0.10)',
     minHeight: '680px'
   },
+  shellCompact: {
+    /*
+      What changed:
+      - Stacks the two sections vertically on smaller screens.
+      - Removes the tall desktop-style minimum height.
+
+      Why:
+      - Portrait phones do not have enough comfortable height for the wide desktop layout.
+
+      What problem this solves:
+      - Prevents the “half screens visible” feeling when the phone is upright.
+    */
+    gridTemplateColumns: '1fr',
+    minHeight: 'auto',
+    borderRadius: '20px'
+  },
   brandPanel: {
     background: 'linear-gradient(160deg, #0f172a 0%, #1e3a8a 55%, #1d4ed8 100%)',
     color: '#ffffff',
@@ -191,6 +294,10 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     alignContent: 'start',
     gap: '28px'
+  },
+  brandPanelCompact: {
+    padding: '22px',
+    gap: '18px'
   },
   brandBadge: {
     display: 'inline-flex',
@@ -213,6 +320,9 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.05,
     fontWeight: 800
   },
+  brandTitleCompact: {
+    fontSize: '30px'
+  },
   brandText: {
     margin: 0,
     color: 'rgba(255,255,255,0.86)',
@@ -220,9 +330,17 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.7,
     maxWidth: '560px'
   },
+  brandTextCompact: {
+    fontSize: '14px',
+    lineHeight: 1.6,
+    maxWidth: '100%'
+  },
   featureGrid: {
     display: 'grid',
     gap: '14px'
+  },
+  featureGridCompact: {
+    gap: '10px'
   },
   featureCard: {
     background: 'rgba(255,255,255,0.10)',
@@ -247,6 +365,9 @@ const styles: Record<string, CSSProperties> = {
     padding: '40px',
     background: '#f8fafc'
   },
+  loginPanelCompact: {
+    padding: '18px'
+  },
   loginCard: {
     width: '100%',
     maxWidth: '420px',
@@ -254,7 +375,13 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: '22px',
     padding: '28px',
-    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)'
+    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)',
+    boxSizing: 'border-box'
+  },
+  loginCardCompact: {
+    maxWidth: '100%',
+    padding: '22px',
+    borderRadius: '18px'
   },
   loginHeader: {
     marginBottom: '22px'
@@ -272,6 +399,9 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '30px',
     lineHeight: 1.1,
     color: '#0f172a'
+  },
+  loginTitleCompact: {
+    fontSize: '26px'
   },
   loginSubtitle: {
     margin: '10px 0 0 0',
