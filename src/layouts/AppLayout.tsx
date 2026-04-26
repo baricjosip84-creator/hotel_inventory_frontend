@@ -122,33 +122,29 @@ export default function AppLayout() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your actual current AppLayout.
+    This file stays grounded in the AppLayout.tsx you just pasted.
 
     The existing shell structure is preserved:
     - same sidebar
     - same mobile drawer
     - same auth/logout flow
-    - same role-based nav filtering
     - same page title/subtitle mapping
+    - same dvh-based layout behavior
+    - same width guards and mobile polish
 
-    This pass is still layout-only, but tightens the shared shell further:
-    - added width guards and wrapping safety in the sidebar brand block
-    - improved mobile drawer behavior and scroll containment
-    - improved header/main sizing so small screens inherit more stable layout behavior
-    - kept main-area scrolling ownership intact
+    The only contract-alignment change:
+    - Admin System navigation is now visible to both admin and manager roles.
 
     WHY IT CHANGED
     --------------
-    After the page-by-page polish passes, the app shell is the highest-leverage
-    place to reduce remaining spacing, overflow, and mobile menu inconsistencies.
+    The uploaded backend exposes tenant-scoped /system-status for admin and manager.
+    Your AdminSystemPage already safely limits admin-only diagnostics internally,
+    while still allowing managers to view the system-status portion.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Reduces remaining layout weirdness around:
-    - mobile drawer stability
-    - long labels in the sidebar and header
-    - shell-level overflow pressure
-    - consistent page spacing inside the shared layout
+    Removes the mismatch where managers can use the route-level/admin-system
+    page safely, but could not see the navigation item in the sidebar.
   */
   const navigate = useNavigate();
   const location = useLocation();
@@ -172,7 +168,15 @@ export default function AppLayout() {
       { to: '/reports', label: 'Reports', roles: ['admin', 'manager'] },
       { to: '/insights', label: 'Insights', roles: ['admin', 'manager'] },
       { to: '/users', label: 'Users', roles: ['admin', 'manager'] },
-      { to: '/admin-system', label: 'Admin System', roles: ['admin'] },
+
+      /*
+        Backend/router alignment:
+        - /system-status is manager-visible.
+        - Admin-only diagnostics remain protected inside AdminSystemPage and by
+          the backend admin diagnostics/system-health routes.
+      */
+      { to: '/admin-system', label: 'Admin System', roles: ['admin', 'manager'] },
+
       { to: '/sessions', label: 'Sessions' }
     ],
     []

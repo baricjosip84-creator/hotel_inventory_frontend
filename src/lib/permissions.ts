@@ -35,13 +35,13 @@ export function getCurrentUserRole(): UserRole {
   /*
     WHAT CHANGED
     ------------
-    This helper now centralizes frontend role detection by decoding the existing
+    This helper centralizes frontend role detection by decoding the existing
     JWT payload already issued by your backend.
 
     WHY IT CHANGED
     --------------
     Your backend role model already exists and is enforced server-side. The
-    frontend now needs one shared source of truth so route guards, navigation,
+    frontend needs one shared source of truth so route guards, navigation,
     and page actions all align with those same roles.
 
     WHAT PROBLEM IT SOLVES
@@ -68,19 +68,25 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
   /*
     WHAT CHANGED
     ------------
-    Added capability flags for the new users, admin/system, and insights
-    surfaces that are being layered on top of the existing role-aware router.
+    This capability map is aligned to the backend authorization rules found in
+    the uploaded backend ZIP.
+
+    The important correction in this pass:
+    - canConsumeStock is manager/staff only.
 
     WHY IT CHANGED
     --------------
-    The backend already exposes users, system-status, diagnostics, and advanced
-    insight endpoints. The frontend needs explicit capability flags so those
-    pages and actions stay aligned with the backend authorization model.
+    Backend route src/routes/stock.js defines POST /stock/consume as:
+    authorize(['manager', 'staff'])
+
+    The previous frontend capability allowed admins to consume stock, which
+    would show admins an enabled action that the backend correctly rejects.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This keeps navigation, route guards, and per-page actions consistent as the
-    product surface expands beyond basic CRUD pages.
+    Prevents the frontend from advertising a stock operation that the backend
+    does not allow for admin users, while keeping the backend as the real
+    security boundary.
   */
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
@@ -103,7 +109,13 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canManageAlerts: canManageMasterData,
     canManageShipments: canManageMasterData,
     canReceiveShipments: isAdmin || isManager || isStaff,
-    canConsumeStock: isAdmin || isManager || isStaff,
+
+    /*
+      Backend contract:
+      POST /stock/consume allows manager + staff, not admin.
+    */
+    canConsumeStock: isManager || isStaff,
+
     canCountStock: isAdmin || isManager,
     canAdjustStock: isAdmin || isManager,
     canViewSessions: isAdmin || isManager || isStaff
