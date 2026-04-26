@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getAccessToken, getRefreshToken, isAuthenticated } from '../lib/auth';
+import {
+  getAccessToken,
+  getRefreshToken,
+  isAuthenticated,
+  saveAuthTokens
+} from '../lib/auth';
+import type { AuthTokens } from '../types/auth';
 import type { UserRole } from '../lib/permissions';
 import { hasAnyRole } from '../lib/permissions';
 import { apiRequest } from '../lib/api';
@@ -12,6 +18,37 @@ type ProtectedRouteProps = PropsWithChildren<{
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const location = useLocation();
+
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in the ProtectedRoute you just pasted.
+
+    Existing behavior preserved:
+    - same checking / allowed / denied state model
+    - same access-token-first session check
+    - same refresh-token fallback
+    - same unauthenticated redirect to /login
+    - same allowedRoles prop contract
+    - same hasAnyRole role check
+
+    Two surgical changes:
+    1. Save returned tokens after /auth/refresh.
+    2. Redirect authenticated-but-unauthorized users to /dashboard.
+
+    WHY IT CHANGED
+    --------------
+    1. The existing refresh call allowed the route after refresh, but did not save
+       the returned token payload. That can leave the app in an inconsistent auth state.
+    2. The agreed route behavior is:
+       - not logged in -> /login
+       - logged in but wrong role -> /dashboard
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Keeps session recovery reliable and makes route-level authorization behavior
+    consistent with the app navigation model, without changing router structure.
+  */
 
   /*
     Route guard states:
@@ -53,10 +90,22 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       }
 
       try {
-        await apiRequest('/auth/refresh', {
+        const tokens = await apiRequest<AuthTokens>('/auth/refresh', {
           method: 'POST',
           body: JSON.stringify({ refreshToken })
         });
+
+        /*
+          WHAT CHANGED
+          ------------
+          Persist the refreshed tokens returned by the backend.
+
+          WHY
+          ---
+          Without this, the route may render as allowed while local auth storage
+          still has no fresh access token.
+        */
+        saveAuthTokens(tokens);
 
         if (isMounted) {
           setStatus('allowed');
@@ -86,30 +135,22 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   /*
     WHAT CHANGED
     ------------
-    ProtectedRoute now supports optional role-based authorization on top of the
-    existing authenticated-session guard.
+    Role-denied authenticated users now redirect to /dashboard instead of seeing
+    an inline access-denied page.
 
     WHY IT CHANGED
     --------------
-    Your backend already enforces role restrictions. The frontend now mirrors
-    those restrictions at route level so management pages do not appear
-    accessible until the user clicks into them.
+    This matches the agreed route behavior:
+    authenticated but unauthorized users should be sent back to the safe default
+    app page.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This prevents unauthorized navigation to protected management routes such as
-    reports while still keeping the backend as the real security boundary.
+    Prevents dead-end route screens while keeping backend authorization as the
+    real security boundary.
   */
   if (allowedRoles && !hasAnyRole(allowedRoles)) {
-    return (
-      <div style={{ padding: '24px', maxWidth: 720 }}>
-        <h2 style={{ marginTop: 0 }}>Access denied</h2>
-        <p style={{ marginBottom: 0, color: '#4b5563' }}>
-          Your current role does not have access to this route. The frontend is
-          aligned to the backend authorization model already enforced by the API.
-        </p>
-      </div>
-    );
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

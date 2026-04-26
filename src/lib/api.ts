@@ -62,6 +62,40 @@ function isAuthLoginRequest(path: string): boolean {
   return path === '/auth/login' || path === 'auth/login';
 }
 
+function redirectToLoginAfterExpiredSession(): void {
+  /*
+    WHAT CHANGED
+    ------------
+    Added one small global expired-session redirect helper.
+
+    WHY IT CHANGED
+    --------------
+    apiRequest already cleared tokens on a final 401, but the app could remain
+    visually sitting on a protected page until the user clicked again or refreshed.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    When a protected API request proves the session cannot be recovered, the user
+    is returned to /login immediately instead of staying in a broken authenticated
+    shell.
+
+    Important:
+    - login requests do not use this helper
+    - refresh requests do not use this helper
+    - 403 responses are still surfaced as ApiError so pages can show their normal
+      permission messages
+  */
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (window.location.pathname === '/login') {
+    return;
+  }
+
+  window.location.replace('/login');
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') || '';
   const rawText = await response.text();
@@ -161,6 +195,35 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  /*
+    WHAT CHANGED
+    ------------
+    This file stays grounded in your current apiRequest.
+
+    Existing behavior preserved:
+    - same API_BASE_URL behavior
+    - same ApiError shape
+    - same parseResponse behavior
+    - same in-flight refresh promise
+    - same pre-request refresh for expired access tokens
+    - same one-time retry after 401
+    - same 403 behavior: throw ApiError and let the page decide UI
+
+    Only added:
+    - after a final unrecoverable 401 on protected API requests, clear auth and
+      redirect to /login.
+
+    WHY IT CHANGED
+    --------------
+    Your API layer already performed most of the correct session recovery work.
+    The remaining issue was the user could stay inside the protected app shell
+    after a final 401.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Makes expired/invalid sessions fail cleanly and visibly without changing
+    backend contracts or page-level permission handling.
+  */
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
   const currentAccessToken = getAccessToken();
@@ -201,8 +264,14 @@ export async function apiRequest<T>(
   try {
     return await parseResponse<T>(response);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (
+      error instanceof ApiError &&
+      error.status === 401 &&
+      !isLoginRequest &&
+      !isRefreshRequest
+    ) {
       clearAuthTokens();
+      redirectToLoginAfterExpiredSession();
     }
 
     throw error;
