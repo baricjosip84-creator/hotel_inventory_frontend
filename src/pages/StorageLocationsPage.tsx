@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 
 type StorageLocationItem = {
   id: string;
@@ -81,21 +82,27 @@ export default function StorageLocationsPage() {
     - same fields
     - same search behavior
     - same soft-delete display logic
+    - same shared UI foundation classes
 
-    This pass applies the shared UI foundation carefully:
-    - stats now align with the shared app-grid-stats layer
-    - major sections now use app-panel/app-panel--padded
-    - success / error states align with the shared state layer
-    - toolbar and form actions align with the shared helper classes
-    - no business logic was changed
+    Backend alignment added:
+    - reads canManageStorageLocations from getRoleCapabilities()
+    - blocks create submission for read-only roles
+    - disables create form controls when the current role cannot create storage locations
+    - shows a role warning like the other master-data pages
+
+    WHY IT CHANGED
+    --------------
+    The backend only allows admin and manager roles to create storage locations.
+    Staff should not see an enabled create workflow that the backend will reject.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes Storage Locations visually consistent with Products, Users, Reports,
-    and the rest of the polished admin/master-data pages without changing
-    contracts, flows, or data behavior.
+    Aligns the Storage Locations page with backend authorization and with the
+    Products/Suppliers master-data UX, without changing request bodies, query
+    keys, or data display behavior.
   */
   const queryClient = useQueryClient();
+  const { role, canManageStorageLocations } = getRoleCapabilities();
 
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
@@ -147,6 +154,14 @@ export default function StorageLocationsPage() {
     event.preventDefault();
     setFormError(null);
     setFormMessage(null);
+
+    if (!canManageStorageLocations) {
+      setFormError(
+        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the existing backend.'
+      );
+      return;
+    }
+
     createMutation.mutate(form);
   };
 
@@ -175,6 +190,12 @@ export default function StorageLocationsPage() {
         />
       </div>
 
+      {!canManageStorageLocations ? (
+        <div className="app-warning-state" style={styles.warningBox}>
+          Current role: {role.toUpperCase()}. Storage locations are read-only in the frontend because your backend only allows manager and admin users to create storage locations.
+        </div>
+      ) : null}
+
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Storage Location</h3>
         <p style={styles.panelSubtitle}>
@@ -193,6 +214,7 @@ export default function StorageLocationsPage() {
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
               placeholder="Example: Main Warehouse"
               required
+              disabled={!canManageStorageLocations}
             />
           </div>
 
@@ -205,11 +227,17 @@ export default function StorageLocationsPage() {
                 setForm((current) => ({ ...current, temperature_zone: event.target.value }))
               }
               placeholder="Example: ambient, chilled, frozen"
+              disabled={!canManageStorageLocations}
             />
           </div>
 
           <div className="app-actions" style={styles.formActions}>
-            <button type="submit" style={styles.primaryButton} disabled={createMutation.isPending}>
+            <button
+              type="submit"
+              style={styles.primaryButton}
+              disabled={createMutation.isPending || !canManageStorageLocations}
+              title={!canManageStorageLocations ? 'Manager or admin role required' : undefined}
+            >
               {createMutation.isPending ? 'Creating...' : 'Create Storage Location'}
             </button>
           </div>
@@ -361,16 +389,6 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   formActions: {
-    /*
-      What changed:
-      - Matched the more resilient action-row pattern already used in Products and Suppliers.
-
-      Why:
-      - The previous version could feel cramped when the form wrapped on smaller widths.
-
-      What problem this solves:
-      - Keeps the submit area stable and responsive without changing form behavior.
-    */
     alignItems: 'end',
     minWidth: 0
   },
@@ -384,30 +402,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   toolbarGrid: {
-    /*
-      What changed:
-      - Replaced the single-purpose toolbar wrapper with the same grid-style toolbar pattern used by Products.
-
-      Why:
-      - This page sits in the same master-data family and should follow the same layout rhythm.
-
-      What problem this solves:
-      - Makes the search area align more naturally with the shared page container and future filter growth.
-    */
     marginBottom: '16px',
     minWidth: 0
   },
   searchInput: {
-    /*
-      What changed:
-      - Removed the hard maxWidth cap so the search control behaves like the other master-data pages.
-
-      Why:
-      - The page now already lives inside the shared centered content container from AppLayout.
-
-      What problem this solves:
-      - Prevents the search row from looking artificially narrow compared with Products and Suppliers.
-    */
     width: '100%',
     minWidth: 0,
     padding: '12px 14px',
@@ -427,16 +425,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width.
-
-      Why:
-      - This table has fewer columns than Products and can tolerate a smaller minimum width.
-
-      What problem this solves:
-      - Reduces unnecessary horizontal scrolling pressure on tablets and smaller laptops.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '720px'
@@ -492,6 +480,9 @@ const styles: Record<string, CSSProperties> = {
   },
   errorBox: {
     marginBottom: '14px'
+  },
+  warningBox: {
+    marginBottom: '16px'
   },
   successBox: {
     marginBottom: '14px'

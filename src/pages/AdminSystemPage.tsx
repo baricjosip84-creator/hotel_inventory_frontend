@@ -107,7 +107,24 @@ async function fetchBrokenShipments(): Promise<BrokenShipmentRow[]> {
 }
 
 async function fetchSystemHealth(): Promise<SystemHealthResponse> {
-  return apiRequest<SystemHealthResponse>('/admin/system-health/system-health');
+  /*
+    WHAT CHANGED
+    ------------
+    Corrected the system health endpoint from:
+    /admin/system-health/system-health
+    to:
+    /admin/system-health
+
+    WHY IT CHANGED
+    --------------
+    The uploaded backend route mounting resolves the admin system health route
+    to GET /admin/system-health.
+
+    WHAT PROBLEM IT SOLVES
+    ----------------------
+    Prevents the System Health panel from calling a non-existent backend route.
+  */
+  return apiRequest<SystemHealthResponse>('/admin/system-health');
 }
 
 function StatCard(props: {
@@ -157,22 +174,24 @@ export default function AdminSystemPage() {
     This file stays grounded in the AdminSystemPage you sent.
 
     Existing real behavior is preserved:
-    - same backend endpoints
     - same query keys
     - same manager/admin visibility rules
     - same section order
-    - same diagnostics and system-health rendering
+    - same diagnostics rendering
+    - same shared UI foundation classes
 
-    This pass applies the shared UI foundation carefully:
-    - summary cards now align with the shared app-grid-stats layer
-    - sections now use app-panel/app-panel--padded
-    - info/warning/error surfaces align with the shared state layer
-    - no diagnostics logic was changed
+    The only backend contract fix:
+    - corrected the System Health endpoint to /admin/system-health
+
+    WHY IT CHANGED
+    --------------
+    The previous endpoint had one extra /system-health segment that does not
+    match the uploaded backend route registry.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes Admin System visually consistent with the rest of the polished admin
-    pages without changing contracts, access rules, or data flow.
+    Lets admin users load System Health from the real backend route without
+    changing UI structure or access rules.
   */
   const capabilities = getRoleCapabilities();
 
@@ -526,16 +545,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   statsGrid: {
-    /*
-      What changed:
-      - Preserved the card layout, but made the stat grid use the same page-wide rhythm as the other polished surfaces.
-
-      Why:
-      - This page belongs to the admin/control-plane family and should visually sit well beside Users and the master-data pages.
-
-      What problem this solves:
-      - Keeps the top summary area stable across viewport widths.
-    */
     width: '100%',
     minWidth: 0
   },
@@ -577,17 +586,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5
   },
   grid: {
-    /*
-      What changed:
-      - Switched the responsive columns to minmax(0, 1fr).
-
-      Why:
-      - Operational/admin pages often contain long IDs and diagnostics strings.
-      - Without a zero-based min width, panels can push the grid wider than intended.
-
-      What problem this solves:
-      - Prevents layout overflow pressure and keeps the two-column split resilient on tablet and smaller laptop widths.
-    */
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
     gap: '20px',
@@ -626,16 +624,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   itemCard: {
-    /*
-      What changed:
-      - Kept the existing diagnostic card structure, but added width guards.
-
-      Why:
-      - This page frequently renders long IDs, keys, and issue messages.
-
-      What problem this solves:
-      - Stops cards from visually breaking when content is unusually long.
-    */
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     padding: '14px',
@@ -671,16 +659,6 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '4px'
   },
   keyValueRow: {
-    /*
-      What changed:
-      - Allowed the key/value rows to wrap and align from the top.
-
-      Why:
-      - Long tenant IDs and timestamps can crowd the row badly on small widths.
-
-      What problem this solves:
-      - Keeps status rows readable without changing the actual data shown.
-    */
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
