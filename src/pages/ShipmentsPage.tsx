@@ -67,6 +67,55 @@ type ShipmentSummary = {
   line_count?: number;
   total_ordered_quantity?: number | string;
   total_received_quantity?: number | string;
+
+  guidedEmptyState: {
+    display: 'grid',
+    gap: 14,
+    border: '1px dashed #cbd5e1',
+    borderRadius: 18,
+    background: '#f8fafc',
+    padding: 18
+  },
+  guidedEmptyStateTitle: {
+    fontSize: '1rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  guidedEmptyStateText: {
+    color: '#475569',
+    lineHeight: 1.6
+  },
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12
+  },
+  workflowStepCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    background: '#ffffff',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepCardComplete: {
+    border: '1px solid #bbf7d0',
+    borderRadius: 16,
+    background: '#f0fdf4',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem'
+  },
 };
 
 type ShipmentItem = {
@@ -91,6 +140,9 @@ type SupplierOption = {
 type ProductOption = {
   id: string;
   name: string;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  barcode?: string | null;
 };
 
 type StorageLocationOption = {
@@ -205,6 +257,7 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
+
 function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
@@ -287,32 +340,6 @@ function useIsMobile(breakpoint = 1024): boolean {
 }
 
 export default function ShipmentsPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the ShipmentsPage you sent.
-
-    Existing real behavior is preserved:
-    - same endpoints
-    - same query keys
-    - same create/add/receive/finalize flows
-    - same scanner return handling
-    - same auto-receive behavior
-    - same role enforcement
-    - same shipment and item state model
-
-    This pass is UI-only and applies the shared shell/page consistency carefully:
-    - major panels now use app-panel/app-panel--padded
-    - page-level states now align with shared warning/error/success surfaces
-    - action rows align more closely with the shared app-actions rhythm
-    - width guards and wrapping were tightened for dense shipment content
-    - no shipment logic or backend contract was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes Shipments visually consistent with the other polished operational pages
-    while preserving the full receiving workflow and scanner integration exactly as implemented.
-  */
   const queryClient = useQueryClient();
 
   const { role, canManageShipments, canReceiveShipments } = getRoleCapabilities();
@@ -464,6 +491,23 @@ export default function ShipmentsPage() {
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
+
+  const shipmentProductOptions = useMemo(() => {
+    const allProducts = productsQuery.data ?? [];
+
+    if (!selectedShipment) {
+      return allProducts;
+    }
+
+    return allProducts.filter((product) => {
+      if (!product.supplier_id) {
+        return true;
+      }
+
+      return product.supplier_id === selectedShipment.supplier_id;
+    });
+  }, [productsQuery.data, selectedShipment]);
+
 
   const selectedShipmentOrderedTotal = shipmentItems.reduce(
     (sum, item) => sum + toNumber(item.quantity),
@@ -799,8 +843,22 @@ export default function ShipmentsPage() {
     setPageError(null);
     setPageMessage(null);
 
-    if (!selectedShipmentId) {
+    if (!selectedShipmentId || !selectedShipment) {
       setPageError('Select a shipment first.');
+      return;
+    }
+
+    const selectedProduct = (productsQuery.data ?? []).find(
+      (product) => product.id === itemForm.product_id
+    );
+
+    if (
+      selectedProduct?.supplier_id &&
+      selectedProduct.supplier_id !== selectedShipment.supplier_id
+    ) {
+      setPageError(
+        'Product supplier does not match the selected shipment supplier. Choose a product from this supplier, or use an unassigned product.'
+      );
       return;
     }
 
@@ -906,9 +964,9 @@ export default function ShipmentsPage() {
   };
 
   return (
-    <div style={styles.page}>
+    <div>
       <div style={styles.header}>
-        <div style={styles.headerTextBlock}>
+        <div>
           <h2 style={styles.title}>Shipments</h2>
           <p style={styles.description}>
             Create inbound shipments, add shipment items, receive lines partially
@@ -917,16 +975,16 @@ export default function ShipmentsPage() {
         </div>
       </div>
 
-      {pageError ? <div className="app-error-state" style={styles.errorBox}>{pageError}</div> : null}
-      {pageMessage ? <div className="app-success-state" style={styles.successBox}>{pageMessage}</div> : null}
+      {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
+      {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
 
       {!canManageShipments ? (
-        <div className="app-warning-state" style={styles.warningBox}>
+        <div style={styles.warningBox}>
           Current role: {role.toUpperCase()}. Shipment creation, shipment item changes, and finalization are blocked in the frontend because your backend only allows manager and admin users to perform those writes. Receiving remains available according to the existing backend access model.
         </div>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Shipment</h3>
 
         <form onSubmit={handleCreateShipment} style={styles.formGrid}>
@@ -984,7 +1042,7 @@ export default function ShipmentsPage() {
             />
           </div>
 
-          <div className="app-actions" style={styles.formActionRow}>
+          <div style={styles.formActionRow}>
             <button
               type="submit"
               style={styles.primaryButton}
@@ -1003,9 +1061,9 @@ export default function ShipmentsPage() {
           gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 420px) minmax(0, 1fr)'
         }}
       >
-        <div className="app-panel app-panel--padded" style={styles.panel}>
+        <div style={styles.panel}>
           <div style={styles.shipmentListHeader}>
-            <div style={styles.shipmentListHeaderText}>
+            <div>
               <h3 style={styles.panelTitle}>Shipment List</h3>
               <p style={styles.panelSubtitle}>
                 Filter shipments and select one for line management and receiving.
@@ -1014,7 +1072,6 @@ export default function ShipmentsPage() {
           </div>
 
           <div
-            className="app-grid-toolbar"
             style={{
               ...styles.filterGrid,
               gridTemplateColumns: isMobile ? '1fr' : '1fr 180px'
@@ -1114,9 +1171,9 @@ export default function ShipmentsPage() {
           </div>
         </div>
 
-        <div className="app-panel app-panel--padded" style={styles.panel}>
+        <div style={styles.panel}>
           <div style={styles.shipmentListHeader}>
-            <div style={styles.shipmentListHeaderText}>
+            <div>
               <h3 style={styles.panelTitle}>Selected Shipment</h3>
               <p style={styles.panelSubtitle}>
                 Add shipment lines, receive stock into locations, and finalize the shipment.
@@ -1203,7 +1260,7 @@ export default function ShipmentsPage() {
               >
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
-                    <div style={styles.readinessHeaderText}>
+                    <div>
                       <h4 style={styles.sectionTitle}>Receiving Progress</h4>
                       <div style={styles.inlineHint}>
                         Keep operators oriented while partially receiving the shipment.
@@ -1241,7 +1298,7 @@ export default function ShipmentsPage() {
 
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
-                    <div style={styles.readinessHeaderText}>
+                    <div>
                       <h4 style={styles.sectionTitle}>Scanner Readiness</h4>
                       <div style={styles.inlineHint}>
                         Make scan destination explicit before operators open the scanner.
@@ -1271,15 +1328,15 @@ export default function ShipmentsPage() {
                   </select>
 
                   {!hasStorageLocations ? (
-                    <div className="app-warning-state" style={styles.scanWarningBanner}>
+                    <div style={styles.scanWarningBanner}>
                       No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
                     </div>
                   ) : selectedScannerLocationId ? (
-                    <div className="app-success-state" style={styles.scanReadyBanner}>
+                    <div style={styles.scanReadyBanner}>
                       Scanning into: <strong>{selectedScannerLocationName}</strong>
                     </div>
                   ) : (
-                    <div className="app-warning-state" style={styles.scanWarningBanner}>
+                    <div style={styles.scanWarningBanner}>
                       Default Scan Location required before scanning.
                     </div>
                   )}
@@ -1304,12 +1361,19 @@ export default function ShipmentsPage() {
                     required
                   >
                     <option value="">Select product</option>
-                    {(productsQuery.data ?? []).map((product) => (
+                    {shipmentProductOptions.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
+                        {product.supplier_name ? ` · ${product.supplier_name}` : ''}
+                        {product.barcode ? ` · ${product.barcode}` : ''}
                       </option>
                     ))}
                   </select>
+                  {selectedShipment ? (
+                    <div style={styles.inlineHint}>
+                      List is limited to products from this shipment supplier, plus products without supplier assignment.
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>
@@ -1330,7 +1394,7 @@ export default function ShipmentsPage() {
                   />
                 </div>
 
-                <div className="app-actions" style={styles.formActionRow}>
+                <div style={styles.formActionRow}>
                   <button
                     type="submit"
                     style={styles.primaryButton}
@@ -1364,10 +1428,10 @@ export default function ShipmentsPage() {
                 </div>
 
                 <div
-                  className="app-actions"
                   style={{
-                    ...styles.itemsHeaderActions,
+                    display: 'flex',
                     flexDirection: isMobile ? 'column' : 'row',
+                    gap: 10,
                     width: isMobile ? '100%' : 'auto'
                   }}
                 >
@@ -1660,60 +1724,51 @@ export default function ShipmentsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: {
-    width: '100%',
-    minWidth: 0
-  },
   header: {
-    marginBottom: 20,
-    minWidth: 0
-  },
-  headerTextBlock: {
-    minWidth: 0
+    marginBottom: 20
   },
   title: {
     margin: 0,
     fontSize: 28,
     fontWeight: 800,
-    color: '#111827',
-    wordBreak: 'break-word'
+    color: '#111827'
   },
   description: {
     marginTop: 8,
     color: '#6b7280',
     lineHeight: 1.6,
-    maxWidth: 860,
-    wordBreak: 'break-word'
+    maxWidth: 860
   },
   panel: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     marginBottom: 20,
-    minWidth: 0,
-    overflow: 'hidden'
+    minWidth: 0
   },
   panelTitle: {
     margin: 0,
     fontSize: 18,
     fontWeight: 700,
-    color: '#111827',
-    wordBreak: 'break-word'
+    color: '#111827'
   },
   panelSubtitle: {
     marginTop: 6,
     color: '#6b7280',
     fontSize: 14,
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
+    lineHeight: 1.5
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 16,
-    alignItems: 'end',
-    minWidth: 0
+    alignItems: 'end'
   },
   formActionRow: {
-    alignItems: 'end',
-    minWidth: 0
+    display: 'flex',
+    alignItems: 'end'
   },
   label: {
     display: 'block',
@@ -1788,33 +1843,43 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'not-allowed'
   },
   errorBox: {
-    marginBottom: 16
+    marginBottom: 16,
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#991b1b',
+    borderRadius: 12,
+    padding: '12px 14px'
   },
   warningBox: {
-    marginBottom: '16px'
+    marginBottom: '16px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412'
   },
   successBox: {
-    marginBottom: 16
+    marginBottom: 16,
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#065f46',
+    borderRadius: 12,
+    padding: '12px 14px'
   },
   twoColumnGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr',
     gap: 20,
-    alignItems: 'start',
-    width: '100%',
-    minWidth: 0
+    alignItems: 'start'
   },
   shipmentListHeader: {
-    marginBottom: 16,
-    minWidth: 0
-  },
-  shipmentListHeaderText: {
-    minWidth: 0
+    marginBottom: 16
   },
   filterGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 180px',
     gap: 12,
-    marginBottom: 16,
-    minWidth: 0
+    marginBottom: 16
   },
   shipmentList: {
     display: 'flex',
@@ -1830,8 +1895,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 14,
     background: '#ffffff',
     cursor: 'pointer',
-    width: '100%',
-    minWidth: 0
+    width: '100%'
   },
   shipmentCardSelected: {
     border: '1px solid #2563eb',
@@ -1862,9 +1926,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gap: 6,
     color: '#374151',
-    fontSize: 13,
-    minWidth: 0,
-    wordBreak: 'break-word'
+    fontSize: 13
   },
   badgeBase: {
     display: 'inline-flex',
@@ -1897,16 +1959,14 @@ const styles: Record<string, CSSProperties> = {
     margin: '0 0 14px',
     fontSize: 16,
     fontWeight: 700,
-    color: '#111827',
-    wordBreak: 'break-word'
+    color: '#111827'
   },
   itemsHeaderRow: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: 12,
     alignItems: 'center',
-    marginBottom: 14,
-    minWidth: 0
+    marginBottom: 14
   },
   itemsHeaderContent: {
     display: 'flex',
@@ -1914,10 +1974,6 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
     minWidth: 0,
     flex: 1
-  },
-  itemsHeaderActions: {
-    gap: 10,
-    minWidth: 0
   },
   defaultLocationBlock: {
     display: 'flex',
@@ -1937,13 +1993,12 @@ const styles: Record<string, CSSProperties> = {
   },
   itemTableWrapper: {
     overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    minWidth: 0
+    WebkitOverflowScrolling: 'touch'
   },
   itemTable: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: 900
+    minWidth: 980
   },
   th: {
     textAlign: 'left',
@@ -1960,8 +2015,7 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
     color: '#111827',
-    fontSize: 14,
-    wordBreak: 'break-word'
+    fontSize: 14
   },
   highlightedTableRow: {
     background: '#eff6ff'
@@ -1986,8 +2040,7 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e5e7eb',
     borderRadius: 14,
     padding: 14,
-    background: '#ffffff',
-    minWidth: 0
+    background: '#ffffff'
   },
   mobileItemCardHighlighted: {
     border: '1px solid #60a5fa',
@@ -2069,176 +2122,6 @@ const styles: Record<string, CSSProperties> = {
   mobileReceiveButtonDisabled: {
     background: '#9ca3af',
     cursor: 'not-allowed'
-  },
-
-  guidedEmptyState: {
-    display: 'grid',
-    gap: 14,
-    border: '1px dashed #cbd5e1',
-    borderRadius: 18,
-    background: '#f8fafc',
-    padding: 18,
-    minWidth: 0
-  },
-  guidedEmptyStateTitle: {
-    fontSize: '1rem',
-    fontWeight: 800,
-    color: '#0f172a',
-    wordBreak: 'break-word'
-  },
-  guidedEmptyStateText: {
-    color: '#475569',
-    lineHeight: 1.6,
-    wordBreak: 'break-word'
-  },
-  workflowGuideGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
-    minWidth: 0
-  },
-  workflowStepCard: {
-    border: '1px solid #e2e8f0',
-    borderRadius: 16,
-    background: '#ffffff',
-    padding: 14,
-    display: 'grid',
-    gap: 8,
-    minWidth: 0
-  },
-  workflowStepCardComplete: {
-    border: '1px solid #bbf7d0',
-    borderRadius: 16,
-    background: '#f0fdf4',
-    padding: 14,
-    display: 'grid',
-    gap: 8,
-    minWidth: 0
-  },
-  workflowStepLabel: {
-    fontSize: '0.86rem',
-    fontWeight: 800,
-    color: '#0f172a',
-    wordBreak: 'break-word'
-  },
-  workflowStepText: {
-    color: '#475569',
-    lineHeight: 1.5,
-    fontSize: '0.92rem',
-    wordBreak: 'break-word'
-  },
-  scannerReadinessSection: {
-    display: 'grid',
-    gridTemplateColumns: '1fr',
-    gap: 16,
-    minWidth: 0,
-    alignItems: 'stretch'
-  },
-  readinessCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 14,
-    background: '#ffffff',
-    padding: 16,
-    display: 'grid',
-    gap: 14,
-    minWidth: 0
-  },
-  readinessHeaderRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    flexWrap: 'wrap',
-    minWidth: 0
-  },
-  readinessHeaderText: {
-    minWidth: 0
-  },
-  readinessStatusReady: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    padding: '6px 10px',
-    fontSize: 12,
-    fontWeight: 700,
-    background: '#dcfce7',
-    color: '#166534'
-  },
-  readinessStatusBlocked: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    padding: '6px 10px',
-    fontSize: 12,
-    fontWeight: 700,
-    background: '#fef3c7',
-    color: '#92400e'
-  },
-  progressBadgeComplete: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    padding: '6px 10px',
-    fontSize: 12,
-    fontWeight: 700,
-    background: '#dcfce7',
-    color: '#166534'
-  },
-  progressBadgePending: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    padding: '6px 10px',
-    fontSize: 12,
-    fontWeight: 700,
-    background: '#eff6ff',
-    color: '#1d4ed8'
-  },
-  progressSummaryRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-    gap: 12,
-    minWidth: 0
-  },
-  progressMetricBox: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    background: '#f8fafc',
-    padding: 12,
-    display: 'grid',
-    gap: 6,
-    minWidth: 0,
-    color: '#111827'
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 10,
-    borderRadius: 999,
-    background: '#e5e7eb',
-    overflow: 'hidden'
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 999,
-    background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)'
-  },
-  defaultLocationSummary: {
-    color: '#374151',
-    fontSize: 14,
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
-  },
-  scanReadyBanner: {
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
-  },
-  scanWarningBanner: {
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
   },
   emptyState: {
     color: '#6b7280',

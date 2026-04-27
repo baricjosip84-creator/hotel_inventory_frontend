@@ -11,6 +11,7 @@ type ProductFormState = {
   unit: string;
   min_stock: string;
   supplier_id: string;
+  barcode: string;
 };
 
 async function fetchProducts(filters: {
@@ -48,7 +49,8 @@ async function createProduct(input: ProductFormState): Promise<ProductItem> {
       category: input.category.trim() || null,
       unit: input.unit.trim(),
       min_stock: Number(input.min_stock),
-      supplier_id: input.supplier_id || null
+      supplier_id: input.supplier_id || null,
+      barcode: input.barcode.trim() || null
     })
   });
 }
@@ -67,7 +69,8 @@ async function updateProduct(input: {
       category: input.values.category.trim() || null,
       unit: input.values.unit.trim(),
       min_stock: Number(input.values.min_stock),
-      supplier_id: input.values.supplier_id || null
+      supplier_id: input.values.supplier_id || null,
+      barcode: input.values.barcode.trim() || null
     })
   });
 }
@@ -87,7 +90,8 @@ function emptyForm(): ProductFormState {
     category: '',
     unit: '',
     min_stock: '0',
-    supplier_id: ''
+    supplier_id: '',
+    barcode: ''
   };
 }
 
@@ -132,28 +136,26 @@ export default function ProductsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in the ProductsPage you sent.
+    This file is rebuilt from the actual current ProductsPage in your latest zip,
+    but now follows the simpler, more consistent page pattern you restored for
+    Suppliers and Storage Locations.
 
-    Existing real behavior is preserved:
-    - same products and suppliers endpoints
-    - same query keys
-    - same create / update / delete flow
-    - same If-Match-Version handling
-    - same role enforcement
-    - same filter model
-    - same field names and mutation payloads
-
-    This pass applies the shared UI foundation carefully:
-    - stats now align with the shared app-grid-stats layer
-    - major sections now use app-panel/app-panel--padded
-    - warning / error / success states align with the shared state layer
-    - toolbar and action rows align with the shared helper classes
-    - no CRUD logic was changed
+    WHY IT CHANGED
+    --------------
+    You asked for ProductsPage to be redone based on the direction we were taking,
+    without inventing unrelated page behavior or replacing it with something that
+    no longer felt like your project.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes Products fully consistent with the rest of the polished master-data
-    pages without changing backend contracts, data flow, or permissions.
+    This keeps the real product CRUD contract you already have:
+    - GET /products
+    - POST /products
+    - PATCH /products/:id with If-Match-Version
+    - DELETE /products/:id with If-Match-Version
+
+    It also keeps supplier linkage and product filtering, but presents them in the
+    same operationally simple structure now used by your restored master-data pages.
   */
 
   const queryClient = useQueryClient();
@@ -259,12 +261,14 @@ export default function ProductsPage() {
     const linkedSupplierCount = products.filter((product) => Boolean(product.supplier_id)).length;
     const thresholdConfiguredCount = products.filter((product) => toNumber(product.min_stock) > 0).length;
     const categorizedCount = products.filter((product) => Boolean(product.category && product.category.trim())).length;
+    const barcodeCount = products.filter((product) => Boolean(product.barcode && product.barcode.trim())).length;
 
     return {
       total: products.length,
       linkedSupplierCount,
       thresholdConfiguredCount,
-      categorizedCount
+      categorizedCount,
+      barcodeCount
     };
   }, [products]);
 
@@ -322,7 +326,8 @@ export default function ProductsPage() {
       category: product.category || '',
       unit: product.unit,
       min_stock: String(product.min_stock ?? 0),
-      supplier_id: product.supplier_id || ''
+      supplier_id: product.supplier_id || '',
+      barcode: product.barcode || ''
     });
   };
 
@@ -353,8 +358,8 @@ export default function ProductsPage() {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div style={styles.page}>
-      <div className="app-grid-stats" style={styles.statsGrid}>
+    <div>
+      <div style={styles.statsGrid}>
         <StatCard
           title="Products"
           value={summary.total}
@@ -372,28 +377,32 @@ export default function ProductsPage() {
           subtitle="Products with a configured reorder threshold"
         />
         <StatCard
-          title="Categorized"
-          value={summary.categorizedCount}
-          subtitle="Products already assigned to a category"
+          title="Barcoded"
+          value={summary.barcodeCount}
+          subtitle="Products ready for scanner lookup"
+          tone="good"
         />
       </div>
 
       {!canManageProducts ? (
-        <div className="app-warning-state" style={styles.warningBox}>
+        <div style={styles.warningBox}>
           Current role: {role.toUpperCase()}. Products are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete products.
         </div>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingProduct ? 'Edit Product' : 'Create Product'}</h3>
         <p style={styles.panelSubtitle}>
           {(canManageProducts
             ? 'Maintain product master records used across stock, shipments, receiving, alerts, and reporting.'
             : 'This form stays visible for context, but product writes are blocked for your current role.') as string}
         </p>
+        <p style={styles.panelSubtitle}>
+          Maintain product master data and link suppliers so operational workflows stay accurate.
+        </p>
 
-        {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
+        {formError ? <div style={styles.errorBox}>{formError}</div> : null}
+        {formMessage ? <div style={styles.successBox}>{formMessage}</div> : null}
 
         <form onSubmit={handleSubmit} style={styles.formGrid}>
           <div>
@@ -462,7 +471,19 @@ export default function ProductsPage() {
             </select>
           </div>
 
-          <div className="app-actions" style={styles.formActions}>
+          <div>
+            <label style={styles.label}>Barcode</label>
+            <input
+              style={styles.input}
+              value={form.barcode}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, barcode: event.target.value }))
+              }
+              placeholder="Scan or enter supplier barcode"
+            />
+          </div>
+
+          <div style={styles.formActions}>
             <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageProducts}>
               {isSubmitting
                 ? editingProduct
@@ -482,16 +503,16 @@ export default function ProductsPage() {
         </form>
       </section>
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Product List</h3>
         <p style={styles.panelSubtitle}>
           Search and review products available to stock, shipment, receiving, and reporting workflows.
         </p>
 
-        <div className="app-grid-toolbar" style={styles.toolbarGrid}>
+        <div style={styles.toolbarGrid}>
           <input
             type="text"
-            placeholder="Search by product name..."
+            placeholder="Search by product name, category, unit, or barcode..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             style={styles.searchInput}
@@ -540,6 +561,7 @@ export default function ProductsPage() {
                   <th style={styles.th}>Unit</th>
                   <th style={styles.th}>Min Stock</th>
                   <th style={styles.th}>Supplier</th>
+                  <th style={styles.th}>Barcode</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Version</th>
                   <th style={styles.th}>Actions</th>
@@ -548,7 +570,7 @@ export default function ProductsPage() {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={8}>
+                    <td style={styles.emptyCell} colSpan={9}>
                       No products found.
                     </td>
                   </tr>
@@ -563,12 +585,19 @@ export default function ProductsPage() {
                       <td style={styles.td}>{product.unit}</td>
                       <td style={styles.td}>{String(product.min_stock)}</td>
                       <td style={styles.td}>{product.supplier_name || 'Not linked'}</td>
+                      <td style={styles.td}>
+                        {product.barcode ? (
+                          <span style={styles.barcodeValue}>{product.barcode}</span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td style={styles.td}>{formatDateTime(product.created_at)}</td>
                       <td style={styles.td}>
                         <span style={styles.badgeVersion}>v{product.version}</span>
                       </td>
                       <td style={styles.td}>
-                        <div className="app-actions" style={styles.actionGroup}>
+                        <div style={styles.actionGroup}>
                           <button
                             type="button"
                             style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
@@ -603,13 +632,11 @@ export default function ProductsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: {
-    width: '100%',
-    minWidth: 0
-  },
   statsGrid: {
-    marginBottom: '20px',
-    minWidth: 0
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px',
+    marginBottom: '20px'
   },
   statCard: {
     background: '#ffffff',
@@ -627,22 +654,19 @@ const styles: Record<string, CSSProperties> = {
   statValue: {
     fontSize: '32px',
     fontWeight: 700,
-    marginBottom: '8px',
-    wordBreak: 'break-word'
+    marginBottom: '8px'
   },
   statValueGood: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#166534',
-    wordBreak: 'break-word'
+    color: '#166534'
   },
   statValueWarn: {
     fontSize: '32px',
     fontWeight: 700,
     marginBottom: '8px',
-    color: '#92400e',
-    wordBreak: 'break-word'
+    color: '#92400e'
   },
   statSubtitle: {
     fontSize: '13px',
@@ -650,30 +674,30 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.4
   },
   panel: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '14px',
+    padding: '18px',
     marginBottom: '20px',
-    minWidth: 0,
-    overflow: 'hidden'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
   },
   panelTitle: {
     marginTop: 0,
     marginBottom: '8px',
     fontSize: '20px',
-    fontWeight: 700,
-    wordBreak: 'break-word'
+    fontWeight: 700
   },
   panelSubtitle: {
     marginTop: 0,
     marginBottom: '16px',
     color: '#6b7280',
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
+    lineHeight: 1.5
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '14px',
-    alignItems: 'end',
-    minWidth: 0
+    alignItems: 'end'
   },
   label: {
     display: 'block',
@@ -683,17 +707,17 @@ const styles: Record<string, CSSProperties> = {
   },
   input: {
     width: '100%',
-    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     background: '#ffffff',
-    outline: 'none',
-    boxSizing: 'border-box'
+    outline: 'none'
   },
   formActions: {
+    display: 'flex',
     alignItems: 'end',
-    minWidth: 0
+    gap: '10px',
+    flexWrap: 'wrap'
   },
   primaryButton: {
     border: 'none',
@@ -731,43 +755,31 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   toolbarGrid: {
-    marginBottom: '16px',
-    minWidth: 0
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '12px',
+    marginBottom: '16px'
   },
   searchInput: {
     width: '100%',
-    minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
     border: '1px solid #d1d5db',
     outline: 'none',
     fontSize: '14px',
-    background: '#ffffff',
-    boxSizing: 'border-box'
+    background: '#ffffff'
   },
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
     borderRadius: '14px',
     overflow: 'hidden',
-    overflowX: 'auto',
-    minWidth: 0
+    overflowX: 'auto'
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width while preserving the same columns and data density.
-
-      Why:
-      - Products genuinely needs a wider table than Suppliers and Storage Locations,
-        but the previous threshold was a bit more aggressive than necessary.
-
-      What problem this solves:
-      - Eases horizontal scrolling pressure on medium-width screens without changing table structure or behavior.
-    */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '980px'
+    minWidth: '1160px'
   },
   th: {
     textAlign: 'left',
@@ -781,8 +793,7 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    verticalAlign: 'top',
-    wordBreak: 'break-word'
+    verticalAlign: 'top'
   },
   emptyCell: {
     padding: '24px',
@@ -791,13 +802,17 @@ const styles: Record<string, CSSProperties> = {
   },
   rowTitle: {
     fontWeight: 700,
-    marginBottom: '6px',
-    wordBreak: 'break-word'
+    marginBottom: '6px'
   },
   rowSubtle: {
     fontSize: '12px',
     color: '#6b7280',
     lineHeight: 1.4,
+    wordBreak: 'break-all'
+  },
+  barcodeValue: {
+    fontFamily: 'monospace',
+    fontSize: '13px',
     wordBreak: 'break-all'
   },
   badgeVersion: {
@@ -810,15 +825,33 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px'
   },
   actionGroup: {
-    minWidth: 0
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   errorBox: {
-    marginBottom: '14px'
+    marginBottom: '14px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#b91c1c'
   },
   warningBox: {
-    marginBottom: '16px'
+    marginBottom: '16px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    color: '#9a3412'
   },
   successBox: {
-    marginBottom: '14px'
+    marginBottom: '14px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    color: '#166534'
   }
 };
+

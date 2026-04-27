@@ -31,6 +31,7 @@ export interface ProductItem {
   min_stock: number | string;
   supplier_id: string | null;
   supplier_name?: string | null;
+  barcode?: string | null;
   created_at: string;
   version: number;
 }
