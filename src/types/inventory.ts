@@ -22,6 +22,19 @@ export interface DashboardSummaryResponse {
   };
 }
 
+export interface ProductPackageItem {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  package_name: string;
+  barcode: string;
+  units_per_package: number | string;
+  is_default: boolean;
+  created_at?: string;
+  deleted_at?: string | null;
+  version: number;
+}
+
 export interface ProductItem {
   id: string;
   tenant_id: string;
@@ -32,6 +45,8 @@ export interface ProductItem {
   supplier_id: string | null;
   supplier_name?: string | null;
   barcode?: string | null;
+  package_count?: number | string;
+  packages?: ProductPackageItem[];
   created_at: string;
   version: number;
 }

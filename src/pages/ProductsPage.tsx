@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { ProductItem, SupplierItem } from '../types/inventory';
+import type { ProductItem, ProductPackageItem, SupplierItem } from '../types/inventory';
 
 type ProductFormState = {
   name: string;
@@ -12,6 +12,13 @@ type ProductFormState = {
   min_stock: string;
   supplier_id: string;
   barcode: string;
+};
+
+type PackageFormState = {
+  package_name: string;
+  barcode: string;
+  units_per_package: string;
+  is_default: boolean;
 };
 
 async function fetchProducts(filters: {
@@ -39,6 +46,10 @@ async function fetchProducts(filters: {
 
 async function fetchSuppliers(): Promise<SupplierItem[]> {
   return apiRequest<SupplierItem[]>('/suppliers');
+}
+
+async function fetchProductPackages(productId: string): Promise<ProductPackageItem[]> {
+  return apiRequest<ProductPackageItem[]>(`/products/${productId}/packages`);
 }
 
 async function createProduct(input: ProductFormState): Promise<ProductItem> {
@@ -84,6 +95,63 @@ async function deleteProduct(product: ProductItem): Promise<void> {
   });
 }
 
+async function createProductPackage(input: {
+  productId: string;
+  values: PackageFormState;
+}): Promise<ProductPackageItem> {
+  return apiRequest<ProductPackageItem>(`/products/${input.productId}/packages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      package_name: input.values.package_name.trim(),
+      barcode: input.values.barcode.trim(),
+      units_per_package: Number(input.values.units_per_package),
+      is_default: input.values.is_default
+    })
+  });
+}
+
+async function updateProductPackage(input: {
+  productId: string;
+  packageItem: ProductPackageItem;
+  values: PackageFormState;
+}): Promise<ProductPackageItem> {
+  return apiRequest<ProductPackageItem>(
+    `/products/${input.productId}/packages/${input.packageItem.id}`,
+    {
+      method: 'PATCH',
+      headers: {
+        /*
+          Safe to send. If the backend route does not require optimistic locking
+          for package rows yet, this header is ignored by Express.
+        */
+        'If-Match-Version': String(input.packageItem.version)
+      },
+      body: JSON.stringify({
+        package_name: input.values.package_name.trim(),
+        barcode: input.values.barcode.trim(),
+        units_per_package: Number(input.values.units_per_package),
+        is_default: input.values.is_default
+      })
+    }
+  );
+}
+
+async function deleteProductPackage(input: {
+  productId: string;
+  packageItem: ProductPackageItem;
+}): Promise<void> {
+  await apiRequest(`/products/${input.productId}/packages/${input.packageItem.id}`, {
+    method: 'DELETE',
+    headers: {
+      /*
+        Safe to send. If the backend route does not require optimistic locking
+        for package rows yet, this header is ignored by Express.
+      */
+      'If-Match-Version': String(input.packageItem.version)
+    }
+  });
+}
+
 function emptyForm(): ProductFormState {
   return {
     name: '',
@@ -92,6 +160,15 @@ function emptyForm(): ProductFormState {
     min_stock: '0',
     supplier_id: '',
     barcode: ''
+  };
+}
+
+function emptyPackageForm(): PackageFormState {
+  return {
+    package_name: '',
+    barcode: '',
+    units_per_package: '1',
+    is_default: false
   };
 }
 
@@ -136,26 +213,18 @@ export default function ProductsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file is rebuilt from the actual current ProductsPage in your latest zip,
-    but now follows the simpler, more consistent page pattern you restored for
-    Suppliers and Storage Locations.
+    Products now support package barcode management directly on this page.
 
     WHY IT CHANGED
     --------------
-    You asked for ProductsPage to be redone based on the direction we were taking,
-    without inventing unrelated page behavior or replacing it with something that
-    no longer felt like your project.
+    Backend Phase 1 added product_packages and backend Phase 2/3 made scanner
+    lookup and receiving package-aware. The frontend now needs a way for users
+    to create, edit, delete, and review package barcodes per product.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    This keeps the real product CRUD contract you already have:
-    - GET /products
-    - POST /products
-    - PATCH /products/:id with If-Match-Version
-    - DELETE /products/:id with If-Match-Version
-
-    It also keeps supplier linkage and product filtering, but presents them in the
-    same operationally simple structure now used by your restored master-data pages.
+    A product is the base inventory item, while product packages represent
+    scannable real-world formats such as bottle, 6-pack, case, or crate.
   */
 
   const queryClient = useQueryClient();
@@ -168,6 +237,12 @@ export default function ProductsPage() {
   const [form, setForm] = useState<ProductFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [selectedPackageProduct, setSelectedPackageProduct] = useState<ProductItem | null>(null);
+  const [editingPackage, setEditingPackage] = useState<ProductPackageItem | null>(null);
+  const [packageForm, setPackageForm] = useState<PackageFormState>(emptyPackageForm());
+  const [packageMessage, setPackageMessage] = useState<string | null>(null);
+  const [packageError, setPackageError] = useState<string | null>(null);
 
   const productsQuery = useQuery({
     queryKey: ['products', search, categoryFilter, supplierFilter],
@@ -182,6 +257,12 @@ export default function ProductsPage() {
   const suppliersQuery = useQuery({
     queryKey: ['suppliers-available-products-page'],
     queryFn: fetchSuppliers
+  });
+
+  const packagesQuery = useQuery({
+    queryKey: ['product-packages', selectedPackageProduct?.id],
+    queryFn: () => fetchProductPackages(selectedPackageProduct!.id),
+    enabled: Boolean(selectedPackageProduct?.id)
   });
 
   const createMutation = useMutation({
@@ -213,6 +294,11 @@ export default function ProductsPage() {
       setFormMessage('Product updated successfully.');
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      if (selectedPackageProduct?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: ['product-packages', selectedPackageProduct.id]
+        });
+      }
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -228,8 +314,12 @@ export default function ProductsPage() {
     mutationFn: deleteProduct,
     onSuccess: async () => {
       setEditingProduct(null);
+      setSelectedPackageProduct(null);
+      setEditingPackage(null);
       setForm(emptyForm());
+      setPackageForm(emptyPackageForm());
       setFormError(null);
+      setPackageError(null);
       setFormMessage('Product deleted successfully.');
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
@@ -244,8 +334,81 @@ export default function ProductsPage() {
     }
   });
 
+  const createPackageMutation = useMutation({
+    mutationFn: createProductPackage,
+    onSuccess: async () => {
+      setEditingPackage(null);
+      setPackageForm(emptyPackageForm());
+      setPackageError(null);
+      setPackageMessage('Package created successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (selectedPackageProduct?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: ['product-packages', selectedPackageProduct.id]
+        });
+      }
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPackageError(error.message);
+      } else {
+        setPackageError('Failed to create package.');
+      }
+      setPackageMessage(null);
+    }
+  });
+
+  const updatePackageMutation = useMutation({
+    mutationFn: updateProductPackage,
+    onSuccess: async () => {
+      setEditingPackage(null);
+      setPackageForm(emptyPackageForm());
+      setPackageError(null);
+      setPackageMessage('Package updated successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (selectedPackageProduct?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: ['product-packages', selectedPackageProduct.id]
+        });
+      }
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPackageError(error.message);
+      } else {
+        setPackageError('Failed to update package.');
+      }
+      setPackageMessage(null);
+    }
+  });
+
+  const deletePackageMutation = useMutation({
+    mutationFn: deleteProductPackage,
+    onSuccess: async () => {
+      setEditingPackage(null);
+      setPackageForm(emptyPackageForm());
+      setPackageError(null);
+      setPackageMessage('Package deleted successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (selectedPackageProduct?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: ['product-packages', selectedPackageProduct.id]
+        });
+      }
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPackageError(error.message);
+      } else {
+        setPackageError('Failed to delete package.');
+      }
+      setPackageMessage(null);
+    }
+  });
+
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
+  const packages = useMemo(() => packagesQuery.data ?? [], [packagesQuery.data]);
 
   const categoryOptions = useMemo(() => {
     return Array.from(
@@ -295,8 +458,8 @@ export default function ProductsPage() {
     }
 
     const parsedMinStock = Number(form.min_stock);
-    if (!Number.isFinite(parsedMinStock)) {
-      setFormError('Minimum stock must be a valid number.');
+    if (!Number.isFinite(parsedMinStock) || parsedMinStock < 0) {
+      setFormError('Minimum stock must be a valid number greater than or equal to zero.');
       return;
     }
 
@@ -309,6 +472,52 @@ export default function ProductsPage() {
     }
 
     createMutation.mutate(form);
+  };
+
+  const handlePackageSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPackageError(null);
+    setPackageMessage(null);
+
+    if (!selectedPackageProduct) {
+      setPackageError('Select a product before managing packages.');
+      return;
+    }
+
+    if (!canManageProducts) {
+      setPackageError('Your current role cannot manage product packages.');
+      return;
+    }
+
+    if (!packageForm.package_name.trim()) {
+      setPackageError('Package name is required.');
+      return;
+    }
+
+    if (!packageForm.barcode.trim()) {
+      setPackageError('Barcode is required.');
+      return;
+    }
+
+    const parsedUnits = Number(packageForm.units_per_package);
+    if (!Number.isFinite(parsedUnits) || parsedUnits <= 0) {
+      setPackageError('Units per package must be a valid number greater than zero.');
+      return;
+    }
+
+    if (editingPackage) {
+      updatePackageMutation.mutate({
+        productId: selectedPackageProduct.id,
+        packageItem: editingPackage,
+        values: packageForm
+      });
+      return;
+    }
+
+    createPackageMutation.mutate({
+      productId: selectedPackageProduct.id,
+      values: packageForm
+    });
   };
 
   const handleStartEdit = (product: ProductItem) => {
@@ -355,7 +564,78 @@ export default function ProductsPage() {
     deleteMutation.mutate(product);
   };
 
+  const handleOpenPackages = (product: ProductItem) => {
+    setSelectedPackageProduct(product);
+    setEditingPackage(null);
+    setPackageForm(emptyPackageForm());
+    setPackageError(null);
+    setPackageMessage(null);
+  };
+
+  const handleClosePackages = () => {
+    setSelectedPackageProduct(null);
+    setEditingPackage(null);
+    setPackageForm(emptyPackageForm());
+    setPackageError(null);
+    setPackageMessage(null);
+  };
+
+  const handleStartEditPackage = (packageItem: ProductPackageItem) => {
+    if (!canManageProducts) {
+      setPackageError('Your current role cannot edit product packages.');
+      setPackageMessage(null);
+      return;
+    }
+
+    setEditingPackage(packageItem);
+    setPackageError(null);
+    setPackageMessage(null);
+    setPackageForm({
+      package_name: packageItem.package_name,
+      barcode: packageItem.barcode,
+      units_per_package: String(packageItem.units_per_package),
+      is_default: Boolean(packageItem.is_default)
+    });
+  };
+
+  const handleCancelPackageEdit = () => {
+    setEditingPackage(null);
+    setPackageForm(emptyPackageForm());
+    setPackageError(null);
+    setPackageMessage(null);
+  };
+
+  const handleDeletePackage = (packageItem: ProductPackageItem) => {
+    if (!selectedPackageProduct) {
+      setPackageError('Select a product before deleting packages.');
+      setPackageMessage(null);
+      return;
+    }
+
+    if (!canManageProducts) {
+      setPackageError('Your current role cannot delete product packages.');
+      setPackageMessage(null);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete package "${packageItem.package_name}" for "${selectedPackageProduct.name}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPackageError(null);
+    setPackageMessage(null);
+    deletePackageMutation.mutate({
+      productId: selectedPackageProduct.id,
+      packageItem
+    });
+  };
+
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isPackageSubmitting = createPackageMutation.isPending || updatePackageMutation.isPending;
 
   return (
     <div>
@@ -379,7 +659,7 @@ export default function ProductsPage() {
         <StatCard
           title="Barcoded"
           value={summary.barcodeCount}
-          subtitle="Products ready for scanner lookup"
+          subtitle="Products with a default barcode package"
           tone="good"
         />
       </div>
@@ -393,12 +673,12 @@ export default function ProductsPage() {
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingProduct ? 'Edit Product' : 'Create Product'}</h3>
         <p style={styles.panelSubtitle}>
-          {(canManageProducts
+          {canManageProducts
             ? 'Maintain product master records used across stock, shipments, receiving, alerts, and reporting.'
-            : 'This form stays visible for context, but product writes are blocked for your current role.') as string}
+            : 'This form stays visible for context, but product writes are blocked for your current role.'}
         </p>
         <p style={styles.panelSubtitle}>
-          Maintain product master data and link suppliers so operational workflows stay accurate.
+          Barcode here is the backward-compatible default package barcode. Additional package barcodes are managed from the Product List.
         </p>
 
         {formError ? <div style={styles.errorBox}>{formError}</div> : null}
@@ -434,7 +714,7 @@ export default function ProductsPage() {
               style={styles.input}
               value={form.unit}
               onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
-              placeholder="Example: kg"
+              placeholder="Example: bottle"
               required
             />
           </div>
@@ -445,6 +725,7 @@ export default function ProductsPage() {
               style={styles.input}
               type="number"
               inputMode="decimal"
+              min="0"
               value={form.min_stock}
               onChange={(event) =>
                 setForm((current) => ({ ...current, min_stock: event.target.value }))
@@ -472,14 +753,14 @@ export default function ProductsPage() {
           </div>
 
           <div>
-            <label style={styles.label}>Barcode</label>
+            <label style={styles.label}>Default Barcode</label>
             <input
               style={styles.input}
               value={form.barcode}
               onChange={(event) =>
                 setForm((current) => ({ ...current, barcode: event.target.value }))
               }
-              placeholder="Scan or enter supplier barcode"
+              placeholder="Scan or enter default package barcode"
             />
           </div>
 
@@ -502,6 +783,182 @@ export default function ProductsPage() {
           </div>
         </form>
       </section>
+
+      {selectedPackageProduct ? (
+        <section style={styles.panel}>
+          <div style={styles.packageHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>Packages for {selectedPackageProduct.name}</h3>
+              <p style={styles.panelSubtitle}>
+                Add scannable package formats such as bottle, 6-pack, case, or crate. Receiving converts package counts into base stock units.
+              </p>
+            </div>
+
+            <button type="button" style={styles.secondaryButton} onClick={handleClosePackages}>
+              Close Packages
+            </button>
+          </div>
+
+          {packageError ? <div style={styles.errorBox}>{packageError}</div> : null}
+          {packageMessage ? <div style={styles.successBox}>{packageMessage}</div> : null}
+
+          <form onSubmit={handlePackageSubmit} style={styles.formGrid}>
+            <div>
+              <label style={styles.label}>Package Name</label>
+              <input
+                style={styles.input}
+                value={packageForm.package_name}
+                onChange={(event) =>
+                  setPackageForm((current) => ({ ...current, package_name: event.target.value }))
+                }
+                placeholder="Example: 6-pack"
+                required
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>Package Barcode</label>
+              <input
+                style={styles.input}
+                value={packageForm.barcode}
+                onChange={(event) =>
+                  setPackageForm((current) => ({ ...current, barcode: event.target.value }))
+                }
+                placeholder="Scan or enter package barcode"
+                required
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>Units Per Package</label>
+              <input
+                style={styles.input}
+                type="number"
+                inputMode="decimal"
+                min="0.000001"
+                step="any"
+                value={packageForm.units_per_package}
+                onChange={(event) =>
+                  setPackageForm((current) => ({ ...current, units_per_package: event.target.value }))
+                }
+                placeholder="1"
+                required
+              />
+            </div>
+
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={packageForm.is_default}
+                onChange={(event) =>
+                  setPackageForm((current) => ({ ...current, is_default: event.target.checked }))
+                }
+              />
+              Default package
+            </label>
+
+            <div style={styles.formActions}>
+              <button
+                type="submit"
+                style={styles.primaryButton}
+                disabled={isPackageSubmitting || !canManageProducts}
+              >
+                {isPackageSubmitting
+                  ? editingPackage
+                    ? 'Updating...'
+                    : 'Creating...'
+                  : editingPackage
+                    ? 'Update Package'
+                    : 'Create Package'}
+              </button>
+
+              {editingPackage ? (
+                <button type="button" style={styles.secondaryButton} onClick={handleCancelPackageEdit}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+
+          <div style={styles.packageTableBlock}>
+            {packagesQuery.isLoading ? <p>Loading packages...</p> : null}
+
+            {packagesQuery.isError ? (
+              <p>Failed to load packages: {(packagesQuery.error as Error).message || 'Unknown error'}</p>
+            ) : null}
+
+            {!packagesQuery.isLoading && !packagesQuery.isError ? (
+              <div style={styles.tableWrapper}>
+                <table style={styles.packageTable}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Package</th>
+                      <th style={styles.th}>Barcode</th>
+                      <th style={styles.th}>Units</th>
+                      <th style={styles.th}>Default</th>
+                      <th style={styles.th}>Version</th>
+                      <th style={styles.th}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {packages.length === 0 ? (
+                      <tr>
+                        <td style={styles.emptyCell} colSpan={6}>
+                          No packages found for this product.
+                        </td>
+                      </tr>
+                    ) : (
+                      packages.map((packageItem) => (
+                        <tr key={packageItem.id}>
+                          <td style={styles.td}>
+                            <div style={styles.rowTitle}>{packageItem.package_name}</div>
+                            <div style={styles.rowSubtle}>Package ID: {packageItem.id}</div>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={styles.barcodeValue}>{packageItem.barcode}</span>
+                          </td>
+                          <td style={styles.td}>{String(packageItem.units_per_package)}</td>
+                          <td style={styles.td}>
+                            {packageItem.is_default ? (
+                              <span style={styles.defaultBadge}>Default</span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td style={styles.td}>
+                            <span style={styles.badgeVersion}>v{packageItem.version}</span>
+                          </td>
+                          <td style={styles.td}>
+                            <div style={styles.actionGroup}>
+                              <button
+                                type="button"
+                                style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
+                                onClick={() => handleStartEditPackage(packageItem)}
+                                disabled={!canManageProducts}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
+                                onClick={() => handleDeletePackage(packageItem)}
+                                disabled={deletePackageMutation.isPending || !canManageProducts}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Product List</h3>
@@ -561,7 +1018,7 @@ export default function ProductsPage() {
                   <th style={styles.th}>Unit</th>
                   <th style={styles.th}>Min Stock</th>
                   <th style={styles.th}>Supplier</th>
-                  <th style={styles.th}>Barcode</th>
+                  <th style={styles.th}>Default Barcode</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Version</th>
                   <th style={styles.th}>Actions</th>
@@ -598,6 +1055,14 @@ export default function ProductsPage() {
                       </td>
                       <td style={styles.td}>
                         <div style={styles.actionGroup}>
+                          <button
+                            type="button"
+                            style={styles.secondaryButton}
+                            onClick={() => handleOpenPackages(product)}
+                          >
+                            Packages
+                          </button>
+
                           <button
                             type="button"
                             style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
@@ -693,6 +1158,17 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     lineHeight: 1.5
   },
+  packageHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '16px',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    marginBottom: '10px'
+  },
+  packageTableBlock: {
+    marginTop: '18px'
+  },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -702,6 +1178,14 @@ const styles: Record<string, CSSProperties> = {
   label: {
     display: 'block',
     marginBottom: '8px',
+    fontSize: '14px',
+    fontWeight: 600
+  },
+  checkboxLabel: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    minHeight: '44px',
     fontSize: '14px',
     fontWeight: 600
   },
@@ -781,6 +1265,11 @@ const styles: Record<string, CSSProperties> = {
     borderCollapse: 'collapse',
     minWidth: '1160px'
   },
+  packageTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    minWidth: '860px'
+  },
   th: {
     textAlign: 'left',
     padding: '14px',
@@ -824,6 +1313,15 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     fontSize: '12px'
   },
+  defaultBadge: {
+    display: 'inline-block',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: '#f0fdf4',
+    color: '#166534',
+    fontWeight: 700,
+    fontSize: '12px'
+  },
   actionGroup: {
     display: 'flex',
     gap: '8px',
@@ -854,4 +1352,3 @@ const styles: Record<string, CSSProperties> = {
     color: '#166534'
   }
 };
-
