@@ -98,6 +98,23 @@ type ProductBarcodeLookupResponse = {
   discrepancy_reason?: string | null;
   product_name?: string;
   barcode: string;
+  product?: {
+    id: string;
+    name: string;
+    barcode?: string | null;
+  };
+  package?: {
+    id: string;
+    package_name: string;
+    barcode: string;
+    units_per_package: number | string;
+    is_default: boolean;
+  };
+  calculated?: {
+    remaining_quantity: number | string;
+    remaining_packages_estimate: number | string;
+    can_receive_one_full_package: boolean;
+  };
 };
 
 type ScannerMode = 'shipment' | 'product';
@@ -173,6 +190,8 @@ export default function ScannerPage() {
   const [resolvedShipmentId, setResolvedShipmentId] = useState<string | null>(null);
   const [resolvedShipmentItemId, setResolvedShipmentItemId] = useState<string | null>(null);
   const [resolvedProductName, setResolvedProductName] = useState<string | null>(null);
+  const [resolvedPackageName, setResolvedPackageName] = useState<string | null>(null);
+  const [resolvedUnitsPerPackage, setResolvedUnitsPerPackage] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -218,12 +237,36 @@ export default function ScannerPage() {
 
     setResolvedShipmentId(match.shipment_id);
     setResolvedShipmentItemId(match.shipment_item_id);
-    setResolvedProductName(match.product_name || null);
+    setResolvedProductName(match.product?.name || match.product_name || null);
+    setResolvedPackageName(match.package?.package_name || null);
+    setResolvedUnitsPerPackage(
+      match.package?.units_per_package !== undefined
+        ? String(match.package.units_per_package)
+        : null
+    );
 
     const params = new URLSearchParams();
     params.set('shipmentId', match.shipment_id);
     params.set('itemId', match.shipment_item_id);
     params.set('scannedBarcode', decodedText);
+
+    if (match.package?.id) {
+      params.set('packageId', match.package.id);
+      params.set('packageName', match.package.package_name);
+      params.set('packageBarcode', match.package.barcode);
+      params.set('unitsPerPackage', String(match.package.units_per_package));
+    }
+
+    if (match.calculated) {
+      params.set(
+        'remainingPackagesEstimate',
+        String(match.calculated.remaining_packages_estimate)
+      );
+      params.set(
+        'canReceiveOneFullPackage',
+        String(match.calculated.can_receive_one_full_package)
+      );
+    }
 
     if (locationId) {
       params.set('locationId', locationId);
@@ -239,6 +282,8 @@ export default function ScannerPage() {
     setResolvedShipmentId(null);
     setResolvedShipmentItemId(null);
     setResolvedProductName(null);
+    setResolvedPackageName(null);
+    setResolvedUnitsPerPackage(null);
     setError(null);
     setIsResolving(true);
 
@@ -289,6 +334,8 @@ export default function ScannerPage() {
     setResolvedShipmentId(null);
     setResolvedShipmentItemId(null);
     setResolvedProductName(null);
+    setResolvedPackageName(null);
+    setResolvedUnitsPerPackage(null);
 
     try {
       await stopScanner();
@@ -608,7 +655,7 @@ export default function ScannerPage() {
         />
       </section>
 
-      {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName ? (
+      {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName || resolvedPackageName ? (
         <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.panelHeader}>
             <div style={styles.panelHeaderText}>
@@ -645,6 +692,16 @@ export default function ScannerPage() {
               <div style={styles.resultCardSuccess}>
                 <div style={styles.resultLabel}>Matched product</div>
                 <div style={styles.resultValue}>{resolvedProductName}</div>
+              </div>
+            ) : null}
+
+            {resolvedPackageName ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>Matched package</div>
+                <div style={styles.resultValue}>
+                  {resolvedPackageName}
+                  {resolvedUnitsPerPackage ? ` · ${resolvedUnitsPerPackage} units/package` : ''}
+                </div>
               </div>
             ) : null}
           </div>

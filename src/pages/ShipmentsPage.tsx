@@ -167,9 +167,24 @@ type ReceiveDraft = {
   discrepancy_reason: string;
 };
 
+type ReceiveShipmentLineItemPayload = {
+  product_id: string;
+  quantity_received?: number;
+  package_id?: string;
+  package_count_received?: number;
+  storage_location_id: string;
+  discrepancy_reason?: string | null;
+};
+
 type PendingAutoReceive = {
   itemId: string;
   scannedBarcode: string | null;
+  packageId: string | null;
+  packageName: string | null;
+  packageBarcode: string | null;
+  unitsPerPackage: number | null;
+  remainingPackagesEstimate: number | null;
+  canReceiveOneFullPackage: boolean | null;
 };
 
 async function fetchShipments(): Promise<ShipmentSummary[]> {
@@ -221,12 +236,7 @@ async function addShipmentItem(input: {
 async function receiveShipmentLine(input: {
   shipmentId: string;
   version: number;
-  item: {
-    product_id: string;
-    quantity_received: number;
-    storage_location_id: string;
-    discrepancy_reason?: string | null;
-  };
+  item: ReceiveShipmentLineItemPayload;
 }): Promise<{ message: string; status: string }> {
   return apiRequest<{ message: string; status: string }>(`/shipments/${input.shipmentId}/receive`, {
     method: 'POST',
@@ -440,7 +450,9 @@ export default function ShipmentsPage() {
       setPageError(null);
 
       const matchedItem = shipmentItems.find((item) => item.product_id === variables.item.product_id);
-      const quantityLabel = formatQuantity(variables.item.quantity_received);
+      const quantityLabel = variables.item.package_count_received
+        ? `${formatQuantity(variables.item.package_count_received)} package${variables.item.package_count_received === 1 ? '' : 's'}`
+        : formatQuantity(variables.item.quantity_received ?? 0);
       const productLabel = matchedItem?.product_name || matchedItem?.product_id || variables.item.product_id;
 
       setPageMessage(`✔ ${productLabel} +${quantityLabel} received into stock.`);
@@ -615,6 +627,16 @@ export default function ShipmentsPage() {
     const itemIdFromQuery = searchParams.get('itemId');
     const scannedBarcode = searchParams.get('scannedBarcode');
     const locationIdFromQuery = searchParams.get('locationId');
+    const packageIdFromQuery = searchParams.get('packageId');
+    const packageNameFromQuery = searchParams.get('packageName');
+    const packageBarcodeFromQuery = searchParams.get('packageBarcode');
+    const unitsPerPackageFromQuery = searchParams.get('unitsPerPackage');
+    const remainingPackagesEstimateFromQuery = searchParams.get('remainingPackagesEstimate');
+    const canReceiveOneFullPackageFromQuery = searchParams.get('canReceiveOneFullPackage');
+    const parsedUnitsPerPackage = unitsPerPackageFromQuery ? Number(unitsPerPackageFromQuery) : null;
+    const parsedRemainingPackagesEstimate = remainingPackagesEstimateFromQuery
+      ? Number(remainingPackagesEstimateFromQuery)
+      : null;
 
     if (locationIdFromQuery) {
       setSelectedScannerLocationId(locationIdFromQuery);
@@ -624,13 +646,26 @@ export default function ShipmentsPage() {
       setHighlightedItemId(itemIdFromQuery);
       setPendingAutoReceive({
         itemId: itemIdFromQuery,
-        scannedBarcode
+        scannedBarcode,
+        packageId: packageIdFromQuery,
+        packageName: packageNameFromQuery,
+        packageBarcode: packageBarcodeFromQuery,
+        unitsPerPackage: Number.isFinite(parsedUnitsPerPackage) ? parsedUnitsPerPackage : null,
+        remainingPackagesEstimate: Number.isFinite(parsedRemainingPackagesEstimate)
+          ? parsedRemainingPackagesEstimate
+          : null,
+        canReceiveOneFullPackage:
+          canReceiveOneFullPackageFromQuery === null
+            ? null
+            : canReceiveOneFullPackageFromQuery === 'true'
       });
       autoReceiveAttemptKeyRef.current = '';
 
       setPageMessage(
         scannedBarcode
-          ? `Product barcode ${scannedBarcode} matched inside selected shipment.`
+          ? packageNameFromQuery && unitsPerPackageFromQuery
+            ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
+            : `Product barcode ${scannedBarcode} matched inside selected shipment.`
           : 'Shipment item matched from scanner.'
       );
     } else {
@@ -645,6 +680,12 @@ export default function ShipmentsPage() {
     nextParams.delete('itemId');
     nextParams.delete('scannedBarcode');
     nextParams.delete('locationId');
+    nextParams.delete('packageId');
+    nextParams.delete('packageName');
+    nextParams.delete('packageBarcode');
+    nextParams.delete('unitsPerPackage');
+    nextParams.delete('remainingPackagesEstimate');
+    nextParams.delete('canReceiveOneFullPackage');
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
@@ -670,7 +711,7 @@ export default function ShipmentsPage() {
         ...current,
         [matchedItem.id]: {
           ...existing,
-          quantity_received: remaining > 0 ? '1' : existing.quantity_received
+          quantity_received: remaining > 0 ? existing.quantity_received || '1' : existing.quantity_received
         }
       };
     });
@@ -730,7 +771,9 @@ export default function ShipmentsPage() {
     const attemptKey = [
       selectedShipment.id,
       matchedItem.id,
-      pendingAutoReceive.scannedBarcode || ''
+      pendingAutoReceive.scannedBarcode || '',
+      pendingAutoReceive.packageId || '',
+      String(pendingAutoReceive.unitsPerPackage ?? '')
     ].join(':');
 
     if (autoReceiveAttemptKeyRef.current === attemptKey) {
@@ -764,11 +807,25 @@ export default function ShipmentsPage() {
       return;
     }
 
+    const packageUnits = pendingAutoReceive.unitsPerPackage;
+    const shouldReceiveByPackage = Boolean(pendingAutoReceive.packageId && packageUnits && packageUnits > 0);
+    const baseQuantityToReceive = shouldReceiveByPackage ? Number(packageUnits) : remaining >= 1 ? 1 : remaining;
+
+    if (shouldReceiveByPackage && baseQuantityToReceive > remaining) {
+      autoReceiveAttemptKeyRef.current = attemptKey;
+      setPendingAutoReceive(null);
+      setPageError(
+        `${pendingAutoReceive.packageName || 'Scanned package'} contains ${formatQuantity(baseQuantityToReceive)} base units, but only ${formatQuantity(remaining)} remain on this shipment line.`
+      );
+      setPageMessage(null);
+      return;
+    }
+
     setReceiveDrafts((current) => ({
       ...current,
       [matchedItem.id]: {
         ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
-        quantity_received: remaining >= 1 ? '1' : String(remaining),
+        quantity_received: String(baseQuantityToReceive),
         storage_location_id: safeStorageLocationId
       }
     }));
@@ -777,20 +834,30 @@ export default function ShipmentsPage() {
     setPendingAutoReceive(null);
     setPageError(null);
     setPageMessage(
-      pendingAutoReceive.scannedBarcode
-        ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving 1 unit...`
-        : 'Scanner matched item. Auto receiving 1 unit...'
+      shouldReceiveByPackage
+        ? `${pendingAutoReceive.packageName || 'Scanned package'} matched. Auto receiving 1 package (${formatQuantity(baseQuantityToReceive)} base units)...`
+        : pendingAutoReceive.scannedBarcode
+          ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+          : `Scanner matched item. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
     );
 
     receiveShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
       version: selectedShipment.version,
-      item: {
-        product_id: matchedItem.product_id,
-        quantity_received: remaining >= 1 ? 1 : remaining,
-        storage_location_id: safeStorageLocationId,
-        discrepancy_reason: draft.discrepancy_reason.trim() || null
-      }
+      item: shouldReceiveByPackage && pendingAutoReceive.packageId
+        ? {
+            product_id: matchedItem.product_id,
+            package_id: pendingAutoReceive.packageId,
+            package_count_received: 1,
+            storage_location_id: safeStorageLocationId,
+            discrepancy_reason: draft.discrepancy_reason.trim() || null
+          }
+        : {
+            product_id: matchedItem.product_id,
+            quantity_received: baseQuantityToReceive,
+            storage_location_id: safeStorageLocationId,
+            discrepancy_reason: draft.discrepancy_reason.trim() || null
+          }
     });
   }, [
     pendingAutoReceive,
