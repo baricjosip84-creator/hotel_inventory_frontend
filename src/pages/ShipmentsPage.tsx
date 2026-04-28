@@ -261,6 +261,18 @@ async function finalizeShipment(input: {
   });
 }
 
+async function sendShipmentToSupplier(input: {
+  shipmentId: string;
+}): Promise<{ message: string; recipient_email: string }> {
+  return apiRequest<{ message: string; recipient_email: string }>(
+    `/shipments/${input.shipmentId}/send-to-supplier`,
+    {
+      method: 'POST',
+      body: JSON.stringify({})
+    }
+  );
+}
+
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') return Number(value);
@@ -489,6 +501,22 @@ export default function ShipmentsPage() {
         setPageError(error.message);
       } else {
         setPageError('Failed to finalize shipment.');
+      }
+      setPageMessage(null);
+    }
+  });
+
+  const sendShipmentToSupplierMutation = useMutation({
+    mutationFn: sendShipmentToSupplier,
+    onSuccess: (data) => {
+      setPageError(null);
+      setPageMessage(`✔ Shipment email sent to ${data.recipient_email}.`);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPageError(error.message);
+      } else {
+        setPageError('Failed to send shipment email to supplier.');
       }
       setPageMessage(null);
     }
@@ -1003,6 +1031,30 @@ export default function ShipmentsPage() {
     });
   };
 
+  const handleSendShipmentToSupplier = () => {
+    if (!canManageShipments) {
+      setPageError('Your current role cannot email shipments to suppliers. This action is restricted to manager and admin roles by the backend.');
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+
+    if (!selectedShipment) {
+      setPageError('Select a shipment first.');
+      return;
+    }
+
+    if (shipmentItems.length === 0) {
+      setPageError('Add at least one shipment item before emailing the supplier.');
+      return;
+    }
+
+    sendShipmentToSupplierMutation.mutate({
+      shipmentId: selectedShipment.id
+    });
+  };
+
   const selectShipment = (shipmentId: string) => {
     setSelectedShipmentId(shipmentId);
     setReceiveDrafts({});
@@ -1243,7 +1295,7 @@ export default function ShipmentsPage() {
             <div>
               <h3 style={styles.panelTitle}>Selected Shipment</h3>
               <p style={styles.panelSubtitle}>
-                Add shipment lines, receive stock into locations, and finalize the shipment.
+                Add shipment lines, email the supplier, receive stock into locations, and finalize the shipment.
               </p>
             </div>
           </div>
@@ -1518,6 +1570,30 @@ export default function ShipmentsPage() {
                     }
                   >
                     Scan Product Barcode
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.emailSupplierButton,
+                      width: isMobile ? '100%' : undefined,
+                      ...(!canManageShipments ? styles.emailSupplierButtonDisabled : {})
+                    }}
+                    onClick={handleSendShipmentToSupplier}
+                    disabled={
+                      sendShipmentToSupplierMutation.isPending ||
+                      shipmentItems.length === 0 ||
+                      !canManageShipments
+                    }
+                    title={
+                      !canManageShipments
+                        ? 'Manager or admin role required'
+                        : shipmentItems.length === 0
+                          ? 'Add at least one shipment item before emailing supplier'
+                          : 'Email shipment details and QR code to supplier'
+                    }
+                  >
+                    {sendShipmentToSupplierMutation.isPending ? 'Sending...' : 'Send to Supplier'}
                   </button>
 
                   <button
@@ -1882,6 +1958,19 @@ const styles: Record<string, CSSProperties> = {
     color: '#111827',
     fontWeight: 700,
     cursor: 'pointer'
+  },
+  emailSupplierButton: {
+    border: 'none',
+    borderRadius: 10,
+    padding: '12px 16px',
+    background: '#7c3aed',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  emailSupplierButtonDisabled: {
+    background: '#94a3b8',
+    cursor: 'not-allowed'
   },
   finalizeButtonDisabled: {
     background: '#94a3b8',
