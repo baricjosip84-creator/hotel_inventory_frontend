@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { canCreateQrImage, createQrDataUrl, MAX_QR_BYTE_LENGTH } from '../utils/qrCode';
 
 /**
  * ============================================================================
@@ -1034,6 +1035,10 @@ export default function ShipmentsPage() {
       return;
     }
 
+    const qrImageDataUrl = canCreateQrImage(selectedShipment.qr_code)
+      ? createQrDataUrl(selectedShipment.qr_code, { moduleSize: 8, quietZone: 4 })
+      : null;
+
     const itemRows = shipmentItems
       .map((item) => {
         const ordered = toNumber(item.quantity);
@@ -1115,15 +1120,34 @@ export default function ShipmentsPage() {
               color: #4b5563;
               margin-bottom: 10px;
             }
+            .qr-image {
+              display: block;
+              width: 220px;
+              height: 220px;
+              margin: 0 auto 12px;
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              background: #ffffff;
+            }
+            .qr-image-warning {
+              margin-bottom: 10px;
+              padding: 10px;
+              border-radius: 8px;
+              background: #fffbeb;
+              border: 1px solid #fde68a;
+              color: #92400e;
+              font-size: 12px;
+              line-height: 1.4;
+            }
             .qr-value {
               font-family: 'Courier New', monospace;
-              font-size: 20px;
+              font-size: 16px;
               font-weight: 800;
               line-height: 1.35;
               word-break: break-all;
               border: 1px dashed #9ca3af;
               border-radius: 8px;
-              padding: 14px;
+              padding: 12px;
               background: #f9fafb;
             }
             .qr-note {
@@ -1215,14 +1239,19 @@ export default function ShipmentsPage() {
               <div>
                 <h1>Shipment Receiving Sheet</h1>
                 <p class="subtitle">
-                  Use this sheet as the physical shipment document. Operators can scan the shipment QR if printed separately, or manually enter this exact QR value in the scanner page.
+                  Use this sheet as the physical shipment document. Operators can scan the shipment QR image, or manually enter this exact QR value in the scanner page.
                 </p>
               </div>
 
               <div class="qr-box">
-                <div class="qr-label">Shipment QR Value</div>
+                <div class="qr-label">Shipment QR Code</div>
+                ${
+                  qrImageDataUrl
+                    ? `<img class="qr-image" src="${escapeHtml(qrImageDataUrl)}" alt="Shipment QR code" />`
+                    : `<div class="qr-image-warning">QR image skipped because this QR value is longer than ${MAX_QR_BYTE_LENGTH} UTF-8 bytes. Use the text value below.</div>`
+                }
                 <div class="qr-value">${escapeHtml(selectedShipment.qr_code)}</div>
-                <div class="qr-note">This is the exact backend QR value for shipment lookup.</div>
+                <div class="qr-note">This QR image encodes the exact backend shipment QR value.</div>
               </div>
             </div>
 
@@ -1582,7 +1611,18 @@ export default function ShipmentsPage() {
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.po_number || '-'}</div>
                   </div>
                   <div>
-                    <strong>Shipment QR Value</strong>
+                    <strong>Shipment QR Code</strong>
+                    {canCreateQrImage(selectedShipment.qr_code) ? (
+                      <img
+                        src={createQrDataUrl(selectedShipment.qr_code, { moduleSize: 5, quietZone: 4 })}
+                        alt="Shipment QR code"
+                        style={styles.qrImageInline}
+                      />
+                    ) : (
+                      <div style={styles.qrImageWarning}>
+                        QR image skipped because this QR value is longer than {MAX_QR_BYTE_LENGTH} UTF-8 bytes.
+                      </div>
+                    )}
                     <div style={styles.qrValueInline}>{selectedShipment.qr_code}</div>
                   </div>
                   <div>
@@ -2300,6 +2340,27 @@ const styles: Record<string, CSSProperties> = {
     gap: 16,
     color: '#111827',
     minWidth: 0
+  },
+  qrImageInline: {
+    display: 'block',
+    width: 150,
+    height: 150,
+    marginTop: 8,
+    marginBottom: 8,
+    border: '1px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#ffffff'
+  },
+  qrImageWarning: {
+    marginTop: 8,
+    marginBottom: 8,
+    padding: '8px 10px',
+    borderRadius: 10,
+    border: '1px solid #fde68a',
+    background: '#fffbeb',
+    color: '#92400e',
+    fontSize: 12,
+    lineHeight: 1.4
   },
   qrValueInline: {
     fontFamily: 'monospace',
