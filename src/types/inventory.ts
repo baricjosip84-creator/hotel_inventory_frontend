@@ -55,6 +55,7 @@ export interface SupplierItem {
   id: string;
   tenant_id: string;
   name: string;
+  email: string | null;
   contact_info: string | null;
   deleted_at: string | null;
 }

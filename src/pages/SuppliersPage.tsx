@@ -7,6 +7,7 @@ import type { SupplierItem } from '../types/inventory';
 
 type SupplierFormState = {
   name: string;
+  email: string;
   contact_info: string;
 };
 
@@ -26,6 +27,7 @@ async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
     method: 'POST',
     body: JSON.stringify({
       name: input.name.trim(),
+      email: input.email.trim() || null,
       contact_info: input.contact_info.trim() || null
     })
   });
@@ -39,6 +41,7 @@ async function updateSupplier(input: {
     method: 'PATCH',
     body: JSON.stringify({
       name: input.values.name.trim(),
+      email: input.values.email.trim() || null,
       contact_info: input.values.contact_info.trim() || null
     })
   });
@@ -53,6 +56,7 @@ async function deleteSupplier(id: string): Promise<void> {
 function emptyForm(): SupplierFormState {
   return {
     name: '',
+    email: '',
     contact_info: ''
   };
 }
@@ -85,22 +89,17 @@ export default function SuppliersPage() {
     - same query key
     - same create / update / delete flow
     - same permission enforcement
-    - same form fields
     - same search behavior
     - same invalidation flow
 
-    This pass applies the shared UI foundation carefully:
-    - stats now align with the shared app-grid-stats layer
-    - major sections now use app-panel/app-panel--padded
-    - warning / error / success states align with the shared state layer
-    - toolbar and action rows align with the shared helper classes
-    - no CRUD logic was changed
+    This pass adds the dedicated supplier email field required by shipment
+    email delivery. The Send to Supplier action depends on suppliers.email
+    instead of trying to parse free-form contact notes.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes Suppliers visually consistent with Products, Storage Locations, Users,
-    and the rest of the polished master-data/admin pages without changing
-    backend contracts, permissions, or data flow.
+    Lets managers/admins store a real supplier email address so shipment
+    emails can be sent reliably from the shipment screen.
   */
   const queryClient = useQueryClient();
 
@@ -186,6 +185,9 @@ export default function SuppliersPage() {
 
   const summary = useMemo(() => {
     const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
+    const withEmail = suppliers.filter(
+      (supplier) => Boolean(supplier.email && supplier.email.trim())
+    ).length;
     const withContact = suppliers.filter(
       (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
     ).length;
@@ -193,6 +195,7 @@ export default function SuppliersPage() {
     return {
       total: suppliers.length,
       active,
+      withEmail,
       withContact
     };
   }, [suppliers]);
@@ -206,6 +209,16 @@ export default function SuppliersPage() {
       setFormError(
         'Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.'
       );
+      return;
+    }
+
+    if (!form.name.trim()) {
+      setFormError('Supplier name is required.');
+      return;
+    }
+
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setFormError('Supplier email must be a valid email address.');
       return;
     }
 
@@ -232,6 +245,7 @@ export default function SuppliersPage() {
     setFormError(null);
     setForm({
       name: supplier.name,
+      email: supplier.email || '',
       contact_info: supplier.contact_info || ''
     });
   };
@@ -277,6 +291,12 @@ export default function SuppliersPage() {
           tone="good"
         />
         <StatCard
+          title="With Email"
+          value={summary.withEmail}
+          subtitle="Suppliers ready for shipment email sending"
+          tone="good"
+        />
+        <StatCard
           title="With Contact Info"
           value={summary.withContact}
           subtitle="Suppliers with saved contact details"
@@ -313,6 +333,19 @@ export default function SuppliersPage() {
           </div>
 
           <div>
+            <label style={styles.label}>Email</label>
+            <input
+              style={styles.input}
+              type="email"
+              value={form.email}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, email: event.target.value }))
+              }
+              placeholder="orders@supplier.com"
+            />
+          </div>
+
+          <div>
             <label style={styles.label}>Contact Info</label>
             <input
               style={styles.input}
@@ -320,7 +353,7 @@ export default function SuppliersPage() {
               onChange={(event) =>
                 setForm((current) => ({ ...current, contact_info: event.target.value }))
               }
-              placeholder="Phone, email, or notes"
+              placeholder="Phone, account rep, delivery notes"
             />
           </div>
 
@@ -351,13 +384,13 @@ export default function SuppliersPage() {
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Supplier List</h3>
         <p style={styles.panelSubtitle}>
-          Search and review supplier records available to inventory and shipment workflows.
+          Search and review supplier records available to inventory, shipment, and supplier email workflows.
         </p>
 
         <div className="app-grid-toolbar" style={styles.toolbarGrid}>
           <input
             type="text"
-            placeholder="Search by supplier name or contact info..."
+            placeholder="Search by supplier name, email, or contact info..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             style={styles.searchInput}
@@ -376,6 +409,7 @@ export default function SuppliersPage() {
               <thead>
                 <tr>
                   <th style={styles.th}>Name</th>
+                  <th style={styles.th}>Email</th>
                   <th style={styles.th}>Contact Info</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Actions</th>
@@ -384,7 +418,7 @@ export default function SuppliersPage() {
               <tbody>
                 {suppliers.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={4}>
+                    <td style={styles.emptyCell} colSpan={5}>
                       No suppliers found.
                     </td>
                   </tr>
@@ -394,6 +428,13 @@ export default function SuppliersPage() {
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{supplier.name}</div>
                         <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
+                      </td>
+                      <td style={styles.td}>
+                        {supplier.email ? (
+                          <span style={styles.emailValue}>{supplier.email}</span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td style={styles.td}>{supplier.contact_info || '-'}</td>
                       <td style={styles.td}>
@@ -612,7 +653,7 @@ const styles: Record<string, CSSProperties> = {
     */
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '780px'
+    minWidth: '920px'
   },
   th: {
     textAlign: 'left',
@@ -643,6 +684,11 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     color: '#6b7280',
     lineHeight: 1.4,
+    wordBreak: 'break-all'
+  },
+  emailValue: {
+    fontFamily: 'monospace',
+    fontSize: '13px',
     wordBreak: 'break-all'
   },
   badgeActive: {
