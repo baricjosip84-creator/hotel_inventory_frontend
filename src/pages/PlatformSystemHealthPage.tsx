@@ -16,12 +16,24 @@ type SystemHealthResponse = {
   tenants: TenantHealthRow[];
 };
 
-function readableError(error: unknown): string {
-  if (error instanceof ApiError || error instanceof Error) {
-    return error.message;
-  }
+type IdempotencyRow = {
+  id: string;
+  idempotency_key: string;
+  method: string;
+  path: string;
+  created_at: string;
+  expires_at?: string | null;
+};
 
+function readableError(error: unknown): string {
+  if (error instanceof ApiError || error instanceof Error) return error.message;
   return 'Unknown error';
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
 }
 
 export default function PlatformSystemHealthPage() {
@@ -30,22 +42,27 @@ export default function PlatformSystemHealthPage() {
     queryFn: () => platformApiRequest<SystemHealthResponse>('/platform/system-health')
   });
 
+  const diagnosticsQuery = useQuery({
+    queryKey: ['platform', 'diagnostics', 'stuck-idempotency'],
+    queryFn: () => platformApiRequest<IdempotencyRow[]>('/platform/diagnostics/stuck-idempotency')
+  });
+
   const rows = systemHealthQuery.data?.tenants || [];
+  const stuckIdempotencyRows = diagnosticsQuery.data || [];
 
   return (
     <div style={styles.page}>
       <header>
         <h1 style={styles.title}>System Health</h1>
-        <p style={styles.subtitle}>Global platform health across tenants.</p>
+        <p style={styles.subtitle}>Global platform health and diagnostics across tenants.</p>
       </header>
 
       {systemHealthQuery.isLoading ? <div style={styles.panel}>Loading system health…</div> : null}
       {systemHealthQuery.error ? <div style={styles.error}>{readableError(systemHealthQuery.error)}</div> : null}
 
       <section style={styles.panel}>
-        <div style={styles.generatedAt}>
-          Generated: {systemHealthQuery.data?.generated_at || '-'}
-        </div>
+        <h2 style={styles.sectionTitle}>Tenant Health</h2>
+        <div style={styles.generatedAt}>Generated: {systemHealthQuery.data?.generated_at || '-'}</div>
         <table style={styles.table}>
           <thead>
             <tr>
@@ -61,62 +78,62 @@ export default function PlatformSystemHealthPage() {
                 <td style={styles.td}>{row.tenant_name}</td>
                 <td style={styles.td}>{row.status}</td>
                 <td style={styles.td}>{row.issue_count}</td>
-                <td style={styles.td}>
-                  {row.issues.length ? row.issues.map((issue) => issue.type).join(', ') : '-'}
-                </td>
+                <td style={styles.td}>{row.issues.length ? row.issues.map((issue) => issue.type).join(', ') : '-'}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section style={styles.panel}>
+        <h2 style={styles.sectionTitle}>Platform Diagnostics</h2>
+        <p style={styles.sectionSubtitle}>Global diagnostics that should not be exposed inside tenant admin routes.</p>
+
+        {diagnosticsQuery.isLoading ? <div>Loading diagnostics…</div> : null}
+        {diagnosticsQuery.error ? <div style={styles.error}>{readableError(diagnosticsQuery.error)}</div> : null}
+
+        <h3 style={styles.smallTitle}>Stuck Idempotency Keys</h3>
+        {stuckIdempotencyRows.length ? (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Method</th>
+                <th style={styles.th}>Path</th>
+                <th style={styles.th}>Key</th>
+                <th style={styles.th}>Created</th>
+                <th style={styles.th}>Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stuckIdempotencyRows.map((row) => (
+                <tr key={row.id}>
+                  <td style={styles.td}>{row.method}</td>
+                  <td style={styles.td}>{row.path}</td>
+                  <td style={styles.tdMono}>{row.idempotency_key}</td>
+                  <td style={styles.td}>{formatDateTime(row.created_at)}</td>
+                  <td style={styles.td}>{formatDateTime(row.expires_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : !diagnosticsQuery.isLoading ? <div>No stuck idempotency keys.</div> : null}
       </section>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  title: {
-    margin: 0,
-    fontSize: '30px'
-  },
-  subtitle: {
-    margin: '8px 0 0',
-    color: '#6b7280'
-  },
-  panel: {
-    background: '#fff',
-    borderRadius: '16px',
-    padding: '20px',
-    boxShadow: '0 12px 36px rgba(15,23,42,0.08)',
-    overflowX: 'auto'
-  },
-  generatedAt: {
-    color: '#6b7280',
-    marginBottom: '14px'
-  },
-  error: {
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse'
-  },
-  th: {
-    textAlign: 'left',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '10px',
-    color: '#6b7280',
-    fontSize: '13px'
-  },
-  td: {
-    borderBottom: '1px solid #f3f4f6',
-    padding: '12px 10px'
-  }
+  page: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  title: { margin: 0, fontSize: '30px' },
+  subtitle: { margin: '8px 0 0', color: '#6b7280' },
+  panel: { background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 12px 36px rgba(15,23,42,0.08)', overflowX: 'auto' },
+  sectionTitle: { margin: '0 0 6px', fontSize: '20px' },
+  sectionSubtitle: { margin: '0 0 18px', color: '#6b7280' },
+  smallTitle: { margin: '16px 0 10px', fontSize: '16px' },
+  generatedAt: { color: '#6b7280', marginBottom: '14px' },
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px', color: '#6b7280', fontSize: '13px' },
+  td: { borderBottom: '1px solid #f3f4f6', padding: '12px 10px' },
+  tdMono: { borderBottom: '1px solid #f3f4f6', padding: '12px 10px', fontFamily: 'monospace', wordBreak: 'break-all' }
 };
