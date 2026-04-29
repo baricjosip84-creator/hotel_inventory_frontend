@@ -27,11 +27,19 @@ import { apiRequest } from '../lib/api';
  * - shipment_id
  * - reason
  * - search
+ * - package_audited
  *
  * PACKAGE AUDIT SUPPORT
  * ----------------------------------------------------------------------------
  * Shipment receiving can now write package audit metadata to stock_movements.
  * This page displays that metadata without changing manual movement behavior.
+ *
+ * PACKAGE AUDIT FILTERING
+ * ----------------------------------------------------------------------------
+ * Operators can filter the ledger to:
+ * - all movements
+ * - package-audited movements only
+ * - unit/manual movements only
  */
 
 type ProductOption = {
@@ -45,6 +53,8 @@ type ShipmentOption = {
   supplier_name?: string;
   status?: string;
 };
+
+type PackageAuditFilter = 'all' | 'true' | 'false';
 
 type StockMovement = {
   id: string;
@@ -77,6 +87,7 @@ type FiltersState = {
   shipment_id: string;
   reason: string;
   search: string;
+  package_audited: PackageAuditFilter;
 };
 
 async function fetchProducts(): Promise<ProductOption[]> {
@@ -104,6 +115,15 @@ async function fetchStockMovements(filters: FiltersState): Promise<StockMovement
 
   if (filters.search.trim()) {
     params.set('search', filters.search.trim());
+  }
+
+  /*
+    package_audited=all is intentionally not sent because the backend treats
+    missing package_audited as no package audit filter. This keeps the URL clean
+    and preserves the old default behavior.
+  */
+  if (filters.package_audited !== 'all') {
+    params.set('package_audited', filters.package_audited);
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
@@ -212,20 +232,22 @@ export default function StockMovementsPage() {
     - same shared UI class usage
 
     Added:
-    - package audit display for package-based shipment receiving.
+    - package audit filter dropdown:
+      - all movements
+      - package audited only
+      - unit/manual only
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    The stock ledger can now show both the base unit movement and the real
-    package action that produced it, for example:
-    - +48 bottles
-    - Received as 2 × 24-pack crate
+    Operators can now quickly isolate package-based receiving movements without
+    manually searching through the full stock ledger.
   */
   const [filters, setFilters] = useState<FiltersState>({
     product_id: '',
     shipment_id: '',
     reason: '',
-    search: ''
+    search: '',
+    package_audited: 'all'
   });
 
   const productsQuery = useQuery({
@@ -350,6 +372,24 @@ export default function StockMovementsPage() {
               <option value="consumption">consumption</option>
               <option value="adjustment">adjustment</option>
               <option value="count">count</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.label}>Package Audit</label>
+            <select
+              style={styles.input}
+              value={filters.package_audited}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  package_audited: event.target.value as PackageAuditFilter
+                }))
+              }
+            >
+              <option value="all">All movements</option>
+              <option value="true">Package audited only</option>
+              <option value="false">Unit/manual only</option>
             </select>
           </div>
 
