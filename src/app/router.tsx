@@ -36,11 +36,42 @@ import UsersPage from '../pages/UsersPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
+import PlatformLayout from '../layouts/PlatformLayout';
+import PlatformLoginPage from '../pages/PlatformLoginPage';
+import PlatformTenantsPage from '../pages/PlatformTenantsPage';
+import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
 
 const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: '/platform/login',
+    element: <PlatformLoginPage />
+  },
+  {
+    path: '/platform',
+    element: (
+      <PlatformProtectedRoute>
+        <PlatformLayout />
+      </PlatformProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/platform/tenants" replace />
+      },
+      {
+        path: 'tenants',
+        element: <PlatformTenantsPage />
+      },
+      {
+        path: 'system-health',
+        element: <PlatformSystemHealthPage />
+      }
+    ]
   },
   {
     path: '/',
