@@ -60,6 +60,33 @@ export interface SupplierItem {
   deleted_at: string | null;
 }
 
+export interface StockMovementItem {
+  id: string;
+  tenant_id?: string;
+  product_id: string;
+  product_name: string;
+  product_unit: string;
+  shipment_id?: string | null;
+  shipment_po_number?: string | null;
+  change: number | string;
+  reason: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  created_at: string;
+
+  /*
+    Package audit fields.
+
+    These are populated when stock was received through package-aware shipment
+    receiving. They remain null for manual stock actions and legacy receiving.
+  */
+  package_id?: string | null;
+  package_count_received?: number | string | null;
+  package_name?: string | null;
+  package_barcode?: string | null;
+  units_per_package?: number | string | null;
+}
+
 export interface AlertItem {
   id: string;
   tenant_id: string;

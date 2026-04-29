@@ -16,6 +16,7 @@ import { apiRequest } from '../lib/api';
  * - why
  * - who did it
  * - whether it came from a shipment
+ * - whether shipment receiving happened through a package format
  *
  * BACKEND CONTRACT
  * ----------------------------------------------------------------------------
@@ -26,6 +27,11 @@ import { apiRequest } from '../lib/api';
  * - shipment_id
  * - reason
  * - search
+ *
+ * PACKAGE AUDIT SUPPORT
+ * ----------------------------------------------------------------------------
+ * Shipment receiving can now write package audit metadata to stock_movements.
+ * This page displays that metadata without changing manual movement behavior.
  */
 
 type ProductOption = {
@@ -52,6 +58,18 @@ type StockMovement = {
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
+
+  /*
+    Package audit fields.
+
+    These are present when the movement came from package-based shipment
+    receiving. They stay null for manual stock operations and legacy receiving.
+  */
+  package_id?: string | null;
+  package_count_received?: number | string | null;
+  package_name?: string | null;
+  package_barcode?: string | null;
+  units_per_package?: number | string | null;
 };
 
 type FiltersState = {
@@ -170,11 +188,20 @@ function changeDisplay(value: number): string {
   return String(value);
 }
 
+function hasPackageAudit(movement: StockMovement): boolean {
+  return Boolean(
+    movement.package_id ||
+      movement.package_name ||
+      movement.package_barcode ||
+      movement.package_count_received
+  );
+}
+
 export default function StockMovementsPage() {
   /*
     WHAT CHANGED
     ------------
-    This file stays grounded in your current StockMovementsPage from the new ZIP.
+    This file stays grounded in your current StockMovementsPage.
 
     Existing real behavior is preserved:
     - same products, shipments, and stock movement endpoints
@@ -182,16 +209,17 @@ export default function StockMovementsPage() {
     - same query keys
     - same ledger columns
     - same movement traceability behavior
+    - same shared UI class usage
 
-    This pass applies the new shared UI layer from App.css:
-    - uses shared panel, toolbar, stats, and state helpers
-    - keeps the page visually aligned with the rest of the polished app
-    - does not change data flow or backend contract
+    Added:
+    - package audit display for package-based shipment receiving.
 
     WHAT PROBLEM IT SOLVES
     ----------------------
-    Makes Stock Movements part of the shared UI foundation instead of relying only
-    on page-local styling, while preserving the existing ledger workflow.
+    The stock ledger can now show both the base unit movement and the real
+    package action that produced it, for example:
+    - +48 bottles
+    - Received as 2 × 24-pack crate
   */
   const [filters, setFilters] = useState<FiltersState>({
     product_id: '',
@@ -221,6 +249,7 @@ export default function StockMovementsPage() {
     let positive = 0;
     let negative = 0;
     let total = 0;
+    let packageAuditRows = 0;
 
     for (const movement of movements) {
       const amount = toNumber(movement.change);
@@ -231,13 +260,18 @@ export default function StockMovementsPage() {
       } else if (amount < 0) {
         negative += Math.abs(amount);
       }
+
+      if (hasPackageAudit(movement)) {
+        packageAuditRows += 1;
+      }
     }
 
     return {
       rowCount: movements.length,
       positive,
       negative,
-      net: total
+      net: total,
+      packageAuditRows
     };
   }, [movements]);
 
@@ -247,8 +281,8 @@ export default function StockMovementsPage() {
         <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Stock Movements</h2>
           <p style={styles.description}>
-            Trace stock changes by product, shipment, reason, and operator. This is your
-            operational stock ledger.
+            Trace stock changes by product, shipment, reason, operator, and package
+            receiving context. This is your operational stock ledger.
           </p>
         </div>
       </div>
@@ -330,7 +364,7 @@ export default function StockMovementsPage() {
                   search: event.target.value
                 }))
               }
-              placeholder="Search by product, user, or reason"
+              placeholder="Search by product, user, reason, package, or barcode"
             />
           </div>
         </div>
@@ -355,6 +389,11 @@ export default function StockMovementsPage() {
         <div style={styles.summaryCard}>
           <div style={styles.summaryLabel}>Net Change</div>
           <div style={styles.summaryValue}>{summary.net}</div>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Package Audited</div>
+          <div style={styles.summaryValue}>{summary.packageAuditRows}</div>
         </div>
       </section>
 
@@ -383,6 +422,7 @@ export default function StockMovementsPage() {
                     <th style={styles.th}>Created</th>
                     <th style={styles.th}>Product</th>
                     <th style={styles.th}>Change</th>
+                    <th style={styles.th}>Package Audit</th>
                     <th style={styles.th}>Reason</th>
                     <th style={styles.th}>Shipment</th>
                     <th style={styles.th}>User</th>
@@ -392,6 +432,8 @@ export default function StockMovementsPage() {
                 <tbody>
                   {movements.map((movement) => {
                     const amount = toNumber(movement.change);
+                    const packageCount = toNumber(movement.package_count_received);
+                    const unitsPerPackage = toNumber(movement.units_per_package);
 
                     return (
                       <tr key={movement.id}>
@@ -409,6 +451,39 @@ export default function StockMovementsPage() {
                           <span style={changeBadgeStyle(amount)}>
                             {changeDisplay(amount)}
                           </span>
+                          <div style={styles.rowSubtle}>
+                            Base units: {changeDisplay(amount)} {movement.product_unit}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          {hasPackageAudit(movement) ? (
+                            <>
+                              <div style={styles.rowTitle}>
+                                {packageCount > 0 ? `${packageCount} × ` : ''}
+                                {movement.package_name || 'Package'}
+                              </div>
+
+                              {unitsPerPackage > 0 ? (
+                                <div style={styles.rowSubtle}>
+                                  Units per package: {unitsPerPackage}
+                                </div>
+                              ) : null}
+
+                              {movement.package_barcode ? (
+                                <div style={styles.rowSubtle}>
+                                  Barcode: {movement.package_barcode}
+                                </div>
+                              ) : null}
+
+                              {movement.package_id ? (
+                                <div style={styles.rowSubtle}>
+                                  Package ID: {movement.package_id}
+                                </div>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span style={styles.rowSubtle}>Unit/manual movement</span>
+                          )}
                         </td>
                         <td style={styles.td}>
                           <span style={reasonBadgeStyle(movement.reason)}>
@@ -536,7 +611,7 @@ const styles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '1040px'
+    minWidth: '1240px'
   },
   th: {
     textAlign: 'left',
