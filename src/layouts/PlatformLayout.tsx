@@ -21,6 +21,12 @@ export default function PlatformLayout() {
           <NavLink to="/platform/system-health" style={styles.link}>
             System Health
           </NavLink>
+          <NavLink to="/platform/audit" style={styles.link}>
+            Audit
+          </NavLink>
+          <NavLink to="/platform/support-sessions" style={styles.link}>
+            Support Sessions
+          </NavLink>
         </nav>
         <button type="button" onClick={logout} style={styles.logoutButton}>
           Logout

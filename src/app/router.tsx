@@ -41,6 +41,8 @@ import PlatformLayout from '../layouts/PlatformLayout';
 import PlatformLoginPage from '../pages/PlatformLoginPage';
 import PlatformTenantsPage from '../pages/PlatformTenantsPage';
 import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
+import PlatformAuditPage from '../pages/PlatformAuditPage';
+import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
 
 const router = createBrowserRouter([
   {
@@ -70,6 +72,14 @@ const router = createBrowserRouter([
       {
         path: 'system-health',
         element: <PlatformSystemHealthPage />
+      },
+      {
+        path: 'audit',
+        element: <PlatformAuditPage />
+      },
+      {
+        path: 'support-sessions',
+        element: <PlatformSupportSessionsPage />
       }
     ]
   },
