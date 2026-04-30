@@ -11,12 +11,15 @@ import {
   savePlatformAuthTokens
 } from '../lib/platformAuth';
 import type { PlatformRole } from '../lib/platformAuth';
+import type { PlatformPermission } from '../lib/platformPermissions';
+import { hasAllPlatformPermissions } from '../lib/platformPermissions';
 
 type PlatformProtectedRouteProps = PropsWithChildren<{
   allowedRoles?: PlatformRole[];
+  requiredPermissions?: PlatformPermission[];
 }>;
 
-export function PlatformProtectedRoute({ children, allowedRoles }: PlatformProtectedRouteProps) {
+export function PlatformProtectedRoute({ children, allowedRoles, requiredPermissions }: PlatformProtectedRouteProps) {
   const location = useLocation();
   const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>(() => {
     return isPlatformAuthenticated() ? 'checking' : 'denied';
@@ -76,6 +79,10 @@ export function PlatformProtectedRoute({ children, allowedRoles }: PlatformProte
   }
 
   if (allowedRoles && !hasAnyPlatformRole(allowedRoles)) {
+    return <Navigate to="/platform" replace />;
+  }
+
+  if (requiredPermissions && !hasAllPlatformPermissions(requiredPermissions)) {
     return <Navigate to="/platform" replace />;
   }
 

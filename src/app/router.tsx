@@ -45,6 +45,7 @@ import PlatformTenantsPage from '../pages/PlatformTenantsPage';
 import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
 import PlatformAuditPage from '../pages/PlatformAuditPage';
 import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
+import { PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
 const router = createBrowserRouter([
   {
@@ -69,19 +70,35 @@ const router = createBrowserRouter([
       },
       {
         path: 'tenants',
-        element: <PlatformTenantsPage />
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantsPage />
+          </PlatformProtectedRoute>
+        )
       },
       {
         path: 'system-health',
-        element: <PlatformSystemHealthPage />
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ]}>
+            <PlatformSystemHealthPage />
+          </PlatformProtectedRoute>
+        )
       },
       {
         path: 'audit',
-        element: <PlatformAuditPage />
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.AUDIT_READ]}>
+            <PlatformAuditPage />
+          </PlatformProtectedRoute>
+        )
       },
       {
         path: 'support-sessions',
-        element: <PlatformSupportSessionsPage />
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ]}>
+            <PlatformSupportSessionsPage />
+          </PlatformProtectedRoute>
+        )
       }
     ]
   },

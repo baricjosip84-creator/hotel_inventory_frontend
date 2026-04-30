@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { clearPlatformAuthTokens } from '../lib/platformAuth';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
@@ -15,18 +16,26 @@ export default function PlatformLayout() {
       <aside style={styles.sidebar}>
         <div style={styles.brand}>Platform</div>
         <nav style={styles.nav}>
-          <NavLink to="/platform/tenants" style={styles.link}>
-            Tenants
-          </NavLink>
-          <NavLink to="/platform/system-health" style={styles.link}>
-            System Health
-          </NavLink>
-          <NavLink to="/platform/audit" style={styles.link}>
-            Audit
-          </NavLink>
-          <NavLink to="/platform/support-sessions" style={styles.link}>
-            Support Sessions
-          </NavLink>
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+            <NavLink to="/platform/tenants" style={styles.link}>
+              Tenants
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ) ? (
+            <NavLink to="/platform/system-health" style={styles.link}>
+              System Health
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ) ? (
+            <NavLink to="/platform/audit" style={styles.link}>
+              Audit
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? (
+            <NavLink to="/platform/support-sessions" style={styles.link}>
+              Support Sessions
+            </NavLink>
+          ) : null}
         </nav>
         <button type="button" onClick={logout} style={styles.logoutButton}>
           Logout
