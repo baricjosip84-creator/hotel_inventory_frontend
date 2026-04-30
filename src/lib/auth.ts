@@ -133,3 +133,37 @@ export function isAuthenticated(): boolean {
 
   return Boolean(refreshToken);
 }
+export type SupportSessionInfo = {
+  isSupportSession: boolean;
+  supportSessionId?: string;
+  platformUserId?: string;
+  tenantId?: string;
+  role?: string;
+  expiresAt?: number;
+};
+
+export function getSupportSessionInfo(): SupportSessionInfo {
+  const payload = decodeJwtPayload(getAccessToken());
+
+  if (payload?.typ !== 'support_session') {
+    return { isSupportSession: false };
+  }
+
+  return {
+    isSupportSession: true,
+    supportSessionId: typeof payload.support_session_id === 'string' ? payload.support_session_id : undefined,
+    platformUserId: typeof payload.platform_user_id === 'string' ? payload.platform_user_id : undefined,
+    tenantId: typeof payload.tenant_id === 'string' ? payload.tenant_id : undefined,
+    role: typeof payload.role === 'string' ? payload.role : undefined,
+    expiresAt: typeof payload.exp === 'number' ? payload.exp : undefined
+  };
+}
+
+export function isSupportSessionAccess(): boolean {
+  return getSupportSessionInfo().isSupportSession;
+}
+
+export function clearSupportSessionAccessToken(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}

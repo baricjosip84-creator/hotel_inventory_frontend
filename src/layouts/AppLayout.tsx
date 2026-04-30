@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { clearAuthTokens, getAccessToken, getRefreshToken } from '../lib/auth';
+import {
+  clearAuthTokens,
+  clearSupportSessionAccessToken,
+  getAccessToken,
+  getRefreshToken,
+  getSupportSessionInfo
+} from '../lib/auth';
 import { apiRequest } from '../lib/api';
 
 type UserRole = 'admin' | 'manager' | 'staff' | null;
@@ -150,6 +156,7 @@ export default function AppLayout() {
   const location = useLocation();
   const isMobile = useIsMobile();
   const role = useMemo(() => getCurrentUserRole(), []);
+  const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -222,6 +229,14 @@ export default function AppLayout() {
     setIsLoggingOut(true);
 
     const refreshToken = getRefreshToken();
+    const supportSessionInfo = getSupportSessionInfo();
+
+    if (supportSessionInfo.isSupportSession) {
+      clearSupportSessionAccessToken();
+      navigate('/platform/support-sessions', { replace: true });
+      setIsLoggingOut(false);
+      return;
+    }
 
     try {
       if (refreshToken) {
@@ -261,6 +276,9 @@ export default function AppLayout() {
           <div style={styles.brandTitle}>Inventory Platform</div>
           <div style={styles.brandSubtitle}>Multi-tenant control center</div>
           {role ? <div style={styles.rolePill}>ROLE: {role.toUpperCase()}</div> : null}
+          {supportSession.isSupportSession ? (
+            <div style={styles.supportPill}>SUPPORT MODE</div>
+          ) : null}
         </div>
 
         <div style={styles.navScrollArea}>
@@ -287,7 +305,7 @@ export default function AppLayout() {
             onClick={handleLogout}
             disabled={isLoggingOut}
           >
-            {isLoggingOut ? 'Logging out…' : 'Log out'}
+            {isLoggingOut ? 'Logging out…' : supportSession.isSupportSession ? 'Exit support mode' : 'Log out'}
           </button>
         </div>
       </aside>
@@ -344,6 +362,18 @@ export default function AppLayout() {
             </div>
           </div>
         </header>
+
+        {supportSession.isSupportSession ? (
+          <div style={styles.supportBanner}>
+            <div>
+              <strong>Support mode active.</strong> You are viewing tenant data through an audited platform support session.
+              {supportSession.tenantId ? <span> Tenant: {supportSession.tenantId}</span> : null}
+            </div>
+            <button type="button" style={styles.supportExitButton} onClick={handleLogout} disabled={isLoggingOut}>
+              Exit support mode
+            </button>
+          </div>
+        ) : null}
 
         <main
           style={{
@@ -443,6 +473,17 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: '0.06em',
     maxWidth: '100%',
     wordBreak: 'break-word'
+  },
+  supportPill: {
+    display: 'inline-flex',
+    marginTop: '8px',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: 'rgba(251, 191, 36, 0.16)',
+    color: '#fde68a',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.06em'
   },
   navScrollArea: {
     flex: 1,
@@ -558,6 +599,28 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '8px',
     fontSize: '14px',
     maxWidth: '100%'
+  },
+  supportBanner: {
+    margin: '0 24px 8px 24px',
+    padding: '14px 16px',
+    borderRadius: '14px',
+    background: '#fffbeb',
+    border: '1px solid #f59e0b',
+    color: '#92400e',
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    alignItems: 'center',
+    flexWrap: 'wrap'
+  },
+  supportExitButton: {
+    border: 'none',
+    borderRadius: '10px',
+    padding: '9px 12px',
+    background: '#92400e',
+    color: '#fff',
+    fontWeight: 800,
+    cursor: 'pointer'
   },
   content: {
     flex: 1,
