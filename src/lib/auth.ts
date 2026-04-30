@@ -26,6 +26,11 @@ const REFRESH_TOKEN_KEY = 'inventory_refresh_token';
 /*
   Save both tokens after login / refresh.
 */
+export function saveSupportSessionAccessToken(accessToken: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
 export function saveAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);

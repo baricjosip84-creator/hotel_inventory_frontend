@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
+import { saveSupportSessionAccessToken } from '../lib/auth';
 import { platformApiRequest } from '../lib/platformApi';
 
  type PlatformSupportSession = {
@@ -61,6 +62,18 @@ export default function PlatformSupportSessionsPage() {
     }
   });
 
+  const accessTokenMutation = useMutation({
+    mutationFn: (sessionId: string) =>
+      platformApiRequest<{ accessToken: string; tenant_id: string; tenant_name?: string | null }>(`/platform/support-sessions/${sessionId}/access-token`, {
+        method: 'POST'
+      }),
+    onSuccess: (payload) => {
+      saveSupportSessionAccessToken(payload.accessToken);
+      queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
+      window.location.href = '/dashboard';
+    }
+  });
+
   const endMutation = useMutation({
     mutationFn: (sessionId: string) =>
       platformApiRequest<PlatformSupportSession>(`/platform/support-sessions/${sessionId}/end`, {
@@ -78,7 +91,7 @@ export default function PlatformSupportSessionsPage() {
     <div style={styles.page}>
       <header>
         <h1 style={styles.title}>Support Sessions</h1>
-        <p style={styles.subtitle}>Audited platform support context for tenant troubleshooting. This does not impersonate a tenant user yet.</p>
+        <p style={styles.subtitle}>Audited platform support context for tenant troubleshooting. Entering a tenant creates a short-lived audited support token tied to an active support session.</p>
       </header>
 
       <section style={styles.panel}>
@@ -116,6 +129,7 @@ export default function PlatformSupportSessionsPage() {
         {sessionsQuery.isLoading ? <div>Loading support sessions…</div> : null}
         {sessionsQuery.error ? <div style={styles.error}>{readableError(sessionsQuery.error)}</div> : null}
         {endMutation.error ? <div style={styles.error}>{readableError(endMutation.error)}</div> : null}
+        {accessTokenMutation.error ? <div style={styles.error}>{readableError(accessTokenMutation.error)}</div> : null}
 
         {rows.length ? (
           <table style={styles.table}>
@@ -143,9 +157,19 @@ export default function PlatformSupportSessionsPage() {
                   <td style={styles.td}>{formatDateTime(row.ended_at)}</td>
                   <td style={styles.td}>
                     {row.status === 'active' ? (
-                      <button type="button" style={styles.buttonSmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending}>
-                        End
-                      </button>
+                      <div style={styles.actions}>
+                        <button
+                          type="button"
+                          style={styles.buttonSmall}
+                          onClick={() => accessTokenMutation.mutate(row.id)}
+                          disabled={accessTokenMutation.isPending}
+                        >
+                          Enter tenant
+                        </button>
+                        <button type="button" style={styles.buttonSecondarySmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending}>
+                          End
+                        </button>
+                      </div>
                     ) : '-'}
                   </td>
                 </tr>
