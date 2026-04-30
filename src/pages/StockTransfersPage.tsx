@@ -12,7 +12,7 @@ type StorageLocationItem = {
   deleted_at?: string | null;
 };
 
-type StockTransferStatus = 'draft' | 'executed' | string;
+type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 
 type StockTransferListItem = {
   id: string;
@@ -26,6 +26,7 @@ type StockTransferListItem = {
   executed_by_user_name?: string | null;
   created_at: string;
   executed_at?: string | null;
+  cancelled_at?: string | null;
   item_count?: number | string;
   total_quantity?: number | string;
 };
@@ -82,6 +83,12 @@ function formatNumber(value: number | string | null | undefined): string {
   return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function getStatusBadgeStyle(status: StockTransferStatus): CSSProperties {
+  if (status === 'executed') return styles.executedBadge;
+  if (status === 'cancelled') return styles.cancelledBadge;
+  return styles.draftBadge;
+}
+
 function normalizeError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -133,6 +140,13 @@ async function executeTransfer(id: string): Promise<{ message: string; transfer:
   });
 }
 
+async function cancelTransfer(id: string): Promise<{ message: string; transfer: StockTransferDetail }> {
+  return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
 function StatCard(props: { title: string; value: number | string; subtitle: string }) {
   return (
     <div style={styles.statCard}>
@@ -148,7 +162,8 @@ export default function StockTransfersPage() {
   const {
     role,
     canCreateStockTransfers,
-    canExecuteStockTransfers
+    canExecuteStockTransfers,
+    canCancelStockTransfers
   } = getRoleCapabilities();
 
   const [statusFilter, setStatusFilter] = useState('');
@@ -188,12 +203,14 @@ export default function StockTransfersPage() {
   const summary = useMemo(() => {
     const drafts = transfers.filter((transfer) => transfer.status === 'draft').length;
     const executed = transfers.filter((transfer) => transfer.status === 'executed').length;
+    const cancelled = transfers.filter((transfer) => transfer.status === 'cancelled').length;
     const totalItems = transfers.reduce((sum, transfer) => sum + Number(transfer.item_count || 0), 0);
 
     return {
       total: transfers.length,
       drafts,
       executed,
+      cancelled,
       totalItems
     };
   }, [transfers]);
@@ -229,6 +246,23 @@ export default function StockTransfersPage() {
     },
     onError: (mutationError) => {
       setError(normalizeError(mutationError, 'Failed to execute stock transfer.'));
+      setMessage(null);
+    }
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: cancelTransfer,
+    onSuccess: async (result) => {
+      setSelectedTransferId(result.transfer.id);
+      setMessage(result.message || 'Stock transfer cancelled successfully.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer', result.transfer.id] })
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(normalizeError(mutationError, 'Failed to cancel stock transfer.'));
       setMessage(null);
     }
   });
@@ -313,6 +347,7 @@ export default function StockTransfersPage() {
         <StatCard title="Transfers" value={summary.total} subtitle="Visible transfers" />
         <StatCard title="Drafts" value={summary.drafts} subtitle="Waiting to be executed" />
         <StatCard title="Executed" value={summary.executed} subtitle="Already moved stock" />
+        <StatCard title="Cancelled" value={summary.cancelled} subtitle="Cancelled drafts" />
         <StatCard title="Items" value={summary.totalItems} subtitle="Transfer line items" />
       </div>
 
@@ -466,6 +501,7 @@ export default function StockTransfersPage() {
             <option value="">All statuses</option>
             <option value="draft">Draft</option>
             <option value="executed">Executed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
 
@@ -488,7 +524,7 @@ export default function StockTransfersPage() {
             >
               <div style={styles.transferCardTop}>
                 <strong>{transfer.from_storage_location_name} → {transfer.to_storage_location_name}</strong>
-                <span style={transfer.status === 'executed' ? styles.executedBadge : styles.draftBadge}>
+                <span style={getStatusBadgeStyle(transfer.status)}>
                   {transfer.status.toUpperCase()}
                 </span>
               </div>
@@ -515,8 +551,11 @@ export default function StockTransfersPage() {
                   {selectedTransfer.executed_at ? (
                     <div style={styles.transferMeta}>Executed {formatDateTime(selectedTransfer.executed_at)} by {selectedTransfer.executed_by_user_name || '-'}</div>
                   ) : null}
+                  {selectedTransfer.cancelled_at ? (
+                    <div style={styles.transferMeta}>Cancelled {formatDateTime(selectedTransfer.cancelled_at)}</div>
+                  ) : null}
                 </div>
-                <span style={selectedTransfer.status === 'executed' ? styles.executedBadge : styles.draftBadge}>
+                <span style={getStatusBadgeStyle(selectedTransfer.status)}>
                   {selectedTransfer.status.toUpperCase()}
                 </span>
               </div>
@@ -550,12 +589,23 @@ export default function StockTransfersPage() {
                     type="button"
                     style={styles.primaryButton}
                     onClick={() => executeMutation.mutate(selectedTransfer.id)}
-                    disabled={!canExecuteStockTransfers || executeMutation.isPending}
+                    disabled={!canExecuteStockTransfers || executeMutation.isPending || cancelMutation.isPending}
                   >
                     {executeMutation.isPending ? 'Executing…' : 'Execute transfer'}
                   </button>
+                  <button
+                    type="button"
+                    style={styles.dangerButton}
+                    onClick={() => cancelMutation.mutate(selectedTransfer.id)}
+                    disabled={!canCancelStockTransfers || executeMutation.isPending || cancelMutation.isPending}
+                  >
+                    {cancelMutation.isPending ? 'Cancelling…' : 'Cancel draft'}
+                  </button>
                   {!canExecuteStockTransfers ? (
                     <span style={styles.permissionHint}>Your current role cannot execute stock transfers.</span>
+                  ) : null}
+                  {!canCancelStockTransfers ? (
+                    <span style={styles.permissionHint}>Your current role cannot cancel stock transfers.</span>
                   ) : null}
                 </div>
               ) : null}
@@ -768,6 +818,15 @@ const styles: Record<string, CSSProperties> = {
     padding: '5px 9px',
     background: '#dcfce7',
     color: '#166534',
+    fontSize: '11px',
+    fontWeight: 900
+  },
+  cancelledBadge: {
+    display: 'inline-flex',
+    borderRadius: '999px',
+    padding: '5px 9px',
+    background: '#fee2e2',
+    color: '#991b1b',
     fontSize: '11px',
     fontWeight: 900
   },
