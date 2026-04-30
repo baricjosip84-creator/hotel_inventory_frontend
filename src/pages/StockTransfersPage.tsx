@@ -43,6 +43,19 @@ type StockTransferDetail = StockTransferListItem & {
   items: StockTransferDetailItem[];
 };
 
+type StockTransferMovement = {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_unit: string;
+  stock_transfer_id: string;
+  change: number | string;
+  reason?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  created_at: string;
+};
+
 type TransferFormItem = {
   product_id: string;
   quantity: string;
@@ -108,6 +121,10 @@ async function fetchTransfers(status: string): Promise<StockTransferListItem[]> 
 
 async function fetchTransferById(id: string): Promise<StockTransferDetail> {
   return apiRequest<StockTransferDetail>(`/stock-transfers/${id}`);
+}
+
+async function fetchTransferMovements(id: string): Promise<StockTransferMovement[]> {
+  return apiRequest<StockTransferMovement[]>(`/stock-transfers/${id}/movements`);
 }
 
 async function fetchProducts(): Promise<ProductItem[]> {
@@ -183,6 +200,12 @@ export default function StockTransfersPage() {
     enabled: Boolean(selectedTransferId)
   });
 
+  const transferMovementsQuery = useQuery({
+    queryKey: ['stock-transfer-movements', selectedTransferId],
+    queryFn: () => fetchTransferMovements(selectedTransferId as string),
+    enabled: Boolean(selectedTransferId)
+  });
+
   const productsQuery = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts
@@ -239,6 +262,7 @@ export default function StockTransfersPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer', result.transfer.id] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-movements', result.transfer.id] }),
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
@@ -340,6 +364,7 @@ export default function StockTransfersPage() {
   };
 
   const selectedTransfer = transferDetailQuery.data;
+  const selectedTransferMovements = transferMovementsQuery.data ?? [];
 
   return (
     <div style={styles.page}>
@@ -582,6 +607,44 @@ export default function StockTransfersPage() {
                   </tbody>
                 </table>
               </div>
+
+              {selectedTransfer.status === 'executed' ? (
+                <div style={styles.movementBlock}>
+                  <h4 style={styles.itemTitle}>Movement Audit</h4>
+                  <p style={styles.panelSubtitle}>Stock movement rows created when this transfer was executed.</p>
+                  {transferMovementsQuery.isLoading ? <div className="app-empty-state">Loading transfer movements…</div> : null}
+                  {transferMovementsQuery.isError ? <div className="app-error-state">Failed to load transfer movements.</div> : null}
+                  {!transferMovementsQuery.isLoading && selectedTransferMovements.length === 0 ? (
+                    <div className="app-empty-state">No movement audit rows found for this transfer.</div>
+                  ) : null}
+                  {selectedTransferMovements.length > 0 ? (
+                    <div style={styles.tableWrapper}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Time</th>
+                            <th style={styles.th}>Product</th>
+                            <th style={styles.th}>Change</th>
+                            <th style={styles.th}>Reason</th>
+                            <th style={styles.th}>User</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedTransferMovements.map((movement) => (
+                            <tr key={movement.id}>
+                              <td style={styles.td}>{formatDateTime(movement.created_at)}</td>
+                              <td style={styles.td}>{movement.product_name}</td>
+                              <td style={styles.td}>{formatNumber(movement.change)} {movement.product_unit}</td>
+                              <td style={styles.td}>{movement.reason || '-'}</td>
+                              <td style={styles.td}>{movement.user_name || 'Support/System'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {selectedTransfer.status === 'draft' ? (
                 <div style={styles.actionsRow}>
@@ -846,6 +909,12 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '18px',
     fontWeight: 900,
     color: '#0f172a'
+  },
+  movementBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginTop: '14px'
   },
   detailNotes: {
     margin: 0,
