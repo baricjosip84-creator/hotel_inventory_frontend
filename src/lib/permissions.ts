@@ -2,6 +2,58 @@ import { getAccessToken } from './auth';
 
 export type UserRole = 'admin' | 'manager' | 'staff' | 'unknown';
 
+export const TENANT_PERMISSIONS = Object.freeze({
+  DASHBOARD_READ: 'dashboard.read',
+
+  PRODUCTS_READ: 'products.read',
+  PRODUCTS_WRITE: 'products.write',
+
+  PRODUCT_PACKAGES_READ: 'product_packages.read',
+  PRODUCT_PACKAGES_WRITE: 'product_packages.write',
+
+  SUPPLIERS_READ: 'suppliers.read',
+  SUPPLIERS_WRITE: 'suppliers.write',
+
+  STORAGE_LOCATIONS_READ: 'storage_locations.read',
+  STORAGE_LOCATIONS_WRITE: 'storage_locations.write',
+
+  STOCK_READ: 'stock.read',
+  STOCK_CONSUME: 'stock.consume',
+  STOCK_COUNT: 'stock.count',
+  STOCK_ADJUST: 'stock.adjust',
+  STOCK_MOVEMENTS_READ: 'stock_movements.read',
+
+  SHIPMENTS_READ: 'shipments.read',
+  SHIPMENTS_WRITE: 'shipments.write',
+  SHIPMENTS_SEND: 'shipments.send',
+  SHIPMENTS_RECEIVE: 'shipments.receive',
+  SHIPMENTS_FINALIZE: 'shipments.finalize',
+  SHIPMENTS_AUTO_REORDER: 'shipments.auto_reorder',
+
+  SHIPMENT_ITEMS_READ: 'shipment_items.read',
+  SHIPMENT_ITEMS_WRITE: 'shipment_items.write',
+
+  ALERTS_READ: 'alerts.read',
+  ALERTS_WRITE: 'alerts.write',
+  ALERTS_OVERRIDE: 'alerts.override',
+
+  REPORTS_READ: 'reports.read',
+  INSIGHTS_READ: 'insights.read',
+
+  TENANT_READ: 'tenant.read',
+  TENANT_UPDATE: 'tenant.update',
+  TENANT_DELETE: 'tenant.delete',
+
+  USERS_READ: 'users.read',
+  USERS_WRITE: 'users.write',
+
+  SYSTEM_STATUS_READ: 'system_status.read',
+  TENANT_DIAGNOSTICS_READ: 'tenant_diagnostics.read',
+  AUDIT_READ: 'audit.read'
+} as const);
+
+export type TenantPermission = (typeof TENANT_PERMISSIONS)[keyof typeof TENANT_PERMISSIONS];
+
 type JwtPayload = {
   role?: string;
   tenant_id?: string;
@@ -31,24 +83,96 @@ function decodeJwtPayload(token: string | null): JwtPayload | null {
   }
 }
 
+export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'unknown'>, readonly TenantPermission[]> = Object.freeze({
+  admin: Object.freeze([
+    TENANT_PERMISSIONS.DASHBOARD_READ,
+    TENANT_PERMISSIONS.PRODUCTS_READ,
+    TENANT_PERMISSIONS.PRODUCTS_WRITE,
+    TENANT_PERMISSIONS.PRODUCT_PACKAGES_READ,
+    TENANT_PERMISSIONS.PRODUCT_PACKAGES_WRITE,
+    TENANT_PERMISSIONS.SUPPLIERS_READ,
+    TENANT_PERMISSIONS.SUPPLIERS_WRITE,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE,
+    TENANT_PERMISSIONS.STOCK_READ,
+    TENANT_PERMISSIONS.STOCK_COUNT,
+    TENANT_PERMISSIONS.STOCK_ADJUST,
+    TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_WRITE,
+    TENANT_PERMISSIONS.SHIPMENTS_SEND,
+    TENANT_PERMISSIONS.SHIPMENTS_RECEIVE,
+    TENANT_PERMISSIONS.SHIPMENTS_FINALIZE,
+    TENANT_PERMISSIONS.SHIPMENTS_AUTO_REORDER,
+    TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ,
+    TENANT_PERMISSIONS.SHIPMENT_ITEMS_WRITE,
+    TENANT_PERMISSIONS.ALERTS_READ,
+    TENANT_PERMISSIONS.ALERTS_WRITE,
+    TENANT_PERMISSIONS.ALERTS_OVERRIDE,
+    TENANT_PERMISSIONS.REPORTS_READ,
+    TENANT_PERMISSIONS.INSIGHTS_READ,
+    TENANT_PERMISSIONS.TENANT_READ,
+    TENANT_PERMISSIONS.TENANT_UPDATE,
+    TENANT_PERMISSIONS.TENANT_DELETE,
+    TENANT_PERMISSIONS.USERS_READ,
+    TENANT_PERMISSIONS.USERS_WRITE,
+    TENANT_PERMISSIONS.SYSTEM_STATUS_READ,
+    TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ,
+    TENANT_PERMISSIONS.AUDIT_READ
+  ]),
+
+  manager: Object.freeze([
+    TENANT_PERMISSIONS.DASHBOARD_READ,
+    TENANT_PERMISSIONS.PRODUCTS_READ,
+    TENANT_PERMISSIONS.PRODUCTS_WRITE,
+    TENANT_PERMISSIONS.PRODUCT_PACKAGES_READ,
+    TENANT_PERMISSIONS.PRODUCT_PACKAGES_WRITE,
+    TENANT_PERMISSIONS.SUPPLIERS_READ,
+    TENANT_PERMISSIONS.SUPPLIERS_WRITE,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE,
+    TENANT_PERMISSIONS.STOCK_READ,
+    TENANT_PERMISSIONS.STOCK_CONSUME,
+    TENANT_PERMISSIONS.STOCK_COUNT,
+    TENANT_PERMISSIONS.STOCK_ADJUST,
+    TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_WRITE,
+    TENANT_PERMISSIONS.SHIPMENTS_SEND,
+    TENANT_PERMISSIONS.SHIPMENTS_RECEIVE,
+    TENANT_PERMISSIONS.SHIPMENTS_FINALIZE,
+    TENANT_PERMISSIONS.SHIPMENTS_AUTO_REORDER,
+    TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ,
+    TENANT_PERMISSIONS.SHIPMENT_ITEMS_WRITE,
+    TENANT_PERMISSIONS.ALERTS_READ,
+    TENANT_PERMISSIONS.ALERTS_WRITE,
+    TENANT_PERMISSIONS.REPORTS_READ,
+    TENANT_PERMISSIONS.INSIGHTS_READ,
+    TENANT_PERMISSIONS.TENANT_READ,
+    TENANT_PERMISSIONS.USERS_READ,
+    TENANT_PERMISSIONS.SYSTEM_STATUS_READ,
+    TENANT_PERMISSIONS.AUDIT_READ
+  ]),
+
+  staff: Object.freeze([
+    TENANT_PERMISSIONS.DASHBOARD_READ,
+    TENANT_PERMISSIONS.PRODUCTS_READ,
+    TENANT_PERMISSIONS.PRODUCT_PACKAGES_READ,
+    TENANT_PERMISSIONS.SUPPLIERS_READ,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ,
+    TENANT_PERMISSIONS.STOCK_READ,
+    TENANT_PERMISSIONS.STOCK_CONSUME,
+    TENANT_PERMISSIONS.STOCK_COUNT,
+    TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_RECEIVE,
+    TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ,
+    TENANT_PERMISSIONS.ALERTS_READ,
+    TENANT_PERMISSIONS.TENANT_READ
+  ])
+});
+
 export function getCurrentUserRole(): UserRole {
-  /*
-    WHAT CHANGED
-    ------------
-    This helper centralizes frontend role detection by decoding the existing
-    JWT payload already issued by your backend.
-
-    WHY IT CHANGED
-    --------------
-    Your backend role model already exists and is enforced server-side. The
-    frontend needs one shared source of truth so route guards, navigation,
-    and page actions all align with those same roles.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    This removes scattered per-page JWT decoding and prevents inconsistent role
-    checks across the application.
-  */
   const payload = decodeJwtPayload(getAccessToken());
   const role = payload?.role;
 
@@ -59,65 +183,54 @@ export function getCurrentUserRole(): UserRole {
   return 'unknown';
 }
 
+export function permissionsForRole(role: UserRole = getCurrentUserRole()): readonly TenantPermission[] {
+  if (role === 'admin' || role === 'manager' || role === 'staff') {
+    return ROLE_PERMISSIONS[role];
+  }
+
+  return [];
+}
+
+export function hasPermission(permission: TenantPermission, role: UserRole = getCurrentUserRole()): boolean {
+  return permissionsForRole(role).includes(permission);
+}
+
+export function hasAllPermissions(permissions: TenantPermission[], role: UserRole = getCurrentUserRole()): boolean {
+  return permissions.every((permission) => hasPermission(permission, role));
+}
+
+export function hasAnyPermission(permissions: TenantPermission[], role: UserRole = getCurrentUserRole()): boolean {
+  return permissions.some((permission) => hasPermission(permission, role));
+}
+
 export function hasAnyRole(allowedRoles: UserRole[]): boolean {
   const currentRole = getCurrentUserRole();
   return allowedRoles.includes(currentRole);
 }
 
 export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
-  /*
-    WHAT CHANGED
-    ------------
-    This capability map is aligned to the backend authorization rules found in
-    the uploaded backend ZIP.
-
-    The important correction in this pass:
-    - canConsumeStock is manager/staff only.
-
-    WHY IT CHANGED
-    --------------
-    Backend route src/routes/stock.js defines POST /stock/consume as:
-    authorize(['manager', 'staff'])
-
-    The previous frontend capability allowed admins to consume stock, which
-    would show admins an enabled action that the backend correctly rejects.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Prevents the frontend from advertising a stock operation that the backend
-    does not allow for admin users, while keeping the backend as the real
-    security boundary.
-  */
-  const isAdmin = role === 'admin';
-  const isManager = role === 'manager';
-  const isStaff = role === 'staff';
-  const canManageMasterData = isAdmin || isManager;
+  const can = (permission: TenantPermission) => hasPermission(permission, role);
 
   return {
     role,
-    isAdmin,
-    isManager,
-    isStaff,
-    canViewReports: isAdmin || isManager,
-    canViewInsights: isAdmin || isManager,
-    canViewUsers: isAdmin || isManager,
-    canManageUsers: isAdmin,
-    canViewAdminSystem: isAdmin || isManager,
-    canManageProducts: canManageMasterData,
-    canManageSuppliers: canManageMasterData,
-    canManageStorageLocations: canManageMasterData,
-    canManageAlerts: canManageMasterData,
-    canManageShipments: canManageMasterData,
-    canReceiveShipments: isAdmin || isManager || isStaff,
-
-    /*
-      Backend contract:
-      POST /stock/consume allows manager + staff, not admin.
-    */
-    canConsumeStock: isManager || isStaff,
-
-    canCountStock: isAdmin || isManager,
-    canAdjustStock: isAdmin || isManager,
-    canViewSessions: isAdmin || isManager || isStaff
+    isAdmin: role === 'admin',
+    isManager: role === 'manager',
+    isStaff: role === 'staff',
+    canViewReports: can(TENANT_PERMISSIONS.REPORTS_READ),
+    canViewInsights: can(TENANT_PERMISSIONS.INSIGHTS_READ),
+    canViewUsers: can(TENANT_PERMISSIONS.USERS_READ),
+    canManageUsers: can(TENANT_PERMISSIONS.USERS_WRITE),
+    canViewAdminSystem: can(TENANT_PERMISSIONS.SYSTEM_STATUS_READ),
+    canManageProducts: can(TENANT_PERMISSIONS.PRODUCTS_WRITE),
+    canManageSuppliers: can(TENANT_PERMISSIONS.SUPPLIERS_WRITE),
+    canManageStorageLocations: can(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE),
+    canManageAlerts: can(TENANT_PERMISSIONS.ALERTS_WRITE),
+    canManageShipments: can(TENANT_PERMISSIONS.SHIPMENTS_WRITE),
+    canReceiveShipments: can(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE),
+    canConsumeStock: can(TENANT_PERMISSIONS.STOCK_CONSUME),
+    canCountStock: can(TENANT_PERMISSIONS.STOCK_COUNT),
+    canAdjustStock: can(TENANT_PERMISSIONS.STOCK_ADJUST),
+    canViewSessions: role === 'admin' || role === 'manager' || role === 'staff',
+    canViewAudit: can(TENANT_PERMISSIONS.AUDIT_READ)
   };
 }

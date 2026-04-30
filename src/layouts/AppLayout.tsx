@@ -9,6 +9,8 @@ import {
   getSupportSessionInfo
 } from '../lib/auth';
 import { apiRequest } from '../lib/api';
+import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import type { TenantPermission } from '../lib/permissions';
 
 type UserRole = 'admin' | 'manager' | 'staff' | null;
 
@@ -16,6 +18,7 @@ type NavItem = {
   to: string;
   label: string;
   roles?: Array<Exclude<UserRole, null>>;
+  permission?: TenantPermission;
 };
 
 function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
@@ -176,10 +179,10 @@ export default function AppLayout() {
       { to: '/storage-locations', label: 'Storage Locations' },
       { to: '/shipments', label: 'Shipments' },
       { to: '/scanner', label: 'Scanner' },
-      { to: '/reports', label: 'Reports', roles: ['admin', 'manager'] },
-      { to: '/insights', label: 'Insights', roles: ['admin', 'manager'] },
-      { to: '/users', label: 'Users', roles: ['admin', 'manager'] },
-      { to: '/audit', label: 'Audit', roles: ['admin', 'manager'] },
+      { to: '/reports', label: 'Reports', permission: TENANT_PERMISSIONS.REPORTS_READ },
+      { to: '/insights', label: 'Insights', permission: TENANT_PERMISSIONS.INSIGHTS_READ },
+      { to: '/users', label: 'Users', permission: TENANT_PERMISSIONS.USERS_READ },
+      { to: '/audit', label: 'Audit', permission: TENANT_PERMISSIONS.AUDIT_READ },
 
       /*
         Backend/router alignment:
@@ -187,7 +190,7 @@ export default function AppLayout() {
         - Admin-only diagnostics remain protected inside AdminSystemPage and by
           the backend admin diagnostics/system-health routes.
       */
-      { to: '/admin-system', label: 'Admin System', roles: ['admin', 'manager'] },
+      { to: '/admin-system', label: 'Admin System', permission: TENANT_PERMISSIONS.SYSTEM_STATUS_READ },
 
       { to: '/sessions', label: 'Sessions' }
     ],
@@ -196,6 +199,10 @@ export default function AppLayout() {
 
   const visibleNavItems = useMemo(() => {
     return navItems.filter((item) => {
+      if (item.permission) {
+        return hasPermission(item.permission);
+      }
+
       if (!item.roles || item.roles.length === 0) {
         return true;
       }

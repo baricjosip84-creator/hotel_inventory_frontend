@@ -8,15 +8,16 @@ import {
   saveAuthTokens
 } from '../lib/auth';
 import type { AuthTokens } from '../types/auth';
-import type { UserRole } from '../lib/permissions';
-import { hasAnyRole } from '../lib/permissions';
+import type { TenantPermission, UserRole } from '../lib/permissions';
+import { hasAllPermissions, hasAnyRole } from '../lib/permissions';
 import { apiRequest } from '../lib/api';
 
 type ProtectedRouteProps = PropsWithChildren<{
   allowedRoles?: UserRole[];
+  requiredPermissions?: TenantPermission[];
 }>;
 
-export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: ProtectedRouteProps) {
   const location = useLocation();
 
   /*
@@ -150,6 +151,10 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     real security boundary.
   */
   if (allowedRoles && !hasAnyRole(allowedRoles)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requiredPermissions && !hasAllPermissions(requiredPermissions)) {
     return <Navigate to="/dashboard" replace />;
   }
 

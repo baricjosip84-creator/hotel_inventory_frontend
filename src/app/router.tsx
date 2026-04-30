@@ -37,6 +37,7 @@ import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
 import TenantAuditPage from '../pages/TenantAuditPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
 import PlatformLayout from '../layouts/PlatformLayout';
 import PlatformLoginPage from '../pages/PlatformLoginPage';
@@ -139,7 +140,7 @@ const router = createBrowserRouter([
       {
         path: 'reports',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.REPORTS_READ]}>
             <ReportsPage />
           </ProtectedRoute>
         )
@@ -147,7 +148,7 @@ const router = createBrowserRouter([
       {
         path: 'users',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.USERS_READ]}>
             <UsersPage />
           </ProtectedRoute>
         )
@@ -155,7 +156,7 @@ const router = createBrowserRouter([
       {
         path: 'admin-system',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SYSTEM_STATUS_READ]}>
             <AdminSystemPage />
           </ProtectedRoute>
         )
@@ -163,7 +164,7 @@ const router = createBrowserRouter([
       {
         path: 'audit',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.AUDIT_READ]}>
             <TenantAuditPage />
           </ProtectedRoute>
         )
@@ -171,7 +172,7 @@ const router = createBrowserRouter([
       {
         path: 'insights',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INSIGHTS_READ]}>
             <InsightsPage />
           </ProtectedRoute>
         )
