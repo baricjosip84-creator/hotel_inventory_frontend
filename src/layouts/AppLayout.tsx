@@ -61,6 +61,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/reports')) return 'Reports';
   if (pathname.startsWith('/insights')) return 'Insights';
   if (pathname.startsWith('/users')) return 'Users';
+  if (pathname.startsWith('/audit')) return 'Tenant Audit';
   if (pathname.startsWith('/admin-system')) return 'Admin System';
   if (pathname.startsWith('/sessions')) return 'Sessions';
   return 'Inventory Management';
@@ -102,6 +103,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/users')) {
     return 'Manage tenant users, their roles, and secure access lifecycle.';
+  }
+  if (pathname.startsWith('/audit')) {
+    return 'Review tenant-scoped write history and audited support-session activity.';
   }
   if (pathname.startsWith('/admin-system')) {
     return 'Review system status, diagnostics, tenant control-plane data, and admin health signals.';
@@ -175,6 +179,7 @@ export default function AppLayout() {
       { to: '/reports', label: 'Reports', roles: ['admin', 'manager'] },
       { to: '/insights', label: 'Insights', roles: ['admin', 'manager'] },
       { to: '/users', label: 'Users', roles: ['admin', 'manager'] },
+      { to: '/audit', label: 'Audit', roles: ['admin', 'manager'] },
 
       /*
         Backend/router alignment:

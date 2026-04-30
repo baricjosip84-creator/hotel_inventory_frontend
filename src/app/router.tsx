@@ -35,6 +35,7 @@ import ReportsPage from '../pages/ReportsPage';
 import UsersPage from '../pages/UsersPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
+import TenantAuditPage from '../pages/TenantAuditPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
 import PlatformLayout from '../layouts/PlatformLayout';
@@ -156,6 +157,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'manager']}>
             <AdminSystemPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'audit',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <TenantAuditPage />
           </ProtectedRoute>
         )
       },
