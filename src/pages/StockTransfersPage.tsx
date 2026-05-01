@@ -56,6 +56,24 @@ type StockTransferMovement = {
   created_at: string;
 };
 
+type StockTransferAvailabilityItem = {
+  product_id: string;
+  product_name: string;
+  product_unit: string;
+  requested_quantity: number | string;
+  available_quantity: number | string;
+  remaining_after_transfer: number | string;
+  sufficient: boolean;
+};
+
+type StockTransferAvailability = {
+  transfer_id: string;
+  status: StockTransferStatus;
+  executable: boolean;
+  message: string;
+  items: StockTransferAvailabilityItem[];
+};
+
 type TransferFormItem = {
   product_id: string;
   quantity: string;
@@ -123,6 +141,10 @@ async function fetchTransferById(id: string): Promise<StockTransferDetail> {
   return apiRequest<StockTransferDetail>(`/stock-transfers/${id}`);
 }
 
+async function fetchTransferAvailability(id: string): Promise<StockTransferAvailability> {
+  return apiRequest<StockTransferAvailability>(`/stock-transfers/${id}/availability`);
+}
+
 async function fetchTransferMovements(id: string): Promise<StockTransferMovement[]> {
   return apiRequest<StockTransferMovement[]>(`/stock-transfers/${id}/movements`);
 }
@@ -138,6 +160,21 @@ async function fetchStorageLocations(): Promise<StorageLocationItem[]> {
 async function createTransfer(input: TransferFormState): Promise<StockTransferDetail> {
   return apiRequest<StockTransferDetail>('/stock-transfers', {
     method: 'POST',
+    body: JSON.stringify({
+      from_storage_location_id: input.from_storage_location_id,
+      to_storage_location_id: input.to_storage_location_id,
+      notes: input.notes.trim() || null,
+      items: input.items.map((item) => ({
+        product_id: item.product_id,
+        quantity: Number(item.quantity)
+      }))
+    })
+  });
+}
+
+async function updateTransfer(id: string, input: TransferFormState): Promise<StockTransferDetail> {
+  return apiRequest<StockTransferDetail>(`/stock-transfers/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify({
       from_storage_location_id: input.from_storage_location_id,
       to_storage_location_id: input.to_storage_location_id,
@@ -179,6 +216,7 @@ export default function StockTransfersPage() {
   const {
     role,
     canCreateStockTransfers,
+    canUpdateStockTransfers,
     canExecuteStockTransfers,
     canCancelStockTransfers
   } = getRoleCapabilities();
@@ -186,6 +224,7 @@ export default function StockTransfersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [form, setForm] = useState<TransferFormState>(emptyTransferForm());
+  const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,6 +245,12 @@ export default function StockTransfersPage() {
     enabled: Boolean(selectedTransferId)
   });
 
+  const transferAvailabilityQuery = useQuery({
+    queryKey: ['stock-transfer-availability', selectedTransferId],
+    queryFn: () => fetchTransferAvailability(selectedTransferId as string),
+    enabled: Boolean(selectedTransferId && transferDetailQuery.data?.status === 'draft')
+  });
+
   const productsQuery = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts
@@ -222,6 +267,8 @@ export default function StockTransfersPage() {
     () => (locationsQuery.data ?? []).filter((location) => !location.deleted_at),
     [locationsQuery.data]
   );
+
+  const canWriteTransferForm = editingTransferId ? canUpdateStockTransfers : canCreateStockTransfers;
 
   const summary = useMemo(() => {
     const drafts = transfers.filter((transfer) => transfer.status === 'draft').length;
@@ -249,6 +296,26 @@ export default function StockTransfersPage() {
     },
     onError: (mutationError) => {
       setError(normalizeError(mutationError, 'Failed to create stock transfer.'));
+      setMessage(null);
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: TransferFormState }) => updateTransfer(id, input),
+    onSuccess: async (transfer) => {
+      setEditingTransferId(null);
+      setForm(emptyTransferForm());
+      setSelectedTransferId(transfer.id);
+      setMessage('Stock transfer draft updated successfully.');
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer', transfer.id] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-availability', transfer.id] })
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(normalizeError(mutationError, 'Failed to update stock transfer.'));
       setMessage(null);
     }
   });
@@ -314,8 +381,36 @@ export default function StockTransfersPage() {
     }));
   };
 
+  const startEditingSelectedTransfer = () => {
+    if (!selectedTransfer || selectedTransfer.status !== 'draft') return;
+
+    setEditingTransferId(selectedTransfer.id);
+    setForm({
+      from_storage_location_id: selectedTransfer.from_storage_location_id,
+      to_storage_location_id: selectedTransfer.to_storage_location_id,
+      notes: selectedTransfer.notes || '',
+      items: selectedTransfer.items.map((item) => ({
+        product_id: item.product_id,
+        quantity: String(item.quantity)
+      }))
+    });
+    setMessage(null);
+    setError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingTransferId(null);
+    setForm(emptyTransferForm());
+    setMessage(null);
+    setError(null);
+  };
+
   const validateForm = (): string | null => {
-    if (!canCreateStockTransfers) {
+    if (editingTransferId && !canUpdateStockTransfers) {
+      return 'Your current role cannot update stock transfer drafts.';
+    }
+
+    if (!editingTransferId && !canCreateStockTransfers) {
       return 'Your current role cannot create stock transfers.';
     }
 
@@ -360,11 +455,39 @@ export default function StockTransfersPage() {
       return;
     }
 
+    if (editingTransferId) {
+      updateMutation.mutate({ id: editingTransferId, input: form });
+      return;
+    }
+
     createMutation.mutate(form);
   };
 
   const selectedTransfer = transferDetailQuery.data;
   const selectedTransferMovements = transferMovementsQuery.data ?? [];
+  const selectedTransferAvailability = transferAvailabilityQuery.data;
+
+  const handleExecuteSelectedTransfer = () => {
+    if (!selectedTransfer) return;
+
+    if (selectedTransferAvailability && !selectedTransferAvailability.executable) {
+      setError(selectedTransferAvailability.message || 'One or more transfer items do not have enough source stock.');
+      setMessage(null);
+      return;
+    }
+
+    const itemSummary = selectedTransfer.items
+      .map((item) => `- ${item.product_name}: ${formatNumber(item.quantity)} ${item.product_unit}`)
+      .join('\n');
+
+    const confirmed = window.confirm(
+      `Execute this stock transfer?\n\n${selectedTransfer.from_storage_location_name} → ${selectedTransfer.to_storage_location_name}\n\n${itemSummary}\n\nThis will move stock immediately and cannot be edited afterwards.`
+    );
+
+    if (!confirmed) return;
+
+    executeMutation.mutate(selectedTransfer.id);
+  };
 
   return (
     <div style={styles.page}>
@@ -386,9 +509,11 @@ export default function StockTransfersPage() {
       ) : null}
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
-        <h3 style={styles.panelTitle}>Create Transfer Draft</h3>
+        <h3 style={styles.panelTitle}>{editingTransferId ? 'Edit Transfer Draft' : 'Create Transfer Draft'}</h3>
         <p style={styles.panelSubtitle}>
-          Move stock internally from one storage location to another. The draft does not change quantities until it is executed.
+          {editingTransferId
+            ? 'Update the selected draft before it is executed. Editing does not change stock quantities.'
+            : 'Move stock internally from one storage location to another. The draft does not change quantities until it is executed.'}
         </p>
 
         <form onSubmit={handleSubmit} style={styles.formStack}>
@@ -399,7 +524,7 @@ export default function StockTransfersPage() {
                 style={styles.input}
                 value={form.from_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, from_storage_location_id: event.target.value }))}
-                disabled={!canCreateStockTransfers || locationsQuery.isLoading}
+                disabled={!canWriteTransferForm || locationsQuery.isLoading}
                 required
               >
                 <option value="">Select source</option>
@@ -415,7 +540,7 @@ export default function StockTransfersPage() {
                 style={styles.input}
                 value={form.to_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, to_storage_location_id: event.target.value }))}
-                disabled={!canCreateStockTransfers || locationsQuery.isLoading}
+                disabled={!canWriteTransferForm || locationsQuery.isLoading}
                 required
               >
                 <option value="">Select destination</option>
@@ -433,7 +558,7 @@ export default function StockTransfersPage() {
               value={form.notes}
               onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
               placeholder="Optional transfer reason or internal note"
-              disabled={!canCreateStockTransfers}
+              disabled={!canWriteTransferForm}
             />
           </div>
 
@@ -446,7 +571,7 @@ export default function StockTransfersPage() {
               type="button"
               style={styles.secondaryButton}
               onClick={addItemRow}
-              disabled={!canCreateStockTransfers}
+              disabled={!canWriteTransferForm}
             >
               Add item
             </button>
@@ -461,7 +586,7 @@ export default function StockTransfersPage() {
                     style={styles.input}
                     value={item.product_id}
                     onChange={(event) => updateItemRow(index, { product_id: event.target.value })}
-                    disabled={!canCreateStockTransfers || productsQuery.isLoading}
+                    disabled={!canWriteTransferForm || productsQuery.isLoading}
                     required
                   >
                     <option value="">Select product</option>
@@ -483,7 +608,7 @@ export default function StockTransfersPage() {
                       step="0.0001"
                       value={item.quantity}
                       onChange={(event) => updateItemRow(index, { quantity: event.target.value })}
-                      disabled={!canCreateStockTransfers}
+                      disabled={!canWriteTransferForm}
                       required
                     />
                   </div>
@@ -491,7 +616,7 @@ export default function StockTransfersPage() {
                     type="button"
                     style={styles.dangerButton}
                     onClick={() => removeItemRow(index)}
-                    disabled={!canCreateStockTransfers || form.items.length === 1}
+                    disabled={!canWriteTransferForm || form.items.length === 1}
                   >
                     Remove
                   </button>
@@ -504,10 +629,22 @@ export default function StockTransfersPage() {
             <button
               type="submit"
               style={styles.primaryButton}
-              disabled={!canCreateStockTransfers || createMutation.isPending}
+              disabled={!canWriteTransferForm || createMutation.isPending || updateMutation.isPending}
             >
-              {createMutation.isPending ? 'Creating…' : 'Create transfer draft'}
+              {editingTransferId
+                ? (updateMutation.isPending ? 'Saving…' : 'Save draft changes')
+                : (createMutation.isPending ? 'Creating…' : 'Create transfer draft')}
             </button>
+            {editingTransferId ? (
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={cancelEditing}
+                disabled={updateMutation.isPending}
+              >
+                Cancel editing
+              </button>
+            ) : null}
           </div>
         </form>
       </section>
@@ -647,12 +784,59 @@ export default function StockTransfersPage() {
               ) : null}
 
               {selectedTransfer.status === 'draft' ? (
+                <div style={styles.availabilityBlock}>
+                  <h4 style={styles.itemTitle}>Execution Check</h4>
+                  {transferAvailabilityQuery.isLoading ? <div className="app-empty-state">Checking source stock…</div> : null}
+                  {transferAvailabilityQuery.isError ? <div className="app-warning-state" style={styles.warningBox}>Could not load source stock preview. Backend will still validate before execution.</div> : null}
+                  {selectedTransferAvailability ? (
+                    <div style={selectedTransferAvailability.executable ? styles.successBox : styles.warningBox}>
+                      {selectedTransferAvailability.message}
+                    </div>
+                  ) : null}
+                  {selectedTransferAvailability?.items?.length ? (
+                    <div style={styles.tableWrapper}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Product</th>
+                            <th style={styles.th}>Requested</th>
+                            <th style={styles.th}>Available at source</th>
+                            <th style={styles.th}>After transfer</th>
+                            <th style={styles.th}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedTransferAvailability.items.map((item) => (
+                            <tr key={item.product_id}>
+                              <td style={styles.td}>{item.product_name}</td>
+                              <td style={styles.td}>{formatNumber(item.requested_quantity)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.available_quantity)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.remaining_after_transfer)} {item.product_unit}</td>
+                              <td style={styles.td}>{item.sufficient ? 'OK' : 'Not enough stock'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {selectedTransfer.status === 'draft' ? (
                 <div style={styles.actionsRow}>
                   <button
                     type="button"
+                    style={styles.secondaryButton}
+                    onClick={startEditingSelectedTransfer}
+                    disabled={!canUpdateStockTransfers || executeMutation.isPending || cancelMutation.isPending || updateMutation.isPending}
+                  >
+                    Edit draft
+                  </button>
+                  <button
+                    type="button"
                     style={styles.primaryButton}
-                    onClick={() => executeMutation.mutate(selectedTransfer.id)}
-                    disabled={!canExecuteStockTransfers || executeMutation.isPending || cancelMutation.isPending}
+                    onClick={handleExecuteSelectedTransfer}
+                    disabled={!canExecuteStockTransfers || executeMutation.isPending || cancelMutation.isPending || transferAvailabilityQuery.isLoading || selectedTransferAvailability?.executable === false}
                   >
                     {executeMutation.isPending ? 'Executing…' : 'Execute transfer'}
                   </button>
@@ -664,6 +848,9 @@ export default function StockTransfersPage() {
                   >
                     {cancelMutation.isPending ? 'Cancelling…' : 'Cancel draft'}
                   </button>
+                  {!canUpdateStockTransfers ? (
+                    <span style={styles.permissionHint}>Your current role cannot edit stock transfer drafts.</span>
+                  ) : null}
                   {!canExecuteStockTransfers ? (
                     <span style={styles.permissionHint}>Your current role cannot execute stock transfers.</span>
                   ) : null}
@@ -909,6 +1096,16 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '18px',
     fontWeight: 900,
     color: '#0f172a'
+  },
+  availabilityBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginTop: '14px',
+    padding: '12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '14px',
+    background: '#f8fafc'
   },
   movementBlock: {
     display: 'flex',
