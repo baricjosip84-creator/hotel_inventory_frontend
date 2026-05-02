@@ -597,6 +597,50 @@ export default function StockTransfersPage() {
     executeMutation.mutate(selectedTransfer.id);
   };
 
+
+  const exportSelectedTransferDetailCsv = () => {
+    if (!selectedTransfer) return;
+
+    const transferRows: unknown[][] = [
+      ['Transfer ID', selectedTransfer.id],
+      ['Status', selectedTransfer.status],
+      ['From Location', selectedTransfer.from_storage_location_name],
+      ['To Location', selectedTransfer.to_storage_location_name],
+      ['Created At', selectedTransfer.created_at],
+      ['Created By', selectedTransfer.created_by_user_name ?? ''],
+      ['Executed At', selectedTransfer.executed_at ?? ''],
+      ['Executed By', selectedTransfer.executed_by_user_name ?? ''],
+      ['Cancelled At', selectedTransfer.cancelled_at ?? ''],
+      ['Notes', selectedTransfer.notes ?? ''],
+      [],
+      ['Items'],
+      ['Product', 'Quantity', 'Unit'],
+      ...selectedTransfer.items.map((item) => [
+        item.product_name,
+        item.quantity,
+        item.product_unit
+      ])
+    ];
+
+    const movementRows: unknown[][] = selectedTransferMovements.length
+      ? [
+          [],
+          ['Movement Audit'],
+          ['Time', 'Product', 'Change', 'Unit', 'Reason', 'User'],
+          ...selectedTransferMovements.map((movement) => [
+            movement.created_at,
+            movement.product_name,
+            movement.change,
+            movement.product_unit,
+            movement.reason ?? '',
+            movement.user_name ?? 'Support/System'
+          ])
+        ]
+      : [];
+
+    downloadCsv(`stock-transfer-${selectedTransfer.id}.csv`, [...transferRows, ...movementRows]);
+  };
+
   return (
     <div style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
@@ -904,9 +948,18 @@ export default function StockTransfersPage() {
                     <div style={styles.transferMeta}>Cancelled {formatDateTime(selectedTransfer.cancelled_at)}</div>
                   ) : null}
                 </div>
-                <span style={getStatusBadgeStyle(selectedTransfer.status)}>
-                  {selectedTransfer.status.toUpperCase()}
-                </span>
+                <div style={styles.detailHeaderActions}>
+                  <button
+                    type="button"
+                    style={styles.secondaryButton}
+                    onClick={exportSelectedTransferDetailCsv}
+                  >
+                    Export detail CSV
+                  </button>
+                  <span style={getStatusBadgeStyle(selectedTransfer.status)}>
+                    {selectedTransfer.status.toUpperCase()}
+                  </span>
+                </div>
               </div>
 
               {selectedTransfer.notes ? <p style={styles.detailNotes}>{selectedTransfer.notes}</p> : null}
@@ -1288,6 +1341,13 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     alignItems: 'flex-start',
     flexWrap: 'wrap'
+  },
+  detailHeaderActions: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end'
   },
   detailRoute: {
     fontSize: '18px',
