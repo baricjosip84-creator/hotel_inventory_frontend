@@ -130,6 +130,29 @@ function normalizeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+
+function escapeCsvCell(value: unknown): string {
+  const raw = value === null || value === undefined ? '' : String(value);
+  const escaped = raw.replace(/"/g, '""');
+  return /[",
+
+]/.test(escaped) ? `"${escaped}"` : escaped;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]): void {
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('
+');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 async function fetchTransfers(filters: {
   status: string;
   search: string;
@@ -515,6 +538,43 @@ export default function StockTransfersPage() {
     setProductFilter('');
   };
 
+
+  const exportVisibleTransfersCsv = () => {
+    const rows: unknown[][] = [
+      [
+        'Transfer ID',
+        'Status',
+        'From Location',
+        'To Location',
+        'Item Count',
+        'Total Quantity',
+        'Created At',
+        'Created By',
+        'Executed At',
+        'Executed By',
+        'Cancelled At',
+        'Notes'
+      ],
+      ...transfers.map((transfer) => [
+        transfer.id,
+        transfer.status,
+        transfer.from_storage_location_name,
+        transfer.to_storage_location_name,
+        transfer.item_count ?? '',
+        transfer.total_quantity ?? '',
+        transfer.created_at,
+        transfer.created_by_user_name ?? '',
+        transfer.executed_at ?? '',
+        transfer.executed_by_user_name ?? '',
+        transfer.cancelled_at ?? '',
+        transfer.notes ?? ''
+      ])
+    ];
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`stock-transfers-${stamp}.csv`, rows);
+  };
+
   const handleExecuteSelectedTransfer = () => {
     if (!selectedTransfer) return;
 
@@ -704,6 +764,14 @@ export default function StockTransfersPage() {
             <p style={styles.panelSubtitle}>Review draft and executed transfers.</p>
           </div>
           <div style={styles.filterActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={exportVisibleTransfersCsv}
+              disabled={transfers.length === 0}
+            >
+              Export visible CSV
+            </button>
             <button
               type="button"
               style={styles.secondaryButton}
