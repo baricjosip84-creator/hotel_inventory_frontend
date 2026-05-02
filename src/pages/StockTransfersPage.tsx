@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
@@ -130,9 +130,19 @@ function normalizeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-async function fetchTransfers(status: string): Promise<StockTransferListItem[]> {
+async function fetchTransfers(filters: {
+  status: string;
+  search: string;
+  fromStorageLocationId: string;
+  toStorageLocationId: string;
+  productId: string;
+}): Promise<StockTransferListItem[]> {
   const params = new URLSearchParams();
-  if (status) params.set('status', status);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.search.trim()) params.set('search', filters.search.trim());
+  if (filters.fromStorageLocationId) params.set('from_storage_location_id', filters.fromStorageLocationId);
+  if (filters.toStorageLocationId) params.set('to_storage_location_id', filters.toStorageLocationId);
+  if (filters.productId) params.set('product_id', filters.productId);
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<StockTransferListItem[]>(`/stock-transfers${suffix}`);
 }
@@ -222,15 +232,27 @@ export default function StockTransfersPage() {
   } = getRoleCapabilities();
 
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [fromLocationFilter, setFromLocationFilter] = useState('');
+  const [toLocationFilter, setToLocationFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [form, setForm] = useState<TransferFormState>(emptyTransferForm());
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const transferFilters = useMemo(() => ({
+    status: statusFilter,
+    search: searchFilter,
+    fromStorageLocationId: fromLocationFilter,
+    toStorageLocationId: toLocationFilter,
+    productId: productFilter
+  }), [statusFilter, searchFilter, fromLocationFilter, toLocationFilter, productFilter]);
+
   const transfersQuery = useQuery({
-    queryKey: ['stock-transfers', statusFilter],
-    queryFn: () => fetchTransfers(statusFilter)
+    queryKey: ['stock-transfers', transferFilters],
+    queryFn: () => fetchTransfers(transferFilters)
   });
 
   const transferDetailQuery = useQuery({
@@ -269,6 +291,13 @@ export default function StockTransfersPage() {
   );
 
   const canWriteTransferForm = editingTransferId ? canUpdateStockTransfers : canCreateStockTransfers;
+  const hasActiveFilters = Boolean(
+    statusFilter ||
+    searchFilter.trim() ||
+    fromLocationFilter ||
+    toLocationFilter ||
+    productFilter
+  );
 
   const summary = useMemo(() => {
     const drafts = transfers.filter((transfer) => transfer.status === 'draft').length;
@@ -467,6 +496,25 @@ export default function StockTransfersPage() {
   const selectedTransferMovements = transferMovementsQuery.data ?? [];
   const selectedTransferAvailability = transferAvailabilityQuery.data;
 
+  useEffect(() => {
+    if (!selectedTransferId) return;
+    if (transfersQuery.isLoading) return;
+
+    const selectedStillVisible = transfers.some((transfer) => transfer.id === selectedTransferId);
+    if (!selectedStillVisible) {
+      setSelectedTransferId(null);
+      setEditingTransferId(null);
+    }
+  }, [selectedTransferId, transfers, transfersQuery.isLoading]);
+
+  const clearTransferFilters = () => {
+    setStatusFilter('');
+    setSearchFilter('');
+    setFromLocationFilter('');
+    setToLocationFilter('');
+    setProductFilter('');
+  };
+
   const handleExecuteSelectedTransfer = () => {
     if (!selectedTransfer) return;
 
@@ -655,16 +703,87 @@ export default function StockTransfersPage() {
             <h3 style={styles.panelTitle}>Stock Transfers</h3>
             <p style={styles.panelSubtitle}>Review draft and executed transfers.</p>
           </div>
-          <select
-            style={styles.filterSelect}
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="executed">Executed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+          <div style={styles.filterActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={clearTransferFilters}
+              disabled={!hasActiveFilters}
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+
+        <div className="app-grid-2" style={styles.filterGrid}>
+          <div>
+            <label style={styles.label}>Search</label>
+            <input
+              style={styles.input}
+              value={searchFilter}
+              onChange={(event) => setSearchFilter(event.target.value)}
+              placeholder="Search notes, locations, or creator"
+            />
+          </div>
+
+          <div>
+            <label style={styles.label}>Status</label>
+            <select
+              style={styles.input}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="executed">Executed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.label}>From location</label>
+            <select
+              style={styles.input}
+              value={fromLocationFilter}
+              onChange={(event) => setFromLocationFilter(event.target.value)}
+              disabled={locationsQuery.isLoading}
+            >
+              <option value="">Any source</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.label}>To location</label>
+            <select
+              style={styles.input}
+              value={toLocationFilter}
+              onChange={(event) => setToLocationFilter(event.target.value)}
+              disabled={locationsQuery.isLoading}
+            >
+              <option value="">Any destination</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.label}>Product</label>
+            <select
+              style={styles.input}
+              value={productFilter}
+              onChange={(event) => setProductFilter(event.target.value)}
+              disabled={productsQuery.isLoading}
+            >
+              <option value="">Any product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {transfersQuery.isLoading ? <div className="app-empty-state">Loading transfers…</div> : null}
@@ -1017,6 +1136,16 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     color: '#0f172a',
     background: '#ffffff'
+  },
+  filterGrid: {
+    gap: '14px',
+    alignItems: 'end'
+  },
+  filterActions: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    flexWrap: 'wrap'
   },
   transferList: {
     display: 'grid',
