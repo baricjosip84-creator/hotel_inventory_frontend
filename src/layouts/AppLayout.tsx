@@ -58,6 +58,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/alerts')) return 'Alerts';
   if (pathname.startsWith('/stock-movements')) return 'Stock Movements';
   if (pathname.startsWith('/stock-transfers')) return 'Stock Transfers';
+  if (pathname.startsWith('/purchase-orders')) return 'Purchase Orders';
   if (pathname.startsWith('/stock')) return 'Stock';
   if (pathname.startsWith('/storage-locations')) return 'Storage Locations';
   if (pathname.startsWith('/shipments')) return 'Shipments';
@@ -89,6 +90,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/stock-transfers')) {
     return 'Move stock between storage locations while preserving audit history.';
+  }
+  if (pathname.startsWith('/purchase-orders')) {
+    return 'Create, submit, approve, and cancel supplier purchase orders.';
   }
   if (pathname.startsWith('/stock')) {
     return 'View stock by product and location, with operational mutation controls.';
@@ -181,6 +185,7 @@ export default function AppLayout() {
       { to: '/stock', label: 'Stock' },
       { to: '/stock-movements', label: 'Stock Movements' },
       { to: '/stock-transfers', label: 'Stock Transfers', permission: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ },
+      { to: '/purchase-orders', label: 'Purchase Orders', permission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },
       { to: '/storage-locations', label: 'Storage Locations' },
       { to: '/shipments', label: 'Shipments' },
       { to: '/scanner', label: 'Scanner' },

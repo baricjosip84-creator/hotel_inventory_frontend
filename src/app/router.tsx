@@ -30,6 +30,7 @@ import StockPage from '../pages/StockPage';
 import StorageLocationsPage from '../pages/StorageLocationsPage';
 import StockMovementsPage from '../pages/StockMovementsPage';
 import StockTransfersPage from '../pages/StockTransfersPage';
+import PurchaseOrdersPage from '../pages/PurchaseOrdersPage';
 import ScannerPage from '../pages/ScannerPage';
 import SessionsPage from '../pages/SessionsPage';
 import ReportsPage from '../pages/ReportsPage';
@@ -144,6 +145,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STOCK_TRANSFERS_READ]}>
             <StockTransfersPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'purchase-orders',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PURCHASE_ORDERS_READ]}>
+            <PurchaseOrdersPage />
           </ProtectedRoute>
         )
       },

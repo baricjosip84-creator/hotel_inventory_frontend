@@ -134,14 +134,21 @@ function normalizeError(error: unknown, fallback: string): string {
 function escapeCsvCell(value: unknown): string {
   const raw = value === null || value === undefined ? '' : String(value);
   const escaped = raw.replace(/"/g, '""');
-  return /[",
+  return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
+}
 
-]/.test(escaped) ? `"${escaped}"` : escaped;
+
+function escapeHtml(value: unknown): string {
+  return (value === null || value === undefined ? '' : String(value))
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function downloadCsv(filename: string, rows: unknown[][]): void {
-  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('
-');
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -641,6 +648,113 @@ export default function StockTransfersPage() {
     downloadCsv(`stock-transfer-${selectedTransfer.id}.csv`, [...transferRows, ...movementRows]);
   };
 
+  const printSelectedTransferDetail = () => {
+    if (!selectedTransfer) return;
+
+    const itemRows = selectedTransfer.items.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.product_name)}</td>
+        <td>${escapeHtml(formatNumber(item.quantity))}</td>
+        <td>${escapeHtml(item.product_unit)}</td>
+      </tr>
+    `).join('');
+
+    const movementRows = selectedTransferMovements.length
+      ? selectedTransferMovements.map((movement) => `
+          <tr>
+            <td>${escapeHtml(formatDateTime(movement.created_at))}</td>
+            <td>${escapeHtml(movement.product_name)}</td>
+            <td>${escapeHtml(formatNumber(movement.change))} ${escapeHtml(movement.product_unit)}</td>
+            <td>${escapeHtml(movement.reason || '-')}</td>
+            <td>${escapeHtml(movement.user_name || 'Support/System')}</td>
+          </tr>
+        `).join('')
+      : '<tr><td colspan="5">No movement audit rows loaded.</td></tr>';
+
+    const availabilityRows = selectedTransferAvailability?.items?.length
+      ? selectedTransferAvailability.items.map((item) => `
+          <tr>
+            <td>${escapeHtml(item.product_name)}</td>
+            <td>${escapeHtml(formatNumber(item.requested_quantity))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.available_quantity))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.remaining_after_transfer))} ${escapeHtml(item.product_unit)}</td>
+            <td>${item.sufficient ? 'OK' : 'Not enough stock'}</td>
+          </tr>
+        `).join('')
+      : '';
+
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
+    if (!printWindow) {
+      setError('Browser blocked the print window. Allow pop-ups for this site and try again.');
+      setMessage(null);
+      return;
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Stock Transfer ${escapeHtml(selectedTransfer.id)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
+            h1 { margin-bottom: 4px; }
+            .meta { color: #475569; margin: 4px 0; }
+            .badge { display: inline-block; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 999px; font-size: 12px; font-weight: 700; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+            th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; font-size: 13px; }
+            th { color: #475569; }
+            section { margin-top: 24px; }
+            .notes { margin-top: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; }
+            @media print { button { display: none; } body { margin: 20px; } }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()">Print</button>
+          <h1>Stock Transfer</h1>
+          <div class="badge">${escapeHtml(selectedTransfer.status.toUpperCase())}</div>
+          <p class="meta"><strong>Transfer ID:</strong> ${escapeHtml(selectedTransfer.id)}</p>
+          <p class="meta"><strong>Route:</strong> ${escapeHtml(selectedTransfer.from_storage_location_name)} → ${escapeHtml(selectedTransfer.to_storage_location_name)}</p>
+          <p class="meta"><strong>Created:</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at))} by ${escapeHtml(selectedTransfer.created_by_user_name || '-')}</p>
+          ${selectedTransfer.executed_at ? `<p class="meta"><strong>Executed:</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at))} by ${escapeHtml(selectedTransfer.executed_by_user_name || '-')}</p>` : ''}
+          ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>Cancelled:</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at))}</p>` : ''}
+          ${selectedTransfer.notes ? `<div class="notes"><strong>Notes:</strong><br />${escapeHtml(selectedTransfer.notes)}</div>` : ''}
+
+          <section>
+            <h2>Items</h2>
+            <table>
+              <thead><tr><th>Product</th><th>Quantity</th><th>Unit</th></tr></thead>
+              <tbody>${itemRows}</tbody>
+            </table>
+          </section>
+
+          ${availabilityRows ? `
+            <section>
+              <h2>Execution Check</h2>
+              <p class="meta">${escapeHtml(selectedTransferAvailability?.message || '')}</p>
+              <table>
+                <thead><tr><th>Product</th><th>Requested</th><th>Available</th><th>After Transfer</th><th>Status</th></tr></thead>
+                <tbody>${availabilityRows}</tbody>
+              </table>
+            </section>
+          ` : ''}
+
+          ${selectedTransfer.status === 'executed' ? `
+            <section>
+              <h2>Movement Audit</h2>
+              <table>
+                <thead><tr><th>Time</th><th>Product</th><th>Change</th><th>Reason</th><th>User</th></tr></thead>
+                <tbody>${movementRows}</tbody>
+              </table>
+            </section>
+          ` : ''}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
+
   return (
     <div style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
@@ -955,6 +1069,13 @@ export default function StockTransfersPage() {
                     onClick={exportSelectedTransferDetailCsv}
                   >
                     Export detail CSV
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.secondaryButton}
+                    onClick={printSelectedTransferDetail}
+                  >
+                    Print detail
                   </button>
                   <span style={getStatusBadgeStyle(selectedTransfer.status)}>
                     {selectedTransfer.status.toUpperCase()}
