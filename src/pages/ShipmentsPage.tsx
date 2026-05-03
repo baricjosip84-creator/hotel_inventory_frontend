@@ -178,6 +178,7 @@ type ReceiveDraft = {
   quantity_received: string;
   storage_location_id: string;
   discrepancy_reason: string;
+  receiving_note: string;
 };
 
 type ReceiveShipmentLineItemPayload = {
@@ -187,6 +188,7 @@ type ReceiveShipmentLineItemPayload = {
   package_count_received?: number;
   storage_location_id: string;
   discrepancy_reason?: string | null;
+  receiving_note?: string | null;
 };
 
 type SendShipmentToSupplierResponse = {
@@ -269,8 +271,36 @@ async function receiveShipmentLine(input: {
   shipmentId: string;
   version: number;
   item: ReceiveShipmentLineItemPayload;
-}): Promise<{ message: string; status: string }> {
-  return apiRequest<{ message: string; status: string }>(`/shipments/${input.shipmentId}/receive`, {
+}): Promise<{
+  message: string;
+  status: string;
+  purchase_order_id?: string | null;
+  linked_purchase_order_receiving_summary?: {
+    id: string;
+    po_number: string;
+    receiving_status: string;
+    receiving_percent: number;
+    ordered_quantity: number;
+    received_quantity: number;
+    remaining_quantity: number;
+    open_linked_shipment_count: number;
+  } | null;
+}> {
+  return apiRequest<{
+    message: string;
+    status: string;
+    purchase_order_id?: string | null;
+    linked_purchase_order_receiving_summary?: {
+      id: string;
+      po_number: string;
+      receiving_status: string;
+      receiving_percent: number;
+      ordered_quantity: number;
+      received_quantity: number;
+      remaining_quantity: number;
+      open_linked_shipment_count: number;
+    } | null;
+  }>(`/shipments/${input.shipmentId}/receive`, {
     method: 'POST',
     headers: {
       'If-Match-Version': String(input.version)
@@ -350,7 +380,8 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
   return {
     quantity_received: remaining > 0 ? String(remaining) : '1',
     storage_location_id: item.storage_location_id || '',
-    discrepancy_reason: ''
+    discrepancy_reason: '',
+    receiving_note: ''
   };
 }
 
@@ -501,7 +532,7 @@ export default function ShipmentsPage() {
 
   const receiveShipmentMutation = useMutation({
     mutationFn: receiveShipmentLine,
-    onSuccess: async (_data, variables) => {
+    onSuccess: async (data, variables) => {
       setPageError(null);
 
       const matchedItem = shipmentItems.find((item) => item.product_id === variables.item.product_id);
@@ -510,10 +541,22 @@ export default function ShipmentsPage() {
         : formatQuantity(variables.item.quantity_received ?? 0);
       const productLabel = matchedItem?.product_name || matchedItem?.product_id || variables.item.product_id;
 
-      setPageMessage(`✔ ${productLabel} +${quantityLabel} received into stock.`);
+      const poSummary = data.linked_purchase_order_receiving_summary;
+      const poProgressLabel = poSummary
+        ? ` PO progress: ${formatQuantity(poSummary.received_quantity)} / ${formatQuantity(poSummary.ordered_quantity)} received.`
+        : '';
+
+      setPageMessage(`✔ ${productLabel} +${quantityLabel} received into stock.${poProgressLabel}`);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+
+      const linkedPurchaseOrderId = data.purchase_order_id || selectedShipment?.purchase_order_id;
+      if (linkedPurchaseOrderId) {
+        await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+        await queryClient.invalidateQueries({ queryKey: ['purchase-order', linkedPurchaseOrderId] });
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['stock'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       await queryClient.invalidateQueries({ queryKey: ['alerts'] });
@@ -536,6 +579,12 @@ export default function ShipmentsPage() {
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+
+      if (selectedShipment?.purchase_order_id) {
+        await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+        await queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedShipment.purchase_order_id] });
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       await queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
@@ -947,13 +996,15 @@ export default function ShipmentsPage() {
             package_id: pendingAutoReceive.packageId,
             package_count_received: 1,
             storage_location_id: safeStorageLocationId,
-            discrepancy_reason: draft.discrepancy_reason.trim() || null
+            discrepancy_reason: draft.discrepancy_reason.trim() || null,
+            receiving_note: draft.receiving_note.trim() || null
           }
         : {
             product_id: matchedItem.product_id,
             quantity_received: baseQuantityToReceive,
             storage_location_id: safeStorageLocationId,
-            discrepancy_reason: draft.discrepancy_reason.trim() || null
+            discrepancy_reason: draft.discrepancy_reason.trim() || null,
+            receiving_note: draft.receiving_note.trim() || null
           }
     });
   }, [
@@ -1075,7 +1126,8 @@ export default function ShipmentsPage() {
         product_id: item.product_id,
         quantity_received: quantityReceived,
         storage_location_id: draft.storage_location_id,
-        discrepancy_reason: draft.discrepancy_reason.trim() || null
+        discrepancy_reason: draft.discrepancy_reason.trim() || null,
+        receiving_note: draft.receiving_note.trim() || null
       }
     });
   };
@@ -1473,13 +1525,18 @@ export default function ShipmentsPage() {
                       {selectedShipment.linked_purchase_order_number || selectedShipment.purchase_order_id || '-'}
                     </div>
                     {selectedShipment.purchase_order_id ? (
-                      <button
-                        type="button"
-                        style={{ ...styles.secondaryButton, marginTop: 8 }}
-                        onClick={() => navigate(`/purchase-orders?purchaseOrderId=${encodeURIComponent(selectedShipment.purchase_order_id as string)}`)}
-                      >
-                        Open PO
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          style={{ ...styles.secondaryButton, marginTop: 8 }}
+                          onClick={() => navigate(`/purchase-orders?purchaseOrderId=${encodeURIComponent(selectedShipment.purchase_order_id as string)}`)}
+                        >
+                          Open PO
+                        </button>
+                        <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                          Receiving this shipment updates stock through the existing shipment flow and refreshes linked PO progress.
+                        </div>
+                      </>
                     ) : null}
                   </div>
                   <div>
@@ -1851,6 +1908,22 @@ export default function ShipmentsPage() {
                           />
                         </div>
 
+                        <div style={styles.mobileFieldGroup}>
+                          <label style={styles.label}>Receiving Note</label>
+                          <input
+                            style={styles.input}
+                            type="text"
+                            placeholder="Optional receiving note"
+                            value={draft.receiving_note}
+                            onChange={(event) =>
+                              updateReceiveDraft(item.id, (current) => ({
+                                ...current,
+                                receiving_note: event.target.value
+                              }))
+                            }
+                          />
+                        </div>
+
                         <button
                           type="button"
                           style={{
@@ -1884,6 +1957,7 @@ export default function ShipmentsPage() {
                         <th style={styles.th}>Storage Location</th>
                         <th style={styles.th}>Receive Quantity</th>
                         <th style={styles.th}>Discrepancy Reason</th>
+                        <th style={styles.th}>Receiving Note</th>
                         <th style={styles.th}>Action</th>
                       </tr>
                     </thead>
@@ -1955,6 +2029,20 @@ export default function ShipmentsPage() {
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
                                     discrepancy_reason: event.target.value
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.inputCompact}
+                                type="text"
+                                placeholder="Optional receiving note"
+                                value={draft.receiving_note}
+                                onChange={(event) =>
+                                  updateReceiveDraft(item.id, (current) => ({
+                                    ...current,
+                                    receiving_note: event.target.value
                                   }))
                                 }
                               />

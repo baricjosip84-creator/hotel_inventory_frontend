@@ -55,6 +55,7 @@ type ShipmentOption = {
 };
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
+type CostStatusFilter = 'all' | 'costed' | 'uncosted';
 
 type StockMovement = {
   id: string;
@@ -65,6 +66,10 @@ type StockMovement = {
   shipment_po_number?: string | null;
   change: number | string;
   reason: string;
+  receiving_note?: string | null;
+  unit_cost?: number | string | null;
+  total_cost?: number | string | null;
+  cost_source?: string | null;
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
@@ -88,6 +93,8 @@ type FiltersState = {
   reason: string;
   search: string;
   package_audited: PackageAuditFilter;
+  cost_status: CostStatusFilter;
+  cost_source: string;
 };
 
 async function fetchProducts(): Promise<ProductOption[]> {
@@ -126,6 +133,14 @@ async function fetchStockMovements(filters: FiltersState): Promise<StockMovement
     params.set('package_audited', filters.package_audited);
   }
 
+  if (filters.cost_status !== 'all') {
+    params.set('cost_status', filters.cost_status);
+  }
+
+  if (filters.cost_source.trim()) {
+    params.set('cost_source', filters.cost_source.trim());
+  }
+
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<StockMovement[]>(`/stock/movements${suffix}`);
 }
@@ -143,6 +158,85 @@ function formatDateTime(dateString: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return dateString;
 
   return date.toLocaleString();
+}
+
+function formatMoney(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '-';
+
+  const amount = toNumber(value);
+
+  if (!Number.isFinite(amount)) return '-';
+
+  return amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+
+function csvValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+
+  const text = String(value);
+
+  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+}
+
+function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
+  const csv = rows.map((row) => row.map(csvValue).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function exportStockMovementsCsv(movements: StockMovement[]) {
+  downloadCsv('stock-movements-cost-audit.csv', [
+    [
+      'Created',
+      'Product',
+      'Product ID',
+      'Change',
+      'Unit',
+      'Reason',
+      'Receiving Note',
+      'Unit Cost',
+      'Total Cost',
+      'Cost Source',
+      'Shipment',
+      'User',
+      'Package',
+      'Package Count',
+      'Movement ID'
+    ],
+    ...movements.map((movement) => [
+      formatDateTime(movement.created_at),
+      movement.product_name,
+      movement.product_id,
+      toNumber(movement.change),
+      movement.product_unit,
+      movement.reason,
+      movement.receiving_note || '',
+      movement.unit_cost ?? '',
+      movement.total_cost ?? '',
+      movement.cost_source || '',
+      movement.shipment_po_number || movement.shipment_id || '',
+      movement.user_name || movement.user_id || '',
+      movement.package_name || '',
+      movement.package_count_received ?? '',
+      movement.id
+    ])
+  ]);
 }
 
 function reasonBadgeStyle(reason: string): CSSProperties {
@@ -247,7 +341,9 @@ export default function StockMovementsPage() {
     shipment_id: '',
     reason: '',
     search: '',
-    package_audited: 'all'
+    package_audited: 'all',
+    cost_status: 'all',
+    cost_source: ''
   });
 
   const productsQuery = useQuery({
@@ -272,6 +368,8 @@ export default function StockMovementsPage() {
     let negative = 0;
     let total = 0;
     let packageAuditRows = 0;
+    let totalCost = 0;
+    let costedRows = 0;
 
     for (const movement of movements) {
       const amount = toNumber(movement.change);
@@ -281,6 +379,16 @@ export default function StockMovementsPage() {
         positive += amount;
       } else if (amount < 0) {
         negative += Math.abs(amount);
+      }
+
+      const movementCost = toNumber(movement.total_cost);
+
+      if (movement.unit_cost !== null || movement.total_cost !== null || movement.cost_source) {
+        costedRows += 1;
+      }
+
+      if (movementCost > 0) {
+        totalCost += movementCost;
       }
 
       if (hasPackageAudit(movement)) {
@@ -293,7 +401,9 @@ export default function StockMovementsPage() {
       positive,
       negative,
       net: total,
-      packageAuditRows
+      packageAuditRows,
+      costedRows,
+      totalCost
     };
   }, [movements]);
 
@@ -394,6 +504,39 @@ export default function StockMovementsPage() {
           </div>
 
           <div>
+            <label style={styles.label}>Cost Status</label>
+            <select
+              style={styles.input}
+              value={filters.cost_status}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  cost_status: event.target.value as CostStatusFilter
+                }))
+              }
+            >
+              <option value="all">All movements</option>
+              <option value="costed">Costed only</option>
+              <option value="uncosted">Uncosted only</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.label}>Cost Source</label>
+            <input
+              style={styles.input}
+              value={filters.cost_source}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  cost_source: event.target.value
+                }))
+              }
+              placeholder="shipment_item_unit_cost"
+            />
+          </div>
+
+          <div>
             <label style={styles.label}>Search</label>
             <input
               style={styles.input}
@@ -404,7 +547,7 @@ export default function StockMovementsPage() {
                   search: event.target.value
                 }))
               }
-              placeholder="Search by product, user, reason, package, or barcode"
+              placeholder="Search by product, user, reason, package, barcode, note, shipment, or cost source"
             />
           </div>
         </div>
@@ -435,10 +578,30 @@ export default function StockMovementsPage() {
           <div style={styles.summaryLabel}>Package Audited</div>
           <div style={styles.summaryValue}>{summary.packageAuditRows}</div>
         </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Costed Rows</div>
+          <div style={styles.summaryValue}>{summary.costedRows}</div>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Received Cost</div>
+          <div style={styles.summaryValue}>{formatMoney(summary.totalCost)}</div>
+        </div>
       </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
-        <h3 style={styles.panelTitle}>Movement Ledger</h3>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.panelTitle}>Movement Ledger</h3>
+          <button
+            type="button"
+            className="app-button app-button--secondary"
+            onClick={() => exportStockMovementsCsv(movements)}
+            disabled={movements.length === 0}
+          >
+            Export CSV
+          </button>
+        </div>
 
         {movementsQuery.isLoading ? <p>Loading stock movements...</p> : null}
 
@@ -462,6 +625,7 @@ export default function StockMovementsPage() {
                     <th style={styles.th}>Created</th>
                     <th style={styles.th}>Product</th>
                     <th style={styles.th}>Change</th>
+                    <th style={styles.th}>Cost Audit</th>
                     <th style={styles.th}>Package Audit</th>
                     <th style={styles.th}>Reason</th>
                     <th style={styles.th}>Shipment</th>
@@ -494,6 +658,21 @@ export default function StockMovementsPage() {
                           <div style={styles.rowSubtle}>
                             Base units: {changeDisplay(amount)} {movement.product_unit}
                           </div>
+                        </td>
+                        <td style={styles.td}>
+                          {movement.total_cost !== null && movement.total_cost !== undefined ? (
+                            <>
+                              <div style={styles.rowTitle}>{formatMoney(movement.total_cost)}</div>
+                              <div style={styles.rowSubtle}>
+                                Unit cost: {formatMoney(movement.unit_cost)}
+                              </div>
+                              <div style={styles.rowSubtle}>
+                                Source: {movement.cost_source || 'movement'}
+                              </div>
+                            </>
+                          ) : (
+                            <span style={styles.rowSubtle}>No cost captured</span>
+                          )}
                         </td>
                         <td style={styles.td}>
                           {hasPackageAudit(movement) ? (
@@ -529,6 +708,11 @@ export default function StockMovementsPage() {
                           <span style={reasonBadgeStyle(movement.reason)}>
                             {movement.reason}
                           </span>
+                          {movement.receiving_note ? (
+                            <div style={styles.rowSubtle}>
+                              Note: {movement.receiving_note}
+                            </div>
+                          ) : null}
                         </td>
                         <td style={styles.td}>
                           {movement.shipment_id ? (
@@ -589,6 +773,14 @@ const styles: Record<string, CSSProperties> = {
   },
   panel: {
     minWidth: 0
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    marginBottom: 0,
+    flexWrap: 'wrap'
   },
   panelTitle: {
     marginTop: 0,

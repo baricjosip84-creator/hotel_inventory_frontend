@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { ProductItem, ProductPackageItem, SupplierItem } from '../types/inventory';
+import type { ProductCostHistoryItem, ProductCostHistoryResponse, ProductItem, ProductPackageItem, SupplierItem } from '../types/inventory';
 
 type ProductFormState = {
   name: string;
@@ -21,10 +21,17 @@ type PackageFormState = {
   is_default: boolean;
 };
 
+type CostHistoryFilterState = {
+  costSource: string;
+  costFrom: string;
+  costTo: string;
+};
+
 async function fetchProducts(filters: {
   search: string;
   category: string;
   supplierId: string;
+  costStatus: string;
 }): Promise<ProductItem[]> {
   const params = new URLSearchParams();
 
@@ -40,6 +47,10 @@ async function fetchProducts(filters: {
     params.set('supplier_id', filters.supplierId.trim());
   }
 
+  if (filters.costStatus.trim()) {
+    params.set('cost_status', filters.costStatus.trim());
+  }
+
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<ProductItem[]>(`/products${suffix}`);
 }
@@ -50,6 +61,27 @@ async function fetchSuppliers(): Promise<SupplierItem[]> {
 
 async function fetchProductPackages(productId: string): Promise<ProductPackageItem[]> {
   return apiRequest<ProductPackageItem[]>(`/products/${productId}/packages`);
+}
+
+async function fetchProductCostHistory(
+  productId: string,
+  filters: CostHistoryFilterState
+): Promise<ProductCostHistoryResponse> {
+  const params = new URLSearchParams({ limit: '50' });
+
+  if (filters.costSource.trim()) {
+    params.set('cost_source', filters.costSource.trim());
+  }
+
+  if (filters.costFrom) {
+    params.set('cost_from', filters.costFrom);
+  }
+
+  if (filters.costTo) {
+    params.set('cost_to', filters.costTo);
+  }
+
+  return apiRequest<ProductCostHistoryResponse>(`/products/${productId}/cost-history?${params.toString()}`);
 }
 
 async function createProduct(input: ProductFormState): Promise<ProductItem> {
@@ -172,6 +204,14 @@ function emptyPackageForm(): PackageFormState {
   };
 }
 
+function emptyCostHistoryFilters(): CostHistoryFilterState {
+  return {
+    costSource: '',
+    costFrom: '',
+    costTo: ''
+  };
+}
+
 function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return '-';
 
@@ -185,6 +225,44 @@ function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') return Number(value);
   return 0;
+}
+
+function formatMoney(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '-';
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+
+  return amount.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2
+  });
+}
+
+function csvEscape(value: unknown): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
+  if (rows.length === 0) return;
+
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.map(csvEscape).join(','),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function StatCard(props: {
@@ -233,24 +311,28 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
+  const [costStatusFilter, setCostStatusFilter] = useState('');
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [selectedPackageProduct, setSelectedPackageProduct] = useState<ProductItem | null>(null);
+  const [selectedCostProduct, setSelectedCostProduct] = useState<ProductItem | null>(null);
+  const [costHistoryFilters, setCostHistoryFilters] = useState<CostHistoryFilterState>(emptyCostHistoryFilters());
   const [editingPackage, setEditingPackage] = useState<ProductPackageItem | null>(null);
   const [packageForm, setPackageForm] = useState<PackageFormState>(emptyPackageForm());
   const [packageMessage, setPackageMessage] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
 
   const productsQuery = useQuery({
-    queryKey: ['products', search, categoryFilter, supplierFilter],
+    queryKey: ['products', search, categoryFilter, supplierFilter, costStatusFilter],
     queryFn: () =>
       fetchProducts({
         search,
         category: categoryFilter,
-        supplierId: supplierFilter
+        supplierId: supplierFilter,
+        costStatus: costStatusFilter
       })
   });
 
@@ -263,6 +345,18 @@ export default function ProductsPage() {
     queryKey: ['product-packages', selectedPackageProduct?.id],
     queryFn: () => fetchProductPackages(selectedPackageProduct!.id),
     enabled: Boolean(selectedPackageProduct?.id)
+  });
+
+  const costHistoryQuery = useQuery({
+    queryKey: [
+      'product-cost-history',
+      selectedCostProduct?.id,
+      costHistoryFilters.costSource,
+      costHistoryFilters.costFrom,
+      costHistoryFilters.costTo
+    ],
+    queryFn: () => fetchProductCostHistory(selectedCostProduct!.id, costHistoryFilters),
+    enabled: Boolean(selectedCostProduct?.id)
   });
 
   const createMutation = useMutation({
@@ -315,6 +409,7 @@ export default function ProductsPage() {
     onSuccess: async () => {
       setEditingProduct(null);
       setSelectedPackageProduct(null);
+      setSelectedCostProduct(null);
       setEditingPackage(null);
       setForm(emptyForm());
       setPackageForm(emptyPackageForm());
@@ -409,6 +504,12 @@ export default function ProductsPage() {
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
   const packages = useMemo(() => packagesQuery.data ?? [], [packagesQuery.data]);
+  const costHistory = useMemo(
+    () => costHistoryQuery.data?.cost_history ?? [],
+    [costHistoryQuery.data]
+  );
+
+  const costSummary = costHistoryQuery.data?.cost_summary;
 
   const categoryOptions = useMemo(() => {
     return Array.from(
@@ -425,13 +526,20 @@ export default function ProductsPage() {
     const thresholdConfiguredCount = products.filter((product) => toNumber(product.min_stock) > 0).length;
     const categorizedCount = products.filter((product) => Boolean(product.category && product.category.trim())).length;
     const barcodeCount = products.filter((product) => Boolean(product.barcode && product.barcode.trim())).length;
+    const productsWithCostCount = products.filter((product) => product.latest_unit_cost !== null && product.latest_unit_cost !== undefined).length;
+    const estimatedInventoryValue = products.reduce(
+      (sum, product) => sum + toNumber(product.estimated_inventory_value),
+      0
+    );
 
     return {
       total: products.length,
       linkedSupplierCount,
       thresholdConfiguredCount,
       categorizedCount,
-      barcodeCount
+      barcodeCount,
+      productsWithCostCount,
+      estimatedInventoryValue
     };
   }, [products]);
 
@@ -580,6 +688,43 @@ export default function ProductsPage() {
     setPackageMessage(null);
   };
 
+
+  const handleOpenCostHistory = (product: ProductItem) => {
+    setSelectedCostProduct(product);
+    setCostHistoryFilters(emptyCostHistoryFilters());
+  };
+
+  const handleCloseCostHistory = () => {
+    setSelectedCostProduct(null);
+    setCostHistoryFilters(emptyCostHistoryFilters());
+  };
+
+  const handleClearCostHistoryFilters = () => {
+    setCostHistoryFilters(emptyCostHistoryFilters());
+  };
+
+  const handleExportCostHistoryCsv = () => {
+    if (!selectedCostProduct || costHistory.length === 0) return;
+
+    const rows = costHistory.map((movement) => ({
+      movement_id: movement.id,
+      product_id: movement.product_id,
+      product_name: movement.product_name,
+      change: movement.change,
+      reason: movement.reason,
+      unit_cost: movement.unit_cost ?? '',
+      total_cost: movement.total_cost ?? '',
+      cost_source: movement.cost_source || '',
+      shipment_id: movement.shipment_id || '',
+      shipment_po_number: movement.shipment_po_number || '',
+      receiving_note: movement.receiving_note || '',
+      user: movement.user_name || movement.user_id || '',
+      created_at: movement.created_at
+    }));
+
+    downloadCsv(`product-cost-history-${selectedCostProduct.id}.csv`, rows);
+  };
+
   const handleStartEditPackage = (packageItem: ProductPackageItem) => {
     if (!canManageProducts) {
       setPackageError('Your current role cannot edit product packages.');
@@ -634,6 +779,27 @@ export default function ProductsPage() {
     });
   };
 
+  const handleExportProductsCsv = () => {
+    const rows = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      category: product.category || '',
+      unit: product.unit,
+      min_stock: product.min_stock,
+      supplier: product.supplier_name || '',
+      default_barcode: product.barcode || '',
+      current_stock_quantity: product.current_stock_quantity ?? 0,
+      latest_unit_cost: product.latest_unit_cost ?? '',
+      latest_cost_source: product.latest_cost_source || '',
+      latest_cost_at: product.latest_cost_at || '',
+      estimated_inventory_value: product.estimated_inventory_value ?? '',
+      created_at: product.created_at,
+      version: product.version
+    }));
+
+    downloadCsv('products-costing.csv', rows);
+  };
+
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isPackageSubmitting = createPackageMutation.isPending || updatePackageMutation.isPending;
 
@@ -661,6 +827,17 @@ export default function ProductsPage() {
           value={summary.barcodeCount}
           subtitle="Products with a default barcode package"
           tone="good"
+        />
+        <StatCard
+          title="Costed"
+          value={summary.productsWithCostCount}
+          subtitle="Products with received cost audit"
+          tone={summary.productsWithCostCount > 0 ? 'good' : 'warn'}
+        />
+        <StatCard
+          title="Inventory Value"
+          value={formatMoney(summary.estimatedInventoryValue)}
+          subtitle="Estimated from latest received unit cost"
         />
       </div>
 
@@ -960,6 +1137,168 @@ export default function ProductsPage() {
         </section>
       ) : null}
 
+      {selectedCostProduct ? (
+        <section style={styles.panel}>
+          <div style={styles.packageHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>Cost History for {selectedCostProduct.name}</h3>
+              <p style={styles.panelSubtitle}>
+                Read-only cost audit from stock movements. This does not change inventory value or stock quantities.
+              </p>
+            </div>
+            <div style={styles.actionGroup}>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={handleExportCostHistoryCsv}
+                disabled={costHistory.length === 0}
+              >
+                Export Cost History CSV
+              </button>
+              <button type="button" style={styles.secondaryButton} onClick={handleCloseCostHistory}>
+                Close Cost History
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.formGrid}>
+            <div>
+              <label style={styles.label}>Cost source</label>
+              <input
+                style={styles.input}
+                value={costHistoryFilters.costSource}
+                onChange={(event) =>
+                  setCostHistoryFilters((current) => ({ ...current, costSource: event.target.value }))
+                }
+                placeholder="Example: shipment_item_unit_cost"
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>Cost from</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={costHistoryFilters.costFrom}
+                onChange={(event) =>
+                  setCostHistoryFilters((current) => ({ ...current, costFrom: event.target.value }))
+                }
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>Cost to</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={costHistoryFilters.costTo}
+                onChange={(event) =>
+                  setCostHistoryFilters((current) => ({ ...current, costTo: event.target.value }))
+                }
+              />
+            </div>
+
+            <div style={styles.formActions}>
+              <button type="button" style={styles.secondaryButton} onClick={handleClearCostHistoryFilters}>
+                Clear Cost Filters
+              </button>
+            </div>
+          </div>
+
+          {costHistoryQuery.isLoading ? <p>Loading cost history...</p> : null}
+
+          {costHistoryQuery.isError ? (
+            <p>Failed to load cost history: {(costHistoryQuery.error as Error).message || 'Unknown error'}</p>
+          ) : null}
+
+          {!costHistoryQuery.isLoading && !costHistoryQuery.isError ? (
+            <>
+              <div style={styles.statsGrid}>
+                <StatCard
+                  title="Costed Movements"
+                  value={String(costSummary?.costed_movement_count ?? 0)}
+                  subtitle="Movements with unit cost"
+                />
+                <StatCard
+                  title="Received Qty"
+                  value={String(costSummary?.received_quantity ?? 0)}
+                  subtitle={selectedCostProduct.unit}
+                />
+                <StatCard
+                  title="Weighted Avg Cost"
+                  value={formatMoney(costSummary?.weighted_average_unit_cost)}
+                  subtitle="Received total / received qty"
+                />
+                <StatCard
+                  title="Received Cost"
+                  value={formatMoney(costSummary?.received_total_cost)}
+                  subtitle="Costed receipt value"
+                />
+                <StatCard
+                  title="Cost Range"
+                  value={`${formatMoney(costSummary?.min_unit_cost)} – ${formatMoney(costSummary?.max_unit_cost)}`}
+                  subtitle="Min / max unit cost"
+                />
+                <StatCard
+                  title="Latest Cost Audit"
+                  value={formatDateTime(costSummary?.latest_cost_at)}
+                  subtitle="Most recent costed movement"
+                />
+              </div>
+
+              <div style={styles.tableWrapper}>
+              <table style={styles.packageTable}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Date</th>
+                    <th style={styles.th}>Quantity</th>
+                    <th style={styles.th}>Unit Cost</th>
+                    <th style={styles.th}>Total Cost</th>
+                    <th style={styles.th}>Source</th>
+                    <th style={styles.th}>Shipment</th>
+                    <th style={styles.th}>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costHistory.length === 0 ? (
+                    <tr>
+                      <td style={styles.emptyCell} colSpan={7}>
+                        No costed stock movements found for this product.
+                      </td>
+                    </tr>
+                  ) : (
+                    costHistory.map((movement: ProductCostHistoryItem) => (
+                      <tr key={movement.id}>
+                        <td style={styles.td}>{formatDateTime(movement.created_at)}</td>
+                        <td style={styles.td}>
+                          <div style={styles.rowTitle}>{String(movement.change)}</div>
+                          <div style={styles.rowSubtle}>{movement.reason}</div>
+                        </td>
+                        <td style={styles.td}>{formatMoney(movement.unit_cost)}</td>
+                        <td style={styles.td}>{formatMoney(movement.total_cost)}</td>
+                        <td style={styles.td}>{movement.cost_source || '-'}</td>
+                        <td style={styles.td}>
+                          {movement.shipment_id ? (
+                            <div>
+                              <div style={styles.rowTitle}>{movement.shipment_po_number || 'Shipment'}</div>
+                              <div style={styles.rowSubtle}>{movement.shipment_id}</div>
+                            </div>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td style={styles.td}>{movement.receiving_note || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              </div>
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Product List</h3>
         <p style={styles.panelSubtitle}>
@@ -1000,6 +1339,26 @@ export default function ProductsPage() {
               </option>
             ))}
           </select>
+
+
+          <select
+            value={costStatusFilter}
+            onChange={(event) => setCostStatusFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All cost statuses</option>
+            <option value="costed">Costed products</option>
+            <option value="uncosted">Uncosted products</option>
+          </select>
+
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleExportProductsCsv}
+            disabled={products.length === 0}
+          >
+            Export Products CSV
+          </button>
         </div>
 
         {productsQuery.isLoading ? <p>Loading products...</p> : null}
@@ -1019,6 +1378,8 @@ export default function ProductsPage() {
                   <th style={styles.th}>Min Stock</th>
                   <th style={styles.th}>Supplier</th>
                   <th style={styles.th}>Default Barcode</th>
+                  <th style={styles.th}>Cost Audit</th>
+                  <th style={styles.th}>Est. Value</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Version</th>
                   <th style={styles.th}>Actions</th>
@@ -1027,7 +1388,7 @@ export default function ProductsPage() {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={9}>
+                    <td style={styles.emptyCell} colSpan={11}>
                       No products found.
                     </td>
                   </tr>
@@ -1049,12 +1410,41 @@ export default function ProductsPage() {
                           '-'
                         )}
                       </td>
+                      <td style={styles.td}>
+                        {product.latest_unit_cost !== null && product.latest_unit_cost !== undefined ? (
+                          <div>
+                            <div style={styles.rowTitle}>{formatMoney(product.latest_unit_cost)}</div>
+                            <div style={styles.rowSubtle}>
+                              Source: {product.latest_cost_source || 'movement'}
+                            </div>
+                            <div style={styles.rowSubtle}>
+                              Last cost: {formatDateTime(product.latest_cost_at)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={styles.rowSubtle}>No cost audit</span>
+                        )}
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value)}</div>
+                        <div style={styles.rowSubtle}>
+                          Stock: {String(product.current_stock_quantity ?? 0)} {product.unit}
+                        </div>
+                      </td>
                       <td style={styles.td}>{formatDateTime(product.created_at)}</td>
                       <td style={styles.td}>
                         <span style={styles.badgeVersion}>v{product.version}</span>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.actionGroup}>
+                          <button
+                            type="button"
+                            style={styles.secondaryButton}
+                            onClick={() => handleOpenCostHistory(product)}
+                          >
+                            Cost History
+                          </button>
+
                           <button
                             type="button"
                             style={styles.secondaryButton}

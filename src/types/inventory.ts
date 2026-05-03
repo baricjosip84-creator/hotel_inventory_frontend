@@ -46,9 +46,49 @@ export interface ProductItem {
   supplier_name?: string | null;
   barcode?: string | null;
   package_count?: number | string;
+  current_stock_quantity?: number | string;
+  latest_unit_cost?: number | string | null;
+  latest_total_cost?: number | string | null;
+  latest_cost_source?: string | null;
+  latest_cost_at?: string | null;
+  estimated_inventory_value?: number | string | null;
   packages?: ProductPackageItem[];
   created_at: string;
   version: number;
+}
+
+export interface ProductCostHistoryItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_unit: string;
+  shipment_id?: string | null;
+  shipment_po_number?: string | null;
+  change: number | string;
+  reason: string;
+  receiving_note?: string | null;
+  unit_cost?: number | string | null;
+  total_cost?: number | string | null;
+  cost_source?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  created_at: string;
+}
+
+export interface ProductCostSummary {
+  costed_movement_count: number | string;
+  received_quantity: number | string;
+  received_total_cost: number | string;
+  min_unit_cost?: number | string | null;
+  max_unit_cost?: number | string | null;
+  weighted_average_unit_cost?: number | string | null;
+  latest_cost_at?: string | null;
+}
+
+export interface ProductCostHistoryResponse {
+  product: ProductItem;
+  cost_summary?: ProductCostSummary;
+  cost_history: ProductCostHistoryItem[];
 }
 
 export interface SupplierItem {
@@ -70,6 +110,10 @@ export interface StockMovementItem {
   shipment_po_number?: string | null;
   change: number | string;
   reason: string;
+  receiving_note?: string | null;
+  unit_cost?: number | string | null;
+  total_cost?: number | string | null;
+  cost_source?: string | null;
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
