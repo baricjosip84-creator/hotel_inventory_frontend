@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem, SupplierItem } from '../types/inventory';
@@ -30,7 +30,12 @@ type PurchaseOrderListItem = {
   total_quantity?: number | string;
   estimated_total_cost?: number | string;
   linked_shipment_count?: number | string;
+  open_linked_shipment_count?: number | string;
   total_received_quantity?: number | string;
+  remaining_quantity?: number | string;
+  receiving_status?: string;
+  receiving_percent?: number | string;
+  can_create_remaining_shipment?: boolean;
 };
 
 type PurchaseOrderDetailItem = {
@@ -64,6 +69,10 @@ type PurchaseOrderReceivingSummary = {
   received_quantity: number | string;
   remaining_quantity: number | string;
   linked_shipment_count: number | string;
+  open_linked_shipment_count?: number | string;
+  receiving_status?: string;
+  receiving_percent?: number | string;
+  can_create_remaining_shipment?: boolean;
 };
 
 type PurchaseOrderDetail = PurchaseOrderListItem & {
@@ -81,6 +90,7 @@ type CreateShipmentFromPurchaseOrderResponse = {
     purchase_order_id?: string | null;
   };
   copied_item_count: number;
+  copied_total_quantity?: number;
 };
 
 type PurchaseOrderFormItem = {
@@ -147,6 +157,28 @@ function formatMoney(value: number | string | null | undefined): string {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
   return parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+
+function receivingStatusLabel(status: string | null | undefined): string {
+  if (status === 'received') return 'Received';
+  if (status === 'partially_received') return 'Partial';
+  if (status === 'not_started') return 'Not started';
+  return 'N/A';
+}
+
+function receivingBadgeStyle(status: string | null | undefined): CSSProperties {
+  if (status === 'received') return styles.receivedBadge;
+  if (status === 'partially_received') return styles.partialReceivedBadge;
+  if (status === 'not_started') return styles.notStartedBadge;
+  return styles.naBadge;
+}
+
+function formatPercent(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '0%';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return String(value);
+  return `${parsed.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 }
 
 function badgeStyle(status: PurchaseOrderStatus): CSSProperties {
@@ -239,6 +271,7 @@ function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
 export default function PurchaseOrdersPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const capabilities = getRoleCapabilities();
 
   const [filters, setFilters] = useState<Filters>({ status: '', search: '', supplierId: '', productId: '' });
@@ -282,6 +315,22 @@ export default function PurchaseOrdersPage() {
     setEditingId(null);
     setFormError(null);
   };
+
+  useEffect(() => {
+    const purchaseOrderIdFromQuery = searchParams.get('purchaseOrderId');
+
+    if (!purchaseOrderIdFromQuery) {
+      return;
+    }
+
+    if (selectedId === purchaseOrderIdFromQuery) {
+      return;
+    }
+
+    setSelectedId(purchaseOrderIdFromQuery);
+    setEditingId(null);
+    setFormError(null);
+  }, [searchParams, selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -398,7 +447,12 @@ export default function PurchaseOrdersPage() {
   const selectedCanSubmit = selectedDetail?.status === 'draft';
   const selectedCanApprove = selectedDetail?.status === 'submitted';
   const selectedCanCancel = selectedDetail?.status === 'draft' || selectedDetail?.status === 'submitted';
-  const selectedCanCreateShipment = selectedDetail?.status === 'approved';
+  const selectedRemainingQuantity = Number(selectedDetail?.receiving_summary?.remaining_quantity || 0);
+  const selectedHasOpenShipment = Number(selectedDetail?.receiving_summary?.open_linked_shipment_count || 0) > 0;
+  const selectedCanCreateShipment = Boolean(
+    selectedDetail?.receiving_summary?.can_create_remaining_shipment ??
+    (selectedDetail?.status === 'approved' && selectedRemainingQuantity > 0 && !selectedHasOpenShipment)
+  );
 
   return (
     <div style={styles.page}>
@@ -475,6 +529,7 @@ export default function PurchaseOrdersPage() {
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Expected</th>
                 <th style={styles.th}>Items</th>
+                <th style={styles.th}>Receiving</th>
                 <th style={styles.th}>Received</th>
                 <th style={styles.th}>Shipments</th>
                 <th style={styles.th}>Estimated Cost</th>
@@ -493,6 +548,7 @@ export default function PurchaseOrdersPage() {
                   <td style={styles.td}><span style={{ ...styles.badge, ...badgeStyle(row.status) }}>{row.status}</span></td>
                   <td style={styles.td}>{formatDate(row.expected_delivery_date)}</td>
                   <td style={styles.td}>{formatNumber(row.item_count)}</td>
+                  <td style={styles.td}><span style={{ ...styles.badge, ...receivingBadgeStyle(row.receiving_status) }}>{receivingStatusLabel(row.receiving_status)}</span></td>
                   <td style={styles.td}>{formatNumber(row.total_received_quantity)}</td>
                   <td style={styles.td}>{formatNumber(row.linked_shipment_count)}</td>
                   <td style={styles.td}>{formatMoney(row.estimated_total_cost)}</td>
@@ -500,7 +556,7 @@ export default function PurchaseOrdersPage() {
                 </tr>
               ))}
               {!purchaseOrdersQuery.isLoading && !(purchaseOrdersQuery.data || []).length ? (
-                <tr><td style={styles.td} colSpan={9}>No purchase orders found.</td></tr>
+                <tr><td style={styles.td} colSpan={10}>No purchase orders found.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -627,9 +683,10 @@ export default function PurchaseOrdersPage() {
               <dl style={styles.detailGrid}>
                 <dt>Expected delivery</dt><dd>{formatDate(selectedDetail.expected_delivery_date)}</dd>
                 <dt>Estimated cost</dt><dd>{formatMoney(selectedDetail.estimated_total_cost)}</dd>
-                <dt>PO received</dt><dd>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)}</dd>
+                <dt>Receiving status</dt><dd><span style={{ ...styles.badge, ...receivingBadgeStyle(selectedDetail.receiving_summary?.receiving_status) }}>{receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status)}</span></dd>
+                <dt>PO received</dt><dd>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)} ({formatPercent(selectedDetail.receiving_summary?.receiving_percent)})</dd>
                 <dt>Remaining</dt><dd>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</dd>
-                <dt>Linked shipments</dt><dd>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)}</dd>
+                <dt>Linked shipments</dt><dd>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)} total / {formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count)} open</dd>
                 <dt>Created</dt><dd>{formatDateTime(selectedDetail.created_at)}</dd>
                 <dt>Submitted</dt><dd>{formatDateTime(selectedDetail.submitted_at)}</dd>
                 <dt>Approved</dt><dd>{formatDateTime(selectedDetail.approved_at)}</dd>
@@ -677,6 +734,7 @@ export default function PurchaseOrdersPage() {
                           <th style={styles.th}>Status</th>
                           <th style={styles.th}>Delivery</th>
                           <th style={styles.th}>Received</th>
+                          <th style={styles.th}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -686,6 +744,18 @@ export default function PurchaseOrdersPage() {
                             <td style={styles.td}>{shipment.status}</td>
                             <td style={styles.td}>{formatDate(shipment.delivery_date)}</td>
                             <td style={styles.td}>{formatNumber(shipment.received_quantity)} / {formatNumber(shipment.ordered_quantity)}</td>
+                            <td style={styles.td}>
+                              <button
+                                type="button"
+                                style={styles.secondaryButton}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`);
+                                }}
+                              >
+                                Open
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -714,7 +784,8 @@ export default function PurchaseOrdersPage() {
                 <div style={styles.bridgeBox}>
                   <div>
                     <h4 style={styles.h4}>Create shipment from this PO</h4>
-                    <p style={styles.muted}>Copies PO lines into a pending shipment. Stock is not changed.</p>
+                    <p style={styles.muted}>Copies only remaining PO quantities into a pending shipment. Stock is not changed.</p>
+                    {selectedHasOpenShipment ? <p style={styles.muted}>An open linked shipment exists; receive or close it before creating another remaining shipment.</p> : null}
                   </div>
                   <input
                     style={styles.input}
@@ -732,7 +803,7 @@ export default function PurchaseOrdersPage() {
                       deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null
                     })}
                   >
-                    Create Shipment
+                    Create Remaining Shipment
                   </button>
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
                 </div>
@@ -793,6 +864,10 @@ const styles: Record<string, CSSProperties> = {
   submittedBadge: { background: '#fef3c7', color: '#92400e' },
   approvedBadge: { background: '#dcfce7', color: '#166534' },
   cancelledBadge: { background: '#fee2e2', color: '#991b1b' },
+  receivedBadge: { background: '#dcfce7', color: '#166534' },
+  partialReceivedBadge: { background: '#dbeafe', color: '#1d4ed8' },
+  notStartedBadge: { background: '#fef3c7', color: '#92400e' },
+  naBadge: { background: '#f1f5f9', color: '#475569' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(360px, 1.05fr)', gap: 20, alignItems: 'start' },
   inlineGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16 },
