@@ -38,6 +38,8 @@ import UsersPage from '../pages/UsersPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
 import TenantAuditPage from '../pages/TenantAuditPage';
+import SystemContextPage from '../pages/SystemContextPage';
+import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
@@ -209,6 +211,22 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INSIGHTS_READ]}>
             <InsightsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'system-context',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ]}>
+            <SystemContextPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'execution-requests',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW]}>
+            <ExecutionRequestsPage />
           </ProtectedRoute>
         )
       }
