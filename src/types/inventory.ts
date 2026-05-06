@@ -1783,6 +1783,52 @@ export interface ExecutionAdapterRegistryResponse {
   notes: string[];
 }
 
+export interface ExecutionRequestExecutionReview {
+  available: boolean;
+  status: string;
+  outcome?: string | null;
+  executor?: string | null;
+  executed_real_action: boolean;
+  executed_at?: string | null;
+  executed_by?: string | null;
+  executed_by_name?: string | null;
+  before_after?: {
+    product_id?: string | null;
+    product_name?: string | null;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+    changed?: boolean;
+  } | null;
+  failure?: {
+    error_code?: string | null;
+    error_message?: string | null;
+    failed_at?: string | null;
+    rollback_applied?: boolean;
+    retry_eligibility?: {
+      eligible: boolean;
+      reason: string;
+      future_retry_supported?: boolean;
+      requires_new_review_before_retry?: boolean;
+      duplicate_execution_blocked?: boolean;
+      retry_count?: number | string;
+      max_retry_count?: number | string;
+      prepared_at?: string | null;
+    } | null;
+  } | null;
+  retry_eligibility?: {
+    eligible: boolean;
+    reason: string;
+    future_retry_supported?: boolean;
+    requires_new_review_before_retry?: boolean;
+    duplicate_execution_blocked?: boolean;
+    retry_count?: number | string;
+    max_retry_count?: number | string;
+    prepared_at?: string | null;
+  } | null;
+  evidence?: Record<string, unknown> | null;
+  review_notes?: string[];
+}
+
 export interface ExecutionRequest {
   id: string;
   tenant_id: string;
@@ -1790,6 +1836,7 @@ export interface ExecutionRequest {
   status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'cancelled';
   execution_status?: 'noop_completed' | 'completed' | 'failed' | string | null;
   execution_result?: Record<string, unknown> | null;
+  execution_review?: ExecutionRequestExecutionReview | null;
   payload: Record<string, unknown>;
   adapter?: ExecutionAdapterDefinition | null;
   gate_snapshot?: Record<string, unknown> | null;
@@ -1823,10 +1870,435 @@ export interface ExecutionRequest {
   };
 }
 
+export interface ExecutionRequestExecutionReviewResponse {
+  request_id: string;
+  request_type: ExecutionRequest['request_type'];
+  status: ExecutionRequest['status'];
+  execution_status?: ExecutionRequest['execution_status'];
+  execution_review: ExecutionRequestExecutionReview;
+  notes: string[];
+}
+
+
+
+export interface ExecutionRequestSecurityAuditResponse {
+  request_id: string;
+  generated_at: string;
+  request_type: ExecutionRequest['request_type'];
+  status: ExecutionRequest['status'];
+  execution_status?: ExecutionRequest['execution_status'];
+  adapter?: {
+    request_type: string;
+    label: string;
+    risk_level: string;
+    execution_enabled: boolean;
+    required_permissions: string[];
+    required_review_permissions: string[];
+    required_execution_permissions: string[];
+  } | null;
+  actor: {
+    role?: string | null;
+    user_id?: string | null;
+    tenant_id?: string | null;
+    typ?: string | null;
+    support_session_id?: string | null;
+    platform_user_id?: string | null;
+    same_as_requester: boolean;
+    same_as_reviewer: boolean;
+  };
+  permission_matrix: {
+    can_view: boolean;
+    can_create: boolean;
+    can_submit: boolean;
+    can_cancel: boolean;
+    can_review: boolean;
+    can_execute: boolean;
+    can_update_products: boolean;
+    required_for_execution: string[];
+    current_actor_has_required_execution_permissions: boolean;
+  };
+  separation_of_duties: {
+    requested_by?: string | null;
+    reviewed_by?: string | null;
+    executed_by?: string | null;
+    requester_reviewer_same: boolean;
+    reviewer_executor_same: boolean;
+    requester_executor_same: boolean;
+    recommended_for_real_execution: boolean;
+  };
+  checks: Array<{
+    key: string;
+    passed: boolean;
+    severity: 'low' | 'medium' | 'high' | 'critical' | string;
+    message: string;
+  }>;
+  summary: {
+    passed: boolean;
+    critical_failures: number | string;
+    warnings: number | string;
+    security_posture: 'ready' | 'review_recommended' | 'blocked' | string;
+  };
+  notes: string[];
+}
+
+export interface ExecutionRequestAuditPackResponse {
+  request_id: string;
+  generated_at: string;
+  status: ExecutionRequest['status'];
+  execution_status?: ExecutionRequest['execution_status'];
+  request_summary: Record<string, unknown>;
+  snapshots: {
+    payload?: Record<string, unknown> | null;
+    gate?: Record<string, unknown> | null;
+    context?: Record<string, unknown> | null;
+    execution_result?: Record<string, unknown> | null;
+    before_after?: Record<string, unknown> | null;
+  };
+  audit_trail: Array<{
+    id: string;
+    action: string;
+    entity_type: string;
+    entity_id?: string | null;
+    user_id?: string | null;
+    user_name?: string | null;
+    metadata?: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+  completeness: {
+    complete: boolean;
+    audit_event_count: number | string;
+    required_actions: string[];
+    missing_actions: string[];
+    has_payload_snapshot: boolean;
+    has_gate_snapshot: boolean;
+    has_context_snapshot: boolean;
+    has_execution_result: boolean;
+    has_before_after: boolean;
+    safe_for_governance_review: boolean;
+  };
+  safety: {
+    read_only: boolean;
+    executes_actions: boolean;
+    mutates_inventory: boolean;
+    mutates_products: boolean;
+    mutates_shipments: boolean;
+    creates_jobs: boolean;
+  };
+  notes: string[];
+}
+
 export interface ExecutionRequestListResponse {
   limit: number | string;
   offset: number | string;
   total: number | string;
   rows: ExecutionRequest[];
+  notes: string[];
+}
+
+
+export interface ExecutionModuleHardeningSummaryResponse {
+  generated_at: string;
+  module_status: 'complete' | 'ready_with_watch_items' | 'needs_fix' | string;
+  closeout_recommendation: string;
+  totals: {
+    total_requests: number | string;
+    draft_requests: number | string;
+    pending_review_requests: number | string;
+    approved_requests: number | string;
+    rejected_requests: number | string;
+    cancelled_requests: number | string;
+    completed_executions: number | string;
+    noop_executions: number | string;
+    failed_executions: number | string;
+    approved_waiting_execution: number | string;
+    real_execution_ready: number | string;
+    terminal_execution_records: number | string;
+  };
+  enabled_real_executors: Array<{
+    request_type: string;
+    label: string;
+    risk_level: string;
+    side_effects_when_executed: string[];
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety_contract: {
+    approval_required: boolean;
+    duplicate_execution_blocked: boolean;
+    retry_requires_explicit_preparation: boolean;
+    mutates_inventory: boolean;
+    mutates_shipments: boolean;
+    creates_background_jobs: boolean;
+    real_execution_scope: string[];
+  };
+  notes: string[];
+}
+
+export interface AutomationTypeDefinition {
+  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | string;
+  label: string;
+  description: string;
+  default_request_type: string;
+  creates_execution_requests_later: boolean;
+  executes_actions: boolean;
+  risk_level: 'low' | 'medium' | 'high' | string;
+}
+
+export interface AutomationSchedule {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description?: string | null;
+  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | string;
+  status: 'draft' | 'paused' | 'disabled' | string;
+  schedule_kind: 'manual' | 'daily' | 'weekly' | 'monthly' | string;
+  schedule_config: Record<string, unknown>;
+  request_defaults: Record<string, unknown>;
+  last_run_at?: string | null;
+  next_run_at?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
+  disabled_at?: string | null;
+  disabled_reason?: string | null;
+  type_definition?: AutomationTypeDefinition | null;
+  timeline?: Array<{
+    status: string;
+    label: string;
+    at?: string | null;
+    by?: string | null;
+  }>;
+  safety?: {
+    runs_automatically: boolean;
+    creates_execution_requests_now: boolean;
+    executes_requests: boolean;
+    mutates_inventory: boolean;
+    mutates_products: boolean;
+    mutates_shipments: boolean;
+    runner_enabled: boolean;
+  };
+  notes?: string[];
+}
+
+export interface AutomationScheduleListResponse {
+  limit: number | string;
+  offset: number | string;
+  total: number | string;
+  rows: AutomationSchedule[];
+  notes: string[];
+}
+
+export interface AutomationScheduleTypesResponse {
+  automation_types: AutomationTypeDefinition[];
+  schedule_kinds: string[];
+  statuses: string[];
+  request_default_statuses: string[];
+  safety: {
+    registry_only: boolean;
+    runner_enabled: boolean;
+    creates_jobs: boolean;
+    auto_executes: boolean;
+  };
+  notes: string[];
+}
+
+
+
+export interface AutomationScheduleManualRunResponse {
+  automation_schedule_id: string;
+  manual_run: boolean;
+  runner_enabled: boolean;
+  created_execution_requests_now: boolean;
+  created_execution_request_count: number | string;
+  executes_requests: boolean;
+  mutates_inventory: boolean;
+  mutates_products: boolean;
+  mutates_shipments: boolean;
+  schedule: AutomationSchedule;
+  execution_request: ExecutionRequest;
+  run_event?: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  permission_profile?: {
+    actor_type: string;
+    uses_broad_role: boolean;
+    explicit_permissions: string[];
+    can_approve_requests: boolean;
+    can_execute_requests: boolean;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  notes: string[];
+}
+
+
+export interface AutomationScheduleAuditPackResponse {
+  automation_schedule_id: string;
+  generated_at: string;
+  audit_scope: 'automation_schedule' | string;
+  schedule_summary: Record<string, unknown>;
+  schedule_snapshots: Record<string, unknown>;
+  linked_execution_requests: ExecutionRequest[];
+  run_ledger?: Array<Record<string, unknown>>;
+  audit_trail: {
+    automation_schedule: Array<Record<string, unknown>>;
+    execution_requests: Array<Record<string, unknown>>;
+  };
+  evidence_summary: {
+    schedule_audit_event_count: number | string;
+    execution_request_count: number | string;
+    execution_request_audit_event_count: number | string;
+    manual_run_audit_event_count: number | string;
+    missing_schedule_actions: string[];
+    linked_request_statuses: Record<string, number>;
+    linked_request_execution_statuses: Record<string, number>;
+  };
+  completeness: {
+    complete: boolean;
+    required_schedule_actions: string[];
+    missing_schedule_actions: string[];
+    has_schedule_snapshot: boolean;
+    has_schedule_audit_trail: boolean;
+    has_linked_request_evidence: boolean;
+    has_run_ledger_evidence?: boolean;
+    safe_for_scheduler_governance_review: boolean;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationScheduleDryRunResponse {
+  automation_schedule_id: string;
+  dry_run: boolean;
+  runner_enabled: boolean;
+  creates_execution_requests_now: boolean;
+  executes_requests: boolean;
+  mutates_inventory: boolean;
+  mutates_products: boolean;
+  mutates_shipments: boolean;
+  schedule: AutomationSchedule;
+  would_create_execution_request: boolean;
+  would_execute_request: boolean;
+  would_mutate_inventory: boolean;
+  would_mutate_products: boolean;
+  would_mutate_shipments: boolean;
+  candidate_request: {
+    request_type: string;
+    status: string;
+    payload: Record<string, unknown>;
+    gate_snapshot: Record<string, unknown>;
+    context_snapshot: Record<string, unknown>;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerStatusResponse {
+  runner_name: string;
+  enabled: boolean;
+  started: boolean;
+  mode: string;
+  interval_ms?: number | string;
+  batch_limit?: number | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  mutates_inventory: boolean;
+  mutates_products: boolean;
+  mutates_shipments: boolean;
+  last_checked_at?: string | null;
+  last_tick_at?: string | null;
+  next_tick_at?: string | null;
+  skip_reason?: string | null;
+  last_tick_result?: Record<string, unknown> | null;
+  step: number | string;
+  can_start_background_runner: boolean;
+  can_create_execution_requests_automatically: boolean;
+  can_execute_requests: boolean;
+  safety: Record<string, unknown>;
+  permission_profile?: {
+    actor_type: string;
+    uses_broad_role: boolean;
+    explicit_permissions: string[];
+    can_approve_requests: boolean;
+    can_execute_requests: boolean;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  notes: string[];
+}
+
+export interface AutomationRunnerReadinessResponse {
+  runner_enabled: boolean;
+  runner_mode: string;
+  can_run_schedules: boolean;
+  can_create_execution_requests: boolean;
+  can_execute_requests: boolean;
+  can_mutate_inventory: boolean;
+  can_mutate_products: boolean;
+  can_mutate_shipments: boolean;
+  totals: {
+    total_schedules: number | string;
+    draft_schedules: number | string;
+    paused_schedules: number | string;
+    disabled_schedules: number | string;
+    eligible_for_future_runner_review: number | string;
+    runnable_now: number | string;
+    due_schedule_count?: number | string;
+  };
+  blockers: Array<{
+    key: string;
+    label: string;
+    severity: string;
+    detail: string;
+  }>;
+  permission_profile?: {
+    actor_type: string;
+    uses_broad_role: boolean;
+    explicit_permissions: string[];
+    can_approve_requests: boolean;
+    can_execute_requests: boolean;
+  };
+  readiness_checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  schedule_preview: Array<{
+    id: string;
+    name: string;
+    automation_type: string;
+    status: string;
+    schedule_kind: string;
+    next_run_at?: string | null;
+    runner_state: string;
+    can_run_now: boolean;
+  }>;
   notes: string[];
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
-import type { ExecutionAdapterRegistryResponse, ExecutionRequest, ExecutionRequestListResponse } from '../types/inventory';
+import type { ExecutionAdapterRegistryResponse, ExecutionModuleHardeningSummaryResponse, ExecutionRequest, ExecutionRequestAuditPackResponse, ExecutionRequestListResponse, ExecutionRequestSecurityAuditResponse } from '../types/inventory';
 
 type StatusFilter = '' | ExecutionRequest['status'];
 type TypeFilter = '' | ExecutionRequest['request_type'];
@@ -34,7 +34,10 @@ function JsonBlock({ value }: { value: unknown }) {
 export default function ExecutionRequestsPage() {
   const [data, setData] = useState<ExecutionRequestListResponse | null>(null);
   const [adapterRegistry, setAdapterRegistry] = useState<ExecutionAdapterRegistryResponse | null>(null);
+  const [hardeningSummary, setHardeningSummary] = useState<ExecutionModuleHardeningSummaryResponse | null>(null);
   const [selected, setSelected] = useState<ExecutionRequest | null>(null);
+  const [auditPack, setAuditPack] = useState<ExecutionRequestAuditPackResponse | null>(null);
+  const [securityAudit, setSecurityAudit] = useState<ExecutionRequestSecurityAuditResponse | null>(null);
   const [status, setStatus] = useState<StatusFilter>('');
   const [requestType, setRequestType] = useState<TypeFilter>('');
   const [search, setSearch] = useState('');
@@ -55,22 +58,26 @@ export default function ExecutionRequestsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [response, adapters] = await Promise.all([
+      const [response, adapters, hardening] = await Promise.all([
         apiRequest<ExecutionRequestListResponse>(`/execution-requests?${query}`),
-        apiRequest<ExecutionAdapterRegistryResponse>('/execution-requests/adapters')
+        apiRequest<ExecutionAdapterRegistryResponse>('/execution-requests/adapters'),
+        apiRequest<ExecutionModuleHardeningSummaryResponse>('/execution-requests/hardening-summary')
       ]);
       setData(response);
       setAdapterRegistry(adapters);
+      setHardeningSummary(hardening);
       if (selected) {
         const nextSelected = response.rows.find((row) => row.id === selected.id) || null;
         setSelected(nextSelected);
+        if (!nextSelected || auditPack?.request_id !== nextSelected.id) setAuditPack(null);
+        if (!nextSelected || securityAudit?.request_id !== nextSelected.id) setSecurityAudit(null);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load execution requests');
     } finally {
       setLoading(false);
     }
-  }, [query, selected]);
+  }, [query, selected, auditPack?.request_id, securityAudit?.request_id]);
 
   useEffect(() => {
     void loadRequests();
@@ -256,6 +263,55 @@ export default function ExecutionRequestsPage() {
     }
   };
 
+
+
+  const loadAuditPack = async (request: ExecutionRequest) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<ExecutionRequestAuditPackResponse>(`/execution-requests/${request.id}/audit-pack`);
+      setAuditPack(response);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load audit pack');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadSecurityAudit = async (request: ExecutionRequest) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<ExecutionRequestSecurityAuditResponse>(`/execution-requests/${request.id}/security-audit`);
+      setSecurityAudit(response);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load security audit');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const prepareRetryRequest = async (request: ExecutionRequest) => {
+    const retryReason = window.prompt('Retry reason');
+    if (!retryReason || retryReason.trim().length < 3) return;
+    const note = window.prompt('Retry preparation note (optional)') || '';
+
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/prepare-retry`, {
+        method: 'POST',
+        body: JSON.stringify({ retry_reason: retryReason.trim(), note: note.trim() || null })
+      });
+      setSelected(updated);
+      await loadRequests();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to prepare retry');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const cancelRequest = async (request: ExecutionRequest) => {
     const cancelReason = window.prompt('Cancel reason');
     if (!cancelReason || cancelReason.trim().length < 3) return;
@@ -282,7 +338,7 @@ export default function ExecutionRequestsPage() {
         <div>
           <h1 style={styles.title}>Execution Requests</h1>
           <p style={styles.subtitle}>
-            Safe registry for proposed actions. Step 192 enables the first real controlled executor: approved standard-cost updates. All other request types remain safe/no-op only; no stock, shipment, supplier, or quantity behavior is changed.
+            Safe registry for proposed actions. Step 195 adds explicit retry preparation for failed approved requests while continuing to block duplicate execution.
           </p>
         </div>
         <div style={styles.actions}>
@@ -318,6 +374,8 @@ export default function ExecutionRequestsPage() {
         </label>
       </section>
 
+      <ExecutionModuleHardeningPanel hardeningSummary={hardeningSummary} />
+
       <section style={styles.card}>
         <div style={styles.cardHeader}>
           <h2 style={styles.cardTitle}>Execution Adapter Registry</h2>
@@ -326,7 +384,7 @@ export default function ExecutionRequestsPage() {
           </span>
         </div>
         <p style={styles.note}>
-          Adapters define what could become executable later. Real execution remains disabled; Step 191 only allows an approved request to pass through a no-op executor.
+          Adapters define which request types can execute. Step 195 surfaces completed/failed execution evidence plus one explicit retry preparation control.
         </p>
         <div style={styles.adapterGrid}>
           {(adapterRegistry?.adapters || []).map((adapter) => (
@@ -372,15 +430,16 @@ export default function ExecutionRequestsPage() {
                     <td>{request.requested_by_name || request.requested_by || '-'}</td>
                     <td>{formatDateTime(request.created_at)}</td>
                     <td>{formatDateTime(request.updated_at)}</td>
-                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...styles.noopTone }}>{label(request.execution_status)}</span> : '-'}</td>
+                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{label(request.execution_status)}</span> : '-'}</td>
                     <td>
                       <div style={styles.actions}>
-                        <button type="button" className="btn btn-secondary" onClick={() => setSelected(request)}>View</button>
+                        <button type="button" className="btn btn-secondary" onClick={() => { setSelected(request); setAuditPack(null); setSecurityAudit(null); }}>View</button>
                         {request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>Submit</button> : null}
                         {request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
                         {request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
                         {request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>Execute</button> : null}
                         {request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>No-op Execute</button> : null}
+                        {request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>Prepare Retry</button> : null}
                         {request.status === 'draft' || request.status === 'pending_review' ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>Cancel</button> : null}
                       </div>
                     </td>
@@ -416,7 +475,18 @@ export default function ExecutionRequestsPage() {
               <KeyValue label="Executed At" value={formatDateTime(selected.executed_at)} />
               <KeyValue label="Adapter Execution Enabled" value={selected.adapter?.execution_enabled ? 'Yes' : 'No'} />
               <KeyValue label="Adapter Risk" value={selected.adapter?.risk_level ? label(selected.adapter.risk_level) : '-'} />
-              <h3 style={styles.subheading}>Execution Result</h3>
+              <div style={styles.actions}>
+                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>
+                  Load Audit Pack
+                </button>
+                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>
+                  Load Security Audit
+                </button>
+              </div>
+              <ExecutionSecurityAuditPanel securityAudit={securityAudit} />
+              <ExecutionAuditPackPanel auditPack={auditPack} />
+              <ExecutionReviewPanel request={selected} />
+              <h3 style={styles.subheading}>Execution Result Snapshot</h3>
               <JsonBlock value={selected.execution_result} />
               <h3 style={styles.subheading}>Payload Snapshot</h3>
               <JsonBlock value={selected.payload} />
@@ -430,6 +500,219 @@ export default function ExecutionRequestsPage() {
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+function formatUnknown(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '-';
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '-';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
+
+
+
+function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary: ExecutionModuleHardeningSummaryResponse | null }) {
+  if (!hardeningSummary) {
+    return (
+      <section style={styles.card}>
+        <div style={styles.cardHeader}>
+          <h2 style={styles.cardTitle}>Execution Module Hardening</h2>
+          <span style={styles.meta}>Loading…</span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={styles.card}>
+      <div style={styles.cardHeader}>
+        <h2 style={styles.cardTitle}>Execution Module Hardening</h2>
+        <span style={{ ...styles.badge, ...statusTone(hardeningSummary.module_status === 'complete' ? 'approved' : hardeningSummary.module_status === 'needs_fix' ? 'rejected' : 'pending_review') }}>
+          {label(hardeningSummary.module_status)}
+        </span>
+      </div>
+      <p style={styles.note}>{hardeningSummary.closeout_recommendation}</p>
+      <div style={styles.metricsGrid}>
+        <KeyValue label="Total Requests" value={formatUnknown(hardeningSummary.totals.total_requests)} />
+        <KeyValue label="Approved Waiting" value={formatUnknown(hardeningSummary.totals.approved_waiting_execution)} />
+        <KeyValue label="Real Execution Ready" value={formatUnknown(hardeningSummary.totals.real_execution_ready)} />
+        <KeyValue label="Completed Executions" value={formatUnknown(hardeningSummary.totals.completed_executions)} />
+        <KeyValue label="Failed Executions" value={formatUnknown(hardeningSummary.totals.failed_executions)} />
+        <KeyValue label="No-op Executions" value={formatUnknown(hardeningSummary.totals.noop_executions)} />
+      </div>
+      <h3 style={styles.subheading}>Closeout Checks</h3>
+      <div style={styles.checkList}>
+        {hardeningSummary.checks.map((check) => (
+          <div key={check.key} style={styles.checkItem}>
+            <span style={{ ...styles.badge, ...statusTone(check.status === 'pass' ? 'approved' : check.status === 'fail' ? 'rejected' : 'pending_review') }}>{label(check.status)}</span>
+            <div>
+              <strong>{check.label}</strong>
+              <div style={styles.meta}>{check.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <h3 style={styles.subheading}>Safety Contract</h3>
+      <div style={styles.metricsGrid}>
+        <KeyValue label="Approval Required" value={hardeningSummary.safety_contract.approval_required ? 'Yes' : 'No'} />
+        <KeyValue label="Duplicate Blocked" value={hardeningSummary.safety_contract.duplicate_execution_blocked ? 'Yes' : 'No'} />
+        <KeyValue label="Retry Explicit" value={hardeningSummary.safety_contract.retry_requires_explicit_preparation ? 'Yes' : 'No'} />
+        <KeyValue label="Inventory Mutations" value={hardeningSummary.safety_contract.mutates_inventory ? 'Yes' : 'No'} />
+        <KeyValue label="Shipment Mutations" value={hardeningSummary.safety_contract.mutates_shipments ? 'Yes' : 'No'} />
+        <KeyValue label="Background Jobs" value={hardeningSummary.safety_contract.creates_background_jobs ? 'Yes' : 'No'} />
+      </div>
+      {hardeningSummary.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </section>
+  );
+}
+
+function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: ExecutionRequestSecurityAuditResponse | null }) {
+  if (!securityAudit) {
+    return <div className="app-empty-state">Load the security audit to review permissions, support context, and separation-of-duties posture.</div>;
+  }
+
+  return (
+    <div style={styles.securityPanel}>
+      <div style={styles.reviewHeader}>
+        <div>
+          <strong>Execution Security Audit</strong>
+          <div style={styles.meta}>Generated {formatDateTime(securityAudit.generated_at)}</div>
+        </div>
+        <span style={{ ...styles.badge, ...securityTone(securityAudit.summary.security_posture) }}>
+          {label(securityAudit.summary.security_posture)}
+        </span>
+      </div>
+      <KeyValue label="Actor Role" value={securityAudit.actor.role || '-'} />
+      <KeyValue label="Support Session" value={securityAudit.actor.support_session_id ? 'Yes' : 'No'} />
+      <KeyValue label="Can Execute" value={securityAudit.permission_matrix.can_execute ? 'Yes' : 'No'} />
+      <KeyValue label="Can Update Products" value={securityAudit.permission_matrix.can_update_products ? 'Yes' : 'No'} />
+      <KeyValue label="Has Required Execution Permissions" value={securityAudit.permission_matrix.current_actor_has_required_execution_permissions ? 'Yes' : 'No'} />
+      <KeyValue label="Requester / Reviewer Same" value={securityAudit.separation_of_duties.requester_reviewer_same ? 'Yes' : 'No'} />
+      <KeyValue label="Reviewer / Executor Same" value={securityAudit.separation_of_duties.reviewer_executor_same ? 'Yes' : 'No'} />
+      <KeyValue label="Recommended For Real Execution" value={securityAudit.separation_of_duties.recommended_for_real_execution ? 'Yes' : 'Review recommended'} />
+      <h3 style={styles.subheading}>Checks</h3>
+      <div style={styles.auditTrail}>
+        {securityAudit.checks.map((check) => (
+          <div key={check.key} style={check.passed ? styles.securityCheck : styles.securityWarning}>
+            <strong>{label(check.key)}</strong>
+            <div style={styles.meta}>{label(check.severity)} · {check.passed ? 'Passed' : 'Review'}</div>
+            <div style={styles.meta}>{check.message}</div>
+          </div>
+        ))}
+      </div>
+      {securityAudit.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      <h3 style={styles.subheading}>Full Security Audit JSON</h3>
+      <JsonBlock value={securityAudit} />
+    </div>
+  );
+}
+
+function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAuditPackResponse | null }) {
+  if (!auditPack) {
+    return <div className="app-empty-state">Load the audit pack to review consolidated evidence for this request.</div>;
+  }
+
+  return (
+    <div style={styles.auditPanel}>
+      <div style={styles.reviewHeader}>
+        <div>
+          <strong>Execution Audit Pack</strong>
+          <div style={styles.meta}>Generated {formatDateTime(auditPack.generated_at)}</div>
+        </div>
+        <span style={{ ...styles.badge, ...(auditPack.completeness.safe_for_governance_review ? styles.successTone : styles.pendingTone) }}>
+          {auditPack.completeness.safe_for_governance_review ? 'Audit ready' : 'Review gaps'}
+        </span>
+      </div>
+      <KeyValue label="Audit Events" value={formatUnknown(auditPack.completeness.audit_event_count)} />
+      <KeyValue label="Complete" value={auditPack.completeness.complete ? 'Yes' : 'No'} />
+      <KeyValue label="Payload Snapshot" value={auditPack.completeness.has_payload_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Gate Snapshot" value={auditPack.completeness.has_gate_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Context Snapshot" value={auditPack.completeness.has_context_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Execution Result" value={auditPack.completeness.has_execution_result ? 'Yes' : 'No'} />
+      {auditPack.completeness.missing_actions.length ? (
+        <div style={styles.failurePanel}>
+          <strong>Missing Audit Actions</strong>
+          {auditPack.completeness.missing_actions.map((action) => <div key={action} style={styles.meta}>{action}</div>)}
+        </div>
+      ) : null}
+      <h3 style={styles.subheading}>Audit Trail</h3>
+      <div style={styles.auditTrail}>
+        {auditPack.audit_trail.map((event) => (
+          <div key={event.id} style={styles.auditEvent}>
+            <strong>{label(event.action)}</strong>
+            <div style={styles.meta}>{formatDateTime(event.created_at)} · {event.user_name || event.user_id || 'system/support'}</div>
+          </div>
+        ))}
+        {!auditPack.audit_trail.length ? <div style={styles.meta}>No audit events found for this request.</div> : null}
+      </div>
+      {auditPack.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      <h3 style={styles.subheading}>Full Audit Pack JSON</h3>
+      <JsonBlock value={auditPack} />
+    </div>
+  );
+}
+
+function ExecutionReviewPanel({ request }: { request: ExecutionRequest }) {
+  const review = request.execution_review;
+
+  if (!review) {
+    return <div className="app-empty-state">Execution review evidence is not available for this request.</div>;
+  }
+
+  return (
+    <div style={styles.reviewPanel}>
+      <div style={styles.reviewHeader}>
+        <div>
+          <strong>Execution Review</strong>
+          <div style={styles.meta}>Read-only result verification for this request.</div>
+        </div>
+        <span style={{ ...styles.badge, ...(review.available ? styles.successTone : styles.pendingTone) }}>
+          {review.available ? 'Available' : 'Not executed'}
+        </span>
+      </div>
+      <KeyValue label="Executor" value={review.executor ? label(review.executor) : '-'} />
+      <KeyValue label="Outcome" value={review.outcome ? label(review.outcome) : '-'} />
+      <KeyValue label="Real Action" value={review.executed_real_action ? 'Yes' : 'No'} />
+      <KeyValue label="Executed At" value={formatDateTime(review.executed_at)} />
+      <KeyValue label="Executed By" value={review.executed_by_name || review.executed_by || '-'} />
+      <KeyValue label="Retry Eligible" value={review.retry_eligibility?.eligible ? 'Yes' : 'No'} />
+      <KeyValue label="Retry Reason" value={review.retry_eligibility?.reason || '-'} />
+      <KeyValue label="Retry Count" value={formatUnknown(review.retry_eligibility?.retry_count)} />
+      <KeyValue label="Max Retries" value={formatUnknown(review.retry_eligibility?.max_retry_count)} />
+      <KeyValue label="Retry Prepared At" value={formatDateTime(review.retry_eligibility?.prepared_at)} />
+
+      {review.failure ? (
+        <div style={styles.failurePanel}>
+          <strong>Failure Details</strong>
+          <KeyValue label="Error Code" value={review.failure.error_code || '-'} />
+          <KeyValue label="Error Message" value={review.failure.error_message || '-'} />
+          <KeyValue label="Failed At" value={formatDateTime(review.failure.failed_at)} />
+          <KeyValue label="Rollback Applied" value={review.failure.rollback_applied ? 'Yes' : 'No'} />
+          <KeyValue label="Duplicate Execution Blocked" value={review.failure.retry_eligibility?.duplicate_execution_blocked ? 'Yes' : 'No'} />
+        </div>
+      ) : null}
+
+      {review.before_after ? (
+        <div style={styles.beforeAfterGrid}>
+          <div style={styles.snapshotCard}>
+            <strong>Before</strong>
+            <KeyValue label="Standard Cost" value={formatUnknown(review.before_after.before?.standard_unit_cost)} />
+            <KeyValue label="Updated At" value={formatDateTime(formatUnknown(review.before_after.before?.standard_cost_updated_at))} />
+            <KeyValue label="Version" value={formatUnknown(review.before_after.before?.version)} />
+          </div>
+          <div style={styles.snapshotCard}>
+            <strong>After</strong>
+            <KeyValue label="Standard Cost" value={formatUnknown(review.before_after.after?.standard_unit_cost)} />
+            <KeyValue label="Updated At" value={formatDateTime(formatUnknown(review.before_after.after?.standard_cost_updated_at))} />
+            <KeyValue label="Version" value={formatUnknown(review.before_after.after?.version)} />
+          </div>
+        </div>
+      ) : null}
+
+      {review.review_notes?.map((note) => <div key={note} style={styles.note}>{note}</div>)}
     </div>
   );
 }
@@ -449,11 +732,25 @@ function riskTone(riskLevel: string) {
   return { background: '#dcfce7', color: '#166534' };
 }
 
+
+function securityTone(posture: string) {
+  if (posture === 'blocked') return { background: '#fee2e2', color: '#991b1b' };
+  if (posture === 'review_recommended') return { background: '#fef3c7', color: '#92400e' };
+  return { background: '#dcfce7', color: '#166534' };
+}
+
 function statusTone(status: ExecutionRequest['status']) {
   if (status === 'approved') return { background: '#dcfce7', color: '#166534' };
   if (status === 'rejected' || status === 'cancelled') return { background: '#fee2e2', color: '#991b1b' };
   if (status === 'pending_review') return { background: '#fef3c7', color: '#92400e' };
   return { background: '#e0f2fe', color: '#075985' };
+}
+
+function executionTone(status?: string | null) {
+  if (status === 'completed') return { background: '#dcfce7', color: '#166534' };
+  if (status === 'failed') return { background: '#fee2e2', color: '#991b1b' };
+  if (status === 'noop_completed') return { background: '#ede9fe', color: '#5b21b6' };
+  return { background: '#e2e8f0', color: '#334155' };
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -469,6 +766,9 @@ const styles: Record<string, CSSProperties> = {
   adapterCard: { border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' },
   adapterTopline: { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' },
   adapterDescription: { margin: 0, color: '#475569', fontSize: '0.85rem', lineHeight: 1.45 },
+  metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.65rem', marginTop: '0.75rem' },
+  checkList: { display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.5rem' },
+  checkItem: { display: 'flex', gap: '0.65rem', alignItems: 'flex-start', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' },
   layout: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 0.8fr)', gap: '1rem' },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '1rem', minWidth: 0 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.75rem' },
@@ -478,10 +778,23 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
   badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize' },
   noopTone: { background: '#ede9fe', color: '#5b21b6' },
+  successTone: { background: '#dcfce7', color: '#166534' },
+  pendingTone: { background: '#fef3c7', color: '#92400e' },
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   empty: { textAlign: 'center', padding: '1rem', color: '#64748b' },
   note: { marginTop: '0.75rem', color: '#64748b', fontSize: '0.85rem' },
   detail: { display: 'flex', flexDirection: 'column', gap: '0.7rem' },
+  reviewPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem', background: '#f8fafc' },
+  auditPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '0.85rem', background: '#eff6ff' },
+  securityPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #fed7aa', borderRadius: '14px', padding: '0.85rem', background: '#fff7ed' },
+  securityCheck: { border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.6rem', background: '#f0fdf4' },
+  securityWarning: { border: '1px solid #fed7aa', borderRadius: '10px', padding: '0.6rem', background: '#fffbeb' },
+  auditTrail: { display: 'flex', flexDirection: 'column', gap: '0.45rem' },
+  auditEvent: { border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.6rem', background: '#fff' },
+  failurePanel: { display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid #fecaca', borderRadius: '12px', padding: '0.75rem', background: '#fef2f2' },
+  reviewHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' },
+  beforeAfterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' },
+  snapshotCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff', display: 'flex', flexDirection: 'column', gap: '0.45rem' },
   kv: { display: 'flex', justifyContent: 'space-between', gap: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.45rem' },
   kvLabel: { color: '#64748b' },
   kvValue: { fontWeight: 700, color: '#0f172a', textAlign: 'right' },

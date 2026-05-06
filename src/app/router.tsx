@@ -40,6 +40,7 @@ import InsightsPage from '../pages/InsightsPage';
 import TenantAuditPage from '../pages/TenantAuditPage';
 import SystemContextPage from '../pages/SystemContextPage';
 import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
+import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
@@ -227,6 +228,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW]}>
             <ExecutionRequestsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'automation-schedules',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW]}>
+            <AutomationSchedulesPage />
           </ProtectedRoute>
         )
       }

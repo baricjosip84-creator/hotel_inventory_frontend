@@ -69,6 +69,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/audit')) return 'Tenant Audit';
   if (pathname.startsWith('/admin-system')) return 'Admin System';
   if (pathname.startsWith('/execution-requests')) return 'Execution Requests';
+  if (pathname.startsWith('/automation-schedules')) return 'Automation Schedules';
   if (pathname.startsWith('/system-context')) return 'System Context';
   if (pathname.startsWith('/sessions')) return 'Sessions';
   return 'Inventory Management';
@@ -125,6 +126,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/system-context')) {
     return 'Read-only tenant context for future automation and AI decision support.';
+  }
+  if (pathname.startsWith('/automation-schedules')) {
+    return 'Configure future scheduled checks. Runner is disabled and nothing executes automatically yet.';
   }
   if (pathname.startsWith('/sessions')) {
     return 'Review active sessions and revoke stale account access.';
@@ -208,6 +212,7 @@ export default function AppLayout() {
       { to: '/admin-system', label: 'Admin System', permission: TENANT_PERMISSIONS.SYSTEM_STATUS_READ },
       { to: '/system-context', label: 'System Context', permission: TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ },
       { to: '/execution-requests', label: 'Execution Requests', permission: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW },
+      { to: '/automation-schedules', label: 'Automation Schedules', permission: TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW },
 
       { to: '/sessions', label: 'Sessions' }
     ],
