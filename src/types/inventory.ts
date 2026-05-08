@@ -1415,6 +1415,22 @@ export interface SystemContextResponse {
     title: string;
     action: string;
     source_section: string;
+    suggested_request_type?: ExecutionRequest['request_type'] | string;
+    executes_actions?: boolean;
+    requires_human_review?: boolean;
+    intelligence_score?: number | string;
+    intelligence_rank_band?: 'urgent' | 'review' | 'monitor' | string;
+    ranking_reason?: string;
+    intelligence_confidence?: 'high' | 'medium' | 'low' | string;
+    intelligence_rationale?: string[];
+    stability_signal?: 'actionable_review_signal' | 'context_watch_signal' | string;
+    signal_freshness_score?: number | string;
+    repeated_signal?: boolean;
+    volatility_indicator?: 'high' | 'medium' | 'low' | string;
+    trend_direction?: 'improving' | 'degrading' | 'stable' | string;
+    recommendation_momentum?: 'accelerating' | 'emerging' | 'steady' | string;
+    signal_age_bucket?: 'fresh' | 'recent' | 'aging' | string;
+    trend_explanation?: string;
   }>;
   context_sources: Array<{
     section: string;
@@ -1454,6 +1470,19 @@ export interface SystemContextResponse {
       message: string;
     }>;
     notes: string[];
+    predictive_guardrails?: {
+      mutation_allowed: boolean;
+      request_creation_allowed: boolean;
+      automatic_execution_allowed: boolean;
+      approval_required_for_any_followup: boolean;
+      tenant_scoped_only: boolean;
+    };
+    explainability?: {
+      score_inputs: string[];
+      score_model: string;
+      confidence_basis: string;
+      limitations: string[];
+    };
   };
   automation_plan: Array<{
     phase: string;
@@ -1462,6 +1491,70 @@ export interface SystemContextResponse {
     description: string;
     required_before_automation: boolean;
     evidence: string[];
+  }>;
+
+
+
+  predictive_readiness_summary?: {
+    status: string;
+    score: number | string;
+    signal_count: number | string;
+    high_confidence_signal_count: number | string;
+    repeated_signal_count: number | string;
+    volatility_signal_count: number | string;
+    allowed_use: string;
+    blocked_use: string;
+    requires_human_review: boolean;
+    read_only: boolean;
+    executes_actions: boolean;
+    notes: string[];
+  };
+
+
+
+  historical_signal_window?: {
+    status: string;
+    window_label: string;
+    baseline_source: string;
+    historical_data_loaded: boolean;
+    minimum_required_snapshots: number | string;
+    available_snapshots: number | string;
+    ready_for_historical_forecasting: boolean;
+    read_only: boolean;
+    executes_actions: boolean;
+    notes: string[];
+  };
+
+  forecast_scenarios?: Array<{
+    code: string;
+    title: string;
+    horizon: string;
+    likelihood: string;
+    impact: string;
+    summary: string;
+    recommended_operator_action: string;
+    read_only: boolean;
+    executes_actions: boolean;
+  }>;
+
+  recommendation_intelligence_summary?: {
+    total_recommendations: number | string;
+    urgent_recommendations: number | string;
+    review_recommendations: number | string;
+    monitor_recommendations: number | string;
+    high_confidence_recommendations: number | string;
+    repeated_signals: number | string;
+    high_volatility_recommendations: number | string;
+    average_intelligence_score: number | string;
+    read_only: boolean;
+    executes_actions: boolean;
+  };
+  recommendation_groups?: Array<{
+    code: string;
+    title: string;
+    recommendation_codes: string[];
+    read_only: boolean;
+    requires_human_review: boolean;
   }>;
   automation_readiness: {
     status: 'ready' | 'needs_review' | 'blocked' | string;
@@ -1832,9 +1925,13 @@ export interface ExecutionRequestExecutionReview {
 export interface ExecutionRequest {
   id: string;
   tenant_id: string;
-  request_type: 'cost_review' | 'cost_standard_update' | 'supplier_review' | 'inventory_review' | 'system_recommendation' | string;
+  request_type: 'cost_review' | 'cost_standard_update' | 'product_min_stock_update' | 'product_pricing_update' | 'supplier_review' | 'inventory_review' | 'system_recommendation' | string;
   status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'cancelled';
   execution_status?: 'noop_completed' | 'completed' | 'failed' | string | null;
+
+  created_from_system_context?: boolean;
+  recommendation_codes?: string[];
+  recommendation_group_codes?: string[];
   execution_result?: Record<string, unknown> | null;
   execution_review?: ExecutionRequestExecutionReview | null;
   payload: Record<string, unknown>;
@@ -2117,6 +2214,8 @@ export interface AutomationScheduleManualRunResponse {
   runner_enabled: boolean;
   created_execution_requests_now: boolean;
   created_execution_request_count: number | string;
+  duplicate_guard_triggered?: boolean;
+  schedule_run_dedupe_key?: string;
   executes_requests: boolean;
   mutates_inventory: boolean;
   mutates_products: boolean;
@@ -2159,6 +2258,13 @@ export interface AutomationScheduleAuditPackResponse {
     execution_request_count: number | string;
     execution_request_audit_event_count: number | string;
     manual_run_audit_event_count: number | string;
+    auto_request_audit_event_count?: number | string;
+    manual_duplicate_skipped_audit_event_count?: number | string;
+    auto_duplicate_skipped_audit_event_count?: number | string;
+    duplicate_skipped_audit_event_count?: number | string;
+    run_event_count?: number | string;
+    successful_run_event_count?: number | string;
+    skipped_run_event_count?: number | string;
     missing_schedule_actions: string[];
     linked_request_statuses: Record<string, number>;
     linked_request_execution_statuses: Record<string, number>;
@@ -2180,6 +2286,52 @@ export interface AutomationScheduleAuditPackResponse {
     detail: string;
   }>;
   safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationScheduleRunEventItem {
+  id: string;
+  automation_schedule_id: string;
+  schedule_name: string;
+  automation_type: string;
+  schedule_kind: string;
+  schedule_status: string;
+  execution_request_id?: string | null;
+  request_type?: string | null;
+  execution_request_status?: string | null;
+  execution_status?: string | null;
+  run_mode: 'manual' | 'auto' | string;
+  status: 'succeeded' | 'skipped' | 'failed' | string;
+  request_status?: string | null;
+  trigger_source: string;
+  started_at: string;
+  completed_at?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AutomationScheduleRunEventsResponse {
+  limit: number | string;
+  offset: number | string;
+  total: number | string;
+  rows: AutomationScheduleRunEventItem[];
+  summary: {
+    run_event_count: number | string;
+    succeeded_count: number | string;
+    skipped_count: number | string;
+    failed_count: number | string;
+    linked_execution_request_count: number | string;
+  };
+  safety: Record<string, unknown>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
   notes: string[];
 }
 
@@ -2215,6 +2367,509 @@ export interface AutomationScheduleDryRunResponse {
 }
 
 
+
+
+
+
+
+
+
+export interface AutomationRunnerDriftReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_drift_report' | string;
+  read_only: boolean;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  drift_posture: 'clear' | 'review_required' | 'blocked' | string;
+  summary: {
+    total_schedules: number | string;
+    due_schedule_count: number | string;
+    overdue_1d_schedule_count: number | string;
+    overdue_7d_schedule_count: number | string;
+    never_run_schedule_count: number | string;
+    total_run_event_count: number | string;
+    failed_run_event_count: number | string;
+    skipped_run_event_count: number | string;
+    auto_run_event_count: number | string;
+    auto_run_event_count_24h: number | string;
+    schedule_created_request_count: number | string;
+    awaiting_review_request_count: number | string;
+    approved_schedule_request_count: number | string;
+    executed_schedule_request_count: number | string;
+    stale_review_request_count: number | string;
+    latest_schedule_run_at?: string | null;
+    latest_run_event_at?: string | null;
+    latest_failed_run_event_at?: string | null;
+    latest_schedule_request_at?: string | null;
+  };
+  drift_signals: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    value: number | string;
+    detail: string;
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerContainmentReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_containment_report' | string;
+  read_only: boolean;
+  containment_posture: 'contained' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  allowed_schedule_request_types: string[];
+  allowed_schedule_request_statuses: string[];
+  summary: {
+    total_schedules: number | string;
+    due_schedules: number | string;
+    disabled_schedules: number | string;
+    schedule_created_request_count: number | string;
+    unsupported_request_type_count: number | string;
+    unsupported_request_status_count: number | string;
+    executable_request_type_count: number | string;
+    execution_boundary_count: number | string;
+    total_run_events: number | string;
+    linked_request_events: number | string;
+    failed_run_events: number | string;
+    skipped_run_events: number | string;
+    auto_run_events: number | string;
+    latest_run_event_at?: string | null;
+  };
+  request_rows: Array<{
+    request_type: string;
+    request_status: string;
+    execution_status: string;
+    request_count: number | string;
+    latest_request_at?: string | null;
+    allowed_request_type: boolean;
+    allowed_request_status: boolean;
+    execution_boundary_preserved: boolean;
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerActivationChecklistResponse {
+  tenant_id: string;
+  generated_at: string;
+  checklist_type: 'automation_runner_activation_checklist' | string;
+  read_only: boolean;
+  activation_posture: 'blocked' | 'review_required' | 'ready_for_controlled_request_creation' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_required_count: number | string;
+    watch_required_count: number | string;
+    due_schedule_count: number | string;
+    open_schedule_request_count: number | string;
+    failed_run_event_count: number | string;
+    executed_schedule_request_count: number | string;
+    automatic_policy_rows_allowed: number | string;
+  };
+  checklist: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerPolicyMatrixResponse {
+  tenant_id: string;
+  generated_at: string;
+  matrix_type: 'automation_runner_policy_matrix' | string;
+  read_only: boolean;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    total_schedules: number | string;
+    due_schedule_count: number | string;
+    schedule_created_request_count: number | string;
+    schedule_created_review_queue_count: number | string;
+    approved_schedule_created_request_count: number | string;
+    executed_schedule_created_request_count: number | string;
+    run_event_count: number | string;
+    failed_run_event_count: number | string;
+    skipped_run_event_count: number | string;
+    auto_run_event_count: number | string;
+  };
+  policy_rows: Array<{
+    key: string;
+    capability: string;
+    manual_allowed: boolean;
+    automatic_allowed: boolean;
+    required_permissions: string[];
+    required_flags: string[];
+    boundary: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerOperationsReviewResponse {
+  tenant_id: string;
+  generated_at: string;
+  review_type: 'automation_runner_operations_review' | string;
+  read_only: boolean;
+  operations_posture: 'clear' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    runner_mode: string;
+    due_schedule_count: number | string;
+    open_schedule_request_count: number | string;
+    failed_run_event_count: number | string;
+    executed_schedule_request_count: number | string;
+    actor_failure_count: number | string;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerAccountabilityDigestResponse {
+  tenant_id: string;
+  generated_at: string;
+  digest_type: 'automation_runner_accountability_digest' | string;
+  read_only: boolean;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  schedule_summary: {
+    total_schedules: number | string;
+    draft_count: number | string;
+    paused_count: number | string;
+    disabled_count: number | string;
+    due_count: number | string;
+    schedules_with_last_run: number | string;
+    latest_schedule_run_at?: string | null;
+  };
+  actor_breakdown: Array<{
+    run_mode: string;
+    trigger_source: string;
+    actor_name: string;
+    run_event_count: number | string;
+    succeeded_count: number | string;
+    skipped_count: number | string;
+    failed_count: number | string;
+    linked_request_count: number | string;
+    latest_event_at?: string | null;
+  }>;
+  request_status_breakdown: Array<{
+    request_status: string;
+    execution_status: string;
+    request_count: number | string;
+    latest_request_at?: string | null;
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerPreflightResponse {
+  tenant_id: string;
+  generated_at: string;
+  preflight_type: string;
+  read_only: boolean;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  batch_limit: number | string;
+  due_schedule_count: number | string;
+  due_schedules: Array<{
+    id: string;
+    name: string;
+    automation_type: string;
+    type_definition?: Record<string, unknown> | null;
+    status: string;
+    schedule_kind: string;
+    next_run_at?: string | null;
+    last_run_at?: string | null;
+    default_request_status: string;
+    run_event_count: number | string;
+    open_schedule_request_count: number | string;
+    would_create_execution_request_if_runner_enabled: boolean;
+    would_execute_request: boolean;
+    checks: Array<{
+      key: string;
+      label: string;
+      status: 'pass' | 'watch' | 'fail' | string;
+      detail: string;
+    }>;
+  }>;
+  summary: {
+    due_schedule_count: number | string;
+    would_create_request_count_if_enabled: number | string;
+    schedules_with_existing_open_requests: number | string;
+    schedules_without_run_ledger: number | string;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerSafetyReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  safety_summary: Record<string, unknown>;
+  schedule_summary: {
+    total_schedules: number | string;
+    draft_schedules: number | string;
+    paused_schedules: number | string;
+    disabled_schedules: number | string;
+    due_request_creation_candidates: number | string;
+    future_request_creation_candidates: number | string;
+    schedules_with_run_history: number | string;
+  };
+  run_ledger_summary: {
+    total_run_events: number | string;
+    succeeded_run_events: number | string;
+    skipped_run_events: number | string;
+    failed_run_events: number | string;
+    manual_run_events: number | string;
+    auto_run_events: number | string;
+    linked_execution_request_events: number | string;
+    latest_event_at?: string | null;
+  };
+  linked_request_summary: {
+    schedule_created_request_count: number | string;
+    awaiting_review_count: number | string;
+    approved_count: number | string;
+    executed_count: number | string;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerGovernancePackResponse {
+  tenant_id: string;
+  generated_at: string;
+  pack_type: 'automation_runner_governance_pack' | string;
+  read_only: boolean;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  evidence_summary: {
+    due_schedule_sample_count: number | string;
+    latest_run_event_sample_count: number | string;
+    linked_request_sample_count: number | string;
+    failed_run_event_sample_count: number | string;
+    auto_run_event_sample_count: number | string;
+    executed_linked_request_sample_count: number | string;
+  };
+  safety_report: AutomationRunnerSafetyReportResponse;
+  due_schedules: Array<Record<string, unknown>>;
+  latest_run_events: Array<Record<string, unknown>>;
+  linked_schedule_requests: Array<Record<string, unknown>>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+
+
+export interface AutomationRunnerChangeControlPackResponse {
+  tenant_id: string;
+  generated_at: string;
+  pack_type: 'automation_runner_change_control_pack' | string;
+  read_only: boolean;
+  step: number | string;
+  change_posture: 'blocked' | 'review_required' | 'controlled' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_required_count: number | string;
+    watch_required_count: number | string;
+    recent_run_event_count: number | string;
+    recent_failed_run_event_count: number | string;
+    recent_auto_run_event_count: number | string;
+    recent_manual_run_event_count: number | string;
+    recent_linked_request_event_count: number | string;
+    recent_schedule_update_count: number | string;
+  };
+  recent_window: {
+    days: number | string;
+    latest_event_at?: string | null;
+    latest_schedule_update_at?: string | null;
+    schedule_status_breakdown: {
+      draft: number | string;
+      paused: number | string;
+      disabled: number | string;
+    };
+  };
+  change_controls: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerReleaseGuardResponse {
+  tenant_id: string;
+  generated_at: string;
+  guard_type: 'automation_runner_release_guard' | string;
+  read_only: boolean;
+  step: number | string;
+  release_posture: 'blocked' | 'review_required' | 'ready_for_request_creation_review' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  can_release_auto_request_creation: boolean;
+  summary: {
+    failed_required_count: number | string;
+    watch_required_count: number | string;
+    due_schedule_count: number | string;
+    would_create_request_count_if_enabled: number | string;
+    existing_open_schedule_request_count: number | string;
+    automatic_policy_rows_allowed: number | string;
+    executed_schedule_request_count: number | string;
+  };
+  guard_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerRollbackPlanResponse {
+  tenant_id: string;
+  generated_at: string;
+  plan_type: 'automation_runner_rollback_plan' | string;
+  read_only: boolean;
+  step: number | string;
+  rollback_posture: 'ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    recent_window_hours: number | string;
+    recent_auto_run_event_count: number | string;
+    recent_failed_auto_run_event_count: number | string;
+    recent_linked_request_count: number | string;
+    required_rollback_step_count: number | string;
+    failed_check_count: number | string;
+    watch_check_count: number | string;
+  };
+  rollback_steps: Array<{
+    key: string;
+    label: string;
+    required: boolean;
+    action_type: string;
+    detail: string;
+  }>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerExecutiveSummaryResponse {
+  tenant_id: string;
+  generated_at: string;
+  summary_type: 'automation_runner_executive_summary' | string;
+  read_only: boolean;
+  step: number | string;
+  overall_posture: 'clear' | 'review_required' | 'blocked' | string;
+  recommendation: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    runner_mode: string;
+    due_schedule_count: number | string;
+    failed_run_event_count: number | string;
+    schedule_created_request_count: number | string;
+    unsupported_request_type_count: number | string;
+    execution_boundary_count: number | string;
+    failed_required_count: number | string;
+    watch_required_count: number | string;
+  };
+  decision_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
 export interface AutomationRunnerStatusResponse {
   runner_name: string;
   enabled: boolean;
@@ -2236,6 +2891,13 @@ export interface AutomationRunnerStatusResponse {
   can_start_background_runner: boolean;
   can_create_execution_requests_automatically: boolean;
   can_execute_requests: boolean;
+  request_creation_hard_cap?: number | string;
+  race_protection?: {
+    enabled: boolean;
+    lock_scope: string;
+    strategy: string;
+    duplicate_lookup: string;
+  };
   safety: Record<string, unknown>;
   permission_profile?: {
     actor_type: string;
@@ -2302,3 +2964,1845 @@ export interface AutomationRunnerReadinessResponse {
   }>;
   notes: string[];
 }
+
+
+
+
+
+export interface AutomationRunnerLaunchAttestationResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_launch_attestation' | string;
+  read_only: boolean;
+  step: number | string;
+  launch_posture: 'attested' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_attestation_count: number | string;
+    watch_attestation_count: number | string;
+    certification_posture: string;
+    evidence_posture: string;
+    release_posture: string;
+    schedule_created_request_count: number | string;
+    execution_metadata_count: number | string;
+  };
+  attestation_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+
+
+
+export interface AutomationRunnerArchiveManifestResponse {
+  tenant_id: string;
+  generated_at: string;
+  manifest_type: 'automation_runner_archive_manifest' | string;
+  read_only: boolean;
+  step: number | string;
+  archive_posture: 'archive_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_manifest_check_count: number | string;
+    watch_manifest_check_count: number | string;
+    closeout_failed_check_count: number | string;
+    closeout_watch_check_count: number | string;
+    closeout_posture: string;
+  };
+  manifest_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerRetentionReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_retention_report' | string;
+  read_only: boolean;
+  step: number | string;
+  retention_posture: 'retention_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    total_run_events: number | string;
+    recent_run_events_7d: number | string;
+    failed_run_events: number | string;
+    linked_request_events: number | string;
+    archive_failed_check_count: number | string;
+    archive_watch_check_count: number | string;
+    oldest_run_event_at?: string | null;
+    newest_run_event_at?: string | null;
+  };
+  retention_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerHandoffBriefResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_handoff_brief' | string;
+  read_only: boolean;
+  step: number | string;
+  handoff_posture: 'handoff_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_handoff_check_count: number | string;
+    watch_handoff_check_count: number | string;
+    retention_posture: string;
+    total_run_events: number | string;
+    linked_request_events: number | string;
+    runner_mode?: string | null;
+  };
+  handoff_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  operator_followups: string[];
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerStewardshipChecklistResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_stewardship_checklist' | string;
+  read_only: boolean;
+  step: number | string;
+  stewardship_posture: 'stewardship_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_stewardship_check_count: number | string;
+    watch_stewardship_check_count: number | string;
+    handoff_posture: string;
+    total_run_events: number | string;
+    linked_request_events: number | string;
+    runner_mode?: string | null;
+  };
+  checklist_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    owner: string;
+    required: boolean;
+    detail: string;
+  }>;
+  stewardship_actions: string[];
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+
+
+
+
+
+
+export interface AutomationRunnerFinalizationManifestResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_finalization_manifest' | string;
+  read_only: boolean;
+  step: number | string;
+  manifest_posture: 'finalized' | 'finalized_with_operator_review' | 'blocked' | string;
+  closure_seal: string;
+  closure_seal_posture: string;
+  module_posture: string;
+  execution_enabled: boolean;
+  request_creation_posture: string;
+  summary: {
+    failed_manifest_count: number | string;
+    watch_manifest_count: number | string;
+    failed_seal_count: number | string;
+    watch_seal_count: number | string;
+    schedule_created_request_count: number | string;
+    open_review_queue: number | string;
+    manual_request_creation_allowed: boolean;
+    auto_request_creation_allowed: boolean;
+  };
+  manifest_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  sealed_payload: Record<string, unknown>;
+  final_boundaries: Record<string, unknown>;
+  completion_certificate?: {
+    module_closed: boolean;
+    closure_step: number | string;
+    future_work_requires_new_phase: boolean;
+    allowed_current_scope: string[];
+    prohibited_without_new_phase: string[];
+  };
+  notes: string[];
+}
+
+export interface AutomationRunnerClosureSealResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_closure_seal' | string;
+  read_only: boolean;
+  step: number | string;
+  seal_algorithm: string;
+  closure_seal: string;
+  seal_posture: 'sealed' | 'sealed_with_operator_review' | 'blocked' | string;
+  module_posture: string;
+  execution_enabled: boolean;
+  request_creation_posture: string;
+  summary: {
+    failed_seal_count: number | string;
+    watch_seal_count: number | string;
+    failed_closure_count: number | string;
+    watch_closure_count: number | string;
+    schedule_created_request_count: number | string;
+    open_review_queue: number | string;
+    manual_request_creation_allowed: boolean;
+    auto_request_creation_allowed: boolean;
+  };
+  seal_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  sealed_payload: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerModuleClosureResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_module_closure' | string;
+  read_only: boolean;
+  step: number | string;
+  module_posture: 'closed' | 'closed_with_operator_review' | 'blocked' | string;
+  execution_enabled: boolean;
+  request_creation_posture: string;
+  summary: {
+    failed_closure_count: number | string;
+    watch_closure_count: number | string;
+    certification_posture: string;
+    total_schedule_count: number | string;
+    total_run_events: number | string;
+    schedule_created_request_count: number | string;
+    open_review_queue: number | string;
+    manual_request_creation_allowed: boolean;
+    auto_request_creation_allowed: boolean;
+  };
+  closure_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  final_boundaries: Record<string, unknown>;
+  evidence_refs: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerReadinessCertificationResponse {
+  tenant_id: string;
+  generated_at: string;
+  certification_type: 'automation_runner_readiness_certification' | string;
+  read_only: boolean;
+  step: number | string;
+  certification_posture: 'certified' | 'certified_with_operator_review' | 'blocked' | string;
+  execution_enabled: boolean;
+  request_creation_posture: string;
+  summary: {
+    failed_check_count: number | string;
+    watch_check_count: number | string;
+    total_schedule_count: number | string;
+    due_schedule_count: number | string;
+    total_run_events: number | string;
+    failed_run_events: number | string;
+    schedule_created_request_count: number | string;
+    open_review_queue: number | string;
+    manual_request_creation_allowed: boolean;
+    auto_request_creation_allowed: boolean;
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerProductionSafetyLockResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_production_safety_lock' | string;
+  read_only: boolean;
+  step: number | string;
+  posture: string;
+  manual_request_creation_allowed: boolean;
+  auto_request_creation_allowed: boolean;
+  execution_enabled: boolean;
+  locks: {
+    manual: {
+      global_disable: boolean;
+      tenant_request_creation_enabled: boolean;
+      run_scheduled_jobs_enabled: boolean;
+      automation_runner_enabled: boolean;
+      auto_request_creation_enabled: boolean;
+      request_creation_allowed_for_mode: boolean;
+      execution_enabled: boolean;
+      default_safe_posture: boolean;
+      required_flags_for_manual_request_creation: string[];
+      required_flags_for_auto_request_creation: string[];
+    };
+    auto: {
+      global_disable: boolean;
+      tenant_request_creation_enabled: boolean;
+      run_scheduled_jobs_enabled: boolean;
+      automation_runner_enabled: boolean;
+      auto_request_creation_enabled: boolean;
+      request_creation_allowed_for_mode: boolean;
+      execution_enabled: boolean;
+      default_safe_posture: boolean;
+      required_flags_for_manual_request_creation: string[];
+      required_flags_for_auto_request_creation: string[];
+    };
+  };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface AutomationRunnerObservabilitySnapshotResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_observability_snapshot' | string;
+  read_only: boolean;
+  step: number | string;
+  production_safety_lock?: Record<string, unknown>;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  headline: string;
+  summary: {
+    total_run_events: number | string;
+    succeeded_run_events: number | string;
+    failed_run_events: number | string;
+    skipped_run_events: number | string;
+    manual_run_events: number | string;
+    auto_run_events: number | string;
+    request_linked_run_events: number | string;
+    open_request_count: number | string;
+    reviewed_request_count: number | string;
+    latest_run_event_at?: string | null;
+    latest_failure_at?: string | null;
+  };
+  operator_signals: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  recent_events: Array<{
+    id: string;
+    automation_schedule_id: string;
+    schedule_name?: string | null;
+    automation_type?: string | null;
+    run_mode: string;
+    run_status: string;
+    trigger_source?: string | null;
+    execution_request_id?: string | null;
+    execution_request_status?: string | null;
+    execution_status?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerAuditBundleResponse {
+  tenant_id: string;
+  generated_at: string;
+  bundle_type: 'automation_runner_audit_bundle' | string;
+  read_only: boolean;
+  step: number | string;
+  audit_scope: string;
+  runner_mode: string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    schedule_count: number | string;
+    run_event_count: number | string;
+    succeeded_run_event_count: number | string;
+    failed_run_event_count: number | string;
+    skipped_run_event_count: number | string;
+    linked_execution_request_count: number | string;
+    open_execution_request_count: number | string;
+    execution_metadata_count: number | string;
+    timeline_sample_count: number | string;
+  };
+  traceability: {
+    has_run_ledger: boolean;
+    has_linked_request_evidence: boolean;
+    run_events_without_request: number | string;
+    request_links_visible: number | string;
+  };
+  timeline: Array<{
+    run_event_id: string;
+    automation_schedule_id: string;
+    schedule_name?: string | null;
+    automation_type?: string | null;
+    execution_request_id?: string | null;
+    execution_request_status?: string | null;
+    execution_status?: string | null;
+    run_mode: string;
+    run_status: string;
+    trigger_source?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerStewardshipLedgerResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_stewardship_ledger' | string;
+  read_only: boolean;
+  step: number | string;
+  ledger_posture: 'ledger_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_ledger_check_count: number | string;
+    watch_ledger_check_count: number | string;
+    stewardship_posture: string;
+    total_schedules: number | string;
+    draft_schedules: number | string;
+    paused_schedules: number | string;
+    disabled_schedules: number | string;
+    due_schedules: number | string;
+    total_run_events: number | string;
+    manual_run_events: number | string;
+    auto_run_events: number | string;
+    failed_run_events: number | string;
+    linked_request_events: number | string;
+    latest_run_event_at?: string | null;
+    runner_mode?: string | null;
+  };
+  ledger_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    owner: string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerCloseoutReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_closeout_report' | string;
+  read_only: boolean;
+  step: number | string;
+  closeout_posture: 'closed_ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_closeout_check_count: number | string;
+    watch_closeout_check_count: number | string;
+    incident_failed_check_count: number | string;
+    incident_watch_check_count: number | string;
+    certification_failed_required_count: number | string;
+    certification_watch_required_count: number | string;
+    governance_failed_check_count: number | string;
+    governance_watch_check_count: number | string;
+  };
+  closeout_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerIncidentDrillResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_incident_drill' | string;
+  read_only: boolean;
+  step: number | string;
+  drill_posture: 'ready' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    failed_drill_check_count: number | string;
+    watch_drill_check_count: number | string;
+    recent_failed_run_event_count: number | string;
+    executed_recent_schedule_request_count: number | string;
+    rollback_failed_check_count: number | string;
+    rollback_watch_check_count: number | string;
+    monitor_posture: string;
+    rollback_posture: string;
+  };
+  drill_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    required: boolean;
+    detail: string;
+  }>;
+  incident_actions: Array<{
+    key: string;
+    label: string;
+    action_type: string;
+    destructive: boolean;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerPostLaunchMonitorResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_post_launch_monitor' | string;
+  read_only: boolean;
+  step: number | string;
+  monitor_posture: 'stable' | 'watch' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  window: {
+    hours: number | string;
+    recent_run_event_rows: number | string;
+    recent_schedule_created_request_rows: number | string;
+  };
+  summary: {
+    failed_monitor_check_count: number | string;
+    watch_monitor_check_count: number | string;
+    failed_recent_run_event_count: number | string;
+    executed_recent_schedule_request_count: number | string;
+    unsupported_active_schedule_count: number | string;
+    launch_posture: string;
+  };
+  monitor_rows: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  recent_run_event_breakdown: Array<Record<string, unknown>>;
+  recent_schedule_created_request_breakdown: Array<Record<string, unknown>>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerCertificationEvidenceResponse {
+  tenant_id: string;
+  generated_at: string;
+  evidence_type: 'automation_runner_certification_evidence' | string;
+  read_only: boolean;
+  step: number | string;
+  evidence_posture: 'complete' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  evidence_summary: {
+    schedule_breakdown_rows: number | string;
+    request_breakdown_rows: number | string;
+    run_breakdown_rows: number | string;
+    latest_evidence_rows: number | string;
+    failed_certification_check_count: number | string;
+    watch_certification_check_count: number | string;
+  };
+  certification_report: {
+    certification_posture: string;
+    summary: Record<string, unknown>;
+    checks: Array<{
+      key: string;
+      label: string;
+      status: 'pass' | 'watch' | 'fail' | string;
+      detail: string;
+    }>;
+  };
+  schedule_breakdown: Array<Record<string, unknown>>;
+  schedule_created_request_breakdown: Array<Record<string, unknown>>;
+  run_event_breakdown: Array<Record<string, unknown>>;
+  latest_run_evidence: Array<Record<string, unknown>>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerCertificationReportResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_certification_report' | string;
+  read_only: boolean;
+  step: number | string;
+  certification_posture: 'certified' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    schedule_count: number | string;
+    due_schedule_count: number | string;
+    schedule_created_request_count: number | string;
+    unsupported_request_status_count: number | string;
+    execution_metadata_count: number | string;
+    failed_run_event_count: number | string;
+    failed_check_count: number | string;
+    watch_check_count: number | string;
+  };
+  certification_checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AutomationRunnerRollbackVerificationResponse {
+  tenant_id: string;
+  generated_at: string;
+  report_type: 'automation_runner_rollback_verification' | string;
+  read_only: boolean;
+  step: number | string;
+  verification_posture: 'verified' | 'review_required' | 'blocked' | string;
+  request_creation_enabled: boolean;
+  execution_enabled: boolean;
+  summary: {
+    recent_window_hours: number | string;
+    recent_auto_run_event_count: number | string;
+    recent_failed_auto_run_event_count: number | string;
+    recent_linked_request_count: number | string;
+    recent_schedule_created_request_count: number | string;
+    recent_schedule_request_execution_metadata_count: number | string;
+    failed_check_count: number | string;
+    watch_check_count: number | string;
+  };
+  verification_checks: Array<{
+    key: string;
+    label: string;
+    status: 'pass' | 'watch' | 'fail' | string;
+    detail: string;
+  }>;
+  evidence_refs: Record<string, unknown>;
+  safety: Record<string, unknown>;
+  notes: string[];
+}
+
+
+export interface SystemContextSnapshot {
+  id: string;
+  tenant_id: string;
+  generated_at: string;
+  source: string;
+  snapshot_status: string;
+  recommendation_summary?: Record<string, unknown> | null;
+  predictive_readiness_summary?: Record<string, unknown> | null;
+  forecast_scenarios?: Array<Record<string, unknown>> | null;
+  historical_signal_window?: Record<string, unknown> | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
+
+export interface SystemContextSnapshotTrendSeries {
+  status: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  executes_actions: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_readiness_summary: {
+    posture: string;
+    minimum_required_snapshots: number;
+    available_snapshots: number;
+    average_directional_confidence_score: number;
+    high_confidence_metric_count: number;
+    high_volatility_metric_count: number;
+    blocking_reasons: string[];
+    watch_reasons: string[];
+    ready_for_future_forecasting_foundation: boolean;
+    read_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  };
+  trend_summary: null | {
+    metric_count: number;
+    increased_metric_count: number;
+    decreased_metric_count: number;
+    unchanged_metric_count: number;
+    stable_metric_count: number;
+    moderate_volatility_metric_count: number;
+    high_volatility_metric_count: number;
+    average_directional_confidence_score: number;
+    high_confidence_metric_count: number;
+    medium_confidence_metric_count: number;
+    low_confidence_metric_count: number;
+    directional_confidence_mix: Array<{
+      code: string;
+      label: string;
+      level: string;
+      score: number;
+      stable_direction_ratio: number;
+    }>;
+    directional_foundation_mix: Array<{
+      code: string;
+      label: string;
+      momentum: string;
+      average_delta_per_snapshot: number;
+    }>;
+    trend_window_mix: Array<{
+      code: string;
+      label: string;
+      short_direction: string;
+      medium_direction: string;
+      long_direction: string;
+      short_consistency_ratio: number;
+      medium_consistency_ratio: number;
+      long_consistency_ratio: number;
+    }>;
+    latest_direction_mix: Array<{
+      code: string;
+      label: string;
+      latest_segment_direction: string;
+      latest_segment_delta: number;
+    }>;
+  };
+  trends: Array<{
+    code: string;
+    label: string;
+    first: number;
+    latest: number;
+    delta: number;
+    direction: string;
+    point_count: number;
+    segment_count: number;
+    latest_segment_direction: string;
+    latest_segment_delta: number;
+    volatility_classification: string;
+    directional_confidence: {
+      level: string;
+      score: number;
+      stable_direction_ratio: number;
+      changed_segment_count: number;
+      required_snapshot_count: number;
+      available_snapshot_count: number;
+      read_only: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    };
+
+    trend_windows: Record<'short' | 'medium' | 'long', {
+      label: string;
+      snapshot_count: number;
+      available_snapshot_count: number;
+      status: string;
+      first?: number;
+      latest?: number;
+      delta: number;
+      direction: string;
+      segment_count?: number;
+      consistency_ratio: number;
+      read_only: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+    }>;
+    directional_foundation: {
+      method: string;
+      first_value: number;
+      latest_value: number;
+      net_delta: number;
+      observation_intervals: number;
+      average_delta_per_snapshot: number;
+      positive_segment_count: number;
+      negative_segment_count: number;
+      unchanged_segment_count: number;
+      latest_segment_delta: number;
+      momentum: string;
+      read_only: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    };
+    points: Array<{
+      snapshot_id: string;
+      generated_at: string;
+      value: number;
+    }>;
+    segments: Array<{
+      from_snapshot_id: string;
+      to_snapshot_id: string;
+      from_generated_at: string;
+      to_generated_at: string;
+      previous: number;
+      current: number;
+      delta: number;
+      direction: string;
+    }>;
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextSnapshotCaptureResponse {
+  snapshot_id: string | null;
+  generated_at: string | null;
+  read_only: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+}
+
+
+export interface SystemContextSnapshotComparison {
+  status: string;
+  current_snapshot_id?: string | null;
+  previous_snapshot_id?: string | null;
+  current_generated_at?: string | null;
+  previous_generated_at?: string | null;
+  read_only: boolean;
+  executes_actions: boolean;
+  comparisons: Array<{
+    code: string;
+    label: string;
+    current: number;
+    previous: number;
+    delta: number;
+    direction: string;
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastSeries {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  series_builder_only: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_series_summary: null | {
+    series_count: number;
+    model_input_ready_series_count: number;
+    total_point_count: number;
+    min_point_count: number;
+    max_point_count: number;
+    average_point_count: number;
+    high_confidence_series_count: number;
+    high_volatility_series_count: number;
+    read_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  forecast_series: Array<{
+    code: string;
+    label: string;
+    point_count: number;
+    segment_count: number;
+    first_observed_at: string | null;
+    latest_observed_at: string | null;
+    statistics: {
+      first_value: number;
+      latest_value: number;
+      min_value: number;
+      max_value: number;
+      value_range: number;
+      average_value: number;
+      net_delta: number;
+    };
+    average_delta_per_snapshot: number;
+    directional_confidence_level: string;
+    directional_confidence_score: number;
+    volatility_classification: string;
+    model_input_ready: boolean;
+    normalized_points: Array<{
+      index: number;
+      snapshot_id: string;
+      generated_at: string;
+      value: number;
+      normalized_value: number;
+      delta_from_previous: number;
+      direction_from_previous: string;
+    }>;
+    read_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastHorizons {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  horizon_projection_only: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  horizon_summary: null | {
+    horizon_count: number;
+    total_metric_projection_count: number;
+    total_watch_projection_count: number;
+    ready_horizon_count: number;
+    read_only: boolean;
+    horizon_projection_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  forecast_horizons: Array<{
+    horizon_code: string;
+    horizon_label: string;
+    snapshot_span: number;
+    metric_projection_count: number;
+    model_input_ready_count: number;
+    watch_projection_count: number;
+    direction_mix: Record<string, number>;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    horizon_projection_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_projections: Array<{
+      metric_code: string;
+      label: string;
+      horizon_code: string;
+      horizon_label: string;
+      snapshot_span: number;
+      source_latest_value: number;
+      average_delta_per_snapshot: number;
+      projected_delta: number;
+      projected_value: number;
+      projected_direction: string;
+      confidence_level: string;
+      risk_classification: string;
+      model_input_ready: boolean;
+      volatility_classification: string;
+      read_only: boolean;
+      horizon_projection_only: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextBaselineForecast {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  baseline_forecast_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  baseline_forecast_summary: null | {
+    horizon_count: number;
+    total_metric_forecast_count: number;
+    total_watch_forecast_count: number;
+    ready_horizon_count: number;
+    read_only: boolean;
+    baseline_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  baseline_forecasts: Array<{
+    horizon_code: string;
+    horizon_label: string;
+    snapshot_span: number;
+    metric_forecast_count: number;
+    model_input_ready_count: number;
+    watch_forecast_count: number;
+    direction_mix: Record<string, number>;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    baseline_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_forecasts: Array<{
+      metric_code: string;
+      label: string;
+      horizon_code: string;
+      horizon_label: string;
+      snapshot_span: number;
+      source_latest_value: number;
+      average_delta_per_snapshot: number;
+      baseline_forecast_delta: number;
+      baseline_forecast_value: number;
+      baseline_forecast_direction: string;
+      confidence_level: string;
+      risk_classification: string;
+      model_input_ready: boolean;
+      historical_point_count: number;
+      historical_net_delta: number;
+      volatility_classification: string;
+      read_only: boolean;
+      baseline_forecast_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextMovingAverageForecast {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  moving_average_forecast_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  moving_average_summary: null | {
+    window_count: number;
+    total_metric_forecast_count: number;
+    total_watch_forecast_count: number;
+    ready_window_count: number;
+    read_only: boolean;
+    moving_average_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  moving_average_forecasts: Array<{
+    window_code: string;
+    window_label: string;
+    requested_window_size: number;
+    metric_forecast_count: number;
+    model_input_ready_count: number;
+    watch_forecast_count: number;
+    direction_mix: Record<string, number>;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    moving_average_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_forecasts: Array<{
+      metric_code: string;
+      label: string;
+      window_code: string;
+      window_label: string;
+      requested_window_size: number;
+      effective_window_size: number;
+      source_latest_value: number;
+      moving_average_value: number;
+      moving_average_forecast_delta: number;
+      moving_average_forecast_value: number;
+      moving_average_forecast_direction: string;
+      confidence_level: string;
+      risk_classification: string;
+      model_input_ready: boolean;
+      historical_point_count: number;
+      historical_net_delta: number;
+      volatility_classification: string;
+      read_only: boolean;
+      moving_average_forecast_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextWeightedTrendForecast {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  weighted_trend_forecast_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  weighted_trend_summary: null | {
+    window_count: number;
+    total_metric_forecast_count: number;
+    total_watch_forecast_count: number;
+    ready_window_count: number;
+    read_only: boolean;
+    weighted_trend_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  weighted_trend_forecasts: Array<{
+    window_code: string;
+    window_label: string;
+    requested_window_size: number;
+    projection_span: number;
+    metric_forecast_count: number;
+    model_input_ready_count: number;
+    watch_forecast_count: number;
+    direction_mix: Record<string, number>;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    weighted_trend_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_forecasts: Array<{
+      metric_code: string;
+      label: string;
+      window_code: string;
+      window_label: string;
+      requested_window_size: number;
+      effective_window_size: number;
+      projection_span: number;
+      source_latest_value: number;
+      weighted_delta_per_snapshot: number;
+      weighted_trend_forecast_delta: number;
+      weighted_trend_forecast_value: number;
+      weighted_trend_forecast_direction: string;
+      confidence_level: string;
+      risk_classification: string;
+      model_input_ready: boolean;
+      historical_point_count: number;
+      historical_net_delta: number;
+      volatility_classification: string;
+      read_only: boolean;
+      weighted_trend_forecast_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextVolatilityAdjustedForecast {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  volatility_adjusted_forecast_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  volatility_adjusted_summary: null | {
+    window_count: number;
+    total_metric_forecast_count: number;
+    total_watch_forecast_count: number;
+    ready_window_count: number;
+    read_only: boolean;
+    volatility_adjusted_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  volatility_adjusted_forecasts: Array<{
+    window_code: string;
+    window_label: string;
+    requested_window_size: number;
+    projection_span: number;
+    metric_forecast_count: number;
+    model_input_ready_count: number;
+    watch_forecast_count: number;
+    direction_mix: Record<string, number>;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    volatility_adjusted_forecast_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_forecasts: Array<{
+      metric_code: string;
+      label: string;
+      window_code: string;
+      window_label: string;
+      requested_window_size: number;
+      projection_span: number;
+      source_latest_value: number;
+      source_weighted_delta: number;
+      volatility_adjustment_factor: number;
+      volatility_adjusted_delta: number;
+      volatility_adjusted_forecast_value: number;
+      volatility_adjusted_direction: string;
+      source_confidence_level: string;
+      confidence_level: string;
+      risk_classification: string;
+      model_input_ready: boolean;
+      historical_point_count: number;
+      historical_net_delta: number;
+      volatility_classification: string;
+      read_only: boolean;
+      volatility_adjusted_forecast_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastConfidence {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  confidence_engine_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_confidence_summary: null | {
+    window_count: number;
+    total_metric_confidence_count: number;
+    total_watch_confidence_count: number;
+    average_confidence_score: number;
+    overall_confidence_band: string;
+    read_only: boolean;
+    confidence_engine_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  forecast_confidence_windows: Array<{
+    window_code: string;
+    window_label: string;
+    requested_window_size: number;
+    projection_span: number;
+    metric_confidence_count: number;
+    average_confidence_score: number;
+    confidence_band: string;
+    confidence_band_mix: Record<string, number>;
+    watch_confidence_count: number;
+    read_only: boolean;
+    confidence_engine_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    metric_confidences: Array<{
+      metric_code: string;
+      label: string;
+      window_code: string;
+      window_label: string;
+      source_confidence_level: string;
+      confidence_score: number;
+      confidence_band: string;
+      confidence_risk_classification: string;
+      confidence_drivers: {
+        base_score: number;
+        historical_depth_adjustment: number;
+        volatility_adjustment: number;
+        readiness_adjustment: number;
+      };
+      source_latest_value: number;
+      forecast_value: number;
+      forecast_delta: number;
+      forecast_direction: string;
+      volatility_classification: string;
+      historical_point_count: number;
+      model_input_ready: boolean;
+      read_only: boolean;
+      confidence_engine_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+      notes: string[];
+    }>;
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastAccuracy {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  forecast_accuracy_only: boolean;
+  historical_backtest_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_accuracy_summary: null | {
+    metric_count: number;
+    total_evaluation_count: number;
+    average_accuracy_score: number;
+    overall_accuracy_band: string;
+    watch_metric_count: number;
+    accuracy_band_mix: Record<string, number>;
+    read_only: boolean;
+    forecast_accuracy_only: boolean;
+    historical_backtest_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  metric_accuracy: Array<{
+    metric_code: string;
+    label: string;
+    historical_point_count: number;
+    evaluation_count: number;
+    backtest_window_size: number;
+    mean_absolute_error: number;
+    mean_absolute_percent_error: number;
+    direction_match_count: number;
+    directional_accuracy_rate: number;
+    accuracy_score: number;
+    accuracy_band: string;
+    accuracy_risk_classification: string;
+    volatility_classification: string;
+    model_input_ready: boolean;
+    read_only: boolean;
+    forecast_accuracy_only: boolean;
+    historical_backtest_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    backtest_points: Array<{
+      index: number;
+      snapshot_id?: string;
+      generated_at?: string;
+      actual_value: number;
+      predicted_value: number;
+      previous_actual_value: number;
+      absolute_error: number;
+      absolute_percent_error: number;
+      predicted_direction: string;
+      actual_direction: string;
+      direction_matched: boolean;
+      read_only: boolean;
+      historical_backtest_only: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+    }>;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastComparison {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  forecast_comparison_only: boolean;
+  deterministic_engine: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_comparison_summary: null | {
+    metric_count: number;
+    average_comparison_score: number;
+    overall_comparison_band: string;
+    watch_metric_count: number;
+    consensus_mix: Record<string, number>;
+    best_model_mix: Record<string, number>;
+    read_only: boolean;
+    forecast_comparison_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  metric_comparisons: Array<{
+    metric_code: string;
+    label: string;
+    compared_model_count: number;
+    average_comparison_score: number;
+    comparison_band: string;
+    best_model_code: string | null;
+    best_model_label: string | null;
+    best_model_score: number;
+    direction_consensus: string;
+    historical_accuracy_score: number | null;
+    historical_accuracy_band: string | null;
+    accuracy_risk_classification: string | null;
+    read_only: boolean;
+    forecast_comparison_only: boolean;
+    deterministic_engine: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    model_forecasts: Array<{
+      model_code: string;
+      model_label: string;
+      metric_code: string;
+      label: string;
+      window_code: string;
+      window_label: string;
+      forecast_value: number;
+      forecast_delta: number;
+      forecast_direction: string;
+      source_latest_value: number;
+      confidence_level: string;
+      risk_classification: string;
+      volatility_classification: string;
+      model_input_ready: boolean;
+      comparison_score: number;
+      read_only: boolean;
+      forecast_comparison_only: boolean;
+      deterministic_engine: boolean;
+      forecast_model_enabled: boolean;
+      execution_enabled: boolean;
+      mutation_enabled: boolean;
+      automation_enabled: boolean;
+    }>;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+
+export interface SystemContextForecastRiskClassification {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  risk_classification_only: boolean;
+  forecast_model_enabled?: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  risk_summary: null | {
+    classified_scenario_count: number;
+    average_forecast_risk_score: number;
+    critical_risk_count: number;
+    high_risk_count: number;
+    moderate_risk_count: number;
+    low_risk_count: number;
+    highest_risk_code: string | null;
+    highest_risk_label: string | null;
+    risk_mix: Record<string, number>;
+    review_priority_mix: Record<string, number>;
+    read_only: boolean;
+    risk_classification_only: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  classified_scenarios: Array<{
+    risk_rank: number;
+    rank: number;
+    code: string;
+    metric_code: string;
+    label: string;
+    preview_direction: string;
+    projected_value: number;
+    projected_delta: number;
+    ranking_score: number;
+    ranking_band: string;
+    confidence_score: number;
+    historical_accuracy_score: number | null;
+    source_risk_classification: string;
+    forecast_risk_score: number;
+    forecast_risk_band: string;
+    review_priority: string;
+    risk_drivers: {
+      ranking_band: string;
+      source_risk_classification: string;
+      actionability_classification: string;
+      direction_consensus: string;
+      model_input_ready: boolean;
+    };
+    read_only: boolean;
+    risk_classification_only: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextForecastRanking {
+  status: string;
+  method: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  ranking_only: boolean;
+  forecast_model_enabled?: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  ranking_summary: null | {
+    ranked_scenario_count: number;
+    average_ranking_score: number;
+    top_ranked_count: number;
+    watch_scenario_count: number;
+    strongest_signal_code: string | null;
+    strongest_signal_label: string | null;
+    actionability_mix: Record<string, number>;
+    read_only: boolean;
+    ranking_only: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  ranked_scenarios: Array<{
+    rank: number;
+    code: string;
+    metric_code: string;
+    label: string;
+    scenario_type: string;
+    preview_direction: string;
+    projected_value: number;
+    projected_delta: number;
+    confidence_score: number;
+    confidence_level: string;
+    risk_classification: string;
+    priority: string;
+    model_input_ready: boolean;
+    comparison_score: number;
+    best_model_code: string | null;
+    best_model_label: string | null;
+    best_model_score: number;
+    direction_consensus: string;
+    historical_accuracy_score: number | null;
+    ranking_score: number;
+    ranking_band: string;
+    actionability_classification: string;
+    read_only: boolean;
+    ranking_only: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextForecastScenarioSet {
+  status: string;
+  method: string;
+  minimum_required_snapshots?: number;
+  available_snapshots: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_snapshot_generated_at?: string | null;
+  latest_snapshot_generated_at?: string | null;
+  read_only: boolean;
+  scenario_persistence_only: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  scenario_summary: null | {
+    scenario_count: number;
+    model_input_ready_scenario_count: number;
+    watch_scenario_count: number;
+    directional_scenario_count: number;
+    stable_scenario_count: number;
+    risk_mix: Record<string, number>;
+    priority_mix: Record<string, number>;
+    read_only: boolean;
+    scenario_persistence_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  forecast_scenarios: Array<{
+    code: string;
+    metric_code: string;
+    label: string;
+    scenario_type: string;
+    preview_direction: string;
+    source_latest_value: number;
+    projected_value: number;
+    projected_delta: number;
+    preview_horizon_snapshots: number;
+    confidence_level: string;
+    confidence_score: number;
+    confidence_band: string;
+    volatility_classification: string;
+    risk_classification: string;
+    priority: string;
+    historical_point_count: number;
+    historical_net_delta: number;
+    historical_average_value: number;
+    model_input_ready: boolean;
+    read_only: boolean;
+    scenario_persistence_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
+export interface SystemContextForecastScenarioCaptureResponse {
+  scenario_set_id: string | null;
+  generated_at: string | null;
+  read_only: boolean;
+  scenario_persistence_only: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+}
+
+export interface SystemContextForecastScenarioHistoryItem {
+  id: string;
+  tenant_id: string;
+  generated_at: string;
+  source: string;
+  scenario_status: string;
+  scenario_summary?: SystemContextForecastScenarioSet['scenario_summary'];
+  generated_from_snapshot_ids?: string[];
+  oldest_snapshot_generated_at?: string | null;
+  latest_snapshot_generated_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SystemContextForecastPreview {
+  status: string;
+  method?: string;
+  minimum_required_snapshots: number;
+  available_snapshots: number;
+  preview_horizon_snapshots?: number;
+  generated_from_snapshot_ids?: string[];
+  oldest_generated_at?: string | null;
+  latest_generated_at?: string | null;
+  read_only: boolean;
+  preview_only: boolean;
+  executes_actions: boolean;
+  forecast_model_enabled: boolean;
+  execution_enabled: boolean;
+  mutation_enabled: boolean;
+  automation_enabled: boolean;
+  forecast_preview_summary: null | {
+    metric_preview_count: number;
+    projected_increase_count: number;
+    projected_decrease_count: number;
+    projected_stable_count: number;
+    watch_metric_count: number;
+    risk_mix: Record<string, number>;
+    read_only: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+  };
+  metric_previews: Array<{
+    code: string;
+    label: string;
+    source_latest_value: number;
+    average_delta_per_snapshot: number;
+    preview_horizon_snapshots: number;
+    preview_delta: number;
+    preview_value: number;
+    preview_direction: string;
+    confidence_level: string;
+    confidence_score: number;
+    confidence_band: string;
+    volatility_classification: string;
+    risk_indicator: string;
+    read_only: boolean;
+    forecast_model_enabled: boolean;
+    execution_enabled: boolean;
+    mutation_enabled: boolean;
+    automation_enabled: boolean;
+    notes: string[];
+  }>;
+  notes: string[];
+}
+
