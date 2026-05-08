@@ -39,10 +39,37 @@ async function createStorageLocation(input: StorageLocationFormState): Promise<S
   });
 }
 
+async function updateStorageLocation(input: {
+  id: string;
+  name: string;
+  temperature_zone: string;
+}): Promise<StorageLocationItem> {
+  return apiRequest<StorageLocationItem>(`/storage-locations/${input.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name: input.name.trim(),
+      temperature_zone: input.temperature_zone.trim() || null
+    })
+  });
+}
+
+async function deleteStorageLocation(id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/storage-locations/${id}`, {
+    method: 'DELETE'
+  });
+}
+
 function emptyForm(): StorageLocationFormState {
   return {
     name: '',
     temperature_zone: ''
+  };
+}
+
+function formFromLocation(location: StorageLocationItem): StorageLocationFormState {
+  return {
+    name: location.name,
+    temperature_zone: location.temperature_zone || ''
   };
 }
 
@@ -70,42 +97,13 @@ function StatCard(props: {
 }
 
 export default function StorageLocationsPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the StorageLocationsPage you sent.
-
-    Existing real behavior is preserved:
-    - same endpoint usage
-    - same query key
-    - same create mutation flow
-    - same fields
-    - same search behavior
-    - same soft-delete display logic
-    - same shared UI foundation classes
-
-    Backend alignment added:
-    - reads canManageStorageLocations from getRoleCapabilities()
-    - blocks create submission for read-only roles
-    - disables create form controls when the current role cannot create storage locations
-    - shows a role warning like the other master-data pages
-
-    WHY IT CHANGED
-    --------------
-    The backend only allows admin and manager roles to create storage locations.
-    Staff should not see an enabled create workflow that the backend will reject.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Aligns the Storage Locations page with backend authorization and with the
-    Products/Suppliers master-data UX, without changing request bodies, query
-    keys, or data display behavior.
-  */
   const queryClient = useQueryClient();
   const { role, canManageStorageLocations } = getRoleCapabilities();
 
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
+  const [createForm, setCreateForm] = useState<StorageLocationFormState>(emptyForm());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<StorageLocationFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -117,18 +115,46 @@ export default function StorageLocationsPage() {
   const createMutation = useMutation({
     mutationFn: createStorageLocation,
     onSuccess: async () => {
-      setForm(emptyForm());
+      setCreateForm(emptyForm());
       setFormError(null);
       setFormMessage('Storage location created successfully.');
       await queryClient.invalidateQueries({ queryKey: ['storage-locations'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to create storage location.');
-      }
+      setFormError(error instanceof ApiError ? error.message : 'Failed to create storage location.');
+      setFormMessage(null);
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateStorageLocation,
+    onSuccess: async () => {
+      setEditingId(null);
+      setEditForm(emptyForm());
+      setFormError(null);
+      setFormMessage('Storage location updated successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['storage-locations'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : 'Failed to update storage location.');
+      setFormMessage(null);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteStorageLocation,
+    onSuccess: async () => {
+      setEditingId(null);
+      setEditForm(emptyForm());
+      setFormError(null);
+      setFormMessage('Storage location deleted successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['storage-locations'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : 'Failed to delete storage location.');
       setFormMessage(null);
     }
   });
@@ -150,19 +176,72 @@ export default function StorageLocationsPage() {
     };
   }, [locations]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const writeBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+
+  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
     setFormMessage(null);
 
     if (!canManageStorageLocations) {
       setFormError(
-        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the existing backend.'
+        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
       );
       return;
     }
 
-    createMutation.mutate(form);
+    createMutation.mutate(createForm);
+  };
+
+  const beginEdit = (location: StorageLocationItem) => {
+    setFormError(null);
+    setFormMessage(null);
+    setEditingId(location.id);
+    setEditForm(formFromLocation(location));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm(emptyForm());
+  };
+
+  const handleEditSubmit = (event: FormEvent<HTMLFormElement>, location: StorageLocationItem) => {
+    event.preventDefault();
+    setFormError(null);
+    setFormMessage(null);
+
+    if (!canManageStorageLocations) {
+      setFormError(
+        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
+      );
+      return;
+    }
+
+    updateMutation.mutate({
+      id: location.id,
+      name: editForm.name,
+      temperature_zone: editForm.temperature_zone
+    });
+  };
+
+  const handleDelete = (location: StorageLocationItem) => {
+    setFormError(null);
+    setFormMessage(null);
+
+    if (!canManageStorageLocations) {
+      setFormError(
+        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete storage location "${location.name}"? This performs the backend soft delete and removes it from active location lists.`
+    );
+
+    if (!confirmed) return;
+
+    deleteMutation.mutate(location.id);
   };
 
   return (
@@ -186,13 +265,13 @@ export default function StorageLocationsPage() {
         <StatCard
           title="Deleted"
           value={summary.deleted}
-          subtitle="Soft-deleted locations"
+          subtitle="Soft-deleted locations returned by API"
         />
       </div>
 
       {!canManageStorageLocations ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Storage locations are read-only in the frontend because your backend only allows manager and admin users to create storage locations.
+          Current role: {role.toUpperCase()}. Storage locations are read-only in the frontend because your backend only allows manager and admin users to write storage locations.
         </div>
       ) : null}
 
@@ -205,16 +284,16 @@ export default function StorageLocationsPage() {
         {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
         {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
 
-        <form onSubmit={handleSubmit} style={styles.formGrid}>
+        <form onSubmit={handleCreateSubmit} style={styles.formGrid}>
           <div>
             <label style={styles.label}>Name</label>
             <input
               style={styles.input}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              value={createForm.name}
+              onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))}
               placeholder="Example: Main Warehouse"
               required
-              disabled={!canManageStorageLocations}
+              disabled={!canManageStorageLocations || writeBusy}
             />
           </div>
 
@@ -222,12 +301,12 @@ export default function StorageLocationsPage() {
             <label style={styles.label}>Temperature Zone</label>
             <input
               style={styles.input}
-              value={form.temperature_zone}
+              value={createForm.temperature_zone}
               onChange={(event) =>
-                setForm((current) => ({ ...current, temperature_zone: event.target.value }))
+                setCreateForm((current) => ({ ...current, temperature_zone: event.target.value }))
               }
               placeholder="Example: ambient, chilled, frozen"
-              disabled={!canManageStorageLocations}
+              disabled={!canManageStorageLocations || writeBusy}
             />
           </div>
 
@@ -235,7 +314,7 @@ export default function StorageLocationsPage() {
             <button
               type="submit"
               style={styles.primaryButton}
-              disabled={createMutation.isPending || !canManageStorageLocations}
+              disabled={writeBusy || !canManageStorageLocations}
               title={!canManageStorageLocations ? 'Manager or admin role required' : undefined}
             >
               {createMutation.isPending ? 'Creating...' : 'Create Storage Location'}
@@ -247,7 +326,7 @@ export default function StorageLocationsPage() {
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Storage Location List</h3>
         <p style={styles.panelSubtitle}>
-          Search and review storage areas currently available to inventory operations.
+          Search, review, edit, and soft-delete storage areas currently available to inventory operations.
         </p>
 
         <div className="app-grid-toolbar" style={styles.toolbarGrid}>
@@ -278,31 +357,109 @@ export default function StorageLocationsPage() {
                   <th style={styles.th}>Temperature Zone</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {locations.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={4}>
+                    <td style={styles.emptyCell} colSpan={5}>
                       No storage locations found.
                     </td>
                   </tr>
                 ) : (
-                  locations.map((location) => (
-                    <tr key={location.id}>
-                      <td style={styles.td}>
-                        <div style={styles.rowTitle}>{location.name}</div>
-                        <div style={styles.rowSubtle}>Location ID: {location.id}</div>
-                      </td>
-                      <td style={styles.td}>{location.temperature_zone || '-'}</td>
-                      <td style={styles.td}>{formatDateTime(location.created_at)}</td>
-                      <td style={styles.td}>
-                        <span style={location.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
-                          {location.deleted_at ? 'Deleted' : 'Active'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  locations.map((location) => {
+                    const isEditing = editingId === location.id;
+
+                    return (
+                      <tr key={location.id}>
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <form id={`storage-location-edit-${location.id}`} onSubmit={(event) => handleEditSubmit(event, location)}>
+                              <input
+                                style={styles.input}
+                                value={editForm.name}
+                                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                                required
+                                disabled={writeBusy}
+                              />
+                            </form>
+                          ) : (
+                            <>
+                              <div style={styles.rowTitle}>{location.name}</div>
+                              <div style={styles.rowSubtle}>Location ID: {location.id}</div>
+                            </>
+                          )}
+                        </td>
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <input
+                              style={styles.input}
+                              value={editForm.temperature_zone}
+                              onChange={(event) => setEditForm((current) => ({ ...current, temperature_zone: event.target.value }))}
+                              placeholder="Example: ambient, chilled, frozen"
+                              disabled={writeBusy}
+                            />
+                          ) : (
+                            location.temperature_zone || '-'
+                          )}
+                        </td>
+                        <td style={styles.td}>{formatDateTime(location.created_at)}</td>
+                        <td style={styles.td}>
+                          <span style={location.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
+                            {location.deleted_at ? 'Deleted' : 'Active'}
+                          </span>
+                        </td>
+                        <td style={styles.td}>
+                          {canManageStorageLocations && !location.deleted_at ? (
+                            <div style={styles.rowActions}>
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    type="submit"
+                                    form={`storage-location-edit-${location.id}`}
+                                    style={styles.smallPrimaryButton}
+                                    disabled={writeBusy}
+                                  >
+                                    {updateMutation.isPending ? 'Saving...' : 'Save'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    style={styles.smallSecondaryButton}
+                                    onClick={cancelEdit}
+                                    disabled={writeBusy}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    style={styles.smallSecondaryButton}
+                                    onClick={() => beginEdit(location)}
+                                    disabled={writeBusy}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    style={styles.smallDangerButton}
+                                    onClick={() => handleDelete(location)}
+                                    disabled={writeBusy}
+                                  >
+                                    {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={styles.rowSubtle}>Read only</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -427,7 +584,7 @@ const styles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '720px'
+    minWidth: '860px'
   },
   th: {
     textAlign: 'left',
@@ -459,6 +616,38 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     lineHeight: 1.4,
     wordBreak: 'break-all'
+  },
+  rowActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px'
+  },
+  smallPrimaryButton: {
+    border: 'none',
+    borderRadius: '8px',
+    padding: '8px 10px',
+    background: '#2563eb',
+    color: '#ffffff',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  smallSecondaryButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    padding: '8px 10px',
+    background: '#ffffff',
+    color: '#111827',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  smallDangerButton: {
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    padding: '8px 10px',
+    background: '#fef2f2',
+    color: '#991b1b',
+    fontWeight: 700,
+    cursor: 'pointer'
   },
   badgeActive: {
     display: 'inline-block',

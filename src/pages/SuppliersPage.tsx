@@ -11,6 +11,38 @@ type SupplierFormState = {
   contact_info: string;
 };
 
+type SupplierSlaBreachesResponse = {
+  rows?: SupplierSlaBreachItem[];
+  total?: number;
+  notes?: string[];
+};
+
+type SupplierSlaBreachItem = {
+  supplier_id?: string;
+  supplier_name?: string;
+  shipment_id?: string;
+  shipment_number?: string;
+  status?: string;
+  expected_delivery_date?: string | null;
+  received_date?: string | null;
+  days_late?: number | string | null;
+  breach_type?: string;
+  severity?: string;
+  [key: string]: unknown;
+};
+
+type SupplierPerformanceResponse = {
+  supplier?: SupplierItem;
+  supplier_id?: string;
+  supplier_name?: string;
+  summary?: Record<string, unknown>;
+  totals?: Record<string, unknown>;
+  metrics?: Record<string, unknown>;
+  recent_shipments?: unknown[];
+  notes?: string[];
+  [key: string]: unknown;
+};
+
 async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
   const params = new URLSearchParams();
 
@@ -20,6 +52,14 @@ async function fetchSuppliers(search: string): Promise<SupplierItem[]> {
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<SupplierItem[]>(`/suppliers${suffix}`);
+}
+
+async function fetchSupplierSlaBreaches(): Promise<SupplierSlaBreachesResponse> {
+  return apiRequest<SupplierSlaBreachesResponse>('/suppliers/sla-breaches');
+}
+
+async function fetchSupplierPerformance(supplierId: string): Promise<SupplierPerformanceResponse> {
+  return apiRequest<SupplierPerformanceResponse>(`/suppliers/${supplierId}/performance`);
 }
 
 async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
@@ -61,13 +101,52 @@ function emptyForm(): SupplierFormState {
   };
 }
 
+function formatUnknown(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '-';
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '-';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString();
+}
+
+function normalizeBreaches(response: SupplierSlaBreachesResponse | undefined): SupplierSlaBreachItem[] {
+  if (!response) return [];
+  if (Array.isArray(response)) return response as SupplierSlaBreachItem[];
+  if (Array.isArray(response.rows)) return response.rows;
+  return [];
+}
+
+function getPerformanceTitle(performance: SupplierPerformanceResponse | undefined, fallback?: SupplierItem | null): string {
+  if (!performance) return fallback?.name || 'Supplier Performance';
+
+  if (typeof performance.supplier_name === 'string') return performance.supplier_name;
+  if (performance.supplier?.name) return performance.supplier.name;
+
+  return fallback?.name || 'Supplier Performance';
+}
+
 function StatCard(props: {
   title: string;
   value: number | string;
   subtitle: string;
-  tone?: 'default' | 'good';
+  tone?: 'default' | 'good' | 'warn' | 'bad';
 }) {
-  const toneStyle = props.tone === 'good' ? styles.statValueGood : styles.statValue;
+  const toneStyle =
+    props.tone === 'good'
+      ? styles.statValueGood
+      : props.tone === 'warn'
+        ? styles.statValueWarn
+        : props.tone === 'bad'
+          ? styles.statValueBad
+          : styles.statValue;
 
   return (
     <div style={styles.statCard}>
@@ -78,35 +157,27 @@ function StatCard(props: {
   );
 }
 
+function JsonBlock({ value }: { value: unknown }) {
+  return <pre style={styles.jsonBlock}>{JSON.stringify(value ?? null, null, 2)}</pre>;
+}
+
+function KeyValue({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div style={styles.keyValue}>
+      <span style={styles.keyLabel}>{label}</span>
+      <span style={styles.keyText}>{formatUnknown(value)}</span>
+    </div>
+  );
+}
+
 export default function SuppliersPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the SuppliersPage you sent.
-
-    Existing real behavior is preserved:
-    - same endpoint usage
-    - same query key
-    - same create / update / delete flow
-    - same permission enforcement
-    - same search behavior
-    - same invalidation flow
-
-    This pass adds the dedicated supplier email field required by shipment
-    email delivery. The Send to Supplier action depends on suppliers.email
-    instead of trying to parse free-form contact notes.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Lets managers/admins store a real supplier email address so shipment
-    emails can be sent reliably from the shipment screen.
-  */
   const queryClient = useQueryClient();
 
   const { role, canManageSuppliers } = getRoleCapabilities();
 
   const [search, setSearch] = useState('');
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [selectedPerformanceSupplier, setSelectedPerformanceSupplier] = useState<SupplierItem | null>(null);
   const [form, setForm] = useState<SupplierFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -114,6 +185,17 @@ export default function SuppliersPage() {
   const suppliersQuery = useQuery({
     queryKey: ['suppliers', search],
     queryFn: () => fetchSuppliers(search)
+  });
+
+  const slaBreachesQuery = useQuery({
+    queryKey: ['supplier-sla-breaches'],
+    queryFn: fetchSupplierSlaBreaches
+  });
+
+  const supplierPerformanceQuery = useQuery({
+    queryKey: ['supplier-performance', selectedPerformanceSupplier?.id],
+    queryFn: () => fetchSupplierPerformance(selectedPerformanceSupplier?.id || ''),
+    enabled: Boolean(selectedPerformanceSupplier?.id)
   });
 
   const createMutation = useMutation({
@@ -125,6 +207,7 @@ export default function SuppliersPage() {
       setFormMessage('Supplier created successfully.');
       await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
@@ -146,6 +229,8 @@ export default function SuppliersPage() {
       setFormMessage('Supplier updated successfully.');
       await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-performance'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
@@ -167,8 +252,11 @@ export default function SuppliersPage() {
         setEditingSupplier(null);
         setForm(emptyForm());
       }
+      setSelectedPerformanceSupplier(null);
       await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-performance'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
@@ -182,6 +270,7 @@ export default function SuppliersPage() {
   });
 
   const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
+  const slaBreaches = useMemo(() => normalizeBreaches(slaBreachesQuery.data), [slaBreachesQuery.data]);
 
   const summary = useMemo(() => {
     const active = suppliers.filter((supplier) => !supplier.deleted_at).length;
@@ -196,9 +285,10 @@ export default function SuppliersPage() {
       total: suppliers.length,
       active,
       withEmail,
-      withContact
+      withContact,
+      slaBreaches: slaBreaches.length
     };
-  }, [suppliers]);
+  }, [suppliers, slaBreaches]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -297,9 +387,10 @@ export default function SuppliersPage() {
           tone="good"
         />
         <StatCard
-          title="With Contact Info"
-          value={summary.withContact}
-          subtitle="Suppliers with saved contact details"
+          title="SLA Breaches"
+          value={summary.slaBreaches}
+          subtitle="Backend-reported supplier SLA exceptions"
+          tone={summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
 
@@ -382,9 +473,74 @@ export default function SuppliersPage() {
       </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
+        <h3 style={styles.panelTitle}>Supplier SLA Breaches</h3>
+        <p style={styles.panelSubtitle}>
+          This uses the existing backend `/suppliers/sla-breaches` endpoint that was previously not surfaced in the supplier frontend.
+        </p>
+
+        {slaBreachesQuery.isLoading ? <p>Loading supplier SLA breaches...</p> : null}
+
+        {slaBreachesQuery.isError ? (
+          <div className="app-error-state" style={styles.errorBox}>
+            Failed to load supplier SLA breaches: {(slaBreachesQuery.error as Error).message || 'Unknown error'}
+          </div>
+        ) : null}
+
+        {!slaBreachesQuery.isLoading && !slaBreachesQuery.isError ? (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Supplier</th>
+                  <th style={styles.th}>Shipment</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Expected</th>
+                  <th style={styles.th}>Received</th>
+                  <th style={styles.th}>Days Late</th>
+                  <th style={styles.th}>Severity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slaBreaches.length === 0 ? (
+                  <tr>
+                    <td style={styles.emptyCell} colSpan={7}>
+                      No supplier SLA breaches returned by the backend.
+                    </td>
+                  </tr>
+                ) : (
+                  slaBreaches.map((breach, index) => (
+                    <tr key={`${breach.supplier_id || 'supplier'}-${breach.shipment_id || index}`}>
+                      <td style={styles.td}>
+                        <div style={styles.rowTitle}>{formatUnknown(breach.supplier_name || breach.supplier_id)}</div>
+                        <div style={styles.rowSubtle}>{formatUnknown(breach.breach_type)}</div>
+                      </td>
+                      <td style={styles.td}>
+                        <div>{formatUnknown(breach.shipment_number || breach.shipment_id)}</div>
+                      </td>
+                      <td style={styles.td}>{formatUnknown(breach.status)}</td>
+                      <td style={styles.td}>{formatDateTime(breach.expected_delivery_date)}</td>
+                      <td style={styles.td}>{formatDateTime(breach.received_date)}</td>
+                      <td style={styles.td}>{formatUnknown(breach.days_late)}</td>
+                      <td style={styles.td}>
+                        <span style={styles.badgeDeleted}>{formatUnknown(breach.severity || 'breach')}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        {slaBreachesQuery.data?.notes?.map((note) => (
+          <div key={note} style={styles.note}>{note}</div>
+        ))}
+      </section>
+
+      <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Supplier List</h3>
         <p style={styles.panelSubtitle}>
-          Search and review supplier records available to inventory, shipment, and supplier email workflows.
+          Search and review supplier records available to inventory, shipment, supplier email, SLA, and performance workflows.
         </p>
 
         <div className="app-grid-toolbar" style={styles.toolbarGrid}>
@@ -446,6 +602,14 @@ export default function SuppliersPage() {
                         <div className="app-actions" style={styles.actionGroup}>
                           <button
                             type="button"
+                            style={styles.secondaryButton}
+                            onClick={() => setSelectedPerformanceSupplier(supplier)}
+                          >
+                            Performance
+                          </button>
+
+                          <button
+                            type="button"
                             style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
                             onClick={() => handleStartEdit(supplier)}
                             disabled={!canManageSuppliers}
@@ -473,6 +637,74 @@ export default function SuppliersPage() {
           </div>
         ) : null}
       </section>
+
+      {selectedPerformanceSupplier ? (
+        <section className="app-panel app-panel--padded" style={styles.panel}>
+          <div style={styles.performanceHeader}>
+            <div>
+              <h3 style={styles.panelTitle}>
+                Supplier Performance: {getPerformanceTitle(supplierPerformanceQuery.data, selectedPerformanceSupplier)}
+              </h3>
+              <p style={styles.panelSubtitle}>
+                This uses the existing backend `/suppliers/:id/performance` endpoint that was previously not surfaced in the supplier frontend.
+              </p>
+            </div>
+            <button type="button" style={styles.secondaryButton} onClick={() => setSelectedPerformanceSupplier(null)}>
+              Close
+            </button>
+          </div>
+
+          {supplierPerformanceQuery.isLoading ? <p>Loading supplier performance...</p> : null}
+
+          {supplierPerformanceQuery.isError ? (
+            <div className="app-error-state" style={styles.errorBox}>
+              Failed to load supplier performance: {(supplierPerformanceQuery.error as Error).message || 'Unknown error'}
+            </div>
+          ) : null}
+
+          {supplierPerformanceQuery.data ? (
+            <div style={styles.performanceGrid}>
+              {supplierPerformanceQuery.data.summary ? (
+                <div style={styles.performanceCard}>
+                  <h4 style={styles.cardTitle}>Summary</h4>
+                  {Object.entries(supplierPerformanceQuery.data.summary).map(([key, value]) => (
+                    <KeyValue key={key} label={key.replace(/_/g, ' ')} value={value} />
+                  ))}
+                </div>
+              ) : null}
+
+              {supplierPerformanceQuery.data.totals ? (
+                <div style={styles.performanceCard}>
+                  <h4 style={styles.cardTitle}>Totals</h4>
+                  {Object.entries(supplierPerformanceQuery.data.totals).map(([key, value]) => (
+                    <KeyValue key={key} label={key.replace(/_/g, ' ')} value={value} />
+                  ))}
+                </div>
+              ) : null}
+
+              {supplierPerformanceQuery.data.metrics ? (
+                <div style={styles.performanceCard}>
+                  <h4 style={styles.cardTitle}>Metrics</h4>
+                  {Object.entries(supplierPerformanceQuery.data.metrics).map(([key, value]) => (
+                    <KeyValue key={key} label={key.replace(/_/g, ' ')} value={value} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {supplierPerformanceQuery.data?.notes?.map((note) => (
+            <div key={note} style={styles.note}>{note}</div>
+          ))}
+
+          {supplierPerformanceQuery.data ? (
+            <>
+              <h4 style={styles.cardTitle}>Raw Performance Response</h4>
+              <JsonBlock value={supplierPerformanceQuery.data} />
+            </>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -512,6 +744,20 @@ const styles: Record<string, CSSProperties> = {
     color: '#166534',
     wordBreak: 'break-word'
   },
+  statValueWarn: {
+    fontSize: '32px',
+    fontWeight: 700,
+    marginBottom: '8px',
+    color: '#92400e',
+    wordBreak: 'break-word'
+  },
+  statValueBad: {
+    fontSize: '32px',
+    fontWeight: 700,
+    marginBottom: '8px',
+    color: '#991b1b',
+    wordBreak: 'break-word'
+  },
   statSubtitle: {
     fontSize: '13px',
     color: '#6b7280',
@@ -535,6 +781,12 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     lineHeight: 1.5,
     wordBreak: 'break-word'
+  },
+  cardTitle: {
+    marginTop: 0,
+    marginBottom: '12px',
+    fontSize: '16px',
+    fontWeight: 700
   },
   formGrid: {
     display: 'grid',
@@ -598,30 +850,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   toolbarGrid: {
-    /*
-      What changed:
-      - Replaced the single-row toolbar wrapper with the same grid-style toolbar pattern used across the newer master-data pages.
-
-      Why:
-      - Suppliers should visually align with Products and Storage Locations.
-
-      What problem this solves:
-      - Makes the search area scale more cleanly inside the shared layout container and keeps future filter expansion straightforward.
-    */
     marginBottom: '16px',
     minWidth: 0
   },
   searchInput: {
-    /*
-      What changed:
-      - Removed the hard width cap while keeping the same control styling.
-
-      Why:
-      - The page already sits inside a centered shared content container, so the extra cap is no longer helpful.
-
-      What problem this solves:
-      - Prevents the search control from looking artificially narrow relative to the other master-data pages.
-    */
     width: '100%',
     minWidth: 0,
     padding: '12px 14px',
@@ -641,16 +873,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   table: {
-    /*
-      What changed:
-      - Slightly reduced the forced minimum width.
-
-      Why:
-      - This table can tolerate a bit more flexibility before horizontal scrolling becomes necessary.
-
-      What problem this solves:
-      - Eases width pressure on medium screens without changing the actual column structure.
-    */
     width: '100%',
     borderCollapse: 'collapse',
     minWidth: '920px'
@@ -720,5 +942,55 @@ const styles: Record<string, CSSProperties> = {
   },
   successBox: {
     marginBottom: '14px'
+  },
+  note: {
+    marginTop: '12px',
+    color: '#6b7280',
+    fontSize: '13px',
+    lineHeight: 1.4
+  },
+  performanceHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '16px',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap'
+  },
+  performanceGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '14px',
+    marginBottom: '16px'
+  },
+  performanceCard: {
+    border: '1px solid #e5e7eb',
+    borderRadius: '14px',
+    padding: '14px',
+    background: '#ffffff'
+  },
+  keyValue: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    padding: '8px 0',
+    borderBottom: '1px solid #f3f4f6'
+  },
+  keyLabel: {
+    color: '#6b7280',
+    textTransform: 'capitalize'
+  },
+  keyText: {
+    fontWeight: 700,
+    textAlign: 'right',
+    wordBreak: 'break-word'
+  },
+  jsonBlock: {
+    maxHeight: '360px',
+    overflow: 'auto',
+    background: '#0f172a',
+    color: '#e5e7eb',
+    borderRadius: '12px',
+    padding: '14px',
+    fontSize: '12px'
   }
 };

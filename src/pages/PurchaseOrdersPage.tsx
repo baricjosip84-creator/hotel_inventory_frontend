@@ -961,6 +961,7 @@ export default function PurchaseOrdersPage() {
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', updated.id] });
+      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', updated.id] });
       setSelectedId(updated.id);
       setCancelReason('');
       setCloseReason('');
@@ -970,9 +971,11 @@ export default function PurchaseOrdersPage() {
   const createShipmentMutation = useMutation({
     mutationFn: ({ id, deliveryDate }: { id: string; deliveryDate?: string | null }) =>
       createShipmentFromPurchaseOrder(id, deliveryDate),
-    onSuccess: async (payload) => {
+    onSuccess: async (payload, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
+      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
       setShipmentDeliveryDate('');
       navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}`);
     }
@@ -2300,13 +2303,13 @@ export default function PurchaseOrdersPage() {
                 <button type="button" style={styles.secondaryButton} onClick={printSelectedPurchaseOrderDetail}>Print Detail</button>
                 {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" style={styles.secondaryButton} onClick={startEdit}>Edit Draft</button> : null}
                 {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
-                  <button type="button" style={styles.primaryButton} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit' })}>
-                    Submit
+                  <button type="button" style={styles.primaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit' })}>
+                    {actionMutation.isPending ? 'Submitting...' : 'Submit'}
                   </button>
                 ) : null}
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
-                  <button type="button" style={styles.primaryButton} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve' })}>
-                    Approve
+                  <button type="button" style={styles.primaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve' })}>
+                    {actionMutation.isPending ? 'Approving...' : 'Approve'}
                   </button>
                 ) : null}
               </div>
@@ -2328,7 +2331,7 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.primaryButton}
-                    disabled={createShipmentMutation.isPending}
+                    disabled={createShipmentMutation.isPending || selectedHasOpenShipment}
                     onClick={() => createShipmentMutation.mutate({
                       id: selectedDetail.id,
                       deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null
@@ -2356,6 +2359,7 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.dangerButton}
+                    disabled={actionMutation.isPending}
                     onClick={() => {
                       if (!closeReason.trim()) {
                         window.alert('Close reason is required.');
@@ -2366,7 +2370,7 @@ export default function PurchaseOrdersPage() {
                       }
                     }}
                   >
-                    Close PO
+                    {actionMutation.isPending ? 'Closing...' : 'Close PO'}
                   </button>
                 </div>
               ) : null}
@@ -2381,13 +2385,14 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.secondaryButton}
+                    disabled={actionMutation.isPending}
                     onClick={() => {
                       if (window.confirm('Reopen this manually closed purchase order?')) {
                         actionMutation.mutate({ id: selectedDetail.id, action: 'reopen' });
                       }
                     }}
                   >
-                    Reopen PO
+                    {actionMutation.isPending ? 'Reopening...' : 'Reopen PO'}
                   </button>
                 </div>
               ) : null}
@@ -2403,13 +2408,14 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.dangerButton}
+                    disabled={actionMutation.isPending}
                     onClick={() => {
                       if (window.confirm('Cancel this purchase order?')) {
                         actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason } });
                       }
                     }}
                   >
-                    Cancel PO
+                    {actionMutation.isPending ? 'Cancelling...' : 'Cancel PO'}
                   </button>
                 </div>
               ) : null}

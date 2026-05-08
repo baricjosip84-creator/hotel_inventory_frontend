@@ -1508,6 +1508,19 @@ export interface SystemContextResponse {
     read_only: boolean;
     executes_actions: boolean;
     notes: string[];
+    predictive_guardrails?: {
+      mutation_allowed: boolean;
+      request_creation_allowed: boolean;
+      automatic_execution_allowed: boolean;
+      approval_required_for_any_followup: boolean;
+      tenant_scoped_only: boolean;
+    };
+    explainability?: {
+      score_inputs: string[];
+      score_model: string;
+      confidence_basis: string;
+      limitations: string[];
+    };
   };
 
 
@@ -3667,6 +3680,7 @@ export interface SystemContextSnapshot {
   predictive_readiness_summary?: Record<string, unknown> | null;
   forecast_scenarios?: Array<Record<string, unknown>> | null;
   historical_signal_window?: Record<string, unknown> | null;
+  context_snapshot?: SystemContextResponse | Record<string, unknown> | null;
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;

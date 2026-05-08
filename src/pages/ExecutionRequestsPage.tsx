@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
-import type { ExecutionAdapterRegistryResponse, ExecutionModuleHardeningSummaryResponse, ExecutionRequest, ExecutionRequestAuditPackResponse, ExecutionRequestListResponse, ExecutionRequestSecurityAuditResponse } from '../types/inventory';
+import type {
+  ExecutionAdapterRegistryResponse,
+  ExecutionModuleHardeningSummaryResponse,
+  ExecutionRequest,
+  ExecutionRequestAuditPackResponse,
+  ExecutionRequestListResponse,
+  ExecutionRequestSecurityAuditResponse
+} from '../types/inventory';
 
 type StatusFilter = '' | ExecutionRequest['status'];
 type TypeFilter = '' | ExecutionRequest['request_type'];
@@ -133,7 +140,6 @@ export default function ExecutionRequestsPage() {
     }
   };
 
-
   const createStandardCostUpdate = async () => {
     const productId = window.prompt('Product ID to update');
     if (!productId || !productId.trim()) return;
@@ -180,7 +186,6 @@ export default function ExecutionRequestsPage() {
       setSaving(false);
     }
   };
-
 
   const createProductMinStockUpdate = async () => {
     const productId = window.prompt('Product ID to update');
@@ -229,53 +234,52 @@ export default function ExecutionRequestsPage() {
     }
   };
 
+  const createProductPricingUpdate = async () => {
+    const productId = window.prompt('Product ID to update');
+    if (!productId || !productId.trim()) return;
 
-const createProductPricingUpdate = async () => {
-  const productId = window.prompt('Product ID to update');
-  if (!productId || !productId.trim()) return;
+    const rawUnitPrice = window.prompt('New unit price');
+    if (rawUnitPrice === null) return;
 
-  const rawUnitPrice = window.prompt('New unit price');
-  if (rawUnitPrice === null) return;
+    const parsedUnitPrice = Number(rawUnitPrice);
+    if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice < 0) {
+      setError('New unit price must be a non-negative number');
+      return;
+    }
 
-  const parsedUnitPrice = Number(rawUnitPrice);
-  if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice < 0) {
-    setError('New unit price must be a non-negative number');
-    return;
-  }
+    const reason = window.prompt('Reason for this pricing update (optional)') || '';
 
-  const reason = window.prompt('Reason for this pricing update (optional)') || '';
+    setSaving(true);
+    setError(null);
+    try {
+      const [contextSnapshot, gateSnapshot] = await Promise.all([
+        apiRequest('/system-context'),
+        apiRequest('/system-context/execution-gate')
+      ]);
 
-  setSaving(true);
-  setError(null);
-  try {
-    const [contextSnapshot, gateSnapshot] = await Promise.all([
-      apiRequest('/system-context'),
-      apiRequest('/system-context/execution-gate')
-    ]);
+      const created = await apiRequest<ExecutionRequest>('/execution-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          request_type: 'product_pricing_update',
+          payload: {
+            product_id: productId.trim(),
+            unit_price: parsedUnitPrice,
+            reason: reason.trim() || null,
+            source: 'execution_requests_page'
+          },
+          gate_snapshot: gateSnapshot,
+          context_snapshot: contextSnapshot
+        })
+      });
 
-    const created = await apiRequest<ExecutionRequest>('/execution-requests', {
-      method: 'POST',
-      body: JSON.stringify({
-        request_type: 'product_pricing_update',
-        payload: {
-          product_id: productId.trim(),
-          unit_price: parsedUnitPrice,
-          reason: reason.trim() || null,
-          source: 'execution_requests_page'
-        },
-        gate_snapshot: gateSnapshot,
-        context_snapshot: contextSnapshot
-      })
-    });
-
-    setSelected(created);
-    await loadRequests();
-  } catch (err) {
-    setError(err instanceof ApiError ? err.message : 'Failed to create pricing update request');
-  } finally {
-    setSaving(false);
-  }
-};
+      setSelected(created);
+      await loadRequests();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to create pricing update request');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const submitRequest = async (request: ExecutionRequest) => {
     setSaving(true);
@@ -333,8 +337,6 @@ const createProductPricingUpdate = async () => {
     }
   };
 
-
-
   const executeRequest = async (request: ExecutionRequest) => {
     const adapterLabel = request.adapter?.label || label(request.request_type);
     const confirmed = window.confirm(`Execute approved request: ${adapterLabel}? This is only enabled for controlled product-field updates.`);
@@ -376,8 +378,6 @@ const createProductPricingUpdate = async () => {
       setSaving(false);
     }
   };
-
-
 
   const loadAuditPack = async (request: ExecutionRequest) => {
     setSaving(true);
@@ -492,14 +492,14 @@ const createProductPricingUpdate = async () => {
       {error ? <div className="app-error" style={styles.error}>{error}</div> : null}
 
       <section style={styles.summaryPanel} aria-label="Review Console Summary">
-          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Pending</span><strong>{summaryCounts.pending}</strong></div>
-          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Approved</span><strong>{summaryCounts.approved}</strong></div>
-          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Executed</span><strong>{summaryCounts.executed}</strong></div>
-          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Failed</span><strong>{summaryCounts.failed}</strong></div>
-          <div style={styles.summaryTile}><span style={styles.summaryLabel}>System Context</span><strong>{summaryCounts.systemContext}</strong></div>
-        </section>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Pending</span><strong>{summaryCounts.pending}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Approved</span><strong>{summaryCounts.approved}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Executed</span><strong>{summaryCounts.executed}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Failed</span><strong>{summaryCounts.failed}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>System Context</span><strong>{summaryCounts.systemContext}</strong></div>
+      </section>
 
-        <section style={styles.filters}>
+      <section style={styles.filters}>
         <label style={styles.field}>
           <span>Status</span>
           <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
@@ -695,9 +695,6 @@ function formatUnknown(value: unknown): string {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return String(value);
 }
-
-
-
 
 function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary: ExecutionModuleHardeningSummaryResponse | null }) {
   if (!hardeningSummary) {
@@ -917,7 +914,6 @@ function riskTone(riskLevel: string) {
   return { background: '#dcfce7', color: '#166534' };
 }
 
-
 function securityTone(posture: string) {
   if (posture === 'blocked') return { background: '#fee2e2', color: '#991b1b' };
   if (posture === 'review_recommended') return { background: '#fef3c7', color: '#92400e' };
@@ -939,16 +935,16 @@ function executionTone(status?: string | null) {
 }
 
 const styles: Record<string, CSSProperties> = {
-  summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
-  summaryTile: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', display: 'grid', gap: '0.25rem' },
-  summaryLabel: { fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  badgeRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' },
-  badge: { fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: '999px', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
   page: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   hero: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: '1.75rem' },
   subtitle: { margin: '0.35rem 0 0', color: '#64748b', maxWidth: '760px' },
   error: { marginBottom: 0 },
+  actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
+  summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
+  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
+  badgeRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' },
+  badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize', fontSize: '0.75rem', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
   filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#475569', fontSize: '0.85rem' },
   fieldWide: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#475569', fontSize: '0.85rem' },
@@ -960,6 +956,7 @@ const styles: Record<string, CSSProperties> = {
   checkList: { display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.5rem' },
   checkItem: { display: 'flex', gap: '0.65rem', alignItems: 'flex-start', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' },
   layout: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 0.8fr)', gap: '1rem' },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '1rem', minWidth: 0 },
   detailCard: {
     background: '#fff',
     border: '1px solid #e2e8f0',
@@ -969,25 +966,16 @@ const styles: Record<string, CSSProperties> = {
     top: '1rem',
     alignSelf: 'start'
   },
-  headerActions: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
-  summaryTile: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', display: 'grid', gap: '0.25rem' },
-  summaryLabel: { fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  traceGrid: { display: 'grid', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '1rem', minWidth: 0 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.75rem' },
   cardTitle: { margin: 0, fontSize: '1.1rem' },
+  headerActions: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' },
   meta: { color: '#64748b', fontSize: '0.85rem' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
-  badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize' },
-  noopTone: { background: '#ede9fe', color: '#5b21b6' },
-  successTone: { background: '#dcfce7', color: '#166534' },
-  pendingTone: { background: '#fef3c7', color: '#92400e' },
-  actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   empty: { textAlign: 'center', padding: '1rem', color: '#64748b' },
   note: { marginTop: '0.75rem', color: '#64748b', fontSize: '0.85rem' },
   detail: { display: 'flex', flexDirection: 'column', gap: '0.7rem' },
+  traceGrid: { display: 'grid', gap: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem' },
   reviewPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem', background: '#f8fafc' },
   auditPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '0.85rem', background: '#eff6ff' },
   securityPanel: { display: 'flex', flexDirection: 'column', gap: '0.65rem', border: '1px solid #fed7aa', borderRadius: '14px', padding: '0.85rem', background: '#fff7ed' },
@@ -1003,5 +991,7 @@ const styles: Record<string, CSSProperties> = {
   kvLabel: { color: '#64748b' },
   kvValue: { fontWeight: 700, color: '#0f172a', textAlign: 'right' },
   subheading: { margin: '0.65rem 0 0', fontSize: '0.95rem' },
-  json: { maxHeight: '260px', overflow: 'auto', background: '#0f172a', color: '#e2e8f0', padding: '0.75rem', borderRadius: '12px', fontSize: '0.75rem' }
+  json: { maxHeight: '260px', overflow: 'auto', background: '#0f172a', color: '#e2e8f0', padding: '0.75rem', borderRadius: '12px', fontSize: '0.75rem' },
+  successTone: { background: '#dcfce7', color: '#166534' },
+  pendingTone: { background: '#fef3c7', color: '#92400e' }
 };

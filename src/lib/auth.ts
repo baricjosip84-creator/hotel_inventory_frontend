@@ -24,13 +24,19 @@ const ACCESS_TOKEN_KEY = 'inventory_access_token';
 const REFRESH_TOKEN_KEY = 'inventory_refresh_token';
 
 /*
-  Save both tokens after login / refresh.
+  Save support-session access token.
+
+  Support access is access-token-only. A refresh token from a normal tenant
+  session must not remain active beside it.
 */
 export function saveSupportSessionAccessToken(accessToken: string): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+/*
+  Save both tokens after login / refresh.
+*/
 export function saveAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
@@ -74,7 +80,11 @@ export function clearAuth(): void {
   Decode a JWT payload safely without depending on an extra package.
   This is used only for client-side expiry checks and UX decisions.
 */
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
+  if (!token) {
+    return null;
+  }
+
   try {
     const parts = token.split('.');
 
@@ -133,6 +143,7 @@ export function isAuthenticated(): boolean {
 
   return Boolean(refreshToken);
 }
+
 export type SupportSessionInfo = {
   isSupportSession: boolean;
   supportSessionId?: string;

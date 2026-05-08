@@ -2305,7 +2305,7 @@ export default function ProductsPage() {
                 title="Watch Actions"
                 value={toNumber(costActionPlan?.totals.watch_products)}
                 subtitle="Lower-priority follow-up"
-                tone={toNumber(costActionPlan?.totals.watch_products) > 0 ? 'neutral' : 'good'}
+                tone={toNumber(costActionPlan?.totals.watch_products) > 0 ? 'warn' : 'good'}
               />
               <StatCard
                 title="Urgent Value"
@@ -2650,7 +2650,7 @@ export default function ProductsPage() {
                 title="Received Evidence"
                 value={toNumber(costActionSourceSummary?.totals.received_source_products)}
                 subtitle="Actions backed by received costs"
-                tone={toNumber(costActionSourceSummary?.totals.received_source_products) > 0 ? 'neutral' : 'good'}
+                tone={toNumber(costActionSourceSummary?.totals.received_source_products) > 0 ? 'warn' : 'good'}
               />
               <StatCard
                 title="Source Value"
@@ -3150,7 +3150,7 @@ export default function ProductsPage() {
                 title="Readiness Score"
                 value={`${toNumber(costGovernanceSummary?.readiness_score).toFixed(0)}%`}
                 subtitle={costGovernanceSummary?.governance_status || 'unknown'}
-                tone={toNumber(costGovernanceSummary?.readiness_score) >= 90 ? 'good' : toNumber(costGovernanceSummary?.readiness_score) >= 70 ? 'warn' : 'danger'}
+                tone={toNumber(costGovernanceSummary?.readiness_score) >= 90 ? 'good' : toNumber(costGovernanceSummary?.readiness_score) >= 70 ? 'warn' : 'bad'}
               />
               <StatCard
                 title="Coverage"
@@ -3287,7 +3287,7 @@ export default function ProductsPage() {
                       title="Blockers"
                       value={toNumber(costGovernanceSignoff?.blockers.length)}
                       subtitle="Must resolve before sign-off"
-                      tone={toNumber(costGovernanceSignoff?.blockers.length) > 0 ? 'danger' : 'good'}
+                      tone={toNumber(costGovernanceSignoff?.blockers.length) > 0 ? 'bad' : 'good'}
                     />
                     <StatCard
                       title="Warnings"
@@ -3357,7 +3357,7 @@ export default function ProductsPage() {
                 <>
                   <div style={styles.costReadinessGrid}>
                     <StatCard title="Queue Items" value={toNumber(costGovernanceReviewQueue?.totals.queue_items)} subtitle="Review work items" tone={toNumber(costGovernanceReviewQueue?.totals.queue_items) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceReviewQueue?.totals.blockers)} subtitle="Before sign-off" tone={toNumber(costGovernanceReviewQueue?.totals.blockers) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Blockers" value={toNumber(costGovernanceReviewQueue?.totals.blockers)} subtitle="Before sign-off" tone={toNumber(costGovernanceReviewQueue?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Warnings" value={toNumber(costGovernanceReviewQueue?.totals.warnings)} subtitle="Conditional review" tone={toNumber(costGovernanceReviewQueue?.totals.warnings) > 0 ? 'warn' : 'good'} />
                     <StatCard title="Priority Products" value={toNumber(costGovernanceReviewQueue?.totals.priority_products)} subtitle="Product-level review" />
                   </div>
@@ -3465,7 +3465,7 @@ export default function ProductsPage() {
                 <>
                   <div style={styles.summaryGrid}>
                     <StatCard title="Closure Status" value={costGovernanceClosureSummary?.closure_status || 'unknown'} subtitle={costGovernanceClosureSummary?.can_archive ? 'Ready to archive' : 'Keep open'} tone={costGovernanceClosureSummary?.can_archive ? 'good' : 'warn'} />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceClosureSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceClosureSummary?.totals.blockers) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Blockers" value={toNumber(costGovernanceClosureSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceClosureSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Archive Rows" value={toNumber(costGovernanceClosureSummary?.totals.archive_rows)} subtitle="Closure evidence rows" />
                     <StatCard title="Warnings" value={toNumber(costGovernanceClosureSummary?.totals.warnings)} subtitle="Follow-up visibility" tone={toNumber(costGovernanceClosureSummary?.totals.warnings) > 0 ? 'warn' : 'good'} />
                   </div>
@@ -3513,7 +3513,7 @@ export default function ProductsPage() {
                 <>
                   <div style={styles.summaryGrid}>
                     <StatCard title="Runbook Status" value={costOperationsRunbookSummary?.runbook_status || 'unknown'} subtitle={costOperationsRunbookSummary?.can_handoff ? 'Handoff-capable' : 'Review required'} tone={costOperationsRunbookSummary?.runbook_status === 'steady_state' ? 'good' : 'warn'} />
-                    <StatCard title="Hardening Issues" value={toNumber(costOperationsRunbookSummary?.totals.hardening_issues)} subtitle="Must stay visible" tone={toNumber(costOperationsRunbookSummary?.totals.hardening_issues) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Hardening Issues" value={toNumber(costOperationsRunbookSummary?.totals.hardening_issues)} subtitle="Must stay visible" tone={toNumber(costOperationsRunbookSummary?.totals.hardening_issues) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Flagged Products" value={toNumber(costOperationsRunbookSummary?.totals.flagged_products)} subtitle="Dashboard follow-up" tone={toNumber(costOperationsRunbookSummary?.totals.flagged_products) > 0 ? 'warn' : 'good'} />
                     <StatCard title="Runbook Rows" value={toNumber(costOperationsRunbookSummary?.totals.runbook_rows)} subtitle="Export-ready evidence" />
                   </div>
@@ -3573,10 +3573,10 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Control Status" value={costOperationsControlSummary?.control_status || 'unknown'} subtitle={costOperationsControlSummary?.runbook_status || 'runbook'} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'danger' : 'warn'} />
+                    <StatCard title="Control Status" value={costOperationsControlSummary?.control_status || 'unknown'} subtitle={costOperationsControlSummary?.runbook_status || 'runbook'} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'bad' : 'warn'} />
                     <StatCard title="Passed Checks" value={toNumber(costOperationsControlSummary?.totals.passed_checks)} subtitle={`${toNumber(costOperationsControlSummary?.totals.checks)} total checks`} tone="good" />
                     <StatCard title="Watch Checks" value={toNumber(costOperationsControlSummary?.totals.watch_checks)} subtitle="Keep visible" tone={toNumber(costOperationsControlSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Review Checks" value={toNumber(costOperationsControlSummary?.totals.review_checks)} subtitle="Requires follow-up" tone={toNumber(costOperationsControlSummary?.totals.review_checks) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Review Checks" value={toNumber(costOperationsControlSummary?.totals.review_checks)} subtitle="Requires follow-up" tone={toNumber(costOperationsControlSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                   </div>
 
                   <div style={styles.riskList}>
@@ -3619,9 +3619,9 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Evidence Status" value={costOperationsEvidenceSummary?.evidence_status || 'unknown'} subtitle={costOperationsEvidenceSummary?.control_status || 'control'} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'danger' : 'warn'} />
+                    <StatCard title="Evidence Status" value={costOperationsEvidenceSummary?.evidence_status || 'unknown'} subtitle={costOperationsEvidenceSummary?.control_status || 'control'} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'bad' : 'warn'} />
                     <StatCard title="Ready Sections" value={toNumber(costOperationsEvidenceSummary?.totals.ready_sections)} subtitle={`${toNumber(costOperationsEvidenceSummary?.totals.evidence_sections)} sections`} tone="good" />
-                    <StatCard title="Review Sections" value={toNumber(costOperationsEvidenceSummary?.totals.review_sections)} subtitle="Needs follow-up" tone={toNumber(costOperationsEvidenceSummary?.totals.review_sections) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Review Sections" value={toNumber(costOperationsEvidenceSummary?.totals.review_sections)} subtitle="Needs follow-up" tone={toNumber(costOperationsEvidenceSummary?.totals.review_sections) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Evidence Rows" value={toNumber(costOperationsEvidenceSummary?.totals.evidence_rows)} subtitle="Pack rows" />
                   </div>
 
@@ -3666,9 +3666,9 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Readiness Status" value={costOperationsReadinessSummary?.readiness_status || 'unknown'} subtitle={costOperationsReadinessSummary?.can_handoff ? 'Handoff capable' : 'Review required'} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'danger' : 'warn'} />
-                    <StatCard title="Readiness Score" value={`${toNumber(costOperationsReadinessSummary?.readiness_score).toFixed(0)}%`} subtitle="Derived go/no-go score" tone={toNumber(costOperationsReadinessSummary?.readiness_score) >= 90 ? 'good' : toNumber(costOperationsReadinessSummary?.readiness_score) >= 70 ? 'warn' : 'danger'} />
-                    <StatCard title="Review Checks" value={toNumber(costOperationsReadinessSummary?.totals.review_checks)} subtitle={`${toNumber(costOperationsReadinessSummary?.totals.checks)} checks`} tone={toNumber(costOperationsReadinessSummary?.totals.review_checks) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Readiness Status" value={costOperationsReadinessSummary?.readiness_status || 'unknown'} subtitle={costOperationsReadinessSummary?.can_handoff ? 'Handoff capable' : 'Review required'} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'bad' : 'warn'} />
+                    <StatCard title="Readiness Score" value={`${toNumber(costOperationsReadinessSummary?.readiness_score).toFixed(0)}%`} subtitle="Derived go/no-go score" tone={toNumber(costOperationsReadinessSummary?.readiness_score) >= 90 ? 'good' : toNumber(costOperationsReadinessSummary?.readiness_score) >= 70 ? 'warn' : 'bad'} />
+                    <StatCard title="Review Checks" value={toNumber(costOperationsReadinessSummary?.totals.review_checks)} subtitle={`${toNumber(costOperationsReadinessSummary?.totals.checks)} checks`} tone={toNumber(costOperationsReadinessSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Watch Checks" value={toNumber(costOperationsReadinessSummary?.totals.watch_checks)} subtitle="Carry forward" tone={toNumber(costOperationsReadinessSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
                   </div>
 
@@ -3714,7 +3714,7 @@ export default function ProductsPage() {
                   <div style={styles.summaryGrid}>
                     <StatCard title="Handoff Status" value={costGovernanceHandoffSummary?.handoff_status || 'unknown'} subtitle={costGovernanceHandoffSummary?.can_handoff ? 'Ready for ownership' : 'Review required'} tone={costGovernanceHandoffSummary?.can_handoff ? 'good' : 'warn'} />
                     <StatCard title="Evidence Rows" value={toNumber(costGovernanceHandoffSummary?.totals.evidence_rows)} subtitle="Archive + review + audit" />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceHandoffSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceHandoffSummary?.totals.blockers) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Blockers" value={toNumber(costGovernanceHandoffSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceHandoffSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Follow-ups" value={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items)} subtitle="Warnings + remediation" tone={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items) > 0 ? 'warn' : 'good'} />
                   </div>
 
@@ -3772,9 +3772,9 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Final Status" value={costGovernanceFinalSummary?.final_status || 'unknown'} subtitle={costGovernanceFinalSummary?.can_finalize ? 'Ready to close module' : 'Review required'} tone={costGovernanceFinalSummary?.can_finalize ? 'good' : costGovernanceFinalSummary?.final_status === 'final_watch' ? 'warn' : 'danger'} />
-                    <StatCard title="Final Score" value={`${toNumber(costGovernanceFinalSummary?.final_score).toFixed(0)}%`} subtitle="Governance + operations" tone={toNumber(costGovernanceFinalSummary?.final_score) >= 90 ? 'good' : toNumber(costGovernanceFinalSummary?.final_score) >= 70 ? 'warn' : 'danger'} />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceFinalSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceFinalSummary?.totals.blockers) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Final Status" value={costGovernanceFinalSummary?.final_status || 'unknown'} subtitle={costGovernanceFinalSummary?.can_finalize ? 'Ready to close module' : 'Review required'} tone={costGovernanceFinalSummary?.can_finalize ? 'good' : costGovernanceFinalSummary?.final_status === 'final_watch' ? 'warn' : 'bad'} />
+                    <StatCard title="Final Score" value={`${toNumber(costGovernanceFinalSummary?.final_score).toFixed(0)}%`} subtitle="Governance + operations" tone={toNumber(costGovernanceFinalSummary?.final_score) >= 90 ? 'good' : toNumber(costGovernanceFinalSummary?.final_score) >= 70 ? 'warn' : 'bad'} />
+                    <StatCard title="Blockers" value={toNumber(costGovernanceFinalSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceFinalSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Evidence Rows" value={toNumber(costGovernanceFinalSummary?.totals.evidence_rows)} subtitle="Audit-ready support" tone={toNumber(costGovernanceFinalSummary?.totals.evidence_rows) > 0 ? 'good' : 'warn'} />
                   </div>
 
@@ -3831,10 +3831,10 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Performance Status" value={costPerformanceSummary?.performance_status || 'unknown'} subtitle={costPerformanceSummary?.query_optimization_status || 'query status'} tone={costPerformanceSummary?.performance_status === 'performance_ready' ? 'good' : costPerformanceSummary?.performance_status === 'performance_watch' ? 'warn' : 'danger'} />
-                    <StatCard title="Performance Score" value={`${toNumber(costPerformanceSummary?.performance_score).toFixed(0)}%`} subtitle="Indexes + payloads" tone={toNumber(costPerformanceSummary?.performance_score) >= 90 ? 'good' : toNumber(costPerformanceSummary?.performance_score) >= 70 ? 'warn' : 'danger'} />
-                    <StatCard title="Indexes Present" value={`${toNumber(costPerformanceSummary?.totals.present_indexes)} / ${toNumber(costPerformanceSummary?.totals.expected_indexes)}`} subtitle="Migration 019 checks" tone={toNumber(costPerformanceSummary?.totals.missing_indexes) > 0 ? 'danger' : 'good'} />
-                    <StatCard title="Review Checks" value={toNumber(costPerformanceSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costPerformanceSummary?.totals.review_checks) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Performance Status" value={costPerformanceSummary?.performance_status || 'unknown'} subtitle={costPerformanceSummary?.query_optimization_status || 'query status'} tone={costPerformanceSummary?.performance_status === 'performance_ready' ? 'good' : costPerformanceSummary?.performance_status === 'performance_watch' ? 'warn' : 'bad'} />
+                    <StatCard title="Performance Score" value={`${toNumber(costPerformanceSummary?.performance_score).toFixed(0)}%`} subtitle="Indexes + payloads" tone={toNumber(costPerformanceSummary?.performance_score) >= 90 ? 'good' : toNumber(costPerformanceSummary?.performance_score) >= 70 ? 'warn' : 'bad'} />
+                    <StatCard title="Indexes Present" value={`${toNumber(costPerformanceSummary?.totals.present_indexes)} / ${toNumber(costPerformanceSummary?.totals.expected_indexes)}`} subtitle="Migration 019 checks" tone={toNumber(costPerformanceSummary?.totals.missing_indexes) > 0 ? 'bad' : 'good'} />
+                    <StatCard title="Review Checks" value={toNumber(costPerformanceSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costPerformanceSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                   </div>
 
                   <div style={styles.riskGrid}>
@@ -3890,9 +3890,9 @@ export default function ProductsPage() {
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Security Status" value={costSecurityAuditSummary?.security_status || 'unknown'} subtitle={costSecurityAuditSummary?.tenant_scope_status || 'tenant scope'} tone={costSecurityAuditSummary?.security_status === 'security_ready' ? 'good' : costSecurityAuditSummary?.security_status === 'security_watch' ? 'warn' : 'danger'} />
-                    <StatCard title="Security Score" value={`${toNumber(costSecurityAuditSummary?.security_score).toFixed(0)}%`} subtitle="Permissions + boundaries" tone={toNumber(costSecurityAuditSummary?.security_score) >= 90 ? 'good' : toNumber(costSecurityAuditSummary?.security_score) >= 70 ? 'warn' : 'danger'} />
-                    <StatCard title="Review Checks" value={toNumber(costSecurityAuditSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costSecurityAuditSummary?.totals.review_checks) > 0 ? 'danger' : 'good'} />
+                    <StatCard title="Security Status" value={costSecurityAuditSummary?.security_status || 'unknown'} subtitle={costSecurityAuditSummary?.tenant_scope_status || 'tenant scope'} tone={costSecurityAuditSummary?.security_status === 'security_ready' ? 'good' : costSecurityAuditSummary?.security_status === 'security_watch' ? 'warn' : 'bad'} />
+                    <StatCard title="Security Score" value={`${toNumber(costSecurityAuditSummary?.security_score).toFixed(0)}%`} subtitle="Permissions + boundaries" tone={toNumber(costSecurityAuditSummary?.security_score) >= 90 ? 'good' : toNumber(costSecurityAuditSummary?.security_score) >= 70 ? 'warn' : 'bad'} />
+                    <StatCard title="Review Checks" value={toNumber(costSecurityAuditSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costSecurityAuditSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Support Session" value={costSecurityAuditSummary?.access_context.support_session_present ? 'present' : 'none'} subtitle={costSecurityAuditSummary?.access_context.actor_type || 'actor context'} tone={costSecurityAuditSummary?.access_context.support_session_present ? 'warn' : 'good'} />
                   </div>
 
