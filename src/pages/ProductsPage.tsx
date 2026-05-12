@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, getVersionConflictMessage } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductCostActionAgeSummaryResponse, ProductCostActionCategorySummaryResponse, ProductCostActionCoverageSummaryResponse, ProductCostAlertSummaryResponse, ProductCostDashboardSummaryResponse, ProductCostGovernanceSummaryResponse, ProductCostGovernanceDetailsResponse, ProductCostGovernanceAuditPackResponse, ProductCostGovernanceClosureSummaryResponse, ProductCostGovernanceHandoffSummaryResponse, ProductCostGovernanceFinalSummaryResponse, ProductCostPerformanceSummaryResponse, ProductCostSecurityAuditSummaryResponse, ProductCostGovernanceSignoffSummaryResponse, ProductCostGovernanceReviewQueueResponse, ProductCostGovernanceReviewPackResponse, ProductCostHardeningSummaryResponse, ProductCostOperationsRunbookSummaryResponse, ProductCostOperationsControlSummaryResponse, ProductCostOperationsEvidenceSummaryResponse, ProductCostOperationsReadinessSummaryResponse, ProductCostRecommendationSummaryResponse, ProductCostReportSummaryResponse, ProductCostActionDetailsResponse, ProductCostActionImpactSummaryResponse, ProductCostActionPlanSummaryResponse, ProductCostActionSourceSummaryResponse, ProductCostActionSupplierSummaryResponse, ProductCostActionSummaryResponse, ProductCostHistoryItem, ProductCostHistoryResponse, ProductCostRiskDetailsResponse, ProductCostRiskItem, ProductCostRiskSummaryResponse, ProductCostValuationDetailsResponse, ProductCostValuationItem, ProductCostValuationSummaryResponse, ProductItem, ProductPackageItem, ProductStandardCostHistoryItem, ProductStandardCostHistoryResponse, SupplierItem } from '../types/inventory';
 
@@ -1130,11 +1130,7 @@ export default function ProductsPage() {
       }
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to update product.');
-      }
+      setFormError(getVersionConflictMessage(error));
       setFormMessage(null);
     }
   });
@@ -1157,11 +1153,7 @@ export default function ProductsPage() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-      } else {
-        setFormError('Failed to delete product.');
-      }
+      setFormError(getVersionConflictMessage(error));
       setFormMessage(null);
     }
   });
@@ -1205,11 +1197,7 @@ export default function ProductsPage() {
       }
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setPackageError(error.message);
-      } else {
-        setPackageError('Failed to update package.');
-      }
+      setPackageError(getVersionConflictMessage(error));
       setPackageMessage(null);
     }
   });
@@ -1229,11 +1217,7 @@ export default function ProductsPage() {
       }
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setPackageError(error.message);
-      } else {
-        setPackageError('Failed to delete package.');
-      }
+      setPackageError(getVersionConflictMessage(error));
       setPackageMessage(null);
     }
   });

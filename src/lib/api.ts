@@ -49,6 +49,34 @@ export class ApiError extends Error {
   }
 }
 
+
+
+export function isVersionConflictError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  return (
+    error.status === 409 ||
+    error.code === 'VERSION_CONFLICT' ||
+    error.code === 'STALE_VERSION' ||
+    error.code === 'CONCURRENT_MODIFICATION'
+  );
+}
+
+export function getVersionConflictMessage(error: unknown): string {
+  if (isVersionConflictError(error)) {
+    return 'This record was modified by another operation. Refresh the page data and retry your changes.';
+  }
+
+  if (error instanceof ApiError || error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown request failure.';
+}
+
+
 function buildUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${API_BASE_URL}${normalizedPath}`;

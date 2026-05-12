@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
 
 type StatusFilter = '' | AutomationSchedule['status'];
@@ -52,6 +53,13 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 export default function AutomationSchedulesPage() {
+  const capabilities = getRoleCapabilities();
+  const canCreateAutomationSchedules = capabilities.canCreateAutomationSchedules;
+  const canUpdateAutomationSchedules = capabilities.canUpdateAutomationSchedules;
+  const canPauseAutomationSchedules = capabilities.canPauseAutomationSchedules;
+  const canResumeAutomationSchedules = capabilities.canResumeAutomationSchedules;
+  const canDisableAutomationSchedules = capabilities.canDisableAutomationSchedules;
+  const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
   const [data, setData] = useState<AutomationScheduleListResponse | null>(null);
   const [types, setTypes] = useState<AutomationScheduleTypesResponse | null>(null);
   const [runnerReadiness, setRunnerReadiness] = useState<AutomationRunnerReadinessResponse | null>(null);
@@ -97,6 +105,7 @@ export default function AutomationSchedulesPage() {
   const [automationType, setAutomationType] = useState<TypeFilter>('');
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [editForm, setEditForm] = useState<FormState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -240,6 +249,79 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+  const scheduleToForm = (schedule: AutomationSchedule): FormState => {
+    const config = schedule.schedule_config || {};
+    const defaults = schedule.request_defaults || {};
+
+    return {
+      name: schedule.name,
+      description: schedule.description || '',
+      automation_type: schedule.automation_type,
+      schedule_kind: schedule.schedule_kind,
+      time: typeof config.time === 'string' ? config.time : '09:00',
+      timezone: typeof config.timezone === 'string' ? config.timezone : 'Europe/Zagreb',
+      default_status: defaults.default_status === 'pending_review' ? 'pending_review' : 'draft'
+    };
+  };
+
+  const loadScheduleDetail = async (schedule: AutomationSchedule) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`);
+      setSelected(response);
+      setEditForm(scheduleToForm(response));
+      setDryRunResult(null);
+      setManualRunResult(null);
+      setAuditPack(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load automation schedule detail');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateSchedule = async (schedule: AutomationSchedule) => {
+    if (!editForm) {
+      setError('No schedule edit form is active');
+      return;
+    }
+
+    if (!editForm.name.trim()) {
+      setError('Schedule name is required');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          description: editForm.description.trim() || null,
+          automation_type: editForm.automation_type,
+          schedule_kind: editForm.schedule_kind,
+          schedule_config: {
+            frequency: editForm.schedule_kind,
+            time: editForm.time,
+            timezone: editForm.timezone
+          },
+          request_defaults: {
+            default_status: editForm.default_status
+          }
+        })
+      });
+      setSelected(updated);
+      setEditForm(scheduleToForm(updated));
+      await loadSchedules();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to update automation schedule');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const pauseSchedule = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
@@ -249,6 +331,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({})
       });
       setSelected(updated);
+      setEditForm(scheduleToForm(updated));
       await loadSchedules();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to pause automation schedule');
@@ -269,6 +352,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({ disabled_reason: reason.trim() })
       });
       setSelected(updated);
+      setEditForm(scheduleToForm(updated));
       await loadSchedules();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to disable automation schedule');
@@ -306,6 +390,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({})
       });
       setSelected(response.schedule);
+      setEditForm(scheduleToForm(response.schedule));
       setManualRunResult(response);
       setDryRunResult(null);
       setAuditPack(null);
@@ -326,6 +411,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({})
       });
       setSelected(schedule);
+      setEditForm(scheduleToForm(schedule));
       setDryRunResult(response);
       setManualRunResult(null);
       setAuditPack(null);
@@ -343,6 +429,7 @@ export default function AutomationSchedulesPage() {
     try {
       const response = await apiRequest<AutomationScheduleAuditPackResponse>(`/automation-schedules/${schedule.id}/audit-pack`);
       setSelected(schedule);
+      setEditForm(scheduleToForm(schedule));
       setAuditPack(response);
       setDryRunResult(null);
     } catch (err) {
@@ -1628,9 +1715,11 @@ export default function AutomationSchedulesPage() {
             <span>Description</span>
             <textarea style={styles.textarea} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
           </label>
-          <button style={styles.primaryButton} disabled={saving} onClick={() => void createSchedule()}>
-            {saving ? 'Saving…' : 'Create draft schedule'}
-          </button>
+          {canCreateAutomationSchedules ? (
+            <button style={styles.primaryButton} disabled={saving} onClick={() => void createSchedule()}>
+              {saving ? 'Saving…' : 'Create draft schedule'}
+            </button>
+          ) : null}
         </div>
 
         <div style={styles.card}>
@@ -1686,13 +1775,13 @@ export default function AutomationSchedulesPage() {
                   <td style={styles.td}>{formatDateTime(schedule.next_run_at)}</td>
                   <td style={styles.td}>{formatDateTime(schedule.last_run_at)}</td>
                   <td style={styles.tdActions}>
-                    <button style={styles.linkButton} onClick={() => setSelected(schedule)}>View</button>
+                    <button style={styles.linkButton} disabled={saving} onClick={() => void loadScheduleDetail(schedule)}>View detail</button>
                     {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void dryRunSchedule(schedule)}>Dry run</button> : null}
                     <button style={styles.linkButton} disabled={saving} onClick={() => void loadAuditPack(schedule)}>Audit Pack</button>
-                    {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void runScheduleManually(schedule)}>Run Schedule</button> : null}
-                    {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
-                    {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void disableSchedule(schedule)}>Disable</button> : null}
-                    {schedule.status === 'paused' ? <button style={styles.linkButton} disabled={saving} onClick={() => void tryResume(schedule)}>Resume</button> : null}
+                    {canCreateAutomationSchedules && canCreateExecutionRequests && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void runScheduleManually(schedule)}>Run Schedule</button> : null}
+                    {canPauseAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
+                    {canDisableAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void disableSchedule(schedule)}>Disable</button> : null}
+                    {canResumeAutomationSchedules && schedule.status === 'paused' ? <button style={styles.linkButton} disabled={saving} onClick={() => void tryResume(schedule)}>Resume</button> : null}
                   </td>
                 </tr>
               ))}
@@ -1817,6 +1906,60 @@ export default function AutomationSchedulesPage() {
             <div><strong>Type</strong><br />{label(selected.automation_type)}</div>
             <div><strong>Next run metadata</strong><br />{formatDateTime(selected.next_run_at)}</div>
           </div>
+
+          {editForm ? (
+            <div style={styles.editBox}>
+              <h4 style={styles.smallTitle}>Edit schedule</h4>
+              <div style={styles.formGrid}>
+                <label style={styles.field}>
+                  <span>Name</span>
+                  <input style={styles.input} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
+                </label>
+                <label style={styles.field}>
+                  <span>Automation type</span>
+                  <select style={styles.input} value={editForm.automation_type} onChange={(event) => setEditForm({ ...editForm, automation_type: event.target.value as FormState['automation_type'] })}>
+                    {automationTypes.map((type) => <option key={type} value={type}>{label(type)}</option>)}
+                  </select>
+                </label>
+                <label style={styles.field}>
+                  <span>Frequency</span>
+                  <select style={styles.input} value={editForm.schedule_kind} onChange={(event) => setEditForm({ ...editForm, schedule_kind: event.target.value as FormState['schedule_kind'] })}>
+                    {scheduleKinds.map((kind) => <option key={kind} value={kind}>{label(kind)}</option>)}
+                  </select>
+                </label>
+                <label style={styles.field}>
+                  <span>Time</span>
+                  <input style={styles.input} type="time" value={editForm.time} onChange={(event) => setEditForm({ ...editForm, time: event.target.value })} />
+                </label>
+                <label style={styles.field}>
+                  <span>Timezone</span>
+                  <input style={styles.input} value={editForm.timezone} onChange={(event) => setEditForm({ ...editForm, timezone: event.target.value })} />
+                </label>
+                <label style={styles.field}>
+                  <span>Future request default</span>
+                  <select style={styles.input} value={editForm.default_status} onChange={(event) => setEditForm({ ...editForm, default_status: event.target.value as FormState['default_status'] })}>
+                    <option value="draft">Draft</option>
+                    <option value="pending_review">Pending review</option>
+                  </select>
+                </label>
+              </div>
+              <label style={styles.field}>
+                <span>Description</span>
+                <textarea style={styles.textarea} value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} />
+              </label>
+              <div style={styles.toolbar}>
+                {canUpdateAutomationSchedules ? (
+                  <button style={styles.primaryButton} disabled={saving} onClick={() => void updateSchedule(selected)}>
+                    {saving ? 'Saving…' : 'Save schedule'}
+                  </button>
+                ) : null}
+                <button style={styles.secondaryButton} disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Reset edit form</button>
+              </div>
+            </div>
+          ) : canUpdateAutomationSchedules ? (
+            <button style={styles.secondaryButton} disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Edit loaded schedule</button>
+          ) : null}
+
           <h4 style={styles.smallTitle}>Schedule config</h4>
           <JsonBlock value={selected.schedule_config} />
           <h4 style={styles.smallTitle}>Request defaults</h4>
@@ -1858,6 +2001,7 @@ const styles: Record<string, CSSProperties> = {
   tdActions: { padding: 10, borderBottom: '1px solid #f1f5f9', display: 'flex', gap: 10, flexWrap: 'wrap' },
   empty: { padding: 20, textAlign: 'center', color: '#64748b' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  editBox: { marginTop: 16, padding: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc' },
   json: { margin: 0, padding: 12, borderRadius: 12, background: '#f8fafc', overflowX: 'auto', fontSize: 12 },
   list: { margin: 0, paddingLeft: 18, color: '#475569' },
   error: { padding: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12 }

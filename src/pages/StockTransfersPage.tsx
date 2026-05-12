@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 
@@ -121,6 +121,10 @@ function getStatusBadgeStyle(status: StockTransferStatus): CSSProperties {
 }
 
 function normalizeError(error: unknown, fallback: string): string {
+  if (isVersionConflictError(error)) {
+    return getVersionConflictMessage(error);
+  }
+
   if (error instanceof ApiError) {
     return error.message;
   }
@@ -234,10 +238,10 @@ async function executeTransfer(id: string): Promise<{ message: string; transfer:
   });
 }
 
-async function cancelTransfer(id: string): Promise<{ message: string; transfer: StockTransferDetail }> {
-  return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${id}/cancel`, {
+async function cancelTransfer(input: { id: string; reason?: string }): Promise<{ message: string; transfer: StockTransferDetail }> {
+  return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${input.id}/cancel`, {
     method: 'POST',
-    body: JSON.stringify({})
+    body: JSON.stringify({ reason: input.reason?.trim() || null })
   });
 }
 
@@ -269,6 +273,7 @@ export default function StockTransfersPage() {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [form, setForm] = useState<TransferFormState>(emptyTransferForm());
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -404,6 +409,7 @@ export default function StockTransfersPage() {
     mutationFn: cancelTransfer,
     onSuccess: async (result) => {
       setSelectedTransferId(result.transfer.id);
+      setCancelReason('');
       setMessage(result.message || 'Stock transfer cancelled successfully.');
       setError(null);
       await Promise.all([
@@ -1027,7 +1033,7 @@ export default function StockTransfersPage() {
                 ...styles.transferCard,
                 ...(selectedTransferId === transfer.id ? styles.transferCardActive : {})
               }}
-              onClick={() => setSelectedTransferId(transfer.id)}
+              onClick={() => { setSelectedTransferId(transfer.id); setCancelReason(''); }}
             >
               <div style={styles.transferCardTop}>
                 <strong>{transfer.from_storage_location_name} → {transfer.to_storage_location_name}</strong>
@@ -1201,10 +1207,18 @@ export default function StockTransfersPage() {
                   >
                     {executeMutation.isPending ? 'Executing…' : 'Execute transfer'}
                   </button>
+                  <textarea
+                    style={styles.cancelReasonInput}
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Optional cancel reason"
+                    rows={2}
+                    disabled={!canCancelStockTransfers || executeMutation.isPending || cancelMutation.isPending}
+                  />
                   <button
                     type="button"
                     style={styles.dangerButton}
-                    onClick={() => cancelMutation.mutate(selectedTransfer.id)}
+                    onClick={() => cancelMutation.mutate({ id: selectedTransfer.id, reason: cancelReason })}
                     disabled={!canCancelStockTransfers || executeMutation.isPending || cancelMutation.isPending}
                   >
                     {cancelMutation.isPending ? 'Cancelling…' : 'Cancel draft'}
@@ -1533,5 +1547,16 @@ const styles: Record<string, CSSProperties> = {
   permissionHint: {
     fontSize: '13px',
     color: '#64748b'
+  },
+  cancelReasonInput: {
+    minWidth: '260px',
+    flex: '1 1 280px',
+    padding: '10px 12px',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    background: '#ffffff',
+    color: '#0f172a',
+    fontFamily: 'inherit',
+    resize: 'vertical'
   }
 };

@@ -78,6 +78,13 @@ async function escalateAlert(id: string): Promise<AlertRow> {
   });
 }
 
+async function overrideBlockingAlert(input: { id: string; reason: string }): Promise<{ message: string; alert: AlertRow }> {
+  return apiRequest<{ message: string; alert: AlertRow }>(`/admin/alerts/${input.id}/override`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: input.reason })
+  });
+}
+
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '-';
   const date = new Date(value);
@@ -138,7 +145,7 @@ export default function AlertsPage() {
     design foundation instead of relying only on page-local styles.
   */
   const queryClient = useQueryClient();
-  const { role, canManageAlerts } = getRoleCapabilities();
+  const { role, canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
 
   const [filters, setFilters] = useState<AlertFilters>({
     search: '',
@@ -148,6 +155,7 @@ export default function AlertsPage() {
   });
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});
 
   const alertsQuery = useQuery({
     queryKey: ['alerts', filters],
@@ -174,6 +182,21 @@ export default function AlertsPage() {
   const resolveMutation = makeMutation(resolveAlert);
   const reopenMutation = makeMutation(reopenAlert);
   const escalateMutation = makeMutation(escalateAlert);
+
+  const overrideMutation = useMutation({
+    mutationFn: overrideBlockingAlert,
+    onSuccess: async () => {
+      setActionError(null);
+      setActionMessage('Blocking alert overridden successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setActionMessage(null);
+      setActionError(error instanceof ApiError ? error.message : 'Failed to override blocking alert.');
+    }
+  });
 
   const alerts = useMemo(() => alertsQuery.data ?? [], [alertsQuery.data]);
   const summary = useMemo(
@@ -245,6 +268,12 @@ export default function AlertsPage() {
           Current role: {role.toUpperCase()}. Alerts can still be reviewed, but
           acknowledge / resolve / reopen / escalate actions are restricted to manager and
           admin roles.
+        </div>
+      ) : null}
+
+      {canOverrideAlerts ? (
+        <div className="app-warning-state" style={styles.messageBox}>
+          Blocking alert override is available for admin-only emergency closure. Backend requires a reason and only accepts blocking alerts.
         </div>
       ) : null}
 
@@ -400,6 +429,41 @@ export default function AlertsPage() {
                       >
                         Escalate
                       </button>
+                    ) : null}
+
+                    {canOverrideAlerts && !alert.resolved && alert.type.toUpperCase().includes('BLOCKING') ? (
+                      <div style={styles.overrideBox}>
+                        <textarea
+                          style={styles.textarea}
+                          value={overrideReasonByAlertId[alert.id] ?? ''}
+                          onChange={(event) =>
+                            setOverrideReasonByAlertId((current) => ({
+                              ...current,
+                              [alert.id]: event.target.value
+                            }))
+                          }
+                          placeholder="Mandatory override reason"
+                          rows={2}
+                        />
+                        <button
+                          style={styles.dangerButton}
+                          onClick={() => {
+                            const reason = (overrideReasonByAlertId[alert.id] ?? '').trim();
+
+                            if (!reason) {
+                              setActionMessage(null);
+                              setActionError('Override reason is mandatory.');
+                              return;
+                            }
+
+                            overrideMutation.mutate({ id: alert.id, reason });
+                          }}
+                          disabled={overrideMutation.isPending}
+                          type="button"
+                        >
+                          Override blocking alert
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 </article>
@@ -633,6 +697,32 @@ const styles: Record<string, CSSProperties> = {
     padding: '0.8rem 1rem',
     fontWeight: 700,
     cursor: 'pointer'
+  },
+  dangerButton: {
+    border: '1px solid #fecaca',
+    borderRadius: 12,
+    background: '#fee2e2',
+    color: '#991b1b',
+    padding: '0.8rem 1rem',
+    fontWeight: 800,
+    cursor: 'pointer'
+  },
+  overrideBox: {
+    display: 'grid',
+    gap: 8,
+    minWidth: 260,
+    flex: '1 1 320px'
+  },
+  textarea: {
+    width: '100%',
+    padding: '0.8rem 0.9rem',
+    borderRadius: 12,
+    border: '1px solid #fecaca',
+    background: '#fff',
+    color: '#0f172a',
+    boxSizing: 'border-box',
+    resize: 'vertical',
+    fontFamily: 'inherit'
   },
   badgeRow: {
     display: 'flex',

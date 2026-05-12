@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { saveSupportSessionAccessToken } from '../lib/auth';
 import { platformApiRequest } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
- type PlatformSupportSession = {
+type PlatformSupportSession = {
   id: string;
   platform_user_id: string;
   platform_user_email?: string | null;
@@ -35,6 +36,10 @@ export default function PlatformSupportSessionsPage() {
   const [tenantId, setTenantId] = useState('');
   const [reason, setReason] = useState('');
   const [status, setStatus] = useState('active');
+  const [formError, setFormError] = useState<string | null>(null);
+  const canStartSupportSession = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_START);
+  const canEndSupportSession = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_END);
+  const canEnterSupportSession = canStartSupportSession || canEndSupportSession;
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -57,6 +62,7 @@ export default function PlatformSupportSessionsPage() {
     onSuccess: () => {
       setTenantId('');
       setReason('');
+      setFormError(null);
       queryClient.invalidateQueries({ queryKey: ['platform', 'support-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
     }
@@ -87,6 +93,24 @@ export default function PlatformSupportSessionsPage() {
 
   const rows = sessionsQuery.data || [];
 
+  const startSupportSession = () => {
+    const normalizedTenantId = tenantId.trim();
+    const normalizedReason = reason.trim();
+
+    if (!normalizedTenantId) {
+      setFormError('Tenant ID is required to start a support session.');
+      return;
+    }
+
+    if (normalizedReason.length < 3) {
+      setFormError('Support session reason is required.');
+      return;
+    }
+
+    setFormError(null);
+    startMutation.mutate();
+  };
+
   return (
     <div style={styles.page}>
       <header>
@@ -99,16 +123,17 @@ export default function PlatformSupportSessionsPage() {
         <div style={styles.formGrid}>
           <label style={styles.label}>
             Tenant ID
-            <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="Tenant UUID" style={styles.input} />
+            <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="Tenant UUID" style={styles.input} disabled={!canStartSupportSession || startMutation.isPending} />
           </label>
           <label style={styles.label}>
             Reason
-            <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why support access is needed" style={styles.input} />
+            <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why support access is needed" style={styles.input} disabled={!canStartSupportSession || startMutation.isPending} />
           </label>
-          <button type="button" style={styles.button} onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
+          <button type="button" style={styles.button} onClick={startSupportSession} disabled={!canStartSupportSession || startMutation.isPending}>
             {startMutation.isPending ? 'Starting…' : 'Start'}
           </button>
         </div>
+        {formError ? <div style={styles.error}>{formError}</div> : null}
         {startMutation.error ? <div style={styles.error}>{readableError(startMutation.error)}</div> : null}
       </section>
 
@@ -158,17 +183,21 @@ export default function PlatformSupportSessionsPage() {
                   <td style={styles.td}>
                     {row.status === 'active' ? (
                       <div style={styles.actions}>
-                        <button
-                          type="button"
-                          style={styles.buttonSmall}
-                          onClick={() => accessTokenMutation.mutate(row.id)}
-                          disabled={accessTokenMutation.isPending}
-                        >
-                          Enter tenant
-                        </button>
-                        <button type="button" style={styles.buttonSecondarySmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending}>
-                          End
-                        </button>
+                        {canEnterSupportSession ? (
+                          <button
+                            type="button"
+                            style={styles.buttonSmall}
+                            onClick={() => accessTokenMutation.mutate(row.id)}
+                            disabled={accessTokenMutation.isPending}
+                          >
+                            Enter tenant
+                          </button>
+                        ) : null}
+                        {canEndSupportSession ? (
+                          <button type="button" style={styles.buttonSecondarySmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending}>
+                            End
+                          </button>
+                        ) : null}
                       </div>
                     ) : '-'}
                   </td>
@@ -196,6 +225,8 @@ const styles: Record<string, CSSProperties> = {
   select: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '8px 10px', fontSize: '14px' },
   button: { border: 0, borderRadius: '10px', padding: '11px 16px', cursor: 'pointer', background: '#111827', color: '#fff', fontWeight: 700 },
   buttonSmall: { border: 0, borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', background: '#111827', color: '#fff', fontWeight: 700 },
+  buttonSecondarySmall: { border: '1px solid #d1d5db', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', background: '#fff', color: '#111827', fontWeight: 700 },
+  actions: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' },
   error: { marginTop: '12px', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px', color: '#6b7280', fontSize: '13px', whiteSpace: 'nowrap' },

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 
@@ -42,6 +42,7 @@ type PurchaseOrderListItem = {
   cancelled_at?: string | null;
   created_at: string;
   updated_at?: string | null;
+  version?: number | string;
   item_count?: number | string;
   total_quantity?: number | string;
   estimated_total_cost?: number | string;
@@ -188,8 +189,6 @@ const EMPTY_FILTERS: Filters = {
   cancelledTo: ''
 };
 
-
-
 const DATE_FILTER_KEYS: (keyof Filters)[] = [
   'expectedFrom',
   'expectedTo',
@@ -230,6 +229,16 @@ const VALID_SORT_KEYS: SortKey[] = [
   'received_percent_desc',
   'received_percent_asc'
 ];
+
+function buildIfMatchHeaders(version?: number | string | null): Record<string, string> | undefined {
+  if (version === undefined || version === null || String(version).trim() === '') {
+    return undefined;
+  }
+
+  return {
+    'If-Match-Version': String(version)
+  };
+}
 
 function filtersFromSearchParams(searchParams: URLSearchParams): Filters {
   return {
@@ -291,6 +300,10 @@ function emptyForm(): PurchaseOrderFormState {
 }
 
 function normalizeError(error: unknown, fallback: string): string {
+  if (isVersionConflictError(error)) {
+    return getVersionConflictMessage(error);
+  }
+
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
@@ -345,8 +358,6 @@ function formatMoney(value: number | string | null | undefined): string {
   if (!Number.isFinite(parsed)) return String(value);
   return parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
-
 
 function completionTypeLabel(type?: string | null): string {
   if (type === 'fully_received') return 'Fully received';
@@ -405,7 +416,6 @@ function deliveryBadgeStyle(status: string | null | undefined): CSSProperties {
   return styles.naBadge;
 }
 
-
 function nextActionLabel(status: string | null | undefined): string {
   if (status === 'submit_for_approval') return 'Submit for approval';
   if (status === 'approve_or_cancel') return 'Approve or cancel';
@@ -435,14 +445,11 @@ function formatPercent(value: number | string | null | undefined): string {
   return `${parsed.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 }
 
-
-
 function escapeCsvCell(value: unknown): string {
   const raw = value === null || value === undefined ? '' : String(value);
   const escaped = raw.replace(/"/g, '""');
   return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
 }
-
 
 function escapeHtml(value: unknown): string {
   return (value === null || value === undefined ? '' : String(value))
@@ -493,7 +500,6 @@ function sortPurchaseOrders(rows: PurchaseOrderListItem[], sortKey: SortKey): Pu
   });
 }
 
-
 type PurchaseOrderAggregate = {
   count: number;
   itemCount: number;
@@ -532,8 +538,6 @@ function aggregatePurchaseOrders(rows: PurchaseOrderListItem[]): PurchaseOrderAg
     remainingEstimatedCost: 0
   });
 }
-
-
 
 type PurchaseOrderBreakdowns = {
   statuses: Record<string, number>;
@@ -641,23 +645,35 @@ async function createPurchaseOrder(input: PurchaseOrderFormState): Promise<Purch
   });
 }
 
-async function updatePurchaseOrder(id: string, input: PurchaseOrderFormState): Promise<PurchaseOrderDetail> {
+async function updatePurchaseOrder(id: string, input: PurchaseOrderFormState, version?: number | string | null): Promise<PurchaseOrderDetail> {
   return apiRequest<PurchaseOrderDetail>(`/purchase-orders/${id}`, {
     method: 'PATCH',
+    headers: buildIfMatchHeaders(version),
     body: JSON.stringify(buildPayload(input))
   });
 }
 
-async function lifecycleAction(id: string, action: 'submit' | 'approve' | 'cancel' | 'close' | 'reopen', body?: unknown): Promise<PurchaseOrderDetail> {
+async function lifecycleAction(
+  id: string,
+  action: 'submit' | 'approve' | 'cancel' | 'close' | 'reopen',
+  body?: unknown,
+  version?: number | string | null
+): Promise<PurchaseOrderDetail> {
   return apiRequest<PurchaseOrderDetail>(`/purchase-orders/${id}/${action}`, {
     method: 'POST',
+    headers: buildIfMatchHeaders(version),
     body: body ? JSON.stringify(body) : JSON.stringify({})
   });
 }
 
-async function createShipmentFromPurchaseOrder(id: string, deliveryDate?: string | null): Promise<CreateShipmentFromPurchaseOrderResponse> {
+async function createShipmentFromPurchaseOrder(
+  id: string,
+  deliveryDate?: string | null,
+  version?: number | string | null
+): Promise<CreateShipmentFromPurchaseOrderResponse> {
   return apiRequest<CreateShipmentFromPurchaseOrderResponse>(`/purchase-orders/${id}/create-shipment`, {
     method: 'POST',
+    headers: buildIfMatchHeaders(version),
     body: JSON.stringify({ delivery_date: deliveryDate || null })
   });
 }
@@ -828,7 +844,6 @@ export default function PurchaseOrdersPage() {
     return chips;
   }, [filters, suppliersQuery.data, productsQuery.data]);
 
-
   const applyDatePreset = (preset: 'expected_today' | 'expected_next_7' | 'created_last_7' | 'created_last_30' | 'approved_last_30' | 'completed_last_30' | 'cancelled_last_30') => {
     setFilters((current) => {
       const next = clearDateFilters(current);
@@ -946,7 +961,7 @@ export default function PurchaseOrdersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: PurchaseOrderFormState }) => updatePurchaseOrder(id, input),
+    mutationFn: ({ id, input, version }: { id: string; input: PurchaseOrderFormState; version?: number | string | null }) => updatePurchaseOrder(id, input, version),
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', updated.id] });
@@ -956,8 +971,8 @@ export default function PurchaseOrdersPage() {
   });
 
   const actionMutation = useMutation({
-    mutationFn: ({ id, action, body }: { id: string; action: 'submit' | 'approve' | 'cancel' | 'close' | 'reopen'; body?: unknown }) =>
-      lifecycleAction(id, action, body),
+    mutationFn: ({ id, action, body, version }: { id: string; action: 'submit' | 'approve' | 'cancel' | 'close' | 'reopen'; body?: unknown; version?: number | string | null }) =>
+      lifecycleAction(id, action, body, version),
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', updated.id] });
@@ -969,8 +984,8 @@ export default function PurchaseOrdersPage() {
   });
 
   const createShipmentMutation = useMutation({
-    mutationFn: ({ id, deliveryDate }: { id: string; deliveryDate?: string | null }) =>
-      createShipmentFromPurchaseOrder(id, deliveryDate),
+    mutationFn: ({ id, deliveryDate, version }: { id: string; deliveryDate?: string | null; version?: number | string | null }) =>
+      createShipmentFromPurchaseOrder(id, deliveryDate, version),
     onSuccess: async (payload, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
@@ -1439,7 +1454,11 @@ export default function PurchaseOrdersPage() {
       return;
     }
     if (editingId) {
-      updateMutation.mutate({ id: editingId, input: form });
+      updateMutation.mutate({
+        id: editingId,
+        input: form,
+        version: selectedDetail?.id === editingId ? selectedDetail.version : undefined
+      });
     } else {
       createMutation.mutate(form);
     }
@@ -1818,7 +1837,6 @@ export default function PurchaseOrdersPage() {
           <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('cancelled_last_30')}>Cancelled last 30 days</button>
           <button type="button" style={styles.clearInlineButton} onClick={clearOnlyDateFilters}>Clear date filters</button>
         </div>
-
 
         {purchaseOrdersQuery.isLoading ? <p>Loading purchase orders…</p> : null}
         {purchaseOrdersQuery.error ? <p style={styles.error}>{normalizeError(purchaseOrdersQuery.error, 'Failed to load purchase orders.')}</p> : null}
@@ -2249,7 +2267,6 @@ export default function PurchaseOrdersPage() {
                 </table>
               </div>
 
-
               {(selectedDetail.linked_shipments || []).length ? (
                 <>
                   <h4 style={{ ...styles.h4, marginTop: 16 }}>Linked Shipments</h4>
@@ -2291,7 +2308,6 @@ export default function PurchaseOrdersPage() {
                 </>
               ) : null}
 
-
               {selectedIsLocked ? (
                 <p style={styles.muted}>This purchase order is locked because it is no longer a draft. Create follow-up shipments or receive linked shipments instead of editing the order.</p>
               ) : null}
@@ -2303,12 +2319,22 @@ export default function PurchaseOrdersPage() {
                 <button type="button" style={styles.secondaryButton} onClick={printSelectedPurchaseOrderDetail}>Print Detail</button>
                 {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" style={styles.secondaryButton} onClick={startEdit}>Edit Draft</button> : null}
                 {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
-                  <button type="button" style={styles.primaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit' })}>
+                  <button
+                    type="button"
+                    style={styles.primaryButton}
+                    disabled={actionMutation.isPending}
+                    onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit', version: selectedDetail.version })}
+                  >
                     {actionMutation.isPending ? 'Submitting...' : 'Submit'}
                   </button>
                 ) : null}
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
-                  <button type="button" style={styles.primaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve' })}>
+                  <button
+                    type="button"
+                    style={styles.primaryButton}
+                    disabled={actionMutation.isPending}
+                    onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve', version: selectedDetail.version })}
+                  >
                     {actionMutation.isPending ? 'Approving...' : 'Approve'}
                   </button>
                 ) : null}
@@ -2334,7 +2360,8 @@ export default function PurchaseOrdersPage() {
                     disabled={createShipmentMutation.isPending || selectedHasOpenShipment}
                     onClick={() => createShipmentMutation.mutate({
                       id: selectedDetail.id,
-                      deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null
+                      deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null,
+                      version: selectedDetail.version
                     })}
                   >
                     Create Remaining Shipment
@@ -2342,7 +2369,6 @@ export default function PurchaseOrdersPage() {
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
                 </div>
               ) : null}
-
 
               {selectedCanClose && capabilities.canCancelPurchaseOrders ? (
                 <div style={styles.cancelBox}>
@@ -2366,7 +2392,7 @@ export default function PurchaseOrdersPage() {
                         return;
                       }
                       if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason } });
+                        actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
                       }
                     }}
                   >
@@ -2374,7 +2400,6 @@ export default function PurchaseOrdersPage() {
                   </button>
                 </div>
               ) : null}
-
 
               {selectedCanReopen && capabilities.canCancelPurchaseOrders ? (
                 <div style={styles.cancelBox}>
@@ -2388,7 +2413,7 @@ export default function PurchaseOrdersPage() {
                     disabled={actionMutation.isPending}
                     onClick={() => {
                       if (window.confirm('Reopen this manually closed purchase order?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'reopen' });
+                        actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version });
                       }
                     }}
                   >
@@ -2411,7 +2436,7 @@ export default function PurchaseOrdersPage() {
                     disabled={actionMutation.isPending}
                     onClick={() => {
                       if (window.confirm('Cancel this purchase order?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason } });
+                        actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version });
                       }
                     }}
                   >
@@ -2453,6 +2478,9 @@ const styles: Record<string, CSSProperties> = {
   filterChip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '6px 10px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   clearInlineButton: { border: 'none', background: 'transparent', color: '#2563eb', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
   filters: { display: 'grid', gridTemplateColumns: 'minmax(180px, 1.5fr) repeat(7, minmax(150px, 1fr)) auto auto', gap: 10, marginTop: 18 },
+  compactField: { display: 'flex', flexDirection: 'column', gap: 4 },
+  compactLabel: { color: '#475569', fontSize: 12, fontWeight: 700 },
+  dateShortcuts: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 12 },
   paginationRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 14 },
   paginationControls: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   listTotalsPanel: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 12, marginTop: 14, background: '#f8fafc' },

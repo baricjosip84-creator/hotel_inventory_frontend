@@ -67,6 +67,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/insights')) return 'Insights';
   if (pathname.startsWith('/users')) return 'Users';
   if (pathname.startsWith('/audit')) return 'Tenant Audit';
+  if (pathname.startsWith('/tenant-settings')) return 'Tenant Settings';
   if (pathname.startsWith('/admin-system')) return 'Admin System';
   if (pathname.startsWith('/execution-requests')) return 'Execution Requests';
   if (pathname.startsWith('/automation-schedules')) return 'Automation Schedules';
@@ -120,6 +121,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/audit')) {
     return 'Review tenant-scoped write history and audited support-session activity.';
+  }
+  if (pathname.startsWith('/tenant-settings')) {
+    return 'Manage tenant configuration through the backend tenant CRUD contract.';
   }
   if (pathname.startsWith('/admin-system')) {
     return 'Review system status, diagnostics, tenant control-plane data, and admin health signals.';
@@ -187,21 +191,22 @@ export default function AppLayout() {
 
   const navItems = useMemo<NavItem[]>(
     () => [
-      { to: '/dashboard', label: 'Dashboard' },
-      { to: '/products', label: 'Products' },
-      { to: '/suppliers', label: 'Suppliers' },
-      { to: '/alerts', label: 'Alerts' },
-      { to: '/stock', label: 'Stock' },
-      { to: '/stock-movements', label: 'Stock Movements' },
+      { to: '/dashboard', label: 'Dashboard', permission: TENANT_PERMISSIONS.DASHBOARD_READ },
+      { to: '/products', label: 'Products', permission: TENANT_PERMISSIONS.PRODUCTS_READ },
+      { to: '/suppliers', label: 'Suppliers', permission: TENANT_PERMISSIONS.SUPPLIERS_READ },
+      { to: '/alerts', label: 'Alerts', permission: TENANT_PERMISSIONS.ALERTS_READ },
+      { to: '/stock', label: 'Stock', permission: TENANT_PERMISSIONS.STOCK_READ },
+      { to: '/stock-movements', label: 'Stock Movements', permission: TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ },
       { to: '/stock-transfers', label: 'Stock Transfers', permission: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ },
       { to: '/purchase-orders', label: 'Purchase Orders', permission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },
-      { to: '/storage-locations', label: 'Storage Locations' },
-      { to: '/shipments', label: 'Shipments' },
-      { to: '/scanner', label: 'Scanner' },
+      { to: '/storage-locations', label: 'Storage Locations', permission: TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ },
+      { to: '/shipments', label: 'Shipments', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },
+      { to: '/scanner', label: 'Scanner', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },
       { to: '/reports', label: 'Reports', permission: TENANT_PERMISSIONS.REPORTS_READ },
       { to: '/insights', label: 'Insights', permission: TENANT_PERMISSIONS.INSIGHTS_READ },
       { to: '/users', label: 'Users', permission: TENANT_PERMISSIONS.USERS_READ },
       { to: '/audit', label: 'Audit', permission: TENANT_PERMISSIONS.AUDIT_READ },
+      { to: '/tenant-settings', label: 'Tenant Settings', permission: TENANT_PERMISSIONS.TENANT_READ },
 
       /*
         Backend/router alignment:

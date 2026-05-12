@@ -1,12 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AuthTokens } from '../types/auth';
 import { platformApiRequest } from '../lib/platformApi';
-import { savePlatformAuthTokens } from '../lib/platformAuth';
+import { fetchCurrentPlatformIdentity, savePlatformAuthTokens } from '../lib/platformAuth';
 
 export default function PlatformLoginPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    fetchCurrentPlatformIdentity()
+      .then((identity) => {
+        if (!active || !identity) {
+          return;
+        }
+
+        navigate('/platform');
+      })
+      .catch(() => {
+        // noop
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
+
+
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

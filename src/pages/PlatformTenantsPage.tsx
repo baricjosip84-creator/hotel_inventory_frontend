@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
-import { getCurrentPlatformRole } from '../lib/platformAuth';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 type TenantRow = {
   id: string;
@@ -25,8 +25,8 @@ function readableError(error: unknown): string {
 
 export default function PlatformTenantsPage() {
   const queryClient = useQueryClient();
-  const role = getCurrentPlatformRole();
-  const canLockTenants = role === 'superadmin';
+  const canLockTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_LOCK);
+  const canUnlockTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UNLOCK);
 
   const tenantsQuery = useQuery({
     queryKey: ['platform', 'tenants'],
@@ -56,6 +56,8 @@ export default function PlatformTenantsPage() {
 
       {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenants…</div> : null}
       {tenantsQuery.error ? <div style={styles.error}>{readableError(tenantsQuery.error)}</div> : null}
+      {lockMutation.error ? <div style={styles.error}>{readableError(lockMutation.error)}</div> : null}
+      {unlockMutation.error ? <div style={styles.error}>{readableError(unlockMutation.error)}</div> : null}
 
       <section style={styles.panel}>
         <table style={styles.table}>
@@ -76,24 +78,28 @@ export default function PlatformTenantsPage() {
                 <td style={styles.td}>{tenant.organization_type || '-'}</td>
                 <td style={styles.td}>{tenant.write_locked ? 'Locked' : 'Open'}</td>
                 <td style={styles.td}>
-                  {canLockTenants ? (
-                    tenant.write_locked ? (
+                  {tenant.write_locked ? (
+                    canUnlockTenants ? (
                       <button
                         type="button"
                         style={styles.button}
                         onClick={() => unlockMutation.mutate(tenant.id)}
+                        disabled={unlockMutation.isPending}
                       >
                         Unlock
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        style={styles.button}
-                        onClick={() => lockMutation.mutate(tenant.id)}
-                      >
-                        Lock
-                      </button>
+                      <span style={styles.muted}>Read-only</span>
                     )
+                  ) : canLockTenants ? (
+                    <button
+                      type="button"
+                      style={styles.button}
+                      onClick={() => lockMutation.mutate(tenant.id)}
+                      disabled={lockMutation.isPending}
+                    >
+                      Lock
+                    </button>
                   ) : (
                     <span style={styles.muted}>Read-only</span>
                   )}

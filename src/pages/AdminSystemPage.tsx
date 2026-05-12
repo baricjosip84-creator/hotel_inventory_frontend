@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 
@@ -12,6 +13,8 @@ type BlockingAlertRow = {
   severity: string;
   created_at: string;
   acknowledged: boolean;
+  resolved?: boolean;
+  override_reason?: string | null;
 };
 
 type StockIntegrityRow = {
@@ -39,6 +42,28 @@ type SystemStatusResponse = {
   tenant_id?: string;
   timestamp?: string;
 };
+
+
+async function acknowledgeAdminAlert(id: string): Promise<{ message: string; alert: BlockingAlertRow }> {
+  return apiRequest<{ message: string; alert: BlockingAlertRow }>(`/admin/alerts/${id}/acknowledge`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+async function resolveAdminAlert(id: string): Promise<{ message: string; alert: BlockingAlertRow }> {
+  return apiRequest<{ message: string; alert: BlockingAlertRow }>(`/admin/alerts/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+async function overrideAdminAlert(input: { id: string; reason: string }): Promise<{ message: string; alert: BlockingAlertRow }> {
+  return apiRequest<{ message: string; alert: BlockingAlertRow }>(`/admin/alerts/${input.id}/override`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: input.reason })
+  });
+}
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) {
@@ -75,7 +100,11 @@ function StatCard(props: { title: string; value: string; subtitle: string; tone?
 }
 
 export default function AdminSystemPage() {
+  const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});
 
   const systemStatusQuery = useQuery({
     queryKey: ['admin-system', 'system-status'],
@@ -100,6 +129,57 @@ export default function AdminSystemPage() {
     enabled: capabilities.isAdmin
   });
 
+
+  const refreshAdminAlertData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin-system', 'system-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-system', 'blocking-alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+    ]);
+  };
+
+  const acknowledgeMutation = useMutation({
+    mutationFn: acknowledgeAdminAlert,
+    onSuccess: async (result) => {
+      setActionError(null);
+      setActionMessage(result.message || 'Alert acknowledged.');
+      await refreshAdminAlertData();
+    },
+    onError: (error) => {
+      setActionMessage(null);
+      setActionError(readableError(error));
+    }
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: resolveAdminAlert,
+    onSuccess: async (result) => {
+      setActionError(null);
+      setActionMessage(result.message || 'Alert resolved.');
+      await refreshAdminAlertData();
+    },
+    onError: (error) => {
+      setActionMessage(null);
+      setActionError(readableError(error));
+    }
+  });
+
+  const overrideMutation = useMutation({
+    mutationFn: overrideAdminAlert,
+    onSuccess: async (result) => {
+      setActionError(null);
+      setActionMessage(result.message || 'Blocking alert overridden.');
+      setOverrideReasonByAlertId({});
+      await refreshAdminAlertData();
+    },
+    onError: (error) => {
+      setActionMessage(null);
+      setActionError(readableError(error));
+    }
+  });
+
   const writeLock = systemStatusQuery.data?.system_write_locked ? 'Locked' : 'Open';
   const maintenance = systemStatusQuery.data?.maintenance_mode ? 'Enabled' : 'Disabled';
   const blockingCount = systemStatusQuery.data?.blocking_alerts?.length ?? 0;
@@ -111,6 +191,9 @@ export default function AdminSystemPage() {
         <StatCard title="Maintenance" value={maintenance} subtitle="Maintenance-mode visibility from system flags." tone={maintenance === 'Enabled' ? 'warn' : 'default'} />
         <StatCard title="Blocking Alerts" value={String(blockingCount)} subtitle="Tenant-scoped blocking alerts from /system-status." tone={blockingCount > 0 ? 'bad' : 'default'} />
       </section>
+
+      {actionMessage ? <div className="app-success-state">{actionMessage}</div> : null}
+      {actionError ? <div className="app-error-state">{actionError}</div> : null}
 
       <div style={styles.grid}>
         <Section title="System Status" subtitle="Tenant-scoped status for the current company.">
@@ -133,13 +216,78 @@ export default function AdminSystemPage() {
               <h4 style={styles.sectionSubheading}>Blocking Diagnostics</h4>
               {blockingAlertsQuery.error ? <div className="app-error-state">{readableError(blockingAlertsQuery.error)}</div> : null}
               {blockingAlertsQuery.isLoading ? <div className="app-empty-state">Loading blocking diagnostics...</div> : null}
-              {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.type}</div>
-                  <div style={styles.itemText}>{row.message}</div>
-                  <div style={styles.itemMeta}>{row.severity.toUpperCase()} · {formatDateTime(row.created_at)}</div>
-                </article>
-              )) : !blockingAlertsQuery.isLoading ? <div className="app-empty-state">No blocking diagnostics returned.</div> : null}
+              {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => {
+                const isBlocking = row.type.toUpperCase().includes('BLOCKING');
+                const isBusy = acknowledgeMutation.isPending || resolveMutation.isPending || overrideMutation.isPending;
+                const reason = overrideReasonByAlertId[row.id] ?? '';
+
+                return (
+                  <article key={row.id} style={styles.itemCard}>
+                    <div style={styles.itemTitle}>{row.type}</div>
+                    <div style={styles.itemText}>{row.message}</div>
+                    <div style={styles.itemMeta}>
+                      {row.severity.toUpperCase()} · {formatDateTime(row.created_at)}
+                      {row.acknowledged ? ' · Acknowledged' : ''}
+                      {row.resolved ? ' · Resolved' : ''}
+                    </div>
+
+                    <div style={styles.actions}>
+                      <button
+                        type="button"
+                        style={styles.secondaryButton}
+                        onClick={() => acknowledgeMutation.mutate(row.id)}
+                        disabled={isBusy || row.acknowledged}
+                      >
+                        Acknowledge
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.primaryButton}
+                        onClick={() => resolveMutation.mutate(row.id)}
+                        disabled={isBusy || row.resolved}
+                      >
+                        Resolve
+                      </button>
+                    </div>
+
+                    {isBlocking && !row.resolved ? (
+                      <div style={styles.overrideBox}>
+                        <textarea
+                          style={styles.textarea}
+                          value={reason}
+                          onChange={(event) =>
+                            setOverrideReasonByAlertId((current) => ({
+                              ...current,
+                              [row.id]: event.target.value
+                            }))
+                          }
+                          placeholder="Mandatory override reason"
+                          rows={2}
+                          disabled={isBusy}
+                        />
+                        <button
+                          type="button"
+                          style={styles.dangerButton}
+                          onClick={() => {
+                            const cleanReason = reason.trim();
+
+                            if (!cleanReason) {
+                              setActionMessage(null);
+                              setActionError('Override reason is mandatory.');
+                              return;
+                            }
+
+                            overrideMutation.mutate({ id: row.id, reason: cleanReason });
+                          }}
+                          disabled={isBusy}
+                        >
+                          Override blocking alert
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              }) : !blockingAlertsQuery.isLoading ? <div className="app-empty-state">No blocking diagnostics returned.</div> : null}
 
               <h4 style={styles.sectionSubheading}>Stock Integrity</h4>
               {stockIntegrityQuery.error ? <div className="app-error-state">{readableError(stockIntegrityQuery.error)}</div> : null}
@@ -190,5 +338,11 @@ const styles: Record<string, CSSProperties> = {
   itemTextMono: { color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all', overflowWrap: 'anywhere' },
   itemMeta: { color: '#64748b', fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word' },
   sectionSubheading: { color: '#0f172a', fontWeight: 800, margin: '4px 0 0' },
-  keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 }
+  keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 },
+  actions: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' },
+  primaryButton: { border: '1px solid #bbf7d0', borderRadius: '12px', background: '#dcfce7', color: '#166534', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
+  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: '12px', background: '#ffffff', color: '#0f172a', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
+  dangerButton: { border: '1px solid #fecaca', borderRadius: '12px', background: '#fee2e2', color: '#991b1b', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
+  overrideBox: { display: 'grid', gap: '10px', marginTop: '4px' },
+  textarea: { width: '100%', padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid #fecaca', background: '#fff', color: '#0f172a', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }
 };

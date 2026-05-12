@@ -38,6 +38,7 @@ import UsersPage from '../pages/UsersPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
 import TenantAuditPage from '../pages/TenantAuditPage';
+import TenantSettingsPage from '../pages/TenantSettingsPage';
 import SystemContextPage from '../pages/SystemContextPage';
 import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
 import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
@@ -121,27 +122,51 @@ const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <DashboardPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DASHBOARD_READ]}>
+            <DashboardPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'products',
-        element: <ProductsPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PRODUCTS_READ]}>
+            <ProductsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'suppliers',
-        element: <SuppliersPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SUPPLIERS_READ]}>
+            <SuppliersPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'alerts',
-        element: <AlertsPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.ALERTS_READ]}>
+            <AlertsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'stock',
-        element: <StockPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STOCK_READ]}>
+            <StockPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'stock-movements',
-        element: <StockMovementsPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ]}>
+            <StockMovementsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'stock-transfers',
@@ -161,15 +186,27 @@ const router = createBrowserRouter([
       },
       {
         path: 'storage-locations',
-        element: <StorageLocationsPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ]}>
+            <StorageLocationsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'shipments',
-        element: <ShipmentsPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SHIPMENTS_READ]}>
+            <ShipmentsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'scanner',
-        element: <ScannerPage />
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SHIPMENTS_READ]}>
+            <ScannerPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'sessions',
@@ -204,6 +241,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.AUDIT_READ]}>
             <TenantAuditPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-settings',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.TENANT_READ]}>
+            <TenantSettingsPage />
           </ProtectedRoute>
         )
       },

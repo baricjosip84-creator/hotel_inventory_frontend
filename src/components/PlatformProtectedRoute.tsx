@@ -8,7 +8,8 @@ import {
   getPlatformRefreshToken,
   hasAnyPlatformRole,
   isPlatformAuthenticated,
-  savePlatformAuthTokens
+  savePlatformAuthTokens,
+  fetchCurrentPlatformIdentity
 } from '../lib/platformAuth';
 import type { PlatformRole } from '../lib/platformAuth';
 import type { PlatformPermission } from '../lib/platformPermissions';
@@ -33,8 +34,10 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
       const refreshToken = getPlatformRefreshToken();
 
       if (accessToken) {
+        const identity = await fetchCurrentPlatformIdentity();
+
         if (isMounted) {
-          setStatus('allowed');
+          setStatus(identity ? 'allowed' : 'denied');
         }
         return;
       }
@@ -52,9 +55,10 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
           body: JSON.stringify({ refreshToken })
         });
         savePlatformAuthTokens(tokens);
+        const identity = await fetchCurrentPlatformIdentity();
 
         if (isMounted) {
-          setStatus('allowed');
+          setStatus(identity ? 'allowed' : 'denied');
         }
       } catch {
         if (isMounted) {

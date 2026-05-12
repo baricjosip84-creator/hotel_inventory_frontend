@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, getVersionConflictMessage } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 
 /**
@@ -16,43 +16,11 @@ import { getRoleCapabilities } from '../lib/permissions';
  * - adding shipment items
  * - receiving shipment items line-by-line
  * - partial receiving
- * - finalizing partially received shipments
+ * - finalizing fully received shipments
+ * - finalizing partially received shipments only when shortages have saved reasons
  * - auto-selecting a shipment when scanner redirects with ?shipmentId=
  * - highlighting and preparing a shipment item when product barcode scan returns
  * - auto-receiving one unit from scanner when a safe storage location is known
- *
- * MOBILE UPDATE
- * ----------------------------------------------------------------------------
- * This version improves mobile UX further by:
- * - stacking major panels on small screens
- * - converting shipment items from a wide table into tap-friendly cards on mobile
- * - making receive controls more readable and easier to use on phone
- *
- * PRODUCT BARCODE SCAN UPDATE
- * ----------------------------------------------------------------------------
- * This version also supports product receiving prep flow:
- * - user selects shipment
- * - user opens scanner in product mode
- * - scanner returns with shipmentId + itemId + scannedBarcode
- * - page auto-selects shipment
- * - matched shipment item is highlighted
- * - receive quantity is prefilled to 1 when possible
- * - auto-receive runs when the system can safely determine storage location
- *
- * DEFAULT LOCATION FLOW
- * ----------------------------------------------------------------------------
- * This version adds a professional scan flow:
- * - user selects a default storage location before scanning
- * - the scanner receives that location in the URL
- * - the shipments page restores that location from scanner return params
- * - auto receive then uses the explicit location instead of guesswork
- *
- * UX IMPROVEMENT
- * ----------------------------------------------------------------------------
- * This version also makes scan requirements explicit:
- * - the scan button is disabled until a default scan location is selected
- * - inline guidance explains why scanning is disabled
- * - the default location label clearly explains what it is used for
  */
 
 type ShipmentSummary = {
@@ -70,55 +38,6 @@ type ShipmentSummary = {
   line_count?: number;
   total_ordered_quantity?: number | string;
   total_received_quantity?: number | string;
-
-  guidedEmptyState: {
-    display: 'grid',
-    gap: 14,
-    border: '1px dashed #cbd5e1',
-    borderRadius: 18,
-    background: '#f8fafc',
-    padding: 18
-  },
-  guidedEmptyStateTitle: {
-    fontSize: '1rem',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  guidedEmptyStateText: {
-    color: '#475569',
-    lineHeight: 1.6
-  },
-  workflowGuideGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12
-  },
-  workflowStepCard: {
-    border: '1px solid #e2e8f0',
-    borderRadius: 16,
-    background: '#ffffff',
-    padding: 14,
-    display: 'grid',
-    gap: 8
-  },
-  workflowStepCardComplete: {
-    border: '1px solid #bbf7d0',
-    borderRadius: 16,
-    background: '#f0fdf4',
-    padding: 14,
-    display: 'grid',
-    gap: 8
-  },
-  workflowStepLabel: {
-    fontSize: '0.86rem',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  workflowStepText: {
-    color: '#475569',
-    lineHeight: 1.5,
-    fontSize: '0.92rem'
-  },
 };
 
 type ShipmentItem = {
@@ -174,6 +93,11 @@ type ItemFormState = {
   quantity: string;
 };
 
+type ShipmentItemEditDraft = {
+  product_id: string;
+  quantity: string;
+};
+
 type ReceiveDraft = {
   quantity_received: string;
   storage_location_id: string;
@@ -191,6 +115,30 @@ type ReceiveShipmentLineItemPayload = {
   receiving_note?: string | null;
 };
 
+type ReceiveShipmentResponse = {
+  message: string;
+  status: string;
+  purchase_order_id?: string | null;
+  linked_purchase_order_receiving_summary?: {
+    id: string;
+    po_number: string;
+    receiving_status: string;
+    receiving_percent: number;
+    ordered_quantity: number;
+    received_quantity: number;
+    remaining_quantity: number;
+    open_linked_shipment_count: number;
+  } | null;
+};
+
+type FinalizeShipmentResponse = {
+  message: string;
+  status: string;
+  finalized_with_discrepancies?: boolean;
+  total_lines?: number;
+  incomplete_line_count?: number;
+};
+
 type SendShipmentToSupplierResponse = {
   message?: string;
   shipment_id?: string;
@@ -203,6 +151,14 @@ type SendShipmentToSupplierResponse = {
     filename?: string;
     content_type?: string;
   }>;
+};
+
+type AutoReorderResponse = {
+  message?: string;
+  created_shipments?: number;
+  created_count?: number;
+  shipment_count?: number;
+  shipments?: ShipmentSummary[];
 };
 
 type PendingAutoReceive = {
@@ -252,6 +208,45 @@ async function createShipment(input: ShipmentFormState): Promise<ShipmentSummary
   });
 }
 
+async function updateShipment(input: {
+  shipmentId: string;
+  version: number;
+  supplier_id: string;
+  delivery_date: string;
+  po_number?: string | null;
+}): Promise<ShipmentSummary> {
+  return apiRequest<ShipmentSummary>(`/shipments/${input.shipmentId}`, {
+    method: 'PATCH',
+    headers: {
+      'If-Match-Version': String(input.version)
+    },
+    body: JSON.stringify({
+      supplier_id: input.supplier_id,
+      delivery_date: input.delivery_date,
+      po_number: input.po_number?.trim() || null
+    })
+  });
+}
+
+async function deleteShipment(input: {
+  shipmentId: string;
+  version: number;
+}): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/shipments/${input.shipmentId}`, {
+    method: 'DELETE',
+    headers: {
+      'If-Match-Version': String(input.version)
+    }
+  });
+}
+
+async function triggerAutoReorder(): Promise<AutoReorderResponse> {
+  return apiRequest<AutoReorderResponse>('/shipments/auto-reorder', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
 async function addShipmentItem(input: {
   shipment_id: string;
   product_id: string;
@@ -267,40 +262,42 @@ async function addShipmentItem(input: {
   });
 }
 
+async function updateShipmentItem(input: {
+  itemId: string;
+  version: number;
+  product_id?: string;
+  quantity?: number;
+}): Promise<ShipmentItem> {
+  return apiRequest<ShipmentItem>(`/shipment-items/${input.itemId}`, {
+    method: 'PATCH',
+    headers: {
+      'If-Match-Version': String(input.version)
+    },
+    body: JSON.stringify({
+      product_id: input.product_id,
+      quantity: input.quantity
+    })
+  });
+}
+
+async function deleteShipmentItem(input: {
+  itemId: string;
+  version: number;
+}): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/shipment-items/${input.itemId}`, {
+    method: 'DELETE',
+    headers: {
+      'If-Match-Version': String(input.version)
+    }
+  });
+}
+
 async function receiveShipmentLine(input: {
   shipmentId: string;
   version: number;
   item: ReceiveShipmentLineItemPayload;
-}): Promise<{
-  message: string;
-  status: string;
-  purchase_order_id?: string | null;
-  linked_purchase_order_receiving_summary?: {
-    id: string;
-    po_number: string;
-    receiving_status: string;
-    receiving_percent: number;
-    ordered_quantity: number;
-    received_quantity: number;
-    remaining_quantity: number;
-    open_linked_shipment_count: number;
-  } | null;
-}> {
-  return apiRequest<{
-    message: string;
-    status: string;
-    purchase_order_id?: string | null;
-    linked_purchase_order_receiving_summary?: {
-      id: string;
-      po_number: string;
-      receiving_status: string;
-      receiving_percent: number;
-      ordered_quantity: number;
-      received_quantity: number;
-      remaining_quantity: number;
-      open_linked_shipment_count: number;
-    } | null;
-  }>(`/shipments/${input.shipmentId}/receive`, {
+}): Promise<ReceiveShipmentResponse> {
+  return apiRequest<ReceiveShipmentResponse>(`/shipments/${input.shipmentId}/receive`, {
     method: 'POST',
     headers: {
       'If-Match-Version': String(input.version)
@@ -314,24 +311,19 @@ async function receiveShipmentLine(input: {
 async function finalizeShipment(input: {
   shipmentId: string;
   version: number;
-}): Promise<{ message: string; status: string }> {
-  return apiRequest<{ message: string; status: string }>(`/shipments/${input.shipmentId}/finalize`, {
+}): Promise<FinalizeShipmentResponse> {
+  return apiRequest<FinalizeShipmentResponse>(`/shipments/${input.shipmentId}/finalize`, {
     method: 'POST',
     headers: {
       'If-Match-Version': String(input.version)
-    }
+    },
+    body: JSON.stringify({})
   });
 }
 
 async function sendShipmentToSupplier(input: {
   shipmentId: string;
 }): Promise<SendShipmentToSupplierResponse> {
-  /*
-    Backend Phase 12 sends the supplier email and attaches the generated
-    shipment PDF plus the QR image file. The frontend only triggers the
-    operation and displays the backend response; it does not generate or store
-    attachments itself.
-  */
   return apiRequest<SendShipmentToSupplierResponse>(
     `/shipments/${input.shipmentId}/send-to-supplier`,
     {
@@ -345,7 +337,6 @@ function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'string' && value.trim() !== '') return Number(value);
   return 0;
 }
-
 
 function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
@@ -433,7 +424,15 @@ function useIsMobile(breakpoint = 1024): boolean {
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
 
-  const { role, canManageShipments, canReceiveShipments } = getRoleCapabilities();
+  const {
+    role,
+    canManageShipments,
+    canSendShipments,
+    canReceiveShipments,
+    canFinalizeShipments,
+    canAutoReorderShipments,
+    canManageShipmentItems
+  } = getRoleCapabilities();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -446,6 +445,7 @@ export default function ShipmentsPage() {
 
   const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
+  const [shipmentItemEditDrafts, setShipmentItemEditDrafts] = useState<Record<string, ShipmentItemEditDraft>>({});
   const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
   const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
   const autoReceiveAttemptKeyRef = useRef<string>('');
@@ -490,6 +490,7 @@ export default function ShipmentsPage() {
       setShipmentForm(emptyShipmentForm());
       setSelectedShipmentId(shipment.id);
       setReceiveDrafts({});
+      setShipmentItemEditDrafts({});
       setHighlightedItemId('');
       setPendingAutoReceive(null);
       setSelectedScannerLocationId('');
@@ -505,6 +506,70 @@ export default function ShipmentsPage() {
         setPageError(error.message);
       } else {
         setPageError('Failed to create shipment.');
+      }
+      setPageMessage(null);
+    }
+  });
+
+  const updateShipmentMutation = useMutation({
+    mutationFn: updateShipment,
+    onSuccess: async () => {
+      setPageError(null);
+      setPageMessage('Shipment updated successfully.');
+
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setPageError(getVersionConflictMessage(error));
+      setPageMessage(null);
+    }
+  });
+
+  const deleteShipmentMutation = useMutation({
+    mutationFn: deleteShipment,
+    onSuccess: async () => {
+      setSelectedShipmentId('');
+      setReceiveDrafts({});
+      setShipmentItemEditDrafts({});
+      setHighlightedItemId('');
+      setPendingAutoReceive(null);
+      setSelectedScannerLocationId('');
+      autoReceiveAttemptKeyRef.current = '';
+      setPageError(null);
+      setPageMessage('Shipment deleted successfully.');
+
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setPageError(getVersionConflictMessage(error));
+      setPageMessage(null);
+    }
+  });
+
+  const autoReorderMutation = useMutation({
+    mutationFn: triggerAutoReorder,
+    onSuccess: async (data) => {
+      const createdCount =
+        data.created_shipments ??
+        data.created_count ??
+        data.shipment_count ??
+        data.shipments?.length ??
+        0;
+
+      setPageError(null);
+      setPageMessage(data.message || `Auto reorder completed. Created ${createdCount} shipment${createdCount === 1 ? '' : 's'}.`);
+
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setPageError(error.message);
+      } else {
+        setPageError('Failed to run auto reorder.');
       }
       setPageMessage(null);
     }
@@ -526,6 +591,38 @@ export default function ShipmentsPage() {
       } else {
         setPageError('Failed to add shipment item.');
       }
+      setPageMessage(null);
+    }
+  });
+
+  const updateShipmentItemMutation = useMutation({
+    mutationFn: updateShipmentItem,
+    onSuccess: async () => {
+      setShipmentItemEditDrafts({});
+      setPageError(null);
+      setPageMessage('Shipment item updated successfully.');
+
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+    },
+    onError: (error) => {
+      setPageError(getVersionConflictMessage(error));
+      setPageMessage(null);
+    }
+  });
+
+  const deleteShipmentItemMutation = useMutation({
+    mutationFn: deleteShipmentItem,
+    onSuccess: async () => {
+      setShipmentItemEditDrafts({});
+      setPageError(null);
+      setPageMessage('Shipment item deleted successfully.');
+
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+    },
+    onError: (error) => {
+      setPageError(getVersionConflictMessage(error));
       setPageMessage(null);
     }
   });
@@ -562,20 +659,20 @@ export default function ShipmentsPage() {
       await queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setPageError(error.message);
-      } else {
-        setPageError('Failed to receive shipment item.');
-      }
+      setPageError(getVersionConflictMessage(error));
       setPageMessage(null);
     }
   });
 
   const finalizeShipmentMutation = useMutation({
     mutationFn: finalizeShipment,
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       setPageError(null);
-      setPageMessage('✔ Shipment finalized and locked for receiving.');
+      setPageMessage(
+        data.finalized_with_discrepancies
+          ? `✔ Shipment finalized with ${data.incomplete_line_count ?? 0} documented receiving discrepancy line(s).`
+          : '✔ Shipment finalized and locked for receiving.'
+      );
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
@@ -589,11 +686,7 @@ export default function ShipmentsPage() {
       await queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setPageError(error.message);
-      } else {
-        setPageError('Failed to finalize shipment.');
-      }
+      setPageError(getVersionConflictMessage(error));
       setPageMessage(null);
     }
   });
@@ -664,7 +757,6 @@ export default function ShipmentsPage() {
     });
   }, [productsQuery.data, selectedShipment]);
 
-
   const selectedShipmentOrderedTotal = shipmentItems.reduce(
     (sum, item) => sum + toNumber(item.quantity),
     0
@@ -682,6 +774,51 @@ export default function ShipmentsPage() {
       ? (selectedShipmentReceivedTotal / selectedShipmentOrderedTotal) * 100
       : 0
   );
+
+  const incompleteShipmentLines = shipmentItems.filter((item) => {
+    const ordered = toNumber(item.quantity);
+    const received = toNumber(item.received_quantity);
+    return received < ordered;
+  });
+
+  const incompleteShipmentLinesWithoutReason = incompleteShipmentLines.filter((item) => {
+    const persistedReason = typeof item.discrepancy_reason === 'string'
+      ? item.discrepancy_reason.trim()
+      : '';
+
+    return !persistedReason;
+  });
+
+  const canEditSelectedShipment =
+    Boolean(selectedShipment) &&
+    selectedShipment?.status === 'pending' &&
+    canManageShipments;
+
+  const canDeleteSelectedShipment =
+    Boolean(selectedShipment) &&
+    selectedShipment?.status === 'pending' &&
+    shipmentItems.length === 0 &&
+    canManageShipments;
+
+  const canFinalizeSelectedShipment =
+    Boolean(selectedShipment) &&
+    selectedShipment?.status !== 'received' &&
+    shipmentItems.length > 0 &&
+    incompleteShipmentLinesWithoutReason.length === 0;
+
+  const finalizeReadinessMessage =
+    !selectedShipment
+      ? 'Select a shipment first.'
+      : selectedShipment.status === 'received'
+        ? 'Shipment already finalized.'
+        : shipmentItems.length === 0
+          ? 'Add shipment items before finalizing.'
+          : incompleteShipmentLinesWithoutReason.length > 0
+            ? `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) need a saved discrepancy reason before finalization.`
+            : incompleteShipmentLines.length > 0
+              ? `${incompleteShipmentLines.length} incomplete line(s) have documented shortage reasons and can be finalized as discrepancies.`
+              : 'All lines are fully received and ready to finalize.';
+
   const selectedScannerLocationName =
     storageLocations.find((location) => location.id === selectedScannerLocationId)?.name ?? '';
   const hasStorageLocations = storageLocations.length > 0;
@@ -713,12 +850,7 @@ export default function ShipmentsPage() {
     },
     {
       label: '4. Finalize Shipment',
-      detail:
-        selectedShipment?.status === 'received'
-          ? 'Shipment already finalized.'
-          : selectedShipmentProgress >= 100
-            ? 'Shipment is ready to finalize.'
-            : 'Finalize after all expected quantities are received.',
+      detail: finalizeReadinessMessage,
       complete: selectedShipment?.status === 'received'
     }
   ];
@@ -786,34 +918,46 @@ export default function ShipmentsPage() {
 
     if (locationIdFromQuery) {
       setSelectedScannerLocationId(locationIdFromQuery);
+    } else if (itemIdFromQuery || scannedBarcode) {
+      setSelectedScannerLocationId('');
     }
 
     if (itemIdFromQuery) {
       setHighlightedItemId(itemIdFromQuery);
-      setPendingAutoReceive({
-        itemId: itemIdFromQuery,
-        scannedBarcode,
-        packageId: packageIdFromQuery,
-        packageName: packageNameFromQuery,
-        packageBarcode: packageBarcodeFromQuery,
-        unitsPerPackage: Number.isFinite(parsedUnitsPerPackage) ? parsedUnitsPerPackage : null,
-        remainingPackagesEstimate: Number.isFinite(parsedRemainingPackagesEstimate)
-          ? parsedRemainingPackagesEstimate
-          : null,
-        canReceiveOneFullPackage:
-          canReceiveOneFullPackageFromQuery === null
-            ? null
-            : canReceiveOneFullPackageFromQuery === 'true'
-      });
       autoReceiveAttemptKeyRef.current = '';
 
-      setPageMessage(
-        scannedBarcode
-          ? packageNameFromQuery && unitsPerPackageFromQuery
-            ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
-            : `Product barcode ${scannedBarcode} matched inside selected shipment.`
-          : 'Shipment item matched from scanner.'
-      );
+      if (!locationIdFromQuery) {
+        setPendingAutoReceive(null);
+        setPageMessage(
+          scannedBarcode
+            ? `Product barcode ${scannedBarcode} matched inside selected shipment. Select a default scan location before receiving.`
+            : 'Shipment item matched from scanner. Select a default scan location before receiving.'
+        );
+      } else {
+        setPendingAutoReceive({
+          itemId: itemIdFromQuery,
+          scannedBarcode,
+          packageId: packageIdFromQuery,
+          packageName: packageNameFromQuery,
+          packageBarcode: packageBarcodeFromQuery,
+          unitsPerPackage: Number.isFinite(parsedUnitsPerPackage) ? parsedUnitsPerPackage : null,
+          remainingPackagesEstimate: Number.isFinite(parsedRemainingPackagesEstimate)
+            ? parsedRemainingPackagesEstimate
+            : null,
+          canReceiveOneFullPackage:
+            canReceiveOneFullPackageFromQuery === null
+              ? null
+              : canReceiveOneFullPackageFromQuery === 'true'
+        });
+
+        setPageMessage(
+          scannedBarcode
+            ? packageNameFromQuery && unitsPerPackageFromQuery
+              ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
+              : `Product barcode ${scannedBarcode} matched inside selected shipment.`
+            : 'Shipment item matched from scanner.'
+        );
+      }
     } else {
       setHighlightedItemId('');
       setPendingAutoReceive(null);
@@ -883,6 +1027,10 @@ export default function ShipmentsPage() {
     }));
   }, [highlightedItemId, selectedScannerLocationId, shipmentItems]);
 
+  const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
+    return receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
+  };
+
   useEffect(() => {
     if (!pendingAutoReceive) {
       return;
@@ -941,6 +1089,7 @@ export default function ShipmentsPage() {
 
     const safeStorageLocationId =
       draft.storage_location_id ||
+      selectedScannerLocationId ||
       matchedItem.storage_location_id ||
       (storageLocations.length === 1 ? storageLocations[0].id : '');
 
@@ -1012,13 +1161,10 @@ export default function ShipmentsPage() {
     selectedShipment,
     shipmentItems,
     storageLocations,
+    selectedScannerLocationId,
     receiveShipmentMutation,
     receiveDrafts
   ]);
-
-  const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
-    return receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
-  };
 
   const updateReceiveDraft = (
     itemId: string,
@@ -1051,8 +1197,8 @@ export default function ShipmentsPage() {
   const handleAddShipmentItem = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!canManageShipments) {
-      setPageError('Your current role cannot add shipment items. Shipment item writes are restricted to manager and admin roles by the existing backend.');
+    if (!canManageShipmentItems) {
+      setPageError('Your current role cannot add shipment items. Shipment item writes are restricted by the backend shipment item write permission.');
       return;
     }
     setPageError(null);
@@ -1081,6 +1227,100 @@ export default function ShipmentsPage() {
       shipment_id: selectedShipmentId,
       product_id: itemForm.product_id,
       quantity: Number(itemForm.quantity)
+    });
+  };
+
+  const getShipmentItemEditDraft = (item: ShipmentItem): ShipmentItemEditDraft => {
+    return shipmentItemEditDrafts[item.id] ?? {
+      product_id: item.product_id,
+      quantity: String(toNumber(item.quantity))
+    };
+  };
+
+  const updateShipmentItemEditDraft = (
+    item: ShipmentItem,
+    updates: Partial<ShipmentItemEditDraft>
+  ) => {
+    setShipmentItemEditDrafts((current) => ({
+      ...current,
+      [item.id]: {
+        ...getShipmentItemEditDraft(item),
+        ...updates
+      }
+    }));
+  };
+
+  const handleUpdateShipmentItem = (item: ShipmentItem) => {
+    if (!canEditSelectedShipment) {
+      setPageMessage(null);
+      setPageError('Only pending shipments can have shipment items edited.');
+      return;
+    }
+
+    const editDraft = getShipmentItemEditDraft(item);
+    const nextQuantity = Number(editDraft.quantity);
+    const receivedQuantity = toNumber(item.received_quantity);
+
+    if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) {
+      setPageMessage(null);
+      setPageError('Shipment item quantity must be greater than zero.');
+      return;
+    }
+
+    if (nextQuantity < receivedQuantity) {
+      setPageMessage(null);
+      setPageError('Shipment item quantity cannot be less than the already received quantity.');
+      return;
+    }
+
+    if (!editDraft.product_id) {
+      setPageMessage(null);
+      setPageError('Shipment item product is required.');
+      return;
+    }
+
+    if (item.version === undefined || item.version === null) {
+      setPageMessage(null);
+      setPageError('Shipment item version is missing. Refresh shipment items before editing.');
+      return;
+    }
+
+    updateShipmentItemMutation.mutate({
+      itemId: item.id,
+      version: item.version,
+      product_id: editDraft.product_id,
+      quantity: nextQuantity
+    });
+  };
+
+  const handleDeleteShipmentItem = (item: ShipmentItem) => {
+    if (!canEditSelectedShipment) {
+      setPageMessage(null);
+      setPageError('Only pending shipments can have shipment items deleted.');
+      return;
+    }
+
+    if (toNumber(item.received_quantity) > 0) {
+      setPageMessage(null);
+      setPageError('Shipment items that already have received quantity cannot be deleted.');
+      return;
+    }
+
+    if (item.version === undefined || item.version === null) {
+      setPageMessage(null);
+      setPageError('Shipment item version is missing. Refresh shipment items before deleting.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete shipment item ${item.product_name || item.product_id}?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteShipmentItemMutation.mutate({
+      itemId: item.id,
+      version: item.version
     });
   };
 
@@ -1133,8 +1373,8 @@ export default function ShipmentsPage() {
   };
 
   const handleFinalizeShipment = () => {
-    if (!canManageShipments) {
-      setPageError('Your current role cannot finalize shipments. Shipment finalization is restricted to manager and admin roles by the existing backend.');
+    if (!canFinalizeShipments) {
+      setPageError('Your current role cannot finalize shipments. Shipment finalization is restricted by the backend shipment finalize permission.');
       return;
     }
 
@@ -1146,15 +1386,129 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (shipmentItems.length === 0) {
+      setPageError('Add shipment items before finalizing.');
+      return;
+    }
+
+    if (selectedShipment.status === 'received') {
+      setPageError('Shipment is already finalized.');
+      return;
+    }
+
+    if (incompleteShipmentLinesWithoutReason.length > 0) {
+      setPageError(
+        `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) still need a saved discrepancy reason before finalization. Enter a discrepancy reason while receiving a partial quantity, then receive that partial quantity to save it.`
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      incompleteShipmentLines.length > 0
+        ? `Finalize shipment with ${incompleteShipmentLines.length} documented shortage/discrepancy line(s)? This will lock the shipment as received.`
+        : 'Finalize this fully received shipment? This will lock receiving.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     finalizeShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
       version: selectedShipment.version
     });
   };
 
-  const handleSendShipmentToSupplier = () => {
+  const handleRunAutoReorder = () => {
     if (!canManageShipments) {
-      setPageError('Your current role cannot email shipments to suppliers. Supplier email actions are restricted to manager and admin roles.');
+      setPageError('Your current role cannot generate auto reorder shipments. Manager or admin role is required.');
+      return;
+    }
+
+    const confirmed = window.confirm('Generate shipments from backend auto-reorder rules now?');
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    autoReorderMutation.mutate();
+  };
+
+  const handleEditSelectedShipment = () => {
+    if (!selectedShipment) {
+      setPageError('Select a shipment first.');
+      return;
+    }
+
+    if (!canEditSelectedShipment) {
+      setPageError('Only pending shipments can be edited by manager or admin roles.');
+      return;
+    }
+
+    const supplierId = window.prompt('Supplier ID', selectedShipment.supplier_id);
+
+    if (supplierId === null) {
+      return;
+    }
+
+    const deliveryDate = window.prompt('Delivery date', selectedShipment.delivery_date.slice(0, 10));
+
+    if (deliveryDate === null) {
+      return;
+    }
+
+    const poNumber = window.prompt('PO number', selectedShipment.po_number || '');
+
+    if (poNumber === null) {
+      return;
+    }
+
+    const trimmedSupplierId = supplierId.trim();
+    const trimmedDeliveryDate = deliveryDate.trim();
+
+    if (!trimmedSupplierId || !trimmedDeliveryDate) {
+      setPageError('Supplier ID and delivery date are required.');
+      setPageMessage(null);
+      return;
+    }
+
+    updateShipmentMutation.mutate({
+      shipmentId: selectedShipment.id,
+      version: selectedShipment.version,
+      supplier_id: trimmedSupplierId,
+      delivery_date: trimmedDeliveryDate,
+      po_number: poNumber
+    });
+  };
+
+  const handleDeleteSelectedShipment = () => {
+    if (!selectedShipment) {
+      setPageError('Select a shipment first.');
+      return;
+    }
+
+    if (!canDeleteSelectedShipment) {
+      setPageError('Only empty pending shipments can be deleted by manager or admin roles. Remove shipment items first.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete shipment ${selectedShipment.po_number || selectedShipment.id}? This cannot be undone.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteShipmentMutation.mutate({
+      shipmentId: selectedShipment.id,
+      version: selectedShipment.version
+    });
+  };
+
+  const handleSendShipmentToSupplier = () => {
+    if (!canSendShipments) {
+      setPageError('Your current role cannot email shipments to suppliers. Supplier email actions are restricted by the backend shipment send permission.');
       return;
     }
 
@@ -1210,7 +1564,7 @@ export default function ShipmentsPage() {
           <h2 style={styles.title}>Shipments</h2>
           <p style={styles.description}>
             Create inbound shipments, add shipment items, receive lines partially
-            or fully, and finalize the shipment when operations are complete.
+            or fully, and finalize only when all shortages are documented.
           </p>
         </div>
       </div>
@@ -1318,9 +1672,19 @@ export default function ShipmentsPage() {
               type="submit"
               style={styles.primaryButton}
               disabled={createShipmentMutation.isPending || !canManageShipments}
-              title={!canManageShipments ? 'Manager or admin role required' : undefined}
+              title={!canManageShipments ? 'Shipment write permission required' : undefined}
             >
               {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
+            </button>
+
+            <button
+              type="button"
+              style={{ ...styles.secondaryButton, width: '100%' }}
+              onClick={handleRunAutoReorder}
+              disabled={autoReorderMutation.isPending || !canAutoReorderShipments}
+              title={!canAutoReorderShipments ? 'Shipment auto-reorder permission required' : 'Generate backend auto-reorder shipments'}
+            >
+              {autoReorderMutation.isPending ? 'Generating...' : 'Auto Reorder'}
             </button>
           </div>
         </form>
@@ -1450,7 +1814,7 @@ export default function ShipmentsPage() {
             <div>
               <h3 style={styles.panelTitle}>Selected Shipment</h3>
               <p style={styles.panelSubtitle}>
-                Add shipment lines, receive stock into locations, and finalize the shipment.
+                Add shipment lines, receive stock into locations, document shortages, and finalize the shipment.
               </p>
             </div>
           </div>
@@ -1560,8 +1924,8 @@ export default function ShipmentsPage() {
                         Keep operators oriented while partially receiving the shipment.
                       </div>
                     </div>
-                    <span style={selectedShipmentProgress >= 100 ? styles.progressBadgeComplete : styles.progressBadgePending}>
-                      {selectedShipmentProgress >= 100 ? 'Ready to finalize' : `${Math.round(selectedShipmentProgress)}% received`}
+                    <span style={canFinalizeSelectedShipment ? styles.progressBadgeComplete : styles.progressBadgePending}>
+                      {canFinalizeSelectedShipment ? 'Ready to finalize' : `${Math.round(selectedShipmentProgress)}% received`}
                     </span>
                   </div>
 
@@ -1587,6 +1951,10 @@ export default function ShipmentsPage() {
                         width: `${selectedShipmentProgress}%`
                       }}
                     />
+                  </div>
+
+                  <div style={canFinalizeSelectedShipment ? styles.finalizeReadyBanner : styles.finalizeBlockedBanner}>
+                    {finalizeReadinessMessage}
                   </div>
                 </div>
 
@@ -1692,8 +2060,8 @@ export default function ShipmentsPage() {
                   <button
                     type="submit"
                     style={styles.primaryButton}
-                    disabled={addShipmentItemMutation.isPending || !canManageShipments}
-                    title={!canManageShipments ? 'Manager or admin role required' : undefined}
+                    disabled={addShipmentItemMutation.isPending || !canManageShipmentItems}
+                    title={!canManageShipmentItems ? 'Shipment item write permission required' : undefined}
                   >
                     {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
                   </button>
@@ -1750,21 +2118,48 @@ export default function ShipmentsPage() {
                   <button
                     type="button"
                     style={{
+                      ...styles.secondaryButton,
+                      width: isMobile ? '100%' : undefined
+                    }}
+                    onClick={handleEditSelectedShipment}
+                    disabled={!canEditSelectedShipment || updateShipmentMutation.isPending}
+                    title={!canEditSelectedShipment ? 'Only pending shipments can be edited by manager or admin roles' : 'Edit pending shipment header'}
+                  >
+                    {updateShipmentMutation.isPending ? 'Saving...' : 'Edit Shipment'}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.deleteShipmentButton,
+                      width: isMobile ? '100%' : undefined,
+                      ...(!canDeleteSelectedShipment ? styles.deleteShipmentButtonDisabled : {})
+                    }}
+                    onClick={handleDeleteSelectedShipment}
+                    disabled={!canDeleteSelectedShipment || deleteShipmentMutation.isPending}
+                    title={!canDeleteSelectedShipment ? 'Only empty pending shipments can be deleted' : 'Delete empty pending shipment'}
+                  >
+                    {deleteShipmentMutation.isPending ? 'Deleting...' : 'Delete Shipment'}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
                       ...styles.emailSupplierButton,
                       width: isMobile ? '100%' : undefined,
-                      ...(!canManageShipments || shipmentItems.length === 0
+                      ...(!canSendShipments || shipmentItems.length === 0
                         ? styles.emailSupplierButtonDisabled
                         : {})
                     }}
                     onClick={handleSendShipmentToSupplier}
                     disabled={
                       sendShipmentToSupplierMutation.isPending ||
-                      !canManageShipments ||
+                      !canSendShipments ||
                       shipmentItems.length === 0
                     }
                     title={
-                      !canManageShipments
-                        ? 'Manager or admin role required'
+                      !canSendShipments
+                        ? 'Shipment send permission required'
                         : shipmentItems.length === 0
                           ? 'Add at least one shipment item before emailing the supplier'
                           : 'Email the supplier a shipment PDF and QR attachment'
@@ -1780,20 +2175,27 @@ export default function ShipmentsPage() {
                     style={{
                       ...styles.finalizeButton,
                       width: isMobile ? '100%' : undefined,
-                      ...(!canManageShipments ? styles.finalizeButtonDisabled : {})
+                      ...(!canFinalizeShipments || !canFinalizeSelectedShipment ? styles.finalizeButtonDisabled : {})
                     }}
                     onClick={handleFinalizeShipment}
                     disabled={
                       finalizeShipmentMutation.isPending ||
                       selectedShipment.status === 'received' ||
-                      !canManageShipments
+                      !canFinalizeShipments ||
+                      !canFinalizeSelectedShipment
                     }
-                    title={!canManageShipments ? 'Manager or admin role required' : undefined}
+                    title={!canFinalizeShipments ? 'Shipment finalize permission required' : finalizeReadinessMessage}
                   >
                     {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
                   </button>
                 </div>
               </div>
+
+              {incompleteShipmentLinesWithoutReason.length > 0 ? (
+                <div style={styles.finalizeBlockedBanner}>
+                  Finalization blocked: {incompleteShipmentLinesWithoutReason.length} incomplete line(s) do not have a saved discrepancy reason.
+                </div>
+              ) : null}
 
               {shipmentItemsQuery.isLoading ? (
                 <p style={styles.emptyState}>Loading shipment items...</p>
@@ -1807,6 +2209,7 @@ export default function ShipmentsPage() {
                     const remaining = Math.max(ordered - received, 0);
                     const draft = getReceiveDraft(item);
                     const isHighlighted = item.id === highlightedItemId;
+                    const hasSavedShortageReason = Boolean(item.discrepancy_reason?.trim());
 
                     return (
                       <div
@@ -1832,6 +2235,10 @@ export default function ShipmentsPage() {
                             >
                               {remaining <= 0 ? 'Received' : `${remaining} remaining`}
                             </span>
+
+                            {remaining > 0 && hasSavedShortageReason ? (
+                              <span style={styles.mobileDiscrepancyBadge}>Reason saved</span>
+                            ) : null}
                           </div>
                         </div>
 
@@ -1853,6 +2260,12 @@ export default function ShipmentsPage() {
                             <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
                           </div>
                         </div>
+
+                        {remaining > 0 && item.discrepancy_reason ? (
+                          <div style={styles.savedReasonBox}>
+                            Saved discrepancy reason: {item.discrepancy_reason}
+                          </div>
+                        ) : null}
 
                         <div style={styles.mobileFieldGroup}>
                           <label style={styles.label}>Storage Location</label>
@@ -1897,7 +2310,7 @@ export default function ShipmentsPage() {
                           <input
                             style={styles.input}
                             type="text"
-                            placeholder="Optional discrepancy reason"
+                            placeholder="Required if this line will remain short at finalization"
                             value={draft.discrepancy_reason}
                             onChange={(event) =>
                               updateReceiveDraft(item.id, (current) => ({
@@ -1923,6 +2336,53 @@ export default function ShipmentsPage() {
                             }
                           />
                         </div>
+
+                        {selectedShipment.status === 'pending' ? (
+                          <div style={styles.mobileItemActionGrid}>
+                            <label style={styles.label}>Product</label>
+                            <select
+                              style={styles.input}
+                              value={getShipmentItemEditDraft(item).product_id}
+                              onChange={(event) => updateShipmentItemEditDraft(item, { product_id: event.target.value })}
+                              disabled={!canManageShipmentItems || !canEditSelectedShipment || updateShipmentItemMutation.isPending || received > 0}
+                            >
+                              {shipmentProductOptions.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name}
+                                  {product.supplier_name ? ` · ${product.supplier_name}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <label style={styles.label}>Ordered Quantity</label>
+                            <input
+                              style={styles.input}
+                              type="number"
+                              min={Math.max(received, 0.01)}
+                              step="0.01"
+                              value={getShipmentItemEditDraft(item).quantity}
+                              onChange={(event) => updateShipmentItemEditDraft(item, { quantity: event.target.value })}
+                              disabled={!canManageShipmentItems || !canEditSelectedShipment || updateShipmentItemMutation.isPending}
+                            />
+                            <div style={styles.mobileItemButtonRow}>
+                              <button
+                                type="button"
+                                style={styles.secondaryButton}
+                                onClick={() => handleUpdateShipmentItem(item)}
+                                disabled={!canManageShipmentItems || !canEditSelectedShipment || updateShipmentItemMutation.isPending}
+                              >
+                                {updateShipmentItemMutation.isPending ? 'Saving...' : 'Save Item'}
+                              </button>
+                              <button
+                                type="button"
+                                style={styles.deleteShipmentButton}
+                                onClick={() => handleDeleteShipmentItem(item)}
+                                disabled={!canManageShipmentItems || !canEditSelectedShipment || deleteShipmentItemMutation.isPending || received > 0}
+                              >
+                                {deleteShipmentItemMutation.isPending ? 'Deleting...' : 'Delete Item'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
 
                         <button
                           type="button"
@@ -1951,7 +2411,9 @@ export default function ShipmentsPage() {
                     <thead>
                       <tr>
                         <th style={styles.th}>Product</th>
+                        <th style={styles.th}>Edit Product</th>
                         <th style={styles.th}>Ordered</th>
+                        <th style={styles.th}>Edit Ordered</th>
                         <th style={styles.th}>Received</th>
                         <th style={styles.th}>Remaining</th>
                         <th style={styles.th}>Storage Location</th>
@@ -1968,6 +2430,7 @@ export default function ShipmentsPage() {
                         const remaining = Math.max(ordered - received, 0);
                         const draft = getReceiveDraft(item);
                         const isHighlighted = item.id === highlightedItemId;
+                        const hasSavedShortageReason = Boolean(item.discrepancy_reason?.trim());
 
                         return (
                           <tr
@@ -1980,9 +2443,39 @@ export default function ShipmentsPage() {
                                 {isHighlighted ? (
                                   <span style={styles.desktopScannedBadge}>Scanned Match</span>
                                 ) : null}
+                                {remaining > 0 && hasSavedShortageReason ? (
+                                  <span style={styles.desktopDiscrepancyBadge}>Reason saved</span>
+                                ) : null}
                               </div>
                             </td>
+                            <td style={styles.td}>
+                              <select
+                                style={styles.inputCompact}
+                                value={getShipmentItemEditDraft(item).product_id}
+                                onChange={(event) => updateShipmentItemEditDraft(item, { product_id: event.target.value })}
+                                disabled={!canManageShipmentItems || !canEditSelectedShipment || selectedShipment.status !== 'pending' || updateShipmentItemMutation.isPending || received > 0}
+                                title={received > 0 ? 'Received shipment items cannot change product' : 'Change pending shipment item product'}
+                              >
+                                {shipmentProductOptions.map((product) => (
+                                  <option key={product.id} value={product.id}>
+                                    {product.name}
+                                    {product.supplier_name ? ` · ${product.supplier_name}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
                             <td style={styles.td}>{ordered}</td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.inputCompact}
+                                type="number"
+                                min={Math.max(received, 0.01)}
+                                step="0.01"
+                                value={getShipmentItemEditDraft(item).quantity}
+                                onChange={(event) => updateShipmentItemEditDraft(item, { quantity: event.target.value })}
+                                disabled={!canManageShipmentItems || !canEditSelectedShipment || selectedShipment.status !== 'pending' || updateShipmentItemMutation.isPending}
+                              />
+                            </td>
                             <td style={styles.td}>{received}</td>
                             <td style={styles.td}>{remaining}</td>
                             <td style={styles.td}>
@@ -2023,7 +2516,7 @@ export default function ShipmentsPage() {
                               <input
                                 style={styles.inputCompact}
                                 type="text"
-                                placeholder="Optional discrepancy reason"
+                                placeholder="Required if final shortage remains"
                                 value={draft.discrepancy_reason}
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
@@ -2032,6 +2525,11 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               />
+                              {item.discrepancy_reason ? (
+                                <div style={styles.savedReasonText}>
+                                  Saved: {item.discrepancy_reason}
+                                </div>
+                              ) : null}
                             </td>
                             <td style={styles.td}>
                               <input
@@ -2048,18 +2546,41 @@ export default function ShipmentsPage() {
                               />
                             </td>
                             <td style={styles.td}>
-                              <button
-                                type="button"
-                                style={styles.secondaryButton}
-                                onClick={() => handleReceiveLine(item)}
-                                disabled={
-                                  receiveShipmentMutation.isPending ||
-                                  remaining <= 0 ||
-                                  selectedShipment.status === 'received'
-                                }
-                              >
-                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
-                              </button>
+                              <div style={styles.itemActionStack}>
+                                {selectedShipment.status === 'pending' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      style={styles.secondaryButton}
+                                      onClick={() => handleUpdateShipmentItem(item)}
+                                      disabled={!canManageShipmentItems || !canEditSelectedShipment || updateShipmentItemMutation.isPending}
+                                    >
+                                      {updateShipmentItemMutation.isPending ? 'Saving...' : 'Save Item'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      style={styles.deleteShipmentButton}
+                                      onClick={() => handleDeleteShipmentItem(item)}
+                                      disabled={!canManageShipmentItems || !canEditSelectedShipment || deleteShipmentItemMutation.isPending || received > 0}
+                                      title={received > 0 ? 'Received shipment items cannot be deleted' : 'Delete shipment item'}
+                                    >
+                                      {deleteShipmentItemMutation.isPending ? 'Deleting...' : 'Delete Item'}
+                                    </button>
+                                  </>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  style={styles.secondaryButton}
+                                  onClick={() => handleReceiveLine(item)}
+                                  disabled={
+                                    receiveShipmentMutation.isPending ||
+                                    remaining <= 0 ||
+                                    selectedShipment.status === 'received'
+                                  }
+                                >
+                                  {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2121,7 +2642,9 @@ const styles: Record<string, CSSProperties> = {
   },
   formActionRow: {
     display: 'flex',
-    alignItems: 'end'
+    alignItems: 'end',
+    gap: 10,
+    flexWrap: 'wrap'
   },
   label: {
     display: 'block',
@@ -2168,6 +2691,21 @@ const styles: Record<string, CSSProperties> = {
     color: '#111827',
     fontWeight: 700,
     cursor: 'pointer'
+  },
+  deleteShipmentButton: {
+    border: '1px solid #fecaca',
+    borderRadius: 10,
+    padding: '10px 14px',
+    background: '#fef2f2',
+    color: '#991b1b',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  deleteShipmentButtonDisabled: {
+    background: '#f3f4f6',
+    color: '#9ca3af',
+    borderColor: '#e5e7eb',
+    cursor: 'not-allowed'
   },
   finalizeButtonDisabled: {
     background: '#94a3b8',
@@ -2307,7 +2845,8 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     padding: 16,
     background: '#f9fafb',
-    minWidth: 0
+    minWidth: 0,
+    marginTop: 16
   },
   selectedShipmentGrid: {
     display: 'grid',
@@ -2341,12 +2880,6 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     flex: 1
   },
-  defaultLocationBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    maxWidth: 320
-  },
   fieldHint: {
     fontSize: 12,
     color: '#64748b',
@@ -2358,10 +2891,6 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     fontWeight: 400,
     marginTop: 4
-  },
-  scanWarningText: {
-    color: '#b45309',
-    fontSize: 13
   },
   itemTableWrapper: {
     overflowX: 'auto',
@@ -2402,6 +2931,17 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     background: '#dbeafe',
     color: '#1d4ed8'
+  },
+  desktopDiscrepancyBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '4px 8px',
+    fontSize: 11,
+    fontWeight: 700,
+    background: '#fef3c7',
+    color: '#92400e'
   },
   mobileItemCardList: {
     display: 'flex',
@@ -2480,6 +3020,17 @@ const styles: Record<string, CSSProperties> = {
     background: '#dbeafe',
     color: '#1d4ed8'
   },
+  mobileDiscrepancyBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 700,
+    background: '#fef3c7',
+    color: '#92400e'
+  },
   mobileReceiveButton: {
     width: '100%',
     border: 'none',
@@ -2498,5 +3049,214 @@ const styles: Record<string, CSSProperties> = {
   emptyState: {
     color: '#6b7280',
     margin: 0
+  },
+  guidedEmptyState: {
+    display: 'grid',
+    gap: 14,
+    border: '1px dashed #cbd5e1',
+    borderRadius: 18,
+    background: '#f8fafc',
+    padding: 18
+  },
+  guidedEmptyStateTitle: {
+    fontSize: '1rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  guidedEmptyStateText: {
+    color: '#475569',
+    lineHeight: 1.6
+  },
+  workflowGuideGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12,
+    marginBottom: 16
+  },
+  workflowStepCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    background: '#ffffff',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepCardComplete: {
+    border: '1px solid #bbf7d0',
+    borderRadius: 16,
+    background: '#f0fdf4',
+    padding: 14,
+    display: 'grid',
+    gap: 8
+  },
+  workflowStepLabel: {
+    fontSize: '0.86rem',
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  workflowStepText: {
+    color: '#475569',
+    lineHeight: 1.5,
+    fontSize: '0.92rem'
+  },
+  scannerReadinessSection: {
+    display: 'grid',
+    gap: 16,
+    marginTop: 16
+  },
+  readinessCard: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 16,
+    padding: 16,
+    background: '#ffffff'
+  },
+  readinessHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14
+  },
+  progressBadgeComplete: {
+    display: 'inline-flex',
+    borderRadius: 999,
+    padding: '6px 10px',
+    background: '#dcfce7',
+    color: '#166534',
+    fontWeight: 800,
+    fontSize: 12
+  },
+  progressBadgePending: {
+    display: 'inline-flex',
+    borderRadius: 999,
+    padding: '6px 10px',
+    background: '#fef3c7',
+    color: '#92400e',
+    fontWeight: 800,
+    fontSize: 12
+  },
+  progressSummaryRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 10,
+    marginBottom: 12
+  },
+  progressMetricBox: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 10,
+    background: '#f9fafb'
+  },
+  progressBarTrack: {
+    height: 10,
+    borderRadius: 999,
+    background: '#e5e7eb',
+    overflow: 'hidden'
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    background: '#2563eb'
+  },
+  readinessStatusReady: {
+    display: 'inline-flex',
+    borderRadius: 999,
+    padding: '6px 10px',
+    background: '#dcfce7',
+    color: '#166534',
+    fontWeight: 800,
+    fontSize: 12
+  },
+  readinessStatusBlocked: {
+    display: 'inline-flex',
+    borderRadius: 999,
+    padding: '6px 10px',
+    background: '#fee2e2',
+    color: '#991b1b',
+    fontWeight: 800,
+    fontSize: 12
+  },
+  scanWarningBanner: {
+    marginTop: 10,
+    border: '1px solid #fed7aa',
+    borderRadius: 12,
+    padding: '10px 12px',
+    background: '#fff7ed',
+    color: '#9a3412',
+    fontSize: 13
+  },
+  scanReadyBanner: {
+    marginTop: 10,
+    border: '1px solid #bbf7d0',
+    borderRadius: 12,
+    padding: '10px 12px',
+    background: '#f0fdf4',
+    color: '#166534',
+    fontSize: 13
+  },
+  finalizeReadyBanner: {
+    marginTop: 12,
+    border: '1px solid #bbf7d0',
+    borderRadius: 12,
+    padding: '10px 12px',
+    background: '#f0fdf4',
+    color: '#166534',
+    fontSize: 13,
+    lineHeight: 1.5
+  },
+  finalizeBlockedBanner: {
+    marginTop: 12,
+    marginBottom: 12,
+    border: '1px solid #fed7aa',
+    borderRadius: 12,
+    padding: '10px 12px',
+    background: '#fff7ed',
+    color: '#9a3412',
+    fontSize: 13,
+    lineHeight: 1.5
+  },
+  defaultLocationSummary: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: '10px 12px',
+    background: '#f9fafb',
+    color: '#374151',
+    fontSize: 13
+  },
+  savedReasonText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#92400e',
+    lineHeight: 1.4
+  },
+  savedReasonBox: {
+    border: '1px solid #fde68a',
+    borderRadius: 12,
+    background: '#fffbeb',
+    color: '#92400e',
+    padding: '10px 12px',
+    fontSize: 13,
+    lineHeight: 1.4,
+    marginBottom: 12
+  },
+
+  itemActionStack: {
+    display: 'grid',
+    gap: 8,
+    minWidth: 120
+  },
+  mobileItemActionGrid: {
+    display: 'grid',
+    gap: 8,
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 12,
+    background: '#f8fafc'
+  },
+  mobileItemButtonRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8
   }
+
 };

@@ -1,13 +1,13 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { clearPlatformAuthTokens } from '../lib/platformAuth';
+import { logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
 
-  const logout = () => {
-    clearPlatformAuthTokens();
+  const logout = async () => {
+    await logoutPlatformSession();
     navigate('/platform/login', { replace: true });
   };
 

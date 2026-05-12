@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
-import { getAccessToken } from '../lib/auth';
+import { getRoleCapabilities } from '../lib/permissions';
 
 type UserRole = 'admin' | 'manager' | 'staff';
 
@@ -21,36 +21,6 @@ type UserFormState = {
   role: UserRole;
   password: string;
 };
-
-function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
-
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    return JSON.parse(atob(padded)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function getCurrentUserRole(): UserRole | null {
-  const payload = decodeJwtPayload(getAccessToken());
-  const role = payload?.role;
-
-  if (role === 'admin' || role === 'manager' || role === 'staff') {
-    return role;
-  }
-
-  return null;
-}
 
 function emptyForm(): UserFormState {
   return {
@@ -148,7 +118,7 @@ export default function UsersPage() {
     Existing real behavior is preserved:
     - same backend endpoints
     - same query key
-    - same JWT role detection
+    - same backend-aligned permission helper
     - same create / update / delete flow
     - same role enforcement
     - same search filtering
@@ -168,8 +138,8 @@ export default function UsersPage() {
   */
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const currentRole = useMemo(() => getCurrentUserRole(), []);
-  const canWrite = currentRole === 'admin';
+  const { canManageUsers } = getRoleCapabilities();
+  const canWrite = canManageUsers;
 
   const [form, setForm] = useState<UserFormState>(emptyForm());
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);

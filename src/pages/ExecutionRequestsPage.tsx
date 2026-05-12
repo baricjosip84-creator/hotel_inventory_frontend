@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,
   ExecutionRequest,
   ExecutionRequestAuditPackResponse,
+  ExecutionRequestExecutionReviewResponse,
   ExecutionRequestListResponse,
   ExecutionRequestSecurityAuditResponse
 } from '../types/inventory';
@@ -57,12 +59,19 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 export default function ExecutionRequestsPage() {
+  const capabilities = getRoleCapabilities();
+  const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
+  const canSubmitExecutionRequests = capabilities.canSubmitExecutionRequests;
+  const canCancelExecutionRequests = capabilities.canCancelExecutionRequests;
+  const canReviewExecutionRequests = capabilities.canReviewExecutionRequests;
+  const canExecuteExecutionRequests = capabilities.canExecuteExecutionRequests;
   const [data, setData] = useState<ExecutionRequestListResponse | null>(null);
   const [adapterRegistry, setAdapterRegistry] = useState<ExecutionAdapterRegistryResponse | null>(null);
   const [hardeningSummary, setHardeningSummary] = useState<ExecutionModuleHardeningSummaryResponse | null>(null);
   const [selected, setSelected] = useState<ExecutionRequest | null>(null);
   const [auditPack, setAuditPack] = useState<ExecutionRequestAuditPackResponse | null>(null);
   const [securityAudit, setSecurityAudit] = useState<ExecutionRequestSecurityAuditResponse | null>(null);
+  const [executionReview, setExecutionReview] = useState<ExecutionRequestExecutionReviewResponse | null>(null);
   const [status, setStatus] = useState<StatusFilter>('');
   const [requestType, setRequestType] = useState<TypeFilter>('');
   const [search, setSearch] = useState('');
@@ -96,13 +105,14 @@ export default function ExecutionRequestsPage() {
         setSelected(nextSelected);
         if (!nextSelected || auditPack?.request_id !== nextSelected.id) setAuditPack(null);
         if (!nextSelected || securityAudit?.request_id !== nextSelected.id) setSecurityAudit(null);
+        if (!nextSelected || executionReview?.request_id !== nextSelected.id) setExecutionReview(null);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load execution requests');
     } finally {
       setLoading(false);
     }
-  }, [query, selected, auditPack?.request_id, securityAudit?.request_id]);
+  }, [query, selected, auditPack?.request_id, securityAudit?.request_id, executionReview?.request_id]);
 
   useEffect(() => {
     void loadRequests();
@@ -379,6 +389,22 @@ export default function ExecutionRequestsPage() {
     }
   };
 
+  const loadRequestDetail = async (request: ExecutionRequest) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const detail = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}`);
+      setSelected(detail);
+      setAuditPack(null);
+      setSecurityAudit(null);
+      setExecutionReview(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load execution request detail');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const loadAuditPack = async (request: ExecutionRequest) => {
     setSaving(true);
     setError(null);
@@ -400,6 +426,19 @@ export default function ExecutionRequestsPage() {
       setSecurityAudit(response);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load security audit');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadExecutionReview = async (request: ExecutionRequest) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<ExecutionRequestExecutionReviewResponse>(`/execution-requests/${request.id}/execution-review`);
+      setExecutionReview(response);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load execution review');
     } finally {
       setSaving(false);
     }
@@ -474,18 +513,22 @@ export default function ExecutionRequestsPage() {
           </p>
         </div>
         <div style={styles.actions}>
-          <button type="button" className="btn btn-primary" onClick={createSystemRecommendation} disabled={saving}>
-            Create from System Context
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={createStandardCostUpdate} disabled={saving}>
-            Create Standard Cost Update
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={createProductMinStockUpdate} disabled={saving}>
-            Create Min Stock Update
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={createProductPricingUpdate} disabled={saving}>
-            Create Pricing Update
-          </button>
+          {canCreateExecutionRequests ? (
+            <>
+              <button type="button" className="btn btn-primary" onClick={createSystemRecommendation} disabled={saving}>
+                Create from System Context
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={createStandardCostUpdate} disabled={saving}>
+                Create Standard Cost Update
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={createProductMinStockUpdate} disabled={saving}>
+                Create Min Stock Update
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={createProductPricingUpdate} disabled={saving}>
+                Create Pricing Update
+              </button>
+            </>
+          ) : null}
         </div>
       </section>
 
@@ -579,14 +622,14 @@ export default function ExecutionRequestsPage() {
                     <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{label(request.execution_status)}</span> : '-'}</td>
                     <td>
                       <div style={styles.actions}>
-                        <button type="button" className="btn btn-secondary" onClick={() => { setSelected(request); setAuditPack(null); setSecurityAudit(null); }}>View</button>
-                        {request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>Submit</button> : null}
-                        {request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
-                        {request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
-                        {request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>Execute</button> : null}
-                        {request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>No-op Execute</button> : null}
-                        {request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>Prepare Retry</button> : null}
-                        {request.status === 'draft' || request.status === 'pending_review' ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>Cancel</button> : null}
+                        <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(request)}>View Detail</button>
+                        {canSubmitExecutionRequests && request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>Submit</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>Execute</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>No-op Execute</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>Prepare Retry</button> : null}
+                        {canCancelExecutionRequests && (request.status === 'draft' || request.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>Cancel</button> : null}
                       </div>
                     </td>
                   </tr>
@@ -653,16 +696,22 @@ export default function ExecutionRequestsPage() {
               <KeyValue label="Adapter Execution Enabled" value={selected.adapter?.execution_enabled ? 'Yes' : 'No'} />
               <KeyValue label="Adapter Risk" value={selected.adapter?.risk_level ? label(selected.adapter.risk_level) : '-'} />
               <div style={styles.actions}>
+                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>
+                  Refresh Detail
+                </button>
                 <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>
                   Load Audit Pack
                 </button>
                 <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>
                   Load Security Audit
                 </button>
+                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadExecutionReview(selected)}>
+                  Load Execution Review
+                </button>
               </div>
               <ExecutionSecurityAuditPanel securityAudit={securityAudit} />
               <ExecutionAuditPackPanel auditPack={auditPack} />
-              <ExecutionReviewPanel request={selected} />
+              <ExecutionReviewPanel request={selected} executionReview={executionReview} />
               <h3 style={styles.subheading}>Traceability</h3>
               <div style={styles.traceGrid}>
                 <KeyValue label="Requested By" value={selected.requested_by_name || selected.requested_by || '-'} />
@@ -837,8 +886,8 @@ function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAud
   );
 }
 
-function ExecutionReviewPanel({ request }: { request: ExecutionRequest }) {
-  const review = request.execution_review;
+function ExecutionReviewPanel({ request, executionReview }: { request: ExecutionRequest; executionReview: ExecutionRequestExecutionReviewResponse | null }) {
+  const review = executionReview?.request_id === request.id ? executionReview.execution_review : request.execution_review;
 
   if (!review) {
     return <div className="app-empty-state">Execution review evidence is not available for this request.</div>;
@@ -849,7 +898,7 @@ function ExecutionReviewPanel({ request }: { request: ExecutionRequest }) {
       <div style={styles.reviewHeader}>
         <div>
           <strong>Execution Review</strong>
-          <div style={styles.meta}>Read-only result verification for this request.</div>
+          <div style={styles.meta}>{executionReview?.request_id === request.id ? 'Loaded from /execution-requests/:id/execution-review.' : 'Embedded execution review evidence from request detail/list.'}</div>
         </div>
         <span style={{ ...styles.badge, ...(review.available ? styles.successTone : styles.pendingTone) }}>
           {review.available ? 'Available' : 'Not executed'}
