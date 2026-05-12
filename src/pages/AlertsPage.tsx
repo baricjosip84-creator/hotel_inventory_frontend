@@ -38,6 +38,22 @@ type AlertFilters = {
   acknowledged: string;
 };
 
+type ManualAlertFormState = {
+  type: string;
+  message: string;
+  severity: AlertSeverity;
+  product_id: string;
+  escalation_level: string;
+};
+
+const emptyManualAlertForm: ManualAlertFormState = {
+  type: '',
+  message: '',
+  severity: 'warning',
+  product_id: '',
+  escalation_level: '0'
+};
+
 async function fetchAlerts(filters: AlertFilters): Promise<AlertRow[]> {
   const params = new URLSearchParams();
 
@@ -48,6 +64,21 @@ async function fetchAlerts(filters: AlertFilters): Promise<AlertRow[]> {
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<AlertRow[]>(`/alerts${suffix}`);
+}
+
+async function createManualAlert(input: ManualAlertFormState): Promise<AlertRow> {
+  const escalationLevel = Number(input.escalation_level || 0);
+
+  return apiRequest<AlertRow>('/alerts', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: input.type.trim(),
+      message: input.message.trim(),
+      severity: input.severity,
+      product_id: input.product_id.trim() || null,
+      escalation_level: Number.isFinite(escalationLevel) ? escalationLevel : 0
+    })
+  });
 }
 
 async function acknowledgeAlert(id: string): Promise<AlertRow> {
@@ -156,6 +187,7 @@ export default function AlertsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});
+  const [manualAlertForm, setManualAlertForm] = useState<ManualAlertFormState>(emptyManualAlertForm);
 
   const alertsQuery = useQuery({
     queryKey: ['alerts', filters],
@@ -177,6 +209,22 @@ export default function AlertsPage() {
         setActionError(error instanceof ApiError ? error.message : 'Failed to update alert.');
       }
     });
+
+  const createAlertMutation = useMutation({
+    mutationFn: createManualAlert,
+    onSuccess: async () => {
+      setManualAlertForm(emptyManualAlertForm);
+      setActionError(null);
+      setActionMessage('Manual alert created successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setActionMessage(null);
+      setActionError(error instanceof ApiError ? error.message : 'Failed to create manual alert.');
+    }
+  });
 
   const acknowledgeMutation = makeMutation(acknowledgeAlert);
   const resolveMutation = makeMutation(resolveAlert);
@@ -208,6 +256,44 @@ export default function AlertsPage() {
     }),
     [alerts]
   );
+
+  const updateManualAlertField = (field: keyof ManualAlertFormState, value: string) => {
+    setManualAlertForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  };
+
+  const submitManualAlert = () => {
+    const type = manualAlertForm.type.trim();
+    const message = manualAlertForm.message.trim();
+    const escalationLevel = Number(manualAlertForm.escalation_level || 0);
+
+    if (!type) {
+      setActionMessage(null);
+      setActionError('Manual alert type is required.');
+      return;
+    }
+
+    if (!message) {
+      setActionMessage(null);
+      setActionError('Manual alert message is required.');
+      return;
+    }
+
+    if (!Number.isFinite(escalationLevel) || escalationLevel < 0) {
+      setActionMessage(null);
+      setActionError('Escalation level must be a non-negative number.');
+      return;
+    }
+
+    createAlertMutation.mutate({
+      ...manualAlertForm,
+      type,
+      message,
+      escalation_level: String(escalationLevel)
+    });
+  };
 
   if (alertsQuery.isLoading) {
     return <p>Loading alerts...</p>;
@@ -269,6 +355,72 @@ export default function AlertsPage() {
           acknowledge / resolve / reopen / escalate actions are restricted to manager and
           admin roles.
         </div>
+      ) : null}
+
+
+      {canManageAlerts ? (
+        <section className="app-panel app-panel--padded" style={styles.panel}>
+          <h2 style={styles.panelTitle}>Create Manual Alert</h2>
+          <p style={styles.formHint}>
+            Uses backend POST /alerts. Type and message are mandatory. Product ID is optional and must belong to the current tenant if provided.
+          </p>
+
+          <div className="app-grid-toolbar" style={styles.createGrid}>
+            <input
+              style={styles.input}
+              value={manualAlertForm.type}
+              onChange={(event) => updateManualAlertField('type', event.target.value)}
+              placeholder="Alert type"
+              disabled={createAlertMutation.isPending}
+            />
+            <select
+              style={styles.input}
+              value={manualAlertForm.severity}
+              onChange={(event) => updateManualAlertField('severity', event.target.value as AlertSeverity)}
+              disabled={createAlertMutation.isPending}
+            >
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+            <input
+              style={styles.input}
+              value={manualAlertForm.product_id}
+              onChange={(event) => updateManualAlertField('product_id', event.target.value)}
+              placeholder="Optional product ID"
+              disabled={createAlertMutation.isPending}
+            />
+            <input
+              style={styles.input}
+              type="number"
+              min="0"
+              step="1"
+              value={manualAlertForm.escalation_level}
+              onChange={(event) => updateManualAlertField('escalation_level', event.target.value)}
+              placeholder="Escalation level"
+              disabled={createAlertMutation.isPending}
+            />
+          </div>
+
+          <div style={styles.createMessageRow}>
+            <textarea
+              style={styles.textarea}
+              value={manualAlertForm.message}
+              onChange={(event) => updateManualAlertField('message', event.target.value)}
+              placeholder="Manual alert message"
+              rows={3}
+              disabled={createAlertMutation.isPending}
+            />
+            <button
+              style={styles.primaryButton}
+              onClick={submitManualAlert}
+              disabled={createAlertMutation.isPending}
+              type="button"
+            >
+              {createAlertMutation.isPending ? 'Creating...' : 'Create alert'}
+            </button>
+          </div>
+        </section>
       ) : null}
 
       {canOverrideAlerts ? (

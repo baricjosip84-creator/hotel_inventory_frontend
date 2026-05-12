@@ -36,14 +36,22 @@ export default function PlatformTenantsPage() {
   const lockMutation = useMutation({
     mutationFn: (tenantId: string) =>
       platformApiRequest(`/platform/tenants/${tenantId}/lock`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'system-health'] });
+    }
   });
 
   const unlockMutation = useMutation({
     mutationFn: (tenantId: string) =>
       platformApiRequest(`/platform/tenants/${tenantId}/unlock`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'system-health'] });
+    }
   });
+
+  const isMutatingTenantLock = lockMutation.isPending || unlockMutation.isPending;
 
   return (
     <div style={styles.page}>
@@ -56,8 +64,6 @@ export default function PlatformTenantsPage() {
 
       {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenants…</div> : null}
       {tenantsQuery.error ? <div style={styles.error}>{readableError(tenantsQuery.error)}</div> : null}
-      {lockMutation.error ? <div style={styles.error}>{readableError(lockMutation.error)}</div> : null}
-      {unlockMutation.error ? <div style={styles.error}>{readableError(unlockMutation.error)}</div> : null}
 
       <section style={styles.panel}>
         <table style={styles.table}>
@@ -84,7 +90,7 @@ export default function PlatformTenantsPage() {
                         type="button"
                         style={styles.button}
                         onClick={() => unlockMutation.mutate(tenant.id)}
-                        disabled={unlockMutation.isPending}
+                        disabled={isMutatingTenantLock}
                       >
                         Unlock
                       </button>
@@ -92,14 +98,14 @@ export default function PlatformTenantsPage() {
                       <span style={styles.muted}>Read-only</span>
                     )
                   ) : canLockTenants ? (
-                    <button
-                      type="button"
-                      style={styles.button}
-                      onClick={() => lockMutation.mutate(tenant.id)}
-                      disabled={lockMutation.isPending}
-                    >
-                      Lock
-                    </button>
+                      <button
+                        type="button"
+                        style={styles.button}
+                        onClick={() => lockMutation.mutate(tenant.id)}
+                        disabled={isMutatingTenantLock}
+                      >
+                        Lock
+                      </button>
                   ) : (
                     <span style={styles.muted}>Read-only</span>
                   )}

@@ -1,14 +1,21 @@
+
+import {
+  fetchCurrentPlatformIdentity,
+  logoutPlatformSession
+} from '../lib/platformAuth';
+
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AuthTokens } from '../types/auth';
 import { platformApiRequest } from '../lib/platformApi';
-import { fetchCurrentPlatformIdentity, savePlatformAuthTokens } from '../lib/platformAuth';
+import { savePlatformAuthTokens } from '../lib/platformAuth';
 
 export default function PlatformLoginPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    void logoutPlatformSession();
     let active = true;
 
     fetchCurrentPlatformIdentity()

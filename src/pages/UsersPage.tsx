@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 
 type UserRole = 'admin' | 'manager' | 'staff';
@@ -140,6 +141,7 @@ export default function UsersPage() {
   const isMobile = useIsMobile();
   const { canManageUsers } = getRoleCapabilities();
   const canWrite = canManageUsers;
+  const currentUserId = getCurrentTenantUserId();
 
   const [form, setForm] = useState<UserFormState>(emptyForm());
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
@@ -272,6 +274,12 @@ export default function UsersPage() {
 
   const handleDelete = (user: UserItem) => {
     if (!canWrite) {
+      return;
+    }
+
+    if (currentUserId && user.id === currentUserId) {
+      setPageMessage(null);
+      setPageError('You cannot delete your own user account. Backend rejects self-delete to prevent account lockout.');
       return;
     }
 

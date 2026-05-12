@@ -50,7 +50,6 @@ export class ApiError extends Error {
 }
 
 
-
 export function isVersionConflictError(error: unknown): boolean {
   if (!(error instanceof ApiError)) {
     return false;
@@ -75,7 +74,6 @@ export function getVersionConflictMessage(error: unknown): string {
 
   return 'Unknown request failure.';
 }
-
 
 function buildUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;

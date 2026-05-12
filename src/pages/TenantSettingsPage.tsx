@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import {
@@ -153,13 +152,17 @@ export default function TenantSettingsPage() {
       return;
     }
 
-    if (selectedTenant && selectedTenant.id !== selectedTenantId) {
-      setSelectedTenantId(selectedTenant.id);
-      setFormState(createFormState(selectedTenant));
-      setFormError(null);
-      setSuccessMessage(null);
+    if (!selectedTenant) {
+      setSelectedTenantId(null);
+      setFormState(emptyFormState);
+      return;
     }
-  }, [formMode, selectedTenant, selectedTenantId]);
+
+    setSelectedTenantId(selectedTenant.id);
+    setFormState(createFormState(selectedTenant));
+    setFormError(null);
+    setSuccessMessage(null);
+  }, [formMode, selectedTenant?.id]);
 
   const parsedMetadata = useMemo(() => {
     try {
@@ -197,7 +200,7 @@ export default function TenantSettingsPage() {
       setSelectedTenantId(tenant.id);
       setFormState(createFormState(tenant));
       setFormError(null);
-      setSuccessMessage('Tenant updated.');
+      setSuccessMessage('Tenant settings updated.');
       await queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
     onError: (error) => {
@@ -210,8 +213,8 @@ export default function TenantSettingsPage() {
     mutationFn: deleteTenant,
     onSuccess: async () => {
       setSelectedTenantId(null);
-      setFormState(emptyFormState);
       setFormMode('edit');
+      setFormState(emptyFormState);
       setFormError(null);
       setSuccessMessage('Tenant deleted.');
       await queryClient.invalidateQueries({ queryKey: ['tenants'] });
@@ -320,9 +323,7 @@ export default function TenantSettingsPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete tenant "${selectedTenant.name}"? This calls DELETE /tenants/:id and cannot be undone from this screen.`
-    );
+    const confirmed = window.confirm(`Delete tenant "${selectedTenant.name}"? This calls DELETE /tenants/:id.`);
 
     if (!confirmed) {
       return;
@@ -349,7 +350,7 @@ export default function TenantSettingsPage() {
           <p style={styles.eyebrow}>Tenant scoped</p>
           <h2 style={styles.title}>Tenant Settings</h2>
           <p style={styles.subtitle}>
-            Full frontend coverage for backend tenant CRUD: GET /tenants, POST /tenants, PUT /tenants/:id, DELETE /tenants/:id.
+            Frontend coverage for backend tenant CRUD: GET /tenants, POST /tenants, PUT /tenants/:id, DELETE /tenants/:id.
           </p>
         </div>
 

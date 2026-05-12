@@ -36,10 +36,8 @@ export default function PlatformSupportSessionsPage() {
   const [tenantId, setTenantId] = useState('');
   const [reason, setReason] = useState('');
   const [status, setStatus] = useState('active');
-  const [formError, setFormError] = useState<string | null>(null);
-  const canStartSupportSession = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_START);
-  const canEndSupportSession = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_END);
-  const canEnterSupportSession = canStartSupportSession || canEndSupportSession;
+  const canStartSupportSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_START);
+  const canEndSupportSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_END);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -54,25 +52,45 @@ export default function PlatformSupportSessionsPage() {
   });
 
   const startMutation = useMutation({
-    mutationFn: () =>
-      platformApiRequest<PlatformSupportSession>('/platform/support-sessions', {
+    mutationFn: () => {
+      const cleanTenantId = tenantId.trim();
+      const cleanReason = reason.trim();
+
+      if (!canStartSupportSessions) {
+        throw new Error('Your platform role cannot start support sessions.');
+      }
+
+      if (!cleanTenantId) {
+        throw new Error('Tenant ID is required.');
+      }
+
+      if (cleanReason.length < 10) {
+        throw new Error('Support session reason must be at least 10 characters.');
+      }
+
+      return platformApiRequest<PlatformSupportSession>('/platform/support-sessions', {
         method: 'POST',
-        body: JSON.stringify({ tenant_id: tenantId.trim(), reason: reason.trim() })
-      }),
+        body: JSON.stringify({ tenant_id: cleanTenantId, reason: cleanReason })
+      });
+    },
     onSuccess: () => {
       setTenantId('');
       setReason('');
-      setFormError(null);
       queryClient.invalidateQueries({ queryKey: ['platform', 'support-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
     }
   });
 
   const accessTokenMutation = useMutation({
-    mutationFn: (sessionId: string) =>
-      platformApiRequest<{ accessToken: string; tenant_id: string; tenant_name?: string | null }>(`/platform/support-sessions/${sessionId}/access-token`, {
+    mutationFn: (sessionId: string) => {
+      if (!canStartSupportSessions) {
+        throw new Error('Your platform role cannot enter tenant support sessions.');
+      }
+
+      return platformApiRequest<{ accessToken: string; tenant_id: string; tenant_name?: string | null }>(`/platform/support-sessions/${sessionId}/access-token`, {
         method: 'POST'
-      }),
+      });
+    },
     onSuccess: (payload) => {
       saveSupportSessionAccessToken(payload.accessToken);
       queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
@@ -81,10 +99,15 @@ export default function PlatformSupportSessionsPage() {
   });
 
   const endMutation = useMutation({
-    mutationFn: (sessionId: string) =>
-      platformApiRequest<PlatformSupportSession>(`/platform/support-sessions/${sessionId}/end`, {
+    mutationFn: (sessionId: string) => {
+      if (!canEndSupportSessions) {
+        throw new Error('Your platform role cannot end support sessions.');
+      }
+
+      return platformApiRequest<PlatformSupportSession>(`/platform/support-sessions/${sessionId}/end`, {
         method: 'POST'
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform', 'support-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
@@ -92,24 +115,6 @@ export default function PlatformSupportSessionsPage() {
   });
 
   const rows = sessionsQuery.data || [];
-
-  const startSupportSession = () => {
-    const normalizedTenantId = tenantId.trim();
-    const normalizedReason = reason.trim();
-
-    if (!normalizedTenantId) {
-      setFormError('Tenant ID is required to start a support session.');
-      return;
-    }
-
-    if (normalizedReason.length < 3) {
-      setFormError('Support session reason is required.');
-      return;
-    }
-
-    setFormError(null);
-    startMutation.mutate();
-  };
 
   return (
     <div style={styles.page}>
@@ -123,17 +128,17 @@ export default function PlatformSupportSessionsPage() {
         <div style={styles.formGrid}>
           <label style={styles.label}>
             Tenant ID
-            <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="Tenant UUID" style={styles.input} disabled={!canStartSupportSession || startMutation.isPending} />
+            <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="Tenant UUID" style={styles.input} />
           </label>
           <label style={styles.label}>
             Reason
-            <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why support access is needed" style={styles.input} disabled={!canStartSupportSession || startMutation.isPending} />
+            <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why support access is needed" style={styles.input} />
           </label>
-          <button type="button" style={styles.button} onClick={startSupportSession} disabled={!canStartSupportSession || startMutation.isPending}>
+          <button type="button" style={styles.button} onClick={() => startMutation.mutate()} disabled={startMutation.isPending || !canStartSupportSessions}>
             {startMutation.isPending ? 'Starting…' : 'Start'}
           </button>
         </div>
-        {formError ? <div style={styles.error}>{formError}</div> : null}
+        {!canStartSupportSessions ? <div style={styles.error}>Your platform role can view support sessions but cannot start or enter them.</div> : null}
         {startMutation.error ? <div style={styles.error}>{readableError(startMutation.error)}</div> : null}
       </section>
 
@@ -183,21 +188,17 @@ export default function PlatformSupportSessionsPage() {
                   <td style={styles.td}>
                     {row.status === 'active' ? (
                       <div style={styles.actions}>
-                        {canEnterSupportSession ? (
-                          <button
-                            type="button"
-                            style={styles.buttonSmall}
-                            onClick={() => accessTokenMutation.mutate(row.id)}
-                            disabled={accessTokenMutation.isPending}
-                          >
-                            Enter tenant
-                          </button>
-                        ) : null}
-                        {canEndSupportSession ? (
-                          <button type="button" style={styles.buttonSecondarySmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending}>
-                            End
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          style={styles.buttonSmall}
+                          onClick={() => accessTokenMutation.mutate(row.id)}
+                          disabled={accessTokenMutation.isPending || !canStartSupportSessions}
+                        >
+                          Enter tenant
+                        </button>
+                        <button type="button" style={styles.buttonSecondarySmall} onClick={() => endMutation.mutate(row.id)} disabled={endMutation.isPending || !canEndSupportSessions}>
+                          End
+                        </button>
                       </div>
                     ) : '-'}
                   </td>

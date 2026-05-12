@@ -7,11 +7,11 @@ import {
   getPlatformAccessToken,
   getPlatformRefreshToken,
   hasAnyPlatformRole,
+  isPlatformAccessTokenExpired,
   isPlatformAuthenticated,
-  savePlatformAuthTokens,
-  fetchCurrentPlatformIdentity
+  savePlatformAuthTokens
 } from '../lib/platformAuth';
-import type { PlatformRole } from '../lib/platformAuth';
+import type { PlatformIdentity, PlatformRole } from '../lib/platformAuth';
 import type { PlatformPermission } from '../lib/platformPermissions';
 import { hasAllPlatformPermissions } from '../lib/platformPermissions';
 
@@ -33,11 +33,17 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
       const accessToken = getPlatformAccessToken();
       const refreshToken = getPlatformRefreshToken();
 
-      if (accessToken) {
-        const identity = await fetchCurrentPlatformIdentity();
+      if (accessToken && !isPlatformAccessTokenExpired(accessToken)) {
+        try {
+          const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
 
-        if (isMounted) {
-          setStatus(identity ? 'allowed' : 'denied');
+          if (isMounted) {
+            setStatus(identity?.id ? 'allowed' : 'denied');
+          }
+        } catch {
+          if (isMounted) {
+            setStatus('denied');
+          }
         }
         return;
       }
@@ -55,10 +61,10 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
           body: JSON.stringify({ refreshToken })
         });
         savePlatformAuthTokens(tokens);
-        const identity = await fetchCurrentPlatformIdentity();
+        const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
 
         if (isMounted) {
-          setStatus(identity ? 'allowed' : 'denied');
+          setStatus(identity?.id ? 'allowed' : 'denied');
         }
       } catch {
         if (isMounted) {

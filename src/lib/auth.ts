@@ -144,6 +144,21 @@ export function isAuthenticated(): boolean {
   return Boolean(refreshToken);
 }
 
+
+export function getCurrentTenantUserId(): string | null {
+  const payload = decodeJwtPayload(getAccessToken());
+
+  if (typeof payload?.id === 'string') {
+    return payload.id;
+  }
+
+  if (typeof payload?.user_id === 'string') {
+    return payload.user_id;
+  }
+
+  return null;
+}
+
 export type SupportSessionInfo = {
   isSupportSession: boolean;
   supportSessionId?: string;
