@@ -806,7 +806,7 @@ export default function ProductsPage() {
   */
 
   const queryClient = useQueryClient();
-  const { role, canManageProducts } = getRoleCapabilities();
+  const { role, canManageProducts, canViewProductPackages, canManageProductPackages } = getRoleCapabilities();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -1068,7 +1068,7 @@ export default function ProductsPage() {
   const packagesQuery = useQuery({
     queryKey: ['product-packages', selectedPackageProduct?.id],
     queryFn: () => fetchProductPackages(selectedPackageProduct!.id),
-    enabled: Boolean(selectedPackageProduct?.id)
+    enabled: Boolean(selectedPackageProduct?.id && canViewProductPackages)
   });
 
   const costHistoryQuery = useQuery({
@@ -1457,7 +1457,7 @@ export default function ProductsPage() {
       return;
     }
 
-    if (!canManageProducts) {
+    if (!canManageProductPackages) {
       setPackageError('Your current role cannot manage product packages.');
       return;
     }
@@ -1610,7 +1610,7 @@ export default function ProductsPage() {
   };
 
   const handleStartEditPackage = (packageItem: ProductPackageItem) => {
-    if (!canManageProducts) {
+    if (!canManageProductPackages) {
       setPackageError('Your current role cannot edit product packages.');
       setPackageMessage(null);
       return;
@@ -1641,7 +1641,7 @@ export default function ProductsPage() {
       return;
     }
 
-    if (!canManageProducts) {
+    if (!canManageProductPackages) {
       setPackageError('Your current role cannot delete product packages.');
       setPackageMessage(null);
       return;
@@ -4787,7 +4787,7 @@ export default function ProductsPage() {
               <button
                 type="submit"
                 style={styles.primaryButton}
-                disabled={isPackageSubmitting || !canManageProducts}
+                disabled={isPackageSubmitting || !canManageProductPackages}
               >
                 {isPackageSubmitting
                   ? editingPackage
@@ -4858,18 +4858,18 @@ export default function ProductsPage() {
                             <div style={styles.actionGroup}>
                               <button
                                 type="button"
-                                style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
+                                style={!canManageProductPackages ? styles.disabledButton : styles.secondaryButton}
                                 onClick={() => handleStartEditPackage(packageItem)}
-                                disabled={!canManageProducts}
+                                disabled={!canManageProductPackages}
                               >
                                 Edit
                               </button>
 
                               <button
                                 type="button"
-                                style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
+                                style={!canManageProductPackages ? styles.disabledButton : styles.dangerButton}
                                 onClick={() => handleDeletePackage(packageItem)}
-                                disabled={deletePackageMutation.isPending || !canManageProducts}
+                                disabled={deletePackageMutation.isPending || !canManageProductPackages}
                               >
                                 Delete
                               </button>

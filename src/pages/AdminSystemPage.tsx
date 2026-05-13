@@ -102,6 +102,9 @@ function StatCard(props: { title: string; value: string; subtitle: string; tone?
 export default function AdminSystemPage() {
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
+  const canViewTenantDiagnostics = capabilities.canViewTenantDiagnostics;
+  const canManageAlerts = capabilities.canManageAlerts;
+  const canOverrideAlerts = capabilities.canOverrideAlerts;
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});
@@ -114,19 +117,19 @@ export default function AdminSystemPage() {
   const blockingAlertsQuery = useQuery({
     queryKey: ['admin-system', 'blocking-alerts'],
     queryFn: () => apiRequest<BlockingAlertRow[]>('/admin/diagnostics/blocking-alerts'),
-    enabled: capabilities.isAdmin
+    enabled: canViewTenantDiagnostics
   });
 
   const stockIntegrityQuery = useQuery({
     queryKey: ['admin-system', 'stock-integrity'],
     queryFn: () => apiRequest<StockIntegrityRow[]>('/admin/diagnostics/stock-integrity'),
-    enabled: capabilities.isAdmin
+    enabled: canViewTenantDiagnostics
   });
 
   const brokenShipmentsQuery = useQuery({
     queryKey: ['admin-system', 'broken-shipments'],
     queryFn: () => apiRequest<BrokenShipmentRow[]>('/admin/diagnostics/broken-shipments'),
-    enabled: capabilities.isAdmin
+    enabled: canViewTenantDiagnostics
   });
 
 
@@ -210,8 +213,8 @@ export default function AdminSystemPage() {
         </Section>
 
         <Section title="Tenant Diagnostics" subtitle="Admin-only integrity checks scoped to the current tenant.">
-          {!capabilities.isAdmin ? <div className="app-warning-state">Diagnostics are limited to tenant admins.</div> : null}
-          {capabilities.isAdmin ? (
+          {!canViewTenantDiagnostics ? <div className="app-warning-state">Diagnostics require tenant diagnostics permission.</div> : null}
+          {canViewTenantDiagnostics ? (
             <div style={styles.list}>
               <h4 style={styles.sectionSubheading}>Blocking Diagnostics</h4>
               {blockingAlertsQuery.error ? <div className="app-error-state">{readableError(blockingAlertsQuery.error)}</div> : null}
@@ -236,7 +239,7 @@ export default function AdminSystemPage() {
                         type="button"
                         style={styles.secondaryButton}
                         onClick={() => acknowledgeMutation.mutate(row.id)}
-                        disabled={isBusy || row.acknowledged}
+                        disabled={isBusy || row.acknowledged || !canManageAlerts}
                       >
                         Acknowledge
                       </button>
@@ -244,7 +247,7 @@ export default function AdminSystemPage() {
                         type="button"
                         style={styles.primaryButton}
                         onClick={() => resolveMutation.mutate(row.id)}
-                        disabled={isBusy || row.resolved}
+                        disabled={isBusy || row.resolved || !canManageAlerts}
                       >
                         Resolve
                       </button>
@@ -279,7 +282,7 @@ export default function AdminSystemPage() {
 
                             overrideMutation.mutate({ id: row.id, reason: cleanReason });
                           }}
-                          disabled={isBusy}
+                          disabled={isBusy || reason.trim().length < 3 || !canOverrideAlerts}
                         >
                           Override blocking alert
                         </button>

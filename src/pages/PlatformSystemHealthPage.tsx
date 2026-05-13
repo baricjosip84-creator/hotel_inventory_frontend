@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 type TenantHealthRow = {
   tenant_id: string;
@@ -37,6 +38,8 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 export default function PlatformSystemHealthPage() {
+  const canViewPlatformDiagnostics = hasPlatformPermission(PLATFORM_PERMISSIONS.DIAGNOSTICS_READ);
+
   const systemHealthQuery = useQuery({
     queryKey: ['platform', 'system-health'],
     queryFn: () => platformApiRequest<SystemHealthResponse>('/platform/system-health')
@@ -44,7 +47,8 @@ export default function PlatformSystemHealthPage() {
 
   const diagnosticsQuery = useQuery({
     queryKey: ['platform', 'diagnostics', 'stuck-idempotency'],
-    queryFn: () => platformApiRequest<IdempotencyRow[]>('/platform/diagnostics/stuck-idempotency')
+    queryFn: () => platformApiRequest<IdempotencyRow[]>('/platform/diagnostics/stuck-idempotency'),
+    enabled: canViewPlatformDiagnostics
   });
 
   const rows = systemHealthQuery.data?.tenants || [];
@@ -89,11 +93,12 @@ export default function PlatformSystemHealthPage() {
         <h2 style={styles.sectionTitle}>Platform Diagnostics</h2>
         <p style={styles.sectionSubtitle}>Global diagnostics that should not be exposed inside tenant admin routes.</p>
 
-        {diagnosticsQuery.isLoading ? <div>Loading diagnostics…</div> : null}
-        {diagnosticsQuery.error ? <div style={styles.error}>{readableError(diagnosticsQuery.error)}</div> : null}
+        {!canViewPlatformDiagnostics ? <div style={styles.error}>Your platform role cannot read platform diagnostics.</div> : null}
+        {canViewPlatformDiagnostics && diagnosticsQuery.isLoading ? <div>Loading diagnostics…</div> : null}
+        {canViewPlatformDiagnostics && diagnosticsQuery.error ? <div style={styles.error}>{readableError(diagnosticsQuery.error)}</div> : null}
 
         <h3 style={styles.smallTitle}>Stuck Idempotency Keys</h3>
-        {stuckIdempotencyRows.length ? (
+        {canViewPlatformDiagnostics && stuckIdempotencyRows.length ? (
           <table style={styles.table}>
             <thead>
               <tr>
@@ -116,7 +121,7 @@ export default function PlatformSystemHealthPage() {
               ))}
             </tbody>
           </table>
-        ) : !diagnosticsQuery.isLoading ? <div>No stuck idempotency keys.</div> : null}
+        ) : canViewPlatformDiagnostics && !diagnosticsQuery.isLoading ? <div>No stuck idempotency keys.</div> : null}
       </section>
     </div>
   );

@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 
 /**
  * ============================================================================
@@ -426,6 +427,8 @@ function StatCard(props: {
  */
 
 export default function DashboardPage() {
+  const { canViewInsights } = getRoleCapabilities();
+
   /*
     WHAT CHANGED
     ------------
@@ -482,22 +485,26 @@ export default function DashboardPage() {
 
   const depletionRiskQuery = useQuery({
     queryKey: ['inventory-depletion-risk'],
-    queryFn: fetchDepletionRisk
+    queryFn: fetchDepletionRisk,
+    enabled: canViewInsights
   });
 
   const reorderRecommendationsQuery = useQuery({
     queryKey: ['reorder-recommendations'],
-    queryFn: fetchReorderRecommendations
+    queryFn: fetchReorderRecommendations,
+    enabled: canViewInsights
   });
 
   const operationalHealthQuery = useQuery({
     queryKey: ['operational-health'],
-    queryFn: fetchOperationalHealth
+    queryFn: fetchOperationalHealth,
+    enabled: canViewInsights
   });
 
   const anomaliesQuery = useQuery({
     queryKey: ['inventory-anomalies'],
-    queryFn: fetchAnomalies
+    queryFn: fetchAnomalies,
+    enabled: canViewInsights
   });
 
   const summary = summaryQuery.data;
@@ -634,7 +641,9 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          {operationalHealthQuery.isLoading ? (
+          {!canViewInsights ? (
+            <SectionError message="Your role can view the operational dashboard but not management insights." />
+          ) : operationalHealthQuery.isLoading ? (
             <p>Loading health score...</p>
           ) : operationalHealthQuery.isError || !health ? (
             <SectionError
@@ -687,7 +696,9 @@ export default function DashboardPage() {
           subtitle="Products and stock rows most at risk of running out soon."
           actionHint="Top risk candidates"
         >
-          {depletionRiskQuery.isLoading ? (
+          {!canViewInsights ? (
+            <SectionError message="Your role can view dashboard operations but not depletion-risk insights." />
+          ) : depletionRiskQuery.isLoading ? (
             <p>Loading depletion risk...</p>
           ) : depletionRiskQuery.isError ? (
             <SectionError
@@ -758,7 +769,9 @@ export default function DashboardPage() {
           subtitle="Explainable reorder signals based on current stock and recent usage."
           actionHint="Action queue"
         >
-          {reorderRecommendationsQuery.isLoading ? (
+          {!canViewInsights ? (
+            <SectionError message="Your role can view dashboard operations but not reorder insights." />
+          ) : reorderRecommendationsQuery.isLoading ? (
             <p>Loading reorder recommendations...</p>
           ) : reorderRecommendationsQuery.isError ? (
             <SectionError
@@ -991,7 +1004,9 @@ export default function DashboardPage() {
           title="Inventory Anomalies"
           subtitle="Products with unusually high outbound activity compared to their own baseline."
         >
-          {anomaliesQuery.isLoading ? (
+          {!canViewInsights ? (
+            <SectionError message="Your role can view dashboard operations but not anomaly insights." />
+          ) : anomaliesQuery.isLoading ? (
             <p>Loading anomalies...</p>
           ) : anomaliesQuery.isError ? (
             <SectionError

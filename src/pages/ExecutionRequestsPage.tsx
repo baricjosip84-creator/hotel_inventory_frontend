@@ -65,6 +65,7 @@ export default function ExecutionRequestsPage() {
   const canCancelExecutionRequests = capabilities.canCancelExecutionRequests;
   const canReviewExecutionRequests = capabilities.canReviewExecutionRequests;
   const canExecuteExecutionRequests = capabilities.canExecuteExecutionRequests;
+  const canViewSystemContext = capabilities.canViewSystemContext;
   const [data, setData] = useState<ExecutionRequestListResponse | null>(null);
   const [adapterRegistry, setAdapterRegistry] = useState<ExecutionAdapterRegistryResponse | null>(null);
   const [hardeningSummary, setHardeningSummary] = useState<ExecutionModuleHardeningSummaryResponse | null>(null);
@@ -118,14 +119,31 @@ export default function ExecutionRequestsPage() {
     void loadRequests();
   }, [loadRequests]);
 
+
+  const loadOptionalExecutionContextSnapshots = useCallback(async () => {
+    if (!canViewSystemContext) {
+      return {
+        contextSnapshot: null,
+        gateSnapshot: null
+      };
+    }
+
+    const [contextSnapshot, gateSnapshot] = await Promise.all([
+      apiRequest('/system-context'),
+      apiRequest('/system-context/execution-gate')
+    ]);
+
+    return {
+      contextSnapshot,
+      gateSnapshot
+    };
+  }, [canViewSystemContext]);
+
   const createSystemRecommendation = async () => {
     setSaving(true);
     setError(null);
     try {
-      const [contextSnapshot, gateSnapshot] = await Promise.all([
-        apiRequest('/system-context'),
-        apiRequest('/system-context/execution-gate')
-      ]);
+      const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
 
       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
         method: 'POST',
@@ -168,10 +186,7 @@ export default function ExecutionRequestsPage() {
     setSaving(true);
     setError(null);
     try {
-      const [contextSnapshot, gateSnapshot] = await Promise.all([
-        apiRequest('/system-context'),
-        apiRequest('/system-context/execution-gate')
-      ]);
+      const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
 
       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
         method: 'POST',
@@ -215,10 +230,7 @@ export default function ExecutionRequestsPage() {
     setSaving(true);
     setError(null);
     try {
-      const [contextSnapshot, gateSnapshot] = await Promise.all([
-        apiRequest('/system-context'),
-        apiRequest('/system-context/execution-gate')
-      ]);
+      const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
 
       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
         method: 'POST',
@@ -262,10 +274,7 @@ export default function ExecutionRequestsPage() {
     setSaving(true);
     setError(null);
     try {
-      const [contextSnapshot, gateSnapshot] = await Promise.all([
-        apiRequest('/system-context'),
-        apiRequest('/system-context/execution-gate')
-      ]);
+      const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
 
       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
         method: 'POST',

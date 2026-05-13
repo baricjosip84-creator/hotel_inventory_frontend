@@ -123,7 +123,7 @@ function getPageSubtitle(pathname: string): string {
     return 'Review tenant-scoped write history and audited support-session activity.';
   }
   if (pathname.startsWith('/tenant-settings')) {
-    return 'Manage tenant configuration through the backend tenant CRUD contract.';
+    return 'Manage tenant-scoped settings for the current company.';
   }
   if (pathname.startsWith('/admin-system')) {
     return 'Review system status, diagnostics, tenant control-plane data, and admin health signals.';

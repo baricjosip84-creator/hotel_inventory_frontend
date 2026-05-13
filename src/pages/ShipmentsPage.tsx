@@ -195,6 +195,37 @@ async function createShipment(input: ShipmentFormState): Promise<ShipmentSummary
   });
 }
 
+async function updateShipment(input: {
+  shipmentId: string;
+  version: number;
+  form: ShipmentFormState;
+}): Promise<ShipmentSummary> {
+  return apiRequest<ShipmentSummary>(`/shipments/${input.shipmentId}`, {
+    method: 'PATCH',
+    headers: {
+      'If-Match-Version': String(input.version)
+    },
+    body: JSON.stringify({
+      supplier_id: input.form.supplier_id,
+      delivery_date: input.form.delivery_date,
+      po_number: input.form.po_number.trim() || null,
+      purchase_order_id: input.form.purchase_order_id || null
+    })
+  });
+}
+
+async function deleteShipment(input: {
+  shipmentId: string;
+  version: number;
+}): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/shipments/${input.shipmentId}`, {
+    method: 'DELETE',
+    headers: {
+      'If-Match-Version': String(input.version)
+    }
+  });
+}
+
 async function addShipmentItem(input: {
   shipment_id: string;
   product_id: string;
@@ -207,6 +238,41 @@ async function addShipmentItem(input: {
       product_id: input.product_id,
       quantity: input.quantity
     })
+  });
+}
+
+async function updateShipmentItem(input: {
+  itemId: string;
+  version: number;
+  quantity: number;
+}): Promise<ShipmentItem> {
+  return apiRequest<ShipmentItem>(`/shipment-items/${input.itemId}`, {
+    method: 'PATCH',
+    headers: {
+      'If-Match-Version': String(input.version)
+    },
+    body: JSON.stringify({
+      quantity: input.quantity
+    })
+  });
+}
+
+async function deleteShipmentItem(input: {
+  itemId: string;
+  version: number;
+}): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/shipment-items/${input.itemId}`, {
+    method: 'DELETE',
+    headers: {
+      'If-Match-Version': String(input.version)
+    }
+  });
+}
+
+async function autoReorderShipments(): Promise<{ message?: string; shipments?: ShipmentSummary[]; created_shipments?: ShipmentSummary[] }> {
+  return apiRequest<{ message?: string; shipments?: ShipmentSummary[]; created_shipments?: ShipmentSummary[] }>('/shipments/auto-reorder', {
+    method: 'POST',
+    body: JSON.stringify({})
   });
 }
 
@@ -342,7 +408,16 @@ function useIsMobile(breakpoint = 1024): boolean {
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
 
-  const { role, canManageShipments, canSendShipments, canReceiveShipments, canFinalizeShipments } = getRoleCapabilities();
+  const {
+    role,
+    canManageShipments,
+    canManageShipmentItems,
+    canSendShipments,
+    canReceiveShipments,
+    canFinalizeShipments,
+    canAutoReorderShipments,
+    canViewPurchaseOrders
+  } = getRoleCapabilities();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -355,6 +430,9 @@ export default function ShipmentsPage() {
 
   const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
   const [itemForm, setItemForm] = useState<ItemFormState>(emptyItemForm());
+  const [editingShipment, setEditingShipment] = useState(false);
+  const [editShipmentForm, setEditShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
+  const [itemEditDrafts, setItemEditDrafts] = useState<Record<string, string>>({});
   const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
   const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
   const autoReceiveAttemptKeyRef = useRef<string>('');
@@ -379,7 +457,8 @@ export default function ShipmentsPage() {
 
   const approvedPurchaseOrdersQuery = useQuery({
     queryKey: ['purchase-orders', 'approved'],
-    queryFn: fetchApprovedPurchaseOrders
+    queryFn: fetchApprovedPurchaseOrders,
+    enabled: canViewPurchaseOrders
   });
 
   const storageLocationsQuery = useQuery({
@@ -436,6 +515,87 @@ export default function ShipmentsPage() {
         setPageError('Failed to add shipment item.');
       }
       setPageMessage(null);
+    }
+  });
+
+  const updateShipmentMutation = useMutation({
+    mutationFn: updateShipment,
+    onSuccess: async (shipment) => {
+      setEditingShipment(false);
+      setPageError(null);
+      setPageMessage('Shipment updated successfully.');
+      setSelectedShipmentId(shipment.id);
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to update shipment.');
+    }
+  });
+
+  const deleteShipmentMutation = useMutation({
+    mutationFn: deleteShipment,
+    onSuccess: async (result) => {
+      setSelectedShipmentId('');
+      setReceiveDrafts({});
+      setItemEditDrafts({});
+      setEditingShipment(false);
+      setHighlightedItemId('');
+      setPendingAutoReceive(null);
+      autoReceiveAttemptKeyRef.current = '';
+      setPageError(null);
+      setPageMessage(result.message || 'Shipment deleted successfully.');
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to delete shipment.');
+    }
+  });
+
+  const updateShipmentItemMutation = useMutation({
+    mutationFn: updateShipmentItem,
+    onSuccess: async () => {
+      setPageError(null);
+      setPageMessage('Shipment item updated successfully.');
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to update shipment item.');
+    }
+  });
+
+  const deleteShipmentItemMutation = useMutation({
+    mutationFn: deleteShipmentItem,
+    onSuccess: async (result) => {
+      setPageError(null);
+      setPageMessage(result.message || 'Shipment item deleted successfully.');
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to delete shipment item.');
+    }
+  });
+
+  const autoReorderShipmentMutation = useMutation({
+    mutationFn: autoReorderShipments,
+    onSuccess: async (result) => {
+      const createdCount = result.created_shipments?.length ?? result.shipments?.length ?? 0;
+      setPageError(null);
+      setPageMessage(result.message || `Auto reorder completed. ${createdCount} shipment${createdCount === 1 ? '' : 's'} created.`);
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-low-stock'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to run shipment auto reorder.');
     }
   });
 
@@ -560,6 +720,28 @@ export default function ShipmentsPage() {
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
+
+  useEffect(() => {
+    if (!selectedShipment) {
+      setEditingShipment(false);
+      setEditShipmentForm(emptyShipmentForm());
+      return;
+    }
+
+    setEditShipmentForm({
+      supplier_id: selectedShipment.supplier_id || '',
+      delivery_date: selectedShipment.delivery_date ? selectedShipment.delivery_date.slice(0, 10) : '',
+      po_number: selectedShipment.po_number || '',
+      purchase_order_id: selectedShipment.purchase_order_id || ''
+    });
+    setEditingShipment(false);
+  }, [selectedShipment?.id, selectedShipment?.version]);
+
+  useEffect(() => {
+    setItemEditDrafts(
+      Object.fromEntries(shipmentItems.map((item) => [item.id, String(toNumber(item.quantity) || '')]))
+    );
+  }, [shipmentItems]);
 
   const shipmentProductOptions = useMemo(() => {
     const allProducts = productsQuery.data ?? [];
@@ -995,6 +1177,119 @@ export default function ShipmentsPage() {
     });
   };
 
+  const handleAutoReorderShipments = () => {
+    if (!canAutoReorderShipments) {
+      setPageError('Your current role cannot run shipment auto reorder.');
+      return;
+    }
+
+    const confirmed = window.confirm('Run auto reorder now? This may create shipments from current reorder rules.');
+    if (!confirmed) return;
+
+    setPageError(null);
+    setPageMessage(null);
+    autoReorderShipmentMutation.mutate();
+  };
+
+  const handleUpdateShipment = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!canManageShipments) {
+      setPageError('Your current role cannot update shipments.');
+      return;
+    }
+
+    if (!selectedShipment) {
+      setPageError('Select a shipment first.');
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    updateShipmentMutation.mutate({
+      shipmentId: selectedShipment.id,
+      version: selectedShipment.version,
+      form: editShipmentForm
+    });
+  };
+
+  const handleDeleteShipment = () => {
+    if (!canManageShipments) {
+      setPageError('Your current role cannot delete shipments.');
+      return;
+    }
+
+    if (!selectedShipment) {
+      setPageError('Select a shipment first.');
+      return;
+    }
+
+    const confirmed = window.confirm('Delete this shipment? This uses the current shipment version and cannot be undone.');
+    if (!confirmed) return;
+
+    setPageError(null);
+    setPageMessage(null);
+    deleteShipmentMutation.mutate({
+      shipmentId: selectedShipment.id,
+      version: selectedShipment.version
+    });
+  };
+
+  const updateItemEditDraft = (itemId: string, value: string) => {
+    setItemEditDrafts((current) => ({
+      ...current,
+      [itemId]: value
+    }));
+  };
+
+  const handleUpdateShipmentItem = (item: ShipmentItem) => {
+    if (!canManageShipmentItems) {
+      setPageError('Your current role cannot update shipment items.');
+      return;
+    }
+
+    if (item.version === undefined || item.version === null) {
+      setPageError('Cannot update this shipment item because the backend did not return a version. Refresh and try again.');
+      return;
+    }
+
+    const quantity = Number(itemEditDrafts[item.id]);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setPageError('Shipment item quantity must be greater than zero.');
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    updateShipmentItemMutation.mutate({
+      itemId: item.id,
+      version: item.version,
+      quantity
+    });
+  };
+
+  const handleDeleteShipmentItem = (item: ShipmentItem) => {
+    if (!canManageShipmentItems) {
+      setPageError('Your current role cannot delete shipment items.');
+      return;
+    }
+
+    if (item.version === undefined || item.version === null) {
+      setPageError('Cannot delete this shipment item because the backend did not return a version. Refresh and try again.');
+      return;
+    }
+
+    const confirmed = window.confirm('Delete this shipment item? This uses the current item version and cannot be undone.');
+    if (!confirmed) return;
+
+    setPageError(null);
+    setPageMessage(null);
+    deleteShipmentItemMutation.mutate({
+      itemId: item.id,
+      version: item.version
+    });
+  };
+
   const handleCreateShipment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPageError(null);
@@ -1006,8 +1301,8 @@ export default function ShipmentsPage() {
   const handleAddShipmentItem = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!canManageShipments) {
-      setPageError('Your current role cannot add shipment items. Shipment item writes are restricted to manager and admin roles by the existing backend.');
+    if (!canManageShipmentItems) {
+      setPageError('Your current role cannot add shipment items. Shipment item writes are restricted by the existing backend permission.');
       return;
     }
     setPageError(null);
@@ -1195,6 +1490,16 @@ export default function ShipmentsPage() {
             or fully, and finalize only when all shortages are documented.
           </p>
         </div>
+        {canAutoReorderShipments ? (
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleAutoReorderShipments}
+            disabled={autoReorderShipmentMutation.isPending}
+          >
+            {autoReorderShipmentMutation.isPending ? 'Running Auto Reorder...' : 'Run Auto Reorder'}
+          </button>
+        ) : null}
       </div>
 
       {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
@@ -1265,6 +1570,7 @@ export default function ShipmentsPage() {
             />
           </div>
 
+          {canViewPurchaseOrders ? (
           <div>
             <label style={styles.label}>Linked Purchase Order</label>
             <select
@@ -1294,6 +1600,7 @@ export default function ShipmentsPage() {
               Optional bridge only: this links an approved PO to the shipment without changing stock or receiving logic.
             </p>
           </div>
+          ) : null}
 
           <div style={styles.formActionRow}>
             <button
@@ -1506,7 +1813,7 @@ export default function ShipmentsPage() {
                     <div style={{ wordBreak: 'break-all' }}>
                       {selectedShipment.linked_purchase_order_number || selectedShipment.purchase_order_id || '-'}
                     </div>
-                    {selectedShipment.purchase_order_id ? (
+                    {selectedShipment.purchase_order_id && canViewPurchaseOrders ? (
                       <>
                         <button
                           type="button"
@@ -1527,6 +1834,123 @@ export default function ShipmentsPage() {
                   </div>
                 </div>
               </div>
+
+              {canManageShipments ? (
+                <div style={styles.selectedActionRow}>
+                  <button
+                    type="button"
+                    style={styles.secondaryButton}
+                    onClick={() => setEditingShipment((current) => !current)}
+                    disabled={updateShipmentMutation.isPending || deleteShipmentMutation.isPending}
+                  >
+                    {editingShipment ? 'Cancel Edit' : 'Edit Shipment'}
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.dangerButton}
+                    onClick={handleDeleteShipment}
+                    disabled={deleteShipmentMutation.isPending}
+                  >
+                    {deleteShipmentMutation.isPending ? 'Deleting...' : 'Delete Shipment'}
+                  </button>
+                </div>
+              ) : null}
+
+              {editingShipment ? (
+                <form onSubmit={handleUpdateShipment} style={styles.formGrid}>
+                  <div>
+                    <label style={styles.label}>Supplier</label>
+                    <select
+                      style={styles.input}
+                      value={editShipmentForm.supplier_id}
+                      onChange={(event) =>
+                        setEditShipmentForm((current) => ({
+                          ...current,
+                          supplier_id: event.target.value,
+                          purchase_order_id: ''
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Select supplier</option>
+                      {(suppliersQuery.data ?? []).map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={styles.label}>Delivery Date</label>
+                    <input
+                      style={styles.input}
+                      type="date"
+                      value={editShipmentForm.delivery_date}
+                      onChange={(event) =>
+                        setEditShipmentForm((current) => ({
+                          ...current,
+                          delivery_date: event.target.value
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={styles.label}>PO Number</label>
+                    <input
+                      style={styles.input}
+                      type="text"
+                      value={editShipmentForm.po_number}
+                      onChange={(event) =>
+                        setEditShipmentForm((current) => ({
+                          ...current,
+                          po_number: event.target.value
+                        }))
+                      }
+                      placeholder="Optional purchase order number"
+                    />
+                  </div>
+
+                  {canViewPurchaseOrders ? (
+                    <div>
+                      <label style={styles.label}>Linked Purchase Order</label>
+                      <select
+                        style={styles.input}
+                        value={editShipmentForm.purchase_order_id}
+                        onChange={(event) => {
+                          const purchaseOrderId = event.target.value;
+                          const selectedOrder = approvedPurchaseOrders.find((order) => order.id === purchaseOrderId);
+                          setEditShipmentForm((current) => ({
+                            ...current,
+                            purchase_order_id: purchaseOrderId,
+                            supplier_id: selectedOrder?.supplier_id || current.supplier_id,
+                            po_number: selectedOrder?.po_number || current.po_number
+                          }));
+                        }}
+                      >
+                        <option value="">No linked PO</option>
+                        {approvedPurchaseOrders.map((order) => (
+                          <option key={order.id} value={order.id}>
+                            {order.po_number} · {order.supplier_name || order.supplier_id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+
+                  <div style={styles.formActionRow}>
+                    <button
+                      type="submit"
+                      style={styles.primaryButton}
+                      disabled={updateShipmentMutation.isPending}
+                    >
+                      {updateShipmentMutation.isPending ? 'Saving...' : 'Save Shipment'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
 
               <div
                 style={{
@@ -1678,8 +2102,8 @@ export default function ShipmentsPage() {
                   <button
                     type="submit"
                     style={styles.primaryButton}
-                    disabled={addShipmentItemMutation.isPending || !canManageShipments}
-                    title={!canManageShipments ? 'Manager or admin role required' : undefined}
+                    disabled={addShipmentItemMutation.isPending || !canManageShipmentItems}
+                    title={!canManageShipmentItems ? 'Shipment item write permission required' : undefined}
                   >
                     {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
                   </button>
@@ -1851,6 +2275,38 @@ export default function ShipmentsPage() {
                             <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
                           </div>
                         </div>
+
+                        {canManageShipmentItems ? (
+                          <div style={styles.mobileFieldGroup}>
+                            <label style={styles.label}>Ordered Quantity</label>
+                            <input
+                              style={styles.input}
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={itemEditDrafts[item.id] ?? String(ordered)}
+                              onChange={(event) => updateItemEditDraft(item.id, event.target.value)}
+                            />
+                            <div style={styles.inlineButtonRow}>
+                              <button
+                                type="button"
+                                style={styles.secondaryButton}
+                                onClick={() => handleUpdateShipmentItem(item)}
+                                disabled={updateShipmentItemMutation.isPending}
+                              >
+                                {updateShipmentItemMutation.isPending ? 'Saving...' : 'Save Line'}
+                              </button>
+                              <button
+                                type="button"
+                                style={styles.dangerButton}
+                                onClick={() => handleDeleteShipmentItem(item)}
+                                disabled={deleteShipmentItemMutation.isPending}
+                              >
+                                {deleteShipmentItemMutation.isPending ? 'Deleting...' : 'Delete Line'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
 
                         {remaining > 0 && item.discrepancy_reason ? (
                           <div style={styles.savedReasonBox}>
@@ -2073,6 +2529,36 @@ export default function ShipmentsPage() {
                               >
                                 {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
                               </button>
+
+                              {canManageShipmentItems ? (
+                                <div style={styles.tableActionStack}>
+                                  <input
+                                    style={styles.inputCompact}
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={itemEditDrafts[item.id] ?? String(ordered)}
+                                    onChange={(event) => updateItemEditDraft(item.id, event.target.value)}
+                                    aria-label="Ordered quantity"
+                                  />
+                                  <button
+                                    type="button"
+                                    style={styles.secondaryButton}
+                                    onClick={() => handleUpdateShipmentItem(item)}
+                                    disabled={updateShipmentItemMutation.isPending}
+                                  >
+                                    Save Line
+                                  </button>
+                                  <button
+                                    type="button"
+                                    style={styles.dangerButton}
+                                    onClick={() => handleDeleteShipmentItem(item)}
+                                    disabled={deleteShipmentItemMutation.isPending}
+                                  >
+                                    Delete Line
+                                  </button>
+                                </div>
+                              ) : null}
                             </td>
                           </tr>
                         );
@@ -2091,7 +2577,32 @@ export default function ShipmentsPage() {
 
 const styles: Record<string, CSSProperties> = {
   header: {
-    marginBottom: 20
+    marginBottom: 20,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 16,
+    alignItems: 'flex-start',
+    flexWrap: 'wrap'
+  },
+  selectedActionRow: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 12,
+    marginBottom: 16
+  },
+  inlineButtonRow: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 8
+  },
+  tableActionStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    marginTop: 8,
+    minWidth: 130
   },
   title: {
     margin: 0,
@@ -2179,6 +2690,15 @@ const styles: Record<string, CSSProperties> = {
     padding: '10px 14px',
     background: '#ffffff',
     color: '#111827',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  dangerButton: {
+    border: '1px solid #fecaca',
+    borderRadius: 10,
+    padding: '10px 14px',
+    background: '#fef2f2',
+    color: '#991b1b',
     fontWeight: 700,
     cursor: 'pointer'
   },

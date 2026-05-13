@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 import type { SystemContextExecutionGateResponse, SystemContextResponse, SystemContextSnapshot, SystemContextSnapshotCaptureResponse, SystemContextSnapshotComparison, SystemContextSnapshotTrendSeries, SystemContextForecastPreview, SystemContextForecastSeries, SystemContextForecastHorizons, SystemContextBaselineForecast, SystemContextMovingAverageForecast, SystemContextWeightedTrendForecast, SystemContextVolatilityAdjustedForecast, SystemContextForecastConfidence, SystemContextForecastAccuracy, SystemContextForecastComparison, SystemContextForecastRiskClassification, SystemContextForecastRanking, SystemContextForecastScenarioSet, SystemContextForecastScenarioCaptureResponse, SystemContextForecastScenarioHistoryItem } from '../types/inventory';
 
 function readableError(error: unknown): string {
@@ -62,6 +63,9 @@ function getSnapshotContextValue(snapshot: SystemContextSnapshot | undefined, ke
 }
 
 export default function SystemContextPage() {
+  const capabilities = getRoleCapabilities();
+  const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
+
   const contextQuery = useQuery({
     queryKey: ['system-context'],
     queryFn: () => apiRequest<SystemContextResponse>('/system-context')
@@ -302,6 +306,12 @@ export default function SystemContextPage() {
 
   const createSystemContextReviewRequest = async () => {
     if (!data) return;
+
+    if (!canCreateExecutionRequests) {
+      setReviewRequestMessage(null);
+      setReviewRequestError('Your current role cannot create execution requests.');
+      return;
+    }
 
     setCreatingReviewRequest(true);
     setReviewRequestMessage(null);
@@ -1593,11 +1603,11 @@ export default function SystemContextPage() {
                     type="button"
                     className="btn btn-secondary"
                     onClick={createSystemContextReviewRequest}
-                    disabled={creatingReviewRequest}
+                    disabled={creatingReviewRequest || !canCreateExecutionRequests}
                   >
                     {creatingReviewRequest ? 'Creating Review Request...' : 'Create Review Request'}
                   </button>
-                  <span style={styles.itemMeta}>Creates a system_recommendation review request only. No execution is performed.</span>
+                  <span style={styles.itemMeta}>{canCreateExecutionRequests ? 'Creates a system_recommendation review request only. No execution is performed.' : 'Creating review requests requires execution request create permission.'}</span>
                 </div>
                 {reviewRequestMessage ? <div style={styles.note}>{reviewRequestMessage}</div> : null}
                 {reviewRequestError ? <div className="app-error-state">{reviewRequestError}</div> : null}

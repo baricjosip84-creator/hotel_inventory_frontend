@@ -102,13 +102,6 @@ async function fetchTenants(): Promise<TenantSettingsRow[]> {
   return apiRequest<TenantSettingsRow[]>('/tenants');
 }
 
-async function createTenant(payload: TenantPayload): Promise<TenantSettingsRow> {
-  return apiRequest<TenantSettingsRow>('/tenants', {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  });
-}
-
 async function updateTenant(input: {
   tenantId: string;
   payload: TenantPayload;
@@ -119,21 +112,13 @@ async function updateTenant(input: {
   });
 }
 
-async function deleteTenant(tenantId: string): Promise<{ message?: string }> {
-  return apiRequest<{ message?: string }>(`/tenants/${tenantId}`, {
-    method: 'DELETE'
-  });
-}
-
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
   const role = getCurrentUserRole();
   const canReadTenants = hasPermission(TENANT_PERMISSIONS.TENANT_READ, role);
-  const canCreateOrUpdateTenants = hasPermission(TENANT_PERMISSIONS.TENANT_UPDATE, role);
-  const canDeleteTenants = hasPermission(TENANT_PERMISSIONS.TENANT_DELETE, role);
+  const canUpdateTenants = hasPermission(TENANT_PERMISSIONS.TENANT_UPDATE, role);
 
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
-  const [formMode, setFormMode] = useState<'edit' | 'create'>('edit');
   const [formState, setFormState] = useState<TenantSettingsFormState>(emptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -148,10 +133,6 @@ export default function TenantSettingsPage() {
   const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) ?? tenants[0] ?? null;
 
   useEffect(() => {
-    if (formMode === 'create') {
-      return;
-    }
-
     if (!selectedTenant) {
       setSelectedTenantId(null);
       setFormState(emptyFormState);
@@ -162,7 +143,7 @@ export default function TenantSettingsPage() {
     setFormState(createFormState(selectedTenant));
     setFormError(null);
     setSuccessMessage(null);
-  }, [formMode, selectedTenant?.id]);
+  }, [selectedTenant?.id]);
 
   const parsedMetadata = useMemo(() => {
     try {
@@ -177,22 +158,6 @@ export default function TenantSettingsPage() {
       return { valid: false, value: null as Record<string, unknown> | null };
     }
   }, [formState.metadata]);
-
-  const createMutation = useMutation({
-    mutationFn: createTenant,
-    onSuccess: async (tenant) => {
-      setFormMode('edit');
-      setSelectedTenantId(tenant.id);
-      setFormState(createFormState(tenant));
-      setFormError(null);
-      setSuccessMessage('Tenant created.');
-      await queryClient.invalidateQueries({ queryKey: ['tenants'] });
-    },
-    onError: (error) => {
-      setSuccessMessage(null);
-      setFormError(readableError(error));
-    }
-  });
 
   const updateMutation = useMutation({
     mutationFn: updateTenant,
@@ -209,23 +174,7 @@ export default function TenantSettingsPage() {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteTenant,
-    onSuccess: async () => {
-      setSelectedTenantId(null);
-      setFormMode('edit');
-      setFormState(emptyFormState);
-      setFormError(null);
-      setSuccessMessage('Tenant deleted.');
-      await queryClient.invalidateQueries({ queryKey: ['tenants'] });
-    },
-    onError: (error) => {
-      setSuccessMessage(null);
-      setFormError(readableError(error));
-    }
-  });
-
-  const isSaving = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const isSaving = updateMutation.isPending;
 
   const updateField = (field: keyof TenantSettingsFormState, value: string) => {
     setFormState((current) => ({
@@ -236,16 +185,7 @@ export default function TenantSettingsPage() {
 
   const selectTenant = (tenant: TenantSettingsRow) => {
     setSelectedTenantId(tenant.id);
-    setFormMode('edit');
     setFormState(createFormState(tenant));
-    setFormError(null);
-    setSuccessMessage(null);
-  };
-
-  const startCreate = () => {
-    setSelectedTenantId(null);
-    setFormMode('create');
-    setFormState(emptyFormState);
     setFormError(null);
     setSuccessMessage(null);
   };
@@ -283,26 +223,15 @@ export default function TenantSettingsPage() {
       return;
     }
 
-    if (formMode === 'create') {
-      if (!canCreateOrUpdateTenants) {
-        setSuccessMessage(null);
-        setFormError('Your current role cannot create tenants.');
-        return;
-      }
-
-      createMutation.mutate(payload);
-      return;
-    }
-
     if (!selectedTenant) {
       setSuccessMessage(null);
       setFormError('Select a tenant to update.');
       return;
     }
 
-    if (!canCreateOrUpdateTenants) {
+    if (!canUpdateTenants) {
       setSuccessMessage(null);
-      setFormError('Your current role cannot update tenants.');
+      setFormError('Your current role cannot update tenant settings.');
       return;
     }
 
@@ -310,26 +239,6 @@ export default function TenantSettingsPage() {
       tenantId: selectedTenant.id,
       payload
     });
-  };
-
-  const handleDelete = () => {
-    if (!selectedTenant) {
-      return;
-    }
-
-    if (!canDeleteTenants) {
-      setSuccessMessage(null);
-      setFormError('Your current role cannot delete tenants.');
-      return;
-    }
-
-    const confirmed = window.confirm(`Delete tenant "${selectedTenant.name}"? This calls DELETE /tenants/:id.`);
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(selectedTenant.id);
   };
 
   if (!canReadTenants) {
@@ -350,15 +259,9 @@ export default function TenantSettingsPage() {
           <p style={styles.eyebrow}>Tenant scoped</p>
           <h2 style={styles.title}>Tenant Settings</h2>
           <p style={styles.subtitle}>
-            Frontend coverage for backend tenant CRUD: GET /tenants, POST /tenants, PUT /tenants/:id, DELETE /tenants/:id.
+            Tenant-scoped settings for the current tenant. Creation and deletion belong to the platform tenant control plane.
           </p>
         </div>
-
-        {canCreateOrUpdateTenants ? (
-          <button type="button" style={styles.primaryButton} onClick={startCreate} disabled={isSaving}>
-            New tenant
-          </button>
-        ) : null}
       </header>
 
       {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenants…</div> : null}
@@ -384,7 +287,7 @@ export default function TenantSettingsPage() {
                 type="button"
                 style={{
                   ...styles.tenantCard,
-                  ...(selectedTenant?.id === tenant.id && formMode === 'edit' ? styles.tenantCardActive : {})
+                  ...(selectedTenant?.id === tenant.id ? styles.tenantCardActive : {})
                 }}
                 onClick={() => selectTenant(tenant)}
               >
@@ -400,17 +303,15 @@ export default function TenantSettingsPage() {
 
         <form style={styles.panel} onSubmit={handleSubmit}>
           <div style={styles.sectionHeader}>
-            <h3 style={styles.sectionTitle}>{formMode === 'create' ? 'Create Tenant' : 'Edit Tenant'}</h3>
-            {formMode === 'edit' && selectedTenant ? <span style={styles.badge}>{selectedTenant.id}</span> : null}
+            <h3 style={styles.sectionTitle}>Edit Tenant Settings</h3>
+            {selectedTenant ? <span style={styles.badge}>{selectedTenant.id}</span> : null}
           </div>
 
           <div style={styles.grid}>
-            {formMode === 'edit' ? (
-              <label style={styles.field}>
-                <span style={styles.label}>Tenant ID</span>
-                <input style={styles.input} value={selectedTenant?.id ?? ''} disabled />
-              </label>
-            ) : null}
+            <label style={styles.field}>
+              <span style={styles.label}>Tenant ID</span>
+              <input style={styles.input} value={selectedTenant?.id ?? ''} disabled />
+            </label>
 
             <label style={styles.field}>
               <span style={styles.label}>Name</span>
@@ -418,7 +319,7 @@ export default function TenantSettingsPage() {
                 style={styles.input}
                 value={formState.name}
                 onChange={(event) => updateField('name', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
                 required
               />
             </label>
@@ -429,7 +330,7 @@ export default function TenantSettingsPage() {
                 style={styles.input}
                 value={formState.location}
                 onChange={(event) => updateField('location', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
               />
             </label>
 
@@ -439,7 +340,7 @@ export default function TenantSettingsPage() {
                 style={styles.input}
                 value={formState.organization_type}
                 onChange={(event) => updateField('organization_type', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
               />
             </label>
 
@@ -450,7 +351,7 @@ export default function TenantSettingsPage() {
                 type="date"
                 value={formState.season_start}
                 onChange={(event) => updateField('season_start', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
               />
             </label>
 
@@ -461,7 +362,7 @@ export default function TenantSettingsPage() {
                 type="date"
                 value={formState.season_end}
                 onChange={(event) => updateField('season_end', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
               />
             </label>
 
@@ -471,7 +372,7 @@ export default function TenantSettingsPage() {
                 style={styles.textarea}
                 value={formState.metadata}
                 onChange={(event) => updateField('metadata', event.target.value)}
-                disabled={!canCreateOrUpdateTenants || isSaving}
+                disabled={!canUpdateTenants || isSaving}
                 rows={8}
               />
             </label>
@@ -481,35 +382,14 @@ export default function TenantSettingsPage() {
             <button
               type="submit"
               style={styles.primaryButton}
-              disabled={!canCreateOrUpdateTenants || isSaving || (formMode === 'edit' && !selectedTenant)}
+              disabled={!canUpdateTenants || isSaving || !selectedTenant}
             >
-              {isSaving ? 'Saving…' : formMode === 'create' ? 'Create tenant' : 'Save tenant'}
+              {isSaving ? 'Saving…' : 'Save tenant settings'}
             </button>
-
-            {formMode === 'edit' && selectedTenant && canDeleteTenants ? (
-              <button type="button" style={styles.dangerButton} onClick={handleDelete} disabled={isSaving}>
-                Delete tenant
-              </button>
-            ) : null}
-
-            {formMode === 'create' ? (
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => {
-                  setFormMode('edit');
-                  setFormState(createFormState(selectedTenant));
-                  setFormError(null);
-                }}
-                disabled={isSaving}
-              >
-                Cancel create
-              </button>
-            ) : null}
           </div>
 
-          {!canCreateOrUpdateTenants ? (
-            <p style={styles.permissionHint}>Your role can read tenants but cannot create or update them.</p>
+          {!canUpdateTenants ? (
+            <p style={styles.permissionHint}>Your role can read tenant settings but cannot update them.</p>
           ) : null}
         </form>
       </div>
