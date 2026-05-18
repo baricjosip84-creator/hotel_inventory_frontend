@@ -9,6 +9,10 @@ import {
   getSupportSessionInfo
 } from '../lib/auth';
 import { apiRequest } from '../lib/api';
+import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/supportContext';
+import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
+import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
+import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import type { TenantPermission } from '../lib/permissions';
 
@@ -186,6 +190,10 @@ export default function AppLayout() {
   const role = useMemo(() => getCurrentUserRole(), []);
   const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
 
+  const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
+  const [maintenanceContext, setMaintenanceContext] = useState<MaintenanceContext | null>(null);
+  const [announcementContext, setAnnouncementContext] = useState<AnnouncementContext | null>(null);
+  const [incidentContext, setIncidentContext] = useState<IncidentContext | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -244,6 +252,94 @@ export default function AppLayout() {
 
   useEffect(() => {
     setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!supportSession.isSupportSession) {
+      setSupportContext(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetchCurrentSupportContext()
+      .then((context) => {
+        if (!cancelled) {
+          setSupportContext(context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSupportContext({ active: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supportSession.isSupportSession, supportSession.supportSessionId, location.pathname]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchMaintenanceContext()
+      .then((context) => {
+        if (!cancelled) {
+          setMaintenanceContext(context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMaintenanceContext(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchAnnouncementContext()
+      .then((context) => {
+        if (!cancelled) {
+          setAnnouncementContext(context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnnouncementContext(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchIncidentContext()
+      .then((context) => {
+        if (!cancelled) {
+          setIncidentContext(context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIncidentContext(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -404,13 +500,63 @@ export default function AppLayout() {
 
         {supportSession.isSupportSession ? (
           <div style={styles.supportBanner}>
-            <div>
-              <strong>Support mode active.</strong> You are viewing tenant data through an audited platform support session.
-              {supportSession.tenantId ? <span> Tenant: {supportSession.tenantId}</span> : null}
+            <div style={styles.supportBannerText}>
+              <strong>Support session active.</strong>{' '}
+              {supportContext?.platform_user_name || supportContext?.platform_user_email
+                ? `${supportContext.platform_user_name || supportContext.platform_user_email} is accessing this tenant through HLA support.`
+                : 'You are accessing this tenant through HLA support.'}
+              <div style={styles.supportBannerMeta}>
+                Tenant: {supportContext?.tenant_name || supportSession.tenantId || '-'} · Role: {supportContext?.effective_role || supportSession.role || '-'} · Reason: {supportContext?.reason || '-'}
+                {supportContext?.expires_at ? ` · Expires: ${new Date(supportContext.expires_at).toLocaleString()}` : ''}
+              </div>
             </div>
             <button type="button" style={styles.supportExitButton} onClick={handleLogout} disabled={isLoggingOut}>
               Exit support mode
             </button>
+          </div>
+        ) : null}
+
+
+        {incidentContext?.incidents?.length ? (
+          <div style={{
+            ...styles.incidentBanner,
+            ...(incidentContext.incidents[0].severity === 'critical' ? styles.incidentCritical : {}),
+            ...(incidentContext.incidents[0].severity === 'major' ? styles.incidentMajor : {})
+          }}>
+            <strong>Service incident:</strong> {incidentContext.incidents[0].title}
+            {incidentContext.incidents[0].public_message ? ` — ${incidentContext.incidents[0].public_message}` : ''}
+            <div style={styles.incidentMeta}>
+              Status: {incidentContext.incidents[0].status} · Severity: {incidentContext.incidents[0].severity} · Impact: {incidentContext.incidents[0].impact}
+            </div>
+          </div>
+        ) : null}
+
+        {maintenanceContext?.active?.length ? (
+          <div style={styles.maintenanceBanner}>
+            <strong>Maintenance active:</strong> {maintenanceContext.active[0].title}
+            {maintenanceContext.active[0].message ? ` — ${maintenanceContext.active[0].message}` : ''}
+            <div style={styles.maintenanceBannerMeta}>
+              Ends: {new Date(maintenanceContext.active[0].ends_at).toLocaleString()} · Scope: {maintenanceContext.active[0].scope} · Write lock: {maintenanceContext.active[0].lock_writes ? 'yes' : 'no'}
+            </div>
+          </div>
+        ) : maintenanceContext?.upcoming?.length ? (
+          <div style={styles.maintenanceNotice}>
+            <strong>Upcoming maintenance:</strong> {maintenanceContext.upcoming[0].title} · Starts {new Date(maintenanceContext.upcoming[0].starts_at).toLocaleString()}
+          </div>
+        ) : null}
+
+        {announcementContext?.announcements?.length ? (
+          <div style={{
+            ...styles.announcementBanner,
+            ...(announcementContext.announcements[0].severity === 'critical' ? styles.announcementCritical : {}),
+            ...(announcementContext.announcements[0].severity === 'warning' ? styles.announcementWarning : {})
+          }}>
+            <strong>{announcementContext.announcements[0].title}</strong>
+            <div>{announcementContext.announcements[0].message}</div>
+            <div style={styles.announcementMeta}>
+              Severity: {announcementContext.announcements[0].severity}
+              {announcementContext.announcements[0].ends_at ? ` · Visible until: ${new Date(announcementContext.announcements[0].ends_at).toLocaleString()}` : ''}
+            </div>
           </div>
         ) : null}
 
@@ -428,6 +574,78 @@ export default function AppLayout() {
 }
 
 const styles: Record<string, CSSProperties> = {
+
+  incidentBanner: {
+    margin: '12px 24px 0',
+    background: '#eff6ff',
+    color: '#1e3a8a',
+    border: '1px solid #bfdbfe',
+    borderRadius: '14px',
+    padding: '12px 16px',
+    lineHeight: 1.45
+  },
+  incidentMajor: {
+    background: '#fffbeb',
+    color: '#92400e',
+    border: '1px solid #fde68a'
+  },
+  incidentCritical: {
+    background: '#7f1d1d',
+    color: '#fff',
+    border: '1px solid #fecaca'
+  },
+  incidentMeta: {
+    marginTop: '4px',
+    fontSize: '12px',
+    opacity: 0.85
+  },
+
+  announcementBanner: {
+    margin: '12px 24px 0',
+    background: '#eff6ff',
+    color: '#1e3a8a',
+    border: '1px solid #bfdbfe',
+    borderRadius: '14px',
+    padding: '12px 16px',
+    lineHeight: 1.45
+  },
+  announcementWarning: {
+    background: '#fffbeb',
+    color: '#92400e',
+    border: '1px solid #fde68a'
+  },
+  announcementCritical: {
+    background: '#7f1d1d',
+    color: '#fff',
+    border: '1px solid #fecaca'
+  },
+  announcementMeta: {
+    marginTop: '4px',
+    fontSize: '12px',
+    opacity: 0.85
+  },
+
+  maintenanceBanner: {
+    margin: '16px 24px 0',
+    background: '#7f1d1d',
+    color: '#fff',
+    borderRadius: '14px',
+    padding: '14px 16px',
+    boxShadow: '0 12px 30px rgba(127,29,29,0.18)'
+  },
+  maintenanceBannerMeta: {
+    marginTop: '4px',
+    fontSize: '12px',
+    color: '#fee2e2'
+  },
+  maintenanceNotice: {
+    margin: '16px 24px 0',
+    background: '#fffbeb',
+    color: '#92400e',
+    border: '1px solid #fde68a',
+    borderRadius: '14px',
+    padding: '12px 16px'
+  },
   shell: {
     minHeight: '100dvh',
     height: '100dvh',
@@ -651,6 +869,16 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     alignItems: 'center',
     flexWrap: 'wrap'
+  },
+  supportBannerText: {
+    minWidth: 0,
+    lineHeight: 1.45
+  },
+  supportBannerMeta: {
+    marginTop: '4px',
+    fontSize: '12px',
+    color: '#92400e',
+    wordBreak: 'break-word'
   },
   supportExitButton: {
     border: 'none',

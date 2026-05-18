@@ -180,3 +180,46 @@ export async function platformApiRequest<T>(
     throw error;
   }
 }
+
+
+export async function platformDownload(path: string, fallbackFilename: string): Promise<void> {
+  if (isPlatformAccessTokenExpired(getPlatformAccessToken())) {
+    await refreshPlatformAccessToken();
+  }
+
+  let response: Response;
+  try {
+    response = await performRequest(path);
+  } catch (error: any) {
+    throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+  }
+
+  if (response.status === 401) {
+    const refreshedAccessToken = await refreshPlatformAccessToken();
+    if (refreshedAccessToken) {
+      try {
+        response = await performRequest(path);
+      } catch (error: any) {
+        throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+      }
+    }
+  }
+
+  if (!response.ok) {
+    await parseResponse<never>(response);
+    return;
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  const filename = filenameMatch?.[1] || fallbackFilename;
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}

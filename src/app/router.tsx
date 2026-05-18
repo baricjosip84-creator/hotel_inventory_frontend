@@ -47,10 +47,43 @@ import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
 import PlatformLayout from '../layouts/PlatformLayout';
 import PlatformLoginPage from '../pages/PlatformLoginPage';
+import PlatformDashboardPage from '../pages/PlatformDashboardPage';
 import PlatformTenantsPage from '../pages/PlatformTenantsPage';
 import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
 import PlatformAuditPage from '../pages/PlatformAuditPage';
 import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
+import PlatformUsersPage from '../pages/PlatformUsersPage';
+import PlatformSessionsPage from '../pages/PlatformSessionsPage';
+import PlatformNotificationsPage from '../pages/PlatformNotificationsPage';
+import PlatformSecurityPage from '../pages/PlatformSecurityPage';
+import PlatformBillingPage from '../pages/PlatformBillingPage';
+import PlatformProvisioningPage from '../pages/PlatformProvisioningPage';
+import PlatformTenantExportsPage from '../pages/PlatformTenantExportsPage';
+import PlatformMaintenancePage from '../pages/PlatformMaintenancePage';
+import PlatformAnnouncementsPage from '../pages/PlatformAnnouncementsPage';
+import PlatformTenantContactsPage from '../pages/PlatformTenantContactsPage';
+import PlatformTenantNotesPage from '../pages/PlatformTenantNotesPage';
+import PlatformTenantCommunicationsPage from '../pages/PlatformTenantCommunicationsPage';
+import PlatformTenantTasksPage from '../pages/PlatformTenantTasksPage';
+import PlatformTenantOffboardingPage from '../pages/PlatformTenantOffboardingPage';
+import PlatformIncidentsPage from '../pages/PlatformIncidentsPage';
+import PlatformDataRetentionPage from '../pages/PlatformDataRetentionPage';
+import PlatformTenantTimelinePage from '../pages/PlatformTenantTimelinePage';
+import PlatformTenantHealthPage from '../pages/PlatformTenantHealthPage';
+import PlatformTenantSlaPage from '../pages/PlatformTenantSlaPage';
+import PlatformRunbooksPage from '../pages/PlatformRunbooksPage';
+import PlatformChangeManagementPage from '../pages/PlatformChangeManagementPage';
+import PlatformApiKeysPage from '../pages/PlatformApiKeysPage';
+import PlatformWebhooksPage from '../pages/PlatformWebhooksPage';
+import PlatformAccessReviewsPage from '../pages/PlatformAccessReviewsPage';
+import PlatformComplianceDocumentsPage from '../pages/PlatformComplianceDocumentsPage';
+import PlatformPrivacyRequestsPage from '../pages/PlatformPrivacyRequestsPage';
+import PlatformVendorsPage from '../pages/PlatformVendorsPage';
+import PlatformServiceDependenciesPage from '../pages/PlatformServiceDependenciesPage';
+import PlatformReleasesPage from '../pages/PlatformReleasesPage';
+import PlatformRiskRegisterPage from '../pages/PlatformRiskRegisterPage';
+import PlatformCapacityPlanningPage from '../pages/PlatformCapacityPlanningPage';
+import PlatformOperationalJobsPage from '../pages/PlatformOperationalJobsPage';
 import { PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
 const router = createBrowserRouter([
@@ -72,13 +105,240 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/platform/tenants" replace />
+        element: <Navigate to="/platform/dashboard" replace />
+      },
+
+      {
+        path: 'dashboard',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformDashboardPage />
+          </PlatformProtectedRoute>
+        )
       },
       {
         path: 'tenants',
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
             <PlatformTenantsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'provisioning',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformProvisioningPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-exports',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_EXPORT]}>
+            <PlatformTenantExportsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-contacts',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantContactsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-notes',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantNotesPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-communications',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantCommunicationsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-tasks',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantTasksPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-timeline',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantTimelinePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-health',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantHealthPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-sla',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SLA_READ]}>
+            <PlatformTenantSlaPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'runbooks',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ]}>
+            <PlatformRunbooksPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'change-management',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_CHANGES_READ]}>
+            <PlatformChangeManagementPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'api-keys',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ]}>
+            <PlatformApiKeysPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'webhooks',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_WEBHOOKS_READ]}>
+            <PlatformWebhooksPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'vendors',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_VENDORS_READ]}>
+            <PlatformVendorsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'service-dependencies',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ]}>
+            <PlatformServiceDependenciesPage />
+          </PlatformProtectedRoute>
+        )
+      },
+
+      {
+        path: 'risk-register',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ]}>
+            <PlatformRiskRegisterPage />
+          </PlatformProtectedRoute>
+        )
+      },
+
+      {
+        path: 'capacity-planning',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_CAPACITY_READ]}>
+            <PlatformCapacityPlanningPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'operational-jobs',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ]}>
+            <PlatformOperationalJobsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'releases',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_RELEASES_READ]}>
+            <PlatformReleasesPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'access-reviews',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ]}>
+            <PlatformAccessReviewsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'compliance-documents',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ]}>
+            <PlatformComplianceDocumentsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'privacy-requests',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ]}>
+            <PlatformPrivacyRequestsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'data-retention',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_READ]}>
+            <PlatformDataRetentionPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-offboarding',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantOffboardingPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'incidents',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ]}>
+            <PlatformIncidentsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'maintenance',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_READ]}>
+            <PlatformMaintenancePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'announcements',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_READ]}>
+            <PlatformAnnouncementsPage />
           </PlatformProtectedRoute>
         )
       },
@@ -97,6 +357,43 @@ const router = createBrowserRouter([
             <PlatformAuditPage />
           </PlatformProtectedRoute>
         )
+      },
+
+      {
+        path: 'users',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_USERS_READ]}>
+            <PlatformUsersPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'sessions',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ]}>
+            <PlatformSessionsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'billing',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+            <PlatformBillingPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'notifications',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ]}>
+            <PlatformNotificationsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'security',
+        element: <PlatformSecurityPage />
       },
       {
         path: 'support-sessions',

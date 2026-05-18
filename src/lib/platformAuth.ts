@@ -4,7 +4,7 @@ const PLATFORM_ACCESS_TOKEN_KEY = 'inventory_platform_access_token';
 const PLATFORM_REFRESH_TOKEN_KEY = 'inventory_platform_refresh_token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export type PlatformRole = 'superadmin' | 'support' | 'platform_viewer' | 'unknown';
+export type PlatformRole = 'superadmin' | 'support' | 'platform_viewer' | 'support_l1' | 'support_l2' | 'security' | 'billing' | 'ops' | 'tenant_success' | 'readonly_audit' | 'unknown';
 
 type PlatformJwtPayload = {
   typ?: string;
@@ -80,7 +80,14 @@ export function getCurrentPlatformRole(): PlatformRole {
   if (
     payload.role === 'superadmin' ||
     payload.role === 'support' ||
-    payload.role === 'platform_viewer'
+    payload.role === 'platform_viewer' ||
+    payload.role === 'support_l1' ||
+    payload.role === 'support_l2' ||
+    payload.role === 'security' ||
+    payload.role === 'billing' ||
+    payload.role === 'ops' ||
+    payload.role === 'tenant_success' ||
+    payload.role === 'readonly_audit'
   ) {
     return payload.role;
   }
@@ -128,7 +135,14 @@ function parsePlatformIdentity(payload: unknown): PlatformIdentity {
     role:
       value?.role === 'superadmin' ||
       value?.role === 'support' ||
-      value?.role === 'platform_viewer'
+      value?.role === 'platform_viewer' ||
+      value?.role === 'support_l1' ||
+      value?.role === 'support_l2' ||
+      value?.role === 'security' ||
+      value?.role === 'billing' ||
+      value?.role === 'ops' ||
+      value?.role === 'tenant_success' ||
+      value?.role === 'readonly_audit'
         ? value.role
         : 'unknown',
     is_active: typeof value?.is_active === 'boolean' ? value.is_active : undefined,
