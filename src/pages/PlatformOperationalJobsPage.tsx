@@ -90,6 +90,10 @@ export default function PlatformOperationalJobsPage() {
   const rows = response?.jobs || [];
   const summary = response?.summary;
 
+  void executionMetrics;
+  void workerHandlers;
+  void defaultJobs;
+
   return (
     <div style={styles.page}>
       <header style={styles.header}><div><h1 style={styles.title}>Operational jobs</h1><p style={styles.subtitle}>Track recurring platform work such as backups, retention scans, billing syncs, webhook delivery, health scans, and SLA checks.</p></div></header>
@@ -107,8 +111,8 @@ export default function PlatformOperationalJobsPage() {
               <ul style={styles.simpleList}>
                 {(dueJobs.data || []).map((job) => (
                   <li key={job.id} style={styles.listItem}>
-                    <strong>{job.name}</strong><span style={styles.muted}>Worker: {job.worker_enabled ? (job.worker_dry_run ? 'dry-run' : 'enabled') : 'disabled'}{job.worker_handler ? ` · ${job.worker_handler}` : ''}{job.last_alerted_at ? ` · Last alert: ${formatDate(job.last_alerted_at)}` : ''}</span>
-                    <span>{job.next_retry_at ? `Retry due ${formatDate(job.next_retry_at)}` : `Next run ${formatDate(job.next_run_at)}`}</span>
+                    <strong>{job.name}</strong><span style={styles.muted}>Worker: {job.worker_enabled ? (job.worker_dry_run ? 'dry-run' : 'enabled') : 'disabled'}{job.worker_handler ? ` · ${job.worker_handler}` : ''}{job.last_alerted_at ? ` · Last alert: ${dateTime(job.last_alerted_at)}` : ''}</span>
+                    <span>{job.next_retry_at ? `Retry due ${dateTime(job.next_retry_at)}` : `Next run ${dateTime(job.next_run_at)}`}</span>
                   </li>
                 ))}
               </ul>
@@ -121,7 +125,7 @@ export default function PlatformOperationalJobsPage() {
                 {(workerHeartbeats.data || []).map((worker) => (
                   <li key={worker.id} style={styles.listItem}>
                     <strong>{worker.worker_id}</strong>
-                    <span>{worker.status}{worker.is_stale ? ' · stale' : ' · online'} · {formatDate(worker.last_seen_at)}</span>
+                    <span>{worker.status}{worker.is_stale ? ' · stale' : ' · online'} · {dateTime(worker.last_seen_at)}</span>
                   </li>
                 ))}
               </ul>
