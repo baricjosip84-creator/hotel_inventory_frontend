@@ -34,6 +34,7 @@ const sourceOptions = [
   { value: 'incident', label: 'Incidents' },
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'tenant_task', label: 'Tenant tasks' },
+  { value: 'tenant_communication', label: 'Tenant communications' },
   { value: 'billing_event', label: 'Billing events' },
   { value: 'data_retention', label: 'Data retention' },
   { value: 'offboarding', label: 'Offboarding' }
@@ -50,7 +51,7 @@ function readableSource(value: string): string {
 
 function importantMetadata(metadata?: Record<string, unknown>): string[] {
   if (!metadata) return [];
-  const keys = ['ticket_reference', 'access_level', 'starts_at', 'ends_at', 'due_at', 'completed_at', 'retain_until', 'scheduled_for', 'impact', 'amount_cents', 'currency', 'external_reference'];
+  const keys = ['ticket_reference', 'access_level', 'starts_at', 'ends_at', 'due_at', 'completed_at', 'retain_until', 'scheduled_for', 'impact', 'channel', 'direction', 'contact_name', 'contact_email', 'follow_up_due_at', 'amount_cents', 'currency', 'external_reference'];
   return keys
     .filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '')
     .map((key) => `${key.replace(/_/g, ' ')}: ${String(metadata[key])}`);

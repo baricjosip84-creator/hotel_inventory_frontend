@@ -11,6 +11,7 @@ type PlatformJwtPayload = {
   role?: string;
   id?: string;
   exp?: number;
+  sid?: string;
 };
 
 export function savePlatformAuthTokens(tokens: AuthTokens): void {
@@ -118,6 +119,7 @@ export type PlatformIdentity = {
   role: PlatformRole;
   is_active?: boolean;
   created_at?: string;
+  session_id?: string | null;
 };
 
 function buildPlatformUrl(path: string): string {
@@ -146,7 +148,8 @@ function parsePlatformIdentity(payload: unknown): PlatformIdentity {
         ? value.role
         : 'unknown',
     is_active: typeof value?.is_active === 'boolean' ? value.is_active : undefined,
-    created_at: typeof value?.created_at === 'string' ? value.created_at : undefined
+    created_at: typeof value?.created_at === 'string' ? value.created_at : undefined,
+    session_id: typeof value?.session_id === 'string' || value?.session_id === null ? value.session_id : undefined
   };
 }
 

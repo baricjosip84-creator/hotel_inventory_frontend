@@ -68,7 +68,7 @@ export default function PlatformOperationalJobsPage() {
   const runbooks = useQuery({ queryKey: ['platform', 'jobs-runbooks'], queryFn: () => platformApiRequest<{ runbooks: Runbook[] }>('/platform/runbooks?limit=500'), enabled: canWrite && canReadRunbooks });
   const jobRuns = useQuery({ queryKey: ['platform', 'operational-job-runs', historyJobId], queryFn: () => platformApiRequest<JobRunsResponse>(`/platform/operational-jobs/${historyJobId}/runs?limit=25`), enabled: Boolean(historyJobId) });
   const dueJobs = useQuery({ queryKey: ['platform', 'operational-jobs-due'], queryFn: () => platformApiRequest<Job[]>('/platform/operational-jobs/scheduler/due?limit=25') });
-  const workerHeartbeats = useQuery({ queryKey: ['platform', 'operational-worker-heartbeats'], queryFn: () => platformApiRequest<WorkerHeartbeat[]>('/platform/operational-jobs/scheduler/heartbeats?staleAfterSeconds=300') });
+  const workerHeartbeats = useQuery({ queryKey: ['platform', 'operational-worker-heartbeats'], queryFn: () => platformApiRequest<WorkerHeartbeat[]>('/platform/operational-jobs/scheduler/heartbeats?stale_after_seconds=300') });
   const executionMetrics = useQuery({ queryKey: ['platform', 'operational-execution-metrics'], queryFn: () => platformApiRequest<any>('/platform/operational-jobs/execution-metrics?days=14') });
   const workerHandlers = useQuery({ queryKey: ['platform', 'worker-handler-options'], queryFn: () => platformApiRequest<{ handlers: WorkerHandlerOption[] }>('/platform/operational-jobs/worker/handlers') });
   const defaultJobs = useQuery({ queryKey: ['platform', 'operational-job-defaults'], queryFn: () => platformApiRequest<{ jobs: DefaultOperationalJob[] }>('/platform/operational-jobs/defaults') });

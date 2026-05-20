@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
-import { getRefreshToken, clearAuthTokens } from '../lib/auth';
+import { clearAuthTokens } from '../lib/auth';
 import { useNavigate } from 'react-router-dom';
 
 type SessionItem = {
@@ -13,6 +13,8 @@ type SessionItem = {
   last_used_at?: string | null;
   expires_at: string;
   revoked: boolean;
+  is_current?: boolean;
+  is_active?: boolean;
 };
 
 async function fetchSessions(): Promise<SessionItem[]> {
@@ -60,21 +62,6 @@ function formatIp(value: string | null | undefined): string {
   return value;
 }
 
-function isProbablyCurrentDevice(session: SessionItem): boolean {
-  const refreshToken = getRefreshToken();
-
-  /*
-    There is no session-id marker stored client-side yet, so we cannot know the
-    exact current session. We use a cautious heuristic for display only:
-    non-revoked session with the most recent activity is probably the current one.
-  */
-  if (!refreshToken) {
-    return false;
-  }
-
-  return !session.revoked;
-}
-
 function StatCard(props: {
   title: string;
   value: number | string;
@@ -110,12 +97,13 @@ export default function SessionsPage() {
     - same revoke-one flow
     - same revoke-all flow
     - same logout-after-revoke-all behavior
-    - same current-session display heuristic
+    - same session list/revoke flows
+    - exact current-session display when backend session-bound tokens provide it
 
     This pass applies the new shared UI layer from App.css:
     - uses shared panel, stats, and state helpers
     - keeps the page visually aligned with the rest of the polished app
-    - does not change session logic
+    - replaces the old current-session heuristic with backend truth
 
     WHAT PROBLEM IT SOLVES
     ----------------------
@@ -186,11 +174,21 @@ export default function SessionsPage() {
 
   const summary = useMemo(() => {
     const total = sessions.length;
-    const active = sessions.filter((session) => !session.revoked).length;
+    const active = sessions.filter((session) => {
+      if (typeof session.is_active === 'boolean') {
+        return session.is_active;
+      }
+
+      return !session.revoked && new Date(session.expires_at).getTime() > Date.now();
+    }).length;
     const revoked = sessions.filter((session) => session.revoked).length;
-    const expired = sessions.filter(
-      (session) => new Date(session.expires_at).getTime() <= Date.now()
-    ).length;
+    const expired = sessions.filter((session) => {
+      if (typeof session.is_active === 'boolean') {
+        return !session.revoked && !session.is_active;
+      }
+
+      return !session.revoked && new Date(session.expires_at).getTime() <= Date.now();
+    }).length;
 
     return {
       total,
@@ -274,7 +272,7 @@ export default function SessionsPage() {
         <StatCard
           title="Active Sessions"
           value={summary.active}
-          subtitle="Not revoked on the backend"
+          subtitle="Usable according to backend session state"
           tone={summary.active > 0 ? 'good' : 'warn'}
         />
         <StatCard
@@ -295,7 +293,7 @@ export default function SessionsPage() {
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Session Inventory</h3>
             <p style={styles.panelSubtitle}>
-              Sessions are ordered by last activity so likely-current sessions appear first.
+              Sessions are ordered by last activity. The current device is marked from the backend session id.
             </p>
           </div>
         </div>
@@ -321,9 +319,13 @@ export default function SessionsPage() {
                   </td>
                 </tr>
               ) : (
-                sessions.map((session, index) => {
-                  const isExpired = new Date(session.expires_at).getTime() <= Date.now();
-                  const isCurrentHint = index === 0 && isProbablyCurrentDevice(session);
+                sessions.map((session) => {
+                  const isExpired =
+                    typeof session.is_active === 'boolean'
+                      ? !session.revoked && !session.is_active
+                      : new Date(session.expires_at).getTime() <= Date.now();
+                  const isCurrent = Boolean(session.is_current);
+                  const canRevoke = !session.revoked && !isExpired && !isCurrent;
 
                   return (
                     <tr key={session.id}>
@@ -341,8 +343,8 @@ export default function SessionsPage() {
                             {session.revoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
                           </span>
 
-                          {isCurrentHint ? (
-                            <span style={styles.badgeInfo}>Likely current</span>
+                          {isCurrent ? (
+                            <span style={styles.badgeInfo}>Current</span>
                           ) : null}
                         </div>
                       </td>
@@ -360,9 +362,9 @@ export default function SessionsPage() {
                       <td style={styles.td}>
                         <button
                           type="button"
-                          style={session.revoked ? styles.disabledButton : styles.secondaryButton}
+                          style={!canRevoke ? styles.disabledButton : styles.secondaryButton}
                           onClick={() => handleRevokeOne(session.id)}
-                          disabled={session.revoked || revokeOneMutation.isPending}
+                          disabled={!canRevoke || revokeOneMutation.isPending}
                         >
                           {revokeOneMutation.isPending ? 'Working...' : 'Revoke'}
                         </button>
