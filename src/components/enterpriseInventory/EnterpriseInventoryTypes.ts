@@ -494,6 +494,7 @@ export type ProductCostGenericSummary = {
   evidence_rows?: Array<Record<string, unknown>>;
   readiness_checklist?: Array<Record<string, unknown>>;
   readiness_rows?: Array<Record<string, unknown>>;
+  export_rows?: Array<Record<string, unknown>>;
   runbook_status?: string;
   control_status?: string;
   evidence_status?: string;
