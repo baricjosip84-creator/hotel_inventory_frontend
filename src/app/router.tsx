@@ -42,6 +42,7 @@ import TenantSettingsPage from '../pages/TenantSettingsPage';
 import SystemContextPage from '../pages/SystemContextPage';
 import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
 import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
+import EnterpriseInventoryPage from '../pages/EnterpriseInventoryPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
@@ -578,6 +579,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW]}>
             <AutomationSchedulesPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'enterprise-inventory',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PAR_LEVELS_READ]}>
+            <EnterpriseInventoryPage />
           </ProtectedRoute>
         )
       }

@@ -138,6 +138,9 @@ function getPageSubtitle(pathname: string): string {
   if (pathname.startsWith('/automation-schedules')) {
     return 'Configure future scheduled checks. Runner is disabled and nothing executes automatically yet.';
   }
+  if (pathname.startsWith('/enterprise-inventory')) {
+    return 'Manage par levels, cycle counts, department requisitions, approvals, invoices, notifications, and labels.';
+  }
   if (pathname.startsWith('/sessions')) {
     return 'Review active sessions and revoke stale account access.';
   }
@@ -226,6 +229,7 @@ export default function AppLayout() {
       { to: '/system-context', label: 'System Context', permission: TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ },
       { to: '/execution-requests', label: 'Execution Requests', permission: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW },
       { to: '/automation-schedules', label: 'Automation Schedules', permission: TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW },
+      { to: '/enterprise-inventory', label: 'Enterprise Inventory', permission: TENANT_PERMISSIONS.PAR_LEVELS_READ },
 
       { to: '/sessions', label: 'Sessions' }
     ],
