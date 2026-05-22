@@ -1,0 +1,862 @@
+import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { formatCurrency, formatDateTime, formatNumber, formatRecordValue } from '../EnterpriseInventoryFormat';
+
+type CostControlTabProps = {
+  highVarianceCostRows: any;
+  inconsistentCostRows: any;
+  missingCostRows: any;
+  productCostActionAgeBands: any;
+  productCostActionAgeSummaryQuery: any;
+  productCostActionCategories: any;
+  productCostActionCategorySummaryQuery: any;
+  productCostActionCoverageRows: any;
+  productCostActionCoverageSummaryQuery: any;
+  productCostActionImpactSummaryQuery: any;
+  productCostActionPlanSummaryQuery: any;
+  productCostActionRows: any;
+  productCostActionSourceSummaryQuery: any;
+  productCostActionSources: any;
+  productCostActionSummaryQuery: any;
+  productCostActionSupplierSummaryQuery: any;
+  productCostActionSuppliers: any;
+  productCostAlertGroups: any;
+  productCostAlertSummaryQuery: any;
+  productCostBasisRows: any;
+  productCostCategoryRows: any;
+  productCostCoverageGaps: any;
+  productCostDashboardCategories: any;
+  productCostDashboardPriorityProducts: any;
+  productCostDashboardSummaryQuery: any;
+  productCostGovernanceAuditPackQuery: any;
+  productCostGovernanceAuditRows: any;
+  productCostGovernanceBlockers: any;
+  productCostGovernanceChecklist: any;
+  productCostGovernanceClosureChecklist: any;
+  productCostGovernanceClosureSummaryQuery: any;
+  productCostGovernanceDetailsQuery: any;
+  productCostGovernanceFailedChecklist: any;
+  productCostGovernanceHandoffChecklist: any;
+  productCostGovernanceHandoffSummaryQuery: any;
+  productCostGovernanceOwnerSummary: any;
+  productCostGovernancePriorityProducts: any;
+  productCostGovernanceQueueItems: any;
+  productCostGovernanceRemediationPlan: any;
+  productCostGovernanceReviewExportRows: any;
+  productCostGovernanceReviewPackQuery: any;
+  productCostGovernanceReviewQueueQuery: any;
+  productCostGovernanceSignoffChecklist: any;
+  productCostGovernanceSignoffSummaryQuery: any;
+  productCostGovernanceSummaryQuery: any;
+  productCostGovernanceWarnings: any;
+  productCostGovernanceWatchChecklist: any;
+  productCostHardeningFailedChecklist: any;
+  productCostHardeningSummaryQuery: any;
+  productCostImpactRows: any;
+  productCostNextActions: any;
+  productCostOperationsControlChecks: any;
+  productCostOperationsControlSummaryQuery: any;
+  productCostOperationsEscalationRules: any;
+  productCostOperationsEvidenceSections: any;
+  productCostOperationsEvidenceSummaryQuery: any;
+  productCostOperationsReadinessChecklist: any;
+  productCostOperationsReadinessSummaryQuery: any;
+  productCostOperationsRhythm: any;
+  productCostOperationsRunbookSummaryQuery: any;
+  productCostPriorityBands: any;
+  productCostRecommendationGroups: any;
+  productCostRecommendationSummaryQuery: any;
+  productCostReportSummaryQuery: any;
+  productCostRiskSummary: any;
+  productCostRiskSummaryQuery: any;
+  productCostTopAlerts: any;
+  productCostTopImpactProducts: any;
+  productCostTopRecommendations: any;
+  productCostTopValueRows: any;
+  productCostValuationDetailRows: any;
+  productCostValuationDetailsQuery: any;
+  productCostValuationSummary: any;
+  productCostValuationSummaryQuery: any;
+};
+
+export function CostControlTab({
+  highVarianceCostRows,
+  inconsistentCostRows,
+  missingCostRows,
+  productCostActionAgeBands,
+  productCostActionAgeSummaryQuery,
+  productCostActionCategories,
+  productCostActionCategorySummaryQuery,
+  productCostActionCoverageRows,
+  productCostActionCoverageSummaryQuery,
+  productCostActionImpactSummaryQuery,
+  productCostActionPlanSummaryQuery,
+  productCostActionRows,
+  productCostActionSourceSummaryQuery,
+  productCostActionSources,
+  productCostActionSummaryQuery,
+  productCostActionSupplierSummaryQuery,
+  productCostActionSuppliers,
+  productCostAlertGroups,
+  productCostAlertSummaryQuery,
+  productCostBasisRows,
+  productCostCategoryRows,
+  productCostCoverageGaps,
+  productCostDashboardCategories,
+  productCostDashboardPriorityProducts,
+  productCostDashboardSummaryQuery,
+  productCostGovernanceAuditPackQuery,
+  productCostGovernanceAuditRows,
+  productCostGovernanceBlockers,
+  productCostGovernanceChecklist,
+  productCostGovernanceClosureChecklist,
+  productCostGovernanceClosureSummaryQuery,
+  productCostGovernanceDetailsQuery,
+  productCostGovernanceFailedChecklist,
+  productCostGovernanceHandoffChecklist,
+  productCostGovernanceHandoffSummaryQuery,
+  productCostGovernanceOwnerSummary,
+  productCostGovernancePriorityProducts,
+  productCostGovernanceQueueItems,
+  productCostGovernanceRemediationPlan,
+  productCostGovernanceReviewExportRows,
+  productCostGovernanceReviewPackQuery,
+  productCostGovernanceReviewQueueQuery,
+  productCostGovernanceSignoffChecklist,
+  productCostGovernanceSignoffSummaryQuery,
+  productCostGovernanceSummaryQuery,
+  productCostGovernanceWarnings,
+  productCostGovernanceWatchChecklist,
+  productCostHardeningFailedChecklist,
+  productCostHardeningSummaryQuery,
+  productCostImpactRows,
+  productCostNextActions,
+  productCostOperationsControlChecks,
+  productCostOperationsControlSummaryQuery,
+  productCostOperationsEscalationRules,
+  productCostOperationsEvidenceSections,
+  productCostOperationsEvidenceSummaryQuery,
+  productCostOperationsReadinessChecklist,
+  productCostOperationsReadinessSummaryQuery,
+  productCostOperationsRhythm,
+  productCostOperationsRunbookSummaryQuery,
+  productCostPriorityBands,
+  productCostRecommendationGroups,
+  productCostRecommendationSummaryQuery,
+  productCostReportSummaryQuery,
+  productCostRiskSummary,
+  productCostRiskSummaryQuery,
+  productCostTopAlerts,
+  productCostTopImpactProducts,
+  productCostTopRecommendations,
+  productCostTopValueRows,
+  productCostValuationDetailRows,
+  productCostValuationDetailsQuery,
+  productCostValuationSummary,
+  productCostValuationSummaryQuery,
+}: CostControlTabProps) {
+  return (
+    <section style={styles.stack}>
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Product cost control</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-risk-summary endpoint. Backend compares standard costs, latest received costs, inventory value, and historical cost spread.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Total products" value={formatNumber(productCostRiskSummary?.totals?.total_products)} />
+          <MetricCard label="Stocked products" value={formatNumber(productCostRiskSummary?.totals?.stocked_products)} />
+          <MetricCard label="Missing cost" value={formatNumber(productCostRiskSummary?.totals?.missing_cost_products)} />
+          <MetricCard label="High variance" value={formatNumber(productCostRiskSummary?.totals?.high_variance_products)} />
+          <MetricCard label="Inconsistent history" value={formatNumber(productCostRiskSummary?.totals?.inconsistent_cost_history_products)} />
+          <MetricCard label="Variance threshold" value={`${formatNumber(productCostRiskSummary?.thresholds?.variance_threshold_percent)}%`} />
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost valuation summary</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-valuation-summary endpoint for inventory value by costing basis and category.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Estimated inventory value" value={formatCurrency(productCostValuationSummary?.totals?.total_estimated_inventory_value)} />
+          <MetricCard label="Received-cost value" value={formatCurrency(productCostValuationSummary?.totals?.received_cost_value)} />
+          <MetricCard label="Standard fallback value" value={formatCurrency(productCostValuationSummary?.totals?.standard_fallback_value)} />
+          <MetricCard label="Unvalued stocked products" value={formatNumber(productCostValuationSummary?.totals?.unvalued_stocked_products)} />
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Valuation basis breakdown</h2>
+        <DataTable
+          loading={productCostValuationSummaryQuery.isLoading}
+          empty="No valuation basis breakdown returned."
+          headers={['Basis', 'Stocked products', 'Quantity', 'Estimated value']}
+          rows={productCostBasisRows.map((item: any) => [
+            formatRecordValue(item, 'valuation_basis'),
+            formatRecordValue(item, 'stocked_products'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_value as number | string | null | undefined)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Top value categories</h2>
+        <DataTable
+          loading={productCostValuationSummaryQuery.isLoading}
+          empty="No cost category breakdown returned."
+          headers={['Category', 'Stocked products', 'Quantity', 'Estimated value', 'Unvalued products']}
+          rows={productCostCategoryRows.map((item: any) => [
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'stocked_products'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_value as number | string | null | undefined),
+            formatRecordValue(item, 'unvalued_stocked_products')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Top value products</h2>
+        <DataTable
+          loading={productCostValuationSummaryQuery.isLoading}
+          empty="No top value products returned."
+          headers={['Product', 'Category', 'Stock', 'Basis', 'Effective cost', 'Estimated value']}
+          rows={productCostTopValueRows.map((item: any) => [
+            item.name || item.product_name || item.product_id || item.id || '-',
+            item.category || '-',
+            `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
+            item.valuation_basis || '-',
+            formatCurrency(item.effective_unit_cost),
+            formatCurrency(item.estimated_inventory_value)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Detailed valuation rows</h2>
+        <DataTable
+          loading={productCostValuationDetailsQuery.isLoading}
+          empty="No valuation detail rows returned."
+          headers={['Product', 'Category', 'Stock', 'Latest cost', 'Standard cost', 'Basis', 'Value']}
+          rows={productCostValuationDetailRows.map((item: any) => [
+            item.name || item.product_name || item.product_id || item.id || '-',
+            item.category || '-',
+            `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
+            formatCurrency(item.latest_unit_cost),
+            formatCurrency(item.standard_unit_cost),
+            item.valuation_basis || '-',
+            formatCurrency(item.estimated_inventory_value)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost action summary</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-action-summary endpoint for prioritized cost remediation signals.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Total actions" value={formatNumber(productCostActionSummaryQuery.data?.totals?.total_actions)} />
+          <MetricCard label="Critical actions" value={formatNumber(productCostActionSummaryQuery.data?.totals?.critical_actions)} />
+          <MetricCard label="High priority" value={formatNumber(productCostActionSummaryQuery.data?.totals?.high_priority_actions)} />
+          <MetricCard label="Generated" value={formatDateTime(productCostActionSummaryQuery.data?.generated_at)} />
+        </div>
+        <DataTable
+          loading={productCostActionSummaryQuery.isLoading}
+          empty="No cost action summary rows returned."
+          headers={['Action', 'Priority', 'Products', 'Estimated value', 'Reason']}
+          rows={productCostActionRows.map((item: any) => [
+            formatRecordValue(item, 'action'),
+            formatRecordValue(item, 'priority'),
+            formatRecordValue(item, 'product_count'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'reason')
+          ])}
+        />
+      </section>
+
+
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost action plan</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-action-plan-summary endpoint for prioritized costing follow-up bands and next actions.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Actionable products" value={formatNumber(productCostActionPlanSummaryQuery.data?.totals?.total_actionable_products)} />
+          <MetricCard label="Critical products" value={formatNumber(productCostActionPlanSummaryQuery.data?.totals?.critical_products)} />
+          <MetricCard label="High products" value={formatNumber(productCostActionPlanSummaryQuery.data?.totals?.high_products)} />
+          <MetricCard label="Urgent value" value={formatCurrency(productCostActionPlanSummaryQuery.data?.totals?.urgent_estimated_inventory_value)} />
+        </div>
+        <DataTable
+          loading={productCostActionPlanSummaryQuery.isLoading}
+          empty="No cost action priority bands returned."
+          headers={['Priority band', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
+          rows={productCostPriorityBands.map((item: any) => [
+            formatRecordValue(item, 'priority_band'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'max_priority_score')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Next cost actions</h2>
+        <DataTable
+          loading={productCostActionPlanSummaryQuery.isLoading}
+          empty="No next cost actions returned."
+          headers={['Product', 'Category', 'Action', 'Priority', 'Score', 'Recommended action']}
+          rows={productCostNextActions.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'action_type'),
+            formatRecordValue(item, 'priority_band'),
+            formatRecordValue(item, 'action_priority_score'),
+            formatRecordValue(item, 'recommended_action')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost action category pressure</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-action-category-summary endpoint.</p>
+        <DataTable
+          loading={productCostActionCategorySummaryQuery.isLoading}
+          empty="No cost action categories returned."
+          headers={['Category', 'Products', 'Critical', 'High', 'Estimated value', 'Recommended focus']}
+          rows={productCostActionCategories.map((item: any) => [
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'critical_products'),
+            formatRecordValue(item, 'high_products'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_focus')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost action impact</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-action-impact-summary endpoint.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Valued review" value={formatNumber(productCostActionImpactSummaryQuery.data?.totals?.valued_inventory_review_products)} />
+          <MetricCard label="Unvalued stock" value={formatNumber(productCostActionImpactSummaryQuery.data?.totals?.unvalued_stock_review_products)} />
+          <MetricCard label="Master data review" value={formatNumber(productCostActionImpactSummaryQuery.data?.totals?.master_data_review_products)} />
+          <MetricCard label="Actionable value" value={formatCurrency(productCostActionImpactSummaryQuery.data?.totals?.total_actionable_estimated_value)} />
+        </div>
+        <DataTable
+          loading={productCostActionImpactSummaryQuery.isLoading}
+          empty="No cost impact rows returned."
+          headers={['Impact type', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
+          rows={productCostImpactRows.map((item: any) => [
+            formatRecordValue(item, 'impact_type'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'max_priority_score')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Top cost impact products</h2>
+        <DataTable
+          loading={productCostActionImpactSummaryQuery.isLoading}
+          empty="No top impact products returned."
+          headers={['Product', 'Impact type', 'Action', 'Stock', 'Value', 'Score']}
+          rows={productCostTopImpactProducts.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'impact_type'),
+            formatRecordValue(item, 'action_type'),
+            formatRecordValue(item, 'current_stock_quantity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'action_priority_score')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Supplier and source cost action split</h2>
+        <p style={styles.helper}>Reads the existing supplier/source cost action summary endpoints.</p>
+        <DataTable
+          loading={productCostActionSupplierSummaryQuery.isLoading}
+          empty="No supplier action rows returned."
+          headers={['Supplier', 'Products', 'Critical', 'High', 'Estimated value', 'Recommended action']}
+          rows={productCostActionSuppliers.map((item: any) => [
+            formatRecordValue(item, 'supplier_name'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'critical_products'),
+            formatRecordValue(item, 'high_products'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_supplier_action')
+          ])}
+        />
+        <DataTable
+          loading={productCostActionSourceSummaryQuery.isLoading}
+          empty="No cost source rows returned."
+          headers={['Cost source', 'Products', 'Missing source', 'Estimated value', 'Recommended source action']}
+          rows={productCostActionSources.map((item: any) => [
+            formatRecordValue(item, 'cost_source'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'missing_source_products'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_source_action')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost evidence age and coverage</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-action-age-summary and GET /products/cost-action-coverage-summary endpoints.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="No cost date" value={formatNumber(productCostActionAgeSummaryQuery.data?.totals?.no_cost_date_products)} />
+          <MetricCard label="Stale received cost" value={formatNumber(productCostActionAgeSummaryQuery.data?.totals?.stale_received_cost_products)} />
+          <MetricCard label="Stocked cost coverage" value={`${formatNumber(productCostActionCoverageSummaryQuery.data?.totals?.stocked_cost_coverage_percent)}%`} />
+          <MetricCard label="Coverage gaps" value={formatNumber(productCostActionCoverageSummaryQuery.data?.totals?.uncosted_stocked_products)} />
+        </div>
+        <DataTable
+          loading={productCostActionAgeSummaryQuery.isLoading}
+          empty="No cost age bands returned."
+          headers={['Age band', 'Products', 'Missing cost', 'Estimated value', 'Recommended age action']}
+          rows={productCostActionAgeBands.map((item: any) => [
+            formatRecordValue(item, 'cost_age_band'),
+            formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'missing_cost_products'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_age_action')
+          ])}
+        />
+        <DataTable
+          loading={productCostActionCoverageSummaryQuery.isLoading}
+          empty="No category coverage rows returned."
+          headers={['Category', 'Stocked products', 'With cost basis', 'Uncosted', 'Coverage %', 'Actionable value']}
+          rows={productCostActionCoverageRows.map((item: any) => [
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'stocked_products'),
+            formatRecordValue(item, 'stocked_products_with_cost_basis'),
+            formatRecordValue(item, 'uncosted_stocked_products'),
+            `${formatRecordValue(item, 'stocked_cost_coverage_percent')}%`,
+            formatCurrency(item.actionable_estimated_value as number | string | null | undefined)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost coverage gaps</h2>
+        <DataTable
+          loading={productCostActionCoverageSummaryQuery.isLoading}
+          empty="No cost coverage gaps returned."
+          headers={['Product', 'Category', 'Stock', 'Cost source', 'Action', 'Score']}
+          rows={productCostCoverageGaps.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'current_stock_quantity'),
+            formatRecordValue(item, 'effective_cost_source'),
+            formatRecordValue(item, 'action_type'),
+            formatRecordValue(item, 'action_priority_score')
+          ])}
+        />
+      </section>
+
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost alert summary</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-alert-summary endpoint.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Total alerts" value={formatNumber(productCostAlertSummaryQuery.data?.totals?.total_alerts)} />
+          <MetricCard label="Critical alerts" value={formatNumber(productCostAlertSummaryQuery.data?.totals?.critical_alerts)} />
+          <MetricCard label="Warning alerts" value={formatNumber(productCostAlertSummaryQuery.data?.totals?.warning_alerts)} />
+          <MetricCard label="Alerted value" value={formatCurrency(productCostAlertSummaryQuery.data?.totals?.alerted_estimated_value)} />
+        </div>
+        <DataTable
+          loading={productCostAlertSummaryQuery.isLoading}
+          empty="No alert groups returned."
+          headers={['Type', 'Severity', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
+          rows={productCostAlertGroups.map((item: any) => [
+            formatRecordValue(item, 'alert_type'),
+            formatRecordValue(item, 'alert_severity'),
+            formatRecordValue(item, 'alert_count'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_alert_action')
+          ])}
+        />
+        <DataTable
+          loading={productCostAlertSummaryQuery.isLoading}
+          empty="No top alert products returned."
+          headers={['Product', 'Alert', 'Severity', 'Value', 'Variance %', 'Score']}
+          rows={productCostTopAlerts.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'alert_type'),
+            formatRecordValue(item, 'alert_severity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'cost_variance_percent'),
+            formatRecordValue(item, 'alert_priority_score')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost recommendation summary</h2>
+        <p style={styles.helper}>Reads the existing GET /products/cost-recommendation-summary endpoint.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Recommendations" value={formatNumber(productCostRecommendationSummaryQuery.data?.totals?.total_recommendations)} />
+          <MetricCard label="Critical" value={formatNumber(productCostRecommendationSummaryQuery.data?.totals?.critical_recommendations)} />
+          <MetricCard label="High" value={formatNumber(productCostRecommendationSummaryQuery.data?.totals?.high_recommendations)} />
+          <MetricCard label="Recommended value" value={formatCurrency(productCostRecommendationSummaryQuery.data?.totals?.recommended_estimated_value)} />
+        </div>
+        <DataTable
+          loading={productCostRecommendationSummaryQuery.isLoading}
+          empty="No recommendation groups returned."
+          headers={['Type', 'Priority', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
+          rows={productCostRecommendationGroups.map((item: any) => [
+            formatRecordValue(item, 'recommendation_type'),
+            formatRecordValue(item, 'recommendation_priority'),
+            formatRecordValue(item, 'recommendation_count'),
+            formatRecordValue(item, 'stock_quantity'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommended_action')
+          ])}
+        />
+        <DataTable
+          loading={productCostRecommendationSummaryQuery.isLoading}
+          empty="No top recommendation products returned."
+          headers={['Product', 'Recommendation', 'Priority', 'Value', 'Score']}
+          rows={productCostTopRecommendations.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'recommendation_type'),
+            formatRecordValue(item, 'recommendation_priority'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommendation_score')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost executive dashboard and governance</h2>
+        <p style={styles.helper}>Reads existing dashboard, report, and governance cost endpoints without mutating product or stock data.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Dashboard value" value={formatCurrency(productCostDashboardSummaryQuery.data?.totals?.total_estimated_inventory_value)} />
+          <MetricCard label="Review value" value={formatCurrency(productCostDashboardSummaryQuery.data?.totals?.review_estimated_value)} />
+          <MetricCard label="Governance score" value={formatNumber(productCostGovernanceSummaryQuery.data?.readiness_score)} />
+          <MetricCard label="Governance status" value={formatRecordValue(productCostGovernanceSummaryQuery.data as unknown as Record<string, unknown>, 'governance_status')} />
+        </div>
+        <DataTable
+          loading={productCostDashboardSummaryQuery.isLoading}
+          empty="No dashboard review categories returned."
+          headers={['Category', 'Products', 'Review value', 'Critical', 'High']}
+          rows={productCostDashboardCategories.map((item: any) => [
+            formatRecordValue(item, 'category'),
+            formatRecordValue(item, 'product_count'),
+            formatCurrency(item.review_estimated_value as number | string | null | undefined),
+            formatRecordValue(item, 'critical_recommendations'),
+            formatRecordValue(item, 'high_recommendations')
+          ])}
+        />
+        <DataTable
+          loading={productCostDashboardSummaryQuery.isLoading}
+          empty="No dashboard priority products returned."
+          headers={['Product', 'Recommendation', 'Priority', 'Value', 'Dashboard score']}
+          rows={productCostDashboardPriorityProducts.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'recommendation_type'),
+            formatRecordValue(item, 'recommendation_priority'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'dashboard_priority_score')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceSummaryQuery.isLoading}
+          empty="No governance checklist returned."
+          headers={['Check', 'Status', 'Detail']}
+          rows={productCostGovernanceChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostReportSummaryQuery.isLoading}
+          empty="No report export rows returned."
+          headers={['Section', 'Metric', 'Value']}
+          rows={(productCostReportSummaryQuery.data?.export_rows ?? []).map((item: any) => [
+            formatRecordValue(item, 'section'),
+            formatRecordValue(item, 'metric'),
+            formatRecordValue(item, 'value')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost governance audit and handoff</h2>
+        <p style={styles.helper}>Reads the existing cost governance detail, audit-pack, sign-off, review, closure, and handoff endpoints without mutating costing or stock records.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Detail readiness" value={formatNumber(productCostGovernanceDetailsQuery.data?.readiness_score)} />
+          <MetricCard label="Sign-off status" value={formatRecordValue(productCostGovernanceSignoffSummaryQuery.data as unknown as Record<string, unknown>, 'signoff_status')} />
+          <MetricCard label="Review status" value={formatRecordValue(productCostGovernanceReviewQueueQuery.data as unknown as Record<string, unknown>, 'review_status')} />
+          <MetricCard label="Handoff status" value={formatRecordValue(productCostGovernanceHandoffSummaryQuery.data as unknown as Record<string, unknown>, 'handoff_status')} />
+        </div>
+        <DataTable
+          loading={productCostGovernanceDetailsQuery.isLoading}
+          empty="No failed governance checklist rows returned."
+          headers={['Failed check', 'Status', 'Detail']}
+          rows={productCostGovernanceFailedChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceDetailsQuery.isLoading}
+          empty="No watch governance checklist rows returned."
+          headers={['Watch check', 'Status', 'Detail']}
+          rows={productCostGovernanceWatchChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceDetailsQuery.isLoading}
+          empty="No remediation plan rows returned."
+          headers={['Key', 'Priority', 'Action', 'Source']}
+          rows={productCostGovernanceRemediationPlan.map((item: any) => [
+            formatRecordValue(item, 'key'),
+            formatRecordValue(item, 'priority'),
+            formatRecordValue(item, 'action'),
+            formatRecordValue(item, 'source')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceDetailsQuery.isLoading}
+          empty="No priority products returned."
+          headers={['Product', 'Category', 'Value', 'Recommendation']}
+          rows={productCostGovernancePriorityProducts.map((item: any) => [
+            formatRecordValue(item, 'name'),
+            formatRecordValue(item, 'category'),
+            formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
+            formatRecordValue(item, 'recommendation') || formatRecordValue(item, 'action')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceAuditPackQuery.isLoading}
+          empty="No audit pack rows returned."
+          headers={['Section', 'Key', 'Status', 'Value']}
+          rows={productCostGovernanceAuditRows.slice(0, 20).map((item: any) => [
+            formatRecordValue(item, 'section'),
+            formatRecordValue(item, 'key'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'value')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceSignoffSummaryQuery.isLoading}
+          empty="No sign-off checklist rows returned."
+          headers={['Check', 'Status', 'Detail']}
+          rows={productCostGovernanceSignoffChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceSignoffSummaryQuery.isLoading}
+          empty="No blockers or warnings returned."
+          headers={['Type', 'Key', 'Severity', 'Detail']}
+          rows={[...productCostGovernanceBlockers.map((item: any) => ({ ...item, issue_type: 'blocker' })), ...productCostGovernanceWarnings.map((item: any) => ({ ...item, issue_type: 'warning' }))].map((item: any) => [
+            formatRecordValue(item, 'issue_type'),
+            formatRecordValue(item, 'key'),
+            formatRecordValue(item, 'severity'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceReviewQueueQuery.isLoading}
+          empty="No governance review queue items returned."
+          headers={['Type', 'Priority', 'Owner', 'Detail']}
+          rows={productCostGovernanceQueueItems.map((item: any) => [
+            formatRecordValue(item, 'queue_type'),
+            formatRecordValue(item, 'priority'),
+            formatRecordValue(item, 'owner_hint'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceReviewPackQuery.isLoading}
+          empty="No review export rows returned."
+          headers={['Section', 'Key', 'Status', 'Value']}
+          rows={productCostGovernanceReviewExportRows.slice(0, 20).map((item: any) => [
+            formatRecordValue(item, 'section'),
+            formatRecordValue(item, 'key'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'value')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceClosureSummaryQuery.isLoading}
+          empty="No closure checklist rows returned."
+          headers={['Check', 'Status', 'Detail']}
+          rows={productCostGovernanceClosureChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceHandoffSummaryQuery.isLoading}
+          empty="No handoff checklist rows returned."
+          headers={['Check', 'Status', 'Detail']}
+          rows={productCostGovernanceHandoffChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostGovernanceHandoffSummaryQuery.isLoading}
+          empty="No owner handoff rows returned."
+          headers={['Owner', 'Responsibility', 'Status']}
+          rows={productCostGovernanceOwnerSummary.map((item: any) => [
+            formatRecordValue(item, 'owner'),
+            formatRecordValue(item, 'responsibility'),
+            formatRecordValue(item, 'status')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Cost operations readiness</h2>
+        <div style={styles.metricsGrid}>
+          <MetricCard label="Hardening issues" value={formatNumber(productCostHardeningSummaryQuery.data?.totals?.issue_count)} />
+          <MetricCard label="Runbook status" value={formatRecordValue(productCostOperationsRunbookSummaryQuery.data as unknown as Record<string, unknown>, 'runbook_status')} />
+          <MetricCard label="Control status" value={formatRecordValue(productCostOperationsControlSummaryQuery.data as unknown as Record<string, unknown>, 'control_status')} />
+          <MetricCard label="Readiness score" value={formatNumber(productCostOperationsReadinessSummaryQuery.data?.readiness_score)} />
+        </div>
+        <DataTable
+          loading={productCostHardeningSummaryQuery.isLoading}
+          empty="No cost hardening checklist issues returned."
+          headers={['Check', 'Status', 'Detail']}
+          rows={productCostHardeningFailedChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostOperationsRunbookSummaryQuery.isLoading}
+          empty="No operating rhythm rows returned."
+          headers={['Cadence', 'Owner', 'Status', 'Action']}
+          rows={productCostOperationsRhythm.map((item: any) => [
+            formatRecordValue(item, 'cadence'),
+            formatRecordValue(item, 'owner'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'action')
+          ])}
+        />
+        <DataTable
+          loading={productCostOperationsRunbookSummaryQuery.isLoading}
+          empty="No escalation rules returned."
+          headers={['Key', 'Current value', 'Condition', 'Escalation']}
+          rows={productCostOperationsEscalationRules.map((item: any) => [
+            formatRecordValue(item, 'key'),
+            formatRecordValue(item, 'current_value'),
+            formatRecordValue(item, 'condition'),
+            formatRecordValue(item, 'escalation')
+          ])}
+        />
+        <DataTable
+          loading={productCostOperationsControlSummaryQuery.isLoading}
+          empty="No control checks returned."
+          headers={['Check', 'Owner', 'Status', 'Value', 'Detail']}
+          rows={productCostOperationsControlChecks.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'owner'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'value'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+        <DataTable
+          loading={productCostOperationsEvidenceSummaryQuery.isLoading}
+          empty="No evidence sections returned."
+          headers={['Evidence', 'Source', 'Rows', 'Status', 'Purpose']}
+          rows={productCostOperationsEvidenceSections.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'source'),
+            formatRecordValue(item, 'rows'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'purpose')
+          ])}
+        />
+        <DataTable
+          loading={productCostOperationsReadinessSummaryQuery.isLoading}
+          empty="No readiness checklist rows returned."
+          headers={['Check', 'Status', 'Value', 'Detail']}
+          rows={productCostOperationsReadinessChecklist.map((item: any) => [
+            formatRecordValue(item, 'label'),
+            formatRecordValue(item, 'status'),
+            formatRecordValue(item, 'value'),
+            formatRecordValue(item, 'detail')
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>High cost variance</h2>
+        <DataTable
+          loading={productCostRiskSummaryQuery.isLoading}
+          empty="No high variance products returned."
+          headers={['Product', 'Category', 'Stock', 'Standard cost', 'Latest cost', 'Variance %', 'Inventory value']}
+          rows={highVarianceCostRows.map((item: any) => [
+            item.name || item.product_name || item.product_id || item.id || '-',
+            item.category || '-',
+            `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
+            formatNumber(item.standard_unit_cost),
+            formatNumber(item.latest_unit_cost),
+            `${formatNumber(item.cost_variance_percent)}%`,
+            formatNumber(item.estimated_inventory_value)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Missing product cost</h2>
+        <DataTable
+          loading={productCostRiskSummaryQuery.isLoading}
+          empty="No stocked products are missing cost."
+          headers={['Product', 'Category', 'Stock', 'Effective cost', 'Cost source', 'Variance status']}
+          rows={missingCostRows.map((item: any) => [
+            item.name || item.product_name || item.product_id || item.id || '-',
+            item.category || '-',
+            `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
+            formatNumber(item.effective_unit_cost),
+            item.effective_cost_source || '-',
+            item.cost_variance_status || '-'
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Inconsistent cost history</h2>
+        <DataTable
+          loading={productCostRiskSummaryQuery.isLoading}
+          empty="No inconsistent cost history rows returned."
+          headers={['Product', 'Category', 'Stock', 'Latest cost', 'History spread %', 'Inventory value']}
+          rows={inconsistentCostRows.map((item: any) => [
+            item.name || item.product_name || item.product_id || item.id || '-',
+            item.category || '-',
+            `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
+            formatNumber(item.latest_unit_cost),
+            `${formatNumber(item.cost_history_spread_percent)}%`,
+            formatNumber(item.estimated_inventory_value)
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Recommended actions</h2>
+        <DataTable
+          loading={productCostRiskSummaryQuery.isLoading}
+          empty="No recommended cost actions returned."
+          headers={['Action']}
+          rows={(productCostRiskSummary?.recommended_actions ?? []).map((action: any) => [action])}
+        />
+      </section>
+    </section>
+          
+  );
+}
