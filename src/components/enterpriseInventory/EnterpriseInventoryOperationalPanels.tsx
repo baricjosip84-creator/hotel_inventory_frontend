@@ -2,14 +2,9 @@ import { EnterpriseInventoryOperationalAnalyticsPanels } from "./EnterpriseInven
 import { EnterpriseInventoryStockOperationsPanels } from "./EnterpriseInventoryStockOperationsPanels";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryOperationalPanelsProps = EnterpriseInventoryPanelBaseProps;
+export function EnterpriseInventoryOperationalPanels(props: EnterpriseInventoryPanelBaseProps) {
+  const { activeTab, pageData } = props;
 
-export function EnterpriseInventoryOperationalPanels({
-  activeTab,
-  actions,
-  formState,
-  pageData,
-}: EnterpriseInventoryOperationalPanelsProps) {
   return (
     <>
       <EnterpriseInventoryOperationalAnalyticsPanels
@@ -17,12 +12,7 @@ export function EnterpriseInventoryOperationalPanels({
         pageData={pageData}
       />
 
-      <EnterpriseInventoryStockOperationsPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryStockOperationsPanels {...props} />
     </>
   );
 }

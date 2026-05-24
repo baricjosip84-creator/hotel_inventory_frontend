@@ -1,12 +1,6 @@
 import { ExecutionTab, SystemContextTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import type {
-  EnterpriseInventoryPanelBaseProps,
-  EnterpriseInventorySystemContextRefreshProps,
-} from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryExecutionSystemPanelsProps =
-  EnterpriseInventoryPanelBaseProps & EnterpriseInventorySystemContextRefreshProps;
+import type { EnterpriseInventoryPanelWithSystemContextProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryExecutionSystemPanels({
   activeTab,
@@ -14,7 +8,7 @@ export function EnterpriseInventoryExecutionSystemPanels({
   formState,
   pageData,
   refreshSystemContext,
-}: EnterpriseInventoryExecutionSystemPanelsProps) {
+}: EnterpriseInventoryPanelWithSystemContextProps) {
   const { executionFilters, setExecutionFilters } = formState;
 
   const {

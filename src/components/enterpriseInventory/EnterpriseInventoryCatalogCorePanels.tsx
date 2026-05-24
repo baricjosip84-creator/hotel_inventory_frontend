@@ -6,13 +6,7 @@ import {
   emptyStorageLocationForm,
   emptySupplierForm,
 } from "./EnterpriseInventoryForms";
-import type {
-  EnterpriseInventoryPanelBaseProps,
-  EnterpriseInventoryPanelNavigationProps,
-} from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryCatalogCorePanelsProps =
-  EnterpriseInventoryPanelBaseProps & EnterpriseInventoryPanelNavigationProps;
+import type { EnterpriseInventoryPanelWithNavigationProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryCatalogCorePanels({
   activeTab,
@@ -20,7 +14,7 @@ export function EnterpriseInventoryCatalogCorePanels({
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryCatalogCorePanelsProps) {
+}: EnterpriseInventoryPanelWithNavigationProps) {
   const {
     editingProductId,
     editingStorageLocationId,

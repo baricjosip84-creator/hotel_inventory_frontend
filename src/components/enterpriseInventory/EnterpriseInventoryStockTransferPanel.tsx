@@ -2,14 +2,12 @@ import { StockTransfersTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryStockTransferPanelProps = EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryStockTransferPanel({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryStockTransferPanelProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const { setStockTransferForm, stockTransferForm } = formState;
   const { queries, stableData, viewData } = pageData;
   const { stockTransfersQuery } = queries;

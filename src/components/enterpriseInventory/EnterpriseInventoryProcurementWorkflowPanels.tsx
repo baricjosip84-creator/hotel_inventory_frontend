@@ -2,14 +2,12 @@ import { ApprovalsTab, InvoicesTab, RequisitionsTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryProcurementWorkflowPanelsProps = EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryProcurementWorkflowPanels({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryProcurementWorkflowPanelsProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const {
     approvalRuleForm,
     requisitionForm,

@@ -1,17 +1,12 @@
 import { CostControlTab } from "./tabs";
 import { buildEnterpriseInventoryCostControlTabProps } from "./EnterpriseInventoryCostControlTabProps";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryCostControlPanelProps = Pick<
-  EnterpriseInventoryPanelBaseProps,
-  "activeTab" | "pageData"
->;
+import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryCostControlPanel({
   activeTab,
   pageData,
-}: EnterpriseInventoryCostControlPanelProps) {
+}: EnterpriseInventoryPanelDataProps) {
   return (
     <EnterpriseInventoryTabPanel activeTab={activeTab} tab="cost-control">
       <CostControlTab {...buildEnterpriseInventoryCostControlTabProps(pageData)} />

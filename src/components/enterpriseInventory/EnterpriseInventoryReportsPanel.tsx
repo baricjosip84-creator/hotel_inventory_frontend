@@ -1,16 +1,11 @@
 import { ReportsTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryReportsPanelProps = Pick<
-  EnterpriseInventoryPanelBaseProps,
-  "activeTab" | "pageData"
->;
+import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryReportsPanel({
   activeTab,
   pageData,
-}: EnterpriseInventoryReportsPanelProps) {
+}: EnterpriseInventoryPanelDataProps) {
   const {
     inventoryValuationReportQuery,
     stockByLocationReportQuery,

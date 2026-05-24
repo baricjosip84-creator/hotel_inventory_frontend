@@ -1,16 +1,11 @@
 import { ForecastTab, InsightsTab, OperationsDashboardTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryOperationalAnalyticsPanelsProps = Pick<
-  EnterpriseInventoryPanelBaseProps,
-  "activeTab" | "pageData"
->;
+import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryOperationalAnalyticsPanels({
   activeTab,
   pageData,
-}: EnterpriseInventoryOperationalAnalyticsPanelsProps) {
+}: EnterpriseInventoryPanelDataProps) {
   const { queries, stableData, viewData } = pageData;
 
   const {

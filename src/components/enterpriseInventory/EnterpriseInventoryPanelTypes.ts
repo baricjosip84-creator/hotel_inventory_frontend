@@ -15,8 +15,23 @@ export type EnterpriseInventoryPanelNavigationProps = {
   setActiveTab: Dispatch<SetStateAction<string>>;
 };
 
+export type EnterpriseInventoryPanelWithNavigationProps =
+  EnterpriseInventoryPanelBaseProps & EnterpriseInventoryPanelNavigationProps;
+
+export type EnterpriseInventoryPanelDataProps = Pick<
+  EnterpriseInventoryPanelBaseProps,
+  "activeTab" | "pageData"
+>;
+
 export type EnterpriseInventorySystemContextRefreshProps = {
   refreshSystemContext: ReturnType<
     typeof useEnterpriseInventoryPageFeedback
   >["refreshSystemContext"];
 };
+
+export type EnterpriseInventoryPanelWithSystemContextProps =
+  EnterpriseInventoryPanelBaseProps & EnterpriseInventorySystemContextRefreshProps;
+
+export type EnterpriseInventoryPagePanelsProps =
+  EnterpriseInventoryPanelWithNavigationProps &
+    EnterpriseInventorySystemContextRefreshProps;

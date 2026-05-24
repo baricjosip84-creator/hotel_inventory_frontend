@@ -3,15 +3,12 @@ import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import { emptyShipmentBarcodeScanForm } from "./EnterpriseInventoryForms";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryProcurementReceivingPanelsProps =
-  EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryProcurementReceivingPanels({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryProcurementReceivingPanelsProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const {
     lastBarcodeLookup,
     purchaseOrderShipmentForm,

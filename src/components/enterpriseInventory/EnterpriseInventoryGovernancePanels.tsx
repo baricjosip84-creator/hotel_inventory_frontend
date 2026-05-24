@@ -2,14 +2,7 @@ import { EnterpriseInventoryAutomationPanel } from "./EnterpriseInventoryAutomat
 import { EnterpriseInventoryCostControlPanel } from "./EnterpriseInventoryCostControlPanel";
 import { EnterpriseInventoryExecutionSystemPanels } from "./EnterpriseInventoryExecutionSystemPanels";
 import { EnterpriseInventoryReportsPanel } from "./EnterpriseInventoryReportsPanel";
-import type {
-  EnterpriseInventoryPanelBaseProps,
-  EnterpriseInventorySystemContextRefreshProps,
-} from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryGovernancePanelsProps =
-  EnterpriseInventoryPanelBaseProps &
-    EnterpriseInventorySystemContextRefreshProps;
+import type { EnterpriseInventoryPanelWithSystemContextProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryGovernancePanels({
   activeTab,
@@ -17,33 +10,20 @@ export function EnterpriseInventoryGovernancePanels({
   formState,
   pageData,
   refreshSystemContext,
-}: EnterpriseInventoryGovernancePanelsProps) {
+}: EnterpriseInventoryPanelWithSystemContextProps) {
+  const panelProps = { activeTab, actions, formState, pageData };
+  const dataPanelProps = { activeTab, pageData };
+
   return (
     <>
       <EnterpriseInventoryExecutionSystemPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
+        {...panelProps}
         refreshSystemContext={refreshSystemContext}
       />
 
-      <EnterpriseInventoryAutomationPanel
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
-
-      <EnterpriseInventoryReportsPanel
-        activeTab={activeTab}
-        pageData={pageData}
-      />
-
-      <EnterpriseInventoryCostControlPanel
-        activeTab={activeTab}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryAutomationPanel {...panelProps} />
+      <EnterpriseInventoryReportsPanel {...dataPanelProps} />
+      <EnterpriseInventoryCostControlPanel {...dataPanelProps} />
     </>
   );
 }

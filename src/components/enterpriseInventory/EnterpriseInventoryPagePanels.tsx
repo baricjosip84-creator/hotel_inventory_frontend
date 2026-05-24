@@ -3,15 +3,7 @@ import { EnterpriseInventoryGovernancePanels } from "./EnterpriseInventoryGovern
 import { EnterpriseInventoryOperationalPanels } from "./EnterpriseInventoryOperationalPanels";
 import { EnterpriseInventoryMasterDataPanels } from "./EnterpriseInventoryMasterDataPanels";
 import { EnterpriseInventoryProcurementPanels } from "./EnterpriseInventoryProcurementPanels";
-import type {
-  EnterpriseInventoryPanelBaseProps,
-  EnterpriseInventoryPanelNavigationProps,
-  EnterpriseInventorySystemContextRefreshProps,
-} from "./EnterpriseInventoryPanelTypes";
-
-type EnterpriseInventoryPagePanelsProps = EnterpriseInventoryPanelBaseProps &
-  EnterpriseInventoryPanelNavigationProps &
-  EnterpriseInventorySystemContextRefreshProps;
+import type { EnterpriseInventoryPagePanelsProps } from "./EnterpriseInventoryPanelTypes";
 
 export function EnterpriseInventoryPagePanels({
   activeTab,
@@ -21,44 +13,25 @@ export function EnterpriseInventoryPagePanels({
   pageData,
   refreshSystemContext,
 }: EnterpriseInventoryPagePanelsProps) {
+  const panelProps = { activeTab, actions, formState, pageData };
+
   return (
     <>
-      <EnterpriseInventoryOperationalPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryOperationalPanels {...panelProps} />
 
       <EnterpriseInventoryGovernancePanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
+        {...panelProps}
         refreshSystemContext={refreshSystemContext}
       />
 
       <EnterpriseInventoryMasterDataPanels
-        activeTab={activeTab}
+        {...panelProps}
         setActiveTab={setActiveTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
       />
 
-      <EnterpriseInventoryProcurementPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryProcurementPanels {...panelProps} />
 
-      <EnterpriseInventoryCompliancePanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryCompliancePanels {...panelProps} />
     </>
   );
 }

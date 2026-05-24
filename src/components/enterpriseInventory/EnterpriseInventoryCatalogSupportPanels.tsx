@@ -5,14 +5,12 @@ import type {
   EnterpriseInventoryPanelBaseProps,
 } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryCatalogSupportPanelsProps = EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryCatalogSupportPanels({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryCatalogSupportPanelsProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const {
     attachmentForm,
     barcodeLabelForm,

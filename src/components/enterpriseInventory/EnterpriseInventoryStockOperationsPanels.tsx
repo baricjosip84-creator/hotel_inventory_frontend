@@ -2,14 +2,12 @@ import { CycleCountsTab, ParLevelsTab, StockRiskTab } from "./tabs";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryStockOperationsPanelsProps = EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryStockOperationsPanels({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryStockOperationsPanelsProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const {
     cycleCountForm,
     parLevelForm,

@@ -2,28 +2,11 @@ import { EnterpriseInventoryProcurementReceivingPanels } from "./EnterpriseInven
 import { EnterpriseInventoryProcurementWorkflowPanels } from "./EnterpriseInventoryProcurementWorkflowPanels";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryProcurementPanelsProps = EnterpriseInventoryPanelBaseProps;
-
-export function EnterpriseInventoryProcurementPanels({
-  activeTab,
-  actions,
-  formState,
-  pageData,
-}: EnterpriseInventoryProcurementPanelsProps) {
+export function EnterpriseInventoryProcurementPanels(props: EnterpriseInventoryPanelBaseProps) {
   return (
     <>
-      <EnterpriseInventoryProcurementReceivingPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
-      <EnterpriseInventoryProcurementWorkflowPanels
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryProcurementReceivingPanels {...props} />
+      <EnterpriseInventoryProcurementWorkflowPanels {...props} />
     </>
   );
 }

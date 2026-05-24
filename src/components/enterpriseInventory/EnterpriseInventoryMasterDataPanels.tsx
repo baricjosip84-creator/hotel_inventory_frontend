@@ -1,36 +1,14 @@
 import { EnterpriseInventoryCatalogPanels } from "./EnterpriseInventoryCatalogPanels";
 import { EnterpriseInventoryStockTransferPanel } from "./EnterpriseInventoryStockTransferPanel";
-import type {
-  EnterpriseInventoryPanelBaseProps,
-  EnterpriseInventoryPanelNavigationProps,
-} from "./EnterpriseInventoryPanelTypes";
+import type { EnterpriseInventoryPanelWithNavigationProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryMasterDataPanelsProps = EnterpriseInventoryPanelBaseProps &
-  EnterpriseInventoryPanelNavigationProps;
-
-export function EnterpriseInventoryMasterDataPanels({
-  activeTab,
-  setActiveTab,
-  actions,
-  formState,
-  pageData,
-}: EnterpriseInventoryMasterDataPanelsProps) {
+export function EnterpriseInventoryMasterDataPanels(
+  props: EnterpriseInventoryPanelWithNavigationProps,
+) {
   return (
     <>
-      <EnterpriseInventoryStockTransferPanel
-        activeTab={activeTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
-
-      <EnterpriseInventoryCatalogPanels
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        actions={actions}
-        formState={formState}
-        pageData={pageData}
-      />
+      <EnterpriseInventoryStockTransferPanel {...props} />
+      <EnterpriseInventoryCatalogPanels {...props} />
     </>
   );
 }

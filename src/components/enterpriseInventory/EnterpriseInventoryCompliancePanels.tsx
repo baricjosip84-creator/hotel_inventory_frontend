@@ -6,14 +6,12 @@ import {
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
-type EnterpriseInventoryCompliancePanelsProps = EnterpriseInventoryPanelBaseProps;
-
 export function EnterpriseInventoryCompliancePanels({
   activeTab,
   actions,
   formState,
   pageData,
-}: EnterpriseInventoryCompliancePanelsProps) {
+}: EnterpriseInventoryPanelBaseProps) {
   const {
     alertFilters,
     alertForm,
