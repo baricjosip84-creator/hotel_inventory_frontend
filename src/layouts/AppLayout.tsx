@@ -60,6 +60,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/products')) return 'Products';
   if (pathname.startsWith('/suppliers')) return 'Suppliers';
   if (pathname.startsWith('/alerts')) return 'Alerts';
+  if (pathname.startsWith('/inventory-usage')) return 'Inventory Usage';
   if (pathname.startsWith('/stock-movements')) return 'Stock Movements';
   if (pathname.startsWith('/stock-transfers')) return 'Stock Transfers';
   if (pathname.startsWith('/purchase-orders')) return 'Purchase Orders';
@@ -92,6 +93,9 @@ function getPageSubtitle(pathname: string): string {
   }
   if (pathname.startsWith('/alerts')) {
     return 'Review and resolve operational issues that require immediate attention.';
+  }
+  if (pathname.startsWith('/inventory-usage')) {
+    return 'Track why stock leaves the business across departments, reasons, events, and locations.';
   }
   if (pathname.startsWith('/stock-movements')) {
     return 'Trace the full movement ledger behind current stock positions.';
@@ -207,6 +211,7 @@ export default function AppLayout() {
       { to: '/suppliers', label: 'Suppliers', permission: TENANT_PERMISSIONS.SUPPLIERS_READ },
       { to: '/alerts', label: 'Alerts', permission: TENANT_PERMISSIONS.ALERTS_READ },
       { to: '/stock', label: 'Stock', permission: TENANT_PERMISSIONS.STOCK_READ },
+      { to: '/inventory-usage', label: 'Usage Ledger', permission: TENANT_PERMISSIONS.STOCK_READ },
       { to: '/stock-movements', label: 'Stock Movements', permission: TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ },
       { to: '/stock-transfers', label: 'Stock Transfers', permission: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ },
       { to: '/purchase-orders', label: 'Purchase Orders', permission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },

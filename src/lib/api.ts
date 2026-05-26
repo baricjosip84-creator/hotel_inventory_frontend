@@ -31,6 +31,7 @@ type ApiErrorResponse = {
     code?: string;
     message?: string;
     request_id?: string;
+    details?: unknown;
   };
   message?: string;
 };
@@ -39,13 +40,15 @@ export class ApiError extends Error {
   status: number;
   code?: string;
   requestId?: string;
+  details?: unknown;
 
-  constructor(message: string, status: number, code?: string, requestId?: string) {
+  constructor(message: string, status: number, code?: string, requestId?: string, details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.requestId = requestId;
+    this.details = details;
   }
 }
 
@@ -198,6 +201,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     let message = rawText || `Request failed with status ${response.status}`;
     let code: string | undefined;
     let requestId: string | undefined;
+    let details: unknown;
 
     try {
       const parsed = rawText ? (JSON.parse(rawText) as ApiErrorResponse) : null;
@@ -210,11 +214,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
       code = parsed?.error?.code;
       requestId = parsed?.error?.request_id;
+      details = parsed?.error?.details;
     } catch {
       // Keep the raw response body when the backend did not return JSON.
     }
 
-    throw new ApiError(message, response.status, code, requestId);
+    throw new ApiError(message, response.status, code, requestId, details);
   }
 
   if (!rawText) {

@@ -35,6 +35,52 @@ type StockMovement = {
   created_at: string;
 };
 
+type InventoryUsageLog = {
+  id: string;
+  product_id: string;
+  product_name?: string | null;
+  product_unit?: string | null;
+  storage_location_id: string;
+  storage_location_name?: string | null;
+  stock_movement_id?: string | null;
+  quantity: number | string;
+  consumption_reason: UsageReason;
+  department?: string | null;
+  event_name?: string | null;
+  notes?: string | null;
+  quantity_before?: number | string | null;
+  quantity_after?: number | string | null;
+  consumed_at: string;
+  created_by_user_name?: string | null;
+  created_by_user_id?: string | null;
+};
+
+type InventoryUsageSummary = {
+  totals?: {
+    usage_count?: number | string | null;
+    total_quantity?: number | string | null;
+    first_consumed_at?: string | null;
+    last_consumed_at?: string | null;
+  };
+  by_reason?: Array<{
+    consumption_reason: UsageReason;
+    usage_count: number | string;
+    total_quantity: number | string;
+  }>;
+  by_product?: Array<{
+    product_id: string;
+    product_name?: string | null;
+    product_unit?: string | null;
+    usage_count: number | string;
+    total_quantity: number | string;
+  }>;
+  by_department?: Array<{
+    department?: string | null;
+    usage_count: number | string;
+    total_quantity: number | string;
+  }>;
+};
+
 type StockActionType = 'consume' | 'count' | 'adjust';
 
 type StockMutationResponse = {
@@ -54,7 +100,31 @@ type StockActionDraft = {
   quantity: string;
   change: string;
   reason: string;
+  consumption_reason: UsageReason;
+  department: string;
+  event_name: string;
+  notes: string;
+  consumed_at: string;
 };
+
+type UsageReason =
+  | 'guest_use'
+  | 'internal_use'
+  | 'damage'
+  | 'waste'
+  | 'event'
+  | 'maintenance'
+  | 'other';
+
+const USAGE_REASON_OPTIONS: Array<{ value: UsageReason; label: string; description: string }> = [
+  { value: 'guest_use', label: 'Guest use', description: 'Consumed directly for guests or customers.' },
+  { value: 'internal_use', label: 'Internal use', description: 'Used by staff or internal operations.' },
+  { value: 'damage', label: 'Damage', description: 'Removed because it was damaged.' },
+  { value: 'waste', label: 'Waste', description: 'Expired, spoiled, discarded, or otherwise wasted.' },
+  { value: 'event', label: 'Event', description: 'Allocated and consumed for a named event.' },
+  { value: 'maintenance', label: 'Maintenance', description: 'Used for repair, upkeep, or facilities work.' },
+  { value: 'other', label: 'Other', description: 'Operational usage that does not fit another reason.' }
+];
 
 async function fetchStock(): Promise<StockItem[]> {
   return apiRequest<StockItem[]>('/stock');
@@ -69,6 +139,30 @@ async function fetchStockMovements(productId: string): Promise<StockMovement[]> 
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<StockMovement[]>(`/stock/movements${suffix}`);
+}
+
+async function fetchInventoryUsageLogs(productId: string): Promise<InventoryUsageLog[]> {
+  const params = new URLSearchParams();
+
+  if (productId) {
+    params.set('product_id', productId);
+  }
+
+  params.set('limit', '8');
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<InventoryUsageLog[]>(`/stock/usage${suffix}`);
+}
+
+async function fetchInventoryUsageSummary(productId: string): Promise<InventoryUsageSummary> {
+  const params = new URLSearchParams();
+
+  if (productId) {
+    params.set('product_id', productId);
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest<InventoryUsageSummary>(`/stock/usage/summary${suffix}`);
 }
 
 function toNumber(value: number | string | null | undefined): number {
@@ -86,13 +180,27 @@ function formatDateTime(dateString: string | null | undefined): string {
   return date.toLocaleString();
 }
 
+function formatUsageReason(reason: string | null | undefined): string {
+  if (!reason) return 'Unassigned';
+
+  return reason
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function getDefaultDraft(action: StockActionType): StockActionDraft {
   if (action === 'consume') {
     return {
       action,
       quantity: '1',
       change: '',
-      reason: 'consumption'
+      reason: 'usage:internal_use',
+      consumption_reason: 'internal_use',
+      department: '',
+      event_name: '',
+      notes: '',
+      consumed_at: ''
     };
   }
 
@@ -101,7 +209,12 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       action,
       quantity: '0',
       change: '',
-      reason: 'inventory_count'
+      reason: 'inventory_count',
+      consumption_reason: 'internal_use',
+      department: '',
+      event_name: '',
+      notes: '',
+      consumed_at: ''
     };
   }
 
@@ -109,7 +222,12 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
     action,
     quantity: '',
     change: '-1',
-    reason: 'manual_adjustment'
+    reason: 'manual_adjustment',
+    consumption_reason: 'internal_use',
+    department: '',
+    event_name: '',
+    notes: '',
+    consumed_at: ''
   };
 }
 
@@ -277,6 +395,18 @@ export default function StockPage() {
     enabled: Boolean(selectedProductId)
   });
 
+  const usageLogsQuery = useQuery({
+    queryKey: ['inventory-usage-logs', 'selected-stock-page', selectedProductId],
+    queryFn: () => fetchInventoryUsageLogs(selectedProductId),
+    enabled: Boolean(selectedProductId)
+  });
+
+  const usageSummaryQuery = useQuery({
+    queryKey: ['inventory-usage-summary', 'selected-stock-page', selectedProductId],
+    queryFn: () => fetchInventoryUsageSummary(selectedProductId),
+    enabled: Boolean(selectedProductId)
+  });
+
   const recentMovements = useMemo(() => {
     const movementRows = movementsQuery.data ?? [];
 
@@ -331,7 +461,12 @@ export default function StockPage() {
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
           quantity: Number(draft.quantity),
-          reason: draft.reason.trim() || 'consumption'
+          reason: draft.reason.trim() || `usage:${draft.consumption_reason}`,
+          consumption_reason: draft.consumption_reason,
+          department: draft.department.trim() || null,
+          event_name: draft.event_name.trim() || null,
+          notes: draft.notes.trim() || null,
+          consumed_at: draft.consumed_at ? new Date(draft.consumed_at).toISOString() : null
         })
       });
     },
@@ -343,7 +478,9 @@ export default function StockPage() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-usage-logs'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-usage-summary'] })
       ]);
     },
     onError: (error) => {
@@ -917,7 +1054,102 @@ export default function StockPage() {
                         placeholder="Required operational reason"
                       />
                     </div>
+
+                    {draft.action === 'consume' && (
+                      <>
+                        <div>
+                          <label style={styles.label}>Usage Reason</label>
+                          <select
+                            style={styles.input}
+                            value={draft.consumption_reason}
+                            onChange={(event) => {
+                              const nextReason = event.target.value as UsageReason;
+                              setDraft((current) => ({
+                                ...current,
+                                consumption_reason: nextReason,
+                                reason: `usage:${nextReason}`
+                              }));
+                            }}
+                          >
+                            {USAGE_REASON_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={styles.label}>Department / Team</label>
+                          <input
+                            style={styles.input}
+                            type="text"
+                            value={draft.department}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                department: event.target.value
+                              }))
+                            }
+                            placeholder="Housekeeping, maintenance, kitchen..."
+                          />
+                        </div>
+
+                        <div>
+                          <label style={styles.label}>Event / Job Name</label>
+                          <input
+                            style={styles.input}
+                            type="text"
+                            value={draft.event_name}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                event_name: event.target.value
+                              }))
+                            }
+                            placeholder="Optional event, work order, or service context"
+                          />
+                        </div>
+
+                        <div>
+                          <label style={styles.label}>Consumed At</label>
+                          <input
+                            style={styles.input}
+                            type="datetime-local"
+                            value={draft.consumed_at}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                consumed_at: event.target.value
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <div style={styles.fullWidthField}>
+                          <label style={styles.label}>Usage Notes</label>
+                          <textarea
+                            style={styles.textarea}
+                            value={draft.notes}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                notes: event.target.value
+                              }))
+                            }
+                            placeholder="Optional context for audit, waste, damage, guest issue, event prep, or maintenance usage"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
+
+                  {draft.action === 'consume' ? (
+                    <div style={styles.usageReasonHelpBox}>
+                      <strong>Usage audit context:</strong>{' '}
+                      {USAGE_REASON_OPTIONS.find((option) => option.value === draft.consumption_reason)?.description}
+                    </div>
+                  ) : null}
 
                   <div style={styles.previewBox}>
                     <div style={styles.previewRow}>
@@ -1049,6 +1281,105 @@ export default function StockPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.innerPanel}>
+                  <h4 style={styles.sectionTitle}>Usage Ledger Snapshot</h4>
+                  <p style={styles.sectionDescription}>
+                    First-class consumption visibility for the selected product, backed by
+                    the new inventory usage log route instead of generic movement reasons.
+                  </p>
+
+                  {usageSummaryQuery.isLoading ? (
+                    <p style={styles.sectionDescription}>Loading usage summary...</p>
+                  ) : usageSummaryQuery.isError ? (
+                    <div className="app-error-state" style={styles.errorBox}>
+                      Failed to load usage summary:{' '}
+                      {(usageSummaryQuery.error as Error).message || 'Unknown error'}
+                    </div>
+                  ) : (
+                    <div style={styles.selectionGrid}>
+                      <div style={styles.selectionItem}>
+                        <div style={styles.selectionLabel}>Usage Events</div>
+                        <div style={styles.selectionValue}>
+                          {toNumber(usageSummaryQuery.data?.totals?.usage_count)}
+                        </div>
+                      </div>
+                      <div style={styles.selectionItem}>
+                        <div style={styles.selectionLabel}>Total Consumed</div>
+                        <div style={styles.selectionValue}>
+                          {toNumber(usageSummaryQuery.data?.totals?.total_quantity)}
+                        </div>
+                      </div>
+                      <div style={styles.selectionItem}>
+                        <div style={styles.selectionLabel}>Last Consumed</div>
+                        <div style={styles.selectionValue}>
+                          {formatDateTime(usageSummaryQuery.data?.totals?.last_consumed_at)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {usageSummaryQuery.data?.by_reason?.length ? (
+                    <div style={styles.usageReasonGrid}>
+                      {usageSummaryQuery.data.by_reason.slice(0, 4).map((row) => (
+                        <div key={row.consumption_reason} style={styles.usageReasonCard}>
+                          <div style={styles.selectionLabel}>
+                            {formatUsageReason(row.consumption_reason)}
+                          </div>
+                          <div style={styles.selectionValue}>{toNumber(row.total_quantity)}</div>
+                          <div style={styles.rowSubtle}>{toNumber(row.usage_count)} events</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {usageLogsQuery.isLoading ? (
+                    <p style={styles.sectionDescription}>Loading usage ledger...</p>
+                  ) : usageLogsQuery.isError ? (
+                    <div className="app-error-state" style={styles.errorBox}>
+                      Failed to load usage ledger:{' '}
+                      {(usageLogsQuery.error as Error).message || 'Unknown error'}
+                    </div>
+                  ) : !usageLogsQuery.data?.length ? (
+                    <div style={styles.emptyPanel}>
+                      No first-class usage logs found for the selected product yet.
+                    </div>
+                  ) : (
+                    <div style={styles.movementList}>
+                      {usageLogsQuery.data.map((usage) => (
+                        <div key={usage.id} style={styles.movementCard}>
+                          <div style={styles.movementTopRow}>
+                            <div style={styles.movementTitleBlock}>
+                              <div style={styles.movementTitle}>
+                                {formatUsageReason(usage.consumption_reason)}
+                              </div>
+                              <div style={styles.rowSubtle}>
+                                {formatDateTime(usage.consumed_at)}
+                              </div>
+                            </div>
+                            <span style={changeBadgeStyle(-Math.abs(toNumber(usage.quantity)))}>
+                              -{toNumber(usage.quantity)}
+                            </span>
+                          </div>
+                          <div style={styles.movementMetaRow}>
+                            <span style={styles.rowSubtle}>
+                              {usage.department || 'No department'}
+                            </span>
+                            <span style={styles.rowSubtle}>
+                              By {usage.created_by_user_name || usage.created_by_user_id || 'system'}
+                            </span>
+                          </div>
+                          {usage.event_name ? (
+                            <div style={styles.rowSubtle}>Event/job: {usage.event_name}</div>
+                          ) : null}
+                          {usage.notes ? (
+                            <div style={styles.usageNotes}>{usage.notes}</div>
+                          ) : null}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1533,7 +1864,12 @@ const styles: Record<string, CSSProperties> = {
   },
   formGrid: {
     display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
     gap: '14px',
+    minWidth: 0
+  },
+  fullWidthField: {
+    gridColumn: '1 / -1',
     minWidth: 0
   },
   label: {
@@ -1551,6 +1887,26 @@ const styles: Record<string, CSSProperties> = {
     padding: '12px 14px',
     fontSize: '14px',
     boxSizing: 'border-box'
+  },
+  textarea: {
+    width: '100%',
+    minHeight: '92px',
+    borderRadius: '12px',
+    border: '1px solid #d1d5db',
+    padding: '12px 14px',
+    fontSize: '14px',
+    lineHeight: 1.5,
+    boxSizing: 'border-box',
+    resize: 'vertical'
+  },
+  usageReasonHelpBox: {
+    marginTop: '14px',
+    borderRadius: '12px',
+    border: '1px solid #bfdbfe',
+    background: '#eff6ff',
+    color: '#1e3a8a',
+    padding: '12px 14px',
+    lineHeight: 1.5
   },
   previewBox: {
     marginTop: '14px',
