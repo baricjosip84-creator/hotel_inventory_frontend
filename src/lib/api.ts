@@ -88,6 +88,74 @@ function isAuthLoginRequest(path: string): boolean {
   return path === '/auth/login' || path === 'auth/login';
 }
 
+
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+type MutationSafetyOptions = {
+  /**
+   * Reuse this when the UI owns a stable operation key for a logical mutation.
+   * When omitted, a fresh key is generated per apiRequest call and then reused
+   * for any internal auth-refresh retry of that same call.
+   */
+  idempotencyKey?: string;
+  /**
+   * Adds If-Match-Version without making every caller hand-roll headers.
+   */
+  version?: string | number;
+  /**
+   * Allows rare intentionally non-idempotent writes to opt out explicitly.
+   */
+  skipIdempotencyKey?: boolean;
+};
+
+export type SafeMutationRequestInit = RequestInit & MutationSafetyOptions;
+
+function isWriteRequest(options: RequestInit = {}): boolean {
+  const method = String(options.method || 'GET').toUpperCase();
+  return WRITE_METHODS.has(method);
+}
+
+function createIdempotencyKey(): string {
+  const cryptoApi = globalThis.crypto;
+
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function withMutationSafetyHeaders(path: string, options: SafeMutationRequestInit = {}): RequestInit {
+  const {
+    idempotencyKey,
+    version,
+    skipIdempotencyKey,
+    headers: originalHeaders,
+    ...requestOptions
+  } = options;
+
+  const headers = new Headers(originalHeaders || {});
+
+  if (version !== undefined && !headers.has('If-Match-Version')) {
+    headers.set('If-Match-Version', String(version));
+  }
+
+  if (
+    isWriteRequest(requestOptions) &&
+    !isAuthLoginRequest(path) &&
+    !isAuthRefreshRequest(path) &&
+    !skipIdempotencyKey &&
+    !headers.has('Idempotency-Key')
+  ) {
+    headers.set('Idempotency-Key', idempotencyKey || createIdempotencyKey());
+  }
+
+  return {
+    ...requestOptions,
+    headers
+  };
+}
+
 function redirectToLoginAfterExpiredSession(): void {
   /*
     WHAT CHANGED
@@ -196,7 +264,8 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 async function performRequest(path: string, options: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(options.headers || {});
+  const safeOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
+  const headers = new Headers(safeOptions.headers || {});
 
   /*
     Only force JSON content-type when the caller did not already set one.
@@ -212,9 +281,20 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
   }
 
   return fetch(buildUrl(path), {
-    ...options,
+    ...safeOptions,
     headers
   });
+}
+
+export async function apiMutationRequest<T>(
+  path: string,
+  options: SafeMutationRequestInit = {}
+): Promise<T> {
+  if (!isWriteRequest(options)) {
+    throw new ApiError('apiMutationRequest requires POST, PUT, PATCH, or DELETE.', 0, 'INVALID_MUTATION_METHOD');
+  }
+
+  return apiRequest<T>(path, options);
 }
 
 export async function apiRequest<T>(
@@ -252,6 +332,7 @@ export async function apiRequest<T>(
   */
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
+  const requestOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
   const currentAccessToken = getAccessToken();
 
   /*
@@ -265,7 +346,7 @@ export async function apiRequest<T>(
   let response: Response;
 
   try {
-    response = await performRequest(path, options);
+    response = await performRequest(path, requestOptions);
   } catch (error: any) {
     throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
@@ -280,7 +361,7 @@ export async function apiRequest<T>(
 
     if (refreshedAccessToken) {
       try {
-        response = await performRequest(path, options);
+        response = await performRequest(path, requestOptions);
       } catch (error: any) {
         throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
