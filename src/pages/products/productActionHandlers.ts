@@ -1,5 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import type { ProductCostRiskItem, ProductItem, ProductPackageItem } from '../../types/inventory';
+import type { ProductItem, ProductPackageItem } from '../../types/inventory';
 import { emptyPackageForm, emptyProductForm } from './productFormDefaults';
 import type { ProductFormState } from './productCoreApi';
 import type { PackageFormState } from './productPackageApi';
@@ -27,7 +27,6 @@ type ProductActionHandlerParams = {
   setFormMessage: Dispatch<SetStateAction<string | null>>;
   setFormError: Dispatch<SetStateAction<string | null>>;
   setSelectedPackageProduct: Dispatch<SetStateAction<ProductItem | null>>;
-  setSelectedCostProduct: Dispatch<SetStateAction<ProductItem | ProductCostRiskItem | null>>;
   setEditingPackage: Dispatch<SetStateAction<ProductPackageItem | null>>;
   setPackageForm: Dispatch<SetStateAction<PackageFormState>>;
   setPackageMessage: Dispatch<SetStateAction<string | null>>;
@@ -53,7 +52,6 @@ export function buildProductActionHandlers({
   setFormMessage,
   setFormError,
   setSelectedPackageProduct,
-  setSelectedCostProduct,
   setEditingPackage,
   setPackageForm,
   setPackageMessage,
@@ -167,7 +165,10 @@ export function buildProductActionHandlers({
       category: product.category || '',
       unit: product.unit,
       min_stock: String(product.min_stock ?? 0),
-      standard_unit_cost: product.standard_unit_cost === null || product.standard_unit_cost === undefined ? '' : String(product.standard_unit_cost),
+      standard_unit_cost:
+        product.standard_unit_cost === null || product.standard_unit_cost === undefined
+          ? ''
+          : String(product.standard_unit_cost),
       supplier_id: product.supplier_id || '',
       barcode: product.barcode || ''
     });
