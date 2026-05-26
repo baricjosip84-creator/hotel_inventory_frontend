@@ -1,8 +1,14 @@
 import { formatUsageReason, toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
-import type { InventoryUsageAlertScanResponse, InventoryUsageExceptions, InventoryUsageLog, InventoryUsageSummary } from './inventoryUsageTypes';
+import type {
+  InventoryUsageAlertScanResponse,
+  InventoryUsageExceptions,
+  InventoryUsageLog,
+  InventoryUsageSummary
+} from './inventoryUsageTypes';
 
 type InventoryUsageGovernancePanelProps = {
+  canReviewUsage?: boolean;
   summary?: InventoryUsageSummary;
   exceptions?: InventoryUsageExceptions;
   logs: InventoryUsageLog[];
@@ -25,6 +31,7 @@ const getRiskLevel = (count: number) => {
 };
 
 export function InventoryUsageGovernancePanel({
+  canReviewUsage,
   summary,
   exceptions,
   logs,
@@ -56,6 +63,7 @@ export function InventoryUsageGovernancePanel({
   const topReason = [...(summary?.by_reason || [])].sort(
     (first, second) => toNumber(second.total_quantity) - toNumber(first.total_quantity)
   )[0];
+
   const exceptionSummary = exceptions?.summary;
   const exceptionRows = exceptions?.rows || [];
   const backendMissingDepartmentCount = toNumber(exceptionSummary?.missing_department_count);
@@ -65,7 +73,6 @@ export function InventoryUsageGovernancePanel({
   const exceptionCount = toNumber(exceptionSummary?.exception_count);
   const pendingReviewCount = toNumber(exceptionSummary?.pending_review_count);
   const followUpRequiredCount = toNumber(exceptionSummary?.follow_up_required_count);
-
 
   const attentionCount = [
     (backendMissingDepartmentCount || missingDepartmentCount) > 0,
@@ -97,10 +104,14 @@ export function InventoryUsageGovernancePanel({
           <span style={styles.filterPill}>{loading ? 'Reviewing...' : getRiskLevel(attentionCount)}</span>
         </div>
       </div>
+
       {alertScanError ? <p style={styles.errorText}>{alertScanError.message}</p> : null}
+
       {alertScanResult ? (
         <p style={styles.sectionDescription}>
-          {alertScanResult.message}: {toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count)} alert signal{toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count) === 1 ? '' : 's'} for the last {alertScanResult.lookback_days || 30} day{Number(alertScanResult.lookback_days || 30) === 1 ? '' : 's'}.
+          {alertScanResult.message}: {toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count)} alert signal
+          {toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count) === 1 ? '' : 's'} for the last{' '}
+          {alertScanResult.lookback_days || 30} day{Number(alertScanResult.lookback_days || 30) === 1 ? '' : 's'}.
         </p>
       ) : null}
 
@@ -115,26 +126,31 @@ export function InventoryUsageGovernancePanel({
             <strong style={styles.statValueSmall}>{backendMissingDepartmentCount || missingDepartmentCount} logs</strong>
             <small>Department attribution helps explain who consumed stock.</small>
           </div>
+
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Missing notes</span>
             <strong style={styles.statValueSmall}>{backendMissingNotesCount || missingNotesCount} logs</strong>
             <small>Notes are recommended for damage, waste, events, and maintenance usage.</small>
           </div>
+
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Backdated usage</span>
             <strong style={styles.statValueSmall}>{backendBackdatedCount || backdatedCount} logs</strong>
             <small>Older consumed-at dates should be reviewed during period close.</small>
           </div>
+
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Damage / waste quantity</span>
             <strong style={styles.statValueSmall}>{backendDamageWasteQuantity || toNumber(damageWasteQuantity)}</strong>
             <small>Operational loss quantity captured in the selected period.</small>
           </div>
+
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Exception rows</span>
             <strong style={styles.statValueSmall}>{exceptionCount}</strong>
             <small>{pendingReviewCount} pending · {followUpRequiredCount} follow-up required.</small>
           </div>
+
           <div style={styles.governanceCardWide}>
             <span style={styles.statLabel}>Latest exceptions</span>
             {exceptionRows.length ? (
@@ -142,23 +158,26 @@ export function InventoryUsageGovernancePanel({
                 {exceptionRows.slice(0, 3).map((row) => (
                   <div key={row.id} style={styles.reviewRow}>
                     <small>
-                      {(row.exception_types || []).join(', ') || 'exception'} · {row.product_name || row.product_id} · {formatUsageReason(row.consumption_reason)} · {row.review_status || 'pending'}
+                      {(row.exception_types || []).join(', ') || 'exception'} · {row.product_name || row.product_id} ·{' '}
+                      {formatUsageReason(row.consumption_reason)} · {row.review_status || 'pending'}
                     </small>
+
                     {!row.reversed_at && row.review_status !== 'reviewed' ? (
                       <div style={styles.inlineActions}>
                         <button
                           type="button"
                           style={styles.secondaryButton}
                           onClick={() => onReviewUsage(row.id, 'reviewed')}
-                          disabled={reviewingUsageId === row.id}
+                          disabled={!canReviewUsage || reviewingUsageId === row.id}
                         >
                           {reviewingUsageId === row.id ? 'Saving...' : 'Mark reviewed'}
                         </button>
+
                         <button
                           type="button"
                           style={styles.dangerButton}
                           onClick={() => onReviewUsage(row.id, 'follow_up_required')}
-                          disabled={reviewingUsageId === row.id}
+                          disabled={!canReviewUsage || reviewingUsageId === row.id}
                         >
                           Follow up
                         </button>
@@ -166,12 +185,14 @@ export function InventoryUsageGovernancePanel({
                     ) : null}
                   </div>
                 ))}
+
                 {reviewError ? <small style={styles.errorText}>{reviewError.message}</small> : null}
               </div>
             ) : (
               <small>No server-side exceptions returned.</small>
             )}
           </div>
+
           <div style={styles.governanceCardWide}>
             <span style={styles.statLabel}>Dominant reason</span>
             <strong style={styles.statValueSmall}>

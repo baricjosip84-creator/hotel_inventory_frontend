@@ -59,7 +59,6 @@ export const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     padding: '0.55rem 0.8rem'
   },
-
   secondaryButton: {
     border: '1px solid #cbd5e1',
     borderRadius: '0.75rem',
@@ -144,7 +143,6 @@ export const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     gap: '0.5rem'
   },
-
   fieldLabel: {
     display: 'flex',
     flexDirection: 'column',
@@ -289,7 +287,6 @@ export const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     gap: '0.5rem'
   },
-
   contextCell: {
     display: 'flex',
     flexDirection: 'column',
@@ -303,7 +300,6 @@ export const styles: Record<string, CSSProperties> = {
     borderRadius: '0.75rem',
     padding: '0.85rem'
   },
-
   governanceGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
@@ -338,7 +334,6 @@ export const styles: Record<string, CSSProperties> = {
     borderRadius: '0.75rem',
     padding: '0.85rem'
   },
-
   importPanel: {
     display: 'flex',
     flexDirection: 'column',
@@ -358,15 +353,10 @@ export const styles: Record<string, CSSProperties> = {
     background: 'white',
     resize: 'vertical'
   },
-  inlineActions: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.6rem'
-  },
-
   bulkLineGrid: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(220px, 1.2fr) minmax(220px, 1.2fr) minmax(120px, 0.6fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) auto',
+    gridTemplateColumns:
+      'minmax(220px, 1.2fr) minmax(220px, 1.2fr) minmax(120px, 0.6fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) auto',
     gap: '0.75rem',
     alignItems: 'end',
     marginTop: '0.75rem'
@@ -379,7 +369,6 @@ export const styles: Record<string, CSSProperties> = {
     gap: '0.75rem',
     marginTop: '1rem'
   },
-
   subsectionTitle: {
     margin: '0 0 0.75rem',
     color: '#0f172a',
@@ -418,7 +407,6 @@ export const styles: Record<string, CSSProperties> = {
     borderRadius: '0.85rem',
     background: '#f8fafc'
   },
-
   templateMetrics: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -449,5 +437,5 @@ export const styles: Record<string, CSSProperties> = {
     color: '#92400e',
     fontWeight: 700,
     margin: '0.75rem 0 0'
-  },
+  }
 };
