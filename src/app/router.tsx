@@ -28,6 +28,7 @@ import AlertsPage from '../pages/AlertsPage';
 import ShipmentsPage from '../pages/ShipmentsPage';
 import StockPage from '../pages/StockPage';
 import InventoryUsagePage from '../pages/InventoryUsagePage';
+import InventoryRequisitionsPage from '../pages/InventoryRequisitionsPage';
 import StorageLocationsPage from '../pages/StorageLocationsPage';
 import StockMovementsPage from '../pages/StockMovementsPage';
 import StockTransfersPage from '../pages/StockTransfersPage';
@@ -462,8 +463,16 @@ const router = createBrowserRouter([
       {
         path: 'inventory-usage',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STOCK_READ]}>
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INVENTORY_USAGE_READ]}>
             <InventoryUsagePage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'inventory-requisitions',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ]}>
+            <InventoryRequisitionsPage />
           </ProtectedRoute>
         )
       },
