@@ -252,6 +252,7 @@ export function InventoryUsageTemplatesPanel({
                 const canRecord = readiness?.summary?.can_record !== false;
                 const blockedCount = toNumber(readiness?.summary?.missing_stock_row_count) + toNumber(readiness?.summary?.insufficient_stock_count);
                 const warningCount = toNumber(readiness?.summary?.below_minimum_after_use_count);
+                const evidenceAcknowledgementCount = toNumber(readiness?.summary?.evidence_acknowledgement_required_count);
 
                 return (
                 <div key={template.id} style={styles.templateCard}>
@@ -270,6 +271,7 @@ export function InventoryUsageTemplatesPanel({
                       </span>
                       {blockedCount > 0 ? <span style={styles.dangerPill}>{blockedCount} blocked lines</span> : null}
                       {warningCount > 0 ? <span style={styles.warningPill}>{warningCount} below min after use</span> : null}
+                      {evidenceAcknowledgementCount > 0 ? <span style={styles.warningPill}>{evidenceAcknowledgementCount} evidence acknowledgements</span> : null}
                     </div>
                     <div style={styles.templateMetrics}>
                       <span style={styles.filterPill}>{toNumber(template.use_count)} runs</span>
@@ -291,7 +293,7 @@ export function InventoryUsageTemplatesPanel({
                       onClick={() => onRecordTemplate(template)}
                       disabled={!canRecordTemplates || recordingTemplateId === template.id || !(template.items?.length) || !canRecord}
                     >
-                      {recordingTemplateId === template.id ? 'Recording...' : 'Record now'}
+                      {recordingTemplateId === template.id ? 'Recording...' : evidenceAcknowledgementCount > 0 ? 'Record with acknowledgement' : 'Record now'}
                     </button>
                     <button
                       type="button"

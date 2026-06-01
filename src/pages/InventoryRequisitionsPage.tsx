@@ -34,6 +34,9 @@ type RequisitionItem = {
   fulfilled_quantity: number | string;
   remaining_quantity?: number | string;
   notes?: string | null;
+  approval_threshold_line_note_min_length?: number | string | null;
+  approval_threshold_line_note_length?: number | string | null;
+  approval_threshold_line_note_meets_minimum?: boolean | null;
 };
 
 type InventoryRequisition = {
@@ -75,6 +78,20 @@ type InventoryRequisition = {
   urgent_age_hours?: number | string | null;
   partial_fulfillment_age_days?: number | string | null;
   partial_fulfillment_state?: string | null;
+  approval_threshold_level?: string | null;
+  approval_threshold_reason?: string | null;
+  approval_threshold_next_level?: string | null;
+  approval_threshold_value_gap?: number | string | null;
+  approval_threshold_notes_required?: boolean | null;
+  approval_threshold_note_min_length?: number | string | null;
+  approval_threshold_requisition_note_length?: number | string | null;
+  approval_threshold_requisition_note_meets_minimum?: boolean | null;
+  approval_threshold_line_note_total_count?: number | string | null;
+  approval_threshold_line_note_below_minimum_count?: number | string | null;
+  approval_threshold_note_depth_state?: string | null;
+  approval_threshold_action_requirements?: string[] | null;
+  high_value_threshold?: number | string | null;
+  executive_value_threshold?: number | string | null;
   updated_at?: string;
   version?: number | string;
   items?: RequisitionItem[];
@@ -127,6 +144,9 @@ type RequisitionActivity = {
 };
 
 type RequisitionReadiness = {
+  requisition_id?: string | null;
+  requisition_number?: string | null;
+  status?: string | null;
   ready: boolean;
   source_storage_location_name?: string | null;
   blockers?: Array<{ code: string; product_name?: string | null; message: string }>;
@@ -136,6 +156,8 @@ type RequisitionReadiness = {
     product_id: string;
     product_name?: string | null;
     product_unit?: string | null;
+    requested_quantity?: number | string;
+    fulfilled_quantity?: number | string;
     remaining_quantity: number | string;
     preview_quantity?: number | string;
     available_quantity: number | string | null;
@@ -144,6 +166,53 @@ type RequisitionReadiness = {
     ready: boolean;
     blocker_code?: string | null;
     warning_code?: string | null;
+    threshold_fulfillment_line_note_min_length?: number | string | null;
+    threshold_fulfillment_line_note_length?: number | string | null;
+    threshold_fulfillment_line_note_meets_minimum?: boolean | null;
+  }>;
+  approval_threshold_notes_required?: boolean | null;
+  threshold_fulfillment_line_note_min_length?: number | string | null;
+  threshold_fulfillment_line_note_below_minimum_count?: number | string | null;
+  threshold_fulfillment_line_notes_meet_minimum?: boolean | null;
+};
+
+type BulkRequisitionReadiness = {
+  ready: boolean;
+  requisition_count: number | string;
+  ready_requisition_count?: number | string;
+  blocked_requisition_count?: number | string;
+  blocker_count?: number | string;
+  warning_count?: number | string;
+  approval_threshold_governed_requisition_count?: number | string;
+  threshold_fulfillment_line_note_below_minimum_count?: number | string | null;
+  threshold_fulfillment_line_notes_meet_minimum?: boolean | null;
+  blocked_requisition_numbers?: string[];
+  blocker_code_counts?: Record<string, number>;
+  warning_code_counts?: Record<string, number>;
+  results?: RequisitionReadiness[];
+};
+
+type BulkFulfillmentResult = {
+  message?: string;
+  requisition_count: number | string;
+  fulfilled_line_count: number | string;
+  fulfilled_quantity_total: number | string;
+  approval_threshold_governed_requisition_count?: number | string;
+  threshold_fulfillment_line_note_below_minimum_count?: number | string | null;
+  threshold_fulfillment_line_notes_meet_minimum?: boolean | null;
+  results: Array<{
+    requisition_id: string;
+    requisition_number?: string | null;
+    status?: string | null;
+    fulfilled_line_count?: number | string;
+    fulfilled_quantity_total?: number | string;
+    approval_threshold_level?: string | null;
+    approval_threshold_reason?: string | null;
+    approval_threshold_note_depth_state?: string | null;
+    approval_threshold_notes_required?: boolean | null;
+    threshold_fulfillment_line_note_min_length?: number | string | null;
+    threshold_fulfillment_line_note_below_minimum_count?: number | string | null;
+    threshold_fulfillment_line_notes_meet_minimum?: boolean | null;
   }>;
 };
 
@@ -161,12 +230,21 @@ type RequisitionExportRow = {
   approved_at?: string | null;
   approved_by_user_name?: string | null;
   approval_notes?: string | null;
+  approval_threshold_approval_note_min_length?: number | string | null;
+  approval_threshold_approval_note_length?: number | string | null;
+  approval_threshold_approval_note_meets_minimum?: boolean | null;
   rejected_at?: string | null;
   rejected_by_user_name?: string | null;
   rejection_reason?: string | null;
+  approval_threshold_rejection_reason_min_length?: number | string | null;
+  approval_threshold_rejection_reason_length?: number | string | null;
+  approval_threshold_rejection_reason_meets_minimum?: boolean | null;
   cancelled_at?: string | null;
   cancelled_by_user_name?: string | null;
   cancellation_reason?: string | null;
+  approval_threshold_cancellation_reason_min_length?: number | string | null;
+  approval_threshold_cancellation_reason_length?: number | string | null;
+  approval_threshold_cancellation_reason_meets_minimum?: boolean | null;
   last_fulfilled_at?: string | null;
   last_fulfilled_by_user_name?: string | null;
   sla_state?: string | null;
@@ -176,6 +254,16 @@ type RequisitionExportRow = {
   urgent_age_hours?: number | string | null;
   partial_fulfillment_age_days?: number | string | null;
   partial_fulfillment_state?: string | null;
+  approval_threshold_level?: string | null;
+  approval_threshold_reason?: string | null;
+  approval_threshold_next_level?: string | null;
+  approval_threshold_value_gap?: number | string | null;
+  approval_threshold_notes_required?: boolean | null;
+  approval_threshold_note_min_length?: number | string | null;
+  approval_threshold_requisition_note_min_length?: number | string | null;
+  approval_threshold_requisition_note_length?: number | string | null;
+  approval_threshold_requisition_note_meets_minimum?: boolean | null;
+  approval_threshold_action_requirements?: string | null;
   created_at?: string | null;
   created_by_user_name?: string | null;
   product_name: string;
@@ -188,6 +276,9 @@ type RequisitionExportRow = {
   fulfilled_quantity: number | string;
   remaining_quantity: number | string;
   line_notes?: string | null;
+  approval_threshold_line_note_min_length?: number | string | null;
+  approval_threshold_line_note_length?: number | string | null;
+  approval_threshold_line_note_meets_minimum?: boolean | null;
   requisition_notes?: string | null;
 };
 
@@ -425,6 +516,191 @@ type RequisitionSummary = {
     urgent_remaining_estimated_value_total?: number;
     overdue_remaining_estimated_value_total?: number;
   };
+  approval_threshold_exposure?: {
+    pending_count: number;
+    urgent_count: number;
+    high_priority_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+    high_value_threshold: number;
+    executive_value_threshold: number;
+  };
+  approval_threshold_near_miss?: {
+    near_high_value_count: number;
+    near_executive_value_count: number;
+    overdue_near_threshold_count: number;
+    near_high_value_total: number;
+    near_executive_value_total: number;
+    largest_near_threshold_value: number;
+    high_value_watch_floor: number;
+    executive_value_watch_floor: number;
+  };
+  approval_threshold_by_reason?: Array<{
+    approval_threshold_reason: string;
+    pending_count: number;
+    urgent_count: number;
+    high_priority_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    pending_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_level?: Array<{
+    approval_threshold_level: string;
+    pending_count: number;
+    urgent_count: number;
+    high_priority_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    pending_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_priority?: Array<{
+    priority: string;
+    pending_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_department?: Array<{
+    requesting_department: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_requester?: Array<{
+    requester_user_id?: string | null;
+    requester_user_name: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_target_department?: Array<{
+    target_department: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_source_location?: Array<{
+    source_storage_location_id?: string | null;
+    source_storage_location_name: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_target_location?: Array<{
+    target_storage_location_id?: string | null;
+    target_storage_location_name: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_product?: Array<{
+    product_id: string;
+    product_name: string;
+    product_unit?: string | null;
+    product_category?: string | null;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    product_remaining_estimated_value_total: number;
+    elevated_product_remaining_estimated_value_total: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_category?: Array<{
+    product_category: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_due_state?: Array<{
+    due_state: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_age_bucket?: Array<{
+    approval_age_bucket: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
+  approval_threshold_by_sla_state?: Array<{
+    approval_sla_state: string;
+    pending_count: number;
+    urgent_count: number;
+    overdue_count: number;
+    high_value_count: number;
+    executive_value_count: number;
+    elevated_approval_count: number;
+    pending_remaining_estimated_value_total: number;
+    elevated_remaining_estimated_value_total: number;
+    largest_pending_remaining_estimated_value: number;
+  }>;
   approval_queue_by_priority?: Array<{
     priority: string;
     pending_count: number;
@@ -570,6 +846,21 @@ type RequisitionSummary = {
     product_count: number;
     remaining_quantity_total: number;
     remaining_estimated_value_total: number;
+  }>;
+  approval_threshold_oldest?: Array<{
+    id: string;
+    requisition_number: string;
+    priority: string;
+    requesting_department?: string | null;
+    target_department?: string | null;
+    needed_by?: string | null;
+    pending_since?: string | null;
+    pending_age_days: number;
+    product_count: number;
+    remaining_quantity_total: number;
+    remaining_estimated_value_total: number;
+    approval_threshold_level?: string | null;
+    approval_threshold_reason?: string | null;
   }>;
   age_buckets?: {
     under_24h_count: number;
@@ -816,6 +1107,122 @@ function slaStateDetail(item: InventoryRequisition): string {
   return '';
 }
 
+function approvalThresholdLabel(level?: string | null): string {
+  switch (level) {
+    case 'executive_value':
+      return 'Executive approval threshold';
+    case 'elevated':
+      return 'Elevated approval threshold';
+    case 'standard':
+      return 'Standard approval threshold';
+    default:
+      return '';
+  }
+}
+
+function approvalThresholdReasonLabel(reason?: string | null): string {
+  switch (reason) {
+    case 'executive_value':
+      return 'Executive value threshold';
+    case 'high_value':
+      return 'High value threshold';
+    case 'high_priority':
+      return 'High priority threshold';
+    case 'standard':
+      return 'Standard approval';
+    default:
+      return reason ? reason.replace(/_/g, ' ') : '';
+  }
+}
+
+const APPROVAL_THRESHOLD_NOTE_MIN_LENGTH = 12;
+const HIGH_VALUE_APPROVAL_THRESHOLD = 1000;
+const EXECUTIVE_VALUE_APPROVAL_THRESHOLD = 5000;
+
+type DraftApprovalThresholdEstimate = {
+  approval_threshold_level: 'standard' | 'elevated' | 'executive_value';
+  approval_threshold_reason: 'standard' | 'high_priority' | 'high_value' | 'executive_value';
+  approval_threshold_next_level: 'high_value' | 'executive_value' | null;
+  approval_threshold_value_gap: number;
+  estimated_value_total: number;
+};
+
+function getApprovalThresholdNoteMinLength(requisition?: InventoryRequisition | null): number {
+  const rawMinLength = requisition?.approval_threshold_note_min_length;
+  const parsedMinLength = typeof rawMinLength === 'number' ? rawMinLength : Number(rawMinLength);
+  return Number.isFinite(parsedMinLength) && parsedMinLength > 0
+    ? parsedMinLength
+    : APPROVAL_THRESHOLD_NOTE_MIN_LENGTH;
+}
+
+function formatApprovalThresholdLineNoteDepth(item: RequisitionItem): string {
+  const rawMinLength = item.approval_threshold_line_note_min_length;
+  const parsedMinLength = typeof rawMinLength === 'number' ? rawMinLength : Number(rawMinLength);
+  if (!Number.isFinite(parsedMinLength) || parsedMinLength <= 0) return '';
+  const rawLength = item.approval_threshold_line_note_length;
+  const parsedLength = typeof rawLength === 'number' ? rawLength : Number(rawLength);
+  const noteLength = Number.isFinite(parsedLength) && parsedLength >= 0 ? parsedLength : 0;
+  const status = item.approval_threshold_line_note_meets_minimum ? 'meets minimum' : 'below minimum';
+  return `${noteLength}/${parsedMinLength} chars · ${status}`;
+}
+
+function formatApprovalThresholdQueueNoteDepth(requisition: InventoryRequisition): string {
+  const rawMinLength = requisition.approval_threshold_note_min_length;
+  const parsedMinLength = typeof rawMinLength === 'number' ? rawMinLength : Number(rawMinLength);
+  if (!Number.isFinite(parsedMinLength) || parsedMinLength <= 0) return '';
+
+  const rawRequisitionLength = requisition.approval_threshold_requisition_note_length;
+  const parsedRequisitionLength = typeof rawRequisitionLength === 'number' ? rawRequisitionLength : Number(rawRequisitionLength);
+  const requisitionNoteLength = Number.isFinite(parsedRequisitionLength) && parsedRequisitionLength >= 0 ? parsedRequisitionLength : 0;
+  const rawLineCount = requisition.approval_threshold_line_note_total_count;
+  const parsedLineCount = typeof rawLineCount === 'number' ? rawLineCount : Number(rawLineCount);
+  const lineCount = Number.isFinite(parsedLineCount) && parsedLineCount >= 0 ? parsedLineCount : 0;
+  const rawBelowMinimumCount = requisition.approval_threshold_line_note_below_minimum_count;
+  const parsedBelowMinimumCount = typeof rawBelowMinimumCount === 'number' ? rawBelowMinimumCount : Number(rawBelowMinimumCount);
+  const belowMinimumCount = Number.isFinite(parsedBelowMinimumCount) && parsedBelowMinimumCount >= 0 ? parsedBelowMinimumCount : 0;
+  const requestNoteStatus = requisition.approval_threshold_requisition_note_meets_minimum ? 'request note ok' : 'request note short';
+  const lineStatus = lineCount > 0 ? `${belowMinimumCount}/${lineCount} line notes short` : 'no request lines';
+  const depthState = requisition.approval_threshold_note_depth_state === 'complete' ? 'ready' : 'needs notes';
+
+  return `Notes: ${depthState} · ${requisitionNoteLength}/${parsedMinLength} chars · ${requestNoteStatus} · ${lineStatus}`;
+}
+
+function isApprovalThresholdGoverned(requisition?: InventoryRequisition | null): boolean {
+  if (requisition?.approval_threshold_notes_required !== undefined && requisition.approval_threshold_notes_required !== null) {
+    return Boolean(requisition.approval_threshold_notes_required);
+  }
+  return Boolean(requisition?.approval_threshold_level && requisition.approval_threshold_level !== 'standard');
+}
+
+function requiresApprovalThresholdNotes(requisition?: InventoryRequisition | null): boolean {
+  return isApprovalThresholdGoverned(requisition);
+}
+
+function estimateDraftApprovalThreshold(form: RequisitionFormState, productById: Map<string, ProductItem>): DraftApprovalThresholdEstimate {
+  const estimatedValueTotal = form.items.reduce((total, item) => {
+    const product = productById.get(item.product_id);
+    const quantity = Number(item.requested_quantity);
+    const unitCost = Number(product?.standard_unit_cost ?? 0);
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitCost) || unitCost <= 0) return total;
+    return total + quantity * unitCost;
+  }, 0);
+  const isExecutiveValue = estimatedValueTotal >= EXECUTIVE_VALUE_APPROVAL_THRESHOLD;
+  const isHighValue = estimatedValueTotal >= HIGH_VALUE_APPROVAL_THRESHOLD;
+  const isHighPriority = ['high', 'urgent'].includes(form.priority);
+
+  return {
+    approval_threshold_level: isExecutiveValue ? 'executive_value' : isHighValue || isHighPriority ? 'elevated' : 'standard',
+    approval_threshold_reason: isExecutiveValue ? 'executive_value' : isHighValue ? 'high_value' : isHighPriority ? 'high_priority' : 'standard',
+    approval_threshold_next_level: isExecutiveValue ? null : isHighValue ? 'executive_value' : 'high_value',
+    approval_threshold_value_gap: isExecutiveValue
+      ? 0
+      : isHighValue
+        ? Math.max(EXECUTIVE_VALUE_APPROVAL_THRESHOLD - estimatedValueTotal, 0)
+        : Math.max(HIGH_VALUE_APPROVAL_THRESHOLD - estimatedValueTotal, 0),
+    estimated_value_total: estimatedValueTotal
+  };
+}
+
 function statusStyle(status: RequisitionStatus): CSSProperties {
   if (status === 'fulfilled') return styles.successBadge;
   if (status === 'approved' || status === 'partially_fulfilled') return styles.activeBadge;
@@ -831,7 +1238,70 @@ function activityLabel(action: string): string {
 
 function metadataText(metadata: Record<string, unknown> | null | undefined): string {
   if (!metadata) return '';
-  const interestingKeys = ['previous_status', 'next_status', 'status', 'approval_notes', 'rejection_reason', 'cancellation_reason', 'reopen_reason', 'comment', 'fulfilled_line_count', 'fulfilled_quantity_total', 'item_count'];
+  const interestingKeys = [
+    'previous_status',
+    'next_status',
+    'status',
+    'approval_notes',
+    'rejection_reason',
+    'approval_threshold_level',
+    'approval_threshold_reason',
+    'approval_threshold_next_level',
+    'approval_threshold_value_gap',
+    'remaining_estimated_value_total',
+    'high_value_threshold',
+    'executive_value_threshold',
+    'threshold_notes_enforced',
+    'threshold_governed_approval',
+    'threshold_approval_note_min_length',
+    'threshold_note_min_length',
+    'approval_note_length',
+    'approval_note_meets_minimum',
+    'threshold_governed_creation',
+    'threshold_governed_update',
+    'threshold_draft_note_min_length',
+    'draft_note_length',
+    'draft_note_meets_minimum',
+    'threshold_draft_line_note_min_length',
+    'draft_line_note_lengths',
+    'draft_line_note_below_minimum_count',
+    'draft_line_notes_meet_minimum',
+    'threshold_governed_submission',
+    'threshold_submission_note_min_length',
+    'submission_note_length',
+    'submission_note_meets_minimum',
+    'threshold_submission_line_note_min_length',
+    'submission_line_note_lengths',
+    'submission_line_note_below_minimum_count',
+    'submission_line_notes_meet_minimum',
+    'threshold_governed_rejection',
+    'threshold_rejection_reason_min_length',
+    'rejection_reason_length',
+    'rejection_reason_meets_minimum',
+    'threshold_governed_cancellation',
+    'threshold_cancellation_reason_min_length',
+    'cancellation_reason_length',
+    'cancellation_reason_meets_minimum',
+    'threshold_governed_reopen',
+    'threshold_reopen_reason_min_length',
+    'reopen_reason_length',
+    'reopen_reason_meets_minimum',
+    'threshold_governed_fulfillment',
+    'threshold_fulfillment_line_note_min_length',
+    'fulfillment_line_note_lengths',
+    'fulfillment_line_note_below_minimum_count',
+    'fulfillment_line_notes_meet_minimum',
+    'threshold_governed_comment',
+    'threshold_comment_note_min_length',
+    'comment_note_length',
+    'comment_note_meets_minimum',
+    'cancellation_reason',
+    'reopen_reason',
+    'comment',
+    'fulfilled_line_count',
+    'fulfilled_quantity_total',
+    'item_count'
+  ];
   return interestingKeys
     .filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '')
     .map((key) => `${key.replace(/_/g, ' ')}: ${String(metadata[key])}`)
@@ -885,6 +1355,13 @@ export default function InventoryRequisitionsPage() {
   const [fulfillmentState, setFulfillmentState] = useState('');
   const [slaState, setSlaState] = useState('');
   const [ageBucket, setAgeBucket] = useState('');
+  const [approvalThresholdLevel, setApprovalThresholdLevel] = useState('');
+  const [approvalThresholdReason, setApprovalThresholdReason] = useState('');
+  const [approvalThresholdWatch, setApprovalThresholdWatch] = useState('');
+  const [approvalThresholdNextLevel, setApprovalThresholdNextLevel] = useState('');
+  const [approvalThresholdNoteDepthState, setApprovalThresholdNoteDepthState] = useState('');
+  const [minApprovalThresholdGapFilter, setMinApprovalThresholdGapFilter] = useState('');
+  const [maxApprovalThresholdGapFilter, setMaxApprovalThresholdGapFilter] = useState('');
   const [minRemainingValueFilter, setMinRemainingValueFilter] = useState('');
   const [maxRemainingValueFilter, setMaxRemainingValueFilter] = useState('');
   const [minRemainingQuantityFilter, setMinRemainingQuantityFilter] = useState('');
@@ -908,8 +1385,13 @@ export default function InventoryRequisitionsPage() {
   const [workflowNotes, setWorkflowNotes] = useState('');
   const [activityComment, setActivityComment] = useState('');
   const [fulfillmentLocationId, setFulfillmentLocationId] = useState('');
+  const [fulfillAllRemaining, setFulfillAllRemaining] = useState(false);
+  const [defaultFulfillmentNote, setDefaultFulfillmentNote] = useState('');
   const [fulfillmentLines, setFulfillmentLines] = useState<FulfillmentFormState>({});
   const [fulfillmentLineNotes, setFulfillmentLineNotes] = useState<FulfillmentFormState>({});
+  const [bulkFulfillmentIds, setBulkFulfillmentIds] = useState<string[]>([]);
+  const [bulkFulfillmentLocationId, setBulkFulfillmentLocationId] = useState('');
+  const [bulkFulfillmentNote, setBulkFulfillmentNote] = useState('');
 
   const summaryQuery = useQuery({
     queryKey: ['inventory-requisition-summary'],
@@ -917,7 +1399,7 @@ export default function InventoryRequisitionsPage() {
   });
 
   const requisitionsQuery = useQuery({
-    queryKey: ['inventory-requisitions', status, dueState, fulfillmentState, slaState, ageBucket, minRemainingValueFilter, maxRemainingValueFilter, minRemainingQuantityFilter, maxRemainingQuantityFilter, priorityFilter, departmentFilter, targetDepartmentFilter, sourceLocationFilter, targetLocationFilter, requesterFilter, neededByFromFilter, neededByToFilter, createdFromFilter, createdToFilter, productFilter, productCategoryFilter, queueSearch],
+    queryKey: ['inventory-requisitions', status, dueState, fulfillmentState, slaState, ageBucket, approvalThresholdLevel, approvalThresholdReason, approvalThresholdWatch, approvalThresholdNextLevel, approvalThresholdNoteDepthState, minApprovalThresholdGapFilter, maxApprovalThresholdGapFilter, minRemainingValueFilter, maxRemainingValueFilter, minRemainingQuantityFilter, maxRemainingQuantityFilter, priorityFilter, departmentFilter, targetDepartmentFilter, sourceLocationFilter, targetLocationFilter, requesterFilter, neededByFromFilter, neededByToFilter, createdFromFilter, createdToFilter, productFilter, productCategoryFilter, queueSearch],
     queryFn: () => {
       const params = new URLSearchParams({ limit: '100' });
       const trimmedSearch = queueSearch.trim();
@@ -928,6 +1410,13 @@ export default function InventoryRequisitionsPage() {
       if (fulfillmentState) params.set('fulfillment_state', fulfillmentState);
       if (slaState) params.set('sla_state', slaState);
       if (ageBucket) params.set('age_bucket', ageBucket);
+      if (approvalThresholdLevel) params.set('approval_threshold_level', approvalThresholdLevel);
+      if (approvalThresholdReason) params.set('approval_threshold_reason', approvalThresholdReason);
+      if (approvalThresholdWatch) params.set('approval_threshold_watch', approvalThresholdWatch);
+      if (approvalThresholdNextLevel) params.set('approval_threshold_next_level', approvalThresholdNextLevel);
+      if (approvalThresholdNoteDepthState) params.set('approval_threshold_note_depth_state', approvalThresholdNoteDepthState);
+      if (minApprovalThresholdGapFilter) params.set('min_approval_threshold_value_gap', minApprovalThresholdGapFilter);
+      if (maxApprovalThresholdGapFilter) params.set('max_approval_threshold_value_gap', maxApprovalThresholdGapFilter);
       if (minRemainingValueFilter) params.set('min_remaining_estimated_value', minRemainingValueFilter);
       if (maxRemainingValueFilter) params.set('max_remaining_estimated_value', maxRemainingValueFilter);
       if (minRemainingQuantityFilter) params.set('min_remaining_quantity', minRemainingQuantityFilter);
@@ -963,6 +1452,14 @@ export default function InventoryRequisitionsPage() {
     return Array.from(categories).sort((a, b) => a.localeCompare(b));
   }, [productsQuery.data]);
 
+  const productById = useMemo(() => {
+    const map = new Map<string, ProductItem>();
+    productsQuery.data?.forEach((product) => {
+      map.set(product.id, product);
+    });
+    return map;
+  }, [productsQuery.data]);
+
   const locationsQuery = useQuery({
     queryKey: ['storage-locations', 'requisition-options'],
     queryFn: () => apiRequest<StorageLocationOption[]>('/storage-locations?limit=500')
@@ -991,16 +1488,22 @@ export default function InventoryRequisitionsPage() {
 
   const readinessPreviewLines = useMemo(() => Object.entries(fulfillmentLines)
     .filter(([, quantity]) => quantity !== '' && Number(quantity) >= 0)
-    .map(([requisition_item_id, quantity]) => ({ requisition_item_id, quantity: Number(quantity) })), [fulfillmentLines]);
+    .map(([requisition_item_id, quantity]) => ({
+      requisition_item_id,
+      quantity: Number(quantity),
+      notes: fulfillmentLineNotes[requisition_item_id]?.trim() || null
+    })), [fulfillmentLineNotes, fulfillmentLines]);
 
   const readinessQuery = useQuery({
-    queryKey: ['inventory-requisition-readiness', selectedId, effectiveFulfillmentLocationId, readinessPreviewLines],
+    queryKey: ['inventory-requisition-readiness', selectedId, effectiveFulfillmentLocationId, readinessPreviewLines, fulfillAllRemaining, defaultFulfillmentNote],
     enabled: Boolean(selectedId) && ['approved', 'partially_fulfilled'].includes(String(selected?.status)),
     queryFn: () => apiMutationRequest<RequisitionReadiness>(`/inventory-requisitions/${selectedId}/readiness`, {
       method: 'POST',
       body: JSON.stringify({
         source_storage_location_id: effectiveFulfillmentLocationId || null,
-        items: readinessPreviewLines
+        fulfill_all_remaining: fulfillAllRemaining,
+        default_fulfillment_note: fulfillAllRemaining ? (defaultFulfillmentNote.trim() || null) : null,
+        items: fulfillAllRemaining ? [] : readinessPreviewLines
       }),
       skipIdempotencyKey: true
     })
@@ -1014,6 +1517,7 @@ export default function InventoryRequisitionsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-detail'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-fulfillments'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-readiness'] }),
+      queryClient.invalidateQueries({ queryKey: ['inventory-requisition-bulk-readiness'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-activity'] }),
       queryClient.invalidateQueries({ queryKey: ['stock'] }),
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
@@ -1061,7 +1565,9 @@ export default function InventoryRequisitionsPage() {
         method: 'POST',
         body: JSON.stringify({
           source_storage_location_id: effectiveFulfillmentLocationId || null,
-          items
+          fulfill_all_remaining: fulfillAllRemaining,
+          default_fulfillment_note: fulfillAllRemaining ? (defaultFulfillmentNote.trim() || null) : null,
+          items: fulfillAllRemaining ? [] : items
         })
       });
     },
@@ -1069,9 +1575,146 @@ export default function InventoryRequisitionsPage() {
       setSelectedId(response.requisition.id);
       setFulfillmentLines({});
       setFulfillmentLineNotes({});
+      setFulfillAllRemaining(false);
+      setDefaultFulfillmentNote('');
       await invalidateRequisitions();
     }
   });
+
+  const bulkFulfillmentMutation = useMutation({
+    mutationFn: () => apiMutationRequest<BulkFulfillmentResult>('/inventory-requisitions/bulk-fulfill', {
+      method: 'POST',
+      body: JSON.stringify({
+        source_storage_location_id: bulkFulfillmentLocationId || null,
+        fulfill_all_remaining: true,
+        default_fulfillment_note: bulkFulfillmentNote.trim() || null,
+        requisitions: bulkFulfillmentIds.map((requisition_id) => ({
+          requisition_id,
+          fulfill_all_remaining: true,
+          default_fulfillment_note: bulkFulfillmentNote.trim() || null
+        }))
+      })
+    }),
+    onSuccess: async () => {
+      setBulkFulfillmentIds([]);
+      setBulkFulfillmentLocationId('');
+      setBulkFulfillmentNote('');
+      await invalidateRequisitions();
+    }
+  });
+
+  const exportBulkFulfillmentResults = () => {
+    const result = bulkFulfillmentMutation.data;
+    if (!result?.results?.length) return;
+
+    downloadCsv('inventory-requisition-bulk-fulfillment-results.csv', [
+      [
+        'Requisition #',
+        'Requisition ID',
+        'Status after fulfillment',
+        'Fulfilled line count',
+        'Fulfilled quantity total',
+        'Approval threshold governed',
+        'Approval threshold level',
+        'Approval threshold reason',
+        'Approval threshold note depth state',
+        'Threshold fulfillment line note minimum length',
+        'Threshold fulfillment line notes below minimum',
+        'Threshold fulfillment line notes meet minimum'
+      ],
+      ...result.results.map((entry) => [
+        entry.requisition_number || '',
+        entry.requisition_id,
+        entry.status || '',
+        entry.fulfilled_line_count ?? '',
+        entry.fulfilled_quantity_total ?? '',
+        entry.approval_threshold_notes_required ? 'yes' : 'no',
+        entry.approval_threshold_level || '',
+        entry.approval_threshold_reason || '',
+        entry.approval_threshold_note_depth_state || '',
+        entry.threshold_fulfillment_line_note_min_length ?? '',
+        entry.threshold_fulfillment_line_note_below_minimum_count ?? '',
+        entry.threshold_fulfillment_line_notes_meet_minimum === null || entry.threshold_fulfillment_line_notes_meet_minimum === undefined
+          ? ''
+          : entry.threshold_fulfillment_line_notes_meet_minimum ? 'yes' : 'no'
+      ])
+    ]);
+  };
+
+
+  const exportBulkReadinessResults = () => {
+    const readiness = bulkReadinessQuery.data;
+    if (!readiness?.results?.length) return;
+
+    const rows = readiness.results.flatMap((entry) => {
+      const base = [
+        entry.requisition_number || '',
+        entry.requisition_id || '',
+        entry.status || '',
+        entry.ready ? 'yes' : 'no',
+        entry.source_storage_location_name || '',
+        entry.approval_threshold_notes_required ? 'yes' : 'no',
+        entry.threshold_fulfillment_line_note_min_length ?? '',
+        entry.threshold_fulfillment_line_note_below_minimum_count ?? '',
+        entry.threshold_fulfillment_line_notes_meet_minimum === null || entry.threshold_fulfillment_line_notes_meet_minimum === undefined
+          ? ''
+          : entry.threshold_fulfillment_line_notes_meet_minimum ? 'yes' : 'no',
+        (entry.blockers || []).map((blocker) => blocker.code).filter(Boolean).join('; '),
+        (entry.warnings || []).map((warning) => warning.code).filter(Boolean).join('; ')
+      ];
+
+      if (!entry.lines?.length) {
+        return [[...base, '', '', '', '', '', '', '', '', '', '']];
+      }
+
+      return entry.lines.map((line) => [
+        ...base,
+        line.product_name || '',
+        line.product_unit || '',
+        line.requested_quantity ?? '',
+        line.fulfilled_quantity ?? '',
+        line.remaining_quantity ?? '',
+        line.preview_quantity ?? '',
+        line.available_quantity ?? '',
+        line.projected_quantity ?? '',
+        line.ready ? 'yes' : 'no',
+        line.blocker_code || '',
+        line.threshold_fulfillment_line_note_length ?? '',
+        line.threshold_fulfillment_line_note_meets_minimum === null || line.threshold_fulfillment_line_note_meets_minimum === undefined
+          ? ''
+          : line.threshold_fulfillment_line_note_meets_minimum ? 'yes' : 'no'
+      ]);
+    });
+
+    downloadCsv('inventory-requisition-bulk-readiness-results.csv', [
+      [
+        'Requisition #',
+        'Requisition ID',
+        'Status',
+        'Ready',
+        'Source location',
+        'Approval threshold governed',
+        'Threshold line note minimum length',
+        'Threshold line notes below minimum',
+        'Threshold line notes meet minimum',
+        'Requisition blockers',
+        'Requisition warnings',
+        'Product',
+        'Unit',
+        'Requested quantity',
+        'Fulfilled quantity',
+        'Remaining quantity',
+        'Preview quantity',
+        'Available quantity',
+        'Projected quantity',
+        'Line ready',
+        'Line blocker',
+        'Line note length',
+        'Line note meets minimum'
+      ],
+      ...rows
+    ]);
+  };
 
 
   const exportQueueMutation = useMutation({
@@ -1085,6 +1728,13 @@ export default function InventoryRequisitionsPage() {
       if (fulfillmentState) params.set('fulfillment_state', fulfillmentState);
       if (slaState) params.set('sla_state', slaState);
       if (ageBucket) params.set('age_bucket', ageBucket);
+      if (approvalThresholdLevel) params.set('approval_threshold_level', approvalThresholdLevel);
+      if (approvalThresholdReason) params.set('approval_threshold_reason', approvalThresholdReason);
+      if (approvalThresholdWatch) params.set('approval_threshold_watch', approvalThresholdWatch);
+      if (approvalThresholdNextLevel) params.set('approval_threshold_next_level', approvalThresholdNextLevel);
+      if (approvalThresholdNoteDepthState) params.set('approval_threshold_note_depth_state', approvalThresholdNoteDepthState);
+      if (minApprovalThresholdGapFilter) params.set('min_approval_threshold_value_gap', minApprovalThresholdGapFilter);
+      if (maxApprovalThresholdGapFilter) params.set('max_approval_threshold_value_gap', maxApprovalThresholdGapFilter);
       if (minRemainingValueFilter) params.set('min_remaining_estimated_value', minRemainingValueFilter);
       if (maxRemainingValueFilter) params.set('max_remaining_estimated_value', maxRemainingValueFilter);
       if (minRemainingQuantityFilter) params.set('min_remaining_quantity', minRemainingQuantityFilter);
@@ -1119,12 +1769,21 @@ export default function InventoryRequisitionsPage() {
         'Approved at',
         'Approved by',
         'Approval notes',
+        'Approval threshold approval note minimum length',
+        'Approval threshold approval note length',
+        'Approval threshold approval note meets minimum',
         'Rejected at',
         'Rejected by',
         'Rejection reason',
+        'Approval threshold rejection reason minimum length',
+        'Approval threshold rejection reason length',
+        'Approval threshold rejection reason meets minimum',
         'Cancelled at',
         'Cancelled by',
         'Cancellation reason',
+        'Approval threshold cancellation reason minimum length',
+        'Approval threshold cancellation reason length',
+        'Approval threshold cancellation reason meets minimum',
         'Last fulfilled at',
         'Last fulfilled by',
         'SLA state',
@@ -1134,6 +1793,19 @@ export default function InventoryRequisitionsPage() {
         'Urgent age hours',
         'Partial fulfillment state',
         'Partial fulfillment age days',
+        'Approval threshold level',
+        'Approval threshold reason',
+        'Approval threshold next level',
+        'Approval threshold value gap',
+        'Approval threshold notes required',
+        'Approval threshold note minimum length',
+        'Approval threshold requisition note minimum length',
+        'Approval threshold requisition note length',
+        'Approval threshold requisition note meets minimum',
+        'Approval threshold action requirements',
+        'Approval threshold line note minimum length',
+        'Approval threshold line note length',
+        'Approval threshold line note meets minimum',
         'Created at',
         'Created by',
         'Product',
@@ -1162,12 +1834,33 @@ export default function InventoryRequisitionsPage() {
         row.approved_at || '',
         row.approved_by_user_name || '',
         row.approval_notes || '',
+        row.approval_threshold_approval_note_min_length ?? '',
+        row.approval_threshold_approval_note_length ?? '',
+        row.approval_threshold_approval_note_meets_minimum === undefined || row.approval_threshold_approval_note_meets_minimum === null
+          ? ''
+          : row.approval_threshold_approval_note_meets_minimum
+            ? 'Yes'
+            : 'No',
         row.rejected_at || '',
         row.rejected_by_user_name || '',
         row.rejection_reason || '',
+        row.approval_threshold_rejection_reason_min_length ?? '',
+        row.approval_threshold_rejection_reason_length ?? '',
+        row.approval_threshold_rejection_reason_meets_minimum === undefined || row.approval_threshold_rejection_reason_meets_minimum === null
+          ? ''
+          : row.approval_threshold_rejection_reason_meets_minimum
+            ? 'Yes'
+            : 'No',
         row.cancelled_at || '',
         row.cancelled_by_user_name || '',
         row.cancellation_reason || '',
+        row.approval_threshold_cancellation_reason_min_length ?? '',
+        row.approval_threshold_cancellation_reason_length ?? '',
+        row.approval_threshold_cancellation_reason_meets_minimum === undefined || row.approval_threshold_cancellation_reason_meets_minimum === null
+          ? ''
+          : row.approval_threshold_cancellation_reason_meets_minimum
+            ? 'Yes'
+            : 'No',
         row.last_fulfilled_at || '',
         row.last_fulfilled_by_user_name || '',
         row.sla_state || '',
@@ -1177,6 +1870,27 @@ export default function InventoryRequisitionsPage() {
         row.urgent_age_hours ?? '',
         row.partial_fulfillment_state || '',
         row.partial_fulfillment_age_days ?? '',
+        row.approval_threshold_level || '',
+        row.approval_threshold_reason || '',
+        row.approval_threshold_next_level || '',
+        row.approval_threshold_value_gap ?? '',
+        row.approval_threshold_notes_required ? 'Yes' : 'No',
+        row.approval_threshold_note_min_length ?? '',
+        row.approval_threshold_requisition_note_min_length ?? '',
+        row.approval_threshold_requisition_note_length ?? '',
+        row.approval_threshold_requisition_note_meets_minimum === undefined || row.approval_threshold_requisition_note_meets_minimum === null
+          ? ''
+          : row.approval_threshold_requisition_note_meets_minimum
+            ? 'Yes'
+            : 'No',
+        row.approval_threshold_action_requirements || '',
+        row.approval_threshold_line_note_min_length ?? '',
+        row.approval_threshold_line_note_length ?? '',
+        row.approval_threshold_line_note_meets_minimum === undefined || row.approval_threshold_line_note_meets_minimum === null
+          ? ''
+          : row.approval_threshold_line_note_meets_minimum
+            ? 'Yes'
+            : 'No',
         row.created_at || '',
         row.created_by_user_name || '',
         row.product_name,
@@ -1233,6 +1947,18 @@ export default function InventoryRequisitionsPage() {
     }));
   };
 
+  const toggleBulkFulfillmentSelection = (requisitionId: string) => {
+    setBulkFulfillmentIds((current) => current.includes(requisitionId)
+      ? current.filter((id) => id !== requisitionId)
+      : [...current, requisitionId]);
+  };
+
+  const clearBulkFulfillmentSelection = () => {
+    setBulkFulfillmentIds([]);
+    setBulkFulfillmentLocationId('');
+    setBulkFulfillmentNote('');
+  };
+
   const handleSaveDraft = (event: FormEvent) => {
     event.preventDefault();
     saveDraftMutation.mutate();
@@ -1259,13 +1985,103 @@ export default function InventoryRequisitionsPage() {
     workflowMutation.mutate({ id: selected.id, action, body });
   };
 
-  const canSubmit = selected?.status === 'draft' && capabilities.canSubmitInventoryRequisitions;
-  const canApprove = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions;
-  const canReject = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions;
-  const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && capabilities.canCancelInventoryRequisitions;
-  const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && capabilities.canCreateInventoryRequisitions;
+  const visibleBulkFulfillmentIds = useMemo(() => new Set(requisitionsQuery.data?.map((item) => item.id) || []), [requisitionsQuery.data]);
+  const bulkSelectedRequisitions = useMemo(() => (requisitionsQuery.data || []).filter((item) => bulkFulfillmentIds.includes(item.id)), [bulkFulfillmentIds, requisitionsQuery.data]);
+  const bulkEligibleRequisitions = bulkSelectedRequisitions.filter((item) => ['approved', 'partially_fulfilled'].includes(String(item.status)));
+  const bulkIneligibleCount = bulkSelectedRequisitions.length - bulkEligibleRequisitions.length;
+  const bulkThresholdGoverned = bulkEligibleRequisitions.some((item) => requiresApprovalThresholdNotes(item));
+  const bulkApprovalThresholdNoteMinLength = bulkEligibleRequisitions.reduce((max, item) => Math.max(max, getApprovalThresholdNoteMinLength(item)), APPROVAL_THRESHOLD_NOTE_MIN_LENGTH);
+  const bulkFulfillmentNoteLength = bulkFulfillmentNote.trim().length;
+  const bulkFulfillmentNoteMeetsThreshold = !bulkThresholdGoverned || bulkFulfillmentNoteLength >= bulkApprovalThresholdNoteMinLength;
+  const bulkEligibleRequisitionIds = bulkEligibleRequisitions.map((item) => item.id);
+  const bulkReadinessQuery = useQuery({
+    queryKey: ['inventory-requisition-bulk-readiness', bulkEligibleRequisitionIds, bulkFulfillmentLocationId, bulkFulfillmentNote],
+    enabled: capabilities.canFulfillInventoryRequisitions
+      && bulkEligibleRequisitions.length > 0
+      && bulkIneligibleCount === 0
+      && bulkFulfillmentNoteMeetsThreshold,
+    queryFn: () => apiMutationRequest<BulkRequisitionReadiness>('/inventory-requisitions/bulk-readiness', {
+      method: 'POST',
+      body: JSON.stringify({
+        source_storage_location_id: bulkFulfillmentLocationId || null,
+        fulfill_all_remaining: true,
+        default_fulfillment_note: bulkFulfillmentNote.trim() || null,
+        requisitions: bulkEligibleRequisitions.map((item) => ({
+          requisition_id: item.id,
+          fulfill_all_remaining: true,
+          default_fulfillment_note: bulkFulfillmentNote.trim() || null
+        }))
+      }),
+      skipIdempotencyKey: true
+    })
+  });
+  const bulkReadinessBlocksFulfillment = bulkReadinessQuery.data?.ready === false;
+  const canBulkFulfill = capabilities.canFulfillInventoryRequisitions
+    && bulkEligibleRequisitions.length > 0
+    && bulkIneligibleCount === 0
+    && bulkFulfillmentNoteMeetsThreshold
+    && !bulkReadinessBlocksFulfillment
+    && !bulkReadinessQuery.isFetching;
+
+  const approvalThresholdNotesRequired = requiresApprovalThresholdNotes(selected);
+  const selectedApprovalThresholdNoteMinLength = getApprovalThresholdNoteMinLength(selected);
+  const draftApprovalThresholdEstimate = useMemo(() => estimateDraftApprovalThreshold(form, productById), [form, productById]);
+  const draftFormThresholdGoverned = draftApprovalThresholdEstimate.approval_threshold_level !== 'standard';
+  const draftSaveThresholdGoverned = Boolean((editingDraftId && selected?.id === editingDraftId && approvalThresholdNotesRequired) || draftFormThresholdGoverned);
+  const draftSaveThresholdLevel = draftFormThresholdGoverned ? draftApprovalThresholdEstimate.approval_threshold_level : selected?.approval_threshold_level;
+  const draftSaveThresholdReason = draftFormThresholdGoverned ? draftApprovalThresholdEstimate.approval_threshold_reason : selected?.approval_threshold_reason;
+  const draftSaveThresholdNoteMinLength = editingDraftId && selected?.id === editingDraftId ? selectedApprovalThresholdNoteMinLength : APPROVAL_THRESHOLD_NOTE_MIN_LENGTH;
+  const editedDraftNotesLength = form.notes.trim().length;
+  const editedDraftNotesMeetThresholdDepth = editedDraftNotesLength >= draftSaveThresholdNoteMinLength;
+  const editedDraftLineNoteDepths = form.items
+    .filter((item) => item.product_id && item.requested_quantity)
+    .map((item) => item.notes.trim().length);
+  const editedDraftLineNotesBelowMinimumCount = editedDraftLineNoteDepths.filter((noteLength) => noteLength < draftSaveThresholdNoteMinLength).length;
+  const editedDraftLineNotesMeetThresholdDepth = editedDraftLineNoteDepths.length > 0 && editedDraftLineNotesBelowMinimumCount === 0;
+  const draftNotesMeetThresholdDepth = (selected?.notes?.trim().length || 0) >= selectedApprovalThresholdNoteMinLength;
+  const selectedDraftLineNoteDepths = (selected?.items || []).map((item) => {
+    if (item.approval_threshold_line_note_meets_minimum !== undefined && item.approval_threshold_line_note_meets_minimum !== null) {
+      return item.approval_threshold_line_note_meets_minimum ? selectedApprovalThresholdNoteMinLength : 0;
+    }
+    return (item.notes?.trim().length || 0);
+  });
+  const selectedDraftLineNotesBelowMinimumCount = selectedDraftLineNoteDepths.filter((noteLength) => noteLength < selectedApprovalThresholdNoteMinLength).length;
+  const selectedDraftLineNotesMeetThresholdDepth = selectedDraftLineNoteDepths.length > 0 && selectedDraftLineNotesBelowMinimumCount === 0;
+  const canSaveDraft = capabilities.canCreateInventoryRequisitions && (!draftSaveThresholdGoverned || (editedDraftNotesMeetThresholdDepth && editedDraftLineNotesMeetThresholdDepth));
+  const canSubmit = selected?.status === 'draft' && capabilities.canSubmitInventoryRequisitions && (!approvalThresholdNotesRequired || (draftNotesMeetThresholdDepth && selectedDraftLineNotesMeetThresholdDepth));
+  const workflowNotesLength = workflowNotes.trim().length;
+  const workflowNotesMeetThresholdDepth = workflowNotesLength >= selectedApprovalThresholdNoteMinLength;
+  const selectedFulfillmentLineEntries = Object.entries(fulfillmentLines).filter(([, quantity]) => quantity && Number(quantity) > 0);
+  const selectedFulfillmentLineCount = selectedFulfillmentLineEntries.length;
+  const defaultFulfillmentNoteLength = defaultFulfillmentNote.trim().length;
+  const fulfillmentThresholdLinesMeetNoteDepth = fulfillAllRemaining
+    ? (!approvalThresholdNotesRequired || defaultFulfillmentNoteLength >= selectedApprovalThresholdNoteMinLength)
+    : selectedFulfillmentLineEntries.every(([requisitionItemId]) => !approvalThresholdNotesRequired || (fulfillmentLineNotes[requisitionItemId]?.trim().length || 0) >= selectedApprovalThresholdNoteMinLength);
+  const canApprove = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canReject = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && capabilities.canCancelInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && capabilities.canCreateInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
-  const mutationError = saveDraftMutation.error || workflowMutation.error || fulfillMutation.error || commentMutation.error;
+  const approvalThresholdApiRequirements = Array.isArray(selected?.approval_threshold_action_requirements)
+    ? selected.approval_threshold_action_requirements.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  const approvalThresholdGovernanceRequirements = approvalThresholdNotesRequired
+    ? [
+        ...approvalThresholdApiRequirements,
+        selected?.status === 'draft'
+          ? `Draft notes must be at least ${selectedApprovalThresholdNoteMinLength} characters before submission (${selected?.notes?.trim().length || 0}/${selectedApprovalThresholdNoteMinLength}).`
+          : null,
+        ['submitted', 'approved', 'rejected', 'cancelled'].includes(String(selected?.status))
+          ? `Workflow note/reason must be at least ${selectedApprovalThresholdNoteMinLength} characters for approve, reject, cancel, or reopen actions (${workflowNotesLength}/${selectedApprovalThresholdNoteMinLength}).`
+          : null,
+        fulfillAllRemaining
+          ? `Default all-remaining fulfillment note must be at least ${selectedApprovalThresholdNoteMinLength} characters (${defaultFulfillmentNoteLength}/${selectedApprovalThresholdNoteMinLength}).`
+          : selectedFulfillmentLineCount > 0
+            ? `Each selected fulfillment line must include a note of at least ${selectedApprovalThresholdNoteMinLength} characters.`
+            : null
+      ].filter((item): item is string => Boolean(item))
+    : [];
+  const mutationError = saveDraftMutation.error || workflowMutation.error || fulfillMutation.error || bulkFulfillmentMutation.error || bulkReadinessQuery.error || commentMutation.error;
 
   return (
     <div style={styles.page}>
@@ -1290,6 +2106,36 @@ export default function InventoryRequisitionsPage() {
       </section>
 
       {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError)}</div>}
+      {bulkFulfillmentMutation.data && (
+        <div style={styles.successBox}>
+          <div>
+            Bulk fulfillment recorded: {formatNumber(bulkFulfillmentMutation.data.requisition_count)} request(s), {formatNumber(bulkFulfillmentMutation.data.fulfilled_line_count)} line(s), {formatNumber(bulkFulfillmentMutation.data.fulfilled_quantity_total)} total units.
+            {bulkFulfillmentMutation.data.approval_threshold_governed_requisition_count !== undefined && (
+              <> Threshold-governed: {formatNumber(bulkFulfillmentMutation.data.approval_threshold_governed_requisition_count)} · below-minimum line notes: {formatNumber(bulkFulfillmentMutation.data.threshold_fulfillment_line_note_below_minimum_count)}.</>
+            )}
+          </div>
+          {bulkFulfillmentMutation.data.results?.length ? (
+            <div style={styles.bulkResultList}>
+              <div style={styles.lineHeader}>
+                <span style={styles.muted}>Bulk fulfillment result rows are available for governance review.</span>
+                <button type="button" style={styles.secondaryButton} onClick={exportBulkFulfillmentResults}>Export result CSV</button>
+              </div>
+              {bulkFulfillmentMutation.data.results.slice(0, 8).map((result) => (
+                <div key={result.requisition_id} style={styles.bulkResultRow}>
+                  <strong>{result.requisition_number || result.requisition_id}</strong>
+                  <span>{formatNumber(result.fulfilled_line_count)} line(s) · {formatNumber(result.fulfilled_quantity_total)} units · {result.status || 'updated'}</span>
+                  {result.approval_threshold_notes_required && (
+                    <span>Threshold {result.approval_threshold_level || 'governed'} · note depth {result.approval_threshold_note_depth_state || 'tracked'} · below-minimum fulfillment notes {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
+                  )}
+                </div>
+              ))}
+              {bulkFulfillmentMutation.data.results.length > 8 && (
+                <span style={styles.muted}>+{formatNumber(bulkFulfillmentMutation.data.results.length - 8)} more result(s)</span>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <section style={styles.summaryGrid}>
         <div style={styles.card}>
@@ -1377,6 +2223,156 @@ export default function InventoryRequisitionsPage() {
           </div>
           <p style={styles.muted}>Average pending age: {formatNumber(summaryQuery.data?.approval_queue?.average_pending_age_days)} days · Oldest: {formatNumber(summaryQuery.data?.approval_queue?.oldest_pending_age_days)} days</p>
           <p style={styles.muted}>Pending value: {formatNumber(summaryQuery.data?.approval_queue?.pending_remaining_estimated_value_total)} · Urgent value: {formatNumber(summaryQuery.data?.approval_queue?.urgent_remaining_estimated_value_total)} · Overdue value: {formatNumber(summaryQuery.data?.approval_queue?.overdue_remaining_estimated_value_total)}</p>
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval threshold exposure</h3>
+          <div style={styles.compactMetrics}>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_approval_count)}</strong><br /><span style={styles.muted}>Elevated approvals</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_threshold || 1000)}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_threshold || 5000)}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.largest_pending_remaining_estimated_value)}</strong><br /><span style={styles.muted}>Largest pending value</span></div>
+          </div>
+          <p style={styles.muted}>Elevated value: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_remaining_estimated_value_total)} · High priority: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_priority_count)} · Urgent: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.urgent_count)} · Overdue: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.overdue_count)}</p>
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval threshold watchlist</h3>
+          {summaryQuery.data?.approval_threshold_near_miss ? (
+            <>
+              <div style={styles.statsGrid}>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_count)}</strong><br /><span style={styles.muted}>Near high-value floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.high_value_watch_floor)}</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_count)}</strong><br /><span style={styles.muted}>Near executive floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.executive_value_watch_floor)}</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.overdue_near_threshold_count)}</strong><br /><span style={styles.muted}>Overdue near-threshold</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.largest_near_threshold_value)}</strong><br /><span style={styles.muted}>Largest near threshold</span></div>
+              </div>
+              <p style={styles.muted}>Near high-value total: {formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_total)} · Near executive total: {formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_total)}</p>
+            </>
+          ) : <p style={styles.muted}>No approval threshold watchlist data.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by reason</h3>
+          {summaryQuery.data?.approval_threshold_by_reason?.length ? summaryQuery.data.approval_threshold_by_reason.map((reason) => (
+            <div key={reason.approval_threshold_reason} style={styles.departmentRow}>
+              <span>{approvalThresholdReasonLabel(reason.approval_threshold_reason)}<br /><span style={styles.muted}>{formatNumber(reason.pending_count)} pending · {formatNumber(reason.urgent_count)} urgent · {formatNumber(reason.high_value_count)} high value · {formatNumber(reason.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(reason.pending_remaining_estimated_value_total)} pending value</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by reason.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by level</h3>
+          {summaryQuery.data?.approval_threshold_by_level?.length ? summaryQuery.data.approval_threshold_by_level.map((level) => (
+            <div key={level.approval_threshold_level} style={styles.departmentRow}>
+              <span>{approvalThresholdLabel(level.approval_threshold_level)}<br /><span style={styles.muted}>{formatNumber(level.pending_count)} pending · {formatNumber(level.urgent_count)} urgent · {formatNumber(level.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(level.pending_remaining_estimated_value_total)} pending value</strong>
+            </div>
+          )) : <p style={styles.muted}>No approval threshold level exposure.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by priority</h3>
+          {summaryQuery.data?.approval_threshold_by_priority?.length ? summaryQuery.data.approval_threshold_by_priority.map((priority) => (
+            <div key={priority.priority} style={styles.departmentRow}>
+              <span><span style={statusStyle(priority.priority)}>{priority.priority}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} elevated · {formatNumber(priority.high_value_count)} high value · {formatNumber(priority.executive_value_count)} executive · {formatNumber(priority.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(priority.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by priority.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by department</h3>
+          {summaryQuery.data?.approval_threshold_by_department?.length ? summaryQuery.data.approval_threshold_by_department.map((department) => (
+            <div key={department.requesting_department} style={styles.departmentRow}>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(department.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by department.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by requester</h3>
+          {summaryQuery.data?.approval_threshold_by_requester?.length ? summaryQuery.data.approval_threshold_by_requester.map((requester) => (
+            <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.elevated_approval_count)} elevated · {formatNumber(requester.urgent_count)} urgent · {formatNumber(requester.high_value_count)} high value · {formatNumber(requester.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(requester.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by requester.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by target department</h3>
+          {summaryQuery.data?.approval_threshold_by_target_department?.length ? summaryQuery.data.approval_threshold_by_target_department.map((department) => (
+            <div key={department.target_department} style={styles.departmentRow}>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(department.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by target department.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by source location</h3>
+          {summaryQuery.data?.approval_threshold_by_source_location?.length ? summaryQuery.data.approval_threshold_by_source_location.map((location) => (
+            <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(location.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by source location.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by target location</h3>
+          {summaryQuery.data?.approval_threshold_by_target_location?.length ? summaryQuery.data.approval_threshold_by_target_location.map((location) => (
+            <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(location.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by target location.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by product</h3>
+          {summaryQuery.data?.approval_threshold_by_product?.length ? summaryQuery.data.approval_threshold_by_product.map((product) => (
+            <div key={product.product_id} style={styles.departmentRow}>
+              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.elevated_approval_count)} elevated requests · {formatNumber(product.high_value_count)} high value · {formatNumber(product.executive_value_count)} executive · {formatNumber(product.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(product.elevated_product_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by product.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by category</h3>
+          {summaryQuery.data?.approval_threshold_by_category?.length ? summaryQuery.data.approval_threshold_by_category.map((category) => (
+            <div key={category.product_category} style={styles.departmentRow}>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.elevated_approval_count)} elevated · {formatNumber(category.urgent_count)} urgent · {formatNumber(category.high_value_count)} high value · {formatNumber(category.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(category.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by category.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by due state</h3>
+          {summaryQuery.data?.approval_threshold_by_due_state?.length ? summaryQuery.data.approval_threshold_by_due_state.map((state) => (
+            <div key={state.due_state} style={styles.departmentRow}>
+              <span>{state.due_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by due state.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by age bucket</h3>
+          {summaryQuery.data?.approval_threshold_by_age_bucket?.length ? summaryQuery.data.approval_threshold_by_age_bucket.map((bucket) => (
+            <div key={bucket.approval_age_bucket} style={styles.departmentRow}>
+              <span>{bucket.approval_age_bucket.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} elevated · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.high_value_count)} high value · {formatNumber(bucket.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(bucket.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by age bucket.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Approval thresholds by SLA state</h3>
+          {summaryQuery.data?.approval_threshold_by_sla_state?.length ? summaryQuery.data.approval_threshold_by_sla_state.map((state) => (
+            <div key={state.approval_sla_state} style={styles.departmentRow}>
+              <span>{state.approval_sla_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
+              <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
+            </div>
+          )) : <p style={styles.muted}>No threshold exposure by SLA state.</p>}
+        </div>
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Oldest threshold approvals</h3>
+          {summaryQuery.data?.approval_threshold_oldest?.length ? summaryQuery.data.approval_threshold_oldest.slice(0, 5).map((request) => (
+            <div key={request.id} style={styles.summaryRow}>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {approvalThresholdLabel(request.approval_threshold_level || 'standard')} · {formatNumber(request.product_count)} products</span></span>
+              <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_estimated_value_total)} value</strong>
+            </div>
+          )) : <p style={styles.muted}>No elevated threshold approvals.</p>}
         </div>
         <div style={styles.card}>
           <h3 style={styles.sectionTitle}>Approval value by priority</h3>
@@ -1908,7 +2904,13 @@ export default function InventoryRequisitionsPage() {
               <button type="button" style={styles.dangerButton} onClick={() => removeFormLine(index)}>Remove</button>
             </div>
           ))}
-          <button style={styles.primaryButton} type="submit" disabled={saveDraftMutation.isPending || !capabilities.canCreateInventoryRequisitions}>
+          {draftSaveThresholdGoverned && !editedDraftNotesMeetThresholdDepth && (
+            <p style={styles.warningBox}>Draft notes of at least {draftSaveThresholdNoteMinLength} characters are required to save this {approvalThresholdLabel(draftSaveThresholdLevel)} request ({approvalThresholdReasonLabel(draftSaveThresholdReason)} · {editedDraftNotesLength}/{draftSaveThresholdNoteMinLength}).</p>
+          )}
+          {draftSaveThresholdGoverned && !editedDraftLineNotesMeetThresholdDepth && (
+            <p style={styles.warningBox}>Each draft request line needs notes of at least {draftSaveThresholdNoteMinLength} characters to save this {approvalThresholdLabel(draftSaveThresholdLevel)} request ({editedDraftLineNotesBelowMinimumCount} line{editedDraftLineNotesBelowMinimumCount === 1 ? '' : 's'} below minimum).</p>
+          )}
+          <button style={styles.primaryButton} type="submit" disabled={saveDraftMutation.isPending || !canSaveDraft}>
             {saveDraftMutation.isPending ? 'Saving…' : editingDraftId ? 'Save draft changes' : 'Create draft requisition'}
           </button>
         </form>
@@ -1979,6 +2981,54 @@ export default function InventoryRequisitionsPage() {
                 <option value="three_to_seven_days">Open 3-7 days</option>
                 <option value="over_seven_days">Open over 7 days</option>
               </select>
+              <select style={styles.smallSelect} value={approvalThresholdLevel} onChange={(event) => setApprovalThresholdLevel(event.target.value)}>
+                <option value="">All approval thresholds</option>
+                <option value="standard">Standard approvals</option>
+                <option value="elevated">Elevated approvals</option>
+                <option value="executive_value">Executive value approvals</option>
+              </select>
+              <select style={styles.smallSelect} value={approvalThresholdReason} onChange={(event) => setApprovalThresholdReason(event.target.value)}>
+                <option value="">All threshold reasons</option>
+                <option value="standard">Standard approval</option>
+                <option value="high_priority">High priority threshold</option>
+                <option value="high_value">High value threshold</option>
+                <option value="executive_value">Executive value threshold</option>
+              </select>
+              <select style={styles.smallSelect} value={approvalThresholdWatch} onChange={(event) => setApprovalThresholdWatch(event.target.value)}>
+                <option value="">All threshold watchlist</option>
+                <option value="near_high_value">Near high-value threshold</option>
+                <option value="near_executive_value">Near executive threshold</option>
+                <option value="any_near_threshold">Any near-threshold</option>
+              </select>
+              <select style={styles.smallSelect} value={approvalThresholdNextLevel} onChange={(event) => setApprovalThresholdNextLevel(event.target.value)}>
+                <option value="">All next thresholds</option>
+                <option value="high_value">Next: high value</option>
+                <option value="executive_value">Next: executive value</option>
+                <option value="none">No next threshold</option>
+              </select>
+              <select style={styles.smallSelect} value={approvalThresholdNoteDepthState} onChange={(event) => setApprovalThresholdNoteDepthState(event.target.value)}>
+                <option value="">All note-depth states</option>
+                <option value="complete">Threshold notes complete</option>
+                <option value="incomplete">Threshold notes incomplete</option>
+              </select>
+              <input
+                style={styles.smallInput}
+                type="number"
+                min="0"
+                step="0.01"
+                value={minApprovalThresholdGapFilter}
+                onChange={(event) => setMinApprovalThresholdGapFilter(event.target.value)}
+                placeholder="Min threshold gap"
+              />
+              <input
+                style={styles.smallInput}
+                type="number"
+                min="0"
+                step="0.01"
+                value={maxApprovalThresholdGapFilter}
+                onChange={(event) => setMaxApprovalThresholdGapFilter(event.target.value)}
+                placeholder="Max threshold gap"
+              />
               <input
                 style={styles.smallInput}
                 type="number"
@@ -2085,7 +3135,7 @@ export default function InventoryRequisitionsPage() {
               >
                 {exportQueueMutation.isPending ? 'Exporting…' : 'Export queue CSV'}
               </button>
-              {(status || dueState || fulfillmentState || slaState || ageBucket || minRemainingValueFilter || maxRemainingValueFilter || minRemainingQuantityFilter || maxRemainingQuantityFilter || priorityFilter || departmentFilter || targetDepartmentFilter || sourceLocationFilter || targetLocationFilter || requesterFilter || neededByFromFilter || neededByToFilter || createdFromFilter || createdToFilter || productFilter || productCategoryFilter || queueSearch) && (
+              {(status || dueState || fulfillmentState || slaState || ageBucket || approvalThresholdLevel || approvalThresholdReason || approvalThresholdWatch || approvalThresholdNextLevel || approvalThresholdNoteDepthState || minApprovalThresholdGapFilter || maxApprovalThresholdGapFilter || minRemainingValueFilter || maxRemainingValueFilter || minRemainingQuantityFilter || maxRemainingQuantityFilter || priorityFilter || departmentFilter || targetDepartmentFilter || sourceLocationFilter || targetLocationFilter || requesterFilter || neededByFromFilter || neededByToFilter || createdFromFilter || createdToFilter || productFilter || productCategoryFilter || queueSearch) && (
                 <button
                   type="button"
                   style={styles.secondaryButton}
@@ -2095,6 +3145,13 @@ export default function InventoryRequisitionsPage() {
                     setFulfillmentState('');
                     setSlaState('');
                     setAgeBucket('');
+                    setApprovalThresholdLevel('');
+                    setApprovalThresholdReason('');
+                    setApprovalThresholdWatch('');
+                    setApprovalThresholdNextLevel('');
+                    setApprovalThresholdNoteDepthState('');
+                    setMinApprovalThresholdGapFilter('');
+                    setMaxApprovalThresholdGapFilter('');
                     setMinRemainingValueFilter('');
                     setMaxRemainingValueFilter('');
                     setMinRemainingQuantityFilter('');
@@ -2119,31 +3176,155 @@ export default function InventoryRequisitionsPage() {
               )}
             </div>
           </div>
+          {capabilities.canFulfillInventoryRequisitions && (
+            <div style={styles.workflowPanel}>
+              <div style={styles.lineHeader}>
+                <h4 style={styles.sectionTitle}>Bulk fulfill selected requests</h4>
+                <span style={styles.muted}>{formatNumber(bulkFulfillmentIds.filter((id) => visibleBulkFulfillmentIds.has(id)).length)} selected</span>
+              </div>
+              <div style={styles.filterRow}>
+                <select
+                  style={styles.smallSelect}
+                  value={bulkFulfillmentLocationId}
+                  onChange={(event) => setBulkFulfillmentLocationId(event.target.value)}
+                >
+                  <option value="">Use each request source location</option>
+                  {locationsQuery.data?.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
+                <input
+                  style={styles.searchInput}
+                  value={bulkFulfillmentNote}
+                  onChange={(event) => setBulkFulfillmentNote(event.target.value)}
+                  placeholder={bulkThresholdGoverned ? `Default note, ${bulkApprovalThresholdNoteMinLength}+ chars for threshold requests` : 'Default fulfillment note for all remaining lines'}
+                />
+                <button
+                  type="button"
+                  style={styles.primaryButton}
+                  disabled={!canBulkFulfill || bulkFulfillmentMutation.isPending}
+                  onClick={() => bulkFulfillmentMutation.mutate()}
+                >
+                  {bulkFulfillmentMutation.isPending ? 'Bulk fulfilling…' : 'Fulfill all remaining'}
+                </button>
+                {bulkFulfillmentIds.length > 0 && (
+                  <button type="button" style={styles.secondaryButton} onClick={clearBulkFulfillmentSelection}>Clear bulk selection</button>
+                )}
+              </div>
+              {bulkIneligibleCount > 0 && <p style={styles.warningBox}>{formatNumber(bulkIneligibleCount)} selected request(s) are not approved or partially fulfilled.</p>}
+              {bulkThresholdGoverned && !bulkFulfillmentNoteMeetsThreshold && (
+                <p style={styles.warningBox}>Bulk threshold fulfillment requires a default note of at least {bulkApprovalThresholdNoteMinLength} characters ({bulkFulfillmentNoteLength}/{bulkApprovalThresholdNoteMinLength}).</p>
+              )}
+              {bulkEligibleRequisitions.length > 0 && (
+                <div style={bulkReadinessBlocksFulfillment ? styles.errorBox : styles.readinessPanel}>
+                  <div style={styles.lineHeader}>
+                    <strong>Bulk readiness preview</strong>
+                    <span style={styles.inlineActions}>
+                      {bulkReadinessQuery.isFetching && <span style={styles.muted}>Checking selected requests…</span>}
+                      {bulkReadinessQuery.data?.results?.length ? (
+                        <button type="button" style={styles.secondaryButtonSmall} onClick={exportBulkReadinessResults}>Export readiness CSV</button>
+                      ) : null}
+                    </span>
+                  </div>
+                  {bulkReadinessQuery.data ? (
+                    <>
+                      <p style={styles.muted}>
+                        {formatNumber(bulkReadinessQuery.data.ready_requisition_count)} ready · {formatNumber(bulkReadinessQuery.data.blocked_requisition_count)} blocked · {formatNumber(bulkReadinessQuery.data.warning_count)} warning(s)
+                      </p>
+                      {bulkReadinessQuery.data.approval_threshold_governed_requisition_count !== undefined && (
+                        <p style={styles.muted}>
+                          {formatNumber(bulkReadinessQuery.data.approval_threshold_governed_requisition_count)} threshold-governed · {formatNumber(bulkReadinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} fulfillment line note(s) below minimum
+                        </p>
+                      )}
+                      {bulkReadinessQuery.data.blocked_requisition_numbers?.length ? (
+                        <p style={styles.warningText}>Blocked: {bulkReadinessQuery.data.blocked_requisition_numbers.join(', ')}</p>
+                      ) : null}
+                      {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).length > 0 && (
+                        <p style={styles.warningText}>Blockers: {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).map(([code, count]) => `${code} (${formatNumber(count)})`).join(', ')}</p>
+                      )}
+                      {bulkReadinessQuery.data.results?.length ? (
+                        <div style={styles.bulkReadinessResultList}>
+                          {bulkReadinessQuery.data.results.slice(0, 8).map((result, index) => (
+                            <div key={result.requisition_id || result.requisition_number || index} style={result.ready ? styles.bulkReadinessResultReady : styles.bulkReadinessResultBlocked}>
+                              <strong>{result.requisition_number || result.requisition_id || `Selected request ${index + 1}`}</strong>
+                              <span>{result.ready ? 'Ready' : 'Blocked'} · {formatNumber(result.lines?.filter((line) => line.ready).length || 0)} ready line(s) · {formatNumber(result.lines?.length || 0)} total line(s)</span>
+                              {result.approval_threshold_notes_required && (
+                                <span>Threshold-governed · line note minimum {formatNumber(result.threshold_fulfillment_line_note_min_length)} · below minimum {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
+                              )}
+                              {result.blockers?.length ? (
+                                <span style={styles.warningText}>Blockers: {result.blockers.slice(0, 3).map((blocker) => blocker.code).join(', ')}</span>
+                              ) : null}
+                              {result.warnings?.length ? (
+                                <span style={styles.muted}>Warnings: {result.warnings.slice(0, 3).map((warning) => warning.code).join(', ')}</span>
+                              ) : null}
+                            </div>
+                          ))}
+                          {bulkReadinessQuery.data.results.length > 8 && (
+                            <span style={styles.muted}>+{formatNumber(bulkReadinessQuery.data.results.length - 8)} more readiness result(s)</span>
+                          )}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p style={styles.muted}>Select eligible requests to preview stock and threshold blockers before bulk fulfillment.</p>
+                  )}
+                </div>
+              )}
+              {bulkEligibleRequisitions.length > 0 && (
+                <p style={styles.muted}>Bulk fulfillment records all remaining quantities for {formatNumber(bulkEligibleRequisitions.length)} eligible request(s) using the audited backend bulk endpoint.</p>
+              )}
+            </div>
+          )}
           {requisitionsQuery.isLoading && <p style={styles.muted}>Loading requisitions…</p>}
-          {requisitionsQuery.data?.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              style={item.id === selectedId ? styles.selectedListItem : styles.listItem}
-              onClick={() => setSelectedId(item.id)}
-            >
-              <span style={styles.listTitle}>{item.requisition_number}</span>
-              <span style={statusStyle(item.status)}>{item.status}</span>
-              <span style={styles.muted}>{item.requesting_department} · {item.priority}</span>
-              {item.sla_state && (
-                <span style={styles.warningText}>
-                  {slaStateLabel(item.sla_state)}{slaStateDetail(item) ? ` · ${slaStateDetail(item)}` : ''}
-                </span>
-              )}
-              <span style={styles.muted}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} fulfilled</span>
-              {item.partial_fulfillment_state && (
-                <span style={item.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>
-                  Partial fulfillment: {item.partial_fulfillment_state === 'stale_partial' ? 'stale' : 'active'}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}d` : ''}
-                </span>
-              )}
-              <span style={styles.muted}>Est. remaining value: {formatNumber(item.remaining_estimated_value_total)}</span>
-            </button>
-          ))}
+          {requisitionsQuery.data?.map((item) => {
+            const bulkSelectable = ['approved', 'partially_fulfilled'].includes(String(item.status));
+            const bulkSelected = bulkFulfillmentIds.includes(item.id);
+            return (
+              <div key={item.id} style={styles.queueItemRow}>
+                {capabilities.canFulfillInventoryRequisitions && (
+                  <label style={bulkSelectable ? styles.bulkSelectLabel : styles.bulkSelectLabelDisabled} title={bulkSelectable ? 'Select for bulk all-remaining fulfillment' : 'Only approved or partially fulfilled requests can be bulk fulfilled'}>
+                    <input
+                      type="checkbox"
+                      checked={bulkSelected}
+                      disabled={!bulkSelectable}
+                      onChange={() => toggleBulkFulfillmentSelection(item.id)}
+                    />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  style={item.id === selectedId ? styles.selectedListItem : styles.listItem}
+                  onClick={() => setSelectedId(item.id)}
+                >
+                  <span style={styles.listTitle}>{item.requisition_number}</span>
+                  <span style={statusStyle(item.status)}>{item.status}</span>
+                  <span style={styles.muted}>{item.requesting_department} · {item.priority}</span>
+                  {item.sla_state && (
+                    <span style={styles.warningText}>
+                      {slaStateLabel(item.sla_state)}{slaStateDetail(item) ? ` · ${slaStateDetail(item)}` : ''}
+                    </span>
+                  )}
+                  {item.approval_threshold_level && (
+                    <span style={item.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>
+                      {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${item.approval_threshold_reason}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} to ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
+                    </span>
+                  )}
+                  {formatApprovalThresholdQueueNoteDepth(item) && (
+                    <span style={item.approval_threshold_note_depth_state === 'complete' ? styles.muted : styles.warningText}>
+                      {formatApprovalThresholdQueueNoteDepth(item)}
+                    </span>
+                  )}
+                  <span style={styles.muted}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} fulfilled</span>
+                  {item.partial_fulfillment_state && (
+                    <span style={item.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>
+                      Partial fulfillment: {item.partial_fulfillment_state === 'stale_partial' ? 'stale' : 'active'}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}d` : ''}
+                    </span>
+                  )}
+                  <span style={styles.muted}>Est. remaining value: {formatNumber(item.remaining_estimated_value_total)}</span>
+                </button>
+              </div>
+            );
+          })}
         </section>
       </section>
 
@@ -2166,12 +3347,29 @@ export default function InventoryRequisitionsPage() {
               <div><strong>Last fulfilled</strong><br />{formatDateTime(selected.last_fulfilled_at)}<br /><span style={styles.muted}>{selected.last_fulfilled_by_user_name || ''}</span></div>
               <div><strong>Partial fulfillment</strong><br />{selected.partial_fulfillment_state ? <span style={selected.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>{selected.partial_fulfillment_state === 'stale_partial' ? 'Stale partial' : 'Active partial'}</span> : '-'}<br /><span style={styles.muted}>{selected.partial_fulfillment_age_days !== null && selected.partial_fulfillment_age_days !== undefined ? `${formatNumber(selected.partial_fulfillment_age_days)} days since last fulfillment/update` : ''}</span></div>
               <div><strong>SLA state</strong><br />{selected.sla_state ? <span style={styles.warningText}>{slaStateLabel(selected.sla_state)}</span> : '-'}<br /><span style={styles.muted}>{slaStateDetail(selected)}</span></div>
+              <div><strong>Approval threshold</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{selected.approval_threshold_reason || ''}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} to ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
               <div><strong>Estimated value</strong><br />Requested: {formatNumber(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatNumber(selected.remaining_estimated_value_total)}</span></div>
               <div><strong>Updated</strong><br />{formatDateTime(selected.updated_at)}</div>
             </div>
             {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && (
               <div style={styles.actionsRow}>
                 <button type="button" style={styles.secondaryButton} onClick={loadSelectedDraftForEditing}>Edit draft details</button>
+              </div>
+            )}
+            {selected.status === 'draft' && approvalThresholdNotesRequired && !draftNotesMeetThresholdDepth && (
+              <p style={styles.warningBox}>Draft notes of at least {selectedApprovalThresholdNoteMinLength} characters are required before submitting this {approvalThresholdLabel(selected.approval_threshold_level)} request.</p>
+            )}
+            {selected.status === 'draft' && approvalThresholdNotesRequired && !selectedDraftLineNotesMeetThresholdDepth && (
+              <p style={styles.warningBox}>Each draft request line needs notes of at least {selectedApprovalThresholdNoteMinLength} characters before submitting this {approvalThresholdLabel(selected.approval_threshold_level)} request ({selectedDraftLineNotesBelowMinimumCount} line{selectedDraftLineNotesBelowMinimumCount === 1 ? '' : 's'} below minimum).</p>
+            )}
+            {approvalThresholdGovernanceRequirements.length > 0 && (
+              <div style={styles.warningBox}>
+                <strong>Approval threshold action requirements</strong>
+                <ul style={styles.compactList}>
+                  {approvalThresholdGovernanceRequirements.map((requirement) => (
+                    <li key={requirement}>{requirement}</li>
+                  ))}
+                </ul>
               </div>
             )}
             {selected.approval_notes && <p style={styles.successBox}>Approval notes: {selected.approval_notes}</p>}
@@ -2188,6 +3386,7 @@ export default function InventoryRequisitionsPage() {
                     <th style={styles.th}>Fulfilled</th>
                     <th style={styles.th}>Remaining</th>
                     <th style={styles.th}>Est. remaining value</th>
+                    <th style={styles.th}>Request note depth</th>
                     <th style={styles.th}>Fulfill now</th>
                     <th style={styles.th}>Fulfillment note</th>
                   </tr>
@@ -2195,6 +3394,10 @@ export default function InventoryRequisitionsPage() {
                 <tbody>
                   {selected.items?.map((item) => {
                     const remaining = Math.max(0, Number(item.remaining_quantity ?? Number(item.requested_quantity) - Number(item.fulfilled_quantity)) || 0);
+                    const fulfillmentQuantity = Number(fulfillmentLines[item.id] || 0);
+                    const fulfillmentNoteLength = fulfillmentLineNotes[item.id]?.trim().length || 0;
+                    const fulfillmentNoteDepthRequired = approvalThresholdNotesRequired && fulfillmentQuantity > 0;
+                    const fulfillmentNoteMeetsThresholdDepth = !fulfillmentNoteDepthRequired || fulfillmentNoteLength >= selectedApprovalThresholdNoteMinLength;
                     return (
                       <tr key={item.id}>
                         <td style={styles.td}>{item.product_name || item.product_id}<br /><span style={styles.muted}>{item.product_unit || ''}</span></td>
@@ -2203,13 +3406,19 @@ export default function InventoryRequisitionsPage() {
                         <td style={styles.td}>{formatNumber(remaining)}</td>
                         <td style={styles.td}>{formatNumber(item.remaining_estimated_value)}</td>
                         <td style={styles.td}>
+                          {item.notes ? <span>{item.notes}</span> : <span style={styles.muted}>No request note</span>}
+                          {formatApprovalThresholdLineNoteDepth(item) && (
+                            <><br /><span style={item.approval_threshold_line_note_meets_minimum ? styles.muted : styles.warningText}>{formatApprovalThresholdLineNoteDepth(item)}</span></>
+                          )}
+                        </td>
+                        <td style={styles.td}>
                           <input
                             style={styles.input}
                             type="number"
                             min="0"
                             max={remaining || undefined}
                             step="0.0001"
-                            disabled={!canFulfill || remaining <= 0}
+                            disabled={!canFulfill || fulfillAllRemaining || remaining <= 0}
                             value={fulfillmentLines[item.id] || ''}
                             onChange={(event) => setFulfillmentLines((current) => ({ ...current, [item.id]: event.target.value }))}
                           />
@@ -2217,11 +3426,14 @@ export default function InventoryRequisitionsPage() {
                         <td style={styles.td}>
                           <input
                             style={styles.input}
-                            disabled={!canFulfill || remaining <= 0}
+                            disabled={!canFulfill || fulfillAllRemaining || remaining <= 0}
                             value={fulfillmentLineNotes[item.id] || ''}
                             onChange={(event) => setFulfillmentLineNotes((current) => ({ ...current, [item.id]: event.target.value }))}
-                            placeholder="Picker, handoff, or exception note"
+                            placeholder={fulfillmentNoteDepthRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required` : 'Picker, handoff, or exception note'}
                           />
+                          {fulfillmentNoteDepthRequired && (
+                            <><br /><span style={fulfillmentNoteMeetsThresholdDepth ? styles.muted : styles.warningText}>Fulfillment note depth: {fulfillmentNoteLength}/{selectedApprovalThresholdNoteMinLength}</span></>
+                          )}
                         </td>
                       </tr>
                     );
@@ -2237,9 +3449,14 @@ export default function InventoryRequisitionsPage() {
                   style={styles.input}
                   value={workflowNotes}
                   onChange={(event) => setWorkflowNotes(event.target.value)}
-                  placeholder="Required for reject/cancel/reopen"
+                  placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required for threshold approve/reject/cancel/reopen` : 'Required for reject/cancel/reopen'}
                 />
               </label>
+              {approvalThresholdNotesRequired && (
+                <p style={styles.warningBox}>
+                  Approval, rejection, cancellation, or reopen notes of at least {selectedApprovalThresholdNoteMinLength} characters are required for this {approvalThresholdLabel(selected?.approval_threshold_level)} request ({approvalThresholdReasonLabel(selected?.approval_threshold_reason)}). Current note depth: {workflowNotesLength}/{selectedApprovalThresholdNoteMinLength}.
+                </p>
+              )}
               <div style={styles.actionsRow}>
                 <button style={styles.secondaryButton} disabled={!canSubmit || workflowMutation.isPending} onClick={() => runWorkflow('submit')}>Submit</button>
                 <button style={styles.primaryButton} disabled={!canApprove || workflowMutation.isPending} onClick={() => runWorkflow('approve')}>Approve</button>
@@ -2264,9 +3481,43 @@ export default function InventoryRequisitionsPage() {
                   ))}
                 </select>
               </label>
+              <label style={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={fulfillAllRemaining}
+                  disabled={!canFulfill}
+                  onChange={(event) => {
+                    setFulfillAllRemaining(event.target.checked);
+                    if (event.target.checked) {
+                      setFulfillmentLines({});
+                      setFulfillmentLineNotes({});
+                    }
+                  }}
+                />
+                Fulfill all remaining lines for this request
+              </label>
+              {fulfillAllRemaining && (
+                <label style={styles.field}>
+                  Default all-remaining fulfillment note
+                  <input
+                    style={styles.input}
+                    value={defaultFulfillmentNote}
+                    disabled={!canFulfill}
+                    onChange={(event) => setDefaultFulfillmentNote(event.target.value)}
+                    placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required` : 'Applied to each remaining fulfillment line'}
+                  />
+                </label>
+              )}
+              {approvalThresholdNotesRequired && !fulfillmentThresholdLinesMeetNoteDepth && (fulfillAllRemaining || selectedFulfillmentLineCount > 0) && (
+                <p style={styles.warningBox}>
+                  {fulfillAllRemaining
+                    ? `Default fulfillment note must be at least ${selectedApprovalThresholdNoteMinLength} characters for this ${approvalThresholdLabel(selected?.approval_threshold_level)} request (${defaultFulfillmentNoteLength}/${selectedApprovalThresholdNoteMinLength}).`
+                    : `Each fulfilled line needs a note of at least ${selectedApprovalThresholdNoteMinLength} characters for this ${approvalThresholdLabel(selected?.approval_threshold_level)} request.`}
+                </p>
+              )}
               <button
                 style={styles.primaryButton}
-                disabled={!canFulfill || fulfillMutation.isPending || readinessQuery.data?.ready === false || !Object.values(fulfillmentLines).some((quantity) => Number(quantity) > 0)}
+                disabled={!canFulfill || fulfillMutation.isPending || readinessQuery.data?.ready === false || (!fulfillAllRemaining && selectedFulfillmentLineCount === 0) || !fulfillmentThresholdLinesMeetNoteDepth}
                 onClick={() => fulfillMutation.mutate()}
               >
                 {fulfillMutation.isPending ? 'Fulfilling…' : 'Record fulfillment'}
@@ -2285,6 +3536,11 @@ export default function InventoryRequisitionsPage() {
                 {readinessQuery.data?.warnings?.map((warning) => (
                   <p key={`${warning.code}-${warning.product_name || warning.message}`} style={styles.warningBox}>{warning.message}</p>
                 ))}
+                {readinessQuery.data?.approval_threshold_notes_required && readinessQuery.data.threshold_fulfillment_line_notes_meet_minimum === false && (
+                  <p style={styles.warningBox}>
+                    {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} selected fulfillment line note(s) are below the {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_min_length)} character threshold minimum.
+                  </p>
+                )}
                 {readinessQuery.data?.lines?.length ? (
                   <div style={styles.tableWrapper}>
                     <table style={styles.table}>
@@ -2304,7 +3560,12 @@ export default function InventoryRequisitionsPage() {
                             <td style={styles.td}>{formatNumber(line.remaining_quantity)}</td>
                             <td style={styles.td}>{line.available_quantity === null ? '-' : formatNumber(line.available_quantity)}</td>
                             <td style={styles.td}>{line.projected_quantity === null ? '-' : formatNumber(line.projected_quantity)}</td>
-                            <td style={styles.td}><span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? 'Warning' : 'Ready') : line.blocker_code || 'Blocked'}</span></td>
+                            <td style={styles.td}>
+                              <span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? 'Warning' : 'Ready') : line.blocker_code || 'Blocked'}</span>
+                              {line.threshold_fulfillment_line_note_meets_minimum === false && (
+                                <div style={styles.muted}>Note {formatNumber(line.threshold_fulfillment_line_note_length)}/{formatNumber(line.threshold_fulfillment_line_note_min_length)} chars</div>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -2331,12 +3592,19 @@ export default function InventoryRequisitionsPage() {
                 <button
                   type="button"
                   style={styles.secondaryButton}
-                  disabled={!activityComment.trim() || commentMutation.isPending}
+                  disabled={
+                    !activityComment.trim() ||
+                    (isApprovalThresholdGoverned(selected) && activityComment.trim().length < selectedApprovalThresholdNoteMinLength) ||
+                    commentMutation.isPending
+                  }
                   onClick={() => commentMutation.mutate()}
                 >
                   {commentMutation.isPending ? 'Adding…' : 'Add note'}
                 </button>
               </div>
+              {isApprovalThresholdGoverned(selected) && (
+                <p style={styles.muted}>Approval-threshold requisitions require activity notes of at least {selectedApprovalThresholdNoteMinLength} characters.</p>
+              )}
               {activityQuery.data?.length ? (
                 <div style={styles.timelineList}>
                   {activityQuery.data.map((entry) => (
@@ -2413,6 +3681,7 @@ const styles: Record<string, CSSProperties> = {
   muted: { color: '#64748b', fontSize: 13 },
   twoColumns: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
   field: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
+  checkboxLabel: { display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#334155' },
   input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minWidth: 0 },
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minHeight: 76, resize: 'vertical' },
   smallSelect: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit' },
@@ -2423,8 +3692,16 @@ const styles: Record<string, CSSProperties> = {
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#1d4ed8', color: '#fff', fontWeight: 700, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', background: '#fff1f2', color: '#be123c', fontWeight: 700, cursor: 'pointer' },
-  listItem: { width: '100%', border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 8, cursor: 'pointer' },
-  selectedListItem: { width: '100%', border: '1px solid #93c5fd', background: '#eff6ff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 8, cursor: 'pointer' },
+  queueItemRow: { display: 'grid', gridTemplateColumns: '32px 1fr', gap: 8, alignItems: 'stretch', marginBottom: 8 },
+  bulkResultList: { marginTop: 10, display: 'grid', gap: 8 },
+  bulkResultRow: { border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: 10, padding: 8, display: 'grid', gap: 3 },
+  bulkReadinessResultList: { marginTop: 10, display: 'grid', gap: 8 },
+  bulkReadinessResultReady: { border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: 10, padding: 8, display: 'grid', gap: 3 },
+  bulkReadinessResultBlocked: { border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 8, display: 'grid', gap: 3 },
+  bulkSelectLabel: { border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  bulkSelectLabelDisabled: { border: '1px solid #e5e7eb', background: '#f8fafc', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'not-allowed', opacity: 0.6 },
+  listItem: { width: '100%', border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 0, cursor: 'pointer' },
+  selectedListItem: { width: '100%', border: '1px solid #93c5fd', background: '#eff6ff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 0, cursor: 'pointer' },
   listTitle: { fontWeight: 800 },
   neutralBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700 },
   warningBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#fef3c7', color: '#92400e', fontSize: 12, fontWeight: 700 },
@@ -2446,6 +3723,7 @@ const styles: Record<string, CSSProperties> = {
   timelineList: { display: 'flex', flexDirection: 'column', gap: 10 },
   timelineItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 4 },
   timelineTitle: { textTransform: 'capitalize' },
+  compactList: { margin: '8px 0 0', paddingLeft: 18 },
   warningBox: { border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', borderRadius: 12, padding: 12 },
   errorBox: { border: '1px solid #fecaca', background: '#fff1f2', color: '#be123c', borderRadius: 12, padding: 12 }
 };

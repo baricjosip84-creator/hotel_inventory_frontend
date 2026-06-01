@@ -110,6 +110,9 @@ function getPageSubtitle(pathname: string): string {
   if (pathname.startsWith('/purchase-orders')) {
     return 'Create, submit, approve, and cancel supplier purchase orders.';
   }
+  if (pathname.startsWith('/procurement-recommendations')) {
+    return 'Turn replenishment intelligence into procurement-ready recommendation queues.';
+  }
   if (pathname.startsWith('/stock')) {
     return 'View stock by product and location, with operational mutation controls.';
   }
@@ -220,6 +223,7 @@ export default function AppLayout() {
       { to: '/stock-movements', label: 'Stock Movements', permission: TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ },
       { to: '/stock-transfers', label: 'Stock Transfers', permission: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ },
       { to: '/purchase-orders', label: 'Purchase Orders', permission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },
+      { to: '/procurement-recommendations', label: 'Procurement Recommendations', permission: TENANT_PERMISSIONS.INSIGHTS_READ },
       { to: '/storage-locations', label: 'Storage Locations', permission: TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ },
       { to: '/shipments', label: 'Shipments', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },
       { to: '/scanner', label: 'Scanner', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },

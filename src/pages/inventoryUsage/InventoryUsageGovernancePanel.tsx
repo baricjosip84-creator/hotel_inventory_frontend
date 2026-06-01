@@ -1,11 +1,11 @@
-import { formatUsageReason, toNumber } from './inventoryUsageFormatting';
-import { styles } from './inventoryUsageStyles';
+import { formatUsageReason, toNumber } from "./inventoryUsageFormatting";
+import { styles } from "./inventoryUsageStyles";
 import type {
   InventoryUsageAlertScanResponse,
   InventoryUsageExceptions,
   InventoryUsageLog,
-  InventoryUsageSummary
-} from './inventoryUsageTypes';
+  InventoryUsageSummary,
+} from "./inventoryUsageTypes";
 
 type InventoryUsageGovernancePanelProps = {
   canReviewUsage?: boolean;
@@ -15,7 +15,10 @@ type InventoryUsageGovernancePanelProps = {
   loading: boolean;
   reviewingUsageId?: string | null;
   reviewError?: Error | null;
-  onReviewUsage: (usageLogId: string, reviewStatus: 'reviewed' | 'follow_up_required') => void;
+  onReviewUsage: (
+    usageLogId: string,
+    reviewStatus: "reviewed" | "follow_up_required",
+  ) => void;
   canScanAlerts?: boolean;
   scanningAlerts?: boolean;
   alertScanError?: Error | null;
@@ -24,10 +27,10 @@ type InventoryUsageGovernancePanelProps = {
 };
 
 const getRiskLevel = (count: number) => {
-  if (count >= 4) return 'High attention';
-  if (count >= 2) return 'Watch';
-  if (count === 1) return 'Low';
-  return 'Clean';
+  if (count >= 4) return "High attention";
+  if (count >= 2) return "Watch";
+  if (count === 1) return "Low";
+  return "Clean";
 };
 
 export function InventoryUsageGovernancePanel({
@@ -43,9 +46,11 @@ export function InventoryUsageGovernancePanel({
   scanningAlerts,
   alertScanError,
   alertScanResult,
-  onScanAlerts
+  onScanAlerts,
 }: InventoryUsageGovernancePanelProps) {
-  const missingDepartmentCount = logs.filter((usage) => !usage.department).length;
+  const missingDepartmentCount = logs.filter(
+    (usage) => !usage.department,
+  ).length;
   const missingNotesCount = logs.filter((usage) => !usage.notes).length;
   const backdatedCount = logs.filter((usage) => {
     if (!usage.consumed_at) return false;
@@ -57,28 +62,110 @@ export function InventoryUsageGovernancePanel({
   }).length;
 
   const damageWasteQuantity = (summary?.by_reason || [])
-    .filter((row) => ['damage', 'waste'].includes(row.consumption_reason))
+    .filter((row) => ["damage", "waste"].includes(row.consumption_reason))
     .reduce((total, row) => total + toNumber(row.total_quantity), 0);
 
   const topReason = [...(summary?.by_reason || [])].sort(
-    (first, second) => toNumber(second.total_quantity) - toNumber(first.total_quantity)
+    (first, second) =>
+      toNumber(second.total_quantity) - toNumber(first.total_quantity),
   )[0];
 
   const exceptionSummary = exceptions?.summary;
   const exceptionRows = exceptions?.rows || [];
-  const backendMissingDepartmentCount = toNumber(exceptionSummary?.missing_department_count);
-  const backendMissingNotesCount = toNumber(exceptionSummary?.missing_notes_count);
+  const backendMissingDepartmentCount = toNumber(
+    exceptionSummary?.missing_department_count,
+  );
+  const backendMissingNotesCount = toNumber(
+    exceptionSummary?.missing_notes_count,
+  );
   const backendBackdatedCount = toNumber(exceptionSummary?.backdated_count);
-  const backendDamageWasteQuantity = toNumber(exceptionSummary?.damage_waste_quantity);
+  const backendDamageWasteQuantity = toNumber(
+    exceptionSummary?.damage_waste_quantity,
+  );
   const exceptionCount = toNumber(exceptionSummary?.exception_count);
   const pendingReviewCount = toNumber(exceptionSummary?.pending_review_count);
-  const followUpRequiredCount = toNumber(exceptionSummary?.follow_up_required_count);
+  const followUpRequiredCount = toNumber(
+    exceptionSummary?.follow_up_required_count,
+  );
+
+  const escapeCsvCell = (value: unknown) => {
+    const raw = value === null || value === undefined ? "" : String(value);
+    const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safeRaw.replace(/"/g, '""')}"`;
+  };
+
+  const exportExceptionsCsv = () => {
+    const headers = [
+      "usage_log_id",
+      "exception_types",
+      "product_id",
+      "product_name",
+      "storage_location_id",
+      "storage_location_name",
+      "consumption_reason",
+      "department",
+      "quantity",
+      "unit",
+      "estimated_usage_value",
+      "review_status",
+      "reviewed_at",
+      "reviewed_by_user_id",
+      "reviewed_by_user_name",
+      "reversed_at",
+      "consumed_at",
+      "created_by_user_id",
+      "created_by_user_name",
+      "notes",
+    ];
+
+    const rows = exceptionRows.map((row) => ({
+      usage_log_id: row.id,
+      exception_types: (row.exception_types || []).join(";"),
+      product_id: row.product_id,
+      product_name: row.product_name,
+      storage_location_id: row.storage_location_id,
+      storage_location_name: row.storage_location_name,
+      consumption_reason: row.consumption_reason,
+      department: row.department || "",
+      quantity: row.quantity,
+      unit: row.product_unit || "",
+      estimated_usage_value: row.estimated_usage_value ?? "",
+      review_status: row.review_status || "pending",
+      reviewed_at: row.reviewed_at || "",
+      reviewed_by_user_id: row.reviewed_by_user_id || "",
+      reviewed_by_user_name: row.reviewed_by_user_name || "",
+      reversed_at: row.reversed_at || "",
+      consumed_at: row.consumed_at || "",
+      created_by_user_id: row.created_by_user_id || "",
+      created_by_user_name: row.created_by_user_name || "",
+      notes: row.notes || "",
+    }));
+
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        headers
+          .map((header) => escapeCsvCell(row[header as keyof typeof row]))
+          .join(","),
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `inventory-usage-exceptions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const attentionCount = [
     (backendMissingDepartmentCount || missingDepartmentCount) > 0,
     (backendMissingNotesCount || missingNotesCount) > 0,
     (backendBackdatedCount || backdatedCount) > 0,
-    (backendDamageWasteQuantity || damageWasteQuantity) > 0
+    (backendDamageWasteQuantity || damageWasteQuantity) > 0,
   ].filter(Boolean).length;
 
   return (
@@ -87,10 +174,19 @@ export function InventoryUsageGovernancePanel({
         <div>
           <h2 style={styles.sectionTitle}>Usage governance</h2>
           <p style={styles.sectionDescription}>
-            Enterprise review signals for attribution quality, backdated usage, and waste/damage exposure.
+            Enterprise review signals for attribution quality, backdated usage,
+            and waste/damage exposure.
           </p>
         </div>
         <div style={styles.inlineActions}>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={exportExceptionsCsv}
+            disabled={!exceptionRows.length}
+          >
+            Export exceptions CSV
+          </button>
           {canScanAlerts && onScanAlerts ? (
             <button
               type="button"
@@ -98,57 +194,92 @@ export function InventoryUsageGovernancePanel({
               onClick={onScanAlerts}
               disabled={scanningAlerts}
             >
-              {scanningAlerts ? 'Scanning alerts...' : 'Scan alerts'}
+              {scanningAlerts ? "Scanning alerts..." : "Scan alerts"}
             </button>
           ) : null}
-          <span style={styles.filterPill}>{loading ? 'Reviewing...' : getRiskLevel(attentionCount)}</span>
+          <span style={styles.filterPill}>
+            {loading ? "Reviewing..." : getRiskLevel(attentionCount)}
+          </span>
         </div>
       </div>
 
-      {alertScanError ? <p style={styles.errorText}>{alertScanError.message}</p> : null}
+      {alertScanError ? (
+        <p style={styles.errorText}>{alertScanError.message}</p>
+      ) : null}
 
       {alertScanResult ? (
         <p style={styles.sectionDescription}>
-          {alertScanResult.message}: {toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count)} alert signal
-          {toNumber(alertScanResult.alert_count ?? alertScanResult.planned_alert_count) === 1 ? '' : 's'} for the last{' '}
-          {alertScanResult.lookback_days || 30} day{Number(alertScanResult.lookback_days || 30) === 1 ? '' : 's'}.
+          {alertScanResult.message}:{" "}
+          {toNumber(
+            alertScanResult.alert_count ?? alertScanResult.planned_alert_count,
+          )}{" "}
+          alert signal
+          {toNumber(
+            alertScanResult.alert_count ?? alertScanResult.planned_alert_count,
+          ) === 1
+            ? ""
+            : "s"}{" "}
+          for the last {alertScanResult.lookback_days || 30} day
+          {Number(alertScanResult.lookback_days || 30) === 1 ? "" : "s"}.
         </p>
       ) : null}
 
       {loading ? (
         <p style={styles.sectionDescription}>Loading governance signals...</p>
       ) : !logs.length ? (
-        <p style={styles.emptyState}>No usage logs available for governance review in the selected filters.</p>
+        <p style={styles.emptyState}>
+          No usage logs available for governance review in the selected filters.
+        </p>
       ) : (
         <div style={styles.governanceGrid}>
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Missing department</span>
-            <strong style={styles.statValueSmall}>{backendMissingDepartmentCount || missingDepartmentCount} logs</strong>
-            <small>Department attribution helps explain who consumed stock.</small>
+            <strong style={styles.statValueSmall}>
+              {backendMissingDepartmentCount || missingDepartmentCount} logs
+            </strong>
+            <small>
+              Department attribution helps explain who consumed stock.
+            </small>
           </div>
 
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Missing notes</span>
-            <strong style={styles.statValueSmall}>{backendMissingNotesCount || missingNotesCount} logs</strong>
-            <small>Notes are recommended for damage, waste, events, and maintenance usage.</small>
+            <strong style={styles.statValueSmall}>
+              {backendMissingNotesCount || missingNotesCount} logs
+            </strong>
+            <small>
+              Notes are recommended for damage, waste, events, and maintenance
+              usage.
+            </small>
           </div>
 
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Backdated usage</span>
-            <strong style={styles.statValueSmall}>{backendBackdatedCount || backdatedCount} logs</strong>
-            <small>Older consumed-at dates should be reviewed during period close.</small>
+            <strong style={styles.statValueSmall}>
+              {backendBackdatedCount || backdatedCount} logs
+            </strong>
+            <small>
+              Older consumed-at dates should be reviewed during period close.
+            </small>
           </div>
 
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Damage / waste quantity</span>
-            <strong style={styles.statValueSmall}>{backendDamageWasteQuantity || toNumber(damageWasteQuantity)}</strong>
-            <small>Operational loss quantity captured in the selected period.</small>
+            <strong style={styles.statValueSmall}>
+              {backendDamageWasteQuantity || toNumber(damageWasteQuantity)}
+            </strong>
+            <small>
+              Operational loss quantity captured in the selected period.
+            </small>
           </div>
 
           <div style={styles.governanceCard}>
             <span style={styles.statLabel}>Exception rows</span>
             <strong style={styles.statValueSmall}>{exceptionCount}</strong>
-            <small>{pendingReviewCount} pending · {followUpRequiredCount} follow-up required.</small>
+            <small>
+              {pendingReviewCount} pending · {followUpRequiredCount} follow-up
+              required.
+            </small>
           </div>
 
           <div style={styles.governanceCardWide}>
@@ -158,26 +289,36 @@ export function InventoryUsageGovernancePanel({
                 {exceptionRows.slice(0, 3).map((row) => (
                   <div key={row.id} style={styles.reviewRow}>
                     <small>
-                      {(row.exception_types || []).join(', ') || 'exception'} · {row.product_name || row.product_id} ·{' '}
-                      {formatUsageReason(row.consumption_reason)} · {row.review_status || 'pending'}
+                      {(row.exception_types || []).join(", ") || "exception"} ·{" "}
+                      {row.product_name || row.product_id} ·{" "}
+                      {formatUsageReason(row.consumption_reason)} ·{" "}
+                      {row.review_status || "pending"}
                     </small>
 
-                    {!row.reversed_at && row.review_status !== 'reviewed' ? (
+                    {!row.reversed_at && row.review_status !== "reviewed" ? (
                       <div style={styles.inlineActions}>
                         <button
                           type="button"
                           style={styles.secondaryButton}
-                          onClick={() => onReviewUsage(row.id, 'reviewed')}
-                          disabled={!canReviewUsage || reviewingUsageId === row.id}
+                          onClick={() => onReviewUsage(row.id, "reviewed")}
+                          disabled={
+                            !canReviewUsage || reviewingUsageId === row.id
+                          }
                         >
-                          {reviewingUsageId === row.id ? 'Saving...' : 'Mark reviewed'}
+                          {reviewingUsageId === row.id
+                            ? "Saving..."
+                            : "Mark reviewed"}
                         </button>
 
                         <button
                           type="button"
                           style={styles.dangerButton}
-                          onClick={() => onReviewUsage(row.id, 'follow_up_required')}
-                          disabled={!canReviewUsage || reviewingUsageId === row.id}
+                          onClick={() =>
+                            onReviewUsage(row.id, "follow_up_required")
+                          }
+                          disabled={
+                            !canReviewUsage || reviewingUsageId === row.id
+                          }
                         >
                           Follow up
                         </button>
@@ -186,7 +327,9 @@ export function InventoryUsageGovernancePanel({
                   </div>
                 ))}
 
-                {reviewError ? <small style={styles.errorText}>{reviewError.message}</small> : null}
+                {reviewError ? (
+                  <small style={styles.errorText}>{reviewError.message}</small>
+                ) : null}
               </div>
             ) : (
               <small>No server-side exceptions returned.</small>
@@ -196,12 +339,14 @@ export function InventoryUsageGovernancePanel({
           <div style={styles.governanceCardWide}>
             <span style={styles.statLabel}>Dominant reason</span>
             <strong style={styles.statValueSmall}>
-              {topReason ? formatUsageReason(topReason.consumption_reason) : '-'}
+              {topReason
+                ? formatUsageReason(topReason.consumption_reason)
+                : "-"}
             </strong>
             <small>
               {topReason
                 ? `${toNumber(topReason.total_quantity)} consumed across ${toNumber(topReason.usage_count)} events.`
-                : 'No reason concentration available.'}
+                : "No reason concentration available."}
             </small>
           </div>
         </div>

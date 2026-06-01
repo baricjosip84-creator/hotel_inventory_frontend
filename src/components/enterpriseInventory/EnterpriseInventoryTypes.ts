@@ -515,19 +515,53 @@ export type ProductCostGenericSummary = {
 export type ReorderRecommendation = {
   product_id: string;
   product_name?: string | null;
+  category?: string | null;
   unit?: string | null;
   current_quantity: number | string;
   min_stock: number | string;
+  stock_min_quantity?: number | string;
+  product_min_stock?: number | string;
   recent_outbound: number | string;
+  recent_usage_quantity?: number | string;
   average_daily_usage: number | string;
   estimated_days_of_coverage?: number | string | null;
+  projected_depletion_date?: string | null;
+  target_coverage_days?: number | string;
+  target_stock_quantity?: number | string;
   recommended_reorder_quantity: number | string;
   urgency: string;
+  recommendation_status?: string;
+  source_signal?: string;
+  recommended_supplier_id?: string | null;
+  recommended_supplier_name?: string | null;
+  supplier_source?: string | null;
+  supplier_catalog_item_id?: string | null;
+  supplier_sku?: string | null;
+  lead_time_days?: number | string | null;
+  min_order_quantity?: number | string;
+  estimated_unit_cost?: number | string | null;
+  estimated_total_cost?: number | string | null;
+  currency?: string | null;
+  procurement_ready?: boolean;
+  blocker_code?: string | null;
+  blocker_message?: string | null;
 };
 
 export type ReorderRecommendationsResponse = {
   generated_at: string;
+  tenant_id?: string;
   lookback_days: number | string;
+  target_coverage_days?: number | string;
+  lead_time_buffer_days?: number | string;
+  filters?: Record<string, unknown>;
+  pagination?: {
+    limit: number | string;
+    offset: number | string;
+    returned: number | string;
+    total: number | string;
+    has_more: boolean;
+  };
+  summary?: Record<string, number | string>;
   rows: ReorderRecommendation[];
 };
 

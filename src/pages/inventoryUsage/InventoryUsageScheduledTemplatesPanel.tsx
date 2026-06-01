@@ -15,7 +15,7 @@ type InventoryUsageScheduledTemplatesPanelProps = {
 
 const getStatusStyle = (status?: string) => {
   if (status === 'due') return styles.warningPill;
-  if (status === 'insufficient_stock' || status === 'missing_stock' || status === 'empty') return styles.dangerPill;
+  if (status === 'insufficient_stock' || status === 'missing_stock' || status === 'missing_evidence_acknowledgement_required' || status === 'empty') return styles.dangerPill;
   if (status === 'ready_with_warnings') return styles.warningPill;
   if (status === 'scheduled') return styles.successPill;
   return styles.filterPill;
@@ -45,6 +45,7 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
           <span style={styles.filterPill}>{toNumber(summary?.template_count)} scheduled</span>
           <span style={styles.warningPill}>{toNumber(summary?.due_count)} due</span>
           <span style={styles.dangerPill}>{toNumber(summary?.blocked_count)} blocked</span>
+          <span style={styles.warningPill}>{toNumber(summary?.evidence_acknowledgement_required_count)} need evidence ack</span>
           {canRunDueTemplates && onRunDueTemplates ? (
             <button
               type="button"
@@ -90,6 +91,7 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
                   <span style={getStatusStyle(row.schedule_status)}>{row.schedule_status || 'scheduled'}</span>
                   <span style={styles.dangerPill}>{toNumber(row.insufficient_stock_count) + toNumber(row.missing_stock_row_count)} blocked lines</span>
                   <span style={styles.warningPill}>{toNumber(row.below_minimum_after_use_count)} below-min warnings</span>
+                  <span style={styles.warningPill}>{toNumber(row.evidence_acknowledgement_required_count)} evidence ack</span>
                   <span style={styles.filterPill}>{toNumber(row.use_count)} recorded</span>
                 </div>
               </div>
