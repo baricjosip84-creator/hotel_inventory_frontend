@@ -57,6 +57,11 @@ export default function PlatformLayout() {
               Tenant health
             </NavLink>
           ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+            <NavLink to="/platform/tenant-lifecycle" style={styles.link}>
+              Tenant lifecycle
+            </NavLink>
+          ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ) ? (
             <NavLink to="/platform/tenant-sla" style={styles.link}>
               Tenant SLA
@@ -75,6 +80,16 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ) ? (
             <NavLink to="/platform/api-keys" style={styles.link}>
               API keys
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ) ? (
+            <NavLink to="/platform/api-client-governance" style={styles.link}>
+              API client governance
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
+            <NavLink to="/platform/integration-monitoring" style={styles.link}>
+              Integration monitoring
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_WEBHOOKS_READ) ? (
@@ -119,9 +134,24 @@ export default function PlatformLayout() {
               Access reviews
             </NavLink>
           ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ) ? (
+            <NavLink to="/platform/permission-audit" style={styles.link}>
+              Permission audit
+            </NavLink>
+          ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
             <NavLink to="/platform/compliance-documents" style={styles.link}>
               Compliance docs
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
+            <NavLink to="/platform/compliance-export" style={styles.link}>
+              Compliance export
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
+            <NavLink to="/platform/legal-compliance-reporting" style={styles.link}>
+              Legal & compliance reporting
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ) ? (
@@ -174,6 +204,11 @@ export default function PlatformLayout() {
               Audit
             </NavLink>
           ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ) ? (
+            <NavLink to="/platform/audit-retention" style={styles.link}>
+              Audit retention
+            </NavLink>
+          ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? (
             <NavLink to="/platform/support-sessions" style={styles.link}>
               Support Sessions
@@ -193,6 +228,26 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
             <NavLink to="/platform/billing" style={styles.link}>
               Billing
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
+            <NavLink to="/platform/subscription-readiness" style={styles.link}>
+              Subscription readiness
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
+            <NavLink to="/platform/license-plan-enforcement" style={styles.link}>
+              License enforcement
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+            <NavLink to="/platform/customer-success-admin" style={styles.link}>
+              Customer success
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/enterprise-identity" style={styles.link}>
+              Enterprise identity
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ) ? (

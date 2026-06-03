@@ -130,6 +130,12 @@ type CreateShipmentFromPurchaseOrderResponse = {
   copied_total_quantity?: number;
 };
 
+type InboundReservationResponse = {
+  id: string;
+  reservation_number?: string | null;
+  status?: string | null;
+};
+
 type PurchaseOrderFormItem = {
   product_id: string;
   quantity: string;
@@ -678,6 +684,17 @@ async function createShipmentFromPurchaseOrder(
   });
 }
 
+async function createInboundReservationFromPurchaseOrder(
+  id: string,
+  version?: number | string | null
+): Promise<InboundReservationResponse> {
+  return apiRequest<InboundReservationResponse>(`/inventory-reservations/from-purchase-order/${id}`, {
+    method: 'POST',
+    headers: buildIfMatchHeaders(version),
+    body: JSON.stringify({ activate: true, linkage_note: 'Protect open inbound purchase order quantity' })
+  });
+}
+
 function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
   return {
     supplier_id: detail.supplier_id,
@@ -993,6 +1010,18 @@ export default function PurchaseOrdersPage() {
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
       setShipmentDeliveryDate('');
       navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}`);
+    }
+  });
+
+  const createInboundReservationMutation = useMutation({
+    mutationFn: ({ id, version }: { id: string; version?: number | string | null }) =>
+      createInboundReservationFromPurchaseOrder(id, version),
+    onSuccess: async (reservation, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ['inventory-reservations'] });
+      await queryClient.invalidateQueries({ queryKey: ['inventory-reservations-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
+      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
+      navigate(`/inventory-reservations?reservationId=${encodeURIComponent(reservation.id)}`);
     }
   });
 
@@ -1494,6 +1523,7 @@ export default function PurchaseOrdersPage() {
 
   const actionError = normalizeError(actionMutation.error, 'Purchase order action failed.');
   const createShipmentError = normalizeError(createShipmentMutation.error, 'Creating shipment from purchase order failed.');
+  const createInboundReservationError = normalizeError(createInboundReservationMutation.error, 'Creating inbound reservation from purchase order failed.');
   const formMutationError = normalizeError(createMutation.error || updateMutation.error, 'Saving purchase order failed.');
 
   const selectedCanEdit = isPurchaseOrderEditable(selectedDetail?.status);
@@ -1508,6 +1538,12 @@ export default function PurchaseOrdersPage() {
   const selectedCanCreateShipment = Boolean(
     selectedDetail?.receiving_summary?.can_create_remaining_shipment ??
     (selectedDetail?.status === 'approved' && selectedRemainingQuantity > 0 && !selectedHasOpenShipment)
+  );
+  const selectedCanCreateInboundReservation = Boolean(
+    capabilities.canCreateInventoryReservations &&
+    selectedDetail &&
+    ['submitted', 'approved'].includes(String(selectedDetail.status)) &&
+    selectedRemainingQuantity > 0
   );
 
   return (
@@ -2367,6 +2403,24 @@ export default function PurchaseOrdersPage() {
                     Create Remaining Shipment
                   </button>
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
+                </div>
+              ) : null}
+
+              {selectedCanCreateInboundReservation ? (
+                <div style={styles.bridgeBox}>
+                  <div>
+                    <h4 style={styles.h4}>Create inbound reservation from this PO</h4>
+                    <p style={styles.muted}>Protects the open inbound purchase order quantity as a procurement inbound reservation without deducting stock.</p>
+                  </div>
+                  <button
+                    type="button"
+                    style={styles.primaryButton}
+                    disabled={createInboundReservationMutation.isPending}
+                    onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}
+                  >
+                    {createInboundReservationMutation.isPending ? 'Creating reservation...' : 'Create Inbound Reservation'}
+                  </button>
+                  {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
                 </div>
               ) : null}
 

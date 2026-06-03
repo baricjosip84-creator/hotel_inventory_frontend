@@ -1,0 +1,29 @@
+import { useQuery } from '@tanstack/react-query';
+import type { CSSProperties } from 'react';
+import { platformApiRequest } from '../lib/platformApi';
+
+type PlanDefinition = { plan_code: string; commercial_tier: string; required_limits: string[]; required_feature_flags: string[]; recommended_enforcement_mode: string };
+type LicenseItem = { tenant_id: string; tenant_name: string; tenant_status: string; billing_status: string; plan_code?: string | null; commercial_tier?: string | null; recommended_enforcement_mode?: string | null; missing_limits: string[]; missing_feature_flags: string[]; enforcement_gaps: string[]; enforcement_state: string };
+type LicensePackage = { posture: string; plan_definitions: PlanDefinition[]; summary: Record<string, number>; items: LicenseItem[] };
+
+function badgeStyle(value: string): CSSProperties { if (value.includes('blocked')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' }; if (value.includes('review')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' }; return { ...styles.badge, background: '#dcfce7', color: '#166534' }; }
+function Chips({ values }: { values: string[] }) { return <div style={styles.flags}>{values.length ? values.map((value) => <span key={value} style={styles.flag}>{value}</span>) : <span style={styles.help}>None</span>}</div>; }
+
+export default function PlatformLicensePlanEnforcementPage() {
+  const enforcementQuery = useQuery({ queryKey: ['platform', 'license-plan-enforcement'], queryFn: () => platformApiRequest<LicensePackage>('/platform/license-plan-enforcement') });
+  const data = enforcementQuery.data;
+  const summary = data?.summary || {};
+  const items = data?.items || [];
+  const metrics = ['tenants_reviewed', 'ready_tenants', 'tenants_requiring_review', 'blocked_tenants', 'missing_plan_definitions', 'missing_required_limits', 'missing_required_feature_flags', 'billing_blocked_tenants'];
+
+  return <div style={styles.page}>
+    <header style={styles.header}><div><h1 style={styles.title}>License & plan enforcement</h1><p style={styles.subtitle}>Read-only commercial entitlement and plan-limit readiness before runtime enforcement is wired into tenant workflows.</p></div>{data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}</header>
+    {enforcementQuery.isLoading ? <section style={styles.card}>Loading license and plan enforcement…</section> : null}
+    {enforcementQuery.error ? <section style={styles.card}>Unable to load license and plan enforcement.</section> : null}
+    {data ? <section style={styles.summaryGrid}>{metrics.map((key) => <div key={key} style={styles.card}><strong>{key.replaceAll('_', ' ')}</strong><div style={styles.metric}>{summary[key] ?? 0}</div></div>)}</section> : null}
+    {data ? <section style={styles.card}><h2 style={styles.cardTitle}>Plan definitions</h2><div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Plan</th><th style={styles.th}>Tier</th><th style={styles.th}>Limits</th><th style={styles.th}>Features</th><th style={styles.th}>Mode</th></tr></thead><tbody>{data.plan_definitions.map((plan) => <tr key={plan.plan_code}><td style={styles.td}><strong>{plan.plan_code}</strong></td><td style={styles.td}>{plan.commercial_tier}</td><td style={styles.td}><Chips values={plan.required_limits} /></td><td style={styles.td}><Chips values={plan.required_feature_flags} /></td><td style={styles.td}>{plan.recommended_enforcement_mode}</td></tr>)}</tbody></table></div></section> : null}
+    <section style={styles.card}><h2 style={styles.cardTitle}>Tenant enforcement evidence</h2><div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Billing</th><th style={styles.th}>Plan</th><th style={styles.th}>Missing limits</th><th style={styles.th}>Missing features</th><th style={styles.th}>Gaps</th></tr></thead><tbody>{items.map((item) => <tr key={item.tenant_id}><td style={styles.td}><strong>{item.tenant_name}</strong><br /><span style={styles.help}>{item.tenant_status} · {item.enforcement_state}</span></td><td style={styles.td}>{item.billing_status}</td><td style={styles.td}>{item.plan_code || '—'}<br /><span style={styles.help}>{item.commercial_tier || '—'} · {item.recommended_enforcement_mode || '—'}</span></td><td style={styles.td}><Chips values={item.missing_limits} /></td><td style={styles.td}><Chips values={item.missing_feature_flags} /></td><td style={styles.td}><Chips values={item.enforcement_gaps} /></td></tr>)}{!items.length ? <tr><td style={styles.td} colSpan={6}>No license enforcement rows available.</td></tr> : null}</tbody></table></div></section>
+  </div>;
+}
+
+const styles: Record<string, CSSProperties> = { page: { display: 'flex', flexDirection: 'column', gap: 20 }, header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }, title: { margin: 0, fontSize: 28 }, subtitle: { margin: '6px 0 0', color: '#6b7280' }, badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap' }, summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }, card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }, metric: { fontSize: 28, fontWeight: 800, marginTop: 8 }, cardTitle: { margin: '0 0 10px', fontSize: 18 }, flags: { display: 'flex', flexWrap: 'wrap', gap: 6 }, flag: { background: '#eef2ff', color: '#3730a3', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 }, help: { color: '#6b7280', fontSize: 12 }, tableWrap: { overflowX: 'auto' }, table: { width: '100%', borderCollapse: 'collapse' }, th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px 8px', color: '#374151', fontSize: 13 }, td: { borderBottom: '1px solid #f3f4f6', padding: '12px 8px', verticalAlign: 'top' } };

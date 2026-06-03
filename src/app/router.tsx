@@ -29,6 +29,7 @@ import ShipmentsPage from '../pages/ShipmentsPage';
 import StockPage from '../pages/StockPage';
 import InventoryUsagePage from '../pages/InventoryUsagePage';
 import InventoryRequisitionsPage from '../pages/InventoryRequisitionsPage';
+import InventoryReservationsPage from '../pages/InventoryReservationsPage';
 import StorageLocationsPage from '../pages/StorageLocationsPage';
 import StockMovementsPage from '../pages/StockMovementsPage';
 import StockTransfersPage from '../pages/StockTransfersPage';
@@ -40,10 +41,20 @@ import ReportsPage from '../pages/ReportsPage';
 import UsersPage from '../pages/UsersPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
+import OperationalActionCenterPage from '../pages/OperationalActionCenterPage';
+import RoleAwareWorkspacePage from '../pages/RoleAwareWorkspacePage';
+import MobileExecutionPage from '../pages/MobileExecutionPage';
+import RealTimeOperationsFeedPage from '../pages/RealTimeOperationsFeedPage';
+import WorkflowAutomationComposerPage from '../pages/WorkflowAutomationComposerPage';
+import HumanInLoopAIReviewPage from '../pages/HumanInLoopAIReviewPage';
+import EnterpriseCollaborationPage from '../pages/EnterpriseCollaborationPage';
+import DigitalTwinVisualizationPage from '../pages/DigitalTwinVisualizationPage';
+import ReliabilityCommandPage from '../pages/ReliabilityCommandPage';
 import TenantAuditPage from '../pages/TenantAuditPage';
 import TenantSettingsPage from '../pages/TenantSettingsPage';
 import SystemContextPage from '../pages/SystemContextPage';
 import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
+import ExecutionTasksPage from '../pages/ExecutionTasksPage';
 import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
 import EnterpriseInventoryPage from '../pages/EnterpriseInventoryPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
@@ -55,6 +66,7 @@ import PlatformDashboardPage from '../pages/PlatformDashboardPage';
 import PlatformTenantsPage from '../pages/PlatformTenantsPage';
 import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
 import PlatformAuditPage from '../pages/PlatformAuditPage';
+import PlatformAuditRetentionPage from '../pages/PlatformAuditRetentionPage';
 import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
 import PlatformUsersPage from '../pages/PlatformUsersPage';
 import PlatformSessionsPage from '../pages/PlatformSessionsPage';
@@ -74,13 +86,23 @@ import PlatformIncidentsPage from '../pages/PlatformIncidentsPage';
 import PlatformDataRetentionPage from '../pages/PlatformDataRetentionPage';
 import PlatformTenantTimelinePage from '../pages/PlatformTenantTimelinePage';
 import PlatformTenantHealthPage from '../pages/PlatformTenantHealthPage';
+import PlatformTenantLifecyclePage from '../pages/PlatformTenantLifecyclePage';
 import PlatformTenantSlaPage from '../pages/PlatformTenantSlaPage';
 import PlatformRunbooksPage from '../pages/PlatformRunbooksPage';
 import PlatformChangeManagementPage from '../pages/PlatformChangeManagementPage';
 import PlatformApiKeysPage from '../pages/PlatformApiKeysPage';
+import PlatformApiClientGovernancePage from '../pages/PlatformApiClientGovernancePage';
+import PlatformIntegrationMonitoringPage from '../pages/PlatformIntegrationMonitoringPage';
+import PlatformLegalComplianceReportingPage from '../pages/PlatformLegalComplianceReportingPage';
+import PlatformEnterpriseIdentityGovernancePage from '../pages/PlatformEnterpriseIdentityGovernancePage';
+import PlatformSubscriptionReadinessPage from '../pages/PlatformSubscriptionReadinessPage';
+import PlatformLicensePlanEnforcementPage from '../pages/PlatformLicensePlanEnforcementPage';
+import PlatformCustomerSuccessAdminPage from '../pages/PlatformCustomerSuccessAdminPage';
 import PlatformWebhooksPage from '../pages/PlatformWebhooksPage';
 import PlatformAccessReviewsPage from '../pages/PlatformAccessReviewsPage';
+import PlatformPermissionAuditPage from '../pages/PlatformPermissionAuditPage';
 import PlatformComplianceDocumentsPage from '../pages/PlatformComplianceDocumentsPage';
+import PlatformComplianceExportPage from '../pages/PlatformComplianceExportPage';
 import PlatformPrivacyRequestsPage from '../pages/PlatformPrivacyRequestsPage';
 import PlatformVendorsPage from '../pages/PlatformVendorsPage';
 import PlatformServiceDependenciesPage from '../pages/PlatformServiceDependenciesPage';
@@ -193,6 +215,14 @@ const router = createBrowserRouter([
         )
       },
       {
+        path: 'tenant-lifecycle',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantLifecyclePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
         path: 'tenant-sla',
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SLA_READ]}>
@@ -221,6 +251,30 @@ const router = createBrowserRouter([
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ]}>
             <PlatformApiKeysPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'api-client-governance',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ]}>
+            <PlatformApiClientGovernancePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'integration-monitoring',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ]}>
+            <PlatformIntegrationMonitoringPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'legal-compliance-reporting',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ]}>
+            <PlatformLegalComplianceReportingPage />
           </PlatformProtectedRoute>
         )
       },
@@ -291,10 +345,26 @@ const router = createBrowserRouter([
         )
       },
       {
+        path: 'permission-audit',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ]}>
+            <PlatformPermissionAuditPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
         path: 'compliance-documents',
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ]}>
             <PlatformComplianceDocumentsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'compliance-export',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ]}>
+            <PlatformComplianceExportPage />
           </PlatformProtectedRoute>
         )
       },
@@ -362,6 +432,14 @@ const router = createBrowserRouter([
           </PlatformProtectedRoute>
         )
       },
+      {
+        path: 'audit-retention',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.AUDIT_READ]}>
+            <PlatformAuditRetentionPage />
+          </PlatformProtectedRoute>
+        )
+      },
 
       {
         path: 'users',
@@ -384,6 +462,38 @@ const router = createBrowserRouter([
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
             <PlatformBillingPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'subscription-readiness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+            <PlatformSubscriptionReadinessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'license-plan-enforcement',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+            <PlatformLicensePlanEnforcementPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'customer-success-admin',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformCustomerSuccessAdminPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'enterprise-identity',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ]}>
+            <PlatformEnterpriseIdentityGovernancePage />
           </PlatformProtectedRoute>
         )
       },
@@ -454,6 +564,78 @@ const router = createBrowserRouter([
         )
       },
       {
+        path: 'action-center',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <OperationalActionCenterPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'workspace',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <RoleAwareWorkspacePage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'mobile-execution',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <MobileExecutionPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'real-time-operations-feed',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <RealTimeOperationsFeedPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'workflow-composer',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <WorkflowAutomationComposerPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'ai-review',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <HumanInLoopAIReviewPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'collaboration',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <EnterpriseCollaborationPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'digital-twin',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+            <DigitalTwinVisualizationPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'reliability-command',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PLATFORM_RELIABILITY_READ]}>
+            <ReliabilityCommandPage />
+          </ProtectedRoute>
+        )
+      },
+      {
         path: 'stock',
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STOCK_READ]}>
@@ -474,6 +656,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ]}>
             <InventoryRequisitionsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'inventory-reservations',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ]}>
+            <InventoryReservationsPage />
           </ProtectedRoute>
         )
       },
@@ -598,6 +788,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW]}>
             <ExecutionRequestsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'execution-tasks',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.EXECUTION_TASKS_READ]}>
+            <ExecutionTasksPage />
           </ProtectedRoute>
         )
       },

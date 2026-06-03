@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "check:commercial-shell": "node scripts/check-commercial-shell-regression.mjs",
+    "check:phase15-closure": "node scripts/check-phase15-closure.mjs",
+    "check:frontend-performance-budget": "node scripts/check-frontend-performance-budget.mjs",
+    "check:phase18-commercial-readiness-surfaces": "node scripts/check-phase18-commercial-readiness-surfaces.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

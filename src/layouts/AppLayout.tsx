@@ -13,17 +13,12 @@ import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/s
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
-import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
-import type { TenantPermission } from '../lib/permissions';
+import { hasPermission } from '../lib/permissions';
+import { getTenantAccessSnapshot } from '../lib/tenantAccess';
+import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
+import type { TenantNavigationItem } from '../app/navigationRegistry';
 
 type UserRole = 'admin' | 'manager' | 'staff' | null;
-
-type NavItem = {
-  to: string;
-  label: string;
-  roles?: Array<Exclude<UserRole, null>>;
-  permission?: TenantPermission;
-};
 
 function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
   if (!token) {
@@ -55,109 +50,6 @@ function getCurrentUserRole(): UserRole {
   return null;
 }
 
-function getPageTitle(pathname: string): string {
-  if (pathname.startsWith('/dashboard')) return 'Dashboard';
-  if (pathname.startsWith('/products')) return 'Products';
-  if (pathname.startsWith('/suppliers')) return 'Suppliers';
-  if (pathname.startsWith('/alerts')) return 'Alerts';
-  if (pathname.startsWith('/inventory-usage')) return 'Inventory Usage';
-  if (pathname.startsWith('/inventory-requisitions')) return 'Inventory Requisitions';
-  if (pathname.startsWith('/stock-movements')) return 'Stock Movements';
-  if (pathname.startsWith('/stock-transfers')) return 'Stock Transfers';
-  if (pathname.startsWith('/purchase-orders')) return 'Purchase Orders';
-  if (pathname.startsWith('/stock')) return 'Stock';
-  if (pathname.startsWith('/storage-locations')) return 'Storage Locations';
-  if (pathname.startsWith('/shipments')) return 'Shipments';
-  if (pathname.startsWith('/scanner')) return 'Scanner';
-  if (pathname.startsWith('/reports')) return 'Reports';
-  if (pathname.startsWith('/insights')) return 'Insights';
-  if (pathname.startsWith('/users')) return 'Users';
-  if (pathname.startsWith('/audit')) return 'Tenant Audit';
-  if (pathname.startsWith('/tenant-settings')) return 'Tenant Settings';
-  if (pathname.startsWith('/admin-system')) return 'Admin System';
-  if (pathname.startsWith('/execution-requests')) return 'Execution Requests';
-  if (pathname.startsWith('/automation-schedules')) return 'Automation Schedules';
-  if (pathname.startsWith('/system-context')) return 'System Context';
-  if (pathname.startsWith('/sessions')) return 'Sessions';
-  return 'Inventory Management';
-}
-
-function getPageSubtitle(pathname: string): string {
-  if (pathname.startsWith('/dashboard')) {
-    return 'Operational overview, intelligence signals, and recent activity.';
-  }
-  if (pathname.startsWith('/products')) {
-    return 'Manage inventory products, categories, barcodes, and supplier relationships.';
-  }
-  if (pathname.startsWith('/suppliers')) {
-    return 'Track suppliers and maintain master data used by shipments and products.';
-  }
-  if (pathname.startsWith('/alerts')) {
-    return 'Review and resolve operational issues that require immediate attention.';
-  }
-  if (pathname.startsWith('/inventory-usage')) {
-    return 'Track why stock leaves the business across departments, reasons, events, and locations.';
-  }
-  if (pathname.startsWith('/inventory-requisitions')) {
-    return 'Request, approve, and fulfill internal department inventory demand.';
-  }
-  if (pathname.startsWith('/stock-movements')) {
-    return 'Trace the full movement ledger behind current stock positions.';
-  }
-  if (pathname.startsWith('/stock-transfers')) {
-    return 'Move stock between storage locations while preserving audit history.';
-  }
-  if (pathname.startsWith('/purchase-orders')) {
-    return 'Create, submit, approve, and cancel supplier purchase orders.';
-  }
-  if (pathname.startsWith('/procurement-recommendations')) {
-    return 'Turn replenishment intelligence into procurement-ready recommendation queues.';
-  }
-  if (pathname.startsWith('/stock')) {
-    return 'View stock by product and location, with operational mutation controls.';
-  }
-  if (pathname.startsWith('/storage-locations')) {
-    return 'Maintain storage areas used for inventory receiving and allocation.';
-  }
-  if (pathname.startsWith('/shipments')) {
-    return 'Manage inbound shipment creation, receiving, and finalization.';
-  }
-  if (pathname.startsWith('/scanner')) {
-    return 'Use the device camera to scan QR codes and barcodes.';
-  }
-  if (pathname.startsWith('/reports')) {
-    return 'Management reporting for valuation, procurement, stock distribution, and forecast.';
-  }
-  if (pathname.startsWith('/insights')) {
-    return 'Management intelligence for depletion risk, anomalies, supplier trust, and reorder actions.';
-  }
-  if (pathname.startsWith('/users')) {
-    return 'Manage tenant users, their roles, and secure access lifecycle.';
-  }
-  if (pathname.startsWith('/audit')) {
-    return 'Review tenant-scoped write history and audited support-session activity.';
-  }
-  if (pathname.startsWith('/tenant-settings')) {
-    return 'Manage tenant-scoped settings for the current company.';
-  }
-  if (pathname.startsWith('/admin-system')) {
-    return 'Review system status, diagnostics, tenant control-plane data, and admin health signals.';
-  }
-  if (pathname.startsWith('/system-context')) {
-    return 'Read-only tenant context for future automation and AI decision support.';
-  }
-  if (pathname.startsWith('/automation-schedules')) {
-    return 'Configure future scheduled checks. Runner is disabled and nothing executes automatically yet.';
-  }
-  if (pathname.startsWith('/enterprise-inventory')) {
-    return 'Manage par levels, cycle counts, department requisitions, approvals, invoices, notifications, and labels.';
-  }
-  if (pathname.startsWith('/sessions')) {
-    return 'Review active sessions and revoke stale account access.';
-  }
-  return 'Frontend connected to your production-ready backend';
-}
-
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
@@ -171,37 +63,11 @@ function useIsMobile(breakpoint = 960): boolean {
 }
 
 export default function AppLayout() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the AppLayout.tsx you just pasted.
-
-    The existing shell structure is preserved:
-    - same sidebar
-    - same mobile drawer
-    - same auth/logout flow
-    - same page title/subtitle mapping
-    - same dvh-based layout behavior
-    - same width guards and mobile polish
-
-    The only contract-alignment change:
-    - Admin System navigation is now visible to both admin and manager roles.
-
-    WHY IT CHANGED
-    --------------
-    The uploaded backend exposes tenant-scoped /system-status for admin and manager.
-    Your AdminSystemPage already safely limits admin-only diagnostics internally,
-    while still allowing managers to view the system-status portion.
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Removes the mismatch where managers can use the route-level/admin-system
-    page safely, but could not see the navigation item in the sidebar.
-  */
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
   const role = useMemo(() => getCurrentUserRole(), []);
+  const tenantAccess = useMemo(() => getTenantAccessSnapshot(), [location.pathname]);
   const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
 
   const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
@@ -211,62 +77,33 @@ export default function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const navItems = useMemo<NavItem[]>(
-    () => [
-      { to: '/dashboard', label: 'Dashboard', permission: TENANT_PERMISSIONS.DASHBOARD_READ },
-      { to: '/products', label: 'Products', permission: TENANT_PERMISSIONS.PRODUCTS_READ },
-      { to: '/suppliers', label: 'Suppliers', permission: TENANT_PERMISSIONS.SUPPLIERS_READ },
-      { to: '/alerts', label: 'Alerts', permission: TENANT_PERMISSIONS.ALERTS_READ },
-      { to: '/stock', label: 'Stock', permission: TENANT_PERMISSIONS.STOCK_READ },
-      { to: '/inventory-usage', label: 'Usage Ledger', permission: TENANT_PERMISSIONS.INVENTORY_USAGE_READ },
-      { to: '/inventory-requisitions', label: 'Requisitions', permission: TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ },
-      { to: '/stock-movements', label: 'Stock Movements', permission: TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ },
-      { to: '/stock-transfers', label: 'Stock Transfers', permission: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ },
-      { to: '/purchase-orders', label: 'Purchase Orders', permission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },
-      { to: '/procurement-recommendations', label: 'Procurement Recommendations', permission: TENANT_PERMISSIONS.INSIGHTS_READ },
-      { to: '/storage-locations', label: 'Storage Locations', permission: TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ },
-      { to: '/shipments', label: 'Shipments', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },
-      { to: '/scanner', label: 'Scanner', permission: TENANT_PERMISSIONS.SHIPMENTS_READ },
-      { to: '/reports', label: 'Reports', permission: TENANT_PERMISSIONS.REPORTS_READ },
-      { to: '/insights', label: 'Insights', permission: TENANT_PERMISSIONS.INSIGHTS_READ },
-      { to: '/users', label: 'Users', permission: TENANT_PERMISSIONS.USERS_READ },
-      { to: '/audit', label: 'Audit', permission: TENANT_PERMISSIONS.AUDIT_READ },
-      { to: '/tenant-settings', label: 'Tenant Settings', permission: TENANT_PERMISSIONS.TENANT_READ },
+  const currentModule = useMemo(() => getTenantModuleForPathname(location.pathname), [location.pathname]);
+  const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);
 
-      /*
-        Backend/router alignment:
-        - /system-status is manager-visible.
-        - Admin-only diagnostics remain protected inside AdminSystemPage and by
-          the backend admin diagnostics/system-health routes.
-      */
-      { to: '/admin-system', label: 'Admin System', permission: TENANT_PERMISSIONS.SYSTEM_STATUS_READ },
-      { to: '/system-context', label: 'System Context', permission: TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ },
-      { to: '/execution-requests', label: 'Execution Requests', permission: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW },
-      { to: '/automation-schedules', label: 'Automation Schedules', permission: TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW },
-      { to: '/enterprise-inventory', label: 'Enterprise Inventory', permission: TENANT_PERMISSIONS.PAR_LEVELS_READ },
+  const isVisibleNavigationItem = (item: TenantNavigationItem): boolean => {
+    if (item.permission) {
+      return hasPermission(item.permission);
+    }
 
-      { to: '/sessions', label: 'Sessions' }
-    ],
-    []
-  );
+    if (!item.roles || item.roles.length === 0) {
+      return true;
+    }
 
-  const visibleNavItems = useMemo(() => {
-    return navItems.filter((item) => {
-      if (item.permission) {
-        return hasPermission(item.permission);
-      }
+    if (!role) {
+      return false;
+    }
 
-      if (!item.roles || item.roles.length === 0) {
-        return true;
-      }
+    return item.roles.includes(role);
+  };
 
-      if (!role) {
-        return false;
-      }
-
-      return item.roles.includes(role);
-    });
-  }, [navItems, role]);
+  const visibleNavSections = useMemo(() => {
+    return tenantNavigationSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(isVisibleNavigationItem)
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [role]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -429,24 +266,50 @@ export default function AppLayout() {
           <div style={styles.brandTitle}>Inventory Platform</div>
           <div style={styles.brandSubtitle}>Multi-tenant control center</div>
           {role ? <div style={styles.rolePill}>ROLE: {role.toUpperCase()}</div> : null}
-          {supportSession.isSupportSession ? (
+  
+        {!tenantAccess.hasTenantContext ? (
+          <div style={styles.tenantAccessBanner}>
+            <strong>Tenant context unavailable.</strong> The session token did not expose a tenant identifier, so tenant-safe API requests may fail until the user signs in again.
+          </div>
+        ) : tenantAccess.hiddenModuleCount > 0 ? (
+          <div style={styles.tenantAccessNotice}>
+            <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
+          </div>
+        ) : null}
+
+        {supportSession.isSupportSession ? (
             <div style={styles.supportPill}>SUPPORT MODE</div>
           ) : null}
+          <div style={styles.accessSummaryCard}>
+            <div style={styles.accessSummaryLabel}>Tenant access</div>
+            <div style={styles.accessSummaryValue}>
+              {tenantAccess.permittedModuleCount}/{tenantAccess.totalModuleCount} modules visible
+            </div>
+            <div style={styles.accessSummaryMeta}>
+              Tenant: {tenantAccess.tenantId || 'unavailable'}
+            </div>
+          </div>
         </div>
 
         <div style={styles.navScrollArea}>
           <nav style={styles.nav}>
-            {visibleNavItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                style={({ isActive }) => ({
-                  ...styles.navItem,
-                  ...(isActive ? styles.navItemActive : {})
-                })}
-              >
-                {item.label}
-              </NavLink>
+            {visibleNavSections.map((section) => (
+              <div key={section.id} style={styles.navSection}>
+                <div style={styles.navSectionTitle}>{section.label}</div>
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    title={item.description}
+                    style={({ isActive }) => ({
+                      ...styles.navItem,
+                      ...(isActive ? styles.navItemActive : {})
+                    })}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
         </div>
@@ -494,7 +357,7 @@ export default function AppLayout() {
                   ...(isMobile ? styles.breadcrumbMobile : {})
                 }}
               >
-                Operations / {getPageTitle(location.pathname)}
+                Operations / {currentModule?.moduleGroupLabel || 'Workspace'} / {pageMeta.title}
               </div>
               <h1
                 style={{
@@ -502,7 +365,7 @@ export default function AppLayout() {
                   ...(isMobile ? styles.headerTitleMobile : {})
                 }}
               >
-                {getPageTitle(location.pathname)}
+                {pageMeta.title}
               </h1>
               <p
                 style={{
@@ -510,11 +373,30 @@ export default function AppLayout() {
                   ...(isMobile ? styles.headerTextMobile : {})
                 }}
               >
-                {getPageSubtitle(location.pathname)}
+                {pageMeta.subtitle}
               </p>
+              {currentModule ? (
+                <div style={styles.moduleMetaRow}>
+                  <span style={styles.moduleMetaPill}>{currentModule.moduleGroupLabel}</span>
+                  <span style={styles.moduleMetaPill}>Priority: {currentModule.priority}</span>
+                  <span style={styles.moduleMetaPill}>Route: {currentModule.to}</span>
+                  <span style={styles.moduleMetaPill}>Access: {currentModule.permission ? 'permission-gated' : 'role-gated'}</span>
+                </div>
+              ) : null}
             </div>
           </div>
         </header>
+
+
+        {!tenantAccess.hasTenantContext ? (
+          <div style={styles.tenantAccessBanner}>
+            <strong>Tenant context unavailable.</strong> The session token did not expose a tenant identifier, so tenant-safe API requests may fail until the user signs in again.
+          </div>
+        ) : tenantAccess.hiddenModuleCount > 0 ? (
+          <div style={styles.tenantAccessNotice}>
+            <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
+          </div>
+        ) : null}
 
         {supportSession.isSupportSession ? (
           <div style={styles.supportBanner}>
@@ -592,6 +474,25 @@ export default function AppLayout() {
 }
 
 const styles: Record<string, CSSProperties> = {
+
+  tenantAccessBanner: {
+    margin: '0 24px 8px 24px',
+    padding: '12px 16px',
+    borderRadius: '14px',
+    background: '#fef2f2',
+    color: '#991b1b',
+    border: '1px solid #fecaca',
+    lineHeight: 1.45
+  },
+  tenantAccessNotice: {
+    margin: '0 24px 8px 24px',
+    padding: '12px 16px',
+    borderRadius: '14px',
+    background: '#f8fafc',
+    color: '#334155',
+    border: '1px solid #dbe3f0',
+    lineHeight: 1.45
+  },
 
   incidentBanner: {
     margin: '12px 24px 0',
@@ -760,6 +661,32 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     letterSpacing: '0.06em'
   },
+  accessSummaryCard: {
+    marginTop: '12px',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: '14px',
+    padding: '10px 12px',
+    background: 'rgba(15, 23, 42, 0.72)'
+  },
+  accessSummaryLabel: {
+    color: 'rgba(255,255,255,0.52)',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    marginBottom: '6px'
+  },
+  accessSummaryValue: {
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: 800
+  },
+  accessSummaryMeta: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: '12px',
+    marginTop: '4px',
+    wordBreak: 'break-word'
+  },
   navScrollArea: {
     flex: 1,
     minHeight: 0,
@@ -770,8 +697,22 @@ const styles: Record<string, CSSProperties> = {
   nav: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '14px',
     minWidth: 0
+  },
+  navSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    minWidth: 0
+  },
+  navSectionTitle: {
+    color: 'rgba(255,255,255,0.46)',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    padding: '4px 12px 2px'
   },
   navItem: {
     color: 'rgba(255,255,255,0.82)',
@@ -874,6 +815,23 @@ const styles: Record<string, CSSProperties> = {
     marginTop: '8px',
     fontSize: '14px',
     maxWidth: '100%'
+  },
+  moduleMetaRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginTop: '12px'
+  },
+  moduleMetaPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: '999px',
+    border: '1px solid #dbe3f0',
+    background: '#ffffff',
+    color: '#475569',
+    fontSize: '12px',
+    fontWeight: 700,
+    padding: '6px 10px'
   },
   supportBanner: {
     margin: '0 24px 8px 24px',

@@ -15,6 +15,9 @@ type StockItem = {
   storage_location_name?: string;
   temperature_zone?: string | null;
   quantity: number | string;
+  reserved_quantity?: number | string | null;
+  allocated_quantity?: number | string | null;
+  projected_free_quantity?: number | string | null;
   min_quantity?: number | string | null;
   product_min_stock?: number | string | null;
   updated_at?: string;
@@ -419,15 +422,23 @@ export default function StockPage() {
     let low = 0;
     let ok = 0;
     let quantityTotal = 0;
+    let reservedTotal = 0;
+    let projectedFreeTotal = 0;
 
     for (const item of rows) {
       const quantity = toNumber(item.quantity);
+      const reservedQuantity = toNumber(item.reserved_quantity);
+      const projectedFreeQuantity = item.projected_free_quantity === undefined
+        ? quantity - reservedQuantity
+        : toNumber(item.projected_free_quantity);
       const minimum = Math.max(
         toNumber(item.min_quantity),
         toNumber(item.product_min_stock)
       );
 
       quantityTotal += quantity;
+      reservedTotal += reservedQuantity;
+      projectedFreeTotal += projectedFreeQuantity;
 
       if (quantity < minimum) {
         low += 1;
@@ -440,11 +451,20 @@ export default function StockPage() {
       totalRows: rows.length,
       lowRows: low,
       okRows: ok,
-      quantityTotal
+      quantityTotal,
+      reservedTotal,
+      projectedFreeTotal
     };
   }, [rows]);
 
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
+  const currentReservedQuantity = selectedRow ? toNumber(selectedRow.reserved_quantity) : 0;
+  const currentAllocatedQuantity = selectedRow ? toNumber(selectedRow.allocated_quantity ?? selectedRow.reserved_quantity) : 0;
+  const currentProjectedFreeQuantity = selectedRow
+    ? selectedRow.projected_free_quantity === undefined
+      ? currentQuantity - currentReservedQuantity
+      : toNumber(selectedRow.projected_free_quantity)
+    : 0;
   const currentMinimum = selectedRow
     ? Math.max(toNumber(selectedRow.min_quantity), toNumber(selectedRow.product_min_stock))
     : 0;
@@ -718,6 +738,18 @@ export default function StockPage() {
           value={summary.quantityTotal}
           subtitle="Combined visible quantity across loaded rows"
         />
+        <StatCard
+          title="Reserved Quantity"
+          value={summary.reservedTotal}
+          subtitle="Open quantity protected by active reservations"
+          tone={summary.reservedTotal > 0 ? 'warn' : 'default'}
+        />
+        <StatCard
+          title="Projected Free"
+          value={summary.projectedFreeTotal}
+          subtitle="On-hand quantity after active reservations"
+          tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
+        />
       </div>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
@@ -778,7 +810,12 @@ export default function StockPage() {
                   toNumber(item.min_quantity),
                   toNumber(item.product_min_stock)
                 );
+                const reservedQuantity = toNumber(item.reserved_quantity);
+                const projectedFreeQuantity = item.projected_free_quantity === undefined
+                  ? quantity - reservedQuantity
+                  : toNumber(item.projected_free_quantity);
                 const lowStock = quantity < minQuantity;
+                const freeStockRisk = projectedFreeQuantity < minQuantity;
                 const selected = selectedRow?.id === item.id;
 
                 return (
@@ -800,8 +837,8 @@ export default function StockPage() {
                           {item.storage_location_name || item.storage_location_id || '-'}
                         </div>
                       </div>
-                      <span style={lowStock ? styles.badgeWarning : styles.badgeOk}>
-                        {lowStock ? 'LOW' : 'OK'}
+                      <span style={lowStock || freeStockRisk ? styles.badgeWarning : styles.badgeOk}>
+                        {lowStock ? 'LOW' : freeStockRisk ? 'RESERVED' : 'OK'}
                       </span>
                     </div>
                     <div style={styles.stockCardMetrics}>
@@ -810,12 +847,12 @@ export default function StockPage() {
                         <div style={styles.stockMetricValue}>{quantity}</div>
                       </div>
                       <div style={styles.stockMetricItem}>
-                        <div style={styles.stockMetricLabel}>Minimum</div>
-                        <div style={styles.stockMetricValue}>{minQuantity}</div>
+                        <div style={styles.stockMetricLabel}>Reserved</div>
+                        <div style={styles.stockMetricValue}>{reservedQuantity}</div>
                       </div>
                       <div style={styles.stockMetricItem}>
-                        <div style={styles.stockMetricLabel}>Unit</div>
-                        <div style={styles.stockMetricValue}>{item.product_unit || '-'}</div>
+                        <div style={styles.stockMetricLabel}>Free</div>
+                        <div style={styles.stockMetricValue}>{projectedFreeQuantity}</div>
                       </div>
                     </div>
                   </button>
@@ -860,6 +897,18 @@ export default function StockPage() {
                         <div style={styles.selectionItem}>
                           <div style={styles.selectionLabel}>Current Quantity</div>
                           <div style={styles.selectionValue}>{currentQuantity}</div>
+                        </div>
+                        <div style={styles.selectionItem}>
+                          <div style={styles.selectionLabel}>Reserved Quantity</div>
+                          <div style={styles.selectionValue}>{currentReservedQuantity}</div>
+                        </div>
+                        <div style={styles.selectionItem}>
+                          <div style={styles.selectionLabel}>Allocated Quantity</div>
+                          <div style={styles.selectionValue}>{currentAllocatedQuantity}</div>
+                        </div>
+                        <div style={styles.selectionItem}>
+                          <div style={styles.selectionLabel}>Projected Free Quantity</div>
+                          <div style={styles.selectionValue}>{currentProjectedFreeQuantity}</div>
                         </div>
                         <div style={styles.selectionItem}>
                           <div style={styles.selectionLabel}>Minimum Quantity</div>
@@ -908,6 +957,10 @@ export default function StockPage() {
                           ? '-'
                           : nextQuantityPreview}
                       </strong>
+                    </div>
+                    <div style={styles.readinessRow}>
+                      <span>Projected free after reservations</span>
+                      <strong>{currentProjectedFreeQuantity}</strong>
                     </div>
                     <div style={styles.readinessRow}>
                       <span>Ledger verification</span>
