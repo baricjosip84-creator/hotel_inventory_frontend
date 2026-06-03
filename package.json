@@ -13,11 +13,11 @@
     "check:commercial-shell": "node scripts/check-commercial-shell-regression.mjs",
     "check:phase15-closure": "node scripts/check-phase15-closure.mjs",
     "check:frontend-performance-budget": "node scripts/check-frontend-performance-budget.mjs",
-    "check:phase18-commercial-readiness-surfaces": "node scripts/check-phase18-commercial-readiness-surfaces.mjs"
+    "check:phase18-commercial-readiness-surfaces": "node scripts/check-phase18-commercial-readiness-surfaces.mjs",
+    "check:vercel-install-hardening": "node scripts/check-vercel-install-hardening.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",
-    "bcrypt": "^6.0.0",
     "html5-qrcode": "^2.3.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -38,5 +38,9 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
   }
 }
