@@ -46,7 +46,6 @@ export function EnterpriseInventoryAutomationPanel({
     disableAutomationScheduleMutation,
     dryRunAutomationScheduleMutation,
     pauseAutomationScheduleMutation,
-    resumeAutomationScheduleMutation,
     runAutomationScheduleMutation,
   } = actions;
 
@@ -87,7 +86,6 @@ export function EnterpriseInventoryAutomationPanel({
         dryRunAutomationScheduleMutation={dryRunAutomationScheduleMutation}
         runAutomationScheduleMutation={runAutomationScheduleMutation}
         pauseAutomationScheduleMutation={pauseAutomationScheduleMutation}
-        resumeAutomationScheduleMutation={resumeAutomationScheduleMutation}
         disableAutomationScheduleMutation={disableAutomationScheduleMutation}
       />
     </EnterpriseInventoryTabPanel>

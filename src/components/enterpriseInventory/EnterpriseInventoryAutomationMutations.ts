@@ -77,18 +77,6 @@ export function useEnterpriseInventoryAutomationMutations(
     onError: mutationFeedback.error("Failed to pause automation schedule."),
   });
 
-  const resumeAutomationScheduleMutation = useMutation({
-    mutationFn: (id: string) =>
-      postEnterpriseInventoryRequest<AutomationSchedule>(
-        `/automation-schedules/${id}/resume`,
-      ),
-    onSuccess: mutationFeedback.refresh(
-      "Automation schedule resumed.",
-      refreshAutomationQueries,
-    ),
-    onError: mutationFeedback.error("Failed to resume automation schedule."),
-  });
-
   const disableAutomationScheduleMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       postEnterpriseInventoryRequest<AutomationSchedule>(
@@ -107,7 +95,6 @@ export function useEnterpriseInventoryAutomationMutations(
     dryRunAutomationScheduleMutation,
     runAutomationScheduleMutation,
     pauseAutomationScheduleMutation,
-    resumeAutomationScheduleMutation,
     disableAutomationScheduleMutation,
   };
 }

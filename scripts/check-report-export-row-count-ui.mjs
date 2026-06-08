@@ -1,0 +1,160 @@
+import fs from 'node:fs';
+
+const api = fs.readFileSync('src/lib/api.ts', 'utf8');
+const reports = fs.readFileSync('src/pages/ReportsPage.tsx', 'utf8');
+
+const requiredApiSnippets = [
+  'export type ApiDownloadMetadata',
+  "response.headers.get('X-Report-Exported-Rows')",
+  "response.headers.get('X-Report-Source-Rows')",
+  "response.headers.get('X-Report-Row-Limit')",
+  "response.headers.get('X-Report-Row-Limit-Applied')",
+  'Promise<ApiDownloadMetadata>',
+  'return readDownloadMetadata(response);',
+  'const normalizedValue = value.trim();',
+  "if (!/^\\d+$/.test(normalizedValue))",
+  'Number.isSafeInteger(parsed)',
+  'const normalizedValue = value.trim().toLowerCase();',
+  "return normalizedValue === 'true';",
+  'function sanitizeDownloadFilename(filename: string): string',
+  ".replace(/[\\\\/]/g, '-')",
+  ".replace(/[\\u0000-\\u001f\\u007f]/g, '')",
+  "link.download = sanitizeDownloadFilename(filename);",
+  'try {',
+  "link.style.display = 'none';",
+  'link.tabIndex = -1;',
+  "link.setAttribute('aria-hidden', 'true');",
+  'link.click();',
+  '} finally {',
+  'link.remove();',
+  'The finally block still guarantees cleanup if DOM append/click fails.',
+  'window.setTimeout(() => {',
+  'window.URL.revokeObjectURL(objectUrl);'
+];
+
+const requiredReportsSnippets = [
+  'type ApiDownloadMetadata',
+  'downloadInfo',
+  'setDownloadInfo({ report, metadata })',
+  'CSV export ready:',
+  'Original result had',
+  'configured limit of',
+  'role="status"',
+  'aria-live="polite"',
+  'role="alert"',
+  'aria-live="assertive"',
+  "const DOWNLOAD_ERROR_STATUS_ID = 'report-download-error-status';",
+  "const DOWNLOAD_SUCCESS_STATUS_ID = 'report-download-success-status';",
+  'id={DOWNLOAD_ERROR_STATUS_ID}',
+  'id={DOWNLOAD_SUCCESS_STATUS_ID}',
+  'aria-describedby={DOWNLOAD_ERROR_STATUS_ID}',
+  'aria-describedby={DOWNLOAD_SUCCESS_STATUS_ID}',
+  'const REPORT_LABELS',
+  'getReportLabel(downloadInfo.report)',
+  'Inventory valuation report',
+  'function getReportFilename',
+  'function getExportButtonAriaLabel',
+  'Exporting ${getReportLabel(report)} as CSV.',
+  'CSV export unavailable while ${getReportLabel(downloadingReport)} is exporting.',
+  "aria-label={getExportButtonAriaLabel('inventory-valuation', downloadingReport)}",
+  "aria-label={getExportButtonAriaLabel('stock-by-location', downloadingReport)}",
+  "aria-label={getExportButtonAriaLabel('product-movements', downloadingReport)}",
+  "aria-label={getExportButtonAriaLabel('procurement-summary', downloadingReport)}",
+  'apiDownloadFile(paths[report], getReportFilename(report))',
+  'disabled={downloadingReport !== null}',
+  ".replace(/[^a-z0-9]+/g, '-')",
+  'const clearDownloadStatus = () =>',
+  'const changeActiveTab = (tab: ReportTab) =>',
+  'const changeLocationCategoryFilter = (value: string) =>',
+  'const changeMovementLimit = (value: number) =>',
+  'onClick={() => changeActiveTab(tab.key)}',
+  'onKeyDown={(event) => handleReportTabKeyDown(event, tab.key)}',
+  'if (downloadingReport !== null) {',
+  'Wait for the current CSV export to finish before changing report tabs.',
+  'Show ${tab.label} report.',
+  'onChange={(event) => changeLocationCategoryFilter(event.target.value)}',
+  'onChange={(event) => changeMovementLimit(Number(event.target.value))}',
+  'disabled={downloadingReport !== null}',
+  'aria-disabled={downloadingReport !== null}',
+  'Wait for the current CSV export to finish before changing this limit.',
+  'Wait for the current CSV export to finish before changing this filter.',
+  'disabled={downloadingReport !== null}',
+  'aria-disabled={downloadingReport !== null}',
+  'onClick={clearDownloadStatus}',
+  'Clear message',
+  'function getClearDownloadStatusAriaLabel',
+  'Clear CSV export error message.',
+  'Clear ${getReportLabel(downloadInfo.report)} export success message.',
+  'aria-label={getClearDownloadStatusAriaLabel(downloadInfo, downloadError)}',
+  'downloadStatusPanel',
+  'dismissStatusButton',
+  'const REPORT_TABS: Array<{ key: ReportTab; label: string }>',
+  'function getReportTabId(tab: ReportTab): string',
+  'function getReportPanelId(tab: ReportTab): string',
+  'role="tablist"',
+  'aria-label="Reports"',
+  'aria-orientation="horizontal"',
+  "const REPORT_TAB_LOCK_HINT_ID = 'report-tab-export-lock-hint';",
+  'aria-describedby={downloadingReport !== null ? REPORT_TAB_LOCK_HINT_ID : undefined}',
+  'Report tabs are locked while {getReportLabel(downloadingReport)} is exporting.',
+  'tabLockHint',
+  'role="tab"',
+  'aria-selected={activeTab === tab.key}',
+  'aria-controls={getReportPanelId(tab.key)}',
+  'tabIndex={activeTab === tab.key ? 0 : -1}',
+  'const handleReportTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: ReportTab) =>',
+  "event.key === 'ArrowRight' || event.key === 'ArrowDown'",
+  "event.key === 'ArrowLeft' || event.key === 'ArrowUp'",
+  "event.key === 'Home'",
+  "event.key === 'End'",
+  'window.requestAnimationFrame(() =>',
+  "role={props.id ? 'tabpanel' : undefined}",
+  'aria-labelledby={props.labelledBy}',
+  'aria-describedby={descriptionId}',
+  'const descriptionId = props.id ? `${props.id}-description` : undefined;',
+  '<p id={descriptionId} style={styles.panelSubtitle}>{props.subtitle}</p>',
+  'tabIndex={props.id ? 0 : undefined}',
+  "id={getReportPanelId('inventory-valuation')}",
+  "labelledBy={getReportTabId('inventory-valuation')}",
+  "id={getReportPanelId('forecast')}",
+  "labelledBy={getReportTabId('forecast')}",
+  'const MAX_REPORT_FILTER_LENGTH = 120;',
+  'maxLength={MAX_REPORT_FILTER_LENGTH}',
+  'aria-describedby={getCategoryFilterHintId()}',
+  'function getCategoryFilterHintId(): string',
+  'function getNormalizedCategoryFilter(value: string): string',
+  'return value.trim();',
+  'const normalizedLocationCategoryFilter = useMemo(',
+  "queryKey: ['reports', 'stock-by-location', normalizedLocationCategoryFilter]",
+  'queryFn: () => fetchStockByLocation(normalizedLocationCategoryFilter)',
+  'category: normalizedLocationCategoryFilter',
+  'function getReportFilterHint(value: string): string',
+  'characters left',
+  'fieldHint',
+  'const PRODUCT_MOVEMENT_LIMIT_OPTIONS = [25, 50, 100, 200, 500] as const;',
+  'const MAX_PRODUCT_MOVEMENT_REPORT_LIMIT = PRODUCT_MOVEMENT_LIMIT_OPTIONS[PRODUCT_MOVEMENT_LIMIT_OPTIONS.length - 1];',
+  'PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((limitOption) => (',
+  'Maximum ${MAX_PRODUCT_MOVEMENT_REPORT_LIMIT} movement rows per report.',
+  'function getMovementLimitHintId(): string',
+  'aria-describedby={getMovementLimitHintId()}',
+  '<span id={getMovementLimitHintId()} style={styles.fieldHint}>'
+];
+
+const missing = [];
+for (const snippet of requiredApiSnippets) {
+  if (!api.includes(snippet)) {
+    missing.push(`src/lib/api.ts missing ${snippet}`);
+  }
+}
+for (const snippet of requiredReportsSnippets) {
+  if (!reports.includes(snippet)) {
+    missing.push(`src/pages/ReportsPage.tsx missing ${snippet}`);
+  }
+}
+
+if (missing.length > 0) {
+  console.error(missing.join('\n'));
+  process.exit(1);
+}
+
+console.log('Report export row-count UI check passed.');

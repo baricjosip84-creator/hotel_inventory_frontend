@@ -42,7 +42,6 @@ type AutomationTabProps = {
   dryRunAutomationScheduleMutation: MutationLike<string>;
   runAutomationScheduleMutation: MutationLike<string>;
   pauseAutomationScheduleMutation: MutationLike<string>;
-  resumeAutomationScheduleMutation: MutationLike<string>;
   disableAutomationScheduleMutation: MutationLike<{ id: string; reason: string }>;
 };
 
@@ -75,7 +74,6 @@ export function AutomationTab({
   dryRunAutomationScheduleMutation,
   runAutomationScheduleMutation,
   pauseAutomationScheduleMutation,
-  resumeAutomationScheduleMutation,
   disableAutomationScheduleMutation
 }: AutomationTabProps) {
   const automationSummary = {
@@ -166,7 +164,7 @@ export function AutomationTab({
                 <button type="button" style={styles.secondarySmallButton} onClick={() => dryRunAutomationScheduleMutation.mutate(schedule.id)}>Dry run</button>
                 <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.smallButton} disabled={schedule.status === 'disabled'} onClick={() => runAutomationScheduleMutation.mutate(schedule.id)}>Manual run</button>
                 <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled'} onClick={() => pauseAutomationScheduleMutation.mutate(schedule.id)}>Pause</button>
-                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled'} onClick={() => resumeAutomationScheduleMutation.mutate(schedule.id)}>Resume</button>
+                {schedule.status === 'paused' ? <button type="button" style={styles.disabledButton} disabled title="Resume is intentionally blocked until the automation runner is enabled.">Resume locked</button> : null}
               </div>
               <div style={{ ...styles.actions, marginTop: 8 }}>
                 <input

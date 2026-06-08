@@ -14,7 +14,15 @@
     "check:phase15-closure": "node scripts/check-phase15-closure.mjs",
     "check:frontend-performance-budget": "node scripts/check-frontend-performance-budget.mjs",
     "check:phase18-commercial-readiness-surfaces": "node scripts/check-phase18-commercial-readiness-surfaces.mjs",
-    "check:vercel-install-hardening": "node scripts/check-vercel-install-hardening.mjs"
+    "check:vercel-install-hardening": "node scripts/check-vercel-install-hardening.mjs",
+    "check:platform-security-route-permission": "node scripts/check-platform-security-route-permission.mjs",
+    "check:platform-api-mutation-safety": "node scripts/check-platform-api-mutation-safety.mjs",
+    "check:production-env-governance": "node scripts/check-production-env-governance.mjs",
+    "check:report-csv-export-ui": "node scripts/check-report-csv-export-ui.mjs",
+    "check:automation-resume-ui-governance": "node scripts/check-automation-resume-ui-governance.mjs",
+    "check:tenant-session-route-auth-governance": "node scripts/check-tenant-session-route-auth-governance.mjs",
+    "check:report-export-row-count-ui": "node scripts/check-report-export-row-count-ui.mjs",
+    "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

@@ -1,7 +1,7 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ApiError, apiRequest } from '../lib/api';
+import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 
 type ReportTab =
@@ -10,6 +10,127 @@ type ReportTab =
   | 'product-movements'
   | 'procurement-summary'
   | 'forecast';
+
+
+const MAX_REPORT_FILTER_LENGTH = 120;
+const DOWNLOAD_ERROR_STATUS_ID = 'report-download-error-status';
+const DOWNLOAD_SUCCESS_STATUS_ID = 'report-download-success-status';
+const REPORT_TAB_LOCK_HINT_ID = 'report-tab-export-lock-hint';
+const PRODUCT_MOVEMENT_LIMIT_OPTIONS = [25, 50, 100, 200, 500] as const;
+const MAX_PRODUCT_MOVEMENT_REPORT_LIMIT = PRODUCT_MOVEMENT_LIMIT_OPTIONS[PRODUCT_MOVEMENT_LIMIT_OPTIONS.length - 1];
+
+const REPORT_TABS: Array<{ key: ReportTab; label: string }> = [
+  { key: 'inventory-valuation', label: 'Inventory Valuation' },
+  { key: 'stock-by-location', label: 'Stock by Location' },
+  { key: 'product-movements', label: 'Product Movements' },
+  { key: 'procurement-summary', label: 'Procurement Summary' },
+  { key: 'forecast', label: 'Forecast' }
+];
+
+const REPORT_LABELS: Record<Exclude<ReportTab, 'forecast'>, string> = {
+  'inventory-valuation': 'Inventory valuation report',
+  'stock-by-location': 'Stock by location report',
+  'product-movements': 'Product movements report',
+  'procurement-summary': 'Procurement summary report'
+};
+
+function getReportLabel(report: Exclude<ReportTab, 'forecast'>): string {
+  return REPORT_LABELS[report] || report;
+}
+
+function getReportFilename(report: Exclude<ReportTab, 'forecast'>): string {
+  return `${getReportLabel(report).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}.csv`;
+}
+
+function getReportTabId(tab: ReportTab): string {
+  return `reports-tab-${tab}`;
+}
+
+function getReportPanelId(tab: ReportTab): string {
+  return `reports-panel-${tab}`;
+}
+
+function getCategoryFilterHintId(): string {
+  return 'stock-location-category-filter-hint';
+}
+
+function getMovementLimitHintId(): string {
+  return 'product-movement-limit-hint';
+}
+
+function getNormalizedCategoryFilter(value: string): string {
+  return value.trim();
+}
+
+function getReportFilterHint(value: string): string {
+  const remaining = MAX_REPORT_FILTER_LENGTH - value.length;
+
+  if (remaining <= 20) {
+    return `${Math.max(remaining, 0)} characters left`;
+  }
+
+  return `Optional. Maximum ${MAX_REPORT_FILTER_LENGTH} characters.`;
+}
+
+function getExportButtonLabel(
+  report: Exclude<ReportTab, 'forecast'>,
+  downloadingReport: ReportTab | null
+): string {
+  if (downloadingReport === report) {
+    return 'Exporting...';
+  }
+
+  if (downloadingReport !== null) {
+    return 'Another export is running';
+  }
+
+  return 'Export CSV';
+}
+
+function getExportButtonTitle(
+  report: Exclude<ReportTab, 'forecast'>,
+  downloadingReport: ReportTab | null
+): string {
+  if (downloadingReport === report) {
+    return `${getReportLabel(report)} is being exported.`;
+  }
+
+  if (downloadingReport !== null && downloadingReport !== 'forecast') {
+    return `Wait for ${getReportLabel(downloadingReport)} to finish exporting.`;
+  }
+
+  return `Export ${getReportLabel(report)} as CSV.`;
+}
+
+function getExportButtonAriaLabel(
+  report: Exclude<ReportTab, 'forecast'>,
+  downloadingReport: ReportTab | null
+): string {
+  if (downloadingReport === report) {
+    return `Exporting ${getReportLabel(report)} as CSV.`;
+  }
+
+  if (downloadingReport !== null && downloadingReport !== 'forecast') {
+    return `CSV export unavailable while ${getReportLabel(downloadingReport)} is exporting.`;
+  }
+
+  return `Export ${getReportLabel(report)} as CSV.`;
+}
+
+function getClearDownloadStatusAriaLabel(
+  downloadInfo: { report: Exclude<ReportTab, 'forecast'>; metadata: ApiDownloadMetadata } | null,
+  downloadError: string | null
+): string {
+  if (downloadError) {
+    return 'Clear CSV export error message.';
+  }
+
+  if (downloadInfo) {
+    return `Clear ${getReportLabel(downloadInfo.report)} export success message.`;
+  }
+
+  return 'Clear CSV export message.';
+}
 
 type InventoryValuationRow = {
   product_id: string;
@@ -183,15 +304,27 @@ function StatCard(props: {
 function ReportPanel(props: {
   title: string;
   subtitle: string;
+  id?: string;
+  labelledBy?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const descriptionId = props.id ? `${props.id}-description` : undefined;
+
   return (
-    <section className="app-panel app-panel--padded" style={styles.panel}>
+    <section
+      id={props.id}
+      className="app-panel app-panel--padded"
+      style={styles.panel}
+      role={props.id ? 'tabpanel' : undefined}
+      aria-labelledby={props.labelledBy}
+      aria-describedby={descriptionId}
+      tabIndex={props.id ? 0 : undefined}
+    >
       <div style={styles.panelHeader}>
         <div style={styles.panelHeaderText}>
           <h3 style={styles.panelTitle}>{props.title}</h3>
-          <p style={styles.panelSubtitle}>{props.subtitle}</p>
+          <p id={descriptionId} style={styles.panelSubtitle}>{props.subtitle}</p>
         </div>
         {props.actions ? <div style={styles.panelActions}>{props.actions}</div> : null}
       </div>
@@ -263,6 +396,13 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
   const [movementLimit, setMovementLimit] = useState(50);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadInfo, setDownloadInfo] = useState<{ report: Exclude<ReportTab, 'forecast'>; metadata: ApiDownloadMetadata } | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState<ReportTab | null>(null);
+  const normalizedLocationCategoryFilter = useMemo(
+    () => getNormalizedCategoryFilter(locationCategoryFilter),
+    [locationCategoryFilter]
+  );
 
   const { role: currentUserRole } = getRoleCapabilities();
 
@@ -272,8 +412,8 @@ export default function ReportsPage() {
   });
 
   const stockByLocationQuery = useQuery({
-    queryKey: ['reports', 'stock-by-location', locationCategoryFilter],
-    queryFn: () => fetchStockByLocation(locationCategoryFilter)
+    queryKey: ['reports', 'stock-by-location', normalizedLocationCategoryFilter],
+    queryFn: () => fetchStockByLocation(normalizedLocationCategoryFilter)
   });
 
   const productMovementsQuery = useQuery({
@@ -333,6 +473,106 @@ export default function ReportsPage() {
     procurementSummaryQuery.error,
     forecastQuery.error
   ].some((error) => getErrorStatus(error) === 403);
+
+  const clearDownloadStatus = () => {
+    setDownloadError(null);
+    setDownloadInfo(null);
+  };
+
+  const changeActiveTab = (tab: ReportTab) => {
+    if (downloadingReport !== null) {
+      return;
+    }
+
+    clearDownloadStatus();
+    setActiveTab(tab);
+  };
+
+
+  const focusReportTab = (tab: ReportTab) => {
+    window.requestAnimationFrame(() => {
+      document.getElementById(getReportTabId(tab))?.focus();
+    });
+  };
+
+  const changeActiveTabFromKeyboard = (tab: ReportTab) => {
+    changeActiveTab(tab);
+    focusReportTab(tab);
+  };
+
+  const handleReportTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: ReportTab) => {
+    if (downloadingReport !== null) {
+      return;
+    }
+
+    const currentIndex = REPORT_TABS.findIndex((reportTab) => reportTab.key === tab);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      const nextTab = REPORT_TABS[(currentIndex + 1) % REPORT_TABS.length].key;
+      changeActiveTabFromKeyboard(nextTab);
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const previousTab = REPORT_TABS[(currentIndex - 1 + REPORT_TABS.length) % REPORT_TABS.length].key;
+      changeActiveTabFromKeyboard(previousTab);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      changeActiveTabFromKeyboard(REPORT_TABS[0].key);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      changeActiveTabFromKeyboard(REPORT_TABS[REPORT_TABS.length - 1].key);
+    }
+  };
+
+  const changeLocationCategoryFilter = (value: string) => {
+    clearDownloadStatus();
+    setLocationCategoryFilter(value);
+  };
+
+  const changeMovementLimit = (value: number) => {
+    clearDownloadStatus();
+    setMovementLimit(value);
+  };
+
+  const downloadReportCsv = async (report: Exclude<ReportTab, 'forecast'>) => {
+    setDownloadError(null);
+    setDownloadInfo(null);
+    setDownloadingReport(report);
+
+    const paths: Record<Exclude<ReportTab, 'forecast'>, string> = {
+      'inventory-valuation': '/reports/inventory-valuation?format=csv',
+      'stock-by-location': `/reports/stock-by-location${buildQueryString({
+        category: normalizedLocationCategoryFilter,
+        format: 'csv'
+      })}`,
+      'product-movements': `/reports/product-movements${buildQueryString({
+        limit: movementLimit,
+        format: 'csv'
+      })}`,
+      'procurement-summary': '/reports/procurement-summary?format=csv'
+    };
+
+    try {
+      const metadata = await apiDownloadFile(paths[report], getReportFilename(report));
+      setDownloadInfo({ report, metadata });
+    } catch (error) {
+      setDownloadError(getReadableError(error));
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
 
   if (anyForbidden) {
     return (
@@ -450,19 +690,87 @@ export default function ReportsPage() {
         </div>
       </section>
 
+      {downloadError ? (
+        <div
+          id={DOWNLOAD_ERROR_STATUS_ID}
+          role="alert"
+          aria-live="assertive"
+          style={styles.downloadStatusPanel}
+        >
+          <ErrorState message={`CSV export failed: ${downloadError}`} />
+          <button
+            type="button"
+            onClick={clearDownloadStatus}
+            style={styles.dismissStatusButton}
+            aria-label={getClearDownloadStatusAriaLabel(downloadInfo, downloadError)}
+            aria-describedby={DOWNLOAD_ERROR_STATUS_ID}
+          >
+            Clear message
+          </button>
+        </div>
+      ) : null}
+
+      {downloadInfo ? (
+        <section
+          id={DOWNLOAD_SUCCESS_STATUS_ID}
+          className="app-success-state"
+          style={styles.downloadInfoPanel}
+          role="status"
+          aria-live="polite"
+        >
+          <div>
+            <strong>CSV export ready:</strong>{' '}
+            {downloadInfo.metadata.exportedRows === null
+              ? `${getReportLabel(downloadInfo.report)} downloaded.`
+              : `${getReportLabel(downloadInfo.report)} downloaded with ${formatNumber(downloadInfo.metadata.exportedRows, 0)} exported rows.`}
+            {downloadInfo.metadata.wasRowLimited && downloadInfo.metadata.originalRows !== null ? (
+              <span>
+                {' '}Original result had {formatNumber(downloadInfo.metadata.originalRows, 0)} rows
+                {downloadInfo.metadata.rowLimit !== null
+                  ? `, so only the configured limit of ${formatNumber(downloadInfo.metadata.rowLimit, 0)} rows was exported.`
+                  : ', so the configured export limit was applied.'}
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={clearDownloadStatus}
+            style={styles.dismissStatusButton}
+            aria-label={getClearDownloadStatusAriaLabel(downloadInfo, downloadError)}
+            aria-describedby={DOWNLOAD_SUCCESS_STATUS_ID}
+          >
+            Clear message
+          </button>
+        </section>
+      ) : null}
+
       <section style={styles.tabSection}>
-        <div style={styles.tabBar}>
-          {[
-            { key: 'inventory-valuation', label: 'Inventory Valuation' },
-            { key: 'stock-by-location', label: 'Stock by Location' },
-            { key: 'product-movements', label: 'Product Movements' },
-            { key: 'procurement-summary', label: 'Procurement Summary' },
-            { key: 'forecast', label: 'Forecast' }
-          ].map((tab) => (
+        <div
+          style={styles.tabBar}
+          role="tablist"
+          aria-label="Reports"
+          aria-orientation="horizontal"
+          aria-describedby={downloadingReport !== null ? REPORT_TAB_LOCK_HINT_ID : undefined}
+        >
+          {REPORT_TABS.map((tab) => (
             <button
               key={tab.key}
+              id={getReportTabId(tab.key)}
               type="button"
-              onClick={() => setActiveTab(tab.key as ReportTab)}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              aria-controls={getReportPanelId(tab.key)}
+              aria-describedby={downloadingReport !== null ? REPORT_TAB_LOCK_HINT_ID : undefined}
+              disabled={downloadingReport !== null}
+              aria-disabled={downloadingReport !== null}
+              title={
+                downloadingReport !== null
+                  ? 'Wait for the current CSV export to finish before changing report tabs.'
+                  : `Show ${tab.label} report.`
+              }
+              tabIndex={activeTab === tab.key ? 0 : -1}
+              onClick={() => changeActiveTab(tab.key)}
+              onKeyDown={(event) => handleReportTabKeyDown(event, tab.key)}
               style={{
                 ...styles.tabButton,
                 ...(activeTab === tab.key ? styles.tabButtonActive : {})
@@ -472,12 +780,32 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
+        {downloadingReport !== null && downloadingReport !== 'forecast' ? (
+          <p id={REPORT_TAB_LOCK_HINT_ID} style={styles.tabLockHint}>
+            Report tabs are locked while {getReportLabel(downloadingReport)} is exporting.
+          </p>
+        ) : null}
       </section>
 
       {activeTab === 'inventory-valuation' ? (
         <ReportPanel
+          id={getReportPanelId('inventory-valuation')}
+          labelledBy={getReportTabId('inventory-valuation')}
           title="Inventory Valuation"
           subtitle="Estimated stock value by product and storage location using the latest available shipment item cost."
+          actions={
+            <button
+              type="button"
+              onClick={() => downloadReportCsv('inventory-valuation')}
+              disabled={downloadingReport !== null}
+              style={styles.actionButton}
+              aria-busy={downloadingReport === 'inventory-valuation'}
+              title={getExportButtonTitle('inventory-valuation', downloadingReport)}
+              aria-label={getExportButtonAriaLabel('inventory-valuation', downloadingReport)}
+            >
+              {getExportButtonLabel('inventory-valuation', downloadingReport)}
+            </button>
+          }
         >
           {inventoryValuationQuery.isLoading ? <div>Loading inventory valuation...</div> : null}
           {inventoryValuationQuery.isError ? (
@@ -566,19 +894,41 @@ export default function ReportsPage() {
 
       {activeTab === 'stock-by-location' ? (
         <ReportPanel
+          id={getReportPanelId('stock-by-location')}
+          labelledBy={getReportTabId('stock-by-location')}
           title="Stock by Location"
           subtitle="Grouped stock totals per storage location using the existing backend stock-by-location report."
           actions={
             <div className="app-actions" style={styles.filterRow}>
+              <button
+                type="button"
+                onClick={() => downloadReportCsv('stock-by-location')}
+                disabled={downloadingReport !== null}
+                style={styles.actionButton}
+                aria-busy={downloadingReport === 'stock-by-location'}
+                title={getExportButtonTitle('stock-by-location', downloadingReport)}
+              aria-label={getExportButtonAriaLabel('stock-by-location', downloadingReport)}
+              >
+                {getExportButtonLabel('stock-by-location', downloadingReport)}
+              </button>
               <label style={styles.fieldLabel}>
                 Category Filter
                 <input
                   type="text"
                   value={locationCategoryFilter}
-                  onChange={(event) => setLocationCategoryFilter(event.target.value)}
+                  onChange={(event) => changeLocationCategoryFilter(event.target.value)}
                   placeholder="All categories"
+                  maxLength={MAX_REPORT_FILTER_LENGTH}
+                  disabled={downloadingReport !== null}
+                  aria-disabled={downloadingReport !== null}
+                  aria-describedby={getCategoryFilterHintId()}
                   style={styles.textInput}
                 />
+                <span id={getCategoryFilterHintId()} style={styles.fieldHint}>
+                  {downloadingReport !== null
+                    ? 'Wait for the current CSV export to finish before changing this filter.'
+                    : getReportFilterHint(locationCategoryFilter)}
+                </span>
               </label>
             </div>
           }
@@ -650,23 +1000,44 @@ export default function ReportsPage() {
 
       {activeTab === 'product-movements' ? (
         <ReportPanel
+          id={getReportPanelId('product-movements')}
+          labelledBy={getReportTabId('product-movements')}
           title="Product Movements"
           subtitle="Product-level movement summary using your existing product movement report endpoint."
           actions={
             <div className="app-actions" style={styles.filterRow}>
+              <button
+                type="button"
+                onClick={() => downloadReportCsv('product-movements')}
+                disabled={downloadingReport !== null}
+                style={styles.actionButton}
+                aria-busy={downloadingReport === 'product-movements'}
+                title={getExportButtonTitle('product-movements', downloadingReport)}
+              aria-label={getExportButtonAriaLabel('product-movements', downloadingReport)}
+              >
+                {getExportButtonLabel('product-movements', downloadingReport)}
+              </button>
               <label style={styles.fieldLabel}>
                 Result Limit
                 <select
                   value={movementLimit}
-                  onChange={(event) => setMovementLimit(Number(event.target.value))}
+                  onChange={(event) => changeMovementLimit(Number(event.target.value))}
+                  disabled={downloadingReport !== null}
+                  aria-disabled={downloadingReport !== null}
+                  aria-describedby={getMovementLimitHintId()}
                   style={styles.selectInput}
                 >
-                  {[25, 50, 100, 200].map((limitOption) => (
+                  {PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((limitOption) => (
                     <option key={limitOption} value={limitOption}>
                       {limitOption}
                     </option>
                   ))}
                 </select>
+                <span id={getMovementLimitHintId()} style={styles.fieldHint}>
+                  {downloadingReport !== null
+                    ? 'Wait for the current CSV export to finish before changing this limit.'
+                    : `Maximum ${MAX_PRODUCT_MOVEMENT_REPORT_LIMIT} movement rows per report.`}
+                </span>
               </label>
             </div>
           }
@@ -749,8 +1120,23 @@ export default function ReportsPage() {
 
       {activeTab === 'procurement-summary' ? (
         <ReportPanel
+          id={getReportPanelId('procurement-summary')}
+          labelledBy={getReportTabId('procurement-summary')}
           title="Procurement Summary"
           subtitle="Shipment and line-level procurement summary from your existing backend procurement report."
+          actions={
+            <button
+              type="button"
+              onClick={() => downloadReportCsv('procurement-summary')}
+              disabled={downloadingReport !== null}
+              style={styles.actionButton}
+              aria-busy={downloadingReport === 'procurement-summary'}
+              title={getExportButtonTitle('procurement-summary', downloadingReport)}
+              aria-label={getExportButtonAriaLabel('procurement-summary', downloadingReport)}
+            >
+              {getExportButtonLabel('procurement-summary', downloadingReport)}
+            </button>
+          }
         >
           {procurementSummaryQuery.isLoading ? <div>Loading procurement summary...</div> : null}
           {procurementSummaryQuery.isError ? (
@@ -814,6 +1200,8 @@ export default function ReportsPage() {
 
       {activeTab === 'forecast' ? (
         <ReportPanel
+          id={getReportPanelId('forecast')}
+          labelledBy={getReportTabId('forecast')}
           title="Demand Forecast"
           subtitle="Usage-based demand forecast from recent negative stock movements over the last 30 days."
         >
@@ -1111,6 +1499,19 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     boxSizing: 'border-box'
   },
+  fieldHint: {
+    color: '#64748b',
+    fontSize: '12px',
+    fontWeight: 500,
+    lineHeight: 1.4
+  },
+  tabLockHint: {
+    margin: '8px 0 0',
+    color: '#64748b',
+    fontSize: '12px',
+    fontWeight: 600,
+    lineHeight: 1.4
+  },
   selectInput: {
     minWidth: '120px',
     maxWidth: '100%',
@@ -1122,11 +1523,52 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff',
     boxSizing: 'border-box'
   },
+  actionButton: {
+    border: '1px solid #0f172a',
+    background: '#0f172a',
+    color: '#ffffff',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
   emptyState: {
     margin: 0
   },
   errorState: {
     margin: 0
+  },
+  downloadStatusPanel: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap'
+  },
+  downloadInfoPanel: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap',
+    border: '1px solid #bbf7d0',
+    background: '#f0fdf4',
+    color: '#166534',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    lineHeight: 1.5
+  },
+  dismissStatusButton: {
+    border: '1px solid #94a3b8',
+    background: '#ffffff',
+    color: '#0f172a',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
   },
   summaryGrid: {
     display: 'grid',

@@ -291,6 +291,139 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
   });
 }
 
+
+export type ApiDownloadMetadata = {
+  exportedRows: number | null;
+  originalRows: number | null;
+  rowLimit: number | null;
+  wasRowLimited: boolean;
+};
+
+function parseOptionalHeaderNumber(value: string | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+
+  if (!/^\d+$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const parsed = Number(normalizedValue);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function parseOptionalHeaderBoolean(value: string | null): boolean {
+  if (value === null) {
+    return false;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return normalizedValue === 'true';
+}
+
+function readDownloadMetadata(response: Response): ApiDownloadMetadata {
+  return {
+    exportedRows: parseOptionalHeaderNumber(response.headers.get('X-Report-Exported-Rows')),
+    originalRows: parseOptionalHeaderNumber(response.headers.get('X-Report-Source-Rows')),
+    rowLimit: parseOptionalHeaderNumber(response.headers.get('X-Report-Row-Limit')),
+    wasRowLimited: parseOptionalHeaderBoolean(response.headers.get('X-Report-Row-Limit-Applied'))
+  };
+}
+
+function sanitizeDownloadFilename(filename: string): string {
+  const normalizedFilename = String(filename || '')
+    .replace(/[\\/]/g, '-')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\.{2,}/g, '.')
+    .replace(/[^a-zA-Z0-9._ -]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const safeFilename = normalizedFilename.replace(/^[-. ]+|[-. ]+$/g, '').slice(0, 120);
+  return safeFilename || 'download.csv';
+}
+
+export async function apiDownloadFile(path: string, filename: string): Promise<ApiDownloadMetadata> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new ApiError('File downloads are only available in the browser.', 0, 'DOWNLOAD_UNAVAILABLE');
+  }
+
+  const isLoginRequest = isAuthLoginRequest(path);
+  const isRefreshRequest = isAuthRefreshRequest(path);
+  const currentAccessToken = getAccessToken();
+
+  if (!isLoginRequest && !isRefreshRequest && isAccessTokenExpired(currentAccessToken)) {
+    await refreshAccessToken();
+  }
+
+  let response: Response;
+
+  try {
+    response = await performRequest(path, { method: 'GET' });
+  } catch (error: any) {
+    throw new ApiError(error?.message || 'Network error while downloading file', 0);
+  }
+
+  if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
+    const refreshedAccessToken = await refreshAccessToken();
+
+    if (refreshedAccessToken) {
+      try {
+        response = await performRequest(path, { method: 'GET' });
+      } catch (error: any) {
+        throw new ApiError(error?.message || 'Network error while downloading file', 0);
+      }
+    }
+  }
+
+  if (!response.ok) {
+    try {
+      await parseResponse<never>(response);
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.status === 401 &&
+        !isLoginRequest &&
+        !isRefreshRequest
+      ) {
+        clearAuthTokens();
+        redirectToLoginAfterExpiredSession();
+      }
+
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  try {
+    link.href = objectUrl;
+    link.download = sanitizeDownloadFilename(filename);
+    link.style.display = 'none';
+    link.tabIndex = -1;
+    link.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+
+    /*
+      Let the browser start consuming the object URL before revoking it.
+      Immediate revocation can be fragile in some browser/download flows.
+      The finally block still guarantees cleanup if DOM append/click fails.
+    */
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 0);
+  }
+
+  return readDownloadMetadata(response);
+}
+
 export async function apiMutationRequest<T>(
   path: string,
   options: SafeMutationRequestInit = {}

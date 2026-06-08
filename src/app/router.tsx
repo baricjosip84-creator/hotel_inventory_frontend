@@ -507,7 +507,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'security',
-        element: <PlatformSecurityPage />
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ]}>
+            <PlatformSecurityPage />
+          </PlatformProtectedRoute>
+        )
       },
       {
         path: 'support-sessions',
@@ -725,7 +729,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'sessions',
-        element: <SessionsPage />
+        element: (
+          <ProtectedRoute>
+            <SessionsPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: 'reports',

@@ -32,4 +32,33 @@ test.describe('reports and forecast surface', () => {
       /Inventory Valuation|Stock by Location|Product Movements|Procurement Summary|Forecast/i
     );
   });
+
+  test('reports page exposes CSV export controls and accessible tab navigation', async ({
+    page,
+    request
+  }) => {
+    await bootstrapAuthenticatedPage(page, request);
+
+    await page.goto('/reports');
+
+    const reportsTabList = page.getByRole('tablist', { name: 'Reports' });
+    await expect(reportsTabList).toBeVisible();
+    await expect(reportsTabList).toHaveAttribute('aria-orientation', 'horizontal');
+
+    await expect(page.getByRole('tab', { name: 'Inventory Valuation' })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('tab', { name: 'Stock by Location' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Stock by Location' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export stock by location report as CSV.' })).toBeVisible();
+
+    const categoryFilter = page.getByLabel('Category Filter');
+    await expect(categoryFilter).toHaveAttribute('maxlength', '120');
+    await expect(page.getByText('Optional. Maximum 120 characters.')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Product Movements' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Product Movements' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export product movements report as CSV.' })).toBeVisible();
+    await expect(page.getByLabel('Result Limit')).toContainText('500');
+    await expect(page.getByText('Maximum 500 movement rows per report.')).toBeVisible();
+  });
+
 });

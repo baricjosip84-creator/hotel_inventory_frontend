@@ -57,7 +57,6 @@ export default function AutomationSchedulesPage() {
   const canCreateAutomationSchedules = capabilities.canCreateAutomationSchedules;
   const canUpdateAutomationSchedules = capabilities.canUpdateAutomationSchedules;
   const canPauseAutomationSchedules = capabilities.canPauseAutomationSchedules;
-  const canResumeAutomationSchedules = capabilities.canResumeAutomationSchedules;
   const canDisableAutomationSchedules = capabilities.canDisableAutomationSchedules;
   const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
   const canViewExecutionRequests = capabilities.canViewExecutionRequests;
@@ -357,22 +356,6 @@ export default function AutomationSchedulesPage() {
       await loadSchedules();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to disable automation schedule');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const tryResume = async (schedule: AutomationSchedule) => {
-    setSaving(true);
-    setError(null);
-    try {
-      await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}/resume`, {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-      await loadSchedules();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Runner is not enabled yet; resume is intentionally blocked in Step 200');
     } finally {
       setSaving(false);
     }
@@ -1787,7 +1770,7 @@ export default function AutomationSchedulesPage() {
                     {canCreateAutomationSchedules && canCreateExecutionRequests && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void runScheduleManually(schedule)}>Run Schedule</button> : null}
                     {canPauseAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
                     {canDisableAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void disableSchedule(schedule)}>Disable</button> : null}
-                    {canResumeAutomationSchedules && schedule.status === 'paused' ? <button style={styles.linkButton} disabled={saving} onClick={() => void tryResume(schedule)}>Resume</button> : null}
+                    {schedule.status === 'paused' ? <button style={styles.disabledLinkButton} disabled title="Resume is intentionally blocked until the automation runner is enabled.">Resume locked</button> : null}
                   </td>
                 </tr>
               ))}
@@ -1999,6 +1982,7 @@ const styles: Record<string, CSSProperties> = {
   primaryButton: { marginTop: 12, padding: '10px 14px', border: 0, borderRadius: 10, background: '#0f172a', color: '#fff', cursor: 'pointer' },
   secondaryButton: { padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', cursor: 'pointer' },
   linkButton: { padding: 0, border: 0, background: 'transparent', color: '#2563eb', cursor: 'pointer', fontWeight: 600 },
+  disabledLinkButton: { padding: 0, border: 0, background: 'transparent', color: '#64748b', cursor: 'not-allowed', fontWeight: 600, opacity: 0.75 },
   toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
