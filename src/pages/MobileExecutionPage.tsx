@@ -5,11 +5,14 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
+type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment' | 'execution_request';
 
 type MobileExecutionTask = {
   mobile_action_id: string;
   action_id: string;
   task_source_id?: string | null;
+  execution_task_source_type?: ExecutionTaskSourceType | null;
+  execution_task_source_id?: string | null;
   mobile_domain?: string;
   queue_status?: string;
   urgency?: ActionUrgency | string;
@@ -38,6 +41,7 @@ type MobileExecutionResponse = {
   filters?: {
     action_domain?: string;
     urgency?: string | null;
+    execution_task_source_type?: ExecutionTaskSourceType | null;
     limit?: number;
   };
   summary?: {
@@ -67,6 +71,20 @@ const URGENCY_FILTERS: Array<{ value: 'all' | ActionUrgency; label: string }> = 
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
+];
+
+
+const SOURCE_FILTERS: Array<{ value: 'all' | ExecutionTaskSourceType; label: string }> = [
+  { value: 'all', label: 'All task sources' },
+  { value: 'execution_request', label: 'Execution requests' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'reservation', label: 'Reservation' },
+  { value: 'requisition', label: 'Requisition' },
+  { value: 'purchase_order', label: 'Purchase order' },
+  { value: 'shipment', label: 'Shipment' },
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'cycle_count', label: 'Cycle count' },
+  { value: 'replenishment', label: 'Replenishment' }
 ];
 
 const gridStyle: CSSProperties = {
@@ -145,11 +163,15 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
 }
 
-async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency): Promise<MobileExecutionResponse> {
+async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency, sourceType: 'all' | ExecutionTaskSourceType): Promise<MobileExecutionResponse> {
   const params = new URLSearchParams({ action_domain: 'execution', limit: '50' });
 
   if (urgency !== 'all') {
     params.set('urgency', urgency);
+  }
+
+  if (sourceType !== 'all') {
+    params.set('execution_task_source_type', sourceType);
   }
 
   return apiRequest<MobileExecutionResponse>(`/operational-action-center/mobile-execution-summary?${params.toString()}`);
@@ -157,10 +179,11 @@ async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency): Prom
 
 export default function MobileExecutionPage() {
   const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
+  const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
 
   const mobileExecutionQuery = useQuery({
-    queryKey: ['mobile-execution-summary', urgency],
-    queryFn: () => fetchMobileExecutionSummary(urgency)
+    queryKey: ['mobile-execution-summary', urgency, sourceType],
+    queryFn: () => fetchMobileExecutionSummary(urgency, sourceType)
   });
 
   const response = mobileExecutionQuery.data;
@@ -202,6 +225,11 @@ export default function MobileExecutionPage() {
           <div style={toolbarStyle}>
             <select style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
               {URGENCY_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select style={selectStyle} value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>
+              {SOURCE_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
@@ -258,6 +286,7 @@ export default function MobileExecutionPage() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {task.barcode_ready ? <span style={badgeStyle}>Scan-ready</span> : null}
                     {task.offline_safe_snapshot ? <span style={badgeStyle}>Offline-safe snapshot</span> : null}
+                    {task.execution_task_source_type ? <span style={badgeStyle}>Source {formatLabel(task.execution_task_source_type)}</span> : null}
                     {task.facility_id ? <span style={badgeStyle}>Facility {task.facility_id}</span> : null}
                     {task.storage_location_id ? <span style={badgeStyle}>Location {task.storage_location_id}</span> : null}
                   </div>

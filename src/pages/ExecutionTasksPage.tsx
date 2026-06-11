@@ -6,7 +6,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 type ExecutionTaskStatus = 'draft' | 'ready' | 'assigned' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 type ExecutionTaskType = 'picking' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'cycle_count' | 'general';
 type ExecutionTaskPriority = 'low' | 'normal' | 'high' | 'urgent';
-type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment';
+type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment' | 'execution_request';
 
 type ExecutionTaskAuditRow = {
   id: string;
@@ -59,6 +59,31 @@ type ExecutionTask = {
   hours_until_due?: number | null;
 };
 
+
+
+type ExecutionTaskBatchStatus = 'draft' | 'released' | 'cancelled';
+type ExecutionTaskBatchType = 'manual' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'mixed';
+
+type ExecutionTaskBatch = {
+  id: string;
+  tenant_id: string;
+  batch_code: string;
+  batch_type: ExecutionTaskBatchType;
+  status: ExecutionTaskBatchStatus;
+  priority: ExecutionTaskPriority;
+  title: string;
+  description?: string | null;
+  facility_id?: string | null;
+  storage_location_id?: string | null;
+  assigned_to?: string | null;
+  due_at?: string | null;
+  sla_due_at?: string | null;
+  task_count?: number;
+  open_task_count?: number;
+  completed_task_count?: number;
+  created_at: string;
+  updated_at: string;
+};
 
 type ExecutionTaskWorkload = {
   assigned_to?: string | null;
@@ -207,6 +232,8 @@ type NewTaskForm = {
   status: 'draft' | 'ready';
   source_type: ExecutionTaskSourceType;
   source_id: string;
+  facility_id: string;
+  storage_location_id: string;
   assigned_to: string;
   due_at: string;
   sla_due_at: string;
@@ -215,7 +242,10 @@ type NewTaskForm = {
 const TASK_TYPES: ExecutionTaskType[] = ['picking', 'reservation_fulfillment', 'receiving', 'replenishment', 'transfer', 'cycle_count', 'general'];
 const PRIORITIES: ExecutionTaskPriority[] = ['urgent', 'high', 'normal', 'low'];
 const STATUSES: ExecutionTaskStatus[] = ['draft', 'ready', 'assigned', 'in_progress', 'blocked', 'completed', 'cancelled'];
-const SOURCE_TYPES: ExecutionTaskSourceType[] = ['manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment'];
+const BATCH_STATUSES: ExecutionTaskBatchStatus[] = ['draft', 'released', 'cancelled'];
+const BATCH_TYPES: ExecutionTaskBatchType[] = ['manual', 'reservation_fulfillment', 'receiving', 'replenishment', 'transfer', 'mixed'];
+const SOURCE_TYPES: ExecutionTaskSourceType[] = ['manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment', 'execution_request'];
+const MANUAL_CREATE_SOURCE_TYPES: ExecutionTaskSourceType[] = SOURCE_TYPES.filter((sourceType) => sourceType !== 'execution_request');
 
 const initialForm: NewTaskForm = {
   title: '',
@@ -225,6 +255,8 @@ const initialForm: NewTaskForm = {
   status: 'draft',
   source_type: 'manual',
   source_id: '',
+  facility_id: '',
+  storage_location_id: '',
   assigned_to: '',
   due_at: '',
   sla_due_at: ''
@@ -258,6 +290,10 @@ function hasJsonContent(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export default function ExecutionTasksPage() {
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canReadOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
@@ -269,6 +305,7 @@ export default function ExecutionTasksPage() {
   const canCancel = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CANCEL);
 
   const [tasks, setTasks] = useState<ExecutionTask[]>([]);
+  const [batches, setBatches] = useState<ExecutionTaskBatch[]>([]);
   const [workload, setWorkload] = useState<ExecutionTaskWorkload[]>([]);
   const [slaQueue, setSlaQueue] = useState<ExecutionTask[]>([]);
   const [throughput, setThroughput] = useState<ExecutionTaskThroughputDashboard | null>(null);
@@ -283,10 +320,45 @@ export default function ExecutionTasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ExecutionTaskStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ExecutionTaskType | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<ExecutionTaskSourceType | 'all'>('all');
+  const [sourceIdFilter, setSourceIdFilter] = useState('');
+  const [batchStatusFilter, setBatchStatusFilter] = useState<ExecutionTaskBatchStatus | 'all'>('all');
+  const [batchTypeFilter, setBatchTypeFilter] = useState<ExecutionTaskBatchType | 'all'>('all');
+  const [facilityIdFilter, setFacilityIdFilter] = useState('');
+  const [storageLocationIdFilter, setStorageLocationIdFilter] = useState('');
+  const sourceIdFilterError = useMemo(() => {
+    const normalized = sourceIdFilter.trim();
+    return normalized && !isUuid(normalized) ? 'Source ID must be a valid UUID before filters can be applied.' : null;
+  }, [sourceIdFilter]);
+  const facilityIdFilterError = useMemo(() => {
+    const normalized = facilityIdFilter.trim();
+    return normalized && !isUuid(normalized) ? 'Facility ID must be a valid UUID before filters can be applied.' : null;
+  }, [facilityIdFilter]);
+  const storageLocationIdFilterError = useMemo(() => {
+    const normalized = storageLocationIdFilter.trim();
+    return normalized && !isUuid(normalized) ? 'Storage location ID must be a valid UUID before filters can be applied.' : null;
+  }, [storageLocationIdFilter]);
   const [openOnly, setOpenOnly] = useState(true);
   const [priorityQueueMode, setPriorityQueueMode] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<NewTaskForm>(initialForm);
+  const formSourceIdError = useMemo(() => {
+    const normalized = form.source_id.trim();
+    return normalized && !isUuid(normalized) ? 'Source ID must be a valid UUID before the task can be created.' : null;
+  }, [form.source_id]);
+  const formFacilityIdError = useMemo(() => {
+    const normalized = form.facility_id.trim();
+    return normalized && !isUuid(normalized) ? 'Facility ID must be a valid UUID before the task can be created.' : null;
+  }, [form.facility_id]);
+  const formStorageLocationIdError = useMemo(() => {
+    const normalized = form.storage_location_id.trim();
+    return normalized && !isUuid(normalized) ? 'Storage location ID must be a valid UUID before the task can be created.' : null;
+  }, [form.storage_location_id]);
+  const formAssignedToError = useMemo(() => {
+    const normalized = form.assigned_to.trim();
+    return normalized && !isUuid(normalized) ? 'Assigned user must be a valid UUID before the task can be created.' : null;
+  }, [form.assigned_to]);
+  const createTaskDisabled = saving || form.title.trim().length < 3 || Boolean(formSourceIdError || formFacilityIdError || formStorageLocationIdError || formAssignedToError);
 
   const summary = useMemo(() => {
     const open = tasks.filter((task) => !['completed', 'cancelled'].includes(task.status)).length;
@@ -305,33 +377,75 @@ export default function ExecutionTasksPage() {
     setLoading(true);
     setError(null);
 
+    const normalizedSourceIdFilter = sourceIdFilter.trim();
+    const normalizedFacilityIdFilter = facilityIdFilter.trim();
+    const normalizedStorageLocationIdFilter = storageLocationIdFilter.trim();
+    const filterValidationError = sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError;
+    if (filterValidationError) {
+      setLoading(false);
+      setError(filterValidationError);
+      return;
+    }
+
+    const appendLocationFilters = (paramsToUpdate: URLSearchParams) => {
+      if (normalizedFacilityIdFilter) paramsToUpdate.set('facility_id', normalizedFacilityIdFilter);
+      if (normalizedStorageLocationIdFilter) paramsToUpdate.set('storage_location_id', normalizedStorageLocationIdFilter);
+    };
+
     const params = new URLSearchParams();
     params.set('limit', '100');
     if (priorityQueueMode) {
       if (typeFilter !== 'all') params.set('task_type', typeFilter);
+      if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
+      if (normalizedSourceIdFilter) params.set('source_id', normalizedSourceIdFilter);
+      appendLocationFilters(params);
     } else {
       params.set('open_only', openOnly ? 'true' : 'false');
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (typeFilter !== 'all') params.set('task_type', typeFilter);
+      if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
+      if (normalizedSourceIdFilter) params.set('source_id', normalizedSourceIdFilter);
+      appendLocationFilters(params);
       if (search.trim()) params.set('search', search.trim());
     }
 
     const workloadParams = new URLSearchParams();
     workloadParams.set('limit', '25');
     if (typeFilter !== 'all') workloadParams.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') workloadParams.set('source_type', sourceFilter);
+    if (normalizedSourceIdFilter) workloadParams.set('source_id', normalizedSourceIdFilter);
+    appendLocationFilters(workloadParams);
 
     const slaParams = new URLSearchParams();
     slaParams.set('limit', '25');
     slaParams.set('sla_status', 'all');
     if (typeFilter !== 'all') slaParams.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') slaParams.set('source_type', sourceFilter);
+    if (normalizedSourceIdFilter) slaParams.set('source_id', normalizedSourceIdFilter);
+    appendLocationFilters(slaParams);
 
     const throughputParams = new URLSearchParams();
     throughputParams.set('days', '14');
     if (typeFilter !== 'all') throughputParams.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') throughputParams.set('source_type', sourceFilter);
+    if (normalizedSourceIdFilter) throughputParams.set('source_id', normalizedSourceIdFilter);
+    appendLocationFilters(throughputParams);
 
     const mobileParams = new URLSearchParams();
     mobileParams.set('limit', '20');
     if (typeFilter !== 'all') mobileParams.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') mobileParams.set('source_type', sourceFilter);
+    if (normalizedSourceIdFilter) mobileParams.set('source_id', normalizedSourceIdFilter);
+    appendLocationFilters(mobileParams);
+
+    const batchParams = new URLSearchParams();
+    batchParams.set('limit', '25');
+    if (batchStatusFilter !== 'all') batchParams.set('status', batchStatusFilter);
+    if (batchTypeFilter !== 'all') batchParams.set('batch_type', batchTypeFilter);
+    if (sourceFilter !== 'all') batchParams.set('source_type', sourceFilter);
+    if (normalizedSourceIdFilter) batchParams.set('source_id', normalizedSourceIdFilter);
+    appendLocationFilters(batchParams);
+    if (search.trim()) batchParams.set('search', search.trim());
 
     const optimizationParams = new URLSearchParams();
     optimizationParams.set('limit', '10');
@@ -343,8 +457,9 @@ export default function ExecutionTasksPage() {
 
     try {
       const endpoint = priorityQueueMode ? '/execution-tasks/priority-queue' : '/execution-tasks';
-      const [nextTasks, nextWorkload, nextSlaQueue, nextThroughput, nextMobileQueue, nextOptimizationDashboard, nextMobileOptimization] = await Promise.all([
+      const [nextTasks, nextBatches, nextWorkload, nextSlaQueue, nextThroughput, nextMobileQueue, nextOptimizationDashboard, nextMobileOptimization] = await Promise.all([
         apiRequest<ExecutionTask[]>(`${endpoint}?${params.toString()}`),
+        apiRequest<ExecutionTaskBatch[]>(`/execution-tasks/batches?${batchParams.toString()}`),
         apiRequest<ExecutionTaskWorkload[]>(`/execution-tasks/workload?${workloadParams.toString()}`),
         apiRequest<ExecutionTask[]>(`/execution-tasks/sla-queue?${slaParams.toString()}`),
         apiRequest<ExecutionTaskThroughputDashboard>(`/execution-tasks/throughput-dashboard?${throughputParams.toString()}`),
@@ -357,6 +472,7 @@ export default function ExecutionTasksPage() {
           : Promise.resolve(null)
       ]);
       setTasks(nextTasks);
+      setBatches(nextBatches);
       setWorkload(nextWorkload);
       setSlaQueue(nextSlaQueue);
       setThroughput(nextThroughput);
@@ -369,7 +485,7 @@ export default function ExecutionTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [canRead, canReadOptimization, openOnly, priorityQueueMode, search, statusFilter, typeFilter]);
+  }, [canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
 
   useEffect(() => {
     void loadTasks();
@@ -408,6 +524,13 @@ export default function ExecutionTasksPage() {
     setMessage(null);
     setError(null);
 
+    const formValidationError = formSourceIdError || formFacilityIdError || formStorageLocationIdError || formAssignedToError;
+    if (formValidationError) {
+      setError(formValidationError);
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -416,6 +539,8 @@ export default function ExecutionTasksPage() {
       status: form.status,
       source_type: form.source_type,
       source_id: form.source_id.trim() || null,
+      facility_id: form.facility_id.trim() || null,
+      storage_location_id: form.storage_location_id.trim() || null,
       assigned_to: form.assigned_to.trim() || null,
       due_at: toIsoOrNull(form.due_at),
       sla_due_at: toIsoOrNull(form.sla_due_at)
@@ -443,12 +568,23 @@ export default function ExecutionTasksPage() {
     setMessage(null);
     setError(null);
 
+    const exportValidationError = sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError;
+    if (exportValidationError) {
+      setError(exportValidationError);
+      setSaving(false);
+      return;
+    }
+
     const params = new URLSearchParams();
     params.set('days', '30');
     params.set('limit', '10000');
     params.set('open_only', openOnly ? 'true' : 'false');
     if (statusFilter !== 'all') params.set('status', statusFilter);
     if (typeFilter !== 'all') params.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
+    if (sourceIdFilter.trim()) params.set('source_id', sourceIdFilter.trim());
+    if (facilityIdFilter.trim()) params.set('facility_id', facilityIdFilter.trim());
+    if (storageLocationIdFilter.trim()) params.set('storage_location_id', storageLocationIdFilter.trim());
     if (search.trim()) params.set('search', search.trim());
 
     try {
@@ -571,6 +707,36 @@ export default function ExecutionTasksPage() {
     }
   };
 
+  const runBatchTransition = async (batch: ExecutionTaskBatch, action: 'release' | 'cancel') => {
+    let body: Record<string, string> = {};
+
+    if (action === 'cancel') {
+      const cancellationReason = window.prompt('Cancellation reason');
+      if (!cancellationReason) return;
+      body = { cancellation_reason: cancellationReason.trim() };
+    }
+
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+
+    try {
+      const updated = await apiRequest<ExecutionTaskBatch>(`/execution-tasks/batches/${batch.id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      setBatches((current) => current.map((candidate) => (candidate.id === updated.id ? updated : candidate)));
+      setMessage(`Updated execution batch ${updated.batch_code} to ${label(updated.status)}.`);
+      await loadTasks();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
   if (!canRead) {
     return (
       <main style={styles.page}>
@@ -588,13 +754,13 @@ export default function ExecutionTasksPage() {
         <div>
           <p style={styles.eyebrow}>Feature #7</p>
           <h1 style={styles.title}>Execution Tasks</h1>
-          <p style={styles.subtitle}>Coordinate picking, receiving, replenishment, transfer, cycle count, and reservation-fulfillment work from one operational task queue.</p>
+          <p style={styles.subtitle}>Coordinate picking, receiving, replenishment, transfer, cycle count, reservation-fulfillment, and execution-request closure work from one operational task queue.</p>
         </div>
         <div style={styles.actionRow}>
-          <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void exportAnalyticsCsv()}>
+          <button type="button" className="btn btn-secondary" disabled={saving || Boolean(sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError)} onClick={() => void exportAnalyticsCsv()}>
             Export analytics CSV
           </button>
-          <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void loadTasks()}>
+          <button type="button" className="btn btn-secondary" disabled={loading || Boolean(sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError)} onClick={() => void loadTasks()}>
             Refresh
           </button>
         </div>
@@ -808,12 +974,64 @@ export default function ExecutionTasksPage() {
         </div>
       </section>
 
+      <section style={styles.card}>
+        <div style={styles.cardHeader}>
+          <div>
+            <h2 style={styles.cardTitle}>Execution Batches</h2>
+            <p style={styles.muted}>Released and draft task batches using the same facility, storage-location, and search filters as the task queue.</p>
+          </div>
+          <span style={styles.muted}>{batches.length} loaded</span>
+        </div>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Batch</th>
+                <th style={styles.th}>Status</th>
+                <th style={styles.th}>Priority</th>
+                <th style={styles.th}>Tasks</th>
+                <th style={styles.th}>Location</th>
+                <th style={styles.th}>Due</th>
+                <th style={styles.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {batches.map((batch) => (
+                <tr key={batch.id}>
+                  <td style={styles.td}>
+                    <div style={styles.strong}>{batch.batch_code}</div>
+                    <div>{batch.title}</div>
+                    <div style={styles.muted}>{label(batch.batch_type)}</div>
+                  </td>
+                  <td style={styles.td}><StatusPill status={batch.status} /></td>
+                  <td style={styles.td}>{label(batch.priority)}</td>
+                  <td style={styles.td}>{batch.completed_task_count ?? 0} completed / {batch.open_task_count ?? 0} open / {batch.task_count ?? 0} total</td>
+                  <td style={styles.td}>{batch.storage_location_id || batch.facility_id || '-'}</td>
+                  <td style={styles.td}>{dateTime(batch.sla_due_at || batch.due_at)}</td>
+                  <td style={styles.td}>
+                    <div style={styles.actionRow}>
+                      {canUpdate && batch.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void runBatchTransition(batch, 'release')}>Release</button> : null}
+                      {canCancel && batch.status !== 'cancelled' ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => void runBatchTransition(batch, 'cancel')}>Cancel</button> : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!batches.length ? (
+                <tr>
+                  <td style={styles.td} colSpan={7}>{loading ? 'Loading execution batches…' : 'No execution batches match the current filters.'}</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section style={styles.grid}>
         <div style={styles.card}>
           <div style={styles.cardHeader}>
             <div>
               <h2 style={styles.cardTitle}>Task Queue</h2>
-              <p style={styles.muted}>{priorityQueueMode ? 'Priority engine queue sorted by urgency, SLA/due risk, source, and lifecycle state.' : 'Filtered by status, type, open-state, and search.'}</p>
+              <p style={styles.muted}>{priorityQueueMode ? 'Priority engine queue sorted by urgency, SLA/due risk, source, and lifecycle state.' : 'Filtered by status, type, source, open-state, and search.'}</p>
             </div>
           </div>
 
@@ -838,6 +1056,42 @@ export default function ExecutionTasksPage() {
                 <option value="all">All types</option>
                 {TASK_TYPES.map((taskType) => <option key={taskType} value={taskType}>{label(taskType)}</option>)}
               </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Source
+              <select style={styles.input} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExecutionTaskSourceType | 'all')}>
+                <option value="all">All sources</option>
+                {SOURCE_TYPES.map((sourceType) => <option key={sourceType} value={sourceType}>{label(sourceType)}</option>)}
+              </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Source ID
+              <input style={styles.input} value={sourceIdFilter} onChange={(event) => setSourceIdFilter(event.target.value)} placeholder="Optional source UUID" aria-invalid={Boolean(sourceIdFilterError)} />
+              {sourceIdFilterError ? <span style={styles.errorText}>{sourceIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every source record.</span>}
+            </label>
+            <label style={styles.fieldLabel}>
+              Batch Status
+              <select style={styles.input} value={batchStatusFilter} onChange={(event) => setBatchStatusFilter(event.target.value as ExecutionTaskBatchStatus | 'all')}>
+                <option value="all">All batch statuses</option>
+                {BATCH_STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+              </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Batch Type
+              <select style={styles.input} value={batchTypeFilter} onChange={(event) => setBatchTypeFilter(event.target.value as ExecutionTaskBatchType | 'all')}>
+                <option value="all">All batch types</option>
+                {BATCH_TYPES.map((batchType) => <option key={batchType} value={batchType}>{label(batchType)}</option>)}
+              </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Facility ID
+              <input style={styles.input} value={facilityIdFilter} onChange={(event) => setFacilityIdFilter(event.target.value)} placeholder="Optional facility UUID" aria-invalid={Boolean(facilityIdFilterError)} />
+              {facilityIdFilterError ? <span style={styles.errorText}>{facilityIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every facility.</span>}
+            </label>
+            <label style={styles.fieldLabel}>
+              Storage Location ID
+              <input style={styles.input} value={storageLocationIdFilter} onChange={(event) => setStorageLocationIdFilter(event.target.value)} placeholder="Optional storage location UUID" aria-invalid={Boolean(storageLocationIdFilterError)} />
+              {storageLocationIdFilterError ? <span style={styles.errorText}>{storageLocationIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every storage location.</span>}
             </label>
             <label style={styles.fieldLabel}>
               Search
@@ -898,12 +1152,14 @@ export default function ExecutionTasksPage() {
                 <label style={styles.fieldLabel}>Type<select style={styles.input} value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((taskType) => <option key={taskType} value={taskType}>{label(taskType)}</option>)}</select></label>
                 <label style={styles.fieldLabel}>Priority<select style={styles.input} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label>
                 <label style={styles.fieldLabel}>Initial status<select style={styles.input} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">Draft</option><option value="ready">Ready</option></select></label>
-                <label style={styles.fieldLabel}>Source<select style={styles.input} value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as ExecutionTaskSourceType })}>{SOURCE_TYPES.map((sourceType) => <option key={sourceType} value={sourceType}>{label(sourceType)}</option>)}</select></label>
-                <label style={styles.fieldLabel}>Source ID<input style={styles.input} value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Optional UUID" /></label>
-                <label style={styles.fieldLabel}>Assign to<input style={styles.input} value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} placeholder="Optional user UUID" /></label>
+                <label style={styles.fieldLabel}>Source<select style={styles.input} value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as ExecutionTaskSourceType })}>{MANUAL_CREATE_SOURCE_TYPES.map((sourceType) => <option key={sourceType} value={sourceType}>{label(sourceType)}</option>)}</select></label>
+                <label style={styles.fieldLabel}>Source ID<input style={styles.input} value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Optional UUID" aria-invalid={Boolean(formSourceIdError)} />{formSourceIdError ? <span style={styles.errorText}>{formSourceIdError}</span> : null}</label>
+                <label style={styles.fieldLabel}>Facility ID<input style={styles.input} value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder="Optional facility UUID" aria-invalid={Boolean(formFacilityIdError)} />{formFacilityIdError ? <span style={styles.errorText}>{formFacilityIdError}</span> : null}</label>
+                <label style={styles.fieldLabel}>Storage Location ID<input style={styles.input} value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} placeholder="Optional storage location UUID" aria-invalid={Boolean(formStorageLocationIdError)} />{formStorageLocationIdError ? <span style={styles.errorText}>{formStorageLocationIdError}</span> : null}</label>
+                <label style={styles.fieldLabel}>Assign to<input style={styles.input} value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} placeholder="Optional user UUID" aria-invalid={Boolean(formAssignedToError)} />{formAssignedToError ? <span style={styles.errorText}>{formAssignedToError}</span> : null}</label>
                 <label style={styles.fieldLabel}>Due at<input style={styles.input} type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
                 <label style={styles.fieldLabel}>SLA due at<input style={styles.input} type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
-                <button type="button" className="btn btn-primary" disabled={saving || form.title.trim().length < 3} onClick={() => void createTask()}>Create execution task</button>
+                <button type="button" className="btn btn-primary" disabled={createTaskDisabled} onClick={() => void createTask()}>Create execution task</button>
               </div>
             </div>
           ) : null}
@@ -934,7 +1190,7 @@ function SummaryCard({ label: cardLabel, value }: { label: string; value: number
   return <div style={styles.summaryCard}><span style={styles.summaryValue}>{value}</span><span style={styles.muted}>{cardLabel}</span></div>;
 }
 
-function StatusPill({ status }: { status: ExecutionTaskStatus }) {
+function StatusPill({ status }: { status: ExecutionTaskStatus | ExecutionTaskBatchStatus }) {
   return <span style={styles.pill}>{label(status)}</span>;
 }
 

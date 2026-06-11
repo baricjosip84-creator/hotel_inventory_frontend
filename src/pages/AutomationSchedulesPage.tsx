@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
+import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerRunOnceResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
 
 type StatusFilter = '' | AutomationSchedule['status'];
 type TypeFilter = '' | AutomationSchedule['automation_type'];
@@ -34,7 +34,7 @@ const automationTypes: AutomationSchedule['automation_type'][] = [
   'execution_readiness_review'
 ];
 
-const statuses: AutomationSchedule['status'][] = ['draft', 'paused', 'disabled'];
+const statuses: AutomationSchedule['status'][] = ['draft', 'active', 'paused', 'disabled'];
 const scheduleKinds: AutomationSchedule['schedule_kind'][] = ['manual', 'daily', 'weekly', 'monthly'];
 
 function label(value?: string | null): string {
@@ -57,6 +57,7 @@ export default function AutomationSchedulesPage() {
   const canCreateAutomationSchedules = capabilities.canCreateAutomationSchedules;
   const canUpdateAutomationSchedules = capabilities.canUpdateAutomationSchedules;
   const canPauseAutomationSchedules = capabilities.canPauseAutomationSchedules;
+  const canResumeAutomationSchedules = capabilities.canResumeAutomationSchedules;
   const canDisableAutomationSchedules = capabilities.canDisableAutomationSchedules;
   const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
   const canViewExecutionRequests = capabilities.canViewExecutionRequests;
@@ -100,6 +101,7 @@ export default function AutomationSchedulesPage() {
   const [selected, setSelected] = useState<AutomationSchedule | null>(null);
   const [dryRunResult, setDryRunResult] = useState<AutomationScheduleDryRunResponse | null>(null);
   const [manualRunResult, setManualRunResult] = useState<AutomationScheduleManualRunResponse | null>(null);
+  const [runnerRunOnceResult, setRunnerRunOnceResult] = useState<AutomationRunnerRunOnceResponse | null>(null);
   const [auditPack, setAuditPack] = useState<AutomationScheduleAuditPackResponse | null>(null);
   const [status, setStatus] = useState<StatusFilter>('');
   const [automationType, setAutomationType] = useState<TypeFilter>('');
@@ -340,6 +342,24 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+  const resumeSchedule = async (schedule: AutomationSchedule) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}/resume`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      setSelected(updated);
+      setEditForm(scheduleToForm(updated));
+      await loadSchedules();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to activate automation schedule');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const disableSchedule = async (schedule: AutomationSchedule) => {
     const reason = window.prompt('Why should this automation schedule be disabled?');
     if (!reason || reason.trim().length < 3) return;
@@ -361,6 +381,76 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+
+
+  const runDueSchedulesOnce = async () => {
+    const confirmed = window.confirm('Run due active schedules once for this tenant? This can create execution requests, but it will not approve, execute, or mutate inventory.');
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<AutomationRunnerRunOnceResponse>('/automation-schedules/runner/run-once', {
+        method: 'POST',
+        body: JSON.stringify({ limit: runnerStatus?.batch_limit ?? 10, confirm_request_creation: true })
+      });
+      setRunnerRunOnceResult(response);
+      await loadSchedules();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to run due automation schedules once');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+  const acknowledgeRunnerUnsafeOutputReview = async () => {
+    const expectedLastUnsafeAt = runnerStatus?.unsafe_runner_output_review_expected_last_unsafe_runner_output_at || runnerStatus?.expected_last_unsafe_runner_output_at || runnerStatus?.last_unsafe_runner_output_at || null;
+    const expectedUnsafeCount = Number(runnerStatus?.unsafe_runner_output_review_expected_count ?? runnerStatus?.expected_unsafe_runner_output_count ?? runnerStatus?.unsafe_runner_output_count ?? 0);
+    if (!expectedLastUnsafeAt || !Number.isFinite(expectedUnsafeCount) || expectedUnsafeCount <= 0) {
+      setError('Refresh runner status before acknowledging anomaly review; the latest unsafe-output timestamp and count are required.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Acknowledge unsafe-output anomaly review for latest unsafe output at ${formatDateTime(expectedLastUnsafeAt)} with anomaly count ${expectedUnsafeCount}? This preserves anomaly evidence, count, and timestamps, but clears the current review-required status only if the confirmation is still current.`);
+    if (!confirmed) return;
+
+    const reviewNoteMinLength = Number(runnerStatus?.unsafe_runner_output_review_note_min_length ?? 10);
+    const reviewNoteMaxLength = Number(runnerStatus?.unsafe_runner_output_review_note_max_length ?? 1000);
+    const note = window.prompt(`Add a specific review note (${reviewNoteMinLength}-${reviewNoteMaxLength} characters). This note is required and will be redacted from runner status and audit body fields.`);
+    if (note === null) return;
+
+    const reviewNote = note.trim();
+    if (reviewNote.length < reviewNoteMinLength) {
+      setError(`A specific review note of at least ${reviewNoteMinLength} characters is required before acknowledging runner anomaly review.`);
+      return;
+    }
+
+    if (reviewNote.length > reviewNoteMaxLength) {
+      setError(`Review note must be ${reviewNoteMaxLength} characters or less before acknowledging runner anomaly review.`);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner/unsafe-output-review/acknowledge', {
+        method: 'POST',
+        body: JSON.stringify({
+          confirm_unsafe_output_review: true,
+          expected_last_unsafe_runner_output_at: expectedLastUnsafeAt,
+          expected_unsafe_runner_output_count: expectedUnsafeCount,
+          review_note: reviewNote
+        })
+      });
+      setRunnerStatus(response);
+      await loadSchedules();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to acknowledge runner anomaly review');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const runScheduleManually = async (schedule: AutomationSchedule) => {
     const confirmed = window.confirm('Create an execution request from this schedule? This will not approve or execute the request.');
@@ -1269,6 +1359,14 @@ export default function AutomationSchedulesPage() {
             </div>
             <div style={styles.safetyBadge}>{runnerStatus.request_creation_enabled ? 'Creates requests only' : (runnerStatus.enabled ? 'Observe only' : 'Disabled')}</div>
           </div>
+          {canCreateAutomationSchedules && canCreateExecutionRequests ? (
+            <div style={styles.actions}>
+              <button style={styles.primaryButton} disabled={saving || !runnerStatus.request_creation_enabled} onClick={() => void runDueSchedulesOnce()}>
+                Run due schedules once
+              </button>
+              <span style={styles.muted}>Tenant-scoped run-once now requires explicit confirmation. It only creates execution requests and never approves or executes them.</span>
+            </div>
+          ) : null}
           <div style={styles.metricGrid}>
             <div style={styles.metric}><strong>{runnerStatus.enabled ? 'Enabled flag' : 'Disabled'}</strong><span>Runner flag</span></div>
             <div style={styles.metric}><strong>{runnerStatus.started ? 'Started' : 'Not started'}</strong><span>Process state</span></div>
@@ -1277,7 +1375,114 @@ export default function AutomationSchedulesPage() {
             <div style={styles.metric}><strong>{runnerStatus.permission_profile?.uses_broad_role ? 'Broad role' : 'Explicit only'}</strong><span>Runner permissions</span></div>
             <div style={styles.metric}><strong>{runnerStatus.request_creation_hard_cap ?? '—'}</strong><span>Request hard cap</span></div>
             <div style={styles.metric}><strong>{runnerStatus.race_protection?.enabled ? 'Enabled' : '—'}</strong><span>Race guard</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.tick_in_flight ? 'Running' : 'Idle'}</strong><span>Tick guard</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.skipped_overlap_count ?? 0}</strong><span>Overlap skips</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.successful_tick_count ?? 0}</strong><span>Successful ticks</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.failed_tick_count ?? 0}</strong><span>Failed ticks</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.observe_only_tick_count ?? 0}</strong><span>Observe-only ticks</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.empty_due_tick_count ?? 0}</strong><span>Empty due ticks</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.request_creation_tick_count ?? 0}</strong><span>Request-creation ticks</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_successful_tick_at ? formatDateTime(runnerStatus.last_successful_tick_at) : '—'}</strong><span>Last successful tick</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_failed_tick_at ? formatDateTime(runnerStatus.last_failed_tick_at) : '—'}</strong><span>Last failed tick</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_empty_due_tick_at ? formatDateTime(runnerStatus.last_empty_due_tick_at) : '—'}</strong><span>Last empty-due tick</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_request_creation_tick_at ? formatDateTime(runnerStatus.last_request_creation_tick_at) : '—'}</strong><span>Last request tick</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_overlap_skip_at ? formatDateTime(runnerStatus.last_overlap_skip_at) : '—'}</strong><span>Last overlap skip</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_tick_outcome ? label(runnerStatus.last_tick_outcome) : '—'}</strong><span>Last tick outcome</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.status_generated_at ? formatDateTime(runnerStatus.status_generated_at) : '—'}</strong><span>Status generated</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.tick_status_fresh === false ? 'Stale' : (runnerStatus.tick_status_fresh === true ? 'Fresh' : 'No tick yet')}</strong><span>Tick freshness</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_tick_age_ms ?? '—'}</strong><span>Last tick age ms</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.next_tick_in_ms ?? '—'}</strong><span>Next tick in ms</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.tick_stale_after_ms ?? '—'}</strong><span>Stale after ms</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.failure_backoff_ms ?? '—'}</strong><span>Failure backoff ms</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_tick_output_safety_status ? label(runnerStatus.last_tick_output_safety_status) : '—'}</strong><span>Top-level output safety</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_tick_output_anomaly_status ? label(runnerStatus.last_tick_output_anomaly_status) : '—'}</strong><span>Anomaly status</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_detected ? 'Yes' : 'No'}</strong><span>Top-level unsafe output</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_count ?? 0}</strong><span>Unsafe output count</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_memory_status ? label(runnerStatus.unsafe_runner_output_memory_status) : '—'}</strong><span>Anomaly memory</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_required ? 'Required' : (runnerStatus.unsafe_runner_output_review_acknowledgement_current ? 'Acknowledged' : 'No')}</strong><span>Anomaly review</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_acknowledged_at) : '—'}</strong><span>Review acknowledged</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_by ?? '—'}</strong><span>Reviewed by</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_unsafe_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_acknowledged_unsafe_at) : '—'}</strong><span>Reviewed unsafe output</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_count ?? '—'}</strong><span>Reviewed unsafe count</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_timestamp_current ? 'Current' : (runnerStatus.unsafe_runner_output_memory_active ? 'Not current' : '—')}</strong><span>Reviewed timestamp current</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_count_current ? 'Current' : (runnerStatus.unsafe_runner_output_memory_active ? 'Not current' : '—')}</strong><span>Reviewed count current</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_present ? 'Present' : '—'}</strong><span>Review note evidence</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_length ?? '—'}</strong><span>Review note length</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_min_length ?? 10} / {runnerStatus.unsafe_runner_output_review_note_max_length ?? 1000}</strong><span>Review note min/max</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_redacted ? 'Redacted' : '—'}</strong><span>Review note body</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_confirmation_required ? 'Required' : 'No'}</strong><span>Review confirmation</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? 'Allowed' : 'Blocked'}</strong><span>Review acknowledge guard</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_block_reason ? label(runnerStatus.unsafe_runner_output_review_acknowledge_block_reason) : '—'}</strong><span>Review block reason</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_evidence_status ? label(runnerStatus.unsafe_runner_output_review_evidence_status) : '—'}</strong><span>Review evidence status</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_evidence_complete ? 'Complete' : (runnerStatus.unsafe_runner_output_memory_active ? 'Incomplete/pending' : '—')}</strong><span>Review evidence complete</span></div>
+            <div style={styles.metric}><strong>{Array.isArray(runnerStatus.unsafe_runner_output_review_evidence_missing) && runnerStatus.unsafe_runner_output_review_evidence_missing.length ? runnerStatus.unsafe_runner_output_review_evidence_missing.map(label).join(', ') : '—'}</strong><span>Missing review evidence</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejected_count ?? 0}</strong><span>Rejected reviews</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_at) : '—'}</strong><span>Last rejected review</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_reason ? label(runnerStatus.last_unsafe_runner_output_review_rejected_reason) : '—'}</strong><span>Reject reason</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_by || '—'}</strong><span>Rejected by</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at) : '—'}</strong><span>Rejected expected timestamp</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at) : '—'}</strong><span>Rejected actual timestamp</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_expected_count ?? '—'}</strong><span>Rejected expected count</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_actual_count ?? '—'}</strong><span>Rejected actual count</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_present ? 'Present' : '—'}</strong><span>Rejected note evidence</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_length ?? '—'}</strong><span>Rejected note length</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_redacted ? 'Redacted' : '—'}</strong><span>Rejected note body</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_result ? label(runnerStatus.unsafe_runner_output_review_acknowledge_result) : '—'}</strong><span>Last review acknowledgement result</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejection_evidence_status ? label(runnerStatus.unsafe_runner_output_review_rejection_evidence_status) : '—'}</strong><span>Rejected evidence status</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejection_evidence_complete ? 'Complete' : (runnerStatus.unsafe_runner_output_review_rejection_memory_active ? 'Incomplete' : '—')}</strong><span>Rejected evidence complete</span></div>
+            <div style={styles.metric}><strong>{Array.isArray(runnerStatus.unsafe_runner_output_review_rejection_evidence_missing) && runnerStatus.unsafe_runner_output_review_rejection_evidence_missing.length ? runnerStatus.unsafe_runner_output_review_rejection_evidence_missing.map(label).join(', ') : '—'}</strong><span>Missing rejected evidence</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_recency_status ? label(runnerStatus.unsafe_runner_output_review_recency_status) : '—'}</strong><span>Review recency</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_stale ? 'Yes' : 'No'}</strong><span>Stale review</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_at) : '—'}</strong><span>Last unsafe output</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at) : '—'}</strong><span>Expected review timestamp</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_expected_count ?? runnerStatus.expected_unsafe_runner_output_count ?? '—'}</strong><span>Expected review count</span></div>
+            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_required && runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at ? 'Required' : '—'}</strong><span>Latest timestamp/count confirmation</span></div>
           </div>
+          {runnerStatus.unsafe_runner_output_review_rejection_memory_active ? (
+            <p style={styles.warningText}>Runner status has rejected unsafe-output review acknowledgement attempt(s). Last rejection: {runnerStatus.last_unsafe_runner_output_review_rejected_reason ? label(runnerStatus.last_unsafe_runner_output_review_rejected_reason) : 'unknown reason'} by {runnerStatus.last_unsafe_runner_output_review_rejected_by || 'unknown actor'}. Expected timestamp: {runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at) : '—'}; actual timestamp: {runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at) : '—'}; expected count: {runnerStatus.last_unsafe_runner_output_review_rejected_expected_count ?? '—'}; actual count: {runnerStatus.last_unsafe_runner_output_review_rejected_actual_count ?? '—'}. Rejected note body is redacted; evidence shows {runnerStatus.last_unsafe_runner_output_review_rejected_note_present ? `present (${runnerStatus.last_unsafe_runner_output_review_rejected_note_length ?? 'unknown'} characters)` : 'not present'}.</p>
+          ) : null}
+          {runnerStatus.unsafe_runner_output_review_required ? (
+            <div style={styles.warningBox}>
+              <p style={styles.warningText}>Runner status has recorded unsafe output anomaly memory that still requires review, even if the latest tick is safe. Inspect the anomaly count, last anomaly timestamp, last tick summary, raw status JSON, and audit ledger before trusting automation status. A specific bounded review note, latest unsafe-output timestamp confirmation, and matching reviewed anomaly count are required before acknowledgement. Current acknowledgement guard: {runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? 'allowed' : `blocked by ${label(runnerStatus.unsafe_runner_output_review_acknowledge_block_reason || 'unknown_reason')}`}.</p>
+              {canCreateAutomationSchedules ? (
+                <button style={styles.secondaryButton} disabled={saving || !runnerStatus.unsafe_runner_output_review_acknowledge_allowed} onClick={() => void acknowledgeRunnerUnsafeOutputReview()}>
+                  Confirm and acknowledge anomaly review
+                </button>
+              ) : null}
+            </div>
+          ) : runnerStatus.unsafe_runner_output_review_acknowledgement_current ? (
+            <p style={styles.muted}>Unsafe-output anomaly evidence is preserved, and the current anomaly memory has been reviewed/acknowledged with a required review note and reviewed unsafe-output count. Note evidence is visible as present/length without needing to open raw JSON.</p>
+          ) : null}
+          {runnerStatus.tick_status_fresh === false ? (
+            <p style={styles.warningText}>Runner status may be stale. Last tick age is {runnerStatus.last_tick_age_ms ?? 'unknown'}ms, above the freshness threshold of {runnerStatus.tick_stale_after_ms ?? 'unknown'}ms.</p>
+          ) : null}
+
+          {runnerStatus.last_tick_outcome === 'empty_due_succeeded' ? (
+            <p style={styles.muted}>Last background tick succeeded with no active schedules due, so no execution requests were created.</p>
+          ) : null}
+          <p style={styles.muted}>Tick timestamps are shown separately from counters so stale runner status is visible without opening raw JSON.</p>
+          {runnerStatus.last_tick_summary ? (
+            <>
+              <h4 style={styles.smallTitle}>Last tick safe summary</h4>
+              <div style={styles.metricGrid}>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.outcome ? label(runnerStatus.last_tick_summary.outcome) : '—'}</strong><span>Outcome</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.processed_schedule_count ?? 0}</strong><span>Processed</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.created_execution_request_count ?? 0}</strong><span>Requests created</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.skipped_schedule_count ?? 0}</strong><span>Schedules skipped</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.failed_schedule_count ?? 0}</strong><span>Schedule failures</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.executed_request_count ?? 0}</strong><span>Requests executed</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.safety_status ? label(runnerStatus.last_tick_summary.safety_status) : '—'}</strong><span>Output safety</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.reported_executed_request_count ?? 0}</strong><span>Reported executions</span></div>
+                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.unsafe_runner_output_detected ? 'Yes' : 'No'}</strong><span>Unsafe output detected</span></div>
+              </div>
+              {runnerStatus.last_tick_summary.unsafe_runner_output_detected ? (
+                <p style={styles.warningText}>Unsafe runner output was reported by the last tick. The runner should create execution requests only, so inspect the runner result and audit ledger before trusting automation status.</p>
+              ) : null}
+              {runnerStatus.last_tick_summary.runner_batch_id ? (
+                <p style={styles.muted}>Last tick batch: {runnerStatus.last_tick_summary.runner_batch_id}</p>
+              ) : null}
+            </>
+          ) : null}
           <h4 style={styles.smallTitle}>Runner safety checks</h4>
           <ul style={styles.list}>
             {runnerStatus.checks.map((check) => (
@@ -1290,6 +1495,44 @@ export default function AutomationSchedulesPage() {
       ) : null}
 
 
+
+
+      {runnerRunOnceResult ? (
+        <section style={styles.card}>
+          <div style={styles.sectionHeader}>
+            <div>
+              <h3 style={styles.cardTitle}>Manual runner run-once result</h3>
+              <p style={styles.muted}>Tenant-scoped due-schedule processing result after explicit confirmation. Requests can be created, but approval, execution, and business mutations remain blocked.</p>
+            </div>
+            <div style={styles.safetyBadge}>{runnerRunOnceResult.skipped ? 'Skipped' : (runnerRunOnceResult.empty_due_batch ? 'No due schedules' : 'Processed')}</div>
+          </div>
+          <div style={styles.metricGrid}>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.processed_schedule_count}</strong><span>Schedules processed</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.empty_due_batch ? 'Yes' : 'No'}</strong><span>Empty due batch</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.created_execution_request_count}</strong><span>Requests created</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.skipped_schedule_count ?? 0}</strong><span>Skipped schedules</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.failed_schedule_count ?? 0}</strong><span>Failed schedules</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.effective_limit ?? '—'}</strong><span>Effective limit</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.request_limit_clamped ? 'Yes' : 'No'}</strong><span>Limit clamped</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.runner_batch_id ? String(runnerRunOnceResult.runner_batch_id).slice(0, 22) + '…' : '—'}</strong><span>Runner batch</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.tenant_scoped ? 'Yes' : 'No'}</strong><span>Tenant scoped</span></div>
+            <div style={styles.metric}><strong>{runnerRunOnceResult.triggered_by_user_id ? String(runnerRunOnceResult.triggered_by_user_id).slice(0, 18) + '…' : 'System'}</strong><span>Confirmed by</span></div>
+          </div>
+          {runnerRunOnceResult.empty_due_batch ? (
+            <p style={styles.muted}>No active schedules were due in this confirmed pass, so the runner created no execution requests and recorded the empty batch safely.</p>
+          ) : null}
+          {runnerRunOnceResult.runner_batch_id ? (
+            <p style={styles.muted}>Runner batch {runnerRunOnceResult.runner_batch_id} links this UI result with the backend audit summary and schedule-level created/skipped samples.</p>
+          ) : null}
+          {runnerRunOnceResult.triggered_by_user_id ? (
+            <p style={styles.muted}>Confirmed run-once actor {runnerRunOnceResult.triggered_by_user_id} is preserved in backend batch, audit, and schedule-level metadata.</p>
+          ) : null}
+          {runnerRunOnceResult.request_limit_clamped ? (
+            <p style={styles.muted}>Requested limit {runnerRunOnceResult.requested_limit ?? '—'} was clamped to safe effective limit {runnerRunOnceResult.effective_limit ?? '—'} before any request creation.</p>
+          ) : null}
+          <JsonBlock value={runnerRunOnceResult} />
+        </section>
+      ) : null}
 
       {runnerRollbackPlan ? (
         <section style={styles.card}>
@@ -1696,6 +1939,7 @@ export default function AutomationSchedulesPage() {
               <span>Future request default</span>
               <select style={styles.input} value={form.default_status} onChange={(event) => setForm({ ...form, default_status: event.target.value as FormState['default_status'] })}>
                 <option value="draft">Draft</option>
+                  <option value="active">Active</option>
                 <option value="pending_review">Pending review</option>
               </select>
             </label>
@@ -1768,9 +2012,10 @@ export default function AutomationSchedulesPage() {
                     {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void dryRunSchedule(schedule)}>Dry run</button> : null}
                     {canViewExecutionRequests ? <button style={styles.linkButton} disabled={saving} onClick={() => void loadAuditPack(schedule)}>Audit Pack</button> : null}
                     {canCreateAutomationSchedules && canCreateExecutionRequests && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void runScheduleManually(schedule)}>Run Schedule</button> : null}
-                    {canPauseAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
+                    {canPauseAutomationSchedules && schedule.status === 'active' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
+                    {canResumeAutomationSchedules && (schedule.status === 'draft' || schedule.status === 'paused') ? <button style={styles.linkButton} disabled={saving} onClick={() => void resumeSchedule(schedule)}>Activate</button> : null}
                     {canDisableAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void disableSchedule(schedule)}>Disable</button> : null}
-                    {schedule.status === 'paused' ? <button style={styles.disabledLinkButton} disabled title="Resume is intentionally blocked until the automation runner is enabled.">Resume locked</button> : null}
+                    
                   </td>
                 </tr>
               ))}
@@ -1928,6 +2173,7 @@ export default function AutomationSchedulesPage() {
                   <span>Future request default</span>
                   <select style={styles.input} value={editForm.default_status} onChange={(event) => setEditForm({ ...editForm, default_status: event.target.value as FormState['default_status'] })}>
                     <option value="draft">Draft</option>
+                  <option value="active">Active</option>
                     <option value="pending_review">Pending review</option>
                   </select>
                 </label>
