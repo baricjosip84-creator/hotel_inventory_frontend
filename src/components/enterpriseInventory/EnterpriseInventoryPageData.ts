@@ -38,6 +38,10 @@ export function useEnterpriseInventoryPageData(params: EnterpriseInventoryQuerie
     productCostOperationsControlSummaryQuery: queries.productCostOperationsControlSummaryQuery,
     productCostOperationsEvidenceSummaryQuery: queries.productCostOperationsEvidenceSummaryQuery,
     productCostOperationsReadinessSummaryQuery: queries.productCostOperationsReadinessSummaryQuery,
+    carryingCostProductionReviewQuery: queries.carryingCostProductionReviewQuery,
+    deadStockProductionReviewQuery: queries.deadStockProductionReviewQuery,
+    marginAwareProductionReviewQuery: queries.marginAwareProductionReviewQuery,
+    procurementSpendProductionReviewQuery: queries.procurementSpendProductionReviewQuery,
   });
 
   const viewData = useEnterpriseInventoryViewData({

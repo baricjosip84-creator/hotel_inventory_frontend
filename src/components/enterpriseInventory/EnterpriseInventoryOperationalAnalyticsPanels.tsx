@@ -17,6 +17,10 @@ export function EnterpriseInventoryOperationalAnalyticsPanels({
     dashboardSupplierPerformanceQuery,
     dashboardUnresolvedAlertsQuery,
     demandForecastQuery,
+    forecastAccuracyBacktestQuery,
+    forecastCalibrationReviewQuery,
+    forecastDataQualityReviewQuery,
+    forecastReliabilityMatrixQuery,
     depletionRiskQuery,
     inventoryAnomaliesQuery,
     operationalHealthQuery,
@@ -81,6 +85,14 @@ export function EnterpriseInventoryOperationalAnalyticsPanels({
         <ForecastTab
           demandForecastRows={demandForecastQuery.data ?? []}
           isLoading={demandForecastQuery.isLoading}
+          forecastAccuracyBacktest={forecastAccuracyBacktestQuery.data}
+          forecastCalibrationReview={forecastCalibrationReviewQuery.data}
+          forecastDataQualityReview={forecastDataQualityReviewQuery.data}
+          forecastReliabilityMatrix={forecastReliabilityMatrixQuery.data}
+          accuracyLoading={forecastAccuracyBacktestQuery.isLoading}
+          calibrationLoading={forecastCalibrationReviewQuery.isLoading}
+          dataQualityLoading={forecastDataQualityReviewQuery.isLoading}
+          reliabilityLoading={forecastReliabilityMatrixQuery.isLoading}
         />
       </EnterpriseInventoryTabPanel>
     </>

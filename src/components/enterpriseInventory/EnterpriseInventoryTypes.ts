@@ -672,6 +672,78 @@ export type DemandForecastRow = {
   avg_daily_usage: number | string;
 };
 
+
+export type IntelligenceMetricValue = string | number | null | undefined;
+
+export type IntelligenceSummary = Record<string, IntelligenceMetricValue>;
+
+export type ForecastAccuracyBacktestRow = Record<string, unknown> & {
+  product_id: string;
+  product_name?: string | null;
+  predicted_daily_usage?: number | string | null;
+  actual_daily_usage?: number | string | null;
+  absolute_error?: number | string | null;
+  absolute_percent_error?: number | string | null;
+  accuracy_status?: string | null;
+};
+
+export type ForecastCalibrationReviewRow = Record<string, unknown> & {
+  product_id: string;
+  product_name?: string | null;
+  priority?: string | number | null;
+  accuracy_status?: string | null;
+  recommended_action?: string | null;
+  review_note?: string | null;
+};
+
+export type ForecastDataQualityReviewRow = Record<string, unknown> & {
+  product_id: string;
+  product_name?: string | null;
+  priority?: string | number | null;
+  data_quality_status?: string | null;
+  training_movement_count?: number | string | null;
+  actual_movement_count?: number | string | null;
+  recommended_action?: string | null;
+};
+
+export type ForecastReliabilityMatrixRow = Record<string, unknown> & {
+  product_id: string;
+  product_name?: string | null;
+  priority?: string | number | null;
+  reliability_status?: string | null;
+  data_quality_status?: string | null;
+  accuracy_status?: string | null;
+  calibration_priority?: string | number | null;
+  recommended_action?: string | null;
+};
+
+export type ForecastAccuracyBacktestResponse = {
+  summary?: IntelligenceSummary;
+  rows?: ForecastAccuracyBacktestRow[];
+};
+
+export type ForecastCalibrationReviewResponse = {
+  summary?: IntelligenceSummary;
+  rows?: ForecastCalibrationReviewRow[];
+};
+
+export type ForecastDataQualityReviewResponse = {
+  summary?: IntelligenceSummary;
+  rows?: ForecastDataQualityReviewRow[];
+};
+
+export type ForecastReliabilityMatrixResponse = {
+  summary?: IntelligenceSummary;
+  rows?: ForecastReliabilityMatrixRow[];
+};
+
+export type ProductionReviewResponse = {
+  summary?: IntelligenceSummary;
+  rows?: Array<Record<string, unknown>>;
+  controls?: string[];
+  safety_contract?: string[];
+};
+
 export type AutomationTypeDefinition = {
   automation_type: string;
   label?: string;

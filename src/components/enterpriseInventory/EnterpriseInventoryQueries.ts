@@ -65,12 +65,20 @@ import {
   fetchProductCostOperationsControlSummary,
   fetchProductCostOperationsEvidenceSummary,
   fetchProductCostOperationsReadinessSummary,
+  fetchCarryingCostProductionReview,
+  fetchDeadStockProductionReview,
+  fetchMarginAwareProductionReview,
+  fetchProcurementSpendProductionReview,
   fetchReorderRecommendations,
   fetchDepletionRisk,
   fetchSupplierTrustScores,
   fetchOperationalHealth,
   fetchInventoryAnomalies,
   fetchDemandForecast,
+  fetchForecastAccuracyBacktest,
+  fetchForecastCalibrationReview,
+  fetchForecastDataQualityReview,
+  fetchForecastReliabilityMatrix,
   fetchAutomationTypes,
   fetchAutomationSchedules,
   fetchAutomationRunnerReadiness,
@@ -180,12 +188,20 @@ export function useEnterpriseInventoryQueries({
   const productCostOperationsControlSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-control-summary'], queryFn: fetchProductCostOperationsControlSummary });
   const productCostOperationsEvidenceSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-evidence-summary'], queryFn: fetchProductCostOperationsEvidenceSummary });
   const productCostOperationsReadinessSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-readiness-summary'], queryFn: fetchProductCostOperationsReadinessSummary });
+  const carryingCostProductionReviewQuery = useQuery({ queryKey: ['enterprise-carrying-cost-production-review'], queryFn: fetchCarryingCostProductionReview });
+  const deadStockProductionReviewQuery = useQuery({ queryKey: ['enterprise-dead-stock-production-review'], queryFn: fetchDeadStockProductionReview });
+  const marginAwareProductionReviewQuery = useQuery({ queryKey: ['enterprise-margin-aware-production-review'], queryFn: fetchMarginAwareProductionReview });
+  const procurementSpendProductionReviewQuery = useQuery({ queryKey: ['enterprise-procurement-spend-production-review'], queryFn: fetchProcurementSpendProductionReview });
   const reorderRecommendationsQuery = useQuery({ queryKey: ['enterprise-reorder-recommendations'], queryFn: fetchReorderRecommendations });
   const depletionRiskQuery = useQuery({ queryKey: ['enterprise-depletion-risk'], queryFn: fetchDepletionRisk });
   const supplierTrustScoresQuery = useQuery({ queryKey: ['enterprise-supplier-trust-scores'], queryFn: fetchSupplierTrustScores });
   const operationalHealthQuery = useQuery({ queryKey: ['enterprise-operational-health'], queryFn: fetchOperationalHealth });
   const inventoryAnomaliesQuery = useQuery({ queryKey: ['enterprise-inventory-anomalies'], queryFn: fetchInventoryAnomalies });
   const demandForecastQuery = useQuery({ queryKey: ['enterprise-demand-forecast'], queryFn: fetchDemandForecast });
+  const forecastAccuracyBacktestQuery = useQuery({ queryKey: ['enterprise-forecast-accuracy-backtest'], queryFn: fetchForecastAccuracyBacktest });
+  const forecastCalibrationReviewQuery = useQuery({ queryKey: ['enterprise-forecast-calibration-review'], queryFn: fetchForecastCalibrationReview });
+  const forecastDataQualityReviewQuery = useQuery({ queryKey: ['enterprise-forecast-data-quality-review'], queryFn: fetchForecastDataQualityReview });
+  const forecastReliabilityMatrixQuery = useQuery({ queryKey: ['enterprise-forecast-reliability-matrix'], queryFn: fetchForecastReliabilityMatrix });
   const automationTypesQuery = useQuery({ queryKey: ['enterprise-automation-types'], queryFn: fetchAutomationTypes });
   const automationSchedulesQuery = useQuery({ queryKey: ['enterprise-automation-schedules'], queryFn: fetchAutomationSchedules });
   const automationRunnerReadinessQuery = useQuery({ queryKey: ['enterprise-automation-runner-readiness'], queryFn: fetchAutomationRunnerReadiness });
@@ -281,12 +297,20 @@ export function useEnterpriseInventoryQueries({
     productCostOperationsControlSummaryQuery,
     productCostOperationsEvidenceSummaryQuery,
     productCostOperationsReadinessSummaryQuery,
+    carryingCostProductionReviewQuery,
+    deadStockProductionReviewQuery,
+    marginAwareProductionReviewQuery,
+    procurementSpendProductionReviewQuery,
     reorderRecommendationsQuery,
     depletionRiskQuery,
     supplierTrustScoresQuery,
     operationalHealthQuery,
     inventoryAnomaliesQuery,
     demandForecastQuery,
+    forecastAccuracyBacktestQuery,
+    forecastCalibrationReviewQuery,
+    forecastDataQualityReviewQuery,
+    forecastReliabilityMatrixQuery,
     automationTypesQuery,
     automationSchedulesQuery,
     automationRunnerReadinessQuery,

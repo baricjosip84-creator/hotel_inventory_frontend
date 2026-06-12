@@ -19,6 +19,10 @@ import type {
   DashboardSummary,
   DashboardSupplierPerformance,
   DemandForecastRow,
+  ForecastAccuracyBacktestResponse,
+  ForecastCalibrationReviewResponse,
+  ForecastDataQualityReviewResponse,
+  ForecastReliabilityMatrixResponse,
   DepartmentRequisition,
   DepletionRiskResponse,
   EntityAttachment,
@@ -35,6 +39,7 @@ import type {
   ProductCostActionSummary,
   ProductCostGenericSummary,
   ProductCostRiskSummary,
+  ProductionReviewResponse,
   ProductCostValuationDetails,
   ProductCostValuationSummary,
   ProductMovementReportRow,
@@ -319,6 +324,22 @@ export async function fetchProductCostOperationsReadinessSummary(): Promise<Prod
   return apiRequest<ProductCostGenericSummary>('/products/cost-operations-readiness-summary?limit=10&variance_threshold_percent=20&history_spread_threshold_percent=25&stale_cost_days=90&spike_threshold_percent=35');
 }
 
+export async function fetchCarryingCostProductionReview(): Promise<ProductionReviewResponse> {
+  return apiRequest<ProductionReviewResponse>('/financial-intelligence/carrying-cost/production-review');
+}
+
+export async function fetchDeadStockProductionReview(): Promise<ProductionReviewResponse> {
+  return apiRequest<ProductionReviewResponse>('/financial-intelligence/dead-stock-risk/production-review');
+}
+
+export async function fetchMarginAwareProductionReview(): Promise<ProductionReviewResponse> {
+  return apiRequest<ProductionReviewResponse>('/financial-intelligence/margin-aware-replenishment/production-review');
+}
+
+export async function fetchProcurementSpendProductionReview(): Promise<ProductionReviewResponse> {
+  return apiRequest<ProductionReviewResponse>('/financial-intelligence/procurement-spend-intelligence/production-review');
+}
+
 export async function fetchReorderRecommendations(): Promise<ReorderRecommendationsResponse> {
   return apiRequest<ReorderRecommendationsResponse>('/reorder-insights/recommendations?lookback_days=30');
 }
@@ -342,6 +363,22 @@ export async function fetchInventoryAnomalies(): Promise<InventoryAnomaliesRespo
 
 export async function fetchDemandForecast(): Promise<DemandForecastRow[]> {
   return apiRequest<DemandForecastRow[]>('/forecast');
+}
+
+export async function fetchForecastAccuracyBacktest(): Promise<ForecastAccuracyBacktestResponse> {
+  return apiRequest<ForecastAccuracyBacktestResponse>('/forecast/accuracy-backtest');
+}
+
+export async function fetchForecastCalibrationReview(): Promise<ForecastCalibrationReviewResponse> {
+  return apiRequest<ForecastCalibrationReviewResponse>('/forecast/calibration-review');
+}
+
+export async function fetchForecastDataQualityReview(): Promise<ForecastDataQualityReviewResponse> {
+  return apiRequest<ForecastDataQualityReviewResponse>('/forecast/data-quality-review');
+}
+
+export async function fetchForecastReliabilityMatrix(): Promise<ForecastReliabilityMatrixResponse> {
+  return apiRequest<ForecastReliabilityMatrixResponse>('/forecast/reliability-matrix');
 }
 
 export async function fetchAutomationTypes(): Promise<AutomationTypesResponse> {

@@ -32,6 +32,10 @@ type ProductCostDerivedDataInput = {
   productCostOperationsControlSummaryQuery: QueryLike;
   productCostOperationsEvidenceSummaryQuery: QueryLike;
   productCostOperationsReadinessSummaryQuery: QueryLike;
+  carryingCostProductionReviewQuery: QueryLike;
+  deadStockProductionReviewQuery: QueryLike;
+  marginAwareProductionReviewQuery: QueryLike;
+  procurementSpendProductionReviewQuery: QueryLike;
 };
 
 export function useProductCostDerivedData({
@@ -61,7 +65,11 @@ export function useProductCostDerivedData({
   productCostOperationsRunbookSummaryQuery,
   productCostOperationsControlSummaryQuery,
   productCostOperationsEvidenceSummaryQuery,
-  productCostOperationsReadinessSummaryQuery
+  productCostOperationsReadinessSummaryQuery,
+  carryingCostProductionReviewQuery,
+  deadStockProductionReviewQuery,
+  marginAwareProductionReviewQuery,
+  procurementSpendProductionReviewQuery
 }: ProductCostDerivedDataInput) {
   const productCostRiskSummary = productCostRiskSummaryQuery.data;
   const highVarianceCostRows = useMemo(() => productCostRiskSummary?.high_variance ?? [], [productCostRiskSummary]);
@@ -111,6 +119,18 @@ export function useProductCostDerivedData({
   const productCostOperationsControlChecks = useMemo(() => productCostOperationsControlSummaryQuery.data?.control_checks ?? [], [productCostOperationsControlSummaryQuery.data]);
   const productCostOperationsEvidenceSections = useMemo(() => productCostOperationsEvidenceSummaryQuery.data?.evidence_sections ?? [], [productCostOperationsEvidenceSummaryQuery.data]);
   const productCostOperationsReadinessChecklist = useMemo(() => productCostOperationsReadinessSummaryQuery.data?.readiness_checklist ?? [], [productCostOperationsReadinessSummaryQuery.data]);
+  const carryingCostProductionReview = carryingCostProductionReviewQuery.data;
+  const carryingCostProductionReviewRows = useMemo(() => carryingCostProductionReview?.rows ?? [], [carryingCostProductionReview]);
+  const carryingCostProductionControls = useMemo(() => carryingCostProductionReview?.controls ?? carryingCostProductionReview?.safety_contract ?? [], [carryingCostProductionReview]);
+  const deadStockProductionReview = deadStockProductionReviewQuery.data;
+  const deadStockProductionReviewRows = useMemo(() => deadStockProductionReview?.rows ?? [], [deadStockProductionReview]);
+  const deadStockProductionControls = useMemo(() => deadStockProductionReview?.controls ?? deadStockProductionReview?.safety_contract ?? [], [deadStockProductionReview]);
+  const marginAwareProductionReview = marginAwareProductionReviewQuery.data;
+  const marginAwareProductionReviewRows = useMemo(() => marginAwareProductionReview?.rows ?? [], [marginAwareProductionReview]);
+  const marginAwareProductionControls = useMemo(() => marginAwareProductionReview?.controls ?? marginAwareProductionReview?.safety_contract ?? [], [marginAwareProductionReview]);
+  const procurementSpendProductionReview = procurementSpendProductionReviewQuery.data;
+  const procurementSpendProductionReviewRows = useMemo(() => procurementSpendProductionReview?.rows ?? [], [procurementSpendProductionReview]);
+  const procurementSpendProductionControls = useMemo(() => procurementSpendProductionReview?.controls ?? procurementSpendProductionReview?.safety_contract ?? [], [procurementSpendProductionReview]);
 
   return {
     productCostRiskSummary,
@@ -158,6 +178,18 @@ export function useProductCostDerivedData({
     productCostOperationsEscalationRules,
     productCostOperationsControlChecks,
     productCostOperationsEvidenceSections,
-    productCostOperationsReadinessChecklist
+    productCostOperationsReadinessChecklist,
+    carryingCostProductionReview,
+    carryingCostProductionReviewRows,
+    carryingCostProductionControls,
+    deadStockProductionReview,
+    deadStockProductionReviewRows,
+    deadStockProductionControls,
+    marginAwareProductionReview,
+    marginAwareProductionReviewRows,
+    marginAwareProductionControls,
+    procurementSpendProductionReview,
+    procurementSpendProductionReviewRows,
+    procurementSpendProductionControls
   };
 }
