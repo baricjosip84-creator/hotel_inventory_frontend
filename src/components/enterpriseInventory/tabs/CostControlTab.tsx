@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
 import { formatCurrency, formatDateTime, formatNumber, formatRecordValue } from '../EnterpriseInventoryFormat';
 

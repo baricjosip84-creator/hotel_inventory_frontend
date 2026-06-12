@@ -1,4 +1,4 @@
-import { AutomationTab } from "./tabs";
+import { AutomationTab } from "./tabs/AutomationTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 

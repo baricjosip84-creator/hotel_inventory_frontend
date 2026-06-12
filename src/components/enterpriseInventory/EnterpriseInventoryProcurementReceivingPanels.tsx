@@ -1,4 +1,5 @@
-import { ProcurementMatchTab, ReceivingTab } from "./tabs";
+import { ProcurementMatchTab } from "./tabs/ProcurementMatchTab";
+import { ReceivingTab } from "./tabs/ReceivingTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import { emptyShipmentBarcodeScanForm } from "./EnterpriseInventoryForms";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";

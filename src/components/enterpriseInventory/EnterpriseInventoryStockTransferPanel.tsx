@@ -1,4 +1,4 @@
-import { StockTransfersTab } from "./tabs";
+import { StockTransfersTab } from "./tabs/StockTransfersTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 

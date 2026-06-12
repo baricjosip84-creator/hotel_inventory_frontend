@@ -1,4 +1,5 @@
-import { ExecutionTab, SystemContextTab } from "./tabs";
+import { ExecutionTab } from "./tabs/ExecutionTab";
+import { SystemContextTab } from "./tabs/SystemContextTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelWithSystemContextProps } from "./EnterpriseInventoryPanelTypes";
 

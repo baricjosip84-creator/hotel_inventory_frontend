@@ -1,8 +1,6 @@
-import {
-  AlertsTab,
-  AuditTrailTab,
-  NotificationsTab,
-} from "./tabs";
+import { AlertsTab } from "./tabs/AlertsTab";
+import { AuditTrailTab } from "./tabs/AuditTrailTab";
+import { NotificationsTab } from "./tabs/NotificationsTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 

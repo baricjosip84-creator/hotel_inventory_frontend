@@ -1,4 +1,6 @@
-import { ApprovalsTab, InvoicesTab, RequisitionsTab } from "./tabs";
+import { ApprovalsTab } from "./tabs/ApprovalsTab";
+import { InvoicesTab } from "./tabs/InvoicesTab";
+import { RequisitionsTab } from "./tabs/RequisitionsTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 

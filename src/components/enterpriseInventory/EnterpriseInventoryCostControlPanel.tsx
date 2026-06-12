@@ -1,4 +1,4 @@
-import { CostControlTab } from "./tabs";
+import { CostControlTab } from "./tabs/CostControlTab";
 import { buildEnterpriseInventoryCostControlTabProps } from "./EnterpriseInventoryCostControlTabProps";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";

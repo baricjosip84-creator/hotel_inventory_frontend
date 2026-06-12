@@ -1,4 +1,4 @@
-import { ReportsTab } from "./tabs";
+import { ReportsTab } from "./tabs/ReportsTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";
 

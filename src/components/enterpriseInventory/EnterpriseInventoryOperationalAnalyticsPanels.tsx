@@ -1,4 +1,6 @@
-import { ForecastTab, InsightsTab, OperationsDashboardTab } from "./tabs";
+import { ForecastTab } from "./tabs/ForecastTab";
+import { InsightsTab } from "./tabs/InsightsTab";
+import { OperationsDashboardTab } from "./tabs/OperationsDashboardTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelDataProps } from "./EnterpriseInventoryPanelTypes";
 

@@ -1,4 +1,6 @@
-import { AttachmentsTab, LabelsTab, PackagesTab } from "./tabs";
+import { AttachmentsTab } from "./tabs/AttachmentsTab";
+import { LabelsTab } from "./tabs/LabelsTab";
+import { PackagesTab } from "./tabs/PackagesTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import { emptyProductPackageForm } from "./EnterpriseInventoryForms";
 import type {

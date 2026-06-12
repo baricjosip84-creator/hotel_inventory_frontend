@@ -1,4 +1,6 @@
-import { LocationsTab, ProductsTab, SuppliersTab } from "./tabs";
+import { LocationsTab } from "./tabs/LocationsTab";
+import { ProductsTab } from "./tabs/ProductsTab";
+import { SuppliersTab } from "./tabs/SuppliersTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import {
   emptyProductForm,

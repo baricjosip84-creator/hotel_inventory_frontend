@@ -125,7 +125,7 @@ export default function AutomationSchedulesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [response, typeResponse, readinessResponse, executiveSummaryResponse, runnerStatusResponse, releaseGuardResponse, changeControlPackResponse, rollbackPlanResponse, rollbackVerificationResponse, certificationReportResponse, certificationEvidenceResponse, launchAttestationResponse, safetyReportResponse, governancePackResponse, preflightResponse, accountabilityDigestResponse, operationsReviewResponse, policyMatrixResponse, activationChecklistResponse, containmentReportResponse, driftReportResponse, postLaunchMonitorResponse, incidentDrillResponse, closeoutReportResponse, archiveManifestResponse, retentionReportResponse, handoffBriefResponse, stewardshipChecklistResponse, stewardshipLedgerResponse, auditBundleResponse, observabilitySnapshotResponse, productionSafetyLockResponse, readinessCertificationResponse, moduleClosureResponse, closureSealResponse, finalizationManifestResponse, runEventsResponse] = await Promise.all([
+      const loadRequests: Promise<unknown>[] = [
         apiRequest<AutomationScheduleListResponse>(`/automation-schedules?${query}`),
         apiRequest<AutomationScheduleTypesResponse>('/automation-schedules/types'),
         apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness'),
@@ -163,7 +163,45 @@ export default function AutomationSchedulesPage() {
         canViewExecutionRequests ? apiRequest<AutomationRunnerClosureSealResponse>('/automation-schedules/runner-closure-seal') : Promise.resolve(null),
         canViewExecutionRequests ? apiRequest<AutomationRunnerFinalizationManifestResponse>('/automation-schedules/runner-finalization-manifest') : Promise.resolve(null),
         canViewExecutionRequests ? apiRequest<AutomationScheduleRunEventsResponse>('/automation-schedules/run-events?limit=10') : Promise.resolve(null)
-      ]);
+      ];
+      const loadResults = await Promise.all(loadRequests);
+      const response = loadResults[0] as AutomationScheduleListResponse;
+      const typeResponse = loadResults[1] as AutomationScheduleTypesResponse;
+      const readinessResponse = loadResults[2] as AutomationRunnerReadinessResponse;
+      const executiveSummaryResponse = loadResults[3] as AutomationRunnerExecutiveSummaryResponse | null;
+      const runnerStatusResponse = loadResults[4] as AutomationRunnerStatusResponse;
+      const releaseGuardResponse = loadResults[5] as AutomationRunnerReleaseGuardResponse | null;
+      const changeControlPackResponse = loadResults[6] as AutomationRunnerChangeControlPackResponse | null;
+      const rollbackPlanResponse = loadResults[7] as AutomationRunnerRollbackPlanResponse | null;
+      const rollbackVerificationResponse = loadResults[8] as AutomationRunnerRollbackVerificationResponse | null;
+      const certificationReportResponse = loadResults[9] as AutomationRunnerCertificationReportResponse | null;
+      const certificationEvidenceResponse = loadResults[10] as AutomationRunnerCertificationEvidenceResponse | null;
+      const launchAttestationResponse = loadResults[11] as AutomationRunnerLaunchAttestationResponse | null;
+      const safetyReportResponse = loadResults[12] as AutomationRunnerSafetyReportResponse | null;
+      const governancePackResponse = loadResults[13] as AutomationRunnerGovernancePackResponse | null;
+      const preflightResponse = loadResults[14] as AutomationRunnerPreflightResponse | null;
+      const accountabilityDigestResponse = loadResults[15] as AutomationRunnerAccountabilityDigestResponse | null;
+      const operationsReviewResponse = loadResults[16] as AutomationRunnerOperationsReviewResponse | null;
+      const policyMatrixResponse = loadResults[17] as AutomationRunnerPolicyMatrixResponse | null;
+      const activationChecklistResponse = loadResults[18] as AutomationRunnerActivationChecklistResponse | null;
+      const containmentReportResponse = loadResults[19] as AutomationRunnerContainmentReportResponse | null;
+      const driftReportResponse = loadResults[20] as AutomationRunnerDriftReportResponse | null;
+      const postLaunchMonitorResponse = loadResults[21] as AutomationRunnerPostLaunchMonitorResponse | null;
+      const incidentDrillResponse = loadResults[22] as AutomationRunnerIncidentDrillResponse | null;
+      const closeoutReportResponse = loadResults[23] as AutomationRunnerCloseoutReportResponse | null;
+      const archiveManifestResponse = loadResults[24] as AutomationRunnerArchiveManifestResponse | null;
+      const retentionReportResponse = loadResults[25] as AutomationRunnerRetentionReportResponse | null;
+      const handoffBriefResponse = loadResults[26] as AutomationRunnerHandoffBriefResponse | null;
+      const stewardshipChecklistResponse = loadResults[27] as AutomationRunnerStewardshipChecklistResponse | null;
+      const stewardshipLedgerResponse = loadResults[28] as AutomationRunnerStewardshipLedgerResponse | null;
+      const auditBundleResponse = loadResults[29] as AutomationRunnerAuditBundleResponse | null;
+      const observabilitySnapshotResponse = loadResults[30] as AutomationRunnerObservabilitySnapshotResponse | null;
+      const productionSafetyLockResponse = loadResults[31] as AutomationRunnerProductionSafetyLockResponse | null;
+      const readinessCertificationResponse = loadResults[32] as AutomationRunnerReadinessCertificationResponse | null;
+      const moduleClosureResponse = loadResults[33] as AutomationRunnerModuleClosureResponse | null;
+      const closureSealResponse = loadResults[34] as AutomationRunnerClosureSealResponse | null;
+      const finalizationManifestResponse = loadResults[35] as AutomationRunnerFinalizationManifestResponse | null;
+      const runEventsResponse = loadResults[36] as AutomationScheduleRunEventsResponse | null;
       setData(response);
       setTypes(typeResponse);
       setRunnerReadiness(readinessResponse);

@@ -1,4 +1,6 @@
-import { CycleCountsTab, ParLevelsTab, StockRiskTab } from "./tabs";
+import { CycleCountsTab } from "./tabs/CycleCountsTab";
+import { ParLevelsTab } from "./tabs/ParLevelsTab";
+import { StockRiskTab } from "./tabs/StockRiskTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
