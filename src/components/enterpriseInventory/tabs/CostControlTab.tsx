@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
 import { formatCurrency, formatDateTime, formatNumber, formatRecordValue } from '../EnterpriseInventoryFormat';
 
@@ -77,6 +76,22 @@ type CostControlTabProps = {
   productCostValuationDetailsQuery: any;
   productCostValuationSummary: any;
   productCostValuationSummaryQuery: any;
+  carryingCostProductionReview: any;
+  carryingCostProductionReviewRows: any;
+  carryingCostProductionControls: any;
+  carryingCostProductionReviewQuery: any;
+  deadStockProductionReview: any;
+  deadStockProductionReviewRows: any;
+  deadStockProductionControls: any;
+  deadStockProductionReviewQuery: any;
+  marginAwareProductionReview: any;
+  marginAwareProductionReviewRows: any;
+  marginAwareProductionControls: any;
+  marginAwareProductionReviewQuery: any;
+  procurementSpendProductionReview: any;
+  procurementSpendProductionReviewRows: any;
+  procurementSpendProductionControls: any;
+  procurementSpendProductionReviewQuery: any;
 };
 
 export function CostControlTab({
@@ -154,9 +169,154 @@ export function CostControlTab({
   productCostValuationDetailsQuery,
   productCostValuationSummary,
   productCostValuationSummaryQuery,
+  carryingCostProductionReview,
+  carryingCostProductionReviewRows,
+  carryingCostProductionControls,
+  carryingCostProductionReviewQuery,
+  deadStockProductionReview,
+  deadStockProductionReviewRows,
+  deadStockProductionControls,
+  deadStockProductionReviewQuery,
+  marginAwareProductionReview,
+  marginAwareProductionReviewRows,
+  marginAwareProductionControls,
+  marginAwareProductionReviewQuery,
+  procurementSpendProductionReview,
+  procurementSpendProductionReviewRows,
+  procurementSpendProductionControls,
+  procurementSpendProductionReviewQuery,
 }: CostControlTabProps) {
   return (
     <section style={styles.stack}>
+
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Carrying-cost production review</h2>
+        <p style={styles.helper}>Reads GET /financial-intelligence/carrying-cost/production-review. This is a read-only financial intelligence control: it reviews high-value stock, monthly carrying-cost exposure, aged stock pressure, and finance-review requirements before procurement, transfer, liquidation, or accounting follow-up.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Production status" value={carryingCostProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Reviewed profiles" value={formatNumber(carryingCostProductionReview?.summary?.reviewed_profile_count)} />
+          <MetricCard label="Blocked profiles" value={formatNumber(carryingCostProductionReview?.summary?.blocked_profile_count)} />
+          <MetricCard label="Watch profiles" value={formatNumber(carryingCostProductionReview?.summary?.watch_profile_count)} />
+          <MetricCard label="Inventory value reviewed" value={formatCurrency(carryingCostProductionReview?.summary?.total_inventory_value_at_review)} />
+          <MetricCard label="Monthly carrying cost" value={formatCurrency(carryingCostProductionReview?.summary?.total_monthly_carrying_cost_at_review)} />
+        </div>
+        <DataTable
+          loading={carryingCostProductionReviewQuery.isLoading}
+          empty="No carrying-cost production review rows returned."
+          headers={['Product', 'Location', 'Readiness', 'Score', 'Monthly cost', 'Factors']}
+          rows={carryingCostProductionReviewRows.map((item: any) => [
+            item.product_name || item.product_id || '-',
+            item.storage_location_name || item.storage_location_id || '-',
+            item.readiness_state || '-',
+            formatNumber(item.carrying_cost_score),
+            formatCurrency(item.monthly_carrying_cost),
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+          ])}
+        />
+        {carryingCostProductionControls.length ? (
+          <ul style={styles.list}>
+            {carryingCostProductionControls.map((item: string) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : null}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Dead-stock production review</h2>
+        <p style={styles.helper}>Reads GET /financial-intelligence/dead-stock-risk/production-review. This is a read-only financial intelligence control: it reviews stale stock, capital lockup, carrying-cost exposure, and human-review requirements before any transfer, liquidation, accounting, or procurement action.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Production status" value={deadStockProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Reviewed profiles" value={formatNumber(deadStockProductionReview?.summary?.reviewed_profile_count)} />
+          <MetricCard label="Blocked profiles" value={formatNumber(deadStockProductionReview?.summary?.blocked_profile_count)} />
+          <MetricCard label="Watch profiles" value={formatNumber(deadStockProductionReview?.summary?.watch_profile_count)} />
+          <MetricCard label="Capital at review" value={formatCurrency(deadStockProductionReview?.summary?.total_capital_at_review)} />
+          <MetricCard label="Blocked capital" value={formatCurrency(deadStockProductionReview?.summary?.blocked_capital_at_review)} />
+        </div>
+        <DataTable
+          loading={deadStockProductionReviewQuery.isLoading}
+          empty="No dead-stock production review rows returned."
+          headers={['Product', 'Location', 'Readiness', 'Score', 'Capital', 'Factors']}
+          rows={deadStockProductionReviewRows.map((item: any) => [
+            item.product_name || item.product_id || '-',
+            item.storage_location_name || item.storage_location_id || '-',
+            item.readiness_state || '-',
+            formatNumber(item.dead_stock_score),
+            formatCurrency(item.capital_locked_value),
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+          ])}
+        />
+        {deadStockProductionControls.length ? (
+          <ul style={styles.list}>
+            {deadStockProductionControls.map((item: string) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : null}
+      </section>
+
+
+
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Procurement spend production review</h2>
+        <p style={styles.helper}>Reads GET /financial-intelligence/procurement-spend-intelligence/production-review. This is a read-only procurement/finance control: it reviews category spend pressure, open commitments, overdue spend, supplier concentration, and human-review requirements before approving more purchase-order spend or supplier changes.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Production status" value={procurementSpendProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Reviewed categories" value={formatNumber(procurementSpendProductionReview?.summary?.reviewed_category_count)} />
+          <MetricCard label="Blocked categories" value={formatNumber(procurementSpendProductionReview?.summary?.blocked_category_count)} />
+          <MetricCard label="Human-review categories" value={formatNumber(procurementSpendProductionReview?.summary?.human_review_category_count)} />
+          <MetricCard label="Committed spend" value={formatCurrency(procurementSpendProductionReview?.summary?.committed_spend_at_review)} />
+          <MetricCard label="Overdue spend" value={formatCurrency(procurementSpendProductionReview?.summary?.overdue_spend_at_review)} />
+        </div>
+        <DataTable
+          loading={procurementSpendProductionReviewQuery.isLoading}
+          empty="No procurement spend production review rows returned."
+          headers={['Category', 'Readiness', 'Pressure', 'Committed', 'Open', 'Factors']}
+          rows={procurementSpendProductionReviewRows.map((item: any) => [
+            item.category || '-',
+            item.readiness_state || '-',
+            item.spend_pressure_tier || item.risk_level || '-',
+            formatCurrency(item.committed_spend_value),
+            formatCurrency(item.open_spend_value),
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+          ])}
+        />
+        {procurementSpendProductionControls.length ? (
+          <ul style={styles.list}>
+            {procurementSpendProductionControls.map((item: string) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : null}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Margin-aware replenishment production review</h2>
+        <p style={styles.helper}>Reads GET /financial-intelligence/margin-aware-replenishment/production-review. This is a read-only commercial control: it reviews replenishment spend, expected margin proxy, inbound overlap, carrying-cost drag, and human-review requirements before purchase-order creation or submission.</p>
+        <div style={styles.statGrid}>
+          <MetricCard label="Production status" value={marginAwareProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Reviewed profiles" value={formatNumber(marginAwareProductionReview?.summary?.reviewed_profile_count)} />
+          <MetricCard label="Blocked profiles" value={formatNumber(marginAwareProductionReview?.summary?.blocked_profile_count)} />
+          <MetricCard label="Watch profiles" value={formatNumber(marginAwareProductionReview?.summary?.watch_profile_count)} />
+          <MetricCard label="Spend reviewed" value={formatCurrency(marginAwareProductionReview?.summary?.total_replenishment_spend_at_review)} />
+          <MetricCard label="Expected margin value" value={formatCurrency(marginAwareProductionReview?.summary?.expected_margin_value_at_review)} />
+        </div>
+        <DataTable
+          loading={marginAwareProductionReviewQuery.isLoading}
+          empty="No margin-aware production review rows returned."
+          headers={['Product', 'Location', 'Readiness', 'Decision', 'Spend', 'Factors']}
+          rows={marginAwareProductionReviewRows.map((item: any) => [
+            item.product_name || item.product_id || '-',
+            item.storage_location_name || item.storage_location_id || '-',
+            item.readiness_state || '-',
+            item.commercial_decision || '-',
+            formatCurrency(item.estimated_replenishment_cost),
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+          ])}
+        />
+        {marginAwareProductionControls.length ? (
+          <ul style={styles.list}>
+            {marginAwareProductionControls.map((item: string) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : null}
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>Product cost control</h2>
         <p style={styles.helper}>Reads the existing GET /products/cost-risk-summary endpoint. Backend compares standard costs, latest received costs, inventory value, and historical cost spread.</p>

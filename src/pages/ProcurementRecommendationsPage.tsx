@@ -20,6 +20,57 @@ type RecommendationSummary = {
   budget_blocker_message?: string | null;
 };
 
+
+type RecommendationProductionReviewResponse = {
+  generated_at: string;
+  tenant_id: string;
+  production_status: string;
+  safety_contract: {
+    mode: string;
+    mutates_inventory: boolean;
+    creates_purchase_orders: boolean;
+    approves_recommendations: boolean;
+    requires_human_approval_for_execution: boolean;
+  };
+  readiness_buckets: {
+    ready_for_approval: number | string;
+    blocked: number | string;
+    approved_not_converted: number | string;
+    pending_review: number | string;
+    high_priority: number | string;
+    shortage_window: number | string;
+  };
+  blockers: Array<{
+    code?: string | null;
+    severity?: string | null;
+    affected_count?: number | string | null;
+    message?: string | null;
+    required_action?: string | null;
+  }>;
+  warnings: Array<{
+    code?: string | null;
+    severity?: string | null;
+    affected_count?: number | string | null;
+    message?: string | null;
+    recommended_action?: string | null;
+  }>;
+  next_actions: string[];
+  evidence_requirements: string[];
+  sample_rows: Array<{
+    product_id: string;
+    product_name?: string | null;
+    urgency?: string | null;
+    procurement_ready?: boolean;
+    recommended_reorder_quantity?: number | string | null;
+    recommended_supplier_name?: string | null;
+    blocker_code?: string | null;
+    supplier_performance_status?: string | null;
+    estimated_total_cost?: number | string | null;
+    decision_status?: string | null;
+    converted_purchase_order_id?: string | null;
+  }>;
+};
+
 type RecommendationPagination = {
   limit: number | string;
   offset: number | string;
@@ -559,6 +610,27 @@ async function fetchRecommendations(
 ): Promise<ReplenishmentRecommendationsResponse> {
   return apiRequest<ReplenishmentRecommendationsResponse>(
     buildRecommendationsPath(filters),
+  );
+}
+
+
+
+async function fetchRecommendationProductionReview(
+  filters: RecommendationFilters,
+): Promise<RecommendationProductionReviewResponse> {
+  const params = new URLSearchParams();
+  params.set("lookback_days", String(filters.lookbackDays));
+  if (filters.shortageWindowDays) {
+    params.set("shortage_window_days", filters.shortageWindowDays);
+  }
+  if (filters.budgetLimit.trim()) {
+    params.set("budget_limit", filters.budgetLimit.trim());
+  }
+  if (filters.search.trim()) {
+    params.set("search", filters.search.trim());
+  }
+  return apiRequest<RecommendationProductionReviewResponse>(
+    `/reorder-insights/recommendations/production-review?${params.toString()}`,
   );
 }
 
@@ -1189,6 +1261,19 @@ export default function ProcurementRecommendationsPage() {
   });
 
 
+
+  const productionReviewQuery = useQuery({
+    queryKey: [
+      "procurement-recommendation-production-review",
+      filters.lookbackDays,
+      filters.shortageWindowDays,
+      filters.budgetLimit,
+      filters.search,
+    ],
+    queryFn: () => fetchRecommendationProductionReview(filters),
+  });
+
+
   const executionHistoryQuery = useQuery({
     queryKey: ["procurement-execution-history"],
     queryFn: fetchProcurementExecutionHistory,
@@ -1268,6 +1353,7 @@ export default function ProcurementRecommendationsPage() {
   const summary = data?.summary ?? {};
   const dashboard = executionDashboardQuery.data;
   const dashboardSummary = dashboard?.summary;
+  const productionReview = productionReviewQuery.data;
   const exceptions = exceptionQueueQuery.data;
   const pagination = data?.pagination;
 
@@ -1574,6 +1660,123 @@ export default function ProcurementRecommendationsPage() {
                   ) : null}
                 </div>
               </div>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Recommendation production review</h2>
+            <p style={styles.panelSubtitle}>
+              Read-only production check for the current replenishment recommendations: supplier readiness, cost evidence, lead-time evidence, budget blockers, and human approval safety.
+            </p>
+          </div>
+          <button
+            style={styles.secondaryButton}
+            type="button"
+            onClick={() => void productionReviewQuery.refetch()}
+          >
+            Refresh review
+          </button>
+        </div>
+        {productionReviewQuery.isLoading ? (
+          <div style={styles.infoBox}>Loading production review...</div>
+        ) : null}
+        {productionReviewQuery.isError ? (
+          <div style={styles.errorBox}>{getErrorMessage(productionReviewQuery.error)}</div>
+        ) : null}
+        {productionReview ? (
+          <>
+            <div style={styles.bulkGrid}>
+              <StatCard
+                label="Production status"
+                value={titleCase(productionReview.production_status)}
+                tone={
+                  productionReview.production_status === "blocked"
+                    ? "bad"
+                    : productionReview.production_status === "needs_review"
+                      ? "warn"
+                      : "good"
+                }
+              />
+              <StatCard
+                label="Ready for approval"
+                value={formatNumber(productionReview.readiness_buckets.ready_for_approval, 0)}
+                tone="good"
+              />
+              <StatCard
+                label="Blocked"
+                value={formatNumber(productionReview.readiness_buckets.blocked, 0)}
+                tone={toNumber(productionReview.readiness_buckets.blocked) > 0 ? "bad" : "good"}
+              />
+              <StatCard
+                label="Approved not converted"
+                value={formatNumber(productionReview.readiness_buckets.approved_not_converted, 0)}
+                tone={toNumber(productionReview.readiness_buckets.approved_not_converted) > 0 ? "warn" : "good"}
+              />
+              <StatCard
+                label="High priority"
+                value={formatNumber(productionReview.readiness_buckets.high_priority, 0)}
+                tone={toNumber(productionReview.readiness_buckets.high_priority) > 0 ? "warn" : "good"}
+              />
+              <StatCard
+                label="Shortage window"
+                value={formatNumber(productionReview.readiness_buckets.shortage_window, 0)}
+                tone={toNumber(productionReview.readiness_buckets.shortage_window) > 0 ? "bad" : "good"}
+              />
+            </div>
+            <div style={styles.dashboardColumns}>
+              <div style={styles.detailCardWide}>
+                <div style={styles.statLabel}>Safety contract</div>
+                <div style={styles.metricLine}>
+                  Mode: <strong>{titleCase(productionReview.safety_contract.mode)}</strong>
+                </div>
+                <div style={styles.mutedText}>
+                  Mutates inventory: {productionReview.safety_contract.mutates_inventory ? "yes" : "no"} · Creates POs: {productionReview.safety_contract.creates_purchase_orders ? "yes" : "no"} · Approves recommendations: {productionReview.safety_contract.approves_recommendations ? "yes" : "no"}
+                </div>
+              </div>
+              <div style={styles.detailCardWide}>
+                <div style={styles.statLabel}>Blockers</div>
+                <div style={styles.compactList}>
+                  {productionReview.blockers.map((blocker) => (
+                    <div key={`production-blocker-${blocker.code}`} style={styles.compactListRow}>
+                      <div>
+                        <strong>{blocker.code || "BLOCKER"}</strong>
+                        <div style={styles.blockerText}>{blocker.message || "Production blocker requires review."}</div>
+                        {blocker.required_action ? <div style={styles.mutedText}>{blocker.required_action}</div> : null}
+                      </div>
+                      <Badge tone="bad">{formatNumber(blocker.affected_count ?? 0, 0)}</Badge>
+                    </div>
+                  ))}
+                  {!productionReview.blockers.length ? <div style={styles.mutedText}>No production blockers for current filters.</div> : null}
+                </div>
+              </div>
+              <div style={styles.detailCardWide}>
+                <div style={styles.statLabel}>Warnings</div>
+                <div style={styles.compactList}>
+                  {productionReview.warnings.map((warning) => (
+                    <div key={`production-warning-${warning.code}`} style={styles.compactListRow}>
+                      <div>
+                        <strong>{warning.code || "WARNING"}</strong>
+                        <div style={styles.mutedText}>{warning.message || "Recommendation evidence should be reviewed."}</div>
+                        {warning.recommended_action ? <div style={styles.mutedText}>{warning.recommended_action}</div> : null}
+                      </div>
+                      <Badge tone={warning.severity === "high" ? "bad" : "warn"}>{formatNumber(warning.affected_count ?? 0, 0)}</Badge>
+                    </div>
+                  ))}
+                  {!productionReview.warnings.length ? <div style={styles.mutedText}>No warning-level evidence gaps for current filters.</div> : null}
+                </div>
+              </div>
+            </div>
+            <div style={styles.detailPanel}>
+              <div style={styles.statLabel}>Next safe actions</div>
+              <ul style={styles.list}>
+                {productionReview.next_actions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
             </div>
           </>
         ) : null}

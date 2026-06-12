@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run check:frontend-project-structure && npm run check:execution-closure-frontend-types && node node_modules/vite/bin/vite.js build",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
@@ -22,13 +22,7 @@
     "check:automation-resume-ui-governance": "node scripts/check-automation-resume-ui-governance.mjs",
     "check:tenant-session-route-auth-governance": "node scripts/check-tenant-session-route-auth-governance.mjs",
     "check:report-export-row-count-ui": "node scripts/check-report-export-row-count-ui.mjs",
-    "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs",
-    "check:execution-tasks-types": "tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --jsx react-jsx --moduleResolution bundler --module esnext --target es2023 --lib ES2023,DOM,DOM.Iterable --types vite/client src/pages/ExecutionTasksPage.tsx",
-    "build:bundle": "node node_modules/vite/bin/vite.js build",
-    "check:frontend-bundle": "node node_modules/vite/bin/vite.js build",
-    "check:execution-closure-frontend-types": "tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --jsx react-jsx --moduleResolution bundler --module esnext --target es2023 --lib ES2023,DOM,DOM.Iterable --types vite/client src/pages/ExecutionTasksPage.tsx src/pages/ExecutionRequestsPage.tsx src/pages/MobileExecutionPage.tsx",
-    "typecheck:full": "node scripts/typecheck-full-bounded.mjs",
-    "check:frontend-project-structure": "tsc -b --pretty false --noCheck"
+    "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

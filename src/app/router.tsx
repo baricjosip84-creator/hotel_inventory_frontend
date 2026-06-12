@@ -18,125 +18,101 @@
   system/admin visibility, and management insights.
 */
 
-import { Suspense, lazy } from 'react';
-import type { ComponentType } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import type { RouteObject } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
+import { LoginPage } from '../pages/LoginPage';
+import DashboardPage from '../pages/DashboardPage';
+import ProductsPage from '../pages/ProductsPage';
+import SuppliersPage from '../pages/SuppliersPage';
+import AlertsPage from '../pages/AlertsPage';
+import ShipmentsPage from '../pages/ShipmentsPage';
+import StockPage from '../pages/StockPage';
+import InventoryUsagePage from '../pages/InventoryUsagePage';
+import InventoryRequisitionsPage from '../pages/InventoryRequisitionsPage';
+import InventoryReservationsPage from '../pages/InventoryReservationsPage';
+import StorageLocationsPage from '../pages/StorageLocationsPage';
+import StockMovementsPage from '../pages/StockMovementsPage';
+import StockTransfersPage from '../pages/StockTransfersPage';
+import PurchaseOrdersPage from '../pages/PurchaseOrdersPage';
+import ProcurementRecommendationsPage from '../pages/ProcurementRecommendationsPage';
+import ScannerPage from '../pages/ScannerPage';
+import SessionsPage from '../pages/SessionsPage';
+import ReportsPage from '../pages/ReportsPage';
+import UsersPage from '../pages/UsersPage';
+import AdminSystemPage from '../pages/AdminSystemPage';
+import InsightsPage from '../pages/InsightsPage';
+import OperationalActionCenterPage from '../pages/OperationalActionCenterPage';
+import RoleAwareWorkspacePage from '../pages/RoleAwareWorkspacePage';
+import MobileExecutionPage from '../pages/MobileExecutionPage';
+import RealTimeOperationsFeedPage from '../pages/RealTimeOperationsFeedPage';
+import WorkflowAutomationComposerPage from '../pages/WorkflowAutomationComposerPage';
+import HumanInLoopAIReviewPage from '../pages/HumanInLoopAIReviewPage';
+import EnterpriseCollaborationPage from '../pages/EnterpriseCollaborationPage';
+import DigitalTwinVisualizationPage from '../pages/DigitalTwinVisualizationPage';
+import ReliabilityCommandPage from '../pages/ReliabilityCommandPage';
+import TenantAuditPage from '../pages/TenantAuditPage';
+import TenantSettingsPage from '../pages/TenantSettingsPage';
+import SystemContextPage from '../pages/SystemContextPage';
+import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
+import ExecutionTasksPage from '../pages/ExecutionTasksPage';
+import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
+import EnterpriseInventoryPage from '../pages/EnterpriseInventoryPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
 import PlatformLayout from '../layouts/PlatformLayout';
+import PlatformLoginPage from '../pages/PlatformLoginPage';
+import PlatformDashboardPage from '../pages/PlatformDashboardPage';
+import PlatformTenantsPage from '../pages/PlatformTenantsPage';
+import PlatformSystemHealthPage from '../pages/PlatformSystemHealthPage';
+import PlatformAuditPage from '../pages/PlatformAuditPage';
+import PlatformAuditRetentionPage from '../pages/PlatformAuditRetentionPage';
+import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
+import PlatformUsersPage from '../pages/PlatformUsersPage';
+import PlatformSessionsPage from '../pages/PlatformSessionsPage';
+import PlatformNotificationsPage from '../pages/PlatformNotificationsPage';
+import PlatformSecurityPage from '../pages/PlatformSecurityPage';
+import PlatformBillingPage from '../pages/PlatformBillingPage';
+import PlatformProvisioningPage from '../pages/PlatformProvisioningPage';
+import PlatformTenantExportsPage from '../pages/PlatformTenantExportsPage';
+import PlatformMaintenancePage from '../pages/PlatformMaintenancePage';
+import PlatformAnnouncementsPage from '../pages/PlatformAnnouncementsPage';
+import PlatformTenantContactsPage from '../pages/PlatformTenantContactsPage';
+import PlatformTenantNotesPage from '../pages/PlatformTenantNotesPage';
+import PlatformTenantCommunicationsPage from '../pages/PlatformTenantCommunicationsPage';
+import PlatformTenantTasksPage from '../pages/PlatformTenantTasksPage';
+import PlatformTenantOffboardingPage from '../pages/PlatformTenantOffboardingPage';
+import PlatformIncidentsPage from '../pages/PlatformIncidentsPage';
+import PlatformDataRetentionPage from '../pages/PlatformDataRetentionPage';
+import PlatformTenantTimelinePage from '../pages/PlatformTenantTimelinePage';
+import PlatformTenantHealthPage from '../pages/PlatformTenantHealthPage';
+import PlatformTenantLifecyclePage from '../pages/PlatformTenantLifecyclePage';
+import PlatformTenantSlaPage from '../pages/PlatformTenantSlaPage';
+import PlatformRunbooksPage from '../pages/PlatformRunbooksPage';
+import PlatformChangeManagementPage from '../pages/PlatformChangeManagementPage';
+import PlatformApiKeysPage from '../pages/PlatformApiKeysPage';
+import PlatformApiClientGovernancePage from '../pages/PlatformApiClientGovernancePage';
+import PlatformIntegrationMonitoringPage from '../pages/PlatformIntegrationMonitoringPage';
+import PlatformLegalComplianceReportingPage from '../pages/PlatformLegalComplianceReportingPage';
+import PlatformEnterpriseIdentityGovernancePage from '../pages/PlatformEnterpriseIdentityGovernancePage';
+import PlatformSubscriptionReadinessPage from '../pages/PlatformSubscriptionReadinessPage';
+import PlatformLicensePlanEnforcementPage from '../pages/PlatformLicensePlanEnforcementPage';
+import PlatformCustomerSuccessAdminPage from '../pages/PlatformCustomerSuccessAdminPage';
+import PlatformWebhooksPage from '../pages/PlatformWebhooksPage';
+import PlatformAccessReviewsPage from '../pages/PlatformAccessReviewsPage';
+import PlatformPermissionAuditPage from '../pages/PlatformPermissionAuditPage';
+import PlatformComplianceDocumentsPage from '../pages/PlatformComplianceDocumentsPage';
+import PlatformComplianceExportPage from '../pages/PlatformComplianceExportPage';
+import PlatformPrivacyRequestsPage from '../pages/PlatformPrivacyRequestsPage';
+import PlatformVendorsPage from '../pages/PlatformVendorsPage';
+import PlatformServiceDependenciesPage from '../pages/PlatformServiceDependenciesPage';
+import PlatformReleasesPage from '../pages/PlatformReleasesPage';
+import PlatformRiskRegisterPage from '../pages/PlatformRiskRegisterPage';
+import PlatformCapacityPlanningPage from '../pages/PlatformCapacityPlanningPage';
+import PlatformOperationalJobsPage from '../pages/PlatformOperationalJobsPage';
 import { PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
-const routeFallback = <div style={{ padding: 24 }}>Loading…</div>;
-
-
-const pageModules = import.meta.glob('../pages/*.tsx');
-
-function lazyPage(path: keyof typeof pageModules) {
-  return lazy(async () => {
-    const module = (await pageModules[path]()) as Record<string, unknown>;
-    const component = (module.default ?? Object.values(module).find((value) => typeof value === 'function')) as
-      | ComponentType
-      | undefined;
-
-    if (!component) {
-      throw new Error(`Route page module ${path} does not export a React component.`);
-    }
-
-    return { default: component };
-  });
-}
-
-const LoginPage = lazyPage('../pages/LoginPage.tsx');
-const DashboardPage = lazyPage('../pages/DashboardPage.tsx');
-const ProductsPage = lazyPage('../pages/ProductsPage.tsx');
-const SuppliersPage = lazyPage('../pages/SuppliersPage.tsx');
-const AlertsPage = lazyPage('../pages/AlertsPage.tsx');
-const ShipmentsPage = lazyPage('../pages/ShipmentsPage.tsx');
-const StockPage = lazyPage('../pages/StockPage.tsx');
-const InventoryUsagePage = lazyPage('../pages/InventoryUsagePage.tsx');
-const InventoryRequisitionsPage = lazyPage('../pages/InventoryRequisitionsPage.tsx');
-const InventoryReservationsPage = lazyPage('../pages/InventoryReservationsPage.tsx');
-const StorageLocationsPage = lazyPage('../pages/StorageLocationsPage.tsx');
-const StockMovementsPage = lazyPage('../pages/StockMovementsPage.tsx');
-const StockTransfersPage = lazyPage('../pages/StockTransfersPage.tsx');
-const PurchaseOrdersPage = lazyPage('../pages/PurchaseOrdersPage.tsx');
-const ProcurementRecommendationsPage = lazyPage('../pages/ProcurementRecommendationsPage.tsx');
-const ScannerPage = lazyPage('../pages/ScannerPage.tsx');
-const SessionsPage = lazyPage('../pages/SessionsPage.tsx');
-const ReportsPage = lazyPage('../pages/ReportsPage.tsx');
-const UsersPage = lazyPage('../pages/UsersPage.tsx');
-const AdminSystemPage = lazyPage('../pages/AdminSystemPage.tsx');
-const InsightsPage = lazyPage('../pages/InsightsPage.tsx');
-const OperationalActionCenterPage = lazyPage('../pages/OperationalActionCenterPage.tsx');
-const RoleAwareWorkspacePage = lazyPage('../pages/RoleAwareWorkspacePage.tsx');
-const MobileExecutionPage = lazyPage('../pages/MobileExecutionPage.tsx');
-const RealTimeOperationsFeedPage = lazyPage('../pages/RealTimeOperationsFeedPage.tsx');
-const WorkflowAutomationComposerPage = lazyPage('../pages/WorkflowAutomationComposerPage.tsx');
-const HumanInLoopAIReviewPage = lazyPage('../pages/HumanInLoopAIReviewPage.tsx');
-const EnterpriseCollaborationPage = lazyPage('../pages/EnterpriseCollaborationPage.tsx');
-const DigitalTwinVisualizationPage = lazyPage('../pages/DigitalTwinVisualizationPage.tsx');
-const ReliabilityCommandPage = lazyPage('../pages/ReliabilityCommandPage.tsx');
-const TenantAuditPage = lazyPage('../pages/TenantAuditPage.tsx');
-const TenantSettingsPage = lazyPage('../pages/TenantSettingsPage.tsx');
-const SystemContextPage = lazyPage('../pages/SystemContextPage.tsx');
-const ExecutionRequestsPage = lazyPage('../pages/ExecutionRequestsPage.tsx');
-const ExecutionTasksPage = lazyPage('../pages/ExecutionTasksPage.tsx');
-const AutomationSchedulesPage = lazyPage('../pages/AutomationSchedulesPage.tsx');
-const EnterpriseInventoryPage = lazyPage('../pages/EnterpriseInventoryPage.tsx');
-const PlatformLoginPage = lazyPage('../pages/PlatformLoginPage.tsx');
-const PlatformDashboardPage = lazyPage('../pages/PlatformDashboardPage.tsx');
-const PlatformTenantsPage = lazyPage('../pages/PlatformTenantsPage.tsx');
-const PlatformSystemHealthPage = lazyPage('../pages/PlatformSystemHealthPage.tsx');
-const PlatformAuditPage = lazyPage('../pages/PlatformAuditPage.tsx');
-const PlatformAuditRetentionPage = lazyPage('../pages/PlatformAuditRetentionPage.tsx');
-const PlatformSupportSessionsPage = lazyPage('../pages/PlatformSupportSessionsPage.tsx');
-const PlatformUsersPage = lazyPage('../pages/PlatformUsersPage.tsx');
-const PlatformSessionsPage = lazyPage('../pages/PlatformSessionsPage.tsx');
-const PlatformNotificationsPage = lazyPage('../pages/PlatformNotificationsPage.tsx');
-const PlatformSecurityPage = lazyPage('../pages/PlatformSecurityPage.tsx');
-const PlatformBillingPage = lazyPage('../pages/PlatformBillingPage.tsx');
-const PlatformProvisioningPage = lazyPage('../pages/PlatformProvisioningPage.tsx');
-const PlatformTenantExportsPage = lazyPage('../pages/PlatformTenantExportsPage.tsx');
-const PlatformMaintenancePage = lazyPage('../pages/PlatformMaintenancePage.tsx');
-const PlatformAnnouncementsPage = lazyPage('../pages/PlatformAnnouncementsPage.tsx');
-const PlatformTenantContactsPage = lazyPage('../pages/PlatformTenantContactsPage.tsx');
-const PlatformTenantNotesPage = lazyPage('../pages/PlatformTenantNotesPage.tsx');
-const PlatformTenantCommunicationsPage = lazyPage('../pages/PlatformTenantCommunicationsPage.tsx');
-const PlatformTenantTasksPage = lazyPage('../pages/PlatformTenantTasksPage.tsx');
-const PlatformTenantOffboardingPage = lazyPage('../pages/PlatformTenantOffboardingPage.tsx');
-const PlatformIncidentsPage = lazyPage('../pages/PlatformIncidentsPage.tsx');
-const PlatformDataRetentionPage = lazyPage('../pages/PlatformDataRetentionPage.tsx');
-const PlatformTenantTimelinePage = lazyPage('../pages/PlatformTenantTimelinePage.tsx');
-const PlatformTenantHealthPage = lazyPage('../pages/PlatformTenantHealthPage.tsx');
-const PlatformTenantLifecyclePage = lazyPage('../pages/PlatformTenantLifecyclePage.tsx');
-const PlatformTenantSlaPage = lazyPage('../pages/PlatformTenantSlaPage.tsx');
-const PlatformRunbooksPage = lazyPage('../pages/PlatformRunbooksPage.tsx');
-const PlatformChangeManagementPage = lazyPage('../pages/PlatformChangeManagementPage.tsx');
-const PlatformApiKeysPage = lazyPage('../pages/PlatformApiKeysPage.tsx');
-const PlatformApiClientGovernancePage = lazyPage('../pages/PlatformApiClientGovernancePage.tsx');
-const PlatformIntegrationMonitoringPage = lazyPage('../pages/PlatformIntegrationMonitoringPage.tsx');
-const PlatformLegalComplianceReportingPage = lazyPage('../pages/PlatformLegalComplianceReportingPage.tsx');
-const PlatformEnterpriseIdentityGovernancePage = lazyPage('../pages/PlatformEnterpriseIdentityGovernancePage.tsx');
-const PlatformSubscriptionReadinessPage = lazyPage('../pages/PlatformSubscriptionReadinessPage.tsx');
-const PlatformLicensePlanEnforcementPage = lazyPage('../pages/PlatformLicensePlanEnforcementPage.tsx');
-const PlatformCustomerSuccessAdminPage = lazyPage('../pages/PlatformCustomerSuccessAdminPage.tsx');
-const PlatformWebhooksPage = lazyPage('../pages/PlatformWebhooksPage.tsx');
-const PlatformAccessReviewsPage = lazyPage('../pages/PlatformAccessReviewsPage.tsx');
-const PlatformPermissionAuditPage = lazyPage('../pages/PlatformPermissionAuditPage.tsx');
-const PlatformComplianceDocumentsPage = lazyPage('../pages/PlatformComplianceDocumentsPage.tsx');
-const PlatformComplianceExportPage = lazyPage('../pages/PlatformComplianceExportPage.tsx');
-const PlatformPrivacyRequestsPage = lazyPage('../pages/PlatformPrivacyRequestsPage.tsx');
-const PlatformVendorsPage = lazyPage('../pages/PlatformVendorsPage.tsx');
-const PlatformServiceDependenciesPage = lazyPage('../pages/PlatformServiceDependenciesPage.tsx');
-const PlatformReleasesPage = lazyPage('../pages/PlatformReleasesPage.tsx');
-const PlatformRiskRegisterPage = lazyPage('../pages/PlatformRiskRegisterPage.tsx');
-const PlatformCapacityPlanningPage = lazyPage('../pages/PlatformCapacityPlanningPage.tsx');
-const PlatformOperationalJobsPage = lazyPage('../pages/PlatformOperationalJobsPage.tsx');
-
-const routes: RouteObject[] = [
+const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />
@@ -853,16 +829,10 @@ const routes: RouteObject[] = [
     path: '*',
     element: <Navigate to="/dashboard" replace />
   }
-];
-
-const router = createBrowserRouter(routes);
+]);
 
 export function AppRouter() {
-  return (
-    <Suspense fallback={routeFallback}>
-      <RouterProvider router={router} />
-    </Suspense>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export { router };

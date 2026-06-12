@@ -25,6 +25,43 @@ type DepletionRiskResponse = {
   }>;
 };
 
+
+type DepletionRiskRootCauseResponse = {
+  generated_at: string;
+  tenant_id: string;
+  lookback_days: number;
+  scope: string;
+  safety_contract: {
+    read_only: boolean;
+    advisory_only: boolean;
+    no_inventory_mutation: boolean;
+    no_procurement_execution: boolean;
+    no_autonomous_approval: boolean;
+  };
+  summary: {
+    total_rows: number;
+    rows_requiring_human_review: number;
+    by_factor_severity: Record<string, number>;
+    by_factor_code: Record<string, number>;
+  };
+  rows: Array<DepletionRiskResponse['rows'][number] & {
+    highest_factor_severity: 'critical' | 'high' | 'medium' | 'low';
+    root_cause_factors: Array<{
+      code: string;
+      label: string;
+      severity: 'critical' | 'high' | 'medium' | 'low';
+      detail: string;
+    }>;
+    recommended_investigation_steps: string[];
+    production_safety: {
+      read_only: boolean;
+      advisory_only: boolean;
+      creates_reorder_or_stock_change: boolean;
+      requires_human_review: boolean;
+    };
+  }>;
+};
+
 type ReorderRecommendationsResponse = {
   generated_at: string;
   tenant_id: string;
@@ -72,6 +109,52 @@ type AnomaliesResponse = {
     spike_ratio: number | string;
     anomaly_score: number | string;
     anomaly_tier: string;
+  }>;
+};
+
+type AnomalyProductionReviewResponse = {
+  generated_at: string;
+  tenant_id: string;
+  short_window_days: number;
+  baseline_window_days: number;
+  production_status: 'blocked' | 'needs_review' | 'ready_for_controlled_use' | 'monitor_only';
+  safety_contract: {
+    mode: string;
+    read_only: boolean;
+    advisory_only: boolean;
+    mutates_inventory: boolean;
+    suppresses_alerts: boolean;
+    creates_procurement_actions: boolean;
+    requires_human_approval_for_execution: boolean;
+  };
+  operational_health_context: {
+    health_score: number | string;
+    health_tier: string;
+    unresolved_alerts: number | string;
+    overdue_shipments: number | string;
+    low_stock_rate_pct: number | string;
+    discrepancy_rate_pct: number | string;
+  };
+  summary: {
+    total_rows: number;
+    rows_requiring_human_review: number;
+    by_severity: Record<string, number>;
+    by_factor_code: Record<string, number>;
+  };
+  blockers: Array<{ code: string; severity: string; affected_count: number; message: string }>;
+  warnings: Array<{ code: string; severity: string; affected_count: number; message: string }>;
+  next_actions: string[];
+  rows: Array<AnomaliesResponse['rows'][number] & {
+    highest_factor_severity: string;
+    review_factors: Array<{ code: string; severity: string; label: string; detail: string }>;
+    recommended_investigation_steps: string[];
+    production_safety: {
+      read_only: boolean;
+      advisory_only: boolean;
+      mutates_inventory: boolean;
+      suppresses_alerts: boolean;
+      requires_human_review: boolean;
+    };
   }>;
 };
 
@@ -124,6 +207,45 @@ type SupplierTrustResponse = {
       severity: 'high' | 'medium' | 'low';
       detail: string;
     }>;
+  }>;
+};
+
+
+type SupplierTrustProductionReviewResponse = {
+  generated_at: string;
+  tenant_id: string;
+  scope: string;
+  production_status: 'blocked' | 'needs_review' | 'ready_for_controlled_use' | 'monitor_only';
+  safety_contract: {
+    mode: string;
+    read_only: boolean;
+    advisory_only: boolean;
+    mutates_supplier_records: boolean;
+    creates_purchase_orders: boolean;
+    changes_supplier_status: boolean;
+    requires_human_approval_for_execution: boolean;
+  };
+  summary: {
+    total_rows: number;
+    rows_requiring_human_review: number;
+    by_factor_severity: Record<string, number>;
+    by_factor_code: Record<string, number>;
+  };
+  blockers: Array<{ code: string; severity: string; affected_count: number; message: string }>;
+  warnings: Array<{ code: string; severity: string; affected_count: number; message: string }>;
+  next_actions: string[];
+  rows: Array<SupplierTrustResponse['rows'][number] & {
+    highest_factor_severity: string;
+    review_factors: Array<{ code: string; severity: string; label: string; detail: string }>;
+    recommended_supplier_review_steps: string[];
+    production_safety: {
+      read_only: boolean;
+      advisory_only: boolean;
+      mutates_supplier_records: boolean;
+      creates_purchase_orders: boolean;
+      changes_supplier_status: boolean;
+      requires_human_review: boolean;
+    };
   }>;
 };
 
@@ -316,6 +438,10 @@ async function fetchDepletionRisk(lookbackDays: number): Promise<DepletionRiskRe
   return apiRequest<DepletionRiskResponse>(`/inventory-insights/depletion-risk?lookback_days=${lookbackDays}`);
 }
 
+async function fetchDepletionRiskRootCause(lookbackDays: number): Promise<DepletionRiskRootCauseResponse> {
+  return apiRequest<DepletionRiskRootCauseResponse>(`/inventory-insights/depletion-risk/root-cause-review?lookback_days=${lookbackDays}`);
+}
+
 async function fetchReorderRecommendations(lookbackDays: number): Promise<ReorderRecommendationsResponse> {
   return apiRequest<ReorderRecommendationsResponse>(`/reorder-insights/recommendations?lookback_days=${lookbackDays}`);
 }
@@ -328,8 +454,16 @@ async function fetchAnomalies(): Promise<AnomaliesResponse> {
   return apiRequest<AnomaliesResponse>('/operational-insights/anomalies');
 }
 
+async function fetchAnomalyProductionReview(): Promise<AnomalyProductionReviewResponse> {
+  return apiRequest<AnomalyProductionReviewResponse>('/operational-insights/anomalies/production-review');
+}
+
 async function fetchSupplierTrust(): Promise<SupplierTrustResponse> {
   return apiRequest<SupplierTrustResponse>('/supplier-insights/trust-scores');
+}
+
+async function fetchSupplierTrustProductionReview(): Promise<SupplierTrustProductionReviewResponse> {
+  return apiRequest<SupplierTrustProductionReviewResponse>('/supplier-insights/trust-scores/production-review');
 }
 
 function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -404,6 +538,11 @@ export default function InsightsPage() {
     queryFn: () => fetchDepletionRisk(lookbackDays)
   });
 
+  const depletionRootCauseQuery = useQuery({
+    queryKey: ['insights', 'depletion-risk-root-cause', lookbackDays],
+    queryFn: () => fetchDepletionRiskRootCause(lookbackDays)
+  });
+
   const reorderQuery = useQuery({
     queryKey: ['insights', 'reorder-recommendations', lookbackDays],
     queryFn: () => fetchReorderRecommendations(lookbackDays)
@@ -419,9 +558,20 @@ export default function InsightsPage() {
     queryFn: fetchAnomalies
   });
 
+  const anomalyProductionReviewQuery = useQuery({
+    queryKey: ['insights', 'anomalies-production-review'],
+    queryFn: fetchAnomalyProductionReview
+  });
+
   const supplierTrustQuery = useQuery({
     queryKey: ['insights', 'supplier-trust'],
     queryFn: fetchSupplierTrust
+  });
+
+
+  const supplierTrustProductionReviewQuery = useQuery({
+    queryKey: ['insights', 'supplier-trust-production-review'],
+    queryFn: fetchSupplierTrustProductionReview
   });
 
   useEffect(() => {
@@ -1100,7 +1250,54 @@ export default function InsightsPage() {
 
         <Section title="Supplier Trust" subtitle="Supplier trust scores derived from shipment behavior plus PO fulfillment, short-close, and overdue PO signals.">
           {supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier trust...</div> : null}
-          {supplierTrustQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustQuery.error)}</div> : null}
+          {supplierTrustProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier production review...</div> : null}
+          {supplierTrustProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustProductionReviewQuery.error)}</div> : null}
+          {supplierTrustProductionReviewQuery.data ? (
+            <div style={styles.supplierBreakdownPanel} aria-label="Supplier Trust production review">
+              <div style={styles.itemTitle}>Supplier Production Review</div>
+              <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
+                <StatCard
+                  title="Production Status"
+                  value={supplierTrustProductionReviewQuery.data.production_status.replace(/_/g, ' ')}
+                  subtitle="Read-only supplier trust production decision."
+                  tone={supplierTrustProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : supplierTrustProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+                />
+                <StatCard
+                  title="Human Review Rows"
+                  value={formatNumber(supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
+                  subtitle={`${formatNumber(supplierTrustProductionReviewQuery.data.summary.total_rows, 0)} supplier rows reviewed.`}
+                  tone={supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+                />
+                <StatCard
+                  title="Blockers"
+                  value={formatNumber(supplierTrustProductionReviewQuery.data.blockers.length, 0)}
+                  subtitle="High-risk supplier trust production blockers."
+                  tone={supplierTrustProductionReviewQuery.data.blockers.length > 0 ? 'bad' : 'good'}
+                />
+                <StatCard
+                  title="Read Only"
+                  value={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'Yes' : 'No'}
+                  subtitle="Does not mutate suppliers, change status, or create POs."
+                  tone={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'good' : 'bad'}
+                />
+              </div>
+              {supplierTrustProductionReviewQuery.data.blockers.length ? (
+                <div style={styles.list}>
+                  {supplierTrustProductionReviewQuery.data.blockers.map((blocker) => (
+                    <div key={blocker.code} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>{blocker.message}</div>
+                      <div style={styles.itemMeta}>{blocker.code} · {blocker.severity} · affected {formatNumber(blocker.affected_count, 0)}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {supplierTrustProductionReviewQuery.data.next_actions.length ? (
+                <ul style={styles.compactList}>
+                  {supplierTrustProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{action}</li>)}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
           {supplierTrustQuery.data?.rows.length ? (
             <>
               {supplierTrustQuery.data.summary ? (
@@ -1550,6 +1747,52 @@ export default function InsightsPage() {
           ) : !depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No depletion risk rows returned.</div> : null}
         </Section>
 
+        <Section title="Depletion Root-Cause Review" subtitle="Read-only explanation of what is driving depletion-risk rows and what operators should investigate first.">
+          {depletionRootCauseQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading depletion root-cause review...</div> : null}
+          {depletionRootCauseQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRootCauseQuery.error)}</div> : null}
+          {depletionRootCauseQuery.data ? (
+            <div style={styles.list}>
+              <div style={styles.supplierDataMetaPanel}>
+                <span>{formatNumber(depletionRootCauseQuery.data.summary.total_rows, 0)} stock rows reviewed</span>
+                <span>{formatNumber(depletionRootCauseQuery.data.summary.rows_requiring_human_review, 0)} need human review</span>
+                <span>Read-only: {depletionRootCauseQuery.data.safety_contract.read_only ? 'yes' : 'no'}</span>
+              </div>
+              {depletionRootCauseQuery.data.rows.slice(0, 8).map((row) => (
+                <article key={`${row.stock_id}-root-cause`} style={styles.itemCard}>
+                  <div style={styles.itemTitle}>{row.product_name}</div>
+                  <div style={styles.itemMeta}>
+                    {row.storage_location_name} · Factor severity {row.highest_factor_severity} · Risk {formatNumber(row.risk_score, 0)} / {row.risk_tier}
+                  </div>
+                  <div style={styles.riskFlagDetailList}>
+                    {row.root_cause_factors.slice(0, 3).map((factor) => (
+                      <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
+                        <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
+                          {factor.severity}
+                        </span>
+                        <div>
+                          <div style={styles.itemTitle}>{factor.label}</div>
+                          <div style={styles.itemText}>{factor.detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={styles.recommendedActionPanel}>
+                    <div style={styles.itemTitle}>Investigation steps</div>
+                    <ul style={styles.compactList}>
+                      {row.recommended_investigation_steps.slice(0, 3).map((step) => (
+                        <li key={`${row.stock_id}-${step}`} style={styles.itemText}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Link to={`/stock?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>
+                    Open in Stock
+                  </Link>
+                </article>
+              ))}
+            </div>
+          ) : !depletionRootCauseQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No depletion root-cause review returned.</div> : null}
+        </Section>
+
         <Section title="Reorder Recommendations" subtitle="Explainable reorder quantities based on current stock and recent outbound usage.">
           {reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading reorder recommendations...</div> : null}
           {reorderQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(reorderQuery.error)}</div> : null}
@@ -1571,6 +1814,69 @@ export default function InsightsPage() {
           ) : !reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No reorder recommendation rows returned.</div> : null}
         </Section>
       </div>
+
+
+
+      <Section title="Anomaly Production Review" subtitle="Read-only production review for anomaly reliability, root-cause factors, and required human investigation before managers rely on anomaly output.">
+        {anomalyProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly production review...</div> : null}
+        {anomalyProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(anomalyProductionReviewQuery.error)}</div> : null}
+        {anomalyProductionReviewQuery.data ? (
+          <div style={styles.list}>
+            <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
+              <StatCard
+                title="Production Status"
+                value={anomalyProductionReviewQuery.data.production_status.replaceAll('_', ' ')}
+                subtitle={`Health tier: ${anomalyProductionReviewQuery.data.operational_health_context.health_tier}`}
+                tone={anomalyProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : anomalyProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+              />
+              <StatCard
+                title="Rows Requiring Review"
+                value={formatNumber(anomalyProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
+                subtitle={`${formatNumber(anomalyProductionReviewQuery.data.summary.total_rows, 0)} anomaly rows reviewed.`}
+                tone={anomalyProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+              />
+              <StatCard
+                title="Safety Mode"
+                value={anomalyProductionReviewQuery.data.safety_contract.mode.replaceAll('_', ' ')}
+                subtitle={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'Mutation enabled' : 'Read-only; no stock mutation or alert suppression.'}
+                tone={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'bad' : 'good'}
+              />
+            </div>
+
+            {anomalyProductionReviewQuery.data.blockers.length || anomalyProductionReviewQuery.data.warnings.length ? (
+              <div style={styles.list}>
+                {[...anomalyProductionReviewQuery.data.blockers, ...anomalyProductionReviewQuery.data.warnings].map((item) => (
+                  <article key={item.code} style={item.severity === 'critical' ? styles.actionCardBad : styles.actionCardWarn}>
+                    <div style={styles.actionCardTitle}>{item.code.replaceAll('_', ' ')}</div>
+                    <div style={styles.actionCardText}>{item.message}</div>
+                    <div style={styles.itemMeta}>Affected rows: {formatNumber(item.affected_count, 0)} · Severity {item.severity}</div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="app-empty-state" style={styles.infoState}>No production blockers returned for anomaly review.</div>
+            )}
+
+            <div style={styles.itemCard}>
+              <div style={styles.itemTitle}>Next actions</div>
+              <ul style={styles.compactList}>
+                {anomalyProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{action}</li>)}
+              </ul>
+            </div>
+
+            {anomalyProductionReviewQuery.data.rows.slice(0, 8).map((row) => (
+              <article key={row.product_id} style={styles.itemCard}>
+                <div style={styles.itemTitle}>{row.product_name}</div>
+                <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {row.anomaly_tier} · Review severity {row.highest_factor_severity}</div>
+                <div style={styles.itemText}>{row.review_factors.map((factor) => `${factor.label}: ${factor.detail}`).join(' ')}</div>
+                <ul style={styles.compactList}>
+                  {row.recommended_investigation_steps.map((step) => <li key={step}>{step}</li>)}
+                </ul>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </Section>
 
       <Section title="Inventory Anomalies" subtitle="Products whose recent outbound activity looks unusual compared to their own baseline.">
         {anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly signals...</div> : null}
@@ -1999,6 +2305,12 @@ const styles: Record<string, CSSProperties> = {
     color: '#334155',
     lineHeight: 1.5,
     wordBreak: 'break-word'
+  },
+  compactList: {
+    margin: 0,
+    paddingLeft: '18px',
+    display: 'grid',
+    gap: '6px'
   },
   recommendedActionPanel: {
     display: 'grid',
