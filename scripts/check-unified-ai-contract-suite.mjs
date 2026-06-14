@@ -40,6 +40,7 @@ const hasBackendRoot = Boolean(backendRoot && backendRoot !== '--backend-root');
 
 run('check:unified-ai-panel-anchor-contract');
 run('check:unified-ai-response-type-contract');
+run('check:vercel-api-base-url');
 
 if (!hasBackendRoot) {
   if (!isManagedFrontendBuildWithoutBackendRoot()) {
