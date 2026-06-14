@@ -49,7 +49,7 @@ const addMissing = (label, expected, actual) => {
 addMissing('frontend panel anchor manifest vs backend frozen keys', backendKeys, frontendKeysFromAnchors);
 addMissing('frontend response type vs backend frozen keys', backendKeys, frontendTypedKeys);
 
-const EXPECTED_UNIFIED_AI_CONTRACT_FREEZE_VERSION = 'step205_unified_ai_commercial_completion_certificate';
+const EXPECTED_UNIFIED_AI_CONTRACT_FREEZE_VERSION = 'step206_unified_ai_frontend_deployment_contract_suite_guard';
 const versionMatch = serviceSource.match(/const\s+UNIFIED_AI_CONTRACT_FREEZE_VERSION\s*=\s*['"]([^'"]+)['"]/);
 if (!versionMatch) failures.push('backend contract version is missing');
 else if (versionMatch[1] !== EXPECTED_UNIFIED_AI_CONTRACT_FREEZE_VERSION) {
@@ -86,6 +86,12 @@ if (!fs.existsSync(frontendSuitePath)) {
   const frontendSuiteSource = fs.readFileSync(frontendSuitePath, 'utf8');
   if (!frontendSuiteSource.includes("argv.indexOf('--backend-root')")) {
     failures.push('frontend contract suite runner does not support --backend-root CLI flag');
+  }
+  if (!frontendSuiteSource.includes('isManagedFrontendBuildWithoutBackendRoot')) {
+    failures.push('frontend contract suite runner must support managed frontend-only deployment builds without requiring a backend checkout');
+  }
+  if (!frontendSuiteSource.includes('backend-dependent route and cross-repo checks were skipped')) {
+    failures.push('frontend contract suite runner must explicitly report skipped backend-dependent checks in managed frontend-only deployment mode');
   }
 }
 if (!fs.existsSync(frontendPackagePath)) failures.push('frontend package.json is missing');
