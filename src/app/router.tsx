@@ -47,6 +47,10 @@ import MobileExecutionPage from '../pages/MobileExecutionPage';
 import RealTimeOperationsFeedPage from '../pages/RealTimeOperationsFeedPage';
 import WorkflowAutomationComposerPage from '../pages/WorkflowAutomationComposerPage';
 import HumanInLoopAIReviewPage from '../pages/HumanInLoopAIReviewPage';
+import DecisionLearningFeedbackPage from '../pages/DecisionLearningFeedbackPage';
+import CrossDomainOptimizationPage from '../pages/CrossDomainOptimizationPage';
+import AdaptivePolicyEnginePage from '../pages/AdaptivePolicyEnginePage';
+import ProbabilisticForecastingPage from '../pages/ProbabilisticForecastingPage';
 import EnterpriseCollaborationPage from '../pages/EnterpriseCollaborationPage';
 import DigitalTwinVisualizationPage from '../pages/DigitalTwinVisualizationPage';
 import ReliabilityCommandPage from '../pages/ReliabilityCommandPage';
@@ -612,6 +616,38 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
             <HumanInLoopAIReviewPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'decision-learning-feedback',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+            <DecisionLearningFeedbackPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'adaptive-policy-engine',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+            <AdaptivePolicyEnginePage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'probabilistic-forecasting',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+            <ProbabilisticForecastingPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'cross-domain-optimization',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+            <CrossDomainOptimizationPage />
           </ProtectedRoute>
         )
       },

@@ -32,7 +32,141 @@ type OperationalAction = {
   updated_at?: string | null;
 };
 
+type ControlTowerTraceability = {
+  traceability_model?: string;
+  traceability_score?: number | string | null;
+  traceability_posture?: string | null;
+  control_tower_action_count?: number;
+  execution_action_count?: number;
+  governance_action_count?: number;
+  critical_action_count?: number;
+  approval_required_count?: number;
+  source_workflow_linked_count?: number;
+  blockers?: string[];
+  orchestration_lanes?: Array<{
+    lane_id?: string;
+    source_actions?: string[];
+    target_actions?: string[];
+    manual_coordination_required?: boolean;
+  }>;
+};
+
+type ControlTowerRemediationFeedbackLoop = {
+  feedback_model?: string;
+  feedback_score?: number | string | null;
+  feedback_posture?: string | null;
+  control_tower_action_count?: number;
+  remediation_action_count?: number;
+  governance_action_count?: number;
+  blocked_action_count?: number;
+  high_risk_action_count?: number;
+  approval_required_count?: number;
+  source_evidence_coverage_score?: number;
+  remediation_coverage_score?: number;
+  remediation_outcome_buckets?: Record<string, number>;
+  blockers?: string[];
+  required_manual_evidence?: string[];
+  recommended_next_step?: string;
+};
+
+type ControlTowerRemediationEffectivenessReview = {
+  effectiveness_model?: string;
+  effectiveness_score?: number | string | null;
+  effectiveness_posture?: string | null;
+  remediation_action_count?: number;
+  control_tower_signal_count?: number;
+  review_ready_action_count?: number;
+  blocked_remediation_count?: number;
+  high_risk_remediation_count?: number;
+  source_evidence_score?: number;
+  governance_coverage_score?: number;
+  review_readiness_score?: number;
+  blockers?: string[];
+  effectiveness_review_contract?: string[];
+  recommended_next_step?: string;
+};
+
+type ControlTowerRemediationEscalationGovernance = {
+  escalation_model?: string;
+  escalation_score?: number | string | null;
+  escalation_posture?: string | null;
+  remediation_action_count?: number;
+  control_tower_signal_count?: number;
+  blocked_remediation_count?: number;
+  escalated_remediation_count?: number;
+  high_risk_remediation_count?: number;
+  approval_required_count?: number;
+  escalation_candidate_count?: number;
+  source_evidence_score?: number;
+  governance_gate_score?: number;
+  escalation_coverage_score?: number;
+  blockers?: string[];
+  escalation_lanes?: Array<{
+    lane_id?: string;
+    action_ids?: string[];
+    manual_owner_required?: boolean;
+    manual_governance_review_required?: boolean;
+  }>;
+  escalation_contract?: string[];
+  recommended_next_step?: string;
+};
+
+
+type ControlTowerRemediationClosureVerificationGate = {
+  closure_gate_model?: string;
+  closure_score?: number | string | null;
+  closure_posture?: string | null;
+  remediation_action_count?: number;
+  control_tower_signal_count?: number;
+  closure_candidate_count?: number;
+  blocked_remediation_count?: number;
+  escalated_remediation_count?: number;
+  high_risk_remediation_count?: number;
+  source_evidence_score?: number;
+  escalation_clearance_score?: number;
+  governance_closure_score?: number;
+  blockers?: string[];
+  closure_verification_contract?: string[];
+  recommended_next_step?: string;
+};
+
+type ControlTowerRemediationResponseContractAudit = {
+  audit_model?: string;
+  audit_score?: number | string | null;
+  audit_posture?: string | null;
+  expected_contract_keys?: string[];
+  populated_contract_keys?: string[];
+  missing_contract_keys?: string[];
+  contract_coverage_score?: number | string | null;
+  blocker_counts_by_contract_key?: Record<string, number>;
+  total_blocker_count?: number;
+  blockers?: string[];
+  audit_contract?: string[];
+  recommended_next_step?: string;
+};
+
+type ControlTowerRouteExposureAudit = {
+  audit_model?: string;
+  route_path?: string;
+  http_method?: string;
+  required_permission?: string;
+  validation_contract?: {
+    allowed_query_params?: string[];
+    bounded_limit?: boolean;
+    write_methods_allowed?: boolean;
+  };
+  frontend_rendered_panels?: string[];
+  backend_returned_panels?: string[];
+  missing_frontend_panels?: string[];
+  route_exposure_score?: number | string | null;
+  route_exposure_posture?: string | null;
+  blockers?: string[];
+  audit_contract?: string[];
+  recommended_next_step?: string;
+};
+
 type ActionCenterSummary = {
+
   total_actions?: number;
   by_urgency?: Record<string, number>;
   by_domain?: Record<string, number>;
@@ -54,10 +188,28 @@ type ActionCenterResponse = {
     limit?: number;
   };
   summary?: ActionCenterSummary;
+  control_tower_orchestration_traceability?: ControlTowerTraceability;
+  control_tower_remediation_feedback_loop?: ControlTowerRemediationFeedbackLoop;
+  control_tower_remediation_effectiveness_review?: ControlTowerRemediationEffectivenessReview;
+  control_tower_remediation_escalation_governance?: ControlTowerRemediationEscalationGovernance;
+  control_tower_remediation_closure_verification_gate?: ControlTowerRemediationClosureVerificationGate;
+  control_tower_remediation_response_contract_audit?: ControlTowerRemediationResponseContractAudit;
+  control_tower_route_exposure_audit?: ControlTowerRouteExposureAudit;
   actions?: OperationalAction[];
   non_mutation_guarantee?: boolean;
   generated_at?: string;
 };
+
+
+const CONTROL_TOWER_RENDERED_PANEL_KEYS = [
+  'control_tower_orchestration_traceability',
+  'control_tower_remediation_feedback_loop',
+  'control_tower_remediation_effectiveness_review',
+  'control_tower_remediation_escalation_governance',
+  'control_tower_remediation_closure_verification_gate',
+  'control_tower_remediation_response_contract_audit',
+  'control_tower_route_exposure_audit'
+] as const;
 
 const ACTION_DOMAIN_VALUES = ['all', 'alerts', 'execution', 'control_tower', 'decision_intelligence', 'ai_governance', 'multi_domain'] as const;
 
@@ -194,6 +346,16 @@ export default function OperationalActionCenterPage() {
   const response = actionCenterQuery.data;
   const actions = response?.actions || [];
   const summary = response?.summary || {};
+  const traceability = response?.control_tower_orchestration_traceability || {};
+  const remediationFeedback = response?.control_tower_remediation_feedback_loop || {};
+  const effectivenessReview = response?.control_tower_remediation_effectiveness_review || {};
+  const escalationGovernance = response?.control_tower_remediation_escalation_governance || {};
+  const closureGate = response?.control_tower_remediation_closure_verification_gate || {};
+  const contractAudit = response?.control_tower_remediation_response_contract_audit || {};
+  const routeExposureAudit = response?.control_tower_route_exposure_audit || {};
+  const frontendPanelContractDriftCount = CONTROL_TOWER_RENDERED_PANEL_KEYS.filter((key) => {
+    return !(routeExposureAudit.frontend_rendered_panels || []).includes(key);
+  }).length;
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
@@ -291,6 +453,359 @@ export default function OperationalActionCenterPage() {
                 );
               })}
             </div>
+          )}
+        </div>
+      </section>
+
+
+      <section className="section">
+        <div className="section__title">Control Tower orchestration traceability</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Traceability score</div>
+            <div className="card__value">{numberValue(traceability.traceability_score)}</div>
+            <div className="card__subtext">Manual orchestration readiness across control-tower, execution, and governance actions.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(traceability.traceability_posture)}</div>
+            <div className="card__subtext">Read-only; source workflows remain authoritative.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Control tower actions</div>
+            <div className="card__value">{numberValue(traceability.control_tower_action_count)}</div>
+            <div className="card__subtext">Signals available for manual coordination trace.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Execution / governance links</div>
+            <div className="card__value">{numberValue(traceability.execution_action_count) + numberValue(traceability.governance_action_count)}</div>
+            <div className="card__subtext">Related operational and decision-review actions in the same inbox.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Traceability blockers</div>
+          {traceability.blockers?.length ? (
+            <ul>
+              {traceability.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No traceability blockers reported by the backend.</p>
+          )}
+        </div>
+      </section>
+
+
+      <section className="section">
+        <div className="section__title">Control Tower remediation feedback loop</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Feedback score</div>
+            <div className="card__value">{numberValue(remediationFeedback.feedback_score)}</div>
+            <div className="card__subtext">Read-only maturity score for remediation outcome evidence.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Feedback posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(remediationFeedback.feedback_posture)}</div>
+            <div className="card__subtext">Human review remains required before closure.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Remediation actions</div>
+            <div className="card__value">{numberValue(remediationFeedback.remediation_action_count)}</div>
+            <div className="card__subtext">Open remediation workflows available for feedback review.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Evidence coverage</div>
+            <div className="card__value">{numberValue(remediationFeedback.source_evidence_coverage_score)}%</div>
+            <div className="card__subtext">Actions with source workflow traceability.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Feedback blockers</div>
+          {remediationFeedback.blockers?.length ? (
+            <ul>
+              {remediationFeedback.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No remediation feedback blockers reported by the backend.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {remediationFeedback.recommended_next_step || 'Review source workflows before closing remediation feedback.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Required manual evidence</div>
+          {remediationFeedback.required_manual_evidence?.length ? (
+            <ul>
+              {remediationFeedback.required_manual_evidence.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No manual evidence requirements reported.</p>
+          )}
+        </div>
+      </section>
+
+
+      <section className="section">
+        <div className="section__title">Control Tower remediation effectiveness review</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Effectiveness score</div>
+            <div className="card__value">{numberValue(effectivenessReview.effectiveness_score)}</div>
+            <div className="card__subtext">Manual before/after review readiness for remediation outcomes.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Effectiveness posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(effectivenessReview.effectiveness_posture)}</div>
+            <div className="card__subtext">No remediation is executed from this page.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Review-ready actions</div>
+            <div className="card__value">{numberValue(effectivenessReview.review_ready_action_count)}</div>
+            <div className="card__subtext">Remediation items available for human effectiveness review.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Governance coverage</div>
+            <div className="card__value">{numberValue(effectivenessReview.governance_coverage_score)}%</div>
+            <div className="card__subtext">High-risk remediation actions with governance gate context.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Effectiveness blockers</div>
+          {effectivenessReview.blockers?.length ? (
+            <ul>
+              {effectivenessReview.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No effectiveness blockers reported by the backend.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {effectivenessReview.recommended_next_step || 'Complete before/after evidence review before closing remediation.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Effectiveness review contract</div>
+          {effectivenessReview.effectiveness_review_contract?.length ? (
+            <ul>
+              {effectivenessReview.effectiveness_review_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No effectiveness review contract reported.</p>
+          )}
+        </div>
+      </section>
+
+
+
+      <section className="section">
+        <div className="section__title">Control Tower remediation escalation governance</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Escalation score</div>
+            <div className="card__value">{numberValue(escalationGovernance.escalation_score)}</div>
+            <div className="card__subtext">Manual governance readiness for blocked or high-risk remediation items.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Escalation posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(escalationGovernance.escalation_posture)}</div>
+            <div className="card__subtext">Closure remains blocked until human escalation decisions are recorded.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Escalation candidates</div>
+            <div className="card__value">{numberValue(escalationGovernance.escalation_candidate_count)}</div>
+            <div className="card__subtext">Blocked, escalated, or high-risk remediation actions requiring review.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Governance gate score</div>
+            <div className="card__value">{numberValue(escalationGovernance.governance_gate_score)}%</div>
+            <div className="card__subtext">High-risk remediation actions covered by approval context.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Escalation blockers</div>
+          {escalationGovernance.blockers?.length ? (
+            <ul>
+              {escalationGovernance.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No escalation governance blockers reported by the backend.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {escalationGovernance.recommended_next_step || 'Run manual escalation review before closing blocked remediation outcomes.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Escalation contract</div>
+          {escalationGovernance.escalation_contract?.length ? (
+            <ul>
+              {escalationGovernance.escalation_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No escalation contract reported.</p>
+          )}
+        </div>
+      </section>
+
+
+      <section className="section">
+        <div className="section__title">Control Tower remediation closure verification gate</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Closure score</div>
+            <div className="card__value">{numberValue(closureGate.closure_score)}</div>
+            <div className="card__subtext">Read-only gate score before remediation can be treated as closed.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Closure posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(closureGate.closure_posture)}</div>
+            <div className="card__subtext">Closure decisions must still be recorded in the source workflow.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Closure candidates</div>
+            <div className="card__value">{numberValue(closureGate.closure_candidate_count)}</div>
+            <div className="card__subtext">Remediation actions available for manual closure verification.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Escalation clearance</div>
+            <div className="card__value">{numberValue(closureGate.escalation_clearance_score)}%</div>
+            <div className="card__subtext">Blocked or escalated remediation must clear before closure.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Closure blockers</div>
+          {closureGate.blockers?.length ? (
+            <ul>
+              {closureGate.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No closure verification blockers reported by the backend.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {closureGate.recommended_next_step || 'Run manual closure verification before closing remediation outcomes.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Closure verification contract</div>
+          {closureGate.closure_verification_contract?.length ? (
+            <ul>
+              {closureGate.closure_verification_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No closure verification contract reported.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section__title">Control Tower remediation response contract audit</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Contract audit score</div>
+            <div className="card__value">{numberValue(contractAudit.audit_score)}</div>
+            <div className="card__subtext">Backend response completeness for every remediation panel rendered here.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Audit posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(contractAudit.audit_posture)}</div>
+            <div className="card__subtext">Prevents frontend/backend contract drift.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Coverage</div>
+            <div className="card__value">{numberValue(contractAudit.contract_coverage_score)}%</div>
+            <div className="card__subtext">Expected response objects currently populated.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Open blockers</div>
+            <div className="card__value">{numberValue(contractAudit.total_blocker_count)}</div>
+            <div className="card__subtext">Combined blockers reported by remediation response objects.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Missing contract keys</div>
+          {contractAudit.missing_contract_keys?.length ? (
+            <ul>
+              {contractAudit.missing_contract_keys.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No missing Control Tower remediation response objects reported.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {contractAudit.recommended_next_step || 'Keep response-contract checks in place before adding more Control Tower panels.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Audit contract</div>
+          {contractAudit.audit_contract?.length ? (
+            <ul>
+              {contractAudit.audit_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No response-contract audit requirements reported.</p>
+          )}
+        </div>
+      </section>
+
+
+      <section className="section">
+        <div className="section__title">Control Tower route exposure audit</div>
+        <div className="card-grid" style={cardGridStyle}>
+          <div className="card">
+            <div className="card__label">Route exposure score</div>
+            <div className="card__value">{numberValue(routeExposureAudit.route_exposure_score)}</div>
+            <div className="card__subtext">Backend route contract coverage for the frontend Control Tower panels.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Route posture</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(routeExposureAudit.route_exposure_posture)}</div>
+            <div className="card__subtext">Detects summary endpoint / frontend panel drift.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Endpoint</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{routeExposureAudit.http_method || 'GET'} {routeExposureAudit.route_path || '/operational-action-center/summary'}</div>
+            <div className="card__subtext">Frontend summary endpoint expected by this page.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Required permission</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(routeExposureAudit.required_permission)}</div>
+            <div className="card__subtext">Backend permission gate expected for the route.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Rendered panels</div>
+            <div className="card__value">{numberValue(routeExposureAudit.frontend_rendered_panels?.length)}</div>
+            <div className="card__subtext">Includes this route exposure audit panel to prevent self-audit drift.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Missing panels</div>
+            <div className="card__value">{numberValue(routeExposureAudit.missing_frontend_panels?.length)}</div>
+            <div className="card__subtext">Backend response objects missing for panels rendered by this page.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Frontend drift count</div>
+            <div className="card__value">{numberValue(frontendPanelContractDriftCount)}</div>
+            <div className="card__subtext">Local rendered-panel contract entries not acknowledged by backend audit.</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Route exposure blockers</div>
+          {routeExposureAudit.blockers?.length ? (
+            <ul>
+              {routeExposureAudit.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No route exposure blockers reported by the backend.</p>
+          )}
+          <div className="card__subtext">Recommended next step: {routeExposureAudit.recommended_next_step || 'Keep route exposure regression checks in place before adding more Control Tower panels.'}</div>
+        </div>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Route audit contract</div>
+          {routeExposureAudit.audit_contract?.length ? (
+            <ul>
+              {routeExposureAudit.audit_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+            </ul>
+          ) : (
+            <p className="card__subtext">No route exposure audit requirements reported.</p>
           )}
         </div>
       </section>

@@ -77,6 +77,8 @@ export const TENANT_PERMISSIONS = Object.freeze({
   INSIGHTS_READ: 'insights.read',
   OPERATIONAL_ACTION_CENTER_READ: 'operational_action_center.read',
   PLATFORM_RELIABILITY_READ: 'platform_reliability.read',
+  DECISION_INTELLIGENCE_READ: 'decision_intelligence.read',
+  DECISION_INTELLIGENCE_GOVERN: 'decision_intelligence.govern',
 
   TENANT_READ: 'tenant.read',
   TENANT_UPDATE: 'tenant.update',
@@ -480,6 +482,8 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canViewInsights: can(TENANT_PERMISSIONS.INSIGHTS_READ),
     canViewOperationalActionCenter: can(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ),
     canViewPlatformReliability: can(TENANT_PERMISSIONS.PLATFORM_RELIABILITY_READ),
+    canViewDecisionIntelligence: can(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ),
+    canGovernDecisionIntelligence: can(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN),
     canViewUsers: can(TENANT_PERMISSIONS.USERS_READ),
     canManageUsers: can(TENANT_PERMISSIONS.USERS_WRITE),
     canViewAdminSystem: can(TENANT_PERMISSIONS.SYSTEM_STATUS_READ),

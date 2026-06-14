@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
+    "pretest:e2e": "npm run check:unified-ai-contract-suite",
     "test:e2e:ui": "playwright test --ui",
     "check:commercial-shell": "node scripts/check-commercial-shell-regression.mjs",
     "check:phase15-closure": "node scripts/check-phase15-closure.mjs",
@@ -22,7 +23,17 @@
     "check:automation-resume-ui-governance": "node scripts/check-automation-resume-ui-governance.mjs",
     "check:tenant-session-route-auth-governance": "node scripts/check-tenant-session-route-auth-governance.mjs",
     "check:report-export-row-count-ui": "node scripts/check-report-export-row-count-ui.mjs",
-    "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs"
+    "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs",
+    "check:unified-ai-panel-anchor-contract": "node scripts/check-unified-ai-panel-anchor-contract.mjs",
+    "check:unified-ai-response-type-contract": "node scripts/check-unified-ai-response-type-contract.mjs",
+    "check:unified-ai-cross-repo-contract": "node scripts/check-unified-ai-cross-repo-contract.mjs",
+    "check:unified-ai-contract-suite": "node scripts/check-unified-ai-contract-suite.mjs",
+    "check:unified-ai-route-fetch-contract": "node scripts/check-unified-ai-route-fetch-contract.mjs",
+    "prelint": "npm run check:unified-ai-contract-suite",
+    "pretest:e2e:ui": "npm run check:unified-ai-contract-suite",
+    "predev": "npm run check:unified-ai-contract-suite",
+    "prepreview": "npm run check:unified-ai-contract-suite",
+    "prebuild": "npm run check:unified-ai-contract-suite"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

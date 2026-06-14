@@ -86,6 +86,34 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
       {
+        to: '/decision-learning-feedback',
+        label: 'Learning Feedback',
+        description: 'Governed decision-intelligence feedback capture for outcomes, forecast accuracy, policy effectiveness, and optimization evidence.',
+        section: 'Command',
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+      },
+      {
+        to: '/adaptive-policy-engine',
+        label: 'Adaptive Policy Engine',
+        description: 'Policy observation, signal evidence, effectiveness measurement, and manual learning feedback readiness.',
+        section: 'Command',
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+      },
+      {
+        to: '/probabilistic-forecasting',
+        label: 'Probabilistic Forecasting',
+        description: 'Uncertainty-aware forecasts, calibration observations, and manual forecast feedback-loop readiness.',
+        section: 'Command',
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+      },
+      {
+        to: '/cross-domain-optimization',
+        label: 'Cross-Domain Optimization',
+        description: 'Optimization runs, objectives, tradeoffs, and manual execution feedback-loop readiness.',
+        section: 'Command',
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+      },
+      {
         to: '/collaboration',
         label: 'Collaboration',
         description: 'Enterprise collaboration thread guidance for incidents, escalations, task coordination, and governed source-workflow comments.',
