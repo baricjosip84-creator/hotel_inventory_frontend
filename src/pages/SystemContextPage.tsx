@@ -56,6 +56,17 @@ function KeyValue(props: { label: string; value: string }) {
   return <div style={styles.keyValueRow}><strong>{props.label}</strong><span>{props.value}</span></div>;
 }
 
+function ErrorNotice(props: { title: string; endpoint: string; error: unknown; explanation: string }) {
+  return (
+    <div className="app-error-state" style={styles.errorNotice}>
+      <strong>{props.title}</strong>
+      <span>{props.explanation}</span>
+      <code style={styles.errorEndpoint}>{props.endpoint}</code>
+      <span>{readableError(props.error)}</span>
+    </div>
+  );
+}
+
 function getSnapshotContextValue(snapshot: SystemContextSnapshot | undefined, key: string): unknown {
   const contextSnapshot = snapshot?.context_snapshot;
   if (!contextSnapshot || typeof contextSnapshot !== 'object') return undefined;
@@ -73,7 +84,8 @@ export default function SystemContextPage() {
 
   const executionGateQuery = useQuery({
     queryKey: ['system-context-execution-gate'],
-    queryFn: () => apiRequest<SystemContextExecutionGateResponse>('/system-context/execution-gate')
+    queryFn: () => apiRequest<SystemContextExecutionGateResponse>('/system-context/execution-gate'),
+    enabled: contextQuery.isSuccess
   });
 
   const snapshotsQuery = useQuery({
@@ -486,8 +498,22 @@ export default function SystemContextPage() {
 
   return (
     <div style={styles.page}>
-      {contextQuery.error ? <div className="app-error-state">{readableError(contextQuery.error)}</div> : null}
-      {executionGateQuery.error ? <div className="app-error-state">{readableError(executionGateQuery.error)}</div> : null}
+      {contextQuery.error ? (
+        <ErrorNotice
+          title="System Context failed to load"
+          endpoint="GET /api/system-context"
+          error={contextQuery.error}
+          explanation="This is the main System Context snapshot. It reads tenant inventory, procurement, costing, alerts, audit, and access signals. If the database is overloaded or temporarily unreachable, this panel cannot load."
+        />
+      ) : null}
+      {executionGateQuery.error ? (
+        <ErrorNotice
+          title="Execution Gate failed to load"
+          endpoint="GET /api/system-context/execution-gate"
+          error={executionGateQuery.error}
+          explanation="This is the read-only decision gate built from the System Context snapshot. It is now loaded only after the main System Context request succeeds, so it no longer hits the backend at the exact same time as the main snapshot."
+        />
+      ) : null}
       {contextQuery.isLoading ? <div className="app-empty-state">Loading system context...</div> : null}
 
       {data ? (
@@ -3128,6 +3154,8 @@ const styles: Record<string, CSSProperties> = {
   list: { display: 'grid', gap: '12px', minWidth: 0 },
   actionRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', minWidth: 0 },
   keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 },
+  errorNotice: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' },
+  errorEndpoint: { padding: '0.2rem 0.45rem', borderRadius: '0.45rem', background: '#fff', border: '1px solid #fecaca', color: '#7f1d1d' },
   itemCard: { border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '8px', minWidth: 0 },
   itemTitle: { fontWeight: 800, color: '#0f172a', textTransform: 'capitalize', wordBreak: 'break-word' },
   itemText: { color: '#334155', lineHeight: 1.5, wordBreak: 'break-word' },
