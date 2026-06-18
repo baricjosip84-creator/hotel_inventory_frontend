@@ -20,6 +20,54 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /*
+  Browser API concurrency guard.
+
+  WHY THIS EXISTS
+  ---------------
+  Some pages, especially System Context, can mount many read-only panels at the
+  same time. Without a client-side guard, the browser can send a large burst of
+  authenticated requests to the backend. On small hosted Postgres/Render setups,
+  that burst can temporarily exhaust available database connections and produce
+  backend errors such as "timeout exceeded when trying to connect".
+
+  This queue keeps the existing API contract unchanged while preventing one page
+  load from stampeding the backend/database.
+*/
+const DEFAULT_API_MAX_CONCURRENT_REQUESTS = 4;
+const parsedApiConcurrencyLimit = Number(import.meta.env.VITE_API_MAX_CONCURRENT_REQUESTS ?? DEFAULT_API_MAX_CONCURRENT_REQUESTS);
+const API_MAX_CONCURRENT_REQUESTS = Number.isFinite(parsedApiConcurrencyLimit) && parsedApiConcurrencyLimit > 0
+  ? Math.floor(parsedApiConcurrencyLimit)
+  : DEFAULT_API_MAX_CONCURRENT_REQUESTS;
+
+let activeApiRequests = 0;
+const queuedApiRequests: Array<() => void> = [];
+
+function releaseApiRequestSlot(): void {
+  activeApiRequests = Math.max(0, activeApiRequests - 1);
+  const nextRequest = queuedApiRequests.shift();
+
+  if (nextRequest) {
+    nextRequest();
+  }
+}
+
+async function withApiRequestSlot<T>(operation: () => Promise<T>): Promise<T> {
+  if (activeApiRequests >= API_MAX_CONCURRENT_REQUESTS) {
+    await new Promise<void>((resolve) => {
+      queuedApiRequests.push(resolve);
+    });
+  }
+
+  activeApiRequests += 1;
+
+  try {
+    return await operation();
+  } finally {
+    releaseApiRequestSlot();
+  }
+}
+
+/*
   Shared in-flight refresh promise.
   This prevents multiple concurrent 401s from triggering multiple refresh calls
   at the same time.
@@ -285,10 +333,10 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
-  return fetch(buildUrl(path), {
+  return withApiRequestSlot(() => fetch(buildUrl(path), {
     ...safeOptions,
     headers
-  });
+  }));
 }
 
 
