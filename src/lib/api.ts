@@ -17,22 +17,7 @@ import {
  * - .env.production points to Render backend:
  *   https://hotel-inventory-backend.onrender.com/api
  */
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
-
-function getBackendReachabilityMessage(error: unknown): string {
-  const detail = error instanceof Error && error.message ? ` Browser detail: ${error.message}.` : '';
-  const base = API_BASE_URL || '/api';
-
-  if (base === '/api') {
-    return `Cannot reach backend. The frontend is using the /api fallback, which only works with a local Vite proxy or an explicit production reverse proxy. In Vercel, set VITE_API_BASE_URL to your Render backend API URL, for example https://<render-backend-host>/api.${detail}`;
-  }
-
-  return `Cannot reach backend at ${base}. Check that the Render backend is running, VITE_API_BASE_URL points to the backend /api URL, and the backend CORS_ORIGINS environment variable includes this exact frontend origin.${detail}`;
-}
-
-export function getApiBaseUrlForDiagnostics(): string {
-  return API_BASE_URL;
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /*
   Shared in-flight refresh promise.
@@ -378,7 +363,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
   try {
     response = await performRequest(path, { method: 'GET' });
   } catch (error: any) {
-    throw new ApiError(getBackendReachabilityMessage(error), 0, 'BACKEND_UNREACHABLE');
+    throw new ApiError(error?.message || 'Network error while downloading file', 0);
   }
 
   if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
@@ -388,7 +373,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
       try {
         response = await performRequest(path, { method: 'GET' });
       } catch (error: any) {
-        throw new ApiError(getBackendReachabilityMessage(error), 0, 'BACKEND_UNREACHABLE');
+        throw new ApiError(error?.message || 'Network error while downloading file', 0);
       }
     }
   }
@@ -501,7 +486,7 @@ export async function apiRequest<T>(
   try {
     response = await performRequest(path, requestOptions);
   } catch (error: any) {
-    throw new ApiError(getBackendReachabilityMessage(error), 0, 'BACKEND_UNREACHABLE');
+    throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
 
   /*
@@ -516,7 +501,7 @@ export async function apiRequest<T>(
       try {
         response = await performRequest(path, requestOptions);
       } catch (error: any) {
-        throw new ApiError(getBackendReachabilityMessage(error), 0, 'BACKEND_UNREACHABLE');
+        throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
     }
   }

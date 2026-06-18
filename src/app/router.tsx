@@ -114,6 +114,46 @@ import PlatformReleasesPage from '../pages/PlatformReleasesPage';
 import PlatformRiskRegisterPage from '../pages/PlatformRiskRegisterPage';
 import PlatformCapacityPlanningPage from '../pages/PlatformCapacityPlanningPage';
 import PlatformOperationalJobsPage from '../pages/PlatformOperationalJobsPage';
+import PlatformCommercialLaunchReadinessPage from '../pages/PlatformCommercialLaunchReadinessPage';
+import PlatformCommercialReadinessVerificationProgramPage from '../pages/PlatformCommercialReadinessVerificationProgramPage';
+import PlatformCustomerOnboardingChecklistPage from '../pages/PlatformCustomerOnboardingChecklistPage';
+import PlatformTenantProvisioningHardeningPage from '../pages/PlatformTenantProvisioningHardeningPage';
+import PlatformBillingSubscriptionActivationPage from '../pages/PlatformBillingSubscriptionActivationPage';
+import PlatformSupportOperationsCockpitPage from '../pages/PlatformSupportOperationsCockpitPage';
+import PlatformProductionMonitoringReadinessPage from '../pages/PlatformProductionMonitoringReadinessPage';
+import PlatformBackupRestoreValidationPage from '../pages/PlatformBackupRestoreValidationPage';
+import PlatformDeploymentValidationPage from '../pages/PlatformDeploymentValidationPage';
+import PlatformDocumentationCompletenessPage from '../pages/PlatformDocumentationCompletenessPage';
+import PlatformPilotCustomerReadinessPage from '../pages/PlatformPilotCustomerReadinessPage';
+import PlatformCommercialLaunchCertificatePage from '../pages/PlatformCommercialLaunchCertificatePage';
+import PlatformCommercialLaunchAcceptancePacketPage from '../pages/PlatformCommercialLaunchAcceptancePacketPage';
+import PlatformCommercialLaunchGoNoGoRegisterPage from '../pages/PlatformCommercialLaunchGoNoGoRegisterPage';
+import PlatformCommercialLaunchSmokeTestChecklistPage from '../pages/PlatformCommercialLaunchSmokeTestChecklistPage';
+import PlatformCommercialLaunchDayCommandCenterPage from '../pages/PlatformCommercialLaunchDayCommandCenterPage';
+import PlatformCommercialLaunchPostLaunchObservationPage from '../pages/PlatformCommercialLaunchPostLaunchObservationPage';
+import PlatformCommercialLaunchIncidentTriagePage from '../pages/PlatformCommercialLaunchIncidentTriagePage';
+import PlatformCommercialLaunchIncidentClosurePage from '../pages/PlatformCommercialLaunchIncidentClosurePage';
+import PlatformCommercialLaunchPreventionVerificationPage from '../pages/PlatformCommercialLaunchPreventionVerificationPage';
+import PlatformCommercialLaunchRolloutExpansionAuthorizationPage from '../pages/PlatformCommercialLaunchRolloutExpansionAuthorizationPage';
+import PlatformCommercialLaunchExpansionHealthObservationPage from '../pages/PlatformCommercialLaunchExpansionHealthObservationPage';
+import PlatformCommercialLaunchAdditionalGrowthAuthorizationPage from '../pages/PlatformCommercialLaunchAdditionalGrowthAuthorizationPage';
+import PlatformCommercialLaunchAdditionalGrowthObservationPage from '../pages/PlatformCommercialLaunchAdditionalGrowthObservationPage';
+import PlatformCommercialLaunchSteadyStateTransitionPage from '../pages/PlatformCommercialLaunchSteadyStateTransitionPage';
+import PlatformCommercialLaunchSteadyStateOperationsCadencePage from '../pages/PlatformCommercialLaunchSteadyStateOperationsCadencePage';
+import PlatformCommercialLaunchSteadyStateExceptionReviewPage from '../pages/PlatformCommercialLaunchSteadyStateExceptionReviewPage';
+import PlatformCommercialLaunchSteadyStateExceptionClosurePage from '../pages/PlatformCommercialLaunchSteadyStateExceptionClosurePage';
+import PlatformCommercialLaunchSteadyStateRecurrenceAuditPage from '../pages/PlatformCommercialLaunchSteadyStateRecurrenceAuditPage';
+import PlatformCommercialLaunchSteadyStateRecurrenceResolutionPage from '../pages/PlatformCommercialLaunchSteadyStateRecurrenceResolutionPage';
+import PlatformCommercialLaunchSteadyStateResolutionVerificationPage from '../pages/PlatformCommercialLaunchSteadyStateResolutionVerificationPage';
+import PlatformCommercialLaunchDurableClosureCertificationPage from '../pages/PlatformCommercialLaunchDurableClosureCertificationPage';
+import PlatformCommercialLaunchFinalEvidenceArchivePage from '../pages/PlatformCommercialLaunchFinalEvidenceArchivePage';
+import PlatformCommercialLaunchEvidenceRetentionSealPage from '../pages/PlatformCommercialLaunchEvidenceRetentionSealPage';
+import PlatformCommercialLaunchRetentionRenewalReviewPage from '../pages/PlatformCommercialLaunchRetentionRenewalReviewPage';
+import PlatformCommercialLaunchRetentionRenewalAcceptanceDocketPage from '../pages/PlatformCommercialLaunchRetentionRenewalAcceptanceDocketPage';
+import PlatformCommercialLaunchRetentionRenewalCertificationPage from '../pages/PlatformCommercialLaunchRetentionRenewalCertificationPage';
+import PlatformCommercialLaunchRetentionRenewalFinalSealPage from '../pages/PlatformCommercialLaunchRetentionRenewalFinalSealPage';
+import PlatformCommercialLaunchRetentionRenewalArchiveSealPage from '../pages/PlatformCommercialLaunchRetentionRenewalArchiveSealPage';
+import PlatformCommercialLaunchRetentionRenewalCycleResetPage from '../pages/PlatformCommercialLaunchRetentionRenewalCycleResetPage';
 import { PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
 const router = createBrowserRouter([
@@ -143,6 +183,326 @@ const router = createBrowserRouter([
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
             <PlatformDashboardPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-readiness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchReadinessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-readiness-verification-program',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialReadinessVerificationProgramPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'customer-onboarding-checklist',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformCustomerOnboardingChecklistPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'tenant-provisioning-hardening',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformTenantProvisioningHardeningPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'billing-subscription-activation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+            <PlatformBillingSubscriptionActivationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'support-operations-cockpit',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformSupportOperationsCockpitPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'production-monitoring-readiness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ]}>
+            <PlatformProductionMonitoringReadinessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'backup-restore-validation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_EXPORT]}>
+            <PlatformBackupRestoreValidationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'deployment-validation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ]}>
+            <PlatformDeploymentValidationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'documentation-completeness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ]}>
+            <PlatformDocumentationCompletenessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'pilot-customer-readiness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+            <PlatformPilotCustomerReadinessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-certificate',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchCertificatePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-acceptance-packet',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchAcceptancePacketPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-go-no-go-register',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchGoNoGoRegisterPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-smoke-test-checklist',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSmokeTestChecklistPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-day-command-center',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchDayCommandCenterPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-post-launch-observation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchPostLaunchObservationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-incident-triage',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchIncidentTriagePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-incident-closure',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchIncidentClosurePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-prevention-verification',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchPreventionVerificationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-rollout-expansion-authorization',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRolloutExpansionAuthorizationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-expansion-health-observation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchExpansionHealthObservationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-additional-growth-authorization',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchAdditionalGrowthAuthorizationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-additional-growth-observation',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchAdditionalGrowthObservationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-transition',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateTransitionPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-operations-cadence',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateOperationsCadencePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-exception-review',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateExceptionReviewPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-exception-closure',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateExceptionClosurePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-recurrence-audit',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateRecurrenceAuditPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-recurrence-resolution',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateRecurrenceResolutionPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-steady-state-resolution-verification',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchSteadyStateResolutionVerificationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-durable-closure-certification',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchDurableClosureCertificationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-final-evidence-archive',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchFinalEvidenceArchivePage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-evidence-retention-seal',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchEvidenceRetentionSealPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-review',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalReviewPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-acceptance-docket',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalAcceptanceDocketPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-certification',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalCertificationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-final-seal',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalFinalSealPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-archive-seal',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalArchiveSealPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-retention-renewal-cycle-reset',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+            <PlatformCommercialLaunchRetentionRenewalCycleResetPage />
           </PlatformProtectedRoute>
         )
       },

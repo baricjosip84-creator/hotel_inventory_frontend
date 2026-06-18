@@ -49,7 +49,8 @@ export default function PlatformProvisioningPage() {
     plan_code: 'standard',
     initial_admin_email: '',
     initial_admin_name: '',
-    initial_admin_password: ''
+    initial_admin_password: '',
+    create_onboarding_tasks: true
   });
 
   const canCreate = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_CREATE);
@@ -99,7 +100,8 @@ export default function PlatformProvisioningPage() {
           email: createForm.initial_admin_email,
           name: createForm.initial_admin_name,
           password: createForm.initial_admin_password
-        } : undefined
+        } : undefined,
+        create_onboarding_tasks: createForm.create_onboarding_tasks
       })
     }),
     onSuccess: async () => {
@@ -110,7 +112,8 @@ export default function PlatformProvisioningPage() {
         plan_code: 'standard',
         initial_admin_email: '',
         initial_admin_name: '',
-        initial_admin_password: ''
+        initial_admin_password: '',
+        create_onboarding_tasks: true
       });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
     }
@@ -181,6 +184,10 @@ export default function PlatformProvisioningPage() {
             </label>
             <label style={styles.label}>Initial admin password
               <input style={styles.input} type="password" value={createForm.initial_admin_password} onChange={(event) => setCreateForm({ ...createForm, initial_admin_password: event.target.value })} />
+            </label>
+            <label style={styles.checkboxLabel}>
+              <input type="checkbox" checked={createForm.create_onboarding_tasks} onChange={(event) => setCreateForm({ ...createForm, create_onboarding_tasks: event.target.checked })} />
+              Create customer onboarding tasks automatically
             </label>
           </div>
           <button type="button" style={styles.button} disabled={createTenant.isPending || !createForm.name} onClick={() => createTenant.mutate()}>
@@ -255,6 +262,7 @@ const styles: Record<string, CSSProperties> = {
   selectedCard: { borderColor: '#111827', background: '#f9fafb' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   label: { display: 'grid', gap: 6, fontWeight: 700 },
+  checkboxLabel: { display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.9rem', color: '#374151' },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10 },
   button: { width: 'fit-content', padding: '10px 14px', border: 0, borderRadius: 10, background: '#111827', color: '#fff', cursor: 'pointer' },
   buttonSecondary: { width: 'fit-content', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', cursor: 'pointer' },

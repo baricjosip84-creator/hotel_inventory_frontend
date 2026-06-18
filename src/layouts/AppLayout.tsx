@@ -13,6 +13,7 @@ import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/s
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
+import { fetchTenantSubscriptionAccess, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
 import { hasPermission } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
@@ -74,6 +75,7 @@ export default function AppLayout() {
   const [maintenanceContext, setMaintenanceContext] = useState<MaintenanceContext | null>(null);
   const [announcementContext, setAnnouncementContext] = useState<AnnouncementContext | null>(null);
   const [incidentContext, setIncidentContext] = useState<IncidentContext | null>(null);
+  const [tenantSubscriptionAccess, setTenantSubscriptionAccess] = useState<TenantSubscriptionAccess | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -197,6 +199,34 @@ export default function AppLayout() {
     };
   }, [location.pathname]);
 
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!tenantAccess.hasTenantContext) {
+      setTenantSubscriptionAccess(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetchTenantSubscriptionAccess()
+      .then((access) => {
+        if (!cancelled) {
+          setTenantSubscriptionAccess(access);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTenantSubscriptionAccess(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantAccess.hasTenantContext, location.pathname]);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
 
@@ -274,6 +304,25 @@ export default function AppLayout() {
         ) : tenantAccess.hiddenModuleCount > 0 ? (
           <div style={styles.tenantAccessNotice}>
             <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
+          </div>
+        ) : null}
+
+
+        {tenantSubscriptionAccess && !tenantSubscriptionAccess.write_access.allowed ? (
+          <div style={styles.subscriptionBlockedBanner}>
+            <strong>Subscription writes blocked.</strong>{' '}
+            {tenantSubscriptionAccess.write_access.blocker?.message || 'This tenant cannot perform operational changes until subscription access is restored.'}
+            <div style={styles.subscriptionBlockedMeta}>
+              Tenant status: {tenantSubscriptionAccess.tenant.status || '-'} · Billing: {tenantSubscriptionAccess.tenant.billing_status || '-'} · Plan: {tenantSubscriptionAccess.tenant.plan_code || '-'}
+            </div>
+          </div>
+        ) : tenantSubscriptionAccess?.plan_limit_blocked_resources.length ? (
+          <div style={styles.subscriptionLimitBanner}>
+            <strong>Plan limit reached.</strong> New records are blocked for: {tenantSubscriptionAccess.plan_limit_blocked_resources.join(', ')}.
+          </div>
+        ) : tenantSubscriptionAccess?.feature_blocked_resources?.length ? (
+          <div style={styles.subscriptionLimitBanner}>
+            <strong>Plan feature locked.</strong> Disabled modules: {tenantSubscriptionAccess.feature_blocked_resources.join(', ')}.
           </div>
         ) : null}
 
@@ -395,6 +444,25 @@ export default function AppLayout() {
         ) : tenantAccess.hiddenModuleCount > 0 ? (
           <div style={styles.tenantAccessNotice}>
             <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
+          </div>
+        ) : null}
+
+
+        {tenantSubscriptionAccess && !tenantSubscriptionAccess.write_access.allowed ? (
+          <div style={styles.subscriptionBlockedBanner}>
+            <strong>Subscription writes blocked.</strong>{' '}
+            {tenantSubscriptionAccess.write_access.blocker?.message || 'This tenant cannot perform operational changes until subscription access is restored.'}
+            <div style={styles.subscriptionBlockedMeta}>
+              Tenant status: {tenantSubscriptionAccess.tenant.status || '-'} · Billing: {tenantSubscriptionAccess.tenant.billing_status || '-'} · Plan: {tenantSubscriptionAccess.tenant.plan_code || '-'}
+            </div>
+          </div>
+        ) : tenantSubscriptionAccess?.plan_limit_blocked_resources.length ? (
+          <div style={styles.subscriptionLimitBanner}>
+            <strong>Plan limit reached.</strong> New records are blocked for: {tenantSubscriptionAccess.plan_limit_blocked_resources.join(', ')}.
+          </div>
+        ) : tenantSubscriptionAccess?.feature_blocked_resources?.length ? (
+          <div style={styles.subscriptionLimitBanner}>
+            <strong>Plan feature locked.</strong> Disabled modules: {tenantSubscriptionAccess.feature_blocked_resources.join(', ')}.
           </div>
         ) : null}
 
@@ -832,6 +900,32 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     padding: '6px 10px'
+  },
+
+  subscriptionBlockedBanner: {
+    margin: '18px 24px 0',
+    padding: '14px 16px',
+    border: '1px solid #fecaca',
+    borderRadius: 14,
+    background: '#fef2f2',
+    color: '#7f1d1d',
+    fontSize: 13,
+    lineHeight: 1.5
+  },
+  subscriptionBlockedMeta: {
+    marginTop: 6,
+    color: '#991b1b',
+    fontSize: 12
+  },
+  subscriptionLimitBanner: {
+    margin: '18px 24px 0',
+    padding: '14px 16px',
+    border: '1px solid #fed7aa',
+    borderRadius: 14,
+    background: '#fff7ed',
+    color: '#7c2d12',
+    fontSize: 13,
+    lineHeight: 1.5
   },
   supportBanner: {
     margin: '0 24px 8px 24px',

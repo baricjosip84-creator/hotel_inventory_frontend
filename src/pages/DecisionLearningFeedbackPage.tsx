@@ -12,6 +12,235 @@ type ContinuousLearningSummary = {
   forecast_accuracy?: Array<Record<string, unknown>>;
   policy_effectiveness?: Array<Record<string, unknown>>;
   optimization_results?: Array<Record<string, unknown>>;
+  recommendation_outcome_foundation?: {
+    phase?: string;
+    phase_name?: string;
+    phase_step?: string;
+    foundation_type?: string;
+    completion_definition?: string;
+    recommendation_outcome_count?: number;
+    linked_recommendation_outcome_count?: number;
+    measured_recommendation_outcome_count?: number;
+    lifecycle_generated_count?: number;
+    lifecycle_approved_count?: number;
+    lifecycle_executed_count?: number;
+    lifecycle_measured_count?: number;
+    lifecycle_scored_count?: number;
+    execution_linked_recommendation_outcome_count?: number;
+    full_lifecycle_trace_count?: number;
+    business_value_measured_count?: number;
+    impact_measured_count?: number;
+    measurement_window_count?: number;
+    validated_recommendation_outcome_count?: number;
+    negative_recommendation_outcome_count?: number;
+    needs_review_recommendation_outcome_count?: number;
+    successful_recommendation_outcome_count?: number;
+    partially_successful_recommendation_outcome_count?: number;
+    neutral_recommendation_outcome_count?: number;
+    failed_recommendation_outcome_count?: number;
+    inconclusive_recommendation_outcome_count?: number;
+    unclassified_recommendation_outcome_count?: number;
+    recommendation_outcome_review_required_count?: number;
+    recommendation_outcome_classified_count?: number;
+    financial_impact_measured_count?: number;
+    positive_financial_impact_count?: number;
+    negative_financial_impact_count?: number;
+    stockout_prevented_count?: number;
+    overstock_prevented_count?: number;
+    waste_reduction_outcome_count?: number;
+    service_level_improved_outcome_count?: number;
+    business_impact_evidence_count?: number;
+    total_financial_impact_amount?: number;
+    total_waste_reduced_quantity?: number;
+    average_service_level_delta_percent?: number | null;
+    outcome_link_coverage_percent?: number;
+    outcome_measurement_coverage_percent?: number;
+    full_lifecycle_trace_coverage_percent?: number;
+    impact_measurement_coverage_percent?: number;
+    outcome_classification_coverage_percent?: number;
+    business_impact_evidence_coverage_percent?: number;
+    target_evidence_coverage_percent?: number;
+    target_attainment_rate_percent?: number;
+    financial_impact_coverage_percent?: number;
+    target_evidence_count?: number;
+    baseline_target_outcome_count?: number;
+    actual_target_outcome_count?: number;
+    target_met_count?: number;
+    target_missed_count?: number;
+    measurement_quality_evidence_count?: number;
+    measurement_method_count?: number;
+    measurement_source_count?: number;
+    measurement_owner_count?: number;
+    measurement_sample_count?: number;
+    measurement_data_quality_count?: number;
+    low_measurement_quality_count?: number;
+    attribution_evidence_count?: number;
+    attribution_method_count?: number;
+    attribution_confidence_count?: number;
+    low_attribution_confidence_count?: number;
+    counterfactual_reference_count?: number;
+    recommendation_review_open_count?: number;
+    recommendation_review_resolved_count?: number;
+    recommendation_review_rejected_count?: number;
+    recommendation_review_deferred_count?: number;
+    recommendation_review_evidence_count?: number;
+    recommendation_reviewed_count?: number;
+    recommendation_evaluation_scheduled_count?: number;
+    recommendation_evaluation_completed_count?: number;
+    recommendation_evaluation_overdue_count?: number;
+    recommendation_evaluation_waived_count?: number;
+    recommendation_evaluation_owner_count?: number;
+    recommendation_evaluation_evidence_count?: number;
+    recommendation_outcome_audit_packet_count?: number;
+    recommendation_outcome_fingerprinted_count?: number;
+    recommendation_outcome_duplicate_fingerprint_count?: number;
+    recommendation_outcome_acceptance_accepted_count?: number;
+    recommendation_outcome_acceptance_rejected_count?: number;
+    recommendation_outcome_acceptance_deferred_count?: number;
+    recommendation_outcome_acceptance_pending_count?: number;
+    recommendation_outcome_acceptance_owner_count?: number;
+    recommendation_outcome_acceptance_timestamp_count?: number;
+    recommendation_outcome_acceptance_evidence_count?: number;
+    recommendation_outcome_acceptance_integrity_ready_count?: number;
+    recommendation_outcome_acceptance_integrity_blocked_count?: number;
+    recommendation_outcome_acceptance_integrity_pending_count?: number;
+    recommendation_outcome_acceptance_integrity_evidence_count?: number;
+    recommendation_outcome_corrective_action_required_count?: number;
+    recommendation_outcome_corrective_action_resolved_count?: number;
+    recommendation_outcome_corrective_action_open_count?: number;
+    recommendation_outcome_corrective_action_overdue_count?: number;
+    recommendation_outcome_corrective_action_owner_count?: number;
+    recommendation_outcome_corrective_action_evidence_count?: number;
+    recommendation_outcome_corrective_action_blocked_count?: number;
+    recommendation_outcome_portfolio_count?: number;
+    recommendation_outcome_commercially_supported_portfolio_count?: number;
+    recommendation_outcome_portfolio_review_required_count?: number;
+    recommendation_outcome_learning_signal_count?: number;
+    recommendation_outcome_learning_signal_evidence_count?: number;
+    recommendation_outcome_learning_signal_next_action_count?: number;
+    recommendation_outcome_reinforce_signal_count?: number;
+    recommendation_outcome_tune_signal_count?: number;
+    recommendation_outcome_suppress_signal_count?: number;
+    recommendation_outcome_review_signal_count?: number;
+    recommendation_outcome_learning_action_assigned_count?: number;
+    recommendation_outcome_learning_action_completed_count?: number;
+    recommendation_outcome_learning_action_owner_count?: number;
+    recommendation_outcome_learning_action_evidence_count?: number;
+    recommendation_outcome_learning_action_overdue_count?: number;
+    recommendation_outcome_learning_action_blocked_count?: number;
+    recommendation_outcome_learning_action_escalation_required_count?: number;
+    recommendation_outcome_learning_action_escalation_clear_percent?: number;
+    recommendation_outcome_learning_action_escalation_evidence?: {
+      escalation_posture?: string;
+      learning_action_count?: number;
+      blocked_learning_action_count?: number;
+      overdue_learning_action_count?: number;
+      escalation_required_count?: number;
+      escalation_items?: Array<{
+        outcome_key?: string;
+        recommendation_id?: string | null;
+        recommendation_key?: string | null;
+        learning_signal?: string;
+        learning_action_status?: string;
+        learning_action_owner?: string | null;
+        learning_action_due_at?: string | null;
+        escalation_reason?: string;
+      }>;
+    };
+    recommendation_outcome_portfolio_commercial_support_coverage_percent?: number;
+    recommendation_outcome_portfolio_evidence?: {
+      portfolio_count?: number;
+      commercially_supported_portfolio_count?: number;
+      portfolio_review_required_count?: number;
+      portfolio_commercial_support_coverage_percent?: number;
+      portfolio_posture?: string;
+      portfolio_evidence_items?: Array<{
+        recommendation_portfolio_key?: string;
+        learning_domain?: string;
+        outcome_count?: number;
+        successful_count?: number;
+        partially_successful_count?: number;
+        failed_count?: number;
+        accepted_count?: number;
+        corrective_action_required_count?: number;
+        corrective_action_resolved_count?: number;
+        total_financial_impact_amount?: number;
+        financial_impact_currency?: string | null;
+        success_rate_percent?: number;
+        failure_rate_percent?: number;
+        acceptance_rate_percent?: number;
+        corrective_action_closure_rate_percent?: number;
+        average_measurement_quality_score?: number | null;
+        average_attribution_confidence_score?: number | null;
+        portfolio_posture?: string;
+      }>;
+    };
+    commercially_ready_recommendation_outcome_count?: number;
+    commercially_blocked_recommendation_outcome_count?: number;
+    recommendation_outcome_commercial_readiness_score_percent?: number;
+    recommendation_outcome_commercial_readiness_gate_status?: string;
+    recommendation_outcome_commercial_readiness_blocker_count?: number;
+    recommendation_outcome_commercial_readiness_blockers?: Array<{
+      blocker_key?: string;
+      blocker_label?: string;
+      current_value?: number | string | null;
+      required_value?: number | string | null;
+      manual_resolution_task?: string;
+    }>;
+    recommendation_outcome_phase_a_closure_status?: string;
+    recommendation_outcome_phase_a_capability_status?: string;
+    recommendation_outcome_phase_a_closure_evidence?: {
+      closure_status?: string;
+      implemented_capability_status?: string;
+      runtime_data_status?: string;
+      closure_definition?: string;
+      implemented_capabilities?: string[];
+      outcome_count?: number;
+      commercially_ready_outcome_count?: number;
+      blocker_count?: number;
+      readiness_score_percent?: number;
+      next_phase?: string;
+    };
+    measurement_quality_evidence_coverage_percent?: number;
+    measurement_method_coverage_percent?: number;
+    measurement_source_coverage_percent?: number;
+    measurement_owner_coverage_percent?: number;
+    attribution_evidence_coverage_percent?: number;
+    attribution_method_coverage_percent?: number;
+    counterfactual_reference_coverage_percent?: number;
+    recommendation_review_resolution_coverage_percent?: number;
+    recommendation_review_evidence_coverage_percent?: number;
+    recommendation_evaluation_schedule_coverage_percent?: number;
+    recommendation_evaluation_completion_coverage_percent?: number;
+    recommendation_evaluation_evidence_coverage_percent?: number;
+    recommendation_outcome_audit_packet_coverage_percent?: number;
+    recommendation_outcome_fingerprint_coverage_percent?: number;
+    recommendation_outcome_acceptance_coverage_percent?: number;
+    recommendation_outcome_acceptance_evidence_coverage_percent?: number;
+    recommendation_outcome_acceptance_integrity_coverage_percent?: number;
+    recommendation_outcome_acceptance_integrity_evidence_coverage_percent?: number;
+    recommendation_outcome_corrective_action_resolution_coverage_percent?: number;
+    recommendation_outcome_corrective_action_evidence_coverage_percent?: number;
+    recommendation_outcome_learning_signal_coverage_percent?: number;
+    recommendation_outcome_learning_signal_evidence_coverage_percent?: number;
+    recommendation_outcome_learning_action_completion_percent?: number;
+    recommendation_outcome_learning_action_evidence_coverage_percent?: number;
+    recommendation_outcome_commercial_readiness_coverage_percent?: number;
+    average_measurement_data_quality_score?: number | null;
+    average_attribution_confidence_score?: number | null;
+    recommendation_outcome_success_rate_percent?: number;
+    recommendation_outcome_failure_rate_percent?: number;
+    average_outcome_score?: number | null;
+    average_business_value_score?: number | null;
+    average_stock_impact_score?: number | null;
+    average_financial_impact_score?: number | null;
+    average_waste_impact_score?: number | null;
+    average_service_level_impact_score?: number | null;
+    average_outcome_confidence_score?: number | null;
+    posture?: string;
+    safety_contract?: Record<string, boolean>;
+  };
+
   feedback_action_plan?: {
     plan_type?: string;
     execution_mode?: string;
@@ -1084,6 +1313,76 @@ type FeedbackFormState = {
   reference: string;
   expected: string;
   observed: string;
+  recommendationKey: string;
+  businessValueScore: string;
+  stockImpactScore: string;
+  financialImpactScore: string;
+  wasteImpactScore: string;
+  serviceLevelImpactScore: string;
+  outcomeConfidenceScore: string;
+  lifecycleStatus: string;
+  generatedAt: string;
+  approvedAt: string;
+  executedAt: string;
+  measuredAt: string;
+  scoredAt: string;
+  executionReference: string;
+  lifecycleEvidence: string;
+  outcomeClassification: string;
+  outcomeReviewRequired: boolean;
+  outcomeReviewReason: string;
+  financialImpactAmount: string;
+  financialImpactCurrency: string;
+  stockoutPrevented: boolean;
+  overstockPrevented: boolean;
+  wasteReducedQuantity: string;
+  serviceLevelDeltaPercent: string;
+  businessImpactEvidence: string;
+  baselineMetricValue: string;
+  targetMetricValue: string;
+  actualMetricValue: string;
+  metricUnit: string;
+  targetDirection: string;
+  targetTolerancePercent: string;
+  targetMet: string;
+  targetEvidence: string;
+  attributionMethod: string;
+  attributionConfidenceScore: string;
+  counterfactualReference: string;
+  attributionEvidence: string;
+  measurementMethod: string;
+  measurementSource: string;
+  measurementOwner: string;
+  measurementSampleSize: string;
+  measurementDataQualityScore: string;
+  measurementQualityEvidence: string;
+  reviewStatus: string;
+  reviewOwner: string;
+  reviewedAt: string;
+  reviewResolution: string;
+  reviewEvidence: string;
+  evaluationDueAt: string;
+  evaluationStatus: string;
+  evaluationOwner: string;
+  evaluationEvidence: string;
+  acceptanceStatus: string;
+  acceptanceOwner: string;
+  acceptedAt: string;
+  acceptanceEvidence: string;
+  correctiveActionStatus: string;
+  correctiveActionOwner: string;
+  correctiveActionDueAt: string;
+  correctiveActionResolvedAt: string;
+  correctiveActionEvidence: string;
+  learningSignal: string;
+  learningSignalReason: string;
+  learningSignalNextAction: string;
+  learningSignalEvidence: string;
+  learningActionStatus: string;
+  learningActionOwner: string;
+  learningActionDueAt: string;
+  learningActionCompletedAt: string;
+  learningActionEvidence: string;
 };
 
 const modeLabels: Record<FeedbackMode, string> = {
@@ -1106,7 +1405,77 @@ const defaultForm: FeedbackFormState = {
   score: '0',
   reference: '',
   expected: '',
-  observed: ''
+  observed: '',
+  recommendationKey: '',
+  businessValueScore: '',
+  stockImpactScore: '',
+  financialImpactScore: '',
+  wasteImpactScore: '',
+  serviceLevelImpactScore: '',
+  outcomeConfidenceScore: '',
+  lifecycleStatus: 'measured',
+  generatedAt: '',
+  approvedAt: '',
+  executedAt: '',
+  measuredAt: '',
+  scoredAt: '',
+  executionReference: '',
+  lifecycleEvidence: '',
+  outcomeClassification: 'unclassified',
+  outcomeReviewRequired: false,
+  outcomeReviewReason: '',
+  financialImpactAmount: '',
+  financialImpactCurrency: 'EUR',
+  stockoutPrevented: false,
+  overstockPrevented: false,
+  wasteReducedQuantity: '',
+  serviceLevelDeltaPercent: '',
+  businessImpactEvidence: '',
+  baselineMetricValue: '',
+  targetMetricValue: '',
+  actualMetricValue: '',
+  metricUnit: 'units',
+  targetDirection: 'increase',
+  targetTolerancePercent: '',
+  targetMet: '',
+  targetEvidence: '',
+  attributionMethod: 'before_after',
+  attributionConfidenceScore: '',
+  counterfactualReference: '',
+  attributionEvidence: '',
+  measurementMethod: '',
+  measurementSource: '',
+  measurementOwner: '',
+  measurementSampleSize: '',
+  measurementDataQualityScore: '',
+  measurementQualityEvidence: '',
+  reviewStatus: 'not_required',
+  reviewOwner: '',
+  reviewedAt: '',
+  reviewResolution: '',
+  reviewEvidence: '',
+  evaluationDueAt: '',
+  evaluationStatus: 'not_scheduled',
+  evaluationOwner: '',
+  evaluationEvidence: '',
+  acceptanceStatus: 'pending',
+  acceptanceOwner: '',
+  acceptedAt: '',
+  acceptanceEvidence: '',
+  correctiveActionStatus: 'not_required',
+  correctiveActionOwner: '',
+  correctiveActionDueAt: '',
+  correctiveActionResolvedAt: '',
+  correctiveActionEvidence: '',
+  learningSignal: 'unclassified',
+  learningSignalReason: '',
+  learningSignalNextAction: '',
+  learningSignalEvidence: '',
+  learningActionStatus: 'assigned',
+  learningActionOwner: '',
+  learningActionDueAt: '',
+  learningActionCompletedAt: '',
+  learningActionEvidence: ''
 };
 
 function safeJsonObject(value: string): Record<string, unknown> {
@@ -1126,6 +1495,12 @@ function scoreOrNull(value: string): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
   return Math.max(-1, Math.min(1, numeric));
+}
+
+function numberOrNull(value: string): number | null {
+  if (value.trim() === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function formatLabel(value: unknown): string {
@@ -1181,9 +1556,80 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
     outcome_status: form.status,
     outcome_type: 'recommendation_outcome',
     source_reference: reference,
+    recommendation_reference: form.recommendationKey ? { recommendation_key: form.recommendationKey } : reference,
+    recommendation_key: form.recommendationKey || undefined,
     expected_result: expected,
     observed_result: observed,
-    outcome_score: score
+    outcome_score: score,
+    business_value_score: scoreOrNull(form.businessValueScore),
+    stock_impact_score: scoreOrNull(form.stockImpactScore),
+    financial_impact_score: scoreOrNull(form.financialImpactScore),
+    waste_impact_score: scoreOrNull(form.wasteImpactScore),
+    service_level_impact_score: scoreOrNull(form.serviceLevelImpactScore),
+    outcome_confidence_score: scoreOrNull(form.outcomeConfidenceScore),
+    recommendation_lifecycle_status: form.lifecycleStatus || 'measured',
+    recommendation_generated_at: form.generatedAt || undefined,
+    recommendation_approved_at: form.approvedAt || undefined,
+    recommendation_executed_at: form.executedAt || undefined,
+    recommendation_measured_at: form.measuredAt || undefined,
+    recommendation_scored_at: form.scoredAt || undefined,
+    execution_reference: safeJsonObject(form.executionReference),
+    lifecycle_evidence: safeJsonObject(form.lifecycleEvidence),
+    recommendation_outcome_classification: form.outcomeClassification || 'unclassified',
+    recommendation_outcome_review_required: form.outcomeReviewRequired,
+    recommendation_outcome_review_reason: safeJsonObject(form.outcomeReviewReason),
+    financial_impact_amount: numberOrNull(form.financialImpactAmount),
+    financial_impact_currency: form.financialImpactCurrency.trim().toUpperCase() || undefined,
+    stockout_prevented: form.stockoutPrevented,
+    overstock_prevented: form.overstockPrevented,
+    waste_reduced_quantity: numberOrNull(form.wasteReducedQuantity),
+    service_level_delta_percent: numberOrNull(form.serviceLevelDeltaPercent),
+    recommendation_business_impact_evidence: safeJsonObject(form.businessImpactEvidence),
+    baseline_metric_value: numberOrNull(form.baselineMetricValue),
+    target_metric_value: numberOrNull(form.targetMetricValue),
+    actual_metric_value: numberOrNull(form.actualMetricValue),
+    metric_unit: form.metricUnit.trim() || undefined,
+    target_direction: form.targetDirection || undefined,
+    target_tolerance_percent: numberOrNull(form.targetTolerancePercent),
+    target_met: form.targetMet === '' ? undefined : form.targetMet === 'true',
+    recommendation_target_evidence: safeJsonObject(form.targetEvidence),
+    recommendation_attribution_method: form.attributionMethod || undefined,
+    recommendation_attribution_confidence_score: scoreOrNull(form.attributionConfidenceScore) === null ? null : Math.max(0, Math.min(1, Number(form.attributionConfidenceScore))),
+    recommendation_counterfactual_reference: safeJsonObject(form.counterfactualReference),
+    recommendation_attribution_evidence: safeJsonObject(form.attributionEvidence),
+    recommendation_measurement_method: form.measurementMethod.trim() || undefined,
+    recommendation_measurement_source: form.measurementSource.trim() || undefined,
+    recommendation_measurement_owner: form.measurementOwner.trim() || undefined,
+    recommendation_measurement_sample_size: numberOrNull(form.measurementSampleSize),
+    recommendation_measurement_data_quality_score: scoreOrNull(form.measurementDataQualityScore) === null ? null : Math.max(0, Math.min(1, Number(form.measurementDataQualityScore))),
+    recommendation_measurement_quality_evidence: safeJsonObject(form.measurementQualityEvidence),
+    recommendation_outcome_review_status: form.reviewStatus || undefined,
+    recommendation_outcome_review_owner: form.reviewOwner.trim() || undefined,
+    recommendation_outcome_reviewed_at: form.reviewedAt || undefined,
+    recommendation_outcome_review_resolution: form.reviewResolution || undefined,
+    recommendation_outcome_review_evidence: safeJsonObject(form.reviewEvidence),
+    recommendation_outcome_evaluation_due_at: form.evaluationDueAt || undefined,
+    recommendation_outcome_evaluation_status: form.evaluationStatus || undefined,
+    recommendation_outcome_evaluation_owner: form.evaluationOwner.trim() || undefined,
+    recommendation_outcome_evaluation_evidence: safeJsonObject(form.evaluationEvidence),
+    recommendation_outcome_acceptance_status: form.acceptanceStatus || 'pending',
+    recommendation_outcome_acceptance_owner: form.acceptanceOwner.trim() || undefined,
+    recommendation_outcome_accepted_at: form.acceptedAt || undefined,
+    recommendation_outcome_acceptance_evidence: safeJsonObject(form.acceptanceEvidence),
+    recommendation_outcome_corrective_action_status: form.correctiveActionStatus || 'not_required',
+    recommendation_outcome_corrective_action_owner: form.correctiveActionOwner.trim() || undefined,
+    recommendation_outcome_corrective_action_due_at: form.correctiveActionDueAt || undefined,
+    recommendation_outcome_corrective_action_resolved_at: form.correctiveActionResolvedAt || undefined,
+    recommendation_outcome_corrective_action_evidence: safeJsonObject(form.correctiveActionEvidence),
+    recommendation_outcome_learning_signal: form.learningSignal || 'unclassified',
+    recommendation_outcome_learning_signal_reason: form.learningSignalReason.trim() || undefined,
+    recommendation_outcome_recommended_next_action: form.learningSignalNextAction.trim() || undefined,
+    recommendation_outcome_learning_signal_evidence: safeJsonObject(form.learningSignalEvidence),
+    recommendation_outcome_learning_action_status: form.learningActionStatus || 'assigned',
+    recommendation_outcome_learning_action_owner: form.learningActionOwner.trim() || undefined,
+    recommendation_outcome_learning_action_due_at: form.learningActionDueAt || undefined,
+    recommendation_outcome_learning_action_completed_at: form.learningActionCompletedAt || undefined,
+    recommendation_outcome_learning_action_evidence: safeJsonObject(form.learningActionEvidence)
   };
 }
 
@@ -3565,6 +4011,272 @@ function ClosedLoopEnterpriseExpansionGovernanceCadence({ cadence }: { cadence: 
   );
 }
 
+
+function RecommendationOutcomeFoundation({ foundation }: { foundation?: ContinuousLearningSummary['recommendation_outcome_foundation'] }) {
+  if (!foundation) return null;
+
+  return (
+    <section className="card">
+      <div className="card__header">
+        <div>
+          <p className="eyebrow">Phase A · Step A18</p>
+          <h2>Recommendation Outcome Foundation</h2>
+          <p className="card__subtext">{foundation.completion_definition || 'Trace recommendations to measured business outcomes.'}</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+        <StatCard label="Posture" value={foundation.posture || 'unknown'} />
+        <StatCard label="Recommendation outcomes" value={foundation.recommendation_outcome_count ?? 0} />
+        <StatCard label="Linked outcomes" value={foundation.linked_recommendation_outcome_count ?? 0} />
+        <StatCard label="Measured outcomes" value={foundation.measured_recommendation_outcome_count ?? 0} />
+        <StatCard label="Full lifecycle traces" value={foundation.full_lifecycle_trace_count ?? 0} />
+        <StatCard label="Execution linked" value={foundation.execution_linked_recommendation_outcome_count ?? 0} />
+        <StatCard label="Business value measured" value={foundation.business_value_measured_count ?? 0} />
+        <StatCard label="Impact measured" value={foundation.impact_measured_count ?? 0} />
+        <StatCard label="Classified outcomes" value={foundation.recommendation_outcome_classified_count ?? 0} />
+        <StatCard label="Review required" value={foundation.recommendation_outcome_review_required_count ?? 0} />
+        <StatCard label="Financial impact measured" value={foundation.financial_impact_measured_count ?? 0} />
+        <StatCard label="Business impact evidence" value={foundation.business_impact_evidence_count ?? 0} />
+        <StatCard label="Target evidence" value={foundation.target_evidence_count ?? 0} />
+        <StatCard label="Target met" value={foundation.target_met_count ?? 0} />
+        <StatCard label="Target missed" value={foundation.target_missed_count ?? 0} />
+        <StatCard label="Measurement quality evidence" value={foundation.measurement_quality_evidence_count ?? 0} />
+        <StatCard label="Low measurement quality" value={foundation.low_measurement_quality_count ?? 0} />
+        <StatCard label="Attribution evidence" value={foundation.attribution_evidence_count ?? 0} />
+        <StatCard label="Low attribution confidence" value={foundation.low_attribution_confidence_count ?? 0} />
+        <StatCard label="Counterfactual references" value={foundation.counterfactual_reference_count ?? 0} />
+        <StatCard label="Open reviews" value={foundation.recommendation_review_open_count ?? 0} />
+        <StatCard label="Resolved reviews" value={foundation.recommendation_review_resolved_count ?? 0} />
+        <StatCard label="Review evidence" value={foundation.recommendation_review_evidence_count ?? 0} />
+        <StatCard label="Evaluation scheduled" value={foundation.recommendation_evaluation_scheduled_count ?? 0} />
+        <StatCard label="Evaluation overdue" value={foundation.recommendation_evaluation_overdue_count ?? 0} />
+        <StatCard label="Evaluation completed" value={foundation.recommendation_evaluation_completed_count ?? 0} />
+        <StatCard label="Audit packets" value={foundation.recommendation_outcome_audit_packet_count ?? 0} />
+        <StatCard label="Fingerprinted outcomes" value={foundation.recommendation_outcome_fingerprinted_count ?? 0} />
+        <StatCard label="Duplicate fingerprints" value={foundation.recommendation_outcome_duplicate_fingerprint_count ?? 0} />
+        <StatCard label="Commercial gate" value={foundation.recommendation_outcome_commercial_readiness_gate_status || 'phase_a_closure_blocked'} />
+        <StatCard label="Commercially ready" value={foundation.commercially_ready_recommendation_outcome_count ?? 0} />
+        <StatCard label="Acceptance integrity ready" value={foundation.recommendation_outcome_acceptance_integrity_ready_count ?? 0} />
+        <StatCard label="Acceptance integrity blocked" value={foundation.recommendation_outcome_acceptance_integrity_blocked_count ?? 0} />
+        <StatCard label="Corrective actions required" value={foundation.recommendation_outcome_corrective_action_required_count ?? 0} />
+        <StatCard label="Corrective actions resolved" value={foundation.recommendation_outcome_corrective_action_resolved_count ?? 0} />
+        <StatCard label="Corrective actions open" value={foundation.recommendation_outcome_corrective_action_open_count ?? 0} />
+        <StatCard label="Corrective actions overdue" value={foundation.recommendation_outcome_corrective_action_overdue_count ?? 0} />
+        <StatCard label="Corrective evidence" value={foundation.recommendation_outcome_corrective_action_evidence_count ?? 0} />
+        <StatCard label="Recommendation portfolios" value={foundation.recommendation_outcome_portfolio_count ?? 0} />
+        <StatCard label="Supported portfolios" value={foundation.recommendation_outcome_commercially_supported_portfolio_count ?? 0} />
+        <StatCard label="Portfolios needing review" value={foundation.recommendation_outcome_portfolio_review_required_count ?? 0} />
+        <StatCard label="Learning actions assigned" value={foundation.recommendation_outcome_learning_action_assigned_count ?? 0} />
+        <StatCard label="Learning actions complete" value={foundation.recommendation_outcome_learning_action_completed_count ?? 0} />
+        <StatCard label="Learning actions overdue" value={foundation.recommendation_outcome_learning_action_overdue_count ?? 0} />
+        <StatCard label="Learning actions blocked" value={foundation.recommendation_outcome_learning_action_blocked_count ?? 0} />
+        <StatCard label="Learning action escalations" value={foundation.recommendation_outcome_learning_action_escalation_required_count ?? 0} />
+        <StatCard label="Commercially blocked" value={foundation.commercially_blocked_recommendation_outcome_count ?? 0} />
+        <StatCard label="Readiness blockers" value={foundation.recommendation_outcome_commercial_readiness_blocker_count ?? 0} />
+        <StatCard label="Stockouts prevented" value={foundation.stockout_prevented_count ?? 0} />
+        <StatCard label="Overstock prevented" value={foundation.overstock_prevented_count ?? 0} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        <p className="card__subtext">Link coverage: {formatLabel(foundation.outcome_link_coverage_percent)}%</p>
+        <p className="card__subtext">Measurement coverage: {formatLabel(foundation.outcome_measurement_coverage_percent)}%</p>
+        <p className="card__subtext">Full lifecycle coverage: {formatLabel(foundation.full_lifecycle_trace_coverage_percent)}%</p>
+        <p className="card__subtext">Impact coverage: {formatLabel(foundation.impact_measurement_coverage_percent)}%</p>
+        <p className="card__subtext">Classification coverage: {formatLabel(foundation.outcome_classification_coverage_percent)}%</p>
+        <p className="card__subtext">Business impact coverage: {formatLabel(foundation.business_impact_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Financial impact coverage: {formatLabel(foundation.financial_impact_coverage_percent)}%</p>
+        <p className="card__subtext">Target evidence coverage: {formatLabel(foundation.target_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Target attainment rate: {formatLabel(foundation.target_attainment_rate_percent)}%</p>
+        <p className="card__subtext">Baseline/target outcomes: {formatLabel(foundation.baseline_target_outcome_count)}</p>
+        <p className="card__subtext">Actual measured targets: {formatLabel(foundation.actual_target_outcome_count)}</p>
+        <p className="card__subtext">Measurement quality coverage: {formatLabel(foundation.measurement_quality_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Measurement method coverage: {formatLabel(foundation.measurement_method_coverage_percent)}%</p>
+        <p className="card__subtext">Measurement source coverage: {formatLabel(foundation.measurement_source_coverage_percent)}%</p>
+        <p className="card__subtext">Measurement owner coverage: {formatLabel(foundation.measurement_owner_coverage_percent)}%</p>
+        <p className="card__subtext">Avg measurement data quality: {formatLabel(foundation.average_measurement_data_quality_score)}</p>
+        <p className="card__subtext">Attribution evidence coverage: {formatLabel(foundation.attribution_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Attribution method coverage: {formatLabel(foundation.attribution_method_coverage_percent)}%</p>
+        <p className="card__subtext">Counterfactual coverage: {formatLabel(foundation.counterfactual_reference_coverage_percent)}%</p>
+        <p className="card__subtext">Review resolution coverage: {formatLabel(foundation.recommendation_review_resolution_coverage_percent)}%</p>
+        <p className="card__subtext">Review evidence coverage: {formatLabel(foundation.recommendation_review_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Evaluation schedule coverage: {formatLabel(foundation.recommendation_evaluation_schedule_coverage_percent)}%</p>
+        <p className="card__subtext">Evaluation completion coverage: {formatLabel(foundation.recommendation_evaluation_completion_coverage_percent)}%</p>
+        <p className="card__subtext">Evaluation evidence coverage: {formatLabel(foundation.recommendation_evaluation_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Audit packet coverage: {formatLabel(foundation.recommendation_outcome_audit_packet_coverage_percent)}%</p>
+        <p className="card__subtext">Fingerprint coverage: {formatLabel(foundation.recommendation_outcome_fingerprint_coverage_percent)}%</p>
+        <p className="card__subtext">Commercial readiness score: {formatLabel(foundation.recommendation_outcome_commercial_readiness_score_percent)}%</p>
+        <p className="card__subtext">Commercial readiness coverage: {formatLabel(foundation.recommendation_outcome_commercial_readiness_coverage_percent)}%</p>
+        <p className="card__subtext">Acceptance coverage: {formatLabel(foundation.recommendation_outcome_acceptance_coverage_percent)}%</p>
+        <p className="card__subtext">Acceptance evidence coverage: {formatLabel(foundation.recommendation_outcome_acceptance_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Acceptance integrity coverage: {formatLabel(foundation.recommendation_outcome_acceptance_integrity_coverage_percent)}%</p>
+        <p className="card__subtext">Acceptance integrity evidence coverage: {formatLabel(foundation.recommendation_outcome_acceptance_integrity_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Corrective action resolution coverage: {formatLabel(foundation.recommendation_outcome_corrective_action_resolution_coverage_percent)}%</p>
+        <p className="card__subtext">Corrective action evidence coverage: {formatLabel(foundation.recommendation_outcome_corrective_action_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Corrective action owners: {formatLabel(foundation.recommendation_outcome_corrective_action_owner_count)}</p>
+        <p className="card__subtext">Corrective action blockers: {formatLabel(foundation.recommendation_outcome_corrective_action_blocked_count)}</p>
+        <p className="card__subtext">Portfolio support coverage: {formatLabel(foundation.recommendation_outcome_portfolio_commercial_support_coverage_percent)}%</p>
+        <p className="card__subtext">Portfolio posture: {formatLabel(foundation.recommendation_outcome_portfolio_evidence?.portfolio_posture)}</p>
+        <p className="card__subtext">Learning action completion: {formatLabel(foundation.recommendation_outcome_learning_action_completion_percent)}%</p>
+        <p className="card__subtext">Learning action evidence coverage: {formatLabel(foundation.recommendation_outcome_learning_action_evidence_coverage_percent)}%</p>
+        <p className="card__subtext">Learning action escalation clear: {formatLabel(foundation.recommendation_outcome_learning_action_escalation_clear_percent)}%</p>
+        <p className="card__subtext">Learning action escalation posture: {formatLabel(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_posture)}</p>
+        <p className="card__subtext">Learning action owners: {formatLabel(foundation.recommendation_outcome_learning_action_owner_count)}</p>
+        <p className="card__subtext">Accepted outcomes: {formatLabel(foundation.recommendation_outcome_acceptance_accepted_count)}</p>
+        <p className="card__subtext">Pending acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_pending_count)}</p>
+        <p className="card__subtext">Rejected acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_rejected_count)}</p>
+        <p className="card__subtext">Deferred acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_deferred_count)}</p>
+        <p className="card__subtext">Acceptance owners: {formatLabel(foundation.recommendation_outcome_acceptance_owner_count)}</p>
+        <p className="card__subtext">Acceptance timestamps: {formatLabel(foundation.recommendation_outcome_acceptance_timestamp_count)}</p>
+        <p className="card__subtext">Rejected reviews: {formatLabel(foundation.recommendation_review_rejected_count)}</p>
+        <p className="card__subtext">Deferred reviews: {formatLabel(foundation.recommendation_review_deferred_count)}</p>
+        <p className="card__subtext">Reviewed outcomes: {formatLabel(foundation.recommendation_reviewed_count)}</p>
+        <p className="card__subtext">Avg attribution confidence: {formatLabel(foundation.average_attribution_confidence_score)}</p>
+        <p className="card__subtext">Success rate: {formatLabel(foundation.recommendation_outcome_success_rate_percent)}%</p>
+        <p className="card__subtext">Failure rate: {formatLabel(foundation.recommendation_outcome_failure_rate_percent)}%</p>
+        <p className="card__subtext">Successful: {formatLabel(foundation.successful_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Partially successful: {formatLabel(foundation.partially_successful_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Neutral: {formatLabel(foundation.neutral_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Failed: {formatLabel(foundation.failed_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Inconclusive: {formatLabel(foundation.inconclusive_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Unclassified: {formatLabel(foundation.unclassified_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Positive financial impact: {formatLabel(foundation.positive_financial_impact_count)}</p>
+        <p className="card__subtext">Negative financial impact: {formatLabel(foundation.negative_financial_impact_count)}</p>
+        <p className="card__subtext">Waste reduction outcomes: {formatLabel(foundation.waste_reduction_outcome_count)}</p>
+        <p className="card__subtext">Service level improved: {formatLabel(foundation.service_level_improved_outcome_count)}</p>
+        <p className="card__subtext">Total financial impact: {formatLabel(foundation.total_financial_impact_amount)}</p>
+        <p className="card__subtext">Total waste reduced: {formatLabel(foundation.total_waste_reduced_quantity)}</p>
+        <p className="card__subtext">Avg service delta %: {formatLabel(foundation.average_service_level_delta_percent)}</p>
+        <p className="card__subtext">Generated: {formatLabel(foundation.lifecycle_generated_count)}</p>
+        <p className="card__subtext">Approved: {formatLabel(foundation.lifecycle_approved_count)}</p>
+        <p className="card__subtext">Executed: {formatLabel(foundation.lifecycle_executed_count)}</p>
+        <p className="card__subtext">Measured: {formatLabel(foundation.lifecycle_measured_count)}</p>
+        <p className="card__subtext">Scored: {formatLabel(foundation.lifecycle_scored_count)}</p>
+        <p className="card__subtext">Validated outcomes: {formatLabel(foundation.validated_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Negative outcomes: {formatLabel(foundation.negative_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Needs review: {formatLabel(foundation.needs_review_recommendation_outcome_count)}</p>
+        <p className="card__subtext">Avg outcome score: {formatLabel(foundation.average_outcome_score)}</p>
+        <p className="card__subtext">Avg business value score: {formatLabel(foundation.average_business_value_score)}</p>
+        <p className="card__subtext">Avg stock impact: {formatLabel(foundation.average_stock_impact_score)}</p>
+        <p className="card__subtext">Avg financial impact: {formatLabel(foundation.average_financial_impact_score)}</p>
+        <p className="card__subtext">Avg waste impact: {formatLabel(foundation.average_waste_impact_score)}</p>
+        <p className="card__subtext">Avg service impact: {formatLabel(foundation.average_service_level_impact_score)}</p>
+      </div>
+
+      {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).length > 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <h3>Recommendation portfolio commercial value evidence</h3>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Portfolio</th>
+                <th>Domain</th>
+                <th>Outcomes</th>
+                <th>Success %</th>
+                <th>Accepted %</th>
+                <th>Financial impact</th>
+                <th>Corrective closure %</th>
+                <th>Posture</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).map((item) => (
+                <tr key={item.recommendation_portfolio_key || item.learning_domain || 'portfolio'}>
+                  <td>{formatLabel(item.recommendation_portfolio_key)}</td>
+                  <td>{formatLabel(item.learning_domain)}</td>
+                  <td>{formatLabel(item.outcome_count)}</td>
+                  <td>{formatLabel(item.success_rate_percent)}</td>
+                  <td>{formatLabel(item.acceptance_rate_percent)}</td>
+                  <td>{formatLabel(item.total_financial_impact_amount)} {item.financial_impact_currency || ''}</td>
+                  <td>{formatLabel(item.corrective_action_closure_rate_percent)}</td>
+                  <td>{formatLabel(item.portfolio_posture)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="card__subtext" style={{ marginTop: 12 }}>No recommendation portfolio evidence has been recorded yet.</p>
+      )}
+
+      {(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_items || []).length > 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <h3>Learning action escalation evidence</h3>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Outcome</th>
+                <th>Recommendation</th>
+                <th>Signal</th>
+                <th>Status</th>
+                <th>Owner</th>
+                <th>Due</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_items || []).map((item, index) => (
+                <tr key={item.outcome_key || index}>
+                  <td>{formatLabel(item.outcome_key)}</td>
+                  <td>{formatLabel(item.recommendation_key || item.recommendation_id)}</td>
+                  <td>{formatLabel(item.learning_signal)}</td>
+                  <td>{formatLabel(item.learning_action_status)}</td>
+                  <td>{formatLabel(item.learning_action_owner)}</td>
+                  <td>{formatLabel(item.learning_action_due_at)}</td>
+                  <td>{formatLabel(item.escalation_reason)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="card__subtext" style={{ marginTop: 12 }}>No blocked or overdue learning actions require escalation.</p>
+      )}
+
+      {foundation.recommendation_outcome_phase_a_closure_evidence ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h4>Phase A closure evidence</h4>
+          <p className="card__subtext">Closure status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.closure_status)}</p>
+          <p className="card__subtext">Capability status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capability_status)}</p>
+          <p className="card__subtext">Runtime data status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.runtime_data_status)}</p>
+          <p className="card__subtext">Readiness: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.readiness_score_percent)}%</p>
+          <p className="card__subtext">Next phase: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}</p>
+          <p className="card__subtext">Implemented capabilities: {(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capabilities || []).map(formatLabel).join(', ')}</p>
+        </div>
+      ) : null}
+
+      {(foundation.recommendation_outcome_commercial_readiness_blockers || []).length > 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <h3>Phase A commercial-readiness blockers</h3>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Blocker</th>
+                <th>Current</th>
+                <th>Required</th>
+                <th>Manual task</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(foundation.recommendation_outcome_commercial_readiness_blockers || []).map((blocker) => (
+                <tr key={blocker.blocker_key || blocker.blocker_label}>
+                  <td>{formatLabel(blocker.blocker_label || blocker.blocker_key || 'blocker')}</td>
+                  <td>{formatLabel(blocker.current_value)}</td>
+                  <td>{formatLabel(blocker.required_value)}</td>
+                  <td>{blocker.manual_resolution_task || 'Resolve evidence gap before Phase A closure.'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="card__subtext" style={{ marginTop: 12 }}>Phase A commercial-readiness gate has no blockers for the currently loaded outcome evidence.</p>
+      )}
+      <p className="card__subtext" style={{ marginTop: 12 }}>
+        Safety: evidence-only learning, tamper-evident outcome fingerprinting, no autonomous model update, no autonomous recommendation execution, no operational mutation.
+      </p>
+    </section>
+  );
+}
+
 function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<string, unknown>> }) {
   const previewRows = rows.slice(0, 8);
 
@@ -3637,7 +4349,7 @@ export default function DecisionLearningFeedbackPage() {
   const governance = summaryQuery.data?.governance;
   const activeStatusOptions = useMemo(() => statusOptions[mode], [mode]);
 
-  const updateForm = (field: keyof FeedbackFormState, value: string) => {
+  const updateForm = (field: keyof FeedbackFormState, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -3701,7 +4413,404 @@ export default function DecisionLearningFeedbackPage() {
             <span className="form-label">Score (-1 to 1)</span>
             <input className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)} placeholder="0" />
           </label>
+          {mode === 'learning-outcomes' ? (
+            <label>
+              <span className="form-label">Recommendation key</span>
+              <input className="input" value={form.recommendationKey} onChange={(event) => updateForm('recommendationKey', event.target.value)} placeholder="recommendation-key" />
+            </label>
+          ) : null}
         </div>
+
+        {mode === 'learning-outcomes' ? (
+          <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Business value</span>
+              <input className="input" value={form.businessValueScore} onChange={(event) => updateForm('businessValueScore', event.target.value)} placeholder="-1 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Stock impact</span>
+              <input className="input" value={form.stockImpactScore} onChange={(event) => updateForm('stockImpactScore', event.target.value)} placeholder="-1 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Financial impact</span>
+              <input className="input" value={form.financialImpactScore} onChange={(event) => updateForm('financialImpactScore', event.target.value)} placeholder="-1 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Waste impact</span>
+              <input className="input" value={form.wasteImpactScore} onChange={(event) => updateForm('wasteImpactScore', event.target.value)} placeholder="-1 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Service impact</span>
+              <input className="input" value={form.serviceLevelImpactScore} onChange={(event) => updateForm('serviceLevelImpactScore', event.target.value)} placeholder="-1 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Outcome confidence</span>
+              <input className="input" value={form.outcomeConfidenceScore} onChange={(event) => updateForm('outcomeConfidenceScore', event.target.value)} placeholder="0 to 1" />
+            </label>
+            <label>
+              <span className="form-label">Outcome classification</span>
+              <select className="input" value={form.outcomeClassification} onChange={(event) => updateForm('outcomeClassification', event.target.value)}>
+                {['successful', 'partially_successful', 'neutral', 'failed', 'inconclusive', 'unclassified'].map((classification) => <option key={classification} value={classification}>{formatLabel(classification)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Review required</span>
+              <select className="input" value={String(form.outcomeReviewRequired)} onChange={(event) => updateForm('outcomeReviewRequired', event.target.value === 'true')}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Outcome review reason JSON</span>
+              <textarea className="input" value={form.outcomeReviewReason} onChange={(event) => updateForm('outcomeReviewReason', event.target.value)} placeholder='{"reason":"negative stock impact"}' rows={2} />
+            </label>
+          </div>
+
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Financial impact amount</span>
+              <input className="input" value={form.financialImpactAmount} onChange={(event) => updateForm('financialImpactAmount', event.target.value)} placeholder="1250.00" />
+            </label>
+            <label>
+              <span className="form-label">Currency</span>
+              <input className="input" value={form.financialImpactCurrency} onChange={(event) => updateForm('financialImpactCurrency', event.target.value)} placeholder="EUR" maxLength={3} />
+            </label>
+            <label>
+              <span className="form-label">Stockout prevented</span>
+              <select className="input" value={String(form.stockoutPrevented)} onChange={(event) => updateForm('stockoutPrevented', event.target.value === 'true')}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Overstock prevented</span>
+              <select className="input" value={String(form.overstockPrevented)} onChange={(event) => updateForm('overstockPrevented', event.target.value === 'true')}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Waste reduced quantity</span>
+              <input className="input" value={form.wasteReducedQuantity} onChange={(event) => updateForm('wasteReducedQuantity', event.target.value)} placeholder="12" />
+            </label>
+            <label>
+              <span className="form-label">Service delta %</span>
+              <input className="input" value={form.serviceLevelDeltaPercent} onChange={(event) => updateForm('serviceLevelDeltaPercent', event.target.value)} placeholder="3.5" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Business impact evidence JSON</span>
+              <textarea className="input" value={form.businessImpactEvidence} onChange={(event) => updateForm('businessImpactEvidence', event.target.value)} placeholder='{"evidence":"stockout avoided after reorder recommendation"}' rows={2} />
+            </label>
+          </div>
+
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Baseline metric value</span>
+              <input className="input" value={form.baselineMetricValue} onChange={(event) => updateForm('baselineMetricValue', event.target.value)} placeholder="10" />
+            </label>
+            <label>
+              <span className="form-label">Target metric value</span>
+              <input className="input" value={form.targetMetricValue} onChange={(event) => updateForm('targetMetricValue', event.target.value)} placeholder="15" />
+            </label>
+            <label>
+              <span className="form-label">Actual metric value</span>
+              <input className="input" value={form.actualMetricValue} onChange={(event) => updateForm('actualMetricValue', event.target.value)} placeholder="16" />
+            </label>
+            <label>
+              <span className="form-label">Metric unit</span>
+              <input className="input" value={form.metricUnit} onChange={(event) => updateForm('metricUnit', event.target.value)} placeholder="units" />
+            </label>
+            <label>
+              <span className="form-label">Target direction</span>
+              <select className="input" value={form.targetDirection} onChange={(event) => updateForm('targetDirection', event.target.value)}>
+                <option value="increase">Increase</option>
+                <option value="decrease">Decrease</option>
+                <option value="maintain">Maintain</option>
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Target tolerance %</span>
+              <input className="input" value={form.targetTolerancePercent} onChange={(event) => updateForm('targetTolerancePercent', event.target.value)} placeholder="5" />
+            </label>
+            <label>
+              <span className="form-label">Target met</span>
+              <select className="input" value={form.targetMet} onChange={(event) => updateForm('targetMet', event.target.value)}>
+                <option value="">Infer from values</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Target evidence JSON</span>
+              <textarea className="input" value={form.targetEvidence} onChange={(event) => updateForm('targetEvidence', event.target.value)} placeholder='{"metric":"stockout days","baseline":3,"target":0,"actual":0}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Attribution method</span>
+              <select className="input" value={form.attributionMethod} onChange={(event) => updateForm('attributionMethod', event.target.value)}>
+                {['direct_measurement', 'before_after', 'control_group', 'counterfactual', 'manual_assessment', 'inferred'].map((method) => <option key={method} value={method}>{formatLabel(method)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Attribution confidence</span>
+              <input className="input" value={form.attributionConfidenceScore} onChange={(event) => updateForm('attributionConfidenceScore', event.target.value)} placeholder="0 to 1" />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Counterfactual reference JSON</span>
+              <textarea className="input" value={form.counterfactualReference} onChange={(event) => updateForm('counterfactualReference', event.target.value)} placeholder='{"baseline_period":"previous 30 days","comparison":"similar item"}' rows={2} />
+            </label>
+            <label>
+              <span className="form-label">Attribution evidence JSON</span>
+              <textarea className="input" value={form.attributionEvidence} onChange={(event) => updateForm('attributionEvidence', event.target.value)} placeholder='{"why_attributed":"stockout rate dropped after approved min-stock change"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Measurement method</span>
+              <input className="input" value={form.measurementMethod} onChange={(event) => updateForm('measurementMethod', event.target.value)} placeholder="manual review / report / sensor" />
+            </label>
+            <label>
+              <span className="form-label">Measurement source</span>
+              <input className="input" value={form.measurementSource} onChange={(event) => updateForm('measurementSource', event.target.value)} placeholder="stock report / supplier KPI" />
+            </label>
+            <label>
+              <span className="form-label">Measurement owner</span>
+              <input className="input" value={form.measurementOwner} onChange={(event) => updateForm('measurementOwner', event.target.value)} placeholder="operations manager" />
+            </label>
+            <label>
+              <span className="form-label">Measurement sample size</span>
+              <input className="input" value={form.measurementSampleSize} onChange={(event) => updateForm('measurementSampleSize', event.target.value)} placeholder="30" />
+            </label>
+            <label>
+              <span className="form-label">Data quality score</span>
+              <input className="input" value={form.measurementDataQualityScore} onChange={(event) => updateForm('measurementDataQualityScore', event.target.value)} placeholder="0 to 1" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Measurement quality evidence JSON</span>
+              <textarea className="input" value={form.measurementQualityEvidence} onChange={(event) => updateForm('measurementQualityEvidence', event.target.value)} placeholder='{"source":"stock movement report","reviewed_by":"manager"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Review status</span>
+              <select className="input" value={form.reviewStatus} onChange={(event) => updateForm('reviewStatus', event.target.value)}>
+                {['not_required', 'open', 'in_review', 'resolved', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Review owner</span>
+              <input className="input" value={form.reviewOwner} onChange={(event) => updateForm('reviewOwner', event.target.value)} placeholder="decision governance reviewer" />
+            </label>
+            <label>
+              <span className="form-label">Reviewed at</span>
+              <input className="input" value={form.reviewedAt} onChange={(event) => updateForm('reviewedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Review resolution</span>
+              <select className="input" value={form.reviewResolution} onChange={(event) => updateForm('reviewResolution', event.target.value)}>
+                <option value="">No resolution yet</option>
+                {['accepted', 'corrected', 'overridden', 'invalidated', 'deferred', 'not_actionable'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Review resolution evidence JSON</span>
+              <textarea className="input" value={form.reviewEvidence} onChange={(event) => updateForm('reviewEvidence', event.target.value)} placeholder='{"resolution_reason":"reviewed against stockout and cost evidence"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Evaluation due at</span>
+              <input className="input" value={form.evaluationDueAt} onChange={(event) => updateForm('evaluationDueAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Evaluation status</span>
+              <select className="input" value={form.evaluationStatus} onChange={(event) => updateForm('evaluationStatus', event.target.value)}>
+                {['not_scheduled', 'scheduled', 'due', 'overdue', 'completed', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Evaluation owner</span>
+              <input className="input" value={form.evaluationOwner} onChange={(event) => updateForm('evaluationOwner', event.target.value)} placeholder="outcome evaluator" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Evaluation SLA evidence JSON</span>
+              <textarea className="input" value={form.evaluationEvidence} onChange={(event) => updateForm('evaluationEvidence', event.target.value)} placeholder='{"measurement_due_policy":"30 days after execution"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Outcome acceptance status</span>
+              <select className="input" value={form.acceptanceStatus} onChange={(event) => updateForm('acceptanceStatus', event.target.value)}>
+                {['pending', 'accepted', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Acceptance owner</span>
+              <input className="input" value={form.acceptanceOwner} onChange={(event) => updateForm('acceptanceOwner', event.target.value)} placeholder="commercial outcome approver" />
+            </label>
+            <label>
+              <span className="form-label">Accepted at</span>
+              <input className="input" value={form.acceptedAt} onChange={(event) => updateForm('acceptedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Outcome acceptance evidence JSON</span>
+              <textarea className="input" value={form.acceptanceEvidence} onChange={(event) => updateForm('acceptanceEvidence', event.target.value)} placeholder='{"accepted_by":"commercial owner","reason":"complete lifecycle and measured impact evidence reviewed"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Corrective action status</span>
+              <select className="input" value={form.correctiveActionStatus} onChange={(event) => updateForm('correctiveActionStatus', event.target.value)}>
+                {['not_required', 'open', 'in_progress', 'resolved', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Corrective action owner</span>
+              <input className="input" value={form.correctiveActionOwner} onChange={(event) => updateForm('correctiveActionOwner', event.target.value)} placeholder="remediation owner" />
+            </label>
+            <label>
+              <span className="form-label">Corrective due at</span>
+              <input className="input" value={form.correctiveActionDueAt} onChange={(event) => updateForm('correctiveActionDueAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Corrective resolved at</span>
+              <input className="input" value={form.correctiveActionResolvedAt} onChange={(event) => updateForm('correctiveActionResolvedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Corrective action evidence JSON</span>
+              <textarea className="input" value={form.correctiveActionEvidence} onChange={(event) => updateForm('correctiveActionEvidence', event.target.value)} placeholder='{"corrective_action":"supplier threshold adjusted after missed target","resolution":"reviewed and waived/resolved"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Learning signal</span>
+              <select className="input" value={form.learningSignal} onChange={(event) => updateForm('learningSignal', event.target.value)}>
+                {['reinforce', 'tune', 'suppress', 'review', 'unclassified'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Learning signal reason</span>
+              <input className="input" value={form.learningSignalReason} onChange={(event) => updateForm('learningSignalReason', event.target.value)} placeholder="why this outcome should reinforce/tune/suppress/review future guidance" />
+            </label>
+            <label>
+              <span className="form-label">Recommended next action</span>
+              <input className="input" value={form.learningSignalNextAction} onChange={(event) => updateForm('learningSignalNextAction', event.target.value)} placeholder="manual next governance action for this recommendation pattern" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Learning signal evidence JSON</span>
+              <textarea className="input" value={form.learningSignalEvidence} onChange={(event) => updateForm('learningSignalEvidence', event.target.value)} placeholder='{"signal_basis":"measured outcome converted into future manual recommendation guidance"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Learning action status</span>
+              <select className="input" value={form.learningActionStatus} onChange={(event) => updateForm('learningActionStatus', event.target.value)}>
+                {['pending', 'assigned', 'completed', 'blocked', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Learning action owner</span>
+              <input className="input" value={form.learningActionOwner} onChange={(event) => updateForm('learningActionOwner', event.target.value)} placeholder="manual follow-up owner" />
+            </label>
+            <label>
+              <span className="form-label">Learning action due at</span>
+              <input className="input" value={form.learningActionDueAt} onChange={(event) => updateForm('learningActionDueAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Learning action completed at</span>
+              <input className="input" value={form.learningActionCompletedAt} onChange={(event) => updateForm('learningActionCompletedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label>
+              <span className="form-label">Learning action evidence JSON</span>
+              <textarea className="input" value={form.learningActionEvidence} onChange={(event) => updateForm('learningActionEvidence', event.target.value)} placeholder='{"manual_follow_up":"threshold review completed or waived with owner evidence"}' rows={2} />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Lifecycle status</span>
+              <select className="input" value={form.lifecycleStatus} onChange={(event) => updateForm('lifecycleStatus', event.target.value)}>
+                {['generated', 'approved', 'executed', 'measured', 'scored', 'validated', 'needs_review', 'dismissed'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">Generated at</span>
+              <input className="input" value={form.generatedAt} onChange={(event) => updateForm('generatedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Approved at</span>
+              <input className="input" value={form.approvedAt} onChange={(event) => updateForm('approvedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Executed at</span>
+              <input className="input" value={form.executedAt} onChange={(event) => updateForm('executedAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Measured at</span>
+              <input className="input" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+            <label>
+              <span className="form-label">Scored at</span>
+              <input className="input" value={form.scoredAt} onChange={(event) => updateForm('scoredAt', event.target.value)} placeholder="ISO timestamp" />
+            </label>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
+            <label>
+              <span className="form-label">Execution reference JSON or note</span>
+              <textarea className="input" rows={3} value={form.executionReference} onChange={(event) => updateForm('executionReference', event.target.value)} placeholder='{"execution_request_id":"..."}' />
+            </label>
+            <label>
+              <span className="form-label">Lifecycle evidence JSON or note</span>
+              <textarea className="input" rows={3} value={form.lifecycleEvidence} onChange={(event) => updateForm('lifecycleEvidence', event.target.value)} placeholder='{"reviewer":"manager","evidence":"approved and executed"}' />
+            </label>
+          </div>
+          </>
+        ) : null}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
           <label>
@@ -3726,6 +4835,7 @@ export default function DecisionLearningFeedbackPage() {
         </div>
       </section>
 
+      <RecommendationOutcomeFoundation foundation={summaryQuery.data?.recommendation_outcome_foundation} />
       <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
       <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
       <LearningCoverageMatrix matrix={summaryQuery.data?.learning_coverage_matrix} />

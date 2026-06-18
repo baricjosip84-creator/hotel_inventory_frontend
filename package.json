@@ -33,8 +33,7 @@
     "pretest:e2e:ui": "npm run check:unified-ai-contract-suite",
     "predev": "npm run check:unified-ai-contract-suite",
     "prepreview": "npm run check:unified-ai-contract-suite",
-    "prebuild": "npm run check:unified-ai-contract-suite",
-    "check:vercel-api-base-url": "node scripts/check-vercel-api-base-url.mjs"
+    "prebuild": "npm run check:unified-ai-contract-suite"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

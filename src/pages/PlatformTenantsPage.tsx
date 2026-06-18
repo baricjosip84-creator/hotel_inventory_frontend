@@ -56,7 +56,8 @@ export default function PlatformTenantsPage() {
     plan_code: 'standard',
     initial_admin_email: '',
     initial_admin_name: '',
-    initial_admin_password: ''
+    initial_admin_password: '',
+    create_onboarding_tasks: true
   });
   const [entitlements, setEntitlements] = useState({
     plan_code: 'standard',
@@ -123,7 +124,8 @@ export default function PlatformTenantsPage() {
           email: form.initial_admin_email,
           name: form.initial_admin_name,
           password: form.initial_admin_password
-        } : undefined
+        } : undefined,
+        create_onboarding_tasks: form.create_onboarding_tasks
       })
     }),
     onSuccess: async () => {
@@ -134,7 +136,8 @@ export default function PlatformTenantsPage() {
         plan_code: 'standard',
         initial_admin_email: '',
         initial_admin_name: '',
-        initial_admin_password: ''
+        initial_admin_password: '',
+        create_onboarding_tasks: true
       });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
     }
@@ -222,6 +225,10 @@ const lock = useMutation({
             <input style={styles.input} placeholder="Initial admin email" value={form.initial_admin_email} onChange={(event) => setForm({ ...form, initial_admin_email: event.target.value })} />
             <input style={styles.input} placeholder="Initial admin name" value={form.initial_admin_name} onChange={(event) => setForm({ ...form, initial_admin_name: event.target.value })} />
             <input style={styles.input} type="password" placeholder="Initial admin password" value={form.initial_admin_password} onChange={(event) => setForm({ ...form, initial_admin_password: event.target.value })} />
+            <label style={styles.checkboxLabel}>
+              <input type="checkbox" checked={form.create_onboarding_tasks} onChange={(event) => setForm({ ...form, create_onboarding_tasks: event.target.checked })} />
+              Create customer onboarding tasks automatically
+            </label>
             <button style={styles.button} onClick={() => createTenant.mutate()} disabled={createTenant.isPending}>Create tenant</button>
           </div>
           {createTenant.error ? <div style={styles.error}>{readableError(createTenant.error)}</div> : null}

@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import type { SystemContextExecutionGateResponse, SystemContextResponse, SystemContextSnapshot, SystemContextSnapshotCaptureResponse, SystemContextSnapshotComparison, SystemContextSnapshotTrendSeries, SystemContextForecastPreview, SystemContextForecastSeries, SystemContextForecastHorizons, SystemContextBaselineForecast, SystemContextMovingAverageForecast, SystemContextWeightedTrendForecast, SystemContextVolatilityAdjustedForecast, SystemContextForecastConfidence, SystemContextForecastAccuracy, SystemContextForecastComparison, SystemContextForecastRiskClassification, SystemContextForecastRanking, SystemContextForecastScenarioSet, SystemContextForecastScenarioCaptureResponse, SystemContextForecastScenarioHistoryItem } from '../types/inventory';
+import type { SystemContextExecutionGateResponse, SystemContextResponse, SystemContextSnapshot, SystemContextSnapshotCaptureResponse, SystemContextSnapshotComparison, SystemContextSnapshotTrendSeries, SystemContextForecastPreview, SystemContextForecastSeries, SystemContextForecastHorizons, SystemContextBaselineForecast, SystemContextMovingAverageForecast, SystemContextWeightedTrendForecast, SystemContextVolatilityAdjustedForecast, SystemContextForecastConfidence, SystemContextForecastAccuracy, SystemContextForecastComparison, SystemContextForecastRiskClassification, SystemContextForecastAccuracyGovernance, SystemContextForecastErrorGovernance, SystemContextForecastDegradationGovernance, SystemContextForecastConfidenceGovernance, SystemContextForecastAdjustmentGovernance, SystemContextForecastOutcomeValidationGovernance, SystemContextForecastGovernanceReadiness, SystemContextForecastPhaseClosure, SystemContextExecutionIntelligenceLinkage, SystemContextExecutionIntelligenceOutcomeScoring, SystemContextExecutionIntelligenceRollbackEvidence, SystemContextExecutionIntelligenceRiskScoring, SystemContextExecutionIntelligenceClosedLoopLearning, SystemContextExecutionIntelligenceReadiness, SystemContextExecutionIntelligencePhaseClosure, SystemContextAIOperationsPipelineMonitoring, SystemContextAIOperationsHealthMonitoring, SystemContextAIOperationsDegradationMonitoring, SystemContextAIOperationsDataQualityMonitoring, SystemContextAIOperationsStaleIntelligenceMonitoring, SystemContextAIOperationsNotificationMonitoring, SystemContextAIOperationsSlaMonitoring, SystemContextAIOperationsAuditEvidenceMonitoring, SystemContextAIOperationsReadinessGate, SystemContextForecastVersionGovernance, SystemContextForecastRanking, SystemContextForecastScenarioSet, SystemContextForecastScenarioCaptureResponse, SystemContextForecastScenarioHistoryItem } from '../types/inventory';
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
@@ -155,6 +155,145 @@ export default function SystemContextPage() {
   const forecastRiskClassificationQuery = useQuery({
     queryKey: ['system-context-forecast-risk-classification'],
     queryFn: () => apiRequest<SystemContextForecastRiskClassification>('/system-context/snapshots/forecast-risk-classification?limit=25')
+  });
+
+
+  const forecastAccuracyGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-accuracy-governance'],
+    queryFn: () => apiRequest<SystemContextForecastAccuracyGovernance>('/system-context/snapshots/forecast-accuracy-governance?limit=25')
+  });
+
+
+
+
+
+  const forecastGovernanceReadinessQuery = useQuery({
+    queryKey: ['system-context-forecast-governance-readiness'],
+    queryFn: () => apiRequest<SystemContextForecastGovernanceReadiness>('/system-context/snapshots/forecast-governance-readiness?limit=25')
+  });
+
+  const forecastPhaseClosureQuery = useQuery({
+    queryKey: ['system-context-forecast-phase-closure'],
+    queryFn: () => apiRequest<SystemContextForecastPhaseClosure>('/system-context/snapshots/forecast-phase-closure?limit=25')
+  });
+
+
+  const executionIntelligenceLinkageQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-linkage'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceLinkage>('/system-context/execution-intelligence/linkage?limit=50')
+  });
+
+  const executionIntelligenceOutcomeScoringQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-outcome-scoring'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceOutcomeScoring>('/system-context/execution-intelligence/outcome-scoring?limit=50')
+  });
+
+  const executionIntelligenceRollbackEvidenceQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-rollback-evidence'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceRollbackEvidence>('/system-context/execution-intelligence/rollback-evidence?limit=50')
+  });
+
+
+  const executionIntelligenceRiskScoringQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-risk-scoring'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceRiskScoring>('/system-context/execution-intelligence/risk-scoring?limit=50')
+  });
+
+
+  const executionIntelligenceClosedLoopLearningQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-closed-loop-learning'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceClosedLoopLearning>('/system-context/execution-intelligence/closed-loop-learning?limit=50')
+  });
+
+
+  const executionIntelligenceReadinessQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-readiness'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligenceReadiness>('/system-context/execution-intelligence/readiness?limit=50')
+  });
+
+
+  const executionIntelligencePhaseClosureQuery = useQuery({
+    queryKey: ['system-context-execution-intelligence-phase-closure'],
+    queryFn: () => apiRequest<SystemContextExecutionIntelligencePhaseClosure>('/system-context/execution-intelligence/phase-closure?limit=50')
+  });
+
+
+
+  const aiOperationsPipelineMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-pipeline-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsPipelineMonitoring>('/system-context/ai-operations/pipeline-monitoring?limit=50')
+  });
+
+  const aiOperationsHealthMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-health-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsHealthMonitoring>('/system-context/ai-operations/health-monitoring?limit=50')
+  });
+
+
+  const aiOperationsDegradationMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-degradation-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsDegradationMonitoring>('/system-context/ai-operations/degradation-monitoring?limit=50')
+  });
+
+  const aiOperationsDataQualityMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-data-quality-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsDataQualityMonitoring>('/system-context/ai-operations/data-quality-monitoring?limit=50')
+  });
+
+  const aiOperationsStaleIntelligenceMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-stale-intelligence-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsStaleIntelligenceMonitoring>('/system-context/ai-operations/stale-intelligence-monitoring?limit=50')
+  });
+
+  const aiOperationsNotificationMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-notification-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsNotificationMonitoring>('/system-context/ai-operations/notification-monitoring?limit=50')
+  });
+
+  const aiOperationsSlaMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-sla-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsSlaMonitoring>('/system-context/ai-operations/sla-monitoring?limit=50')
+  });
+
+  const aiOperationsAuditEvidenceMonitoringQuery = useQuery({
+    queryKey: ['system-context-ai-operations-audit-evidence-monitoring'],
+    queryFn: () => apiRequest<SystemContextAIOperationsAuditEvidenceMonitoring>('/system-context/ai-operations/audit-evidence-monitoring?limit=50')
+  });
+
+  const aiOperationsReadinessGateQuery = useQuery({
+    queryKey: ['system-context-ai-operations-readiness-gate'],
+    queryFn: () => apiRequest<SystemContextAIOperationsReadinessGate>('/system-context/ai-operations/readiness-gate?limit=50')
+  });
+
+
+  const forecastOutcomeValidationGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-outcome-validation-governance'],
+    queryFn: () => apiRequest<SystemContextForecastOutcomeValidationGovernance>('/system-context/snapshots/forecast-outcome-validation-governance?limit=25')
+  });
+
+  const forecastAdjustmentGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-adjustment-governance'],
+    queryFn: () => apiRequest<SystemContextForecastAdjustmentGovernance>('/system-context/snapshots/forecast-adjustment-governance?limit=25')
+  });
+
+  const forecastConfidenceGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-confidence-governance'],
+    queryFn: () => apiRequest<SystemContextForecastConfidenceGovernance>('/system-context/snapshots/forecast-confidence-governance?limit=25')
+  });
+
+  const forecastDegradationGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-degradation-governance'],
+    queryFn: () => apiRequest<SystemContextForecastDegradationGovernance>('/system-context/snapshots/forecast-degradation-governance?limit=25')
+  });
+
+  const forecastErrorGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-error-governance'],
+    queryFn: () => apiRequest<SystemContextForecastErrorGovernance>('/system-context/snapshots/forecast-error-governance?limit=25')
+  });
+
+  const forecastVersionGovernanceQuery = useQuery({
+    queryKey: ['system-context-forecast-version-governance'],
+    queryFn: () => apiRequest<SystemContextForecastVersionGovernance>('/system-context/snapshots/forecast-version-governance?limit=25')
   });
 
   const forecastRankingQuery = useQuery({
@@ -984,6 +1123,569 @@ export default function SystemContextPage() {
 ) : null}
 
 
+
+
+
+
+{forecastConfidenceGovernanceQuery.data ? (<>
+  
+
+
+
+
+
+<Section title="Phase C — Execution Intelligence Linkage" subtitle="Read-only traceability from system recommendations into execution request lifecycle evidence.">
+{executionIntelligenceLinkageQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Execution intelligence linkage is evidence only. It does not submit, approve, execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceLinkageQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceLinkageQuery.data.phase_c_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceLinkageQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceLinkageQuery.data.linkage_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Coverage</span><strong>{formatNumber(executionIntelligenceLinkageQuery.data.linkage_summary.linkage_coverage_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Linked Requests</span><strong>{formatNumber(executionIntelligenceLinkageQuery.data.linkage_summary.linked_recommendation_execution_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Executed Requests</span><strong>{formatNumber(executionIntelligenceLinkageQuery.data.linkage_summary.executed_recommendation_execution_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceLinkageQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {executionIntelligenceLinkageQuery.data.linkage_blockers.length > 0 ? <div style={styles.warningText}>Linkage blockers: {executionIntelligenceLinkageQuery.data.linkage_blockers.join(', ')}</div> : null}
+    {executionIntelligenceLinkageQuery.data.request_linkage_evidence.map((request) => (
+      <div key={request.execution_request_id} style={styles.listItem}>
+        <div style={styles.itemTitle}>{request.request_type.replace(/_/g, ' ')} — {request.linkage_status.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Lifecycle: {request.lifecycle_stage.replace(/_/g, ' ')} · Status: {request.status.replace(/_/g, ' ')} · Execution: {(request.execution_status || 'not executed').replace(/_/g, ' ')}</div>
+        <div style={styles.itemMeta}>Recommendation key: {request.recommendation_key || '-'} · Requested: {formatDateTime(request.requested_at)} · Reviewed: {formatDateTime(request.reviewed_at)} · Executed: {formatDateTime(request.executed_at)}</div>
+        {request.linkage_blockers.length > 0 ? <div style={styles.warningText}>Request blockers: {request.linkage_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {executionIntelligenceLinkageQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Execution intelligence linkage evidence is loading.</div>
+)}
+{executionIntelligenceLinkageQuery.error ? (
+  <div className="app-error-state">{readableError(executionIntelligenceLinkageQuery.error)}</div>
+) : null}
+</Section>
+
+
+
+<Section title="Phase C — Execution Outcome Scoring" subtitle="Read-only scoring of recommendation execution results, audit evidence, rollback evidence, and runtime blockers.">
+{executionIntelligenceOutcomeScoringQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Execution outcome scoring is evidence only. It does not submit, approve, execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceOutcomeScoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceOutcomeScoringQuery.data.phase_c_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceOutcomeScoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Average Outcome Score</span><strong>{formatNumber(executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_summary.average_execution_outcome_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Scored Rate</span><strong>{formatNumber(executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_summary.scored_execution_outcome_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Failed Executions</span><strong>{formatNumber(executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_summary.failed_recommendation_execution_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceOutcomeScoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_blockers.length > 0 ? <div style={styles.warningText}>Outcome scoring blockers: {executionIntelligenceOutcomeScoringQuery.data.outcome_scoring_blockers.join(', ')}</div> : null}
+    {executionIntelligenceOutcomeScoringQuery.data.request_outcome_scoring_evidence.map((request) => (
+      <div key={request.execution_request_id} style={styles.listItem}>
+        <div style={styles.itemTitle}>{request.request_type.replace(/_/g, ' ')} — {request.outcome_classification.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Score: {formatNumber(request.execution_outcome_score)}% · Status: {request.status.replace(/_/g, ' ')} · Execution: {(request.execution_status || 'not executed').replace(/_/g, ' ')} · Result: {(request.result_outcome || 'missing').replace(/_/g, ' ')}</div>
+        <div style={styles.itemMeta}>Recommendation key: {request.recommendation_key || '-'} · Executed: {formatDateTime(request.executed_at)} · Audit evidence: {request.has_audit_evidence ? 'yes' : 'no'} · Rollback evidence: {request.rollback_evidence_present ? 'yes' : 'no'}</div>
+        {request.outcome_blockers.length > 0 ? <div style={styles.warningText}>Outcome blockers: {request.outcome_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {executionIntelligenceOutcomeScoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Execution outcome scoring evidence is loading.</div>
+)}
+{executionIntelligenceOutcomeScoringQuery.error ? (
+  <div className="app-error-state">{readableError(executionIntelligenceOutcomeScoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase C — Execution Rollback Evidence" subtitle="Read-only rollback and recovery evidence governance for risky or failed recommendation executions.">
+{executionIntelligenceRollbackEvidenceQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Rollback evidence governance is evidence only. It does not execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceRollbackEvidenceQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceRollbackEvidenceQuery.data.phase_c_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceRollbackEvidenceQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Coverage</span><strong>{formatNumber(executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_summary.rollback_evidence_coverage_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Rollback Required</span><strong>{formatNumber(executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_summary.rollback_required_execution_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Missing Required Evidence</span><strong>{formatNumber(executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_summary.missing_required_rollback_evidence_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceRollbackEvidenceQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_blockers.length > 0 ? <div style={styles.warningText}>Rollback evidence blockers: {executionIntelligenceRollbackEvidenceQuery.data.rollback_evidence_blockers.join(', ')}</div> : null}
+    {executionIntelligenceRollbackEvidenceQuery.data.request_rollback_evidence.map((request) => (
+      <div key={request.execution_request_id} style={styles.listItem}>
+        <div style={styles.itemTitle}>{request.request_type.replace(/_/g, ' ')} — {request.rollback_posture.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Status: {request.status.replace(/_/g, ' ')} · Execution: {(request.execution_status || 'not executed').replace(/_/g, ' ')} · Result: {(request.result_outcome || 'missing').replace(/_/g, ' ')}</div>
+        <div style={styles.itemMeta}>Recommendation key: {request.recommendation_key || '-'} · Executed: {formatDateTime(request.executed_at)} · Rollback required: {request.rollback_required ? 'yes' : 'no'} · Rollback evidence: {request.rollback_evidence_present ? 'yes' : 'no'} · Recovery evidence: {request.recovery_evidence_present ? 'yes' : 'no'}</div>
+        {request.rollback_blockers.length > 0 ? <div style={styles.warningText}>Rollback blockers: {request.rollback_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {executionIntelligenceRollbackEvidenceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Execution rollback evidence is loading.</div>
+)}
+{executionIntelligenceRollbackEvidenceQuery.error ? (
+  <div className="app-error-state">{readableError(executionIntelligenceRollbackEvidenceQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase C — Execution Risk Scoring" subtitle="Read-only commercial risk scoring for recommendation executions before closed-loop learning evidence.">
+{executionIntelligenceRiskScoringQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Execution risk scoring is evidence only. It does not execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceRiskScoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceRiskScoringQuery.data.phase_c_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceRiskScoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceRiskScoringQuery.data.risk_scoring_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Average Risk Score</span><strong>{formatNumber(executionIntelligenceRiskScoringQuery.data.risk_scoring_summary.average_execution_risk_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>High/Critical Rate</span><strong>{formatNumber(executionIntelligenceRiskScoringQuery.data.risk_scoring_summary.high_or_critical_execution_risk_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Critical Risks</span><strong>{formatNumber(executionIntelligenceRiskScoringQuery.data.risk_scoring_summary.critical_execution_risk_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceRiskScoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {executionIntelligenceRiskScoringQuery.data.risk_scoring_blockers.length > 0 ? <div style={styles.warningText}>Risk scoring blockers: {executionIntelligenceRiskScoringQuery.data.risk_scoring_blockers.join(', ')}</div> : null}
+    {executionIntelligenceRiskScoringQuery.data.request_risk_scoring_evidence.map((request) => (
+      <div key={request.execution_request_id} style={styles.listItem}>
+        <div style={styles.itemTitle}>{request.request_type.replace(/_/g, ' ')} — {request.risk_classification.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Risk score: {formatNumber(request.execution_risk_score)}% · Status: {request.status.replace(/_/g, ' ')} · Execution: {(request.execution_status || 'not executed').replace(/_/g, ' ')} · Result: {(request.result_outcome || 'missing').replace(/_/g, ' ')}</div>
+        <div style={styles.itemMeta}>Recommendation key: {request.recommendation_key || '-'} · Executed: {formatDateTime(request.executed_at)} · Audit evidence: {request.has_audit_evidence ? 'yes' : 'no'} · Rollback required: {request.rollback_required ? 'yes' : 'no'} · Rollback evidence: {request.rollback_evidence_present ? 'yes' : 'no'}</div>
+        {request.explicit_risk_signals.length > 0 ? <div style={styles.itemMeta}>Risk signals: {request.explicit_risk_signals.join(', ')}</div> : null}
+        {request.risk_blockers.length > 0 ? <div style={styles.warningText}>Risk blockers: {request.risk_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {executionIntelligenceRiskScoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Execution risk scoring evidence is loading.</div>
+)}
+{executionIntelligenceRiskScoringQuery.error ? (
+  <div className="app-error-state">{readableError(executionIntelligenceRiskScoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase C — Closed-Loop Learning Evidence" subtitle="Read-only evidence proving recommendation execution requests connect to measured outcomes and learning signals.">
+{executionIntelligenceClosedLoopLearningQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Closed-loop learning evidence is read-only. It does not execute recommendations, mutate tenant operations, train models, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceClosedLoopLearningQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceClosedLoopLearningQuery.data.phase_c_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceClosedLoopLearningQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Completion Rate</span><strong>{formatNumber(executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_summary.closed_loop_completion_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Learning Signal Coverage</span><strong>{formatNumber(executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_summary.learning_signal_coverage_rate * 100)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Requests</span><strong>{formatNumber(executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_summary.blocked_closed_loop_execution_requests)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceClosedLoopLearningQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_blockers.length > 0 ? <div style={styles.warningText}>Closed-loop blockers: {executionIntelligenceClosedLoopLearningQuery.data.closed_loop_learning_blockers.join(', ')}</div> : null}
+    {executionIntelligenceClosedLoopLearningQuery.data.request_closed_loop_learning_evidence.map((request) => (
+      <div key={request.execution_request_id} style={styles.listItem}>
+        <div style={styles.itemTitle}>{request.recommendation_key || request.execution_request_id} — {request.closed_loop_ready ? 'closed loop ready' : 'closed loop blocked'}</div>
+        <div style={styles.itemText}>Execution: {(request.execution_status || 'not executed').replace(/_/g, ' ')} · Outcomes: {formatNumber(request.matched_outcome_count)} · Learning signals: {formatNumber(request.learning_signal_count)} · Evidence: {formatNumber(request.learning_signal_evidence_count)} · Closed actions: {formatNumber(request.closed_learning_action_count)}</div>
+        <div style={styles.itemMeta}>Executed: {formatDateTime(request.executed_at)} · Result evidence: {request.has_execution_result ? 'yes' : 'no'} · Signals: {request.learning_signals.length ? request.learning_signals.join(', ') : '-'}</div>
+        <div style={styles.itemMeta}>Outcome keys: {request.outcome_keys.length ? request.outcome_keys.join(', ') : '-'}</div>
+        {request.closed_loop_blockers.length > 0 ? <div style={styles.warningText}>Closed-loop blockers: {request.closed_loop_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {executionIntelligenceClosedLoopLearningQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Closed-loop learning evidence is loading.</div>
+)}
+{executionIntelligenceClosedLoopLearningQuery.error ? (
+  <div className="app-error-state">{readableError(executionIntelligenceClosedLoopLearningQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase B — Forecast Phase Closure" subtitle="Read-only closure evidence for the implemented forecast governance and accuracy capability set.">
+{forecastPhaseClosureQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Forecast phase closure is evidence only. It does not execute forecasts, create execution requests, mutate tenant operations, start workers, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{forecastPhaseClosureQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{forecastPhaseClosureQuery.data.phase_b_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{forecastPhaseClosureQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Capability Status</span><strong>{forecastPhaseClosureQuery.data.capability_status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Runtime Data</span><strong>{forecastPhaseClosureQuery.data.runtime_data_status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Closure Score</span><strong>{formatNumber(forecastPhaseClosureQuery.data.phase_closure_summary.closure_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Closed Capabilities</span><strong>{formatNumber(forecastPhaseClosureQuery.data.phase_closure_summary.closed_capability_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Capabilities</span><strong>{formatNumber(forecastPhaseClosureQuery.data.phase_closure_summary.blocked_capability_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Phase</span><strong>{forecastPhaseClosureQuery.data.next_phase}</strong></div>
+    </div>
+    {forecastPhaseClosureQuery.data.phase_closure_blockers.length > 0 ? <div style={styles.warningText}>Closure blockers: {forecastPhaseClosureQuery.data.phase_closure_blockers.join(', ')}</div> : null}
+    {forecastPhaseClosureQuery.data.capability_closure_evidence.map((capability) => (
+      <div key={capability.code} style={styles.listItem}>
+        <div style={styles.itemTitle}>{capability.label} — {capability.closure_status.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Step: {capability.phase_b_step} · Source status: {capability.source_status.replace(/_/g, ' ')} · Evidence: {capability.evidence_reference ?? '-'}</div>
+        {capability.closure_blockers.length > 0 ? <div style={styles.warningText}>Capability blockers: {capability.closure_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {forecastPhaseClosureQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Forecast phase closure evidence is loading.</div>
+)}
+{forecastPhaseClosureQuery.error ? (
+  <div className="app-error-state">{readableError(forecastPhaseClosureQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase B — Forecast Governance Readiness" subtitle="Read-only readiness gate aggregating all Phase B forecast governance controls into one commercial review view.">
+{forecastGovernanceReadinessQuery.data ? (
+  <>
+    <div style={styles.readOnlyBanner}>
+      Forecast governance readiness is evidence only. It does not execute forecasts, create execution requests, mutate tenant operations, or schedule automation.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastGovernanceReadinessQuery.data.phase_b_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{forecastGovernanceReadinessQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Controls</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.ready_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Controls</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.blocked_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Control Score</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.average_control_readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastGovernanceReadinessQuery.data.governance_readiness_summary.blocker_count)}</strong></div>
+    </div>
+    {forecastGovernanceReadinessQuery.data.governance_readiness_blockers.length > 0 ? <div style={styles.warningText}>Readiness blockers: {forecastGovernanceReadinessQuery.data.governance_readiness_blockers.join(', ')}</div> : null}
+    {forecastGovernanceReadinessQuery.data.control_readiness.map((control) => (
+      <div key={control.code} style={styles.listItem}>
+        <div style={styles.itemTitle}>{control.label} — {control.control_status.replace(/_/g, ' ')}</div>
+        <div style={styles.itemText}>Step: {control.phase_b_step} · Source status: {control.source_status.replace(/_/g, ' ')} · Readiness score: {control.readiness_score == null ? '-' : `${formatNumber(control.readiness_score)}%`} · Snapshots: {formatNumber(control.available_snapshots)}</div>
+        {control.control_blockers.length > 0 ? <div style={styles.warningText}>Control blockers: {control.control_blockers.join(', ')}</div> : null}
+      </div>
+    ))}
+    {forecastGovernanceReadinessQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </>
+) : (
+  <div className="app-empty-state">Forecast governance readiness evidence is loading.</div>
+)}
+{forecastGovernanceReadinessQuery.error ? (
+  <div className="app-error-state">{readableError(forecastGovernanceReadinessQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase B — Forecast Outcome Validation Governance" subtitle="Read-only validation evidence proving forecast signals can be measured after outcomes are observed.">
+{forecastOutcomeValidationGovernanceQuery.data ? (
+  forecastOutcomeValidationGovernanceQuery.data.status === 'insufficient_history' ? (
+    <div style={styles.listItem}>
+      <div style={styles.itemTitle}>Insufficient Forecast Outcome Validation History</div>
+      <div style={styles.itemText}>At least {formatNumber(forecastOutcomeValidationGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastOutcomeValidationGovernanceQuery.data.available_snapshots)}.</div>
+      {forecastOutcomeValidationGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </div>
+  ) : (
+    <>
+      <div style={styles.readOnlyBanner}>
+        Forecast outcome validation governance is evidence only. It does not execute recommendations, mutate inventory, change suppliers or shipments, or schedule automation.
+      </div>
+      <div style={styles.summaryGrid}>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastOutcomeValidationGovernanceQuery.data.phase_b_step}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{forecastOutcomeValidationGovernanceQuery.data.status.replace(/_/g, ' ')}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.readiness_score)}%</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Scenarios</span><strong>{formatNumber(forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.scenario_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready</span><strong>{formatNumber(forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.ready_scenario_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked</span><strong>{formatNumber(forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.blocked_scenario_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Evidence Coverage</span><strong>{formatNumber((forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.validation_evidence_coverage_rate ?? 0) * 100)}%</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastOutcomeValidationGovernanceQuery.data.outcome_validation_summary?.blocker_count)}</strong></div>
+      </div>
+      {forecastOutcomeValidationGovernanceQuery.data.outcome_validation_blockers.length > 0 ? <div style={styles.warningText}>Governance blockers: {forecastOutcomeValidationGovernanceQuery.data.outcome_validation_blockers.join(', ')}</div> : null}
+      {forecastOutcomeValidationGovernanceQuery.data.scenario_outcome_validation_governance.slice(0, 8).map((scenario) => (
+        <div key={scenario.code ?? scenario.label} style={styles.listItem}>
+          <div style={styles.itemTitle}>{scenario.label} — {scenario.outcome_validation_status}</div>
+          <div style={styles.itemText}>Risk: {scenario.forecast_risk_band.replace(/_/g, ' ')} · Priority: {scenario.review_priority.replace(/_/g, ' ')} · Confidence: {formatNumber(scenario.confidence_score)} · Accuracy: {scenario.historical_accuracy_score == null ? '-' : formatNumber(scenario.historical_accuracy_score)}</div>
+          <div style={styles.itemMeta}>Projected value: {formatNumber(scenario.projected_value)} · Projected delta: {formatNumber(scenario.projected_delta)} · Direction consensus: {scenario.direction_consensus.replace(/_/g, ' ')} · Evaluations: {formatNumber(scenario.historical_evaluation_count)}</div>
+          {scenario.outcome_validation_blockers.length > 0 ? <div style={styles.warningText}>Scenario blockers: {scenario.outcome_validation_blockers.join(', ')}</div> : null}
+        </div>
+      ))}
+      {forecastOutcomeValidationGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </>
+  )
+) : (
+  <div className="app-empty-state">Forecast outcome validation governance evidence is loading.</div>
+)}
+{forecastOutcomeValidationGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastOutcomeValidationGovernanceQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase B — Forecast Adjustment Governance" subtitle="Read-only adjustment/override evidence for volatility-adjusted forecasts, exposure limits, and review blockers.">
+{forecastAdjustmentGovernanceQuery.data ? (
+  forecastAdjustmentGovernanceQuery.data.status === 'insufficient_history' ? (
+    <div style={styles.listItem}>
+      <div style={styles.itemTitle}>Insufficient Forecast Adjustment Governance History</div>
+      <div style={styles.itemText}>At least {formatNumber(forecastAdjustmentGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastAdjustmentGovernanceQuery.data.available_snapshots)}.</div>
+      {forecastAdjustmentGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </div>
+  ) : (
+    <>
+      <div style={styles.summaryGrid}>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastAdjustmentGovernanceQuery.data.phase_b_step}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.readiness_score)}%</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Windows</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.window_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Metrics</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.metric_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Adjusted Metrics</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.adjusted_metric_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>High Volatility</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.high_volatility_adjustment_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Explained</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.explained_adjustment_count)}</strong></div>
+        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastAdjustmentGovernanceQuery.data.adjustment_governance_summary?.blocker_count)}</strong></div>
+      </div>
+      {forecastAdjustmentGovernanceQuery.data.window_adjustment_governance.map((window) => (
+        <div key={window.window_code ?? window.window_label} style={styles.listItem}>
+          <div style={styles.itemTitle}>{window.window_label} — {window.adjustment_governance_status}</div>
+          <div style={styles.itemText}>Ready metrics: {formatNumber(window.ready_metric_count)} / {formatNumber(window.metric_count)} · Adjusted metrics: {formatNumber(window.adjusted_metric_count)} · Exposure: {formatNumber(window.adjusted_metric_exposure_rate * 100)}% · Explanation coverage: {formatNumber(window.adjustment_explanation_coverage_rate * 100)}%</div>
+          {window.adjustment_governance_blockers.length > 0 ? <div style={styles.warningText}>Window blockers: {window.adjustment_governance_blockers.join(', ')}</div> : null}
+          {window.metric_adjustment_governance.slice(0, 5).map((metric) => (
+            <div key={`${window.window_code}-${metric.metric_code}`} style={styles.nestedListItem}>
+              <div style={styles.itemTitle}>{metric.label} — {metric.adjustment_governance_status}</div>
+              <div style={styles.itemText}>Factor: {formatNumber(metric.volatility_adjustment_factor)} · Source delta: {formatNumber(metric.source_weighted_delta)} · Adjusted delta: {formatNumber(metric.volatility_adjusted_delta)} · Volatility: {metric.volatility_classification}</div>
+              {metric.adjustment_governance_blockers.length > 0 ? <div style={styles.warningText}>Metric blockers: {metric.adjustment_governance_blockers.join(', ')}</div> : null}
+            </div>
+          ))}
+        </div>
+      ))}
+      {forecastAdjustmentGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </>
+  )
+) : (
+  <div className="app-empty-state">Forecast adjustment governance evidence is loading.</div>
+)}
+{forecastAdjustmentGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastAdjustmentGovernanceQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase B — Forecast Confidence Governance" subtitle="Read-only confidence visibility, low-confidence exposure, and review blockers for forecast governance.">
+    <div style={styles.readOnlyBanner}>
+      Forecast confidence governance is evidence only. It does not create execution requests, mutate inventory, change suppliers or shipments, or schedule automation.
+    </div>
+    {forecastConfidenceGovernanceQuery.data.status === 'insufficient_history' ? (
+      <div style={styles.emptyState}>
+        <div style={styles.itemTitle}>Insufficient Forecast Confidence Governance History</div>
+        <div style={styles.itemText}>At least {formatNumber(forecastConfidenceGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastConfidenceGovernanceQuery.data.available_snapshots)}.</div>
+        {forecastConfidenceGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </div>
+    ) : (
+      <>
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastConfidenceGovernanceQuery.data.phase_b_step}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.readiness_score)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Windows</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.window_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Metrics</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Metrics</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.ready_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Low Confidence</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.low_confidence_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Watch Confidence</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.watch_confidence_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Confidence</span><strong>{formatNumber(forecastConfidenceGovernanceQuery.data.confidence_governance_summary?.average_confidence_score)}</strong></div>
+        </div>
+        {forecastConfidenceGovernanceQuery.data.window_confidence_governance.map((window) => (
+          <div key={window.window_code || window.window_label} style={styles.detailCard}>
+            <div style={styles.itemTitle}>{window.window_label}</div>
+            <div style={styles.itemText}>Status: {window.confidence_governance_status.replace(/_/g, ' ')} · Ready: {window.confidence_governance_ready ? 'yes' : 'no'} · Average confidence {formatNumber(window.average_confidence_score)} / floor {formatNumber(window.minimum_confidence_score)}</div>
+            <div style={styles.itemMeta}>Metrics: {formatNumber(window.metric_count)} · Ready {formatNumber(window.ready_metric_count)} · Low confidence {formatNumber(window.low_confidence_metric_count)} · Watch confidence {formatNumber(window.watch_confidence_metric_count)}</div>
+            <div style={styles.itemMeta}>Low exposure {formatNumber(Number(window.low_confidence_exposure_rate) * 100)}% / max {formatNumber(Number(window.max_low_confidence_exposure_rate) * 100)}% · Watch exposure {formatNumber(Number(window.watch_confidence_exposure_rate) * 100)}% / max {formatNumber(Number(window.max_watch_confidence_exposure_rate) * 100)}%</div>
+            {window.confidence_governance_blockers.length > 0 ? <div style={styles.note}>Window blockers: {window.confidence_governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+            {window.metric_confidence_governance.slice(0, 5).map((metric) => (
+              <div key={metric.metric_code || metric.label} style={styles.itemCard}>
+                <div style={styles.itemTitle}>{metric.label}</div>
+                <div style={styles.itemText}>Score: {formatNumber(metric.confidence_score)} · Band: {metric.confidence_band.replace(/_/g, ' ')} · Risk: {metric.confidence_risk_classification.replace(/_/g, ' ')}</div>
+                <div style={styles.itemMeta}>Volatility: {metric.volatility_classification.replace(/_/g, ' ')} · Input ready: {metric.model_input_ready ? 'yes' : 'no'} · Forecast {formatNumber(metric.forecast_value)} · Delta {formatNumber(metric.forecast_delta)}</div>
+                {metric.confidence_governance_blockers.length > 0 ? <div style={styles.note}>Blockers: {metric.confidence_governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+              </div>
+            ))}
+          </div>
+        ))}
+        {forecastConfidenceGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </>
+    )}
+  </Section>
+</>) : null}
+
+{forecastConfidenceGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastConfidenceGovernanceQuery.error)}</div>
+) : null}
+
+{forecastDegradationGovernanceQuery.data ? (
+  <Section title="Phase B — Forecast Degradation Governance" subtitle="Read-only detection for worsening recent forecast quality, recent MAPE exposure, and degradation blockers.">
+    <div style={styles.readOnlyBanner}>
+      Forecast degradation governance is evidence only. It does not create execution requests, mutate inventory, change suppliers or shipments, or schedule automation.
+    </div>
+    {forecastDegradationGovernanceQuery.data.status === 'insufficient_history' ? (
+      <div style={styles.emptyState}>
+        <div style={styles.itemTitle}>Insufficient Forecast Degradation Governance History</div>
+        <div style={styles.itemText}>At least {formatNumber(forecastDegradationGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastDegradationGovernanceQuery.data.available_snapshots)}.</div>
+        {forecastDegradationGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </div>
+    ) : (
+      <>
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastDegradationGovernanceQuery.data.phase_b_step}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.readiness_score)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Metrics</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.ready_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.blocked_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Degraded</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.degraded_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Recent MAPE</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.average_recent_mean_absolute_percent_error)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Degradation</span><strong>{formatNumber(forecastDegradationGovernanceQuery.data.degradation_governance_summary?.average_degradation_delta)} pts</strong></div>
+        </div>
+        {forecastDegradationGovernanceQuery.data.metric_degradation_governance.map((metric) => (
+          <div key={metric.metric_code || metric.label} style={styles.detailCard}>
+            <div style={styles.itemTitle}>{metric.label}</div>
+            <div style={styles.itemText}>Status: {metric.degradation_governance_status.replace(/_/g, ' ')} · Ready: {metric.degradation_governance_ready ? 'yes' : 'no'} · Severity: {metric.degradation_severity.replace(/_/g, ' ')}</div>
+            <div style={styles.itemMeta}>Evaluations: {formatNumber(metric.evaluation_count)} · Recent MAPE {formatNumber(metric.recent_mean_absolute_percent_error)}% / max {formatNumber(metric.max_recent_mean_absolute_percent_error)}% · Prior MAPE {formatNumber(metric.prior_mean_absolute_percent_error)}% · Degradation {formatNumber(metric.degradation_delta)} pts / max {formatNumber(metric.max_degradation_delta)} pts</div>
+            <div style={styles.itemMeta}>Recent MAE {formatNumber(metric.recent_mean_absolute_error)} · Recent actual avg {formatNumber(metric.recent_average_actual_value)} · Recent error/value ratio {formatNumber(Number(metric.recent_error_to_value_ratio) * 100)}%</div>
+            {metric.degradation_governance_blockers.length > 0 ? <div style={styles.note}>Blockers: {metric.degradation_governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+          </div>
+        ))}
+        {forecastDegradationGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </>
+    )}
+  </Section>
+) : null}
+{forecastDegradationGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastDegradationGovernanceQuery.error)}</div>
+) : null}
+
+{forecastErrorGovernanceQuery.data ? (
+  <Section title="Phase B — Forecast Error Governance" subtitle="Read-only tolerance gate for forecast error exposure, MAPE thresholds, and material error blockers.">
+    <div style={styles.readOnlyBanner}>
+      Forecast error governance is evidence only. It does not create execution requests, mutate inventory, change suppliers or shipments, or schedule automation.
+    </div>
+    {forecastErrorGovernanceQuery.data.status === 'insufficient_history' ? (
+      <div style={styles.emptyState}>
+        <div style={styles.itemTitle}>Insufficient Forecast Error Governance History</div>
+        <div style={styles.itemText}>At least {formatNumber(forecastErrorGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastErrorGovernanceQuery.data.available_snapshots)}.</div>
+        {forecastErrorGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </div>
+    ) : (
+      <>
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastErrorGovernanceQuery.data.phase_b_step}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.readiness_score)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Metrics</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.ready_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.blocked_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.blocker_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg MAPE</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.average_mean_absolute_percent_error)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Critical Errors</span><strong>{formatNumber(forecastErrorGovernanceQuery.data.error_governance_summary?.critical_error_metric_count)}</strong></div>
+        </div>
+        {forecastErrorGovernanceQuery.data.metric_error_governance.map((metric) => (
+          <div key={metric.metric_code || metric.label} style={styles.detailCard}>
+            <div style={styles.itemTitle}>{metric.label}</div>
+            <div style={styles.itemText}>Status: {metric.error_governance_status.replace(/_/g, ' ')} · Ready: {metric.error_governance_ready ? 'yes' : 'no'} · Severity: {metric.error_severity.replace(/_/g, ' ')}</div>
+            <div style={styles.itemMeta}>Evaluations: {formatNumber(metric.evaluation_count)} · MAE {formatNumber(metric.mean_absolute_error)} · MAPE {formatNumber(metric.mean_absolute_percent_error)}% / max {formatNumber(metric.max_mean_absolute_percent_error)}% · Error/value ratio {formatNumber(Number(metric.error_to_value_ratio) * 100)}%</div>
+            {metric.error_governance_blockers.length > 0 ? <div style={styles.note}>Blockers: {metric.error_governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+          </div>
+        ))}
+        {forecastErrorGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </>
+    )}
+  </Section>
+) : null}
+{forecastErrorGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastErrorGovernanceQuery.error)}</div>
+) : null}
+
+{forecastAccuracyGovernanceQuery.data ? (
+  <Section title="Phase B — Forecast Accuracy Governance" subtitle="Read-only governance gate for forecast accuracy, directional accuracy, backtest depth, and metric-level blockers.">
+    <div style={styles.readOnlyBanner}>
+      Forecast accuracy governance is evidence only. It does not create execution requests, mutate inventory, change suppliers or shipments, or schedule automation.
+    </div>
+    {forecastAccuracyGovernanceQuery.data.status === 'insufficient_history' ? (
+      <div style={styles.emptyState}>
+        <div style={styles.itemTitle}>Insufficient Forecast Accuracy Governance History</div>
+        <div style={styles.itemText}>At least {formatNumber(forecastAccuracyGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastAccuracyGovernanceQuery.data.available_snapshots)}.</div>
+        {forecastAccuracyGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </div>
+    ) : (
+      <>
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastAccuracyGovernanceQuery.data.phase_b_step}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.readiness_score)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Metrics</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.ready_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.blocked_metric_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.blocker_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Accuracy</span><strong>{formatNumber(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.average_accuracy_score)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Avg Direction</span><strong>{formatNumber(Number(forecastAccuracyGovernanceQuery.data.accuracy_governance_summary?.average_directional_accuracy_rate ?? 0) * 100)}%</strong></div>
+        </div>
+        {forecastAccuracyGovernanceQuery.data.metric_accuracy_governance.map((metric) => (
+          <div key={metric.metric_code || metric.label} style={styles.detailCard}>
+            <div style={styles.itemTitle}>{metric.label}</div>
+            <div style={styles.itemText}>Status: {metric.governance_status.replace(/_/g, ' ')} · Ready: {metric.governance_ready ? 'yes' : 'no'} · Accuracy: {formatNumber(metric.accuracy_score)} · Direction: {formatNumber(Number(metric.directional_accuracy_rate) * 100)}%</div>
+            <div style={styles.itemMeta}>Evaluations: {formatNumber(metric.evaluation_count)} · MAPE {formatNumber(metric.mean_absolute_percent_error)}% · Band: {metric.accuracy_band.replace(/_/g, ' ')} · Risk: {metric.accuracy_risk_classification.replace(/_/g, ' ')}</div>
+            {metric.governance_blockers.length > 0 ? <div style={styles.note}>Blockers: {metric.governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+          </div>
+        ))}
+        {forecastAccuracyGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </>
+    )}
+  </Section>
+) : null}
+{forecastAccuracyGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastAccuracyGovernanceQuery.error)}</div>
+) : null}
+
+
+{forecastVersionGovernanceQuery.data ? (
+  <Section title="Phase B — Forecast Version Governance" subtitle="Read-only version keys, SHA-256 fingerprints, source lineage, and governance blockers for each forecast capability.">
+    <div style={styles.readOnlyBanner}>
+      Forecast version governance is evidence only. It does not create execution requests, mutate inventory, change suppliers or shipments, or schedule automation.
+    </div>
+    {forecastVersionGovernanceQuery.data.status === 'insufficient_history' ? (
+      <div style={styles.emptyState}>
+        <div style={styles.itemTitle}>Insufficient Forecast Version Governance History</div>
+        <div style={styles.itemText}>At least {formatNumber(forecastVersionGovernanceQuery.data.minimum_required_snapshots)} snapshots are required. Available snapshots: {formatNumber(forecastVersionGovernanceQuery.data.available_snapshots)}.</div>
+        {forecastVersionGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </div>
+    ) : (
+      <>
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase Step</span><strong>{forecastVersionGovernanceQuery.data.phase_b_step}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(forecastVersionGovernanceQuery.data.version_governance_summary?.readiness_score)}%</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Versions</span><strong>{formatNumber(forecastVersionGovernanceQuery.data.version_governance_summary?.version_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready</span><strong>{formatNumber(forecastVersionGovernanceQuery.data.version_governance_summary?.ready_version_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked</span><strong>{formatNumber(forecastVersionGovernanceQuery.data.version_governance_summary?.blocked_version_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(forecastVersionGovernanceQuery.data.version_governance_summary?.blocker_count)}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Execution</span><strong>{forecastVersionGovernanceQuery.data.execution_enabled ? 'Enabled' : 'Disabled'}</strong></div>
+          <div style={styles.summaryTile}><span style={styles.summaryLabel}>Mutation</span><strong>{forecastVersionGovernanceQuery.data.mutation_enabled ? 'Enabled' : 'Disabled'}</strong></div>
+        </div>
+        {forecastVersionGovernanceQuery.data.forecast_versions.map((version) => (
+          <div key={version.code} style={styles.detailCard}>
+            <div style={styles.itemTitle}>{version.label}</div>
+            <div style={styles.itemText}>Status: {version.status.replace(/_/g, ' ')} · Source: {version.source_status.replace(/_/g, ' ')} · Ready: {version.governance_ready ? 'yes' : 'no'} · Readiness rate: {formatNumber(Number(version.readiness_rate) * 100)}%</div>
+            <div style={styles.itemMeta}>Version key: {version.forecast_version_key}</div>
+            <div style={styles.itemMeta}>Fingerprint: {version.forecast_version_fingerprint.slice(0, 16)}… · Metrics: {formatNumber(version.metric_count)} · Watch: {formatNumber(version.watch_count)} · Snapshots: {formatNumber(version.snapshot_lineage.available_snapshots)}</div>
+            {version.governance_blockers.length > 0 ? <div style={styles.note}>Blockers: {version.governance_blockers.map((item) => item.replace(/_/g, ' ')).join(', ')}</div> : null}
+          </div>
+        ))}
+        {forecastVersionGovernanceQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+      </>
+    )}
+  </Section>
+) : null}
+{forecastVersionGovernanceQuery.error ? (
+  <div className="app-error-state">{readableError(forecastVersionGovernanceQuery.error)}</div>
+) : null}
+
+
 {forecastComparisonQuery.data ? (
   <Section title="Forecast Comparison Engine" subtitle="Read-only comparison of deterministic forecast model families and directional consensus.">
     <div style={styles.readOnlyBanner}>
@@ -1544,7 +2246,368 @@ export default function SystemContextPage() {
             </Section>
           ) : null}
 
+            <Section title="Phase C — Execution Intelligence Readiness" subtitle="Read-only readiness gate aggregating linkage, outcome scoring, rollback, risk, and closed-loop learning controls.">
+              {executionIntelligenceReadinessQuery.data ? (
+                <>
+                  <div style={styles.readOnlyBanner}>
+                    Execution intelligence readiness is evidence only. It does not execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+                  </div>
+                  <div style={styles.summaryGrid}>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligenceReadinessQuery.data.phase}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligenceReadinessQuery.data.phase_c_step}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligenceReadinessQuery.data.status.replace(/_/g, ' ')}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_summary.readiness_score)}%</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_summary.ready_capability_count)} / {formatNumber(executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_summary.capability_count)}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Controls</span><strong>{formatNumber(executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_summary.blocked_capability_count)}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blockers</span><strong>{formatNumber(executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_summary.blocker_count)}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{executionIntelligenceReadinessQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+                  </div>
+                  {executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_blockers.length > 0 ? <div style={styles.warningText}>Readiness blockers: {executionIntelligenceReadinessQuery.data.execution_intelligence_readiness_blockers.join(', ')}</div> : null}
+                  {executionIntelligenceReadinessQuery.data.capability_evidence.map((capability) => (
+                    <div key={capability.capability_key} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>{capability.capability_label} — {capability.capability_ready ? 'ready' : 'blocked'}</div>
+                      <div style={styles.itemMeta}>Step: {capability.phase_c_step} · Status: {capability.status.replace(/_/g, ' ')} · Score: {formatNumber(capability.readiness_score)}% · Ready by status: {capability.ready_by_status ? 'yes' : 'no'} · Ready by score: {capability.ready_by_score ? 'yes' : 'no'}</div>
+                      {capability.blockers.length > 0 ? <div style={styles.warningText}>Capability blockers: {capability.blockers.join(', ')}</div> : null}
+                    </div>
+                  ))}
+                  {executionIntelligenceReadinessQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+                </>
+              ) : (
+                <div className="app-empty-state">Execution intelligence readiness is loading.</div>
+              )}
+              {executionIntelligenceReadinessQuery.error ? (
+                <div className="app-error-state">{readableError(executionIntelligenceReadinessQuery.error)}</div>
+              ) : null}
+            </Section>
+
+
+            
+
+<Section title="Phase D — AI Operations Pipeline Monitoring" subtitle="Read-only production monitoring across recommendation outcome, forecast governance, and execution intelligence pipelines.">
+{aiOperationsPipelineMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsPipelineMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsPipelineMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsPipelineMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Monitoring Score</span><strong>{formatNumber(aiOperationsPipelineMonitoringQuery.data.pipeline_monitoring_summary.monitoring_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(aiOperationsPipelineMonitoringQuery.data.pipeline_monitoring_summary.ready_control_count)} / {formatNumber(aiOperationsPipelineMonitoringQuery.data.pipeline_monitoring_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsPipelineMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsPipelineMonitoringQuery.data.pipeline_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI operations blockers: {aiOperationsPipelineMonitoringQuery.data.pipeline_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsPipelineMonitoringQuery.data.pipeline_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · {control.actual_status.replace(/_/g, ' ')} · score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Blockers: {control.blockers.join(', ')}</small> : <small>Monitoring ready · Evidence: {control.evidence_reference}</small>}
+      </div>
+    ))}
+    {aiOperationsPipelineMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI operations pipeline monitoring...</div>}
+{aiOperationsPipelineMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsPipelineMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase D — AI Operations Health Monitoring" subtitle="Read-only production health evidence for monitored AI/intelligence pipelines.">
+{aiOperationsHealthMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsHealthMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsHealthMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsHealthMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Health Score</span><strong>{formatNumber(aiOperationsHealthMonitoringQuery.data.health_monitoring_summary.health_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Healthy Controls</span><strong>{formatNumber(aiOperationsHealthMonitoringQuery.data.health_monitoring_summary.healthy_control_count)} / {formatNumber(aiOperationsHealthMonitoringQuery.data.health_monitoring_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsHealthMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsHealthMonitoringQuery.data.health_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI health blockers: {aiOperationsHealthMonitoringQuery.data.health_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsHealthMonitoringQuery.data.health_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · {control.health_status.replace(/_/g, ' ')} · score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Health blockers: {control.blockers.join(', ')}</small> : <small>Healthy · Evidence: {control.evidence_reference || 'not provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsHealthMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI operations health monitoring...</div>}
+{aiOperationsHealthMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsHealthMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+
+<Section title="Phase D — AI Degradation Monitoring" subtitle="Read-only degradation monitoring across production AI/intelligence controls.">
+{aiOperationsDegradationMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI degradation monitoring is evidence only. It does not generate recommendations, execute requests, mutate tenant data, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsDegradationMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsDegradationMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsDegradationMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Severity</span><strong>{aiOperationsDegradationMonitoringQuery.data.degradation_severity.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Degradation Score</span><strong>{formatNumber(aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_summary.degradation_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Affected Controls</span><strong>{formatNumber(aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_summary.affected_control_count)} / {formatNumber(aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Critical Controls</span><strong>{formatNumber(aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_summary.critical_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsDegradationMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI degradation blockers: {aiOperationsDegradationMonitoringQuery.data.degradation_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsDegradationMonitoringQuery.data.degradation_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · health {control.health_status.replace(/_/g, ' ')} · degradation {control.degradation_severity.replace(/_/g, ' ')} · score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Degradation blockers: {control.blockers.join(', ')}</small> : <small>No degradation detected · Evidence: {control.evidence_reference || 'not provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsDegradationMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI degradation monitoring...</div>}
+{aiOperationsDegradationMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsDegradationMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase D — AI Data Quality Monitoring" subtitle="Read-only evidence-quality monitoring for production AI/intelligence controls.">
+{aiOperationsDataQualityMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI data quality monitoring is evidence only. It does not generate recommendations, execute requests, mutate tenant data, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsDataQualityMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsDataQualityMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsDataQualityMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Data Quality</span><strong>{aiOperationsDataQualityMonitoringQuery.data.data_quality_status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Quality Score</span><strong>{formatNumber(aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_summary.data_quality_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Complete Controls</span><strong>{formatNumber(aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_summary.complete_control_count)} / {formatNumber(aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Controls</span><strong>{formatNumber(aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_summary.blocked_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsDataQualityMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI data quality blockers: {aiOperationsDataQualityMonitoringQuery.data.data_quality_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsDataQualityMonitoringQuery.data.data_quality_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · quality {control.data_quality_status.replace(/_/g, ' ')} · degradation {control.degradation_severity.replace(/_/g, ' ')} · score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Data quality blockers: {control.blockers.join(', ')}</small> : <small>Data quality ready · Evidence: {control.evidence_reference || 'not provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsDataQualityMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI data quality monitoring...</div>}
+{aiOperationsDataQualityMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsDataQualityMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase D — AI Stale Intelligence Monitoring" subtitle="Read-only freshness monitoring for production AI/intelligence evidence.">
+{aiOperationsStaleIntelligenceMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI stale intelligence monitoring is evidence only. It does not generate recommendations, execute requests, mutate tenant data, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsStaleIntelligenceMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsStaleIntelligenceMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsStaleIntelligenceMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Freshness</span><strong>{aiOperationsStaleIntelligenceMonitoringQuery.data.freshness_status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Freshness Score</span><strong>{formatNumber(aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_summary.freshness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Fresh Controls</span><strong>{formatNumber(aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_summary.fresh_control_count)} / {formatNumber(aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_summary.control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Stale Controls</span><strong>{formatNumber(aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_summary.stale_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsStaleIntelligenceMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI stale intelligence blockers: {aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsStaleIntelligenceMonitoringQuery.data.stale_intelligence_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · freshness {control.freshness_status.replace(/_/g, ' ')} · quality {control.data_quality_status.replace(/_/g, ' ')} · score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Freshness blockers: {control.blockers.join(', ')}</small> : <small>Freshness ready · Evidence: {control.evidence_reference || 'not provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsStaleIntelligenceMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI stale intelligence monitoring...</div>}
+{aiOperationsStaleIntelligenceMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsStaleIntelligenceMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase D — AI Operational Notification Monitoring" subtitle="Read-only notification evidence monitoring for blocked, watched, or stale AI operations controls.">
+{aiOperationsNotificationMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI operational notification monitoring is evidence only. It does not send notifications, generate recommendations, execute requests, mutate tenant data, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsNotificationMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsNotificationMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsNotificationMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Coverage Score</span><strong>{formatNumber(aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_summary.notification_coverage_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Required Notifications</span><strong>{formatNumber(aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_summary.notification_required_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Required</span><strong>{formatNumber(aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_summary.notification_ready_required_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Critical Controls</span><strong>{formatNumber(aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_summary.critical_notification_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsNotificationMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI operational notification blockers: {aiOperationsNotificationMonitoringQuery.data.operational_notification_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsNotificationMonitoringQuery.data.operational_notification_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · notification {control.notification_status.replace(/_/g, ' ')} · severity {control.notification_severity.replace(/_/g, ' ')} · freshness {control.freshness_status.replace(/_/g, ' ')}</span>
+        {control.blockers.length > 0 ? <small>Notification blockers: {control.blockers.join(', ')}</small> : <small>Notification evidence ready · Evidence: {control.evidence_reference || 'not required'}</small>}
+      </div>
+    ))}
+    {aiOperationsNotificationMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI operational notification monitoring...</div>}
+{aiOperationsNotificationMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsNotificationMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+<Section title="Phase D — AI Operations SLA Monitoring" subtitle="Read-only SLA posture for AI operations monitoring controls.">
+{aiOperationsSlaMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI operations SLA monitoring is evidence only. It does not send notifications, generate recommendations, execute requests, mutate tenant data, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsSlaMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsSlaMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsSlaMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>SLA Score</span><strong>{formatNumber(aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_summary.sla_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_summary.sla_ready_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Breached Controls</span><strong>{formatNumber(aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_summary.sla_breached_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>At Risk Controls</span><strong>{formatNumber(aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_summary.sla_at_risk_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsSlaMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI operations SLA blockers: {aiOperationsSlaMonitoringQuery.data.ai_operations_sla_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsSlaMonitoringQuery.data.ai_operations_sla_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · SLA {control.sla_status.replace(/_/g, ' ')} · notification {control.notification_status.replace(/_/g, ' ')} · monitoring score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>SLA blockers: {control.blockers.join(', ')}</small> : <small>SLA evidence ready · Evidence: {control.evidence_reference || 'provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsSlaMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI operations SLA monitoring...</div>}
+{aiOperationsSlaMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsSlaMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+
+<Section title="Phase D — AI Audit Evidence Monitoring" subtitle="Read-only audit-grade evidence posture for AI operations controls.">
+{aiOperationsAuditEvidenceMonitoringQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI audit evidence monitoring is evidence only. It does not generate recommendations, execute requests, mutate tenant data, send notifications, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsAuditEvidenceMonitoringQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsAuditEvidenceMonitoringQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsAuditEvidenceMonitoringQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Audit Evidence Score</span><strong>{formatNumber(aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_summary.audit_evidence_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_summary.audit_ready_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Missing Evidence</span><strong>{formatNumber(aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_summary.missing_evidence_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Safety Flag Issues</span><strong>{formatNumber(aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_summary.safety_flag_blocked_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsAuditEvidenceMonitoringQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_blockers.length > 0 ? <div style={styles.warningText}>AI audit evidence blockers: {aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_monitoring_blockers.join(', ')}</div> : null}
+    {aiOperationsAuditEvidenceMonitoringQuery.data.ai_audit_evidence_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · audit {control.audit_evidence_status.replace(/_/g, ' ')} · SLA {control.sla_status.replace(/_/g, ' ')} · monitoring score {formatNumber(control.monitoring_score)}%</span>
+        {control.blockers.length > 0 ? <small>Audit blockers: {control.blockers.join(', ')}</small> : <small>Audit evidence ready · Evidence: {control.evidence_reference || 'provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsAuditEvidenceMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI audit evidence monitoring...</div>}
+{aiOperationsAuditEvidenceMonitoringQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsAuditEvidenceMonitoringQuery.error)}</div>
+) : null}
+</Section>
+
+
+
+<Section title="Phase D — AI Operations Readiness Gate" subtitle="Read-only production readiness gate across all AI operations monitoring controls.">
+{aiOperationsReadinessGateQuery.data ? (
+  <div style={styles.stack}>
+    <div style={styles.readOnlyBanner}>
+      AI operations readiness gate is evidence only. It does not generate recommendations, execute requests, mutate tenant data, send notifications, start workers, schedule automation, or call external AI providers.
+    </div>
+    <div style={styles.summaryGrid}>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{aiOperationsReadinessGateQuery.data.phase}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{aiOperationsReadinessGateQuery.data.phase_d_step}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{aiOperationsReadinessGateQuery.data.status.replace(/_/g, ' ')}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Readiness Score</span><strong>{formatNumber(aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_summary.readiness_score)}%</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Ready Controls</span><strong>{formatNumber(aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_summary.ready_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Blocked Controls</span><strong>{formatNumber(aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_summary.blocked_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Missing Required</span><strong>{formatNumber(aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_summary.missing_required_control_count)}</strong></div>
+      <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Capability</span><strong>{aiOperationsReadinessGateQuery.data.next_capability.replace(/_/g, ' ')}</strong></div>
+    </div>
+    {aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_blockers.length > 0 ? <div style={styles.warningText}>AI operations readiness blockers: {aiOperationsReadinessGateQuery.data.ai_operations_readiness_gate_blockers.join(', ')}</div> : null}
+    {aiOperationsReadinessGateQuery.data.missing_required_controls.length > 0 ? <div style={styles.warningText}>Missing required controls: {aiOperationsReadinessGateQuery.data.missing_required_controls.join(', ')}</div> : null}
+    {aiOperationsReadinessGateQuery.data.ai_operations_readiness_controls.map((control) => (
+      <div key={control.code} style={styles.cardRow}>
+        <strong>{control.label}</strong>
+        <span>{control.phase} · readiness {control.readiness_status.replace(/_/g, ' ')} · audit {control.audit_evidence_status.replace(/_/g, ' ')} · SLA {control.sla_status.replace(/_/g, ' ')}</span>
+        {control.blockers.length > 0 ? <small>Readiness blockers: {control.blockers.join(', ')}</small> : <small>Readiness gate evidence ready · Evidence: {control.evidence_reference || 'provided'}</small>}
+      </div>
+    ))}
+    {aiOperationsReadinessGateQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+  </div>
+) : <div>Loading AI operations readiness gate...</div>}
+{aiOperationsReadinessGateQuery.error ? (
+  <div className="app-error-state">{readableError(aiOperationsReadinessGateQuery.error)}</div>
+) : null}
+</Section>
+
+<Section title="Phase C — Execution Intelligence Phase Closure" subtitle="Read-only closure evidence for the implemented execution-intelligence loop capability set.">
+              {executionIntelligencePhaseClosureQuery.data ? (
+                <>
+                  <div style={styles.readOnlyBanner}>
+                    Phase C closure evidence is capability/readiness evidence only. It does not submit, approve, execute, retry, rollback, mutate tenant operations, start workers, or schedule automation.
+                  </div>
+                  <div style={styles.summaryGrid}>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Phase</span><strong>{executionIntelligencePhaseClosureQuery.data.phase}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Step</span><strong>{executionIntelligencePhaseClosureQuery.data.phase_c_step}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Status</span><strong>{executionIntelligencePhaseClosureQuery.data.status.replace(/_/g, ' ')}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Capability Status</span><strong>{executionIntelligencePhaseClosureQuery.data.capability_status.replace(/_/g, ' ')}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Runtime Data</span><strong>{executionIntelligencePhaseClosureQuery.data.runtime_data_status.replace(/_/g, ' ')}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Closure Score</span><strong>{formatNumber(executionIntelligencePhaseClosureQuery.data.phase_closure_summary.closure_score)}%</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Closed Controls</span><strong>{formatNumber(executionIntelligencePhaseClosureQuery.data.phase_closure_summary.closed_capability_count)} / {formatNumber(executionIntelligencePhaseClosureQuery.data.phase_closure_summary.capability_count)}</strong></div>
+                    <div style={styles.summaryTile}><span style={styles.summaryLabel}>Next Phase</span><strong>{executionIntelligencePhaseClosureQuery.data.next_phase}</strong></div>
+                  </div>
+                  {executionIntelligencePhaseClosureQuery.data.phase_closure_blockers.length > 0 ? <div style={styles.warningText}>Phase closure blockers: {executionIntelligencePhaseClosureQuery.data.phase_closure_blockers.join(', ')}</div> : null}
+                  {executionIntelligencePhaseClosureQuery.data.capability_closure_evidence.map((capability) => (
+                    <div key={capability.code} style={styles.itemCard}>
+                      <div style={styles.itemTitle}>{capability.label} — {capability.closure_ready ? 'closed' : 'blocked'}</div>
+                      <div style={styles.itemMeta}>Step: {capability.phase_c_step} · Status: {capability.closure_status.replace(/_/g, ' ')} · Source: {capability.source_status.replace(/_/g, ' ')} · Evidence: {capability.evidence_reference || 'missing'}</div>
+                      {capability.closure_blockers.length > 0 ? <div style={styles.warningText}>Closure blockers: {capability.closure_blockers.join(', ')}</div> : null}
+                    </div>
+                  ))}
+                  {executionIntelligencePhaseClosureQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+                </>
+              ) : (
+                <div className="app-empty-state">Execution intelligence phase closure evidence is loading.</div>
+              )}
+              {executionIntelligencePhaseClosureQuery.error ? (
+                <div className="app-error-state">{readableError(executionIntelligencePhaseClosureQuery.error)}</div>
+              ) : null}
+            </Section>
+
+
           {data.forecast_scenarios && data.forecast_scenarios.length > 0 ? (
+
             <Section title="Forecast Scenarios" subtitle="Read-only scenario planning derived from predictive readiness metadata.">
               <div style={styles.grid}>
                 {data.forecast_scenarios.map((scenario) => (
