@@ -296,35 +296,6 @@ export default function AppLayout() {
           <div style={styles.brandTitle}>Inventory Platform</div>
           <div style={styles.brandSubtitle}>Multi-tenant control center</div>
           {role ? <div style={styles.rolePill}>ROLE: {role.toUpperCase()}</div> : null}
-  
-        {!tenantAccess.hasTenantContext ? (
-          <div style={styles.tenantAccessBanner}>
-            <strong>Tenant context unavailable.</strong> The session token did not expose a tenant identifier, so tenant-safe API requests may fail until the user signs in again.
-          </div>
-        ) : tenantAccess.hiddenModuleCount > 0 ? (
-          <div style={styles.tenantAccessNotice}>
-            <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
-          </div>
-        ) : null}
-
-
-        {tenantSubscriptionAccess && !tenantSubscriptionAccess.write_access.allowed ? (
-          <div style={styles.subscriptionBlockedBanner}>
-            <strong>Subscription writes blocked.</strong>{' '}
-            {tenantSubscriptionAccess.write_access.blocker?.message || 'This tenant cannot perform operational changes until subscription access is restored.'}
-            <div style={styles.subscriptionBlockedMeta}>
-              Tenant status: {tenantSubscriptionAccess.tenant.status || '-'} · Billing: {tenantSubscriptionAccess.tenant.billing_status || '-'} · Plan: {tenantSubscriptionAccess.tenant.plan_code || '-'}
-            </div>
-          </div>
-        ) : tenantSubscriptionAccess?.plan_limit_blocked_resources.length ? (
-          <div style={styles.subscriptionLimitBanner}>
-            <strong>Plan limit reached.</strong> New records are blocked for: {tenantSubscriptionAccess.plan_limit_blocked_resources.join(', ')}.
-          </div>
-        ) : tenantSubscriptionAccess?.feature_blocked_resources?.length ? (
-          <div style={styles.subscriptionLimitBanner}>
-            <strong>Plan feature locked.</strong> Disabled modules: {tenantSubscriptionAccess.feature_blocked_resources.join(', ')}.
-          </div>
-        ) : null}
 
         {supportSession.isSupportSession ? (
             <div style={styles.supportPill}>SUPPORT MODE</div>
