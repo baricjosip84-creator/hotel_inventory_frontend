@@ -83,6 +83,13 @@ export default function AppLayout() {
   const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);
 
   const isVisibleNavigationItem = (item: TenantNavigationItem): boolean => {
+    if (item.to === '/automation-schedules') {
+      const automationEntitlement = tenantSubscriptionAccess?.feature_entitlements?.find((entitlement) => entitlement.feature === 'automation');
+      if (automationEntitlement && !automationEntitlement.allowed) {
+        return false;
+      }
+    }
+
     if (item.permission) {
       return hasPermission(item.permission);
     }
@@ -105,7 +112,7 @@ export default function AppLayout() {
         items: section.items.filter(isVisibleNavigationItem)
       }))
       .filter((section) => section.items.length > 0);
-  }, [role]);
+  }, [role, tenantSubscriptionAccess]);
 
   useEffect(() => {
     setMobileNavOpen(false);

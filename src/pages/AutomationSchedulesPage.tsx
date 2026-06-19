@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
+import { fetchTenantSubscriptionAccess, type TenantFeatureEntitlementRow } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerRunOnceResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
 
@@ -36,6 +37,10 @@ const automationTypes: AutomationSchedule['automation_type'][] = [
 
 const statuses: AutomationSchedule['status'][] = ['draft', 'active', 'paused', 'disabled'];
 const scheduleKinds: AutomationSchedule['schedule_kind'][] = ['manual', 'daily', 'weekly', 'monthly'];
+
+function getAutomationEntitlement(featureEntitlements?: TenantFeatureEntitlementRow[]): TenantFeatureEntitlementRow | null {
+  return featureEntitlements?.find((entitlement) => entitlement.feature === 'automation') || null;
+}
 
 function label(value?: string | null): string {
   return value ? value.replace(/_/g, ' ') : '-';
@@ -111,6 +116,7 @@ export default function AutomationSchedulesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [automationEntitlement, setAutomationEntitlement] = useState<TenantFeatureEntitlementRow | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -125,6 +131,21 @@ export default function AutomationSchedulesPage() {
     setLoading(true);
     setError(null);
     try {
+      const subscriptionAccess = await fetchTenantSubscriptionAccess();
+      const entitlement = getAutomationEntitlement(subscriptionAccess.feature_entitlements);
+      setAutomationEntitlement(entitlement);
+
+      if (entitlement && !entitlement.allowed) {
+        setData(null);
+        setTypes(null);
+        setRunnerReadiness(null);
+        setRunnerExecutiveSummary(null);
+        setRunnerStatus(null);
+        setRunEvents(null);
+        setSelected(null);
+        return;
+      }
+
       const [response, typeResponse, readinessResponse, executiveSummaryResponse, runnerStatusResponse, releaseGuardResponse, changeControlPackResponse, rollbackPlanResponse, rollbackVerificationResponse, certificationReportResponse, certificationEvidenceResponse, launchAttestationResponse, safetyReportResponse, governancePackResponse, preflightResponse, accountabilityDigestResponse, operationsReviewResponse, policyMatrixResponse, activationChecklistResponse, containmentReportResponse, driftReportResponse, postLaunchMonitorResponse, incidentDrillResponse, closeoutReportResponse, archiveManifestResponse, retentionReportResponse, handoffBriefResponse, stewardshipChecklistResponse, stewardshipLedgerResponse, auditBundleResponse, observabilitySnapshotResponse, productionSafetyLockResponse, readinessCertificationResponse, moduleClosureResponse, closureSealResponse, finalizationManifestResponse, runEventsResponse] = await Promise.all([
         apiRequest<AutomationScheduleListResponse>(`/automation-schedules?${query}`),
         apiRequest<AutomationScheduleTypesResponse>('/automation-schedules/types'),
@@ -518,6 +539,34 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+  if (automationEntitlement && !automationEntitlement.allowed) {
+    return (
+      <div style={styles.page}>
+        <section style={styles.headerCard}>
+          <div>
+            <h2 style={styles.title}>Automation Schedules</h2>
+            <p style={styles.subtitle}>
+              Configure future scheduled checks. Step 241 adds final read-only readiness certification. Schedules still create reviewable requests only when explicitly allowed and never approve or execute them.
+            </p>
+          </div>
+          <div style={styles.safetyBadge}>Not enabled</div>
+        </section>
+
+        <section style={styles.card}>
+          <h3 style={styles.cardTitle}>Automation schedules are not enabled for this tenant</h3>
+          <p style={styles.muted}>
+            This tenant plan does not include automation schedules, so this page does not call automation schedule endpoints.
+            This keeps Render logs clean and avoids expected 403 entitlement warnings.
+          </p>
+          <div style={styles.metricGrid}>
+            <div style={styles.metric}><strong>{label(automationEntitlement.reason)}</strong><span>Reason</span></div>
+            <div style={styles.metric}><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required tenant flag</span></div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <section style={styles.headerCard}>
@@ -532,8 +581,21 @@ export default function AutomationSchedulesPage() {
 
       {error ? <div style={styles.error}>{error}</div> : null}
 
+      {automationEntitlement && !automationEntitlement.allowed ? (
+        <section style={styles.card}>
+          <h3 style={styles.cardTitle}>Automation schedules are not enabled for this tenant</h3>
+          <p style={styles.muted}>
+            This tenant plan does not include automation schedules, so the page does not load automation schedule endpoints.
+            This keeps Render logs clean and avoids expected 403 entitlement warnings.
+          </p>
+          <div style={styles.metricGrid}>
+            <div style={styles.metric}><strong>{label(automationEntitlement.reason)}</strong><span>Reason</span></div>
+            <div style={styles.metric}><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required tenant flag</span></div>
+          </div>
+        </section>
+      ) : null}
 
-      {runnerExecutiveSummary ? (
+      {automationEntitlement && !automationEntitlement.allowed ? null : runnerExecutiveSummary ? (
         <section style={styles.card}>
           <div style={styles.sectionHeader}>
             <div>
