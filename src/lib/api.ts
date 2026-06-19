@@ -74,6 +74,11 @@ async function withApiRequestSlot<T>(operation: () => Promise<T>): Promise<T> {
 */
 let refreshPromise: Promise<string | null> | null = null;
 
+type ApiFetchResult = {
+  response: Response;
+  accessTokenUsed: string | null;
+};
+
 type ApiErrorResponse = {
   error?: {
     code?: string;
@@ -316,7 +321,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-async function performRequest(path: string, options: RequestInit = {}): Promise<Response> {
+async function performRequest(path: string, options: RequestInit = {}): Promise<ApiFetchResult> {
   const safeOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
   const headers = new Headers(safeOptions.headers || {});
 
@@ -333,10 +338,34 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
-  return withApiRequestSlot(() => fetch(buildUrl(path), {
+  const response = await withApiRequestSlot(() => fetch(buildUrl(path), {
     ...safeOptions,
     headers
   }));
+
+  return {
+    response,
+    accessTokenUsed: accessToken || null
+  };
+}
+
+async function recoverFromUnauthorized(path: string, accessTokenUsed: string | null): Promise<string | null> {
+  if (isAuthLoginRequest(path) || isAuthRefreshRequest(path)) {
+    return null;
+  }
+
+  const currentAccessToken = getAccessToken();
+
+  /*
+    A different request may already have refreshed the session after this
+    request was sent with an old token. In that case, do not call refresh again;
+    just let the caller retry with the newer token already stored in auth.
+  */
+  if (currentAccessToken && currentAccessToken !== accessTokenUsed) {
+    return currentAccessToken;
+  }
+
+  return refreshAccessToken();
 }
 
 
@@ -409,17 +438,17 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
   let response: Response;
 
   try {
-    response = await performRequest(path, { method: 'GET' });
+    ({ response } = await performRequest(path, { method: 'GET' }));
   } catch (error: any) {
     throw new ApiError(error?.message || 'Network error while downloading file', 0);
   }
 
   if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
-    const refreshedAccessToken = await refreshAccessToken();
+    const recoveredAccessToken = await recoverFromUnauthorized(path, null);
 
-    if (refreshedAccessToken) {
+    if (recoveredAccessToken) {
       try {
-        response = await performRequest(path, { method: 'GET' });
+        ({ response } = await performRequest(path, { method: 'GET' }));
       } catch (error: any) {
         throw new ApiError(error?.message || 'Network error while downloading file', 0);
       }
@@ -530,9 +559,10 @@ export async function apiRequest<T>(
   }
 
   let response: Response;
+  let accessTokenUsed: string | null = null;
 
   try {
-    response = await performRequest(path, requestOptions);
+    ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: any) {
     throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
@@ -543,11 +573,11 @@ export async function apiRequest<T>(
     loops.
   */
   if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
-    const refreshedAccessToken = await refreshAccessToken();
+    const recoveredAccessToken = await recoverFromUnauthorized(path, accessTokenUsed);
 
-    if (refreshedAccessToken) {
+    if (recoveredAccessToken) {
       try {
-        response = await performRequest(path, requestOptions);
+        ({ response } = await performRequest(path, requestOptions));
       } catch (error: any) {
         throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
