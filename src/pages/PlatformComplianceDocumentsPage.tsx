@@ -64,7 +64,7 @@ export default function PlatformComplianceDocumentsPage() {
   }, [filters]);
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'compliance-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const users = useQuery({ queryKey: ['platform', 'users', 'compliance-owner-picker'], queryFn: () => platformApiRequest<{ users: PlatformUser[] }>('/platform/users?limit=200') });
+  const users = useQuery({ queryKey: ['platform', 'users', 'compliance-owner-picker'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users') });
   const summary = useQuery({ queryKey: ['platform', 'compliance-documents', 'summary'], queryFn: () => platformApiRequest<SummaryResponse>('/platform/compliance-documents/summary') });
   const documents = useQuery({ queryKey: ['platform', 'compliance-documents', filters], queryFn: () => platformApiRequest<DocumentsResponse>(`/platform/compliance-documents?${queryString}`) });
 
@@ -159,7 +159,7 @@ export default function PlatformComplianceDocumentsPage() {
             <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} style={styles.input}>{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>
             <select value={form.owner_platform_user_id} onChange={(event) => setForm({ ...form, owner_platform_user_id: event.target.value })} style={styles.input}>
               <option value="">No owner</option>
-              {(users.data?.users || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
+              {(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
             </select>
             <input value={form.external_url} onChange={(event) => setForm({ ...form, external_url: event.target.value })} placeholder="External document URL" style={styles.input} />
             <input type="date" value={form.effective_at} onChange={(event) => setForm({ ...form, effective_at: event.target.value })} style={styles.input} />

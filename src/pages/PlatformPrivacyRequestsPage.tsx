@@ -62,7 +62,7 @@ export default function PlatformPrivacyRequestsPage() {
   }, [filters]);
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'privacy-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const users = useQuery({ queryKey: ['platform', 'users', 'privacy-assignee-picker'], queryFn: () => platformApiRequest<{ users: PlatformUser[] }>('/platform/users?limit=200') });
+  const users = useQuery({ queryKey: ['platform', 'users', 'privacy-assignee-picker'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users') });
   const summary = useQuery({ queryKey: ['platform', 'privacy-requests', 'summary'], queryFn: () => platformApiRequest<SummaryResponse>('/platform/privacy-requests/summary') });
   const requests = useQuery({ queryKey: ['platform', 'privacy-requests', filters], queryFn: () => platformApiRequest<RequestsResponse>(`/platform/privacy-requests?${queryString}`) });
 
@@ -125,7 +125,7 @@ export default function PlatformPrivacyRequestsPage() {
           <input value={form.requester_email} onChange={(e) => setForm({ ...form, requester_email: e.target.value })} placeholder="Requester email" style={styles.input} />
           <input value={form.subject_identifier} onChange={(e) => setForm({ ...form, subject_identifier: e.target.value })} placeholder="Subject identifier" style={styles.input} />
           <input type="datetime-local" value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} style={styles.input} />
-          <select value={form.assigned_platform_user_id} onChange={(e) => setForm({ ...form, assigned_platform_user_id: e.target.value })} style={styles.input}><option value="">Unassigned</option>{(users.data?.users || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}</select>
+          <select value={form.assigned_platform_user_id} onChange={(e) => setForm({ ...form, assigned_platform_user_id: e.target.value })} style={styles.input}><option value="">Unassigned</option>{(users.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}</select>
         </div>
         <textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Request summary" style={styles.textarea} />
         {canWrite ? <button type="button" style={styles.primaryButton} onClick={() => saveRequest.mutate()} disabled={saveRequest.isPending}>{editingId ? 'Save changes' : 'Create request'}</button> : null}
