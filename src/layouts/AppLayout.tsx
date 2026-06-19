@@ -130,19 +130,25 @@ export default function AppLayout() {
   const forcePageScrollTop = () => {
     const scrollTargets = new Set<HTMLElement>();
 
-    if (mainAreaRef.current) {
-      scrollTargets.add(mainAreaRef.current);
-      mainAreaRef.current
-        .querySelectorAll<HTMLElement>('[data-route-scroll-container], main, section, article, div')
-        .forEach((element) => {
-          if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
-            scrollTargets.add(element);
-          }
-        });
-    }
-
     scrollTargets.add(document.documentElement);
     scrollTargets.add(document.body);
+
+    if (mainAreaRef.current) {
+      scrollTargets.add(mainAreaRef.current);
+    }
+
+    document
+      .querySelectorAll<HTMLElement>('[data-route-scroll-container], main, section, article, div')
+      .forEach((element) => {
+        if (
+          element.scrollTop > 0 ||
+          element.scrollLeft > 0 ||
+          element.scrollHeight > element.clientHeight ||
+          element.scrollWidth > element.clientWidth
+        ) {
+          scrollTargets.add(element);
+        }
+      });
 
     scrollTargets.forEach((element) => {
       const previousScrollBehavior = element.style.scrollBehavior;
@@ -152,7 +158,7 @@ export default function AppLayout() {
       element.style.scrollBehavior = previousScrollBehavior;
     });
 
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    window.scrollTo(0, 0);
   };
 
   useEffect(() => {
@@ -389,9 +395,9 @@ export default function AppLayout() {
                     key={item.to}
                     to={item.to}
                     title={item.description}
-                    onClick={() => {
-                      window.setTimeout(forcePageScrollTop, 0);
-                    }}
+                    onPointerDown={forcePageScrollTop}
+                    onMouseDown={forcePageScrollTop}
+                    onClick={forcePageScrollTop}
                     style={({ isActive }) => ({
                       ...styles.navItem,
                       ...(isActive ? styles.navItemActive : {})
