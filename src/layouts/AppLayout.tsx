@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import {
   clearAuthTokens,
   clearSupportSessionAccessToken,
@@ -137,18 +137,9 @@ export default function AppLayout() {
       scrollTargets.add(mainAreaRef.current);
     }
 
-    document
-      .querySelectorAll<HTMLElement>('[data-route-scroll-container], main, section, article, div')
-      .forEach((element) => {
-        if (
-          element.scrollTop > 0 ||
-          element.scrollLeft > 0 ||
-          element.scrollHeight > element.clientHeight ||
-          element.scrollWidth > element.clientWidth
-        ) {
-          scrollTargets.add(element);
-        }
-      });
+    document.querySelectorAll<HTMLElement>('[data-route-scroll-container]').forEach((element) => {
+      scrollTargets.add(element);
+    });
 
     scrollTargets.forEach((element) => {
       const previousScrollBehavior = element.style.scrollBehavior;
@@ -159,6 +150,23 @@ export default function AppLayout() {
     });
 
     window.scrollTo(0, 0);
+  };
+
+  const handleNavigationClick = (event: MouseEvent<HTMLAnchorElement>, targetPath: string) => {
+    event.preventDefault();
+
+    if (targetPath === location.pathname) {
+      forcePageScrollTop();
+      setMobileNavOpen(false);
+      return;
+    }
+
+    setMobileNavOpen(false);
+    navigate(targetPath);
+
+    window.requestAnimationFrame(forcePageScrollTop);
+    window.setTimeout(forcePageScrollTop, 0);
+    window.setTimeout(forcePageScrollTop, 75);
   };
 
   useEffect(() => {
@@ -395,9 +403,7 @@ export default function AppLayout() {
                     key={item.to}
                     to={item.to}
                     title={item.description}
-                    onPointerDown={forcePageScrollTop}
-                    onMouseDown={forcePageScrollTop}
-                    onClick={forcePageScrollTop}
+                    onClick={(event) => handleNavigationClick(event, item.to)}
                     style={({ isActive }) => ({
                       ...styles.navItem,
                       ...(isActive ? styles.navItemActive : {})
@@ -423,7 +429,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div key={location.pathname} ref={mainAreaRef} style={styles.mainArea} data-route-scroll-container>
+      <div ref={mainAreaRef} style={styles.mainArea} data-route-scroll-container>
         <header
           style={{
             ...styles.header,
