@@ -204,18 +204,18 @@ export default function ReliabilityCommandPage() {
           {closureItems.map((item) => (
             <article key={item.closure_item_id || item.risk_id} style={styles.card}>
               <div style={styles.cardHeader}>
-                <strong>{item.risk_id || item.closure_item_id}</strong>
+                <strong style={styles.breakableText}>{item.risk_id || item.closure_item_id}</strong>
                 <span style={{ ...styles.badge, ...getTone(item.severity) }}>{formatLabel(item.severity)}</span>
               </div>
               <p style={styles.cardText}>{formatLabel(item.source_surface)}</p>
               <div style={styles.metaGrid}>
-                <span><b>Closure</b>{formatLabel(item.closure_readiness)}</span>
-                <span><b>Owner</b>{formatLabel(item.recommended_closure_owner)}</span>
-                <span><b>Reviewer</b>{formatLabel(item.recommended_reviewer)}</span>
-                <span><b>Gate</b>{formatLabel(item.final_review_gate?.gate_type)}</span>
+                <span style={styles.metaItem}><b>Closure</b>{formatLabel(item.closure_readiness)}</span>
+                <span style={styles.metaItem}><b>Owner</b>{formatLabel(item.recommended_closure_owner)}</span>
+                <span style={styles.metaItem}><b>Reviewer</b>{formatLabel(item.recommended_reviewer)}</span>
+                <span style={styles.metaItem}><b>Gate</b>{formatLabel(item.final_review_gate?.gate_type)}</span>
               </div>
               <ul style={styles.requirements}>
-                {(item.manual_closure_requirements || []).slice(0, 3).map((requirement) => <li key={requirement}>{requirement}</li>)}
+                {(item.manual_closure_requirements || []).slice(0, 3).map((requirement) => <li key={requirement} style={styles.breakableText}>{requirement}</li>)}
               </ul>
               <p style={styles.safeLine}>Read-only: closes risk {String(Boolean(item.final_review_gate?.closes_risk))} · records signoff {String(Boolean(item.final_review_gate?.records_signoff))}</p>
             </article>
@@ -244,7 +244,7 @@ export default function ReliabilityCommandPage() {
           <div style={styles.stack}>
             {safetyFlags.map(([key, value]) => (
               <div key={key} style={styles.listItem}>
-                <span>{formatLabel(key)}</span>
+                <span style={styles.breakableText}>{formatLabel(key)}</span>
                 <strong>{String(value)}</strong>
               </div>
             ))}
@@ -285,14 +285,16 @@ const styles: Record<string, CSSProperties> = {
   muted: { margin: 0, color: '#6b7280', lineHeight: 1.5 },
   error: { padding: 14, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 14 },
   cardGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 },
-  card: { border: '1px solid #e5e7eb', borderRadius: 16, padding: 16, background: '#f9fafb' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' },
-  cardText: { margin: '10px 0', color: '#4b5563' },
-  badge: { display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', border: '1px solid', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 800, textTransform: 'capitalize' },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, margin: '12px 0' },
-  requirements: { margin: '12px 0', paddingLeft: 18, color: '#374151' },
-  safeLine: { margin: 0, color: '#065f46', fontSize: 12, fontWeight: 700 },
+  card: { minWidth: 0, overflow: 'hidden', border: '1px solid #e5e7eb', borderRadius: 16, padding: 16, background: '#f9fafb' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', minWidth: 0 },
+  cardText: { margin: '10px 0', color: '#4b5563', overflowWrap: 'anywhere', wordBreak: 'break-word' },
+  badge: { display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', flexShrink: 0, border: '1px solid', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 800, textTransform: 'capitalize' },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, margin: '12px 0', minWidth: 0 },
+  metaItem: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' },
+  requirements: { margin: '12px 0', paddingLeft: 18, color: '#374151', overflowWrap: 'anywhere', wordBreak: 'break-word' },
+  safeLine: { margin: 0, color: '#065f46', fontSize: 12, fontWeight: 700, overflowWrap: 'anywhere', wordBreak: 'break-word' },
+  breakableText: { minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 },
   stack: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 },
-  listItem: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14 }
+  listItem: { minWidth: 0, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, overflow: 'hidden' }
 };
