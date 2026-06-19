@@ -94,6 +94,7 @@ export default function SystemContextPage() {
   });
 
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [loadAdvancedAiOperations, setLoadAdvancedAiOperations] = useState(false);
 
   const selectedSnapshotQuery = useQuery({
     queryKey: ['system-context-snapshot', selectedSnapshotId],
@@ -103,7 +104,8 @@ export default function SystemContextPage() {
 
   const snapshotComparisonQuery = useQuery({
     queryKey: ['system-context-snapshot-comparison'],
-    queryFn: () => apiRequest<SystemContextSnapshotComparison>('/system-context/snapshots/compare/latest')
+    queryFn: () => apiRequest<SystemContextSnapshotComparison>('/system-context/snapshots/compare/latest'),
+    enabled: (snapshotsQuery.data?.length ?? 0) > 0
   });
 
   const snapshotTrendQuery = useQuery({
@@ -233,48 +235,57 @@ export default function SystemContextPage() {
 
   const aiOperationsPipelineMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-pipeline-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsPipelineMonitoring>('/system-context/ai-operations/pipeline-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsPipelineMonitoring>('/system-context/ai-operations/pipeline-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsHealthMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-health-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsHealthMonitoring>('/system-context/ai-operations/health-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsHealthMonitoring>('/system-context/ai-operations/health-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
 
   const aiOperationsDegradationMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-degradation-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsDegradationMonitoring>('/system-context/ai-operations/degradation-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsDegradationMonitoring>('/system-context/ai-operations/degradation-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsDataQualityMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-data-quality-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsDataQualityMonitoring>('/system-context/ai-operations/data-quality-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsDataQualityMonitoring>('/system-context/ai-operations/data-quality-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsStaleIntelligenceMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-stale-intelligence-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsStaleIntelligenceMonitoring>('/system-context/ai-operations/stale-intelligence-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsStaleIntelligenceMonitoring>('/system-context/ai-operations/stale-intelligence-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsNotificationMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-notification-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsNotificationMonitoring>('/system-context/ai-operations/notification-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsNotificationMonitoring>('/system-context/ai-operations/notification-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsSlaMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-sla-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsSlaMonitoring>('/system-context/ai-operations/sla-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsSlaMonitoring>('/system-context/ai-operations/sla-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsAuditEvidenceMonitoringQuery = useQuery({
     queryKey: ['system-context-ai-operations-audit-evidence-monitoring'],
-    queryFn: () => apiRequest<SystemContextAIOperationsAuditEvidenceMonitoring>('/system-context/ai-operations/audit-evidence-monitoring?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsAuditEvidenceMonitoring>('/system-context/ai-operations/audit-evidence-monitoring?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
   const aiOperationsReadinessGateQuery = useQuery({
     queryKey: ['system-context-ai-operations-readiness-gate'],
-    queryFn: () => apiRequest<SystemContextAIOperationsReadinessGate>('/system-context/ai-operations/readiness-gate?limit=50')
+    queryFn: () => apiRequest<SystemContextAIOperationsReadinessGate>('/system-context/ai-operations/readiness-gate?limit=10'),
+    enabled: loadAdvancedAiOperations
   });
 
 
@@ -2309,6 +2320,17 @@ export default function SystemContextPage() {
 
             
 
+<Section title="Phase D — AI Operations" subtitle="Advanced AI operations panels are loaded on demand to avoid overloading the production database during normal page load.">
+  <div style={styles.stack}>
+    <div className="app-empty-state">
+      Main System Context loads first. Use this button only when you need the heavy AI Operations monitoring evidence.
+    </div>
+    <button className="button button--secondary" type="button" onClick={() => setLoadAdvancedAiOperations(true)} disabled={loadAdvancedAiOperations}>
+      {loadAdvancedAiOperations ? 'AI Operations loading enabled' : 'Load AI Operations panels'}
+    </button>
+  </div>
+</Section>
+
 <Section title="Phase D — AI Operations Pipeline Monitoring" subtitle="Read-only production monitoring across recommendation outcome, forecast governance, and execution intelligence pipelines.">
 {aiOperationsPipelineMonitoringQuery.data ? (
   <div style={styles.stack}>
@@ -2330,7 +2352,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsPipelineMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI operations pipeline monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI operations pipeline monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsPipelineMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsPipelineMonitoringQuery.error)}</div>
 ) : null}
@@ -2357,7 +2379,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsHealthMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI operations health monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI operations health monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsHealthMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsHealthMonitoringQuery.error)}</div>
 ) : null}
@@ -2391,7 +2413,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsDegradationMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI degradation monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI degradation monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsDegradationMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsDegradationMonitoringQuery.error)}</div>
 ) : null}
@@ -2423,7 +2445,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsDataQualityMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI data quality monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI data quality monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsDataQualityMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsDataQualityMonitoringQuery.error)}</div>
 ) : null}
@@ -2456,7 +2478,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsStaleIntelligenceMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI stale intelligence monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI stale intelligence monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsStaleIntelligenceMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsStaleIntelligenceMonitoringQuery.error)}</div>
 ) : null}
@@ -2489,7 +2511,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsNotificationMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI operational notification monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI operational notification monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsNotificationMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsNotificationMonitoringQuery.error)}</div>
 ) : null}
@@ -2522,7 +2544,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsSlaMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI operations SLA monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI operations SLA monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsSlaMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsSlaMonitoringQuery.error)}</div>
 ) : null}
@@ -2556,7 +2578,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsAuditEvidenceMonitoringQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI audit evidence monitoring...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI audit evidence monitoring...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsAuditEvidenceMonitoringQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsAuditEvidenceMonitoringQuery.error)}</div>
 ) : null}
@@ -2591,7 +2613,7 @@ export default function SystemContextPage() {
     ))}
     {aiOperationsReadinessGateQuery.data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
   </div>
-) : <div>Loading AI operations readiness gate...</div>}
+) : <div>{loadAdvancedAiOperations ? 'Loading AI operations readiness gate...' : 'AI Operations panel not loaded yet. Click Load AI Operations panels above when needed.'}</div>}
 {aiOperationsReadinessGateQuery.error ? (
   <div className="app-error-state">{readableError(aiOperationsReadinessGateQuery.error)}</div>
 ) : null}
