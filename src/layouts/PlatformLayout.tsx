@@ -1,10 +1,18 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useLayoutEffect, useRef } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
 
   const logout = async () => {
     await logoutPlatformSession();
@@ -415,7 +423,7 @@ export default function PlatformLayout() {
           Logout
         </button>
       </aside>
-      <main style={styles.main}>
+      <main ref={mainRef} style={styles.main}>
         <Outlet />
       </main>
     </div>

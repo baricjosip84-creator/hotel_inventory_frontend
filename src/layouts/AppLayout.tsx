@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import {
@@ -78,6 +78,7 @@ export default function AppLayout() {
   const [tenantSubscriptionAccess, setTenantSubscriptionAccess] = useState<TenantSubscriptionAccess | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const mainAreaRef = useRef<HTMLDivElement | null>(null);
 
   const currentModule = useMemo(() => getTenantModuleForPathname(location.pathname), [location.pathname]);
   const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);
@@ -123,6 +124,12 @@ export default function AppLayout() {
 
   useEffect(() => {
     setMobileNavOpen(false);
+  }, [location.pathname]);
+
+
+  useLayoutEffect(() => {
+    mainAreaRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [location.pathname]);
 
   useEffect(() => {
@@ -360,7 +367,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div style={styles.mainArea}>
+      <div ref={mainAreaRef} style={styles.mainArea}>
         <header
           style={{
             ...styles.header,
