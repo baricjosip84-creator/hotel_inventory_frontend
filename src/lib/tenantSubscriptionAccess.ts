@@ -52,6 +52,21 @@ export type TenantSubscriptionAccess = {
   feature_blocked_resources?: string[];
 };
 
+export function getTenantFeatureEntitlement(
+  access: TenantSubscriptionAccess | null | undefined,
+  feature: string
+): TenantFeatureEntitlementRow | null {
+  return access?.feature_entitlements?.find((entitlement) => entitlement.feature === feature) || null;
+}
+
+export function isTenantFeatureAllowed(
+  access: TenantSubscriptionAccess | null | undefined,
+  feature: string
+): boolean {
+  const entitlement = getTenantFeatureEntitlement(access, feature);
+  return entitlement ? entitlement.allowed : true;
+}
+
 export async function fetchTenantSubscriptionAccess(): Promise<TenantSubscriptionAccess> {
   return apiRequest<TenantSubscriptionAccess>('/tenants/subscription-access');
 }

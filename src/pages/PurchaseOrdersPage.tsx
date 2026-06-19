@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
+import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 
@@ -729,26 +730,35 @@ export default function PurchaseOrdersPage() {
   const [pageSize, setPageSize] = useState<number>(() => pageSizeFromSearchParams(searchParams));
   const [auditSearch, setAuditSearch] = useState('');
 
+  const subscriptionAccessQuery = useQuery({
+    queryKey: ['tenant-subscription-access', 'purchase-orders'],
+    queryFn: fetchTenantSubscriptionAccess
+  });
+  const purchaseOrdersEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'purchase_orders');
+  const purchaseOrdersEntitled = purchaseOrdersEntitlement ? purchaseOrdersEntitlement.allowed : true;
+  const purchaseOrdersFeatureReady = !subscriptionAccessQuery.isLoading && purchaseOrdersEntitled;
+
   const purchaseOrdersQuery = useQuery({
     queryKey: ['purchase-orders', filters],
-    queryFn: () => fetchPurchaseOrders(filters)
+    queryFn: () => fetchPurchaseOrders(filters),
+    enabled: purchaseOrdersFeatureReady
   });
 
   const detailQuery = useQuery({
     queryKey: ['purchase-order', selectedId],
     queryFn: () => fetchPurchaseOrder(selectedId as string),
-    enabled: Boolean(selectedId)
+    enabled: Boolean(selectedId && purchaseOrdersFeatureReady)
   });
 
   const auditQuery = useQuery({
     queryKey: ['purchase-order', 'audit', selectedId],
     queryFn: () => fetchPurchaseOrderAudit(selectedId as string),
-    enabled: Boolean(selectedId && capabilities.canViewAudit),
+    enabled: Boolean(selectedId && capabilities.canViewAudit && purchaseOrdersFeatureReady),
     retry: false
   });
 
-  const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers });
-  const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
+  const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers, enabled: purchaseOrdersFeatureReady });
+  const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts, enabled: purchaseOrdersFeatureReady });
 
   const selectedDetail = detailQuery.data ?? null;
   const selectedLifecycleEvents = useMemo(() => {
@@ -1545,6 +1555,29 @@ export default function PurchaseOrdersPage() {
     ['submitted', 'approved'].includes(String(selectedDetail.status)) &&
     selectedRemainingQuantity > 0
   );
+
+  if (subscriptionAccessQuery.isLoading) {
+    return (
+      <div style={styles.page}>
+        <section style={styles.card}>
+          <h2 style={styles.h2}>Purchase Orders</h2>
+          <p style={styles.muted}>Checking tenant plan access…</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (purchaseOrdersEntitlement && !purchaseOrdersEntitlement.allowed) {
+    return (
+      <div style={styles.page}>
+        <section style={styles.card}>
+          <h2 style={styles.h2}>Purchase Orders</h2>
+          <p style={styles.muted}>Purchase Orders are not enabled for this tenant plan.</p>
+          <p style={styles.smallMuted}>Required feature flags: {(purchaseOrdersEntitlement.required_flags || ['purchase_orders', 'procurement']).join(', ')}.</p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>

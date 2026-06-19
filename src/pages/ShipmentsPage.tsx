@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
+import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
 
 /**
@@ -455,10 +456,18 @@ export default function ShipmentsPage() {
     queryFn: fetchProducts
   });
 
+  const subscriptionAccessQuery = useQuery({
+    queryKey: ['tenant-subscription-access', 'shipments-purchase-orders'],
+    queryFn: fetchTenantSubscriptionAccess,
+    enabled: canViewPurchaseOrders
+  });
+  const purchaseOrdersEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'purchase_orders');
+  const purchaseOrdersEntitled = purchaseOrdersEntitlement ? purchaseOrdersEntitlement.allowed : true;
+
   const approvedPurchaseOrdersQuery = useQuery({
     queryKey: ['purchase-orders', 'approved'],
     queryFn: fetchApprovedPurchaseOrders,
-    enabled: canViewPurchaseOrders
+    enabled: canViewPurchaseOrders && !subscriptionAccessQuery.isLoading && purchaseOrdersEntitled
   });
 
   const storageLocationsQuery = useQuery({

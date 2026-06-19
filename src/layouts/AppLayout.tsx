@@ -13,7 +13,7 @@ import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/s
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
-import { fetchTenantSubscriptionAccess, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
+import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
 import { hasPermission } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
@@ -83,9 +83,15 @@ export default function AppLayout() {
   const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);
 
   const isVisibleNavigationItem = (item: TenantNavigationItem): boolean => {
-    if (item.to === '/automation-schedules') {
-      const automationEntitlement = tenantSubscriptionAccess?.feature_entitlements?.find((entitlement) => entitlement.feature === 'automation');
-      if (automationEntitlement && !automationEntitlement.allowed) {
+    const featureByPath: Record<string, string> = {
+      '/automation-schedules': 'automation',
+      '/purchase-orders': 'purchase_orders'
+    };
+    const requiredFeature = featureByPath[item.to];
+
+    if (requiredFeature) {
+      const entitlement = getTenantFeatureEntitlement(tenantSubscriptionAccess, requiredFeature);
+      if (entitlement && !entitlement.allowed) {
         return false;
       }
     }
