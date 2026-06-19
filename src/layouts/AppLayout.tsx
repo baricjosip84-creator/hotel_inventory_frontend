@@ -127,9 +127,33 @@ export default function AppLayout() {
   }, [location.pathname]);
 
 
+  const forcePageScrollTop = () => {
+    const mainArea = mainAreaRef.current;
+
+    if (mainArea) {
+      mainArea.scrollTop = 0;
+      mainArea.scrollLeft = 0;
+    }
+
+    document.documentElement.scrollTop = 0;
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollTop = 0;
+    document.body.scrollLeft = 0;
+    window.scrollTo(0, 0);
+  };
+
   useLayoutEffect(() => {
-    mainAreaRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    forcePageScrollTop();
+
+    const animationFrame = window.requestAnimationFrame(forcePageScrollTop);
+    const shortTimer = window.setTimeout(forcePageScrollTop, 0);
+    const settledTimer = window.setTimeout(forcePageScrollTop, 75);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(shortTimer);
+      window.clearTimeout(settledTimer);
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -342,6 +366,9 @@ export default function AppLayout() {
                     key={item.to}
                     to={item.to}
                     title={item.description}
+                    onClick={() => {
+                      window.setTimeout(forcePageScrollTop, 0);
+                    }}
                     style={({ isActive }) => ({
                       ...styles.navItem,
                       ...(isActive ? styles.navItemActive : {})
