@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 
 type ReportTab =
   | 'inventory-valuation'
@@ -406,29 +407,42 @@ export default function ReportsPage() {
 
   const { role: currentUserRole } = getRoleCapabilities();
 
+  const subscriptionAccessQuery = useQuery({
+    queryKey: ['tenant-subscription-access', 'reports'],
+    queryFn: fetchTenantSubscriptionAccess
+  });
+  const reportsEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'reports');
+  const reportsEntitled = reportsEntitlement ? reportsEntitlement.allowed : true;
+  const reportsFeatureReady = Boolean(subscriptionAccessQuery.data) && reportsEntitled;
+
   const inventoryValuationQuery = useQuery({
     queryKey: ['reports', 'inventory-valuation'],
-    queryFn: fetchInventoryValuation
+    queryFn: fetchInventoryValuation,
+    enabled: reportsFeatureReady
   });
 
   const stockByLocationQuery = useQuery({
     queryKey: ['reports', 'stock-by-location', normalizedLocationCategoryFilter],
-    queryFn: () => fetchStockByLocation(normalizedLocationCategoryFilter)
+    queryFn: () => fetchStockByLocation(normalizedLocationCategoryFilter),
+    enabled: reportsFeatureReady
   });
 
   const productMovementsQuery = useQuery({
     queryKey: ['reports', 'product-movements', movementLimit],
-    queryFn: () => fetchProductMovements(movementLimit)
+    queryFn: () => fetchProductMovements(movementLimit),
+    enabled: reportsFeatureReady
   });
 
   const procurementSummaryQuery = useQuery({
     queryKey: ['reports', 'procurement-summary'],
-    queryFn: fetchProcurementSummary
+    queryFn: fetchProcurementSummary,
+    enabled: reportsFeatureReady
   });
 
   const forecastQuery = useQuery({
     queryKey: ['reports', 'forecast'],
-    queryFn: fetchForecast
+    queryFn: fetchForecast,
+    enabled: reportsFeatureReady
   });
 
   const inventoryValuationRows = inventoryValuationQuery.data?.rows ?? [];
@@ -588,6 +602,34 @@ export default function ReportsPage() {
           <p style={styles.permissionText}>
             This protects valuation, procurement summary, movement analysis, and
             forecast data from being exposed to unauthorized roles.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  if (subscriptionAccessQuery.isLoading) {
+    return (
+      <div style={styles.pageStack}>
+        <section className="app-panel app-panel--padded" style={styles.panel}>
+          <h3 style={styles.panelTitle}>Management Reporting</h3>
+          <p style={styles.panelSubtitle}>Checking tenant plan access…</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (reportsEntitlement && !reportsEntitlement.allowed) {
+    return (
+      <div style={styles.pageStack}>
+        <section className="app-panel app-panel--padded" style={styles.panel}>
+          <h3 style={styles.panelTitle}>Management Reporting</h3>
+          <p style={styles.panelSubtitle}>
+            Reports are not enabled for this tenant plan, so this page does not call report endpoints.
+            This keeps Render logs clean and avoids expected 403 entitlement warnings.
+          </p>
+          <p style={styles.permissionText}>
+            Required feature flags: {(reportsEntitlement.required_flags || ['reports']).join(', ')}.
           </p>
         </section>
       </div>

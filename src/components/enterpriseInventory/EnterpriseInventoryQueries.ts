@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../../lib/tenantSubscriptionAccess';
 
 import type {
   AlertFilters,
@@ -133,6 +134,14 @@ export function useEnterpriseInventoryQueries({
   attachmentEntityType,
   attachmentEntityId
 }: UseEnterpriseInventoryQueriesParams) {
+  const tenantSubscriptionAccessQuery = useQuery({
+    queryKey: ['tenant-subscription-access', 'enterprise-inventory'],
+    queryFn: fetchTenantSubscriptionAccess
+  });
+  const reportsFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'reports');
+  const automationFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'automation');
+  const purchaseOrdersFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'purchase_orders');
+
   const productsQuery = useQuery({ queryKey: ['enterprise-products', productSearch], queryFn: () => fetchProducts(productSearch) });
   const productPackagesQuery = useQuery({
     queryKey: ['enterprise-product-packages', productPackageProductId],
@@ -156,10 +165,10 @@ export function useEnterpriseInventoryQueries({
   const dashboardUnresolvedAlertsQuery = useQuery({ queryKey: ['enterprise-dashboard-unresolved-alerts'], queryFn: fetchDashboardUnresolvedAlerts });
   const dashboardRecentActivityQuery = useQuery({ queryKey: ['enterprise-dashboard-recent-activity'], queryFn: fetchDashboardRecentActivity });
   const dashboardSupplierPerformanceQuery = useQuery({ queryKey: ['enterprise-dashboard-supplier-performance'], queryFn: fetchDashboardSupplierPerformance });
-  const inventoryValuationReportQuery = useQuery({ queryKey: ['enterprise-inventory-valuation-report'], queryFn: fetchInventoryValuationReport });
-  const stockByLocationReportQuery = useQuery({ queryKey: ['enterprise-stock-by-location-report'], queryFn: fetchStockByLocationReport });
-  const productMovementReportQuery = useQuery({ queryKey: ['enterprise-product-movement-report'], queryFn: fetchProductMovementReport });
-  const procurementSummaryReportQuery = useQuery({ queryKey: ['enterprise-procurement-summary-report'], queryFn: fetchProcurementSummaryReport });
+  const inventoryValuationReportQuery = useQuery({ queryKey: ['enterprise-inventory-valuation-report'], queryFn: fetchInventoryValuationReport, enabled: reportsFeatureReady });
+  const stockByLocationReportQuery = useQuery({ queryKey: ['enterprise-stock-by-location-report'], queryFn: fetchStockByLocationReport, enabled: reportsFeatureReady });
+  const productMovementReportQuery = useQuery({ queryKey: ['enterprise-product-movement-report'], queryFn: fetchProductMovementReport, enabled: reportsFeatureReady });
+  const procurementSummaryReportQuery = useQuery({ queryKey: ['enterprise-procurement-summary-report'], queryFn: fetchProcurementSummaryReport, enabled: reportsFeatureReady });
   const productCostRiskSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-risk-summary'], queryFn: fetchProductCostRiskSummary });
   const productCostValuationSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-valuation-summary'], queryFn: fetchProductCostValuationSummary });
   const productCostValuationDetailsQuery = useQuery({ queryKey: ['enterprise-product-cost-valuation-details'], queryFn: fetchProductCostValuationDetails });
@@ -202,16 +211,16 @@ export function useEnterpriseInventoryQueries({
   const forecastCalibrationReviewQuery = useQuery({ queryKey: ['enterprise-forecast-calibration-review'], queryFn: fetchForecastCalibrationReview });
   const forecastDataQualityReviewQuery = useQuery({ queryKey: ['enterprise-forecast-data-quality-review'], queryFn: fetchForecastDataQualityReview });
   const forecastReliabilityMatrixQuery = useQuery({ queryKey: ['enterprise-forecast-reliability-matrix'], queryFn: fetchForecastReliabilityMatrix });
-  const automationTypesQuery = useQuery({ queryKey: ['enterprise-automation-types'], queryFn: fetchAutomationTypes });
-  const automationSchedulesQuery = useQuery({ queryKey: ['enterprise-automation-schedules'], queryFn: fetchAutomationSchedules });
-  const automationRunnerReadinessQuery = useQuery({ queryKey: ['enterprise-automation-runner-readiness'], queryFn: fetchAutomationRunnerReadiness });
-  const automationRunnerStatusQuery = useQuery({ queryKey: ['enterprise-automation-runner-status'], queryFn: fetchAutomationRunnerStatus });
-  const automationRunEventsQuery = useQuery({ queryKey: ['enterprise-automation-run-events'], queryFn: fetchAutomationRunEvents });
-  const automationRunnerSafetyReportQuery = useQuery({ queryKey: ['enterprise-automation-runner-safety-report'], queryFn: fetchAutomationRunnerSafetyReport });
-  const automationRunnerGovernancePackQuery = useQuery({ queryKey: ['enterprise-automation-runner-governance-pack'], queryFn: fetchAutomationRunnerGovernancePack });
-  const automationRunnerOperationsReviewQuery = useQuery({ queryKey: ['enterprise-automation-runner-operations-review'], queryFn: fetchAutomationRunnerOperationsReview });
-  const automationRunnerAccountabilityDigestQuery = useQuery({ queryKey: ['enterprise-automation-runner-accountability-digest'], queryFn: fetchAutomationRunnerAccountabilityDigest });
-  const automationRunnerPolicyMatrixQuery = useQuery({ queryKey: ['enterprise-automation-runner-policy-matrix'], queryFn: fetchAutomationRunnerPolicyMatrix });
+  const automationTypesQuery = useQuery({ queryKey: ['enterprise-automation-types'], queryFn: fetchAutomationTypes, enabled: automationFeatureReady });
+  const automationSchedulesQuery = useQuery({ queryKey: ['enterprise-automation-schedules'], queryFn: fetchAutomationSchedules, enabled: automationFeatureReady });
+  const automationRunnerReadinessQuery = useQuery({ queryKey: ['enterprise-automation-runner-readiness'], queryFn: fetchAutomationRunnerReadiness, enabled: automationFeatureReady });
+  const automationRunnerStatusQuery = useQuery({ queryKey: ['enterprise-automation-runner-status'], queryFn: fetchAutomationRunnerStatus, enabled: automationFeatureReady });
+  const automationRunEventsQuery = useQuery({ queryKey: ['enterprise-automation-run-events'], queryFn: fetchAutomationRunEvents, enabled: automationFeatureReady });
+  const automationRunnerSafetyReportQuery = useQuery({ queryKey: ['enterprise-automation-runner-safety-report'], queryFn: fetchAutomationRunnerSafetyReport, enabled: automationFeatureReady });
+  const automationRunnerGovernancePackQuery = useQuery({ queryKey: ['enterprise-automation-runner-governance-pack'], queryFn: fetchAutomationRunnerGovernancePack, enabled: automationFeatureReady });
+  const automationRunnerOperationsReviewQuery = useQuery({ queryKey: ['enterprise-automation-runner-operations-review'], queryFn: fetchAutomationRunnerOperationsReview, enabled: automationFeatureReady });
+  const automationRunnerAccountabilityDigestQuery = useQuery({ queryKey: ['enterprise-automation-runner-accountability-digest'], queryFn: fetchAutomationRunnerAccountabilityDigest, enabled: automationFeatureReady });
+  const automationRunnerPolicyMatrixQuery = useQuery({ queryKey: ['enterprise-automation-runner-policy-matrix'], queryFn: fetchAutomationRunnerPolicyMatrix, enabled: automationFeatureReady });
   const systemStatusQuery = useQuery({ queryKey: ['enterprise-system-status'], queryFn: fetchSystemStatus });
   const systemContextQuery = useQuery({ queryKey: ['enterprise-system-context'], queryFn: fetchSystemContext });
   const systemExecutionGateQuery = useQuery({ queryKey: ['enterprise-system-execution-gate'], queryFn: fetchSystemExecutionGate });
@@ -226,7 +235,7 @@ export function useEnterpriseInventoryQueries({
   const executionHardeningQuery = useQuery({ queryKey: ['enterprise-execution-hardening'], queryFn: fetchExecutionHardeningSummary });
   const executionRequestsQuery = useQuery({ queryKey: ['enterprise-execution-requests', executionFilters], queryFn: () => fetchExecutionRequests(executionFilters) });
   const stockTransfersQuery = useQuery({ queryKey: ['enterprise-stock-transfers'], queryFn: fetchStockTransfers });
-  const purchaseOrdersQuery = useQuery({ queryKey: ['enterprise-purchase-orders'], queryFn: fetchPurchaseOrders });
+  const purchaseOrdersQuery = useQuery({ queryKey: ['enterprise-purchase-orders'], queryFn: fetchPurchaseOrders, enabled: purchaseOrdersFeatureReady });
   const shipmentsQuery = useQuery({ queryKey: ['enterprise-shipments'], queryFn: fetchShipments });
   const shipmentItemsQuery = useQuery({
     queryKey: ['enterprise-shipment-items', shipmentReceivingShipmentId],

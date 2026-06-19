@@ -467,7 +467,7 @@ export default function ShipmentsPage() {
   const approvedPurchaseOrdersQuery = useQuery({
     queryKey: ['purchase-orders', 'approved'],
     queryFn: fetchApprovedPurchaseOrders,
-    enabled: canViewPurchaseOrders && !subscriptionAccessQuery.isLoading && purchaseOrdersEntitled
+    enabled: canViewPurchaseOrders && Boolean(subscriptionAccessQuery.data) && purchaseOrdersEntitled
   });
 
   const storageLocationsQuery = useQuery({

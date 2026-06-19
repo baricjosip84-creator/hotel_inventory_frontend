@@ -85,7 +85,8 @@ export default function AppLayout() {
   const isVisibleNavigationItem = (item: TenantNavigationItem): boolean => {
     const featureByPath: Record<string, string> = {
       '/automation-schedules': 'automation',
-      '/purchase-orders': 'purchase_orders'
+      '/purchase-orders': 'purchase_orders',
+      '/reports': 'reports'
     };
     const requiredFeature = featureByPath[item.to];
 

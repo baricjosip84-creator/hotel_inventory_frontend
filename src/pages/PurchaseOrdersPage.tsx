@@ -736,7 +736,7 @@ export default function PurchaseOrdersPage() {
   });
   const purchaseOrdersEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'purchase_orders');
   const purchaseOrdersEntitled = purchaseOrdersEntitlement ? purchaseOrdersEntitlement.allowed : true;
-  const purchaseOrdersFeatureReady = !subscriptionAccessQuery.isLoading && purchaseOrdersEntitled;
+  const purchaseOrdersFeatureReady = Boolean(subscriptionAccessQuery.data) && purchaseOrdersEntitled;
 
   const purchaseOrdersQuery = useQuery({
     queryKey: ['purchase-orders', filters],
