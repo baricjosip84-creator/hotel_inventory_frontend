@@ -847,8 +847,9 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   navItemActive: {
-    background: 'rgba(59,130,246,0.22)',
-    color: '#ffffff'
+    background: 'rgba(59,130,246,0.34)',
+    color: '#ffffff',
+    boxShadow: 'inset 4px 0 0 #60a5fa, 0 0 0 1px rgba(96,165,250,0.18)'
   },
   sidebarFooter: {
     paddingTop: '16px',
