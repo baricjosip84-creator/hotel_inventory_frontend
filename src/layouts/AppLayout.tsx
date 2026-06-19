@@ -128,31 +128,54 @@ export default function AppLayout() {
 
 
   const forcePageScrollTop = () => {
-    const mainArea = mainAreaRef.current;
+    const scrollTargets = new Set<HTMLElement>();
 
-    if (mainArea) {
-      mainArea.scrollTop = 0;
-      mainArea.scrollLeft = 0;
+    if (mainAreaRef.current) {
+      scrollTargets.add(mainAreaRef.current);
+      mainAreaRef.current
+        .querySelectorAll<HTMLElement>('[data-route-scroll-container], main, section, article, div')
+        .forEach((element) => {
+          if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
+            scrollTargets.add(element);
+          }
+        });
     }
 
-    document.documentElement.scrollTop = 0;
-    document.documentElement.scrollLeft = 0;
-    document.body.scrollTop = 0;
-    document.body.scrollLeft = 0;
-    window.scrollTo(0, 0);
+    scrollTargets.add(document.documentElement);
+    scrollTargets.add(document.body);
+
+    scrollTargets.forEach((element) => {
+      const previousScrollBehavior = element.style.scrollBehavior;
+      element.style.scrollBehavior = 'auto';
+      element.scrollTop = 0;
+      element.scrollLeft = 0;
+      element.style.scrollBehavior = previousScrollBehavior;
+    });
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   };
+
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
 
   useLayoutEffect(() => {
     forcePageScrollTop();
 
     const animationFrame = window.requestAnimationFrame(forcePageScrollTop);
     const shortTimer = window.setTimeout(forcePageScrollTop, 0);
-    const settledTimer = window.setTimeout(forcePageScrollTop, 75);
+    const renderTimer = window.setTimeout(forcePageScrollTop, 50);
+    const settledTimer = window.setTimeout(forcePageScrollTop, 150);
+    const lateTimer = window.setTimeout(forcePageScrollTop, 350);
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
       window.clearTimeout(shortTimer);
+      window.clearTimeout(renderTimer);
       window.clearTimeout(settledTimer);
+      window.clearTimeout(lateTimer);
     };
   }, [location.pathname]);
 
@@ -394,7 +417,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div ref={mainAreaRef} style={styles.mainArea}>
+      <div key={location.pathname} ref={mainAreaRef} style={styles.mainArea} data-route-scroll-container>
         <header
           style={{
             ...styles.header,
@@ -548,6 +571,7 @@ export default function AppLayout() {
         ) : null}
 
         <main
+          data-route-scroll-container
           style={{
             ...styles.content,
             ...(isMobile ? styles.contentMobile : styles.contentDesktop)
