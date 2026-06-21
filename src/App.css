@@ -114,6 +114,24 @@ button {
   -webkit-appearance: none;
 }
 
+/* Keep checkbox/radio controls visible after the global form-control reset. */
+input[type='checkbox'],
+input[type='radio'] {
+  appearance: auto;
+  -webkit-appearance: auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  flex: 0 0 auto;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  cursor: not-allowed;
+}
+
 /* Keep selects looking like selects while still normalized */
 select {
   background-image:
