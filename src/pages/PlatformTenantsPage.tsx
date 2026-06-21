@@ -27,11 +27,13 @@ type TenantRow = {
   plan_code?: string;
 };
 type LimitStatus = { used: number; limit: number | null };
+type TenantUser = { id: string; email: string; name: string; role: 'admin' | 'manager' | 'staff'; is_active?: boolean; created_at?: string; last_login_at?: string | null };
 type TenantDetails = {
   tenant: TenantRow & { feature_flags?: FeatureFlags; limits?: TenantLimits; support_policy?: SupportPolicy };
   usage: Record<string, number>;
   limit_status?: Record<string, LimitStatus>;
   support_sessions: { total_count: number; active_count: number };
+  users?: TenantUser[];
 };
 
 const planOptions = [
@@ -68,6 +70,12 @@ export default function PlatformTenantsPage() {
     plan_code: 'standard',
     feature_flags: {} as FeatureFlags,
     limits: {} as TenantLimits
+  });
+  const [tenantUserForm, setTenantUserForm] = useState({
+    email: '',
+    name: '',
+    role: 'admin',
+    password: ''
   });
   const [supportPolicy, setSupportPolicy] = useState<SupportPolicy>({
     support_enabled: true,
@@ -154,6 +162,18 @@ export default function PlatformTenantsPage() {
       body: JSON.stringify(body)
     }),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
+    }
+  });
+
+  const saveTenantUser = useMutation({
+    mutationFn: () => platformApiRequest(`/platform/tenants/${selected}/users`, {
+      method: 'POST',
+      body: JSON.stringify(tenantUserForm)
+    }),
+    onSuccess: async () => {
+      setTenantUserForm({ email: '', name: '', role: 'admin', password: '' });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
     }
@@ -301,6 +321,52 @@ const lock = useMutation({
                   </div>
                 ))}
               </div>
+
+              <div style={styles.entitlements}>
+                <h3>Tenant users</h3>
+                <p style={styles.note}>Platform bootstrap tool for creating the first tenant admin or resetting an existing tenant user password. Existing matching email inside this tenant is updated instead of duplicated.</p>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Name</th>
+                      <th style={styles.th}>Email</th>
+                      <th style={styles.th}>Role</th>
+                      <th style={styles.th}>Active</th>
+                      <th style={styles.th}>Last login</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detailsQuery.data.users || []).map((user) => (
+                      <tr key={user.id}>
+                        <td style={styles.td}>{user.name}</td>
+                        <td style={styles.td}>{user.email}</td>
+                        <td style={styles.td}>{user.role}</td>
+                        <td style={styles.td}>{user.is_active === false ? 'No' : 'Yes'}</td>
+                        <td style={styles.td}>{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never'}</td>
+                      </tr>
+                    ))}
+                    {!(detailsQuery.data.users || []).length ? (
+                      <tr><td style={styles.td} colSpan={5}>No tenant users found.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+
+                {canUpdate ? (
+                  <div style={styles.form}>
+                    <input style={styles.input} placeholder="User email" value={tenantUserForm.email} onChange={(event) => setTenantUserForm({ ...tenantUserForm, email: event.target.value })} />
+                    <input style={styles.input} placeholder="Name" value={tenantUserForm.name} onChange={(event) => setTenantUserForm({ ...tenantUserForm, name: event.target.value })} />
+                    <select style={styles.input} value={tenantUserForm.role} onChange={(event) => setTenantUserForm({ ...tenantUserForm, role: event.target.value })}>
+                      <option value="admin">admin</option>
+                      <option value="manager">manager</option>
+                      <option value="staff">staff</option>
+                    </select>
+                    <input style={styles.input} type="password" placeholder="Password" value={tenantUserForm.password} onChange={(event) => setTenantUserForm({ ...tenantUserForm, password: event.target.value })} />
+                    <button style={styles.button} onClick={() => saveTenantUser.mutate()} disabled={saveTenantUser.isPending || !selected}>Create/reset tenant user</button>
+                  </div>
+                ) : null}
+                {saveTenantUser.error ? <div style={styles.error}>{readableError(saveTenantUser.error)}</div> : null}
+              </div>
+
 
               {canUpdate ? (
                 <div style={styles.entitlements}>
