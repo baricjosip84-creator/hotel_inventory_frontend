@@ -34,7 +34,12 @@ type TenantDetails = {
   support_sessions: { total_count: number; active_count: number };
 };
 
-const knownFeatureFlags = ['inventory', 'procurement', 'forecasting', 'automation', 'scanner', 'reports', 'support_access'];
+const planOptions = [
+  { code: 'starter', label: 'Starter', description: 'Basic tenant package' },
+  { code: 'standard', label: 'Standard', description: 'Commercial tenant package' },
+  { code: 'enterprise', label: 'Enterprise', description: 'Full tenant package with automation' }
+];
+const knownFeatureFlags = ['inventory', 'procurement', 'forecasting', 'automation', 'scanner', 'reports', 'support_access', 'requisitions', 'purchase_orders', 'sso', 'api_access', 'advanced_integrations'];
 const defaultLimitKeys = ['max_users', 'max_products', 'max_storage_locations'];
 const supportAccessLevels = ['read_only', 'inventory_support', 'procurement_support', 'emergency_admin'];
 
@@ -221,7 +226,16 @@ const lock = useMutation({
               <option>warehouse</option>
               <option>facility</option>
             </select>
-            <input style={styles.input} placeholder="Plan code" value={form.plan_code} onChange={(event) => setForm({ ...form, plan_code: event.target.value })} />
+            <select
+              style={styles.input}
+              value={form.plan_code}
+              onChange={(event) => setForm({ ...form, plan_code: event.target.value })}
+              aria-label="Tenant plan"
+            >
+              {planOptions.map((plan) => (
+                <option key={plan.code} value={plan.code}>{plan.label} ({plan.code})</option>
+              ))}
+            </select>
             <input style={styles.input} placeholder="Initial admin email" value={form.initial_admin_email} onChange={(event) => setForm({ ...form, initial_admin_email: event.target.value })} />
             <input style={styles.input} placeholder="Initial admin name" value={form.initial_admin_name} onChange={(event) => setForm({ ...form, initial_admin_name: event.target.value })} />
             <input style={styles.input} type="password" placeholder="Initial admin password" value={form.initial_admin_password} onChange={(event) => setForm({ ...form, initial_admin_password: event.target.value })} />
@@ -291,9 +305,18 @@ const lock = useMutation({
               {canUpdate ? (
                 <div style={styles.entitlements}>
                   <h3>Entitlements</h3>
-                  <label style={styles.label}>Plan code
-                    <input style={styles.input} value={entitlements.plan_code} onChange={(event) => setEntitlements({ ...entitlements, plan_code: event.target.value })} />
+                  <label style={styles.label}>Plan
+                    <select
+                      style={styles.input}
+                      value={entitlements.plan_code}
+                      onChange={(event) => setEntitlements({ ...entitlements, plan_code: event.target.value })}
+                    >
+                      {planOptions.map((plan) => (
+                        <option key={plan.code} value={plan.code}>{plan.label} ({plan.code}) · {plan.description}</option>
+                      ))}
+                    </select>
                   </label>
+                  <p style={styles.note}>Changing the plan applies backend plan defaults when you save entitlements. Enterprise enables automation by default.</p>
 
                   <div style={styles.checkboxGrid}>
                     {featureFlagKeys.map((key) => (
