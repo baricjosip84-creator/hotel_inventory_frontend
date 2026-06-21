@@ -306,6 +306,7 @@ const lock = useMutation({
       {selected ? (
         <section style={styles.panel}>
           <h2>{selectedTenantName}</h2>
+          {detailsQuery.error ? <div style={styles.error}>{readableError(detailsQuery.error)}</div> : null}
           {detailsQuery.isLoading ? 'Loading…' : detailsQuery.data ? (
             <>
               <div style={styles.grid}>
@@ -480,7 +481,7 @@ const lock = useMutation({
                 support_policy: detailsQuery.data.tenant.support_policy
               }, null, 2)}</pre>
             </>
-          ) : null}
+          ) : detailsQuery.error ? null : 'Select a tenant to load details.'}
         </section>
       ) : null}
     </div>
