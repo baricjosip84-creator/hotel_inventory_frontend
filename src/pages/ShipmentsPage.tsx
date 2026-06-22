@@ -1366,55 +1366,50 @@ export default function ShipmentsPage() {
   };
 
   const handleReceiveLine = (item: ShipmentItem) => {
+    const clickedAt = new Date().toLocaleTimeString();
+    const selectedLocation =
+      selectedScannerLocationId ||
+      item.storage_location_id ||
+      (storageLocations.length === 1 ? storageLocations[0].id : '');
+    const draft = getReceiveDraft(item);
+    const safeStorageLocationId = draft.storage_location_id || selectedLocation;
+    const ordered = toNumber(item.quantity);
+    const received = toNumber(item.received_quantity);
+    const remaining = Math.max(ordered - received, 0);
+    const draftQuantity = Number(draft.quantity_received);
+    const quantityReceived = Number.isFinite(draftQuantity) && draftQuantity > 0
+      ? Math.min(draftQuantity, remaining || draftQuantity)
+      : remaining;
+
+    setPageError(null);
+    setPageMessage(`Receive click detected at ${clickedAt}. Preparing backend request...`);
+
     if (!canReceiveShipments) {
-      setPageError('Your current role cannot receive shipments.');
+      setPageError('Receive click detected, but your current role cannot receive shipments. Log in as tenant admin or manager.');
       setPageMessage(null);
       return;
     }
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
-      setPageMessage(null);
-      return;
-    }
-
-    if (receiveShipmentMutation.isPending) {
-      setPageError('A receive request is already in progress. Wait for it to finish, then try again.');
-      setPageMessage(null);
-      return;
-    }
-
-    const draft = getReceiveDraft(item);
-    const ordered = toNumber(item.quantity);
-    const received = toNumber(item.received_quantity);
-    const remaining = Math.max(ordered - received, 0);
-    const quantityReceived = Number(draft.quantity_received);
-    const safeStorageLocationId =
-      draft.storage_location_id ||
-      selectedScannerLocationId ||
-      item.storage_location_id ||
-      (storageLocations.length === 1 ? storageLocations[0].id : '');
-
-    if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-      setPageError('Receive button clicked, but quantity received must be greater than zero.');
+      setPageError('Receive click detected, but no shipment is selected. Select PO-001 again and retry.');
       setPageMessage(null);
       return;
     }
 
     if (remaining <= 0) {
-      setPageError('Receive button clicked, but this shipment line is already fully received.');
+      setPageError('Receive click detected, but this shipment line is already fully received.');
       setPageMessage(null);
       return;
     }
 
-    if (quantityReceived > remaining) {
-      setPageError('Receive button clicked, but quantity received cannot exceed remaining quantity.');
+    if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
+      setPageError('Receive click detected, but the receive quantity is not valid. Refresh the shipment and retry.');
       setPageMessage(null);
       return;
     }
 
     if (!safeStorageLocationId) {
-      setPageError('Receive button clicked, but no storage location is selected. Choose a row storage location or set the shipment scan/default location.');
+      setPageError('Receive click detected, but no storage location is available. Set Scan Location to Main Warehouse, then retry.');
       setPageMessage(null);
       return;
     }
@@ -1424,12 +1419,12 @@ export default function ShipmentsPage() {
       [item.id]: {
         ...(current[item.id] ?? makeDefaultReceiveDraft(item)),
         ...draft,
+        quantity_received: String(quantityReceived),
         storage_location_id: safeStorageLocationId
       }
     }));
 
-    setPageError(null);
-    setPageMessage(`Receiving ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} for ${item.product_name || item.product_id}...`);
+    setPageMessage(`Sending receive request for ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} of ${item.product_name || item.product_id}...`);
 
     receiveShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
@@ -2455,11 +2450,7 @@ export default function ShipmentsPage() {
                               : {})
                           }}
                           onClick={() => handleReceiveLine(item)}
-                          disabled={
-                            receiveShipmentMutation.isPending ||
-                            remaining <= 0 ||
-                            selectedShipment.status === 'received'
-                          }
+                          disabled={remaining <= 0 || selectedShipment.status === 'received'}
                         >
                           {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
                         </button>
@@ -2583,10 +2574,7 @@ export default function ShipmentsPage() {
                                 type="button"
                                 style={styles.secondaryButton}
                                 onClick={() => handleReceiveLine(item)}
-                                disabled={
-                                  remaining <= 0 ||
-                                  selectedShipment.status === 'received'
-                                }
+                                disabled={remaining <= 0 || selectedShipment.status === 'received'}
                                 title={
                                   remaining <= 0
                                     ? 'This line is already fully received.'
