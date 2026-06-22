@@ -1439,116 +1439,6 @@ export default function ShipmentsPage() {
     });
   };
 
-  useEffect(() => {
-    const nativeForceReceiveClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const forceButton = target?.closest('[data-force-receive-native="true"]');
-
-      if (!forceButton) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const clickedAt = new Date().toLocaleTimeString();
-      setPageError(null);
-      setPageMessage(`Native force receive click detected at ${clickedAt}. Sending direct backend request...`);
-
-      window.alert('Native force receive click detected. The app will now send the receive request directly.');
-
-      void (async () => {
-        try {
-          if (!canReceiveShipments) {
-            throw new Error('Native Force Receive clicked, but your current role cannot receive shipments. Log in as tenant admin or manager.');
-          }
-
-          if (!selectedShipment) {
-            throw new Error('Native Force Receive clicked, but no shipment is selected. Open PO-001 and retry.');
-          }
-
-          const firstOpenLine = shipmentItems.find((line) => {
-            const ordered = toNumber(line.quantity);
-            const received = toNumber(line.received_quantity);
-            return Math.max(ordered - received, 0) > 0;
-          });
-
-          if (!firstOpenLine) {
-            throw new Error('Native Force Receive clicked, but no open shipment line remains. The line may already be fully received.');
-          }
-
-          const ordered = toNumber(firstOpenLine.quantity);
-          const received = toNumber(firstOpenLine.received_quantity);
-          const remaining = Math.max(ordered - received, 0);
-          const draft = getReceiveDraft(firstOpenLine);
-          const draftQuantity = Number(draft.quantity_received);
-          const quantityReceived = Number.isFinite(draftQuantity) && draftQuantity > 0
-            ? Math.min(draftQuantity, remaining || draftQuantity)
-            : remaining;
-          const storageLocationId =
-            draft.storage_location_id ||
-            selectedScannerLocationId ||
-            firstOpenLine.storage_location_id ||
-            (storageLocations.length === 1 ? storageLocations[0].id : '');
-
-          if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-            throw new Error('Native Force Receive clicked, but receive quantity is invalid.');
-          }
-
-          if (!storageLocationId) {
-            throw new Error('Native Force Receive clicked, but no storage location is available. Set Scan Location to Main Warehouse and retry.');
-          }
-
-          setPageMessage(`Native direct request sending ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} of ${firstOpenLine.product_name || firstOpenLine.product_id}...`);
-
-          await receiveShipmentLine({
-            shipmentId: selectedShipment.id,
-            version: selectedShipment.version,
-            item: {
-              product_id: firstOpenLine.product_id,
-              quantity_received: quantityReceived,
-              storage_location_id: storageLocationId,
-              discrepancy_reason: draft.discrepancy_reason.trim() || null,
-              receiving_note: draft.receiving_note.trim() || null
-            }
-          });
-
-          await queryClient.invalidateQueries({ queryKey: ['shipment-items', selectedShipment.id] });
-          await queryClient.invalidateQueries({ queryKey: ['shipments'] });
-          await queryClient.invalidateQueries({ queryKey: ['stock'] });
-          await queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
-
-          setPageError(null);
-          setPageMessage('✔ Native direct receive request completed. Check stock and stock movements.');
-        } catch (error) {
-          if (error instanceof ApiError) {
-            setPageError(error.requestId ? `${error.message} (Request ID: ${error.requestId})` : error.message);
-          } else if (error instanceof Error) {
-            setPageError(error.message);
-          } else {
-            setPageError('Native Force Receive failed before completion.');
-          }
-          setPageMessage(null);
-        }
-      })();
-    };
-
-    document.addEventListener('click', nativeForceReceiveClick, true);
-
-    return () => {
-      document.removeEventListener('click', nativeForceReceiveClick, true);
-    };
-  }, [
-    canReceiveShipments,
-    getReceiveDraft,
-    queryClient,
-    receiveDrafts,
-    selectedScannerLocationId,
-    selectedShipment,
-    shipmentItems,
-    storageLocations
-  ]);
-
   const handleFinalizeShipment = () => {
     if (!canFinalizeShipments) {
       setPageError('Your current role cannot finalize shipments. Shipment finalization is restricted to manager and admin roles by the existing backend.');
@@ -2002,10 +1892,6 @@ export default function ShipmentsPage() {
                 </div>
               </div>
 
-              <div style={styles.receiveDiagnosticBanner}>
-                RECEIVE TEST BUILD 43 NATIVE CLICK ACTIVE — if you do not see this yellow box on the Shipments page, Vercel is still serving an older frontend bundle.
-              </div>
-
               {canManageShipments ? (
                 <div style={styles.selectedActionRow}>
                   <button
@@ -2380,41 +2266,6 @@ export default function ShipmentsPage() {
               {incompleteShipmentLinesWithoutReason.length > 0 ? (
                 <div style={styles.finalizeBlockedBanner}>
                   Finalization blocked: {incompleteShipmentLinesWithoutReason.length} incomplete line(s) do not have a saved discrepancy reason.
-                </div>
-              ) : null}
-
-              {shipmentItems.length > 0 ? (
-                <div style={styles.forceReceivePanel}>
-                  <strong>Receive emergency test control</strong>
-                  <span>
-                    This button uses the first not-yet-received line and the selected/default location. It is intentionally never disabled so a click cannot silently disappear.
-                  </span>
-                  <button
-                    type="button"
-                    style={styles.forceReceiveButton}
-                    data-force-receive-native="true"
-                    onMouseDown={() => {
-                      setPageError(null);
-                      setPageMessage('Mouse down detected on FORCE RECEIVE button. Click release should trigger native handler next.');
-                    }}
-                    onClick={() => {
-                      const firstOpenLine = shipmentItems.find((line) => {
-                        const ordered = toNumber(line.quantity);
-                        const received = toNumber(line.received_quantity);
-                        return Math.max(ordered - received, 0) > 0;
-                      });
-
-                      if (!firstOpenLine) {
-                        setPageError('Force Receive clicked, but no open shipment line remains. The line may already be fully received.');
-                        setPageMessage(null);
-                        return;
-                      }
-
-                      handleReceiveLine(firstOpenLine);
-                    }}
-                  >
-                    FORCE RECEIVE FIRST OPEN LINE
-                  </button>
                 </div>
               ) : null}
 
@@ -2795,35 +2646,6 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     marginTop: 12,
     marginBottom: 16
-  },
-  receiveDiagnosticBanner: {
-    border: '2px solid #facc15',
-    background: '#fef9c3',
-    color: '#713f12',
-    padding: '12px 14px',
-    borderRadius: 10,
-    fontWeight: 800,
-    marginBottom: 14
-  },
-  forceReceivePanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    padding: 14,
-    border: '2px solid #f97316',
-    background: '#fff7ed',
-    borderRadius: 12,
-    marginBottom: 16
-  },
-  forceReceiveButton: {
-    border: 'none',
-    borderRadius: 10,
-    padding: '12px 16px',
-    background: '#ea580c',
-    color: '#ffffff',
-    fontWeight: 900,
-    cursor: 'pointer',
-    alignSelf: 'flex-start'
   },
   inlineButtonRow: {
     display: 'flex',
