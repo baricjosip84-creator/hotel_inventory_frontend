@@ -581,6 +581,22 @@ export default function StockPage() {
   const activeMutation =
     consumeMutation.isPending || countMutation.isPending || adjustMutation.isPending;
 
+  const currentActionAllowed =
+    draft.action === 'consume'
+      ? canConsume
+      : draft.action === 'count'
+        ? canCount
+        : canAdjust;
+
+  const currentActionBlockedMessage =
+    draft.action === 'consume'
+      ? 'Your current role cannot consume stock from the existing backend access model.'
+      : draft.action === 'count'
+        ? 'Your current role cannot post physical counts from the existing backend access model.'
+        : 'Your current role cannot apply manual adjustments from the existing backend access model.';
+
+  const currentActionDisabled = activeMutation || !selectedRow || !currentActionAllowed;
+
   const nextQuantityPreview = useMemo(() => {
     if (!selectedRow) {
       return null;
@@ -656,6 +672,11 @@ export default function StockPage() {
 
     if (!selectedRow) {
       setOperationError('Select a stock row before posting a stock action.');
+      return;
+    }
+
+    if (!currentActionAllowed) {
+      setOperationError(currentActionBlockedMessage);
       return;
     }
 
@@ -1241,19 +1262,23 @@ export default function StockPage() {
                   <div className="app-actions" style={styles.actionFooter}>
                     <button
                       type="button"
-                      style={styles.primaryButton}
-                      disabled={
-                        activeMutation ||
-                        !selectedRow ||
-                        (draft.action === 'consume' && !canConsume) ||
-                        (draft.action === 'count' && !canCount) ||
-                        (draft.action === 'adjust' && !canAdjust)
+                      style={
+                        currentActionDisabled
+                          ? styles.primaryButtonDisabled
+                          : styles.primaryButton
                       }
+                      disabled={currentActionDisabled}
+                      aria-disabled={currentActionDisabled}
+                      title={!currentActionAllowed ? currentActionBlockedMessage : undefined}
                       onClick={() => {
                         void submitAction();
                       }}
                     >
-                      {activeMutation ? 'Submitting...' : getActionLabel(draft.action)}
+                      {activeMutation
+                        ? 'Submitting...'
+                        : !currentActionAllowed
+                          ? `${getActionLabel(draft.action)} blocked`
+                          : getActionLabel(draft.action)}
                     </button>
                   </div>
                 </div>
@@ -1999,6 +2024,18 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer'
+  },
+  primaryButtonDisabled: {
+    minHeight: '48px',
+    borderRadius: '12px',
+    border: '1px solid #d1d5db',
+    background: '#e5e7eb',
+    color: '#6b7280',
+    padding: '0 18px',
+    fontSize: '14px',
+    fontWeight: 700,
+    cursor: 'not-allowed',
+    opacity: 0.85
   },
   readinessList: {
     display: 'grid',
