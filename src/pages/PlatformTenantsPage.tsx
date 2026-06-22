@@ -27,7 +27,8 @@ type TenantRow = {
   plan_code?: string;
 };
 type LimitStatus = { used: number; limit: number | null };
-type TenantUser = { id: string; email: string; name: string; role: 'admin' | 'manager' | 'staff'; is_active?: boolean; created_at?: string; last_login_at?: string | null };
+type TenantRole = 'admin' | 'manager' | 'staff';
+type TenantUser = { id: string; email: string; name: string; role: TenantRole; is_active?: boolean; created_at?: string; last_login_at?: string | null };
 type TenantDetails = {
   tenant: TenantRow & { feature_flags?: FeatureFlags; limits?: TenantLimits; support_policy?: SupportPolicy };
   usage: Record<string, number>;
@@ -74,7 +75,7 @@ export default function PlatformTenantsPage() {
   const [tenantUserForm, setTenantUserForm] = useState({
     email: '',
     name: '',
-    role: 'admin',
+    role: 'admin' as TenantRole,
     password: ''
   });
   const [supportPolicy, setSupportPolicy] = useState<SupportPolicy>({
@@ -179,6 +180,36 @@ export default function PlatformTenantsPage() {
     }
   });
 
+  const resetTenantUserPassword = useMutation({
+    mutationFn: ({ userId, password }: { userId: string; password: string }) => platformApiRequest(`/platform/tenants/${selected}/users/${userId}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password })
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
+    }
+  });
+
+  const setTenantUserStatus = useMutation({
+    mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) => platformApiRequest(`/platform/tenants/${selected}/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: isActive })
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
+    }
+  });
+
+  const deleteTenantUser = useMutation({
+    mutationFn: (userId: string) => platformApiRequest(`/platform/tenants/${selected}/users/${userId}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
+    }
+  });
+
   const saveEntitlements = useMutation({
     mutationFn: () => platformApiRequest(`/platform/tenants/${selected}/entitlements`, {
       method: 'PATCH',
@@ -226,6 +257,26 @@ const lock = useMutation({
   });
 
   const selectedTenantName = detailsQuery.data?.tenant.name || 'Tenant detail';
+  const tenantUsers = detailsQuery.data?.users || [];
+  const tenantUserActionPending = resetTenantUserPassword.isPending || setTenantUserStatus.isPending || deleteTenantUser.isPending;
+
+  const handleResetTenantUserPassword = (user: TenantUser) => {
+    const password = window.prompt(`Enter a new password for ${user.email}. Minimum 10 characters.`);
+    if (!password) return;
+    resetTenantUserPassword.mutate({ userId: user.id, password });
+  };
+
+  const handleToggleTenantUserStatus = (user: TenantUser) => {
+    const nextActive = user.is_active === false;
+    const action = nextActive ? 'enable' : 'disable';
+    if (!window.confirm(`Are you sure you want to ${action} ${user.email}?`)) return;
+    setTenantUserStatus.mutate({ userId: user.id, isActive: nextActive });
+  };
+
+  const handleDeleteTenantUser = (user: TenantUser) => {
+    if (!window.confirm(`Delete tenant user ${user.email}? This cannot be undone.`)) return;
+    deleteTenantUser.mutate(user.id);
+  };
 
   return (
     <div style={styles.page}>
@@ -325,47 +376,64 @@ const lock = useMutation({
 
               <div style={styles.entitlements}>
                 <h3>Tenant users</h3>
-                <p style={styles.note}>Platform bootstrap tool for creating the first tenant admin or resetting an existing tenant user password. Existing matching email inside this tenant is updated instead of duplicated.</p>
+                <p style={styles.note}>Platform tenant-user administration. Create users, reset passwords, enable/disable accounts, or delete users without leaving the platform area.</p>
                 <table style={styles.table}>
                   <thead>
                     <tr>
                       <th style={styles.th}>Name</th>
                       <th style={styles.th}>Email</th>
                       <th style={styles.th}>Role</th>
-                      <th style={styles.th}>Active</th>
+                      <th style={styles.th}>Status</th>
                       <th style={styles.th}>Last login</th>
+                      {canUpdate ? <th style={styles.th}>Actions</th> : null}
                     </tr>
                   </thead>
                   <tbody>
-                    {(detailsQuery.data.users || []).map((user) => (
+                    {tenantUsers.map((user) => (
                       <tr key={user.id}>
                         <td style={styles.td}>{user.name}</td>
                         <td style={styles.td}>{user.email}</td>
                         <td style={styles.td}>{user.role}</td>
-                        <td style={styles.td}>{user.is_active === false ? 'No' : 'Yes'}</td>
+                        <td style={styles.td}>{user.is_active === false ? <span style={styles.inactiveBadge}>Disabled</span> : <span style={styles.activeBadge}>Active</span>}</td>
                         <td style={styles.td}>{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never'}</td>
+                        {canUpdate ? (
+                          <td style={styles.td}>
+                            <div style={styles.actionRow}>
+                              <button style={styles.button} onClick={() => handleResetTenantUserPassword(user)} disabled={tenantUserActionPending}>Reset password</button>
+                              <button style={styles.button} onClick={() => handleToggleTenantUserStatus(user)} disabled={tenantUserActionPending}>{user.is_active === false ? 'Enable' : 'Disable'}</button>
+                              <button style={styles.dangerButton} onClick={() => handleDeleteTenantUser(user)} disabled={tenantUserActionPending}>Delete</button>
+                            </div>
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
-                    {!(detailsQuery.data.users || []).length ? (
-                      <tr><td style={styles.td} colSpan={5}>No tenant users found.</td></tr>
+                    {!tenantUsers.length ? (
+                      <tr><td style={styles.td} colSpan={canUpdate ? 6 : 5}>No tenant users found.</td></tr>
                     ) : null}
                   </tbody>
                 </table>
 
                 {canUpdate ? (
-                  <div style={styles.form}>
-                    <input style={styles.input} placeholder="User email" value={tenantUserForm.email} onChange={(event) => setTenantUserForm({ ...tenantUserForm, email: event.target.value })} />
-                    <input style={styles.input} placeholder="Name" value={tenantUserForm.name} onChange={(event) => setTenantUserForm({ ...tenantUserForm, name: event.target.value })} />
-                    <select style={styles.input} value={tenantUserForm.role} onChange={(event) => setTenantUserForm({ ...tenantUserForm, role: event.target.value })}>
-                      <option value="admin">admin</option>
-                      <option value="manager">manager</option>
-                      <option value="staff">staff</option>
-                    </select>
-                    <input style={styles.input} type="password" placeholder="Password" value={tenantUserForm.password} onChange={(event) => setTenantUserForm({ ...tenantUserForm, password: event.target.value })} />
-                    <button style={styles.button} onClick={() => saveTenantUser.mutate()} disabled={saveTenantUser.isPending || !selected}>Create/reset tenant user</button>
+                  <div style={styles.adminBox}>
+                    <h4 style={styles.sectionTitle}>Create tenant user</h4>
+                    <p style={styles.note}>Use this to create a new tenant login. If the email already exists inside this tenant, the same form updates that user's name, role, password, and re-enables the account.</p>
+                    <div style={styles.form}>
+                      <input style={styles.input} placeholder="User email" value={tenantUserForm.email} onChange={(event) => setTenantUserForm({ ...tenantUserForm, email: event.target.value })} />
+                      <input style={styles.input} placeholder="Name" value={tenantUserForm.name} onChange={(event) => setTenantUserForm({ ...tenantUserForm, name: event.target.value })} />
+                      <select style={styles.input} value={tenantUserForm.role} onChange={(event) => setTenantUserForm({ ...tenantUserForm, role: event.target.value as TenantRole })}>
+                        <option value="admin">admin</option>
+                        <option value="manager">manager</option>
+                        <option value="staff">staff</option>
+                      </select>
+                      <input style={styles.input} type="password" placeholder="Temporary password" value={tenantUserForm.password} onChange={(event) => setTenantUserForm({ ...tenantUserForm, password: event.target.value })} />
+                      <button style={styles.button} onClick={() => saveTenantUser.mutate()} disabled={saveTenantUser.isPending || !selected}>Create tenant user</button>
+                    </div>
                   </div>
                 ) : null}
                 {saveTenantUser.error ? <div style={styles.error}>{readableError(saveTenantUser.error)}</div> : null}
+                {resetTenantUserPassword.error ? <div style={styles.error}>{readableError(resetTenantUserPassword.error)}</div> : null}
+                {setTenantUserStatus.error ? <div style={styles.error}>{readableError(setTenantUserStatus.error)}</div> : null}
+                {deleteTenantUser.error ? <div style={styles.error}>{readableError(deleteTenantUser.error)}</div> : null}
               </div>
 
 
@@ -496,6 +564,7 @@ const styles: Record<string, CSSProperties> = {
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 },
   input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
   button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
+  dangerButton: { padding: '8px 10px', borderRadius: 10, border: '1px solid #fecaca', background: '#fee2e2', color: '#991b1b', cursor: 'pointer' },
   linkButton: { background: 'none', border: 0, color: '#2563eb', cursor: 'pointer', padding: 0 },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: 10, color: '#6b7280', fontSize: 13 },
@@ -508,5 +577,10 @@ const styles: Record<string, CSSProperties> = {
   label: { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 600 },
   checkboxGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 },
   checkboxLabel: { display: 'flex', gap: 8, alignItems: 'center', background: '#f9fafb', borderRadius: 10, padding: 10 },
-  note: { color: '#6b7280', marginTop: 0 }
+  note: { color: '#6b7280', marginTop: 0 },
+  actionRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  adminBox: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12 },
+  sectionTitle: { margin: '0 0 8px' },
+  activeBadge: { display: 'inline-block', padding: '4px 8px', borderRadius: 999, background: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: 12 },
+  inactiveBadge: { display: 'inline-block', padding: '4px 8px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 700, fontSize: 12 }
 };
