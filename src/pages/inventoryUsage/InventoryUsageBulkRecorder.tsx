@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageBulkLine, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageTemplate } from './inventoryUsageTypes';
+import { showTenantActionError, showTenantActionSuccess } from '../../lib/actionFeedback';
 
 const createBlankLine = (): InventoryUsageBulkLine => ({
   product_id: '',
@@ -202,18 +203,19 @@ export function InventoryUsageBulkRecorder({
     const payload = buildBulkPayload();
 
     if (!payload.items.length) {
-      window.alert('Add at least one valid usage line with product ID, location ID, and quantity.');
+      showTenantActionError('Add at least one valid usage line with product ID, location ID, and quantity.');
       return;
     }
 
     onPreviewBulkUsage?.(payload);
+    showTenantActionSuccess('Bulk usage preview prepared successfully.');
   };
 
   const handleSubmit = () => {
     const payload = buildBulkPayload();
 
     if (!payload.items.length) {
-      window.alert('Add at least one valid usage line with product ID, location ID, and quantity.');
+      showTenantActionError('Add at least one valid usage line with product ID, location ID, and quantity.');
       return;
     }
 

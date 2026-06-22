@@ -7,6 +7,7 @@ import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../l
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem, SupplierItem } from '../types/inventory';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 
 type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | string;
 
@@ -1480,8 +1481,10 @@ export default function PurchaseOrdersPage() {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setFormError(null);
+      showTenantActionSuccess('Current view link copied successfully.');
     } catch {
       setFormError('Could not copy link. Copy the browser address bar instead.');
+      showTenantActionError('Could not copy link. Copy the browser address bar instead.');
     }
   };
 
@@ -2477,7 +2480,7 @@ export default function PurchaseOrdersPage() {
                     disabled={actionMutation.isPending}
                     onClick={() => {
                       if (!closeReason.trim()) {
-                        window.alert('Close reason is required.');
+                        showTenantActionError('Close reason is required.');
                         return;
                       }
                       if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) {

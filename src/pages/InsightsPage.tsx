@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 
 type DepletionRiskResponse = {
   generated_at: string;
@@ -873,10 +874,11 @@ export default function InsightsPage() {
 
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(viewUrl);
+      showTenantActionSuccess('Supplier trust view link copied successfully.');
       return;
     }
 
-    window.prompt('Copy Supplier Trust view link', viewUrl);
+    showTenantActionError('Clipboard is not available. Copy the link from the address bar instead.');
   }
 
   function exportSupplierTrustCsv() {

@@ -4,6 +4,7 @@ import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { formatDateTime, formatUsageReason, toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness } from './inventoryUsageTypes';
+import { showTenantActionError } from '../../lib/actionFeedback';
 
 const createBlankLine = (): InventoryUsageTemplateLine => ({
   product_id: '',
@@ -98,12 +99,12 @@ export function InventoryUsageTemplatesPanel({
     const items = lines.filter((line) => line.product_id.trim() && line.storage_location_id.trim() && Number(line.quantity) > 0);
 
     if (!name.trim()) {
-      window.alert('Template name is required.');
+      showTenantActionError('Template name is required.');
       return;
     }
 
     if (!items.length) {
-      window.alert('Add at least one valid template line.');
+      showTenantActionError('Add at least one valid template line.');
       return;
     }
 

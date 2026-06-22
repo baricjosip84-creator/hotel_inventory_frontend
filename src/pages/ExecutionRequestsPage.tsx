@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,
@@ -498,8 +499,9 @@ export default function ExecutionRequestsPage() {
     if (!selected?.id) return;
     try {
       await navigator.clipboard.writeText(selected.id);
+      showTenantActionSuccess('Execution request ID copied successfully.');
     } catch {
-      window.prompt('Copy request ID', selected.id);
+      showTenantActionError('Could not copy request ID. Copy it from the detail panel instead.');
     }
   };
 

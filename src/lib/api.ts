@@ -5,6 +5,7 @@ import {
   isAccessTokenExpired,
   saveAuthTokens
 } from './auth';
+import { TENANT_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
 
 /**
  * IMPORTANT
@@ -78,6 +79,48 @@ type ApiFetchResult = {
   response: Response;
   accessTokenUsed: string | null;
 };
+
+
+function tenantMutationActionLabel(path: string, method: string): string {
+  const normalizedPath = path.toLowerCase();
+  const normalizedMethod = method.toUpperCase();
+
+  if (normalizedPath.includes('/suppliers')) return 'Supplier';
+  if (normalizedPath.includes('/products')) return 'Product';
+  if (normalizedPath.includes('/users')) return 'User';
+  if (normalizedPath.includes('/storage-locations')) return 'Storage location';
+  if (normalizedPath.includes('/stock-movements')) return 'Stock movement';
+  if (normalizedPath.includes('/stock')) return 'Stock';
+  if (normalizedPath.includes('/shipments')) return 'Shipment';
+  if (normalizedPath.includes('/inventory-usage')) return 'Usage record';
+  if (normalizedPath.includes('/requisitions')) return 'Requisition';
+  if (normalizedPath.includes('/purchase-orders')) return 'Purchase order';
+  if (normalizedPath.includes('/alerts')) return 'Alert';
+  if (normalizedPath.includes('/automation-schedules')) return 'Automation schedule';
+  if (normalizedPath.includes('/execution-requests')) return 'Execution request';
+  if (normalizedPath.includes('/reports')) return 'Report action';
+  if (normalizedPath.includes('/admin/alerts')) return 'Admin alert action';
+
+  if (normalizedMethod === 'POST') return 'Item';
+  if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return 'Changes';
+  if (normalizedMethod === 'DELETE') return 'Item';
+
+  return 'Request';
+}
+
+function tenantMutationSuccessMessage(path: string, method: string): string {
+  const label = tenantMutationActionLabel(path, method);
+  const normalizedMethod = method.toUpperCase();
+
+  if (normalizedMethod === 'POST') return `${label} created successfully.`;
+  if (normalizedMethod === 'DELETE') return `${label} deleted successfully.`;
+  return `${label} saved successfully.`;
+}
+
+function dispatchTenantMutationFeedback(detail: { type: 'success' | 'error'; message: string; requestId?: string }): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, { detail }));
+}
 
 type ApiErrorResponse = {
   error?: {
@@ -440,6 +483,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
   try {
     ({ response } = await performRequest(path, { method: 'GET' }));
   } catch (error: any) {
+    dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while downloading file' });
     throw new ApiError(error?.message || 'Network error while downloading file', 0);
   }
 
@@ -450,6 +494,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
       try {
         ({ response } = await performRequest(path, { method: 'GET' }));
       } catch (error: any) {
+        dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while downloading file' });
         throw new ApiError(error?.message || 'Network error while downloading file', 0);
       }
     }
@@ -469,6 +514,11 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
         redirectToLoginAfterExpiredSession();
       }
 
+      dispatchTenantMutationFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Download failed.',
+        requestId: error instanceof ApiError ? error.requestId : undefined
+      });
       throw error;
     }
   }
@@ -498,6 +548,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
     }, 0);
   }
 
+  dispatchTenantMutationFeedback({ type: 'success', message: 'Download started successfully.' });
   return readDownloadMetadata(response);
 }
 
@@ -548,6 +599,8 @@ export async function apiRequest<T>(
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
   const requestOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
+  const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
+  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest;
   const currentAccessToken = getAccessToken();
 
   /*
@@ -564,6 +617,9 @@ export async function apiRequest<T>(
   try {
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: any) {
+    if (shouldShowMutationFeedback) {
+      dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+    }
     throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
 
@@ -579,13 +635,20 @@ export async function apiRequest<T>(
       try {
         ({ response } = await performRequest(path, requestOptions));
       } catch (error: any) {
+        if (shouldShowMutationFeedback) {
+          dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+        }
         throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
     }
   }
 
   try {
-    return await parseResponse<T>(response);
+    const result = await parseResponse<T>(response);
+    if (shouldShowMutationFeedback) {
+      dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method) });
+    }
+    return result;
   } catch (error) {
     if (
       error instanceof ApiError &&
@@ -595,6 +658,14 @@ export async function apiRequest<T>(
     ) {
       clearAuthTokens();
       redirectToLoginAfterExpiredSession();
+    }
+
+    if (shouldShowMutationFeedback) {
+      dispatchTenantMutationFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Action failed.',
+        requestId: error instanceof ApiError ? error.requestId : undefined
+      });
     }
 
     throw error;

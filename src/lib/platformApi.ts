@@ -1,4 +1,5 @@
 import type { AuthTokens } from '../types/auth';
+import { PLATFORM_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
 import { ApiError } from './api';
 import {
   clearPlatformAuthTokens,
@@ -12,7 +13,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 let refreshPromise: Promise<string | null> | null = null;
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const PLATFORM_MUTATION_FEEDBACK_EVENT = 'platform-mutation-feedback';
 
 type ApiErrorResponse = {
   error?: {
@@ -336,6 +336,7 @@ export async function platformDownload(path: string, fallbackFilename: string): 
   try {
     response = await performRequest(path);
   } catch (error: any) {
+    dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
     throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
 
@@ -345,13 +346,23 @@ export async function platformDownload(path: string, fallbackFilename: string): 
       try {
         response = await performRequest(path);
       } catch (error: any) {
+        dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
         throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
     }
   }
 
   if (!response.ok) {
-    await parseResponse<never>(response);
+    try {
+      await parseResponse<never>(response);
+    } catch (error) {
+      dispatchPlatformMutationFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Download failed.',
+        requestId: error instanceof ApiError ? error.requestId : undefined
+      });
+      throw error;
+    }
     return;
   }
 
@@ -367,4 +378,5 @@ export async function platformDownload(path: string, fallbackFilename: string): 
   anchor.click();
   anchor.remove();
   window.URL.revokeObjectURL(url);
+  dispatchPlatformMutationFeedback({ type: 'success', message: 'Download started successfully.' });
 }
