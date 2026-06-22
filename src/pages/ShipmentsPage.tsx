@@ -1439,6 +1439,116 @@ export default function ShipmentsPage() {
     });
   };
 
+  useEffect(() => {
+    const nativeForceReceiveClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const forceButton = target?.closest('[data-force-receive-native="true"]');
+
+      if (!forceButton) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const clickedAt = new Date().toLocaleTimeString();
+      setPageError(null);
+      setPageMessage(`Native force receive click detected at ${clickedAt}. Sending direct backend request...`);
+
+      window.alert('Native force receive click detected. The app will now send the receive request directly.');
+
+      void (async () => {
+        try {
+          if (!canReceiveShipments) {
+            throw new Error('Native Force Receive clicked, but your current role cannot receive shipments. Log in as tenant admin or manager.');
+          }
+
+          if (!selectedShipment) {
+            throw new Error('Native Force Receive clicked, but no shipment is selected. Open PO-001 and retry.');
+          }
+
+          const firstOpenLine = shipmentItems.find((line) => {
+            const ordered = toNumber(line.quantity);
+            const received = toNumber(line.received_quantity);
+            return Math.max(ordered - received, 0) > 0;
+          });
+
+          if (!firstOpenLine) {
+            throw new Error('Native Force Receive clicked, but no open shipment line remains. The line may already be fully received.');
+          }
+
+          const ordered = toNumber(firstOpenLine.quantity);
+          const received = toNumber(firstOpenLine.received_quantity);
+          const remaining = Math.max(ordered - received, 0);
+          const draft = getReceiveDraft(firstOpenLine);
+          const draftQuantity = Number(draft.quantity_received);
+          const quantityReceived = Number.isFinite(draftQuantity) && draftQuantity > 0
+            ? Math.min(draftQuantity, remaining || draftQuantity)
+            : remaining;
+          const storageLocationId =
+            draft.storage_location_id ||
+            selectedScannerLocationId ||
+            firstOpenLine.storage_location_id ||
+            (storageLocations.length === 1 ? storageLocations[0].id : '');
+
+          if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
+            throw new Error('Native Force Receive clicked, but receive quantity is invalid.');
+          }
+
+          if (!storageLocationId) {
+            throw new Error('Native Force Receive clicked, but no storage location is available. Set Scan Location to Main Warehouse and retry.');
+          }
+
+          setPageMessage(`Native direct request sending ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} of ${firstOpenLine.product_name || firstOpenLine.product_id}...`);
+
+          await receiveShipmentLine({
+            shipmentId: selectedShipment.id,
+            version: selectedShipment.version,
+            item: {
+              product_id: firstOpenLine.product_id,
+              quantity_received: quantityReceived,
+              storage_location_id: storageLocationId,
+              discrepancy_reason: draft.discrepancy_reason.trim() || null,
+              receiving_note: draft.receiving_note.trim() || null
+            }
+          });
+
+          await queryClient.invalidateQueries({ queryKey: ['shipment-items', selectedShipment.id] });
+          await queryClient.invalidateQueries({ queryKey: ['shipments'] });
+          await queryClient.invalidateQueries({ queryKey: ['stock'] });
+          await queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+
+          setPageError(null);
+          setPageMessage('✔ Native direct receive request completed. Check stock and stock movements.');
+        } catch (error) {
+          if (error instanceof ApiError) {
+            setPageError(error.requestId ? `${error.message} (Request ID: ${error.requestId})` : error.message);
+          } else if (error instanceof Error) {
+            setPageError(error.message);
+          } else {
+            setPageError('Native Force Receive failed before completion.');
+          }
+          setPageMessage(null);
+        }
+      })();
+    };
+
+    document.addEventListener('click', nativeForceReceiveClick, true);
+
+    return () => {
+      document.removeEventListener('click', nativeForceReceiveClick, true);
+    };
+  }, [
+    canReceiveShipments,
+    getReceiveDraft,
+    queryClient,
+    receiveDrafts,
+    selectedScannerLocationId,
+    selectedShipment,
+    shipmentItems,
+    storageLocations
+  ]);
+
   const handleFinalizeShipment = () => {
     if (!canFinalizeShipments) {
       setPageError('Your current role cannot finalize shipments. Shipment finalization is restricted to manager and admin roles by the existing backend.');
@@ -1893,7 +2003,7 @@ export default function ShipmentsPage() {
               </div>
 
               <div style={styles.receiveDiagnosticBanner}>
-                RECEIVE TEST BUILD 42 ACTIVE — if you do not see this yellow box on the Shipments page, Vercel is still serving an older frontend bundle.
+                RECEIVE TEST BUILD 43 NATIVE CLICK ACTIVE — if you do not see this yellow box on the Shipments page, Vercel is still serving an older frontend bundle.
               </div>
 
               {canManageShipments ? (
@@ -2282,6 +2392,11 @@ export default function ShipmentsPage() {
                   <button
                     type="button"
                     style={styles.forceReceiveButton}
+                    data-force-receive-native="true"
+                    onMouseDown={() => {
+                      setPageError(null);
+                      setPageMessage('Mouse down detected on FORCE RECEIVE button. Click release should trigger native handler next.');
+                    }}
                     onClick={() => {
                       const firstOpenLine = shipmentItems.find((line) => {
                         const ordered = toNumber(line.quantity);
