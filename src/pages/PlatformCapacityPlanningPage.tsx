@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type PlatformUser = { id: string; email: string };
 type Dependency = { id: string; name: string; status?: string };
@@ -182,7 +183,7 @@ export default function PlatformCapacityPlanningPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.panel}>
+        <section id="platform-capacity-planning-form" style={styles.panel}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit capacity resource' : 'Add capacity resource'}</h2>
           <div style={styles.grid3}>
             <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Resource name" style={styles.input} />
@@ -223,7 +224,7 @@ export default function PlatformCapacityPlanningPage() {
                     <td style={styles.td}>{resource.owner_email || '—'}</td>
                     <td style={styles.td}>{dateTime(resource.projected_exhaustion_at)}<br /><span style={styles.muted}>Updated {dateTime(resource.updated_at)}</span></td>
                     <td style={styles.td}><strong>Scaling:</strong> {resource.scaling_plan || '—'}<br /><strong>Notes:</strong> {resource.notes || '—'}</td>
-                    <td style={styles.td}>{canWrite ? <button type="button" onClick={() => { setEditingId(resource.id); setForm(toForm(resource)); }} style={styles.secondaryButton}>Edit</button> : null}{canWrite && resource.status !== 'archived' ? <button type="button" onClick={() => archive.mutate(resource.id)} style={styles.secondaryButton}>Archive</button> : null}</td>
+                    <td style={styles.td}>{canWrite ? <button type="button" onClick={() => { setEditingId(resource.id); setForm(toForm(resource)); scrollToFormSection('platform-capacity-planning-form'); }} style={styles.secondaryButton}>Edit</button> : null}{canWrite && resource.status !== 'archived' ? <button type="button" onClick={() => archive.mutate(resource.id)} style={styles.secondaryButton}>Archive</button> : null}</td>
                   </tr>
                 );
               })}

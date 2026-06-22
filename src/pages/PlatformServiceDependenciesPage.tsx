@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type PlatformUser = { id: string; email: string };
 type Vendor = { id: string; name: string };
@@ -154,7 +155,7 @@ export default function PlatformServiceDependenciesPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.card}>
+        <section id="platform-service-dependencies-form" style={styles.card}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit dependency' : 'Add dependency'}</h2>
           <div style={styles.grid4}>
             <label style={styles.label}>Name<input style={styles.input} value={form.name} onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))} /></label>
@@ -196,7 +197,7 @@ export default function PlatformServiceDependenciesPage() {
                   <td>{row.status_page_url ? <a href={row.status_page_url} target="_blank" rel="noreferrer">status</a> : '—'} {row.escalation_url ? <a href={row.escalation_url} target="_blank" rel="noreferrer"> escalate</a> : ''}</td>
                   <td><span style={styles.muted}>{row.check_notes || '—'}</span></td>
                   <td>{canWrite ? <div style={styles.rowActions}>
-                    <button style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm(toForm(row)); }}>Edit</button>
+                    <button style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm(toForm(row)); scrollToFormSection('platform-service-dependencies-form'); }}>Edit</button>
                     <button style={styles.smallButton} disabled={markChecked.isPending} onClick={() => markChecked.mutate(row)}>Mark checked</button>
                     {!row.archived_at ? <button style={styles.dangerButton} disabled={archive.isPending} onClick={() => archive.mutate(row.id)}>Archive</button> : null}
                   </div> : '—'}</td>

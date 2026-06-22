@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type RetentionRow = {
   tenant_id: string;
@@ -64,6 +65,7 @@ export default function PlatformDataRetentionPage() {
 
   const startEdit = (row: RetentionRow) => {
     setEditing(row);
+    scrollToFormSection('platform-data-retention-form');
     setForm({
       retention_policy: row.retention_policy || 'standard',
       retain_until: row.retain_until ? row.retain_until.slice(0, 10) : '',
@@ -166,7 +168,7 @@ export default function PlatformDataRetentionPage() {
       </section>
 
       {editing ? (
-        <section style={cardStyle}>
+        <section id="platform-data-retention-form" style={cardStyle}>
           <h2>Edit retention: {editing.tenant_name}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
             <label>Policy<select value={form.retention_policy} onChange={(e) => setForm((f) => ({ ...f, retention_policy: e.target.value }))} style={inputStyle}>{policies.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>

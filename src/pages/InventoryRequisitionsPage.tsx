@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem } from '../types/inventory';
 
 type StorageLocationOption = {
@@ -1968,6 +1969,7 @@ export default function InventoryRequisitionsPage() {
     if (!selected || selected.status !== 'draft') return;
     setForm(formFromRequisition(selected));
     setEditingDraftId(selected.id);
+    scrollToFormSection('inventory-requisition-form');
   };
 
   const cancelDraftEditing = () => {
@@ -2787,7 +2789,7 @@ export default function InventoryRequisitionsPage() {
       </section>
 
       <section style={styles.grid}>
-        <form style={styles.card} onSubmit={handleSaveDraft}>
+        <form id="inventory-requisition-form" style={styles.card} onSubmit={handleSaveDraft}>
           <div style={styles.lineHeader}>
             <h3 style={styles.sectionTitle}>{editingDraftId ? 'Edit draft request' : 'Create request'}</h3>
             {editingDraftId && <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>Cancel edit</button>}

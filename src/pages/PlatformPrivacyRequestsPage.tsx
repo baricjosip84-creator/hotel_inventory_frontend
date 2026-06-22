@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string };
 type PlatformUser = { id: string; email: string; name?: string | null };
@@ -95,6 +96,7 @@ export default function PlatformPrivacyRequestsPage() {
 
   const startEdit = (row: PrivacyRequest) => {
     setEditingId(row.id);
+    scrollToFormSection('platform-privacy-requests-form');
     setForm({ tenant_id: row.tenant_id || '', request_type: row.request_type, status: row.status, priority: row.priority, requester_name: row.requester_name || '', requester_email: row.requester_email, subject_identifier: row.subject_identifier || '', summary: row.summary, due_at: row.due_at ? row.due_at.slice(0, 16) : '', assigned_platform_user_id: row.assigned_platform_user_id || '' });
   };
 
@@ -114,7 +116,7 @@ export default function PlatformPrivacyRequestsPage() {
         <div style={styles.metric}><strong>{summary.data?.summary.high_priority_open ?? 0}</strong><span>High priority</span></div>
       </section>
 
-      <section style={styles.card}>
+      <section id="platform-privacy-requests-form" style={styles.card}>
         <h2 style={styles.cardTitle}>{editingId ? 'Edit privacy request' : 'Create privacy request'}</h2>
         <div style={styles.formGrid}>
           <select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>

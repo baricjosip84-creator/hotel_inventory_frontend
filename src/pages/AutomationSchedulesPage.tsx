@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, type TenantFeatureEntitlementRow } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerRunOnceResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
 
 type StatusFilter = '' | AutomationSchedule['status'];
@@ -2204,7 +2205,7 @@ export default function AutomationSchedulesPage() {
           </div>
 
           {editForm ? (
-            <div style={styles.editBox}>
+            <div id="automation-schedule-edit-form" style={styles.editBox}>
               <h4 style={styles.smallTitle}>Edit schedule</h4>
               <div style={styles.formGrid}>
                 <label style={styles.field}>
@@ -2254,7 +2255,7 @@ export default function AutomationSchedulesPage() {
               </div>
             </div>
           ) : canUpdateAutomationSchedules ? (
-            <button style={styles.secondaryButton} disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Edit loaded schedule</button>
+            <button style={styles.secondaryButton} disabled={saving} onClick={() => { setEditForm(scheduleToForm(selected)); scrollToFormSection('automation-schedule-edit-form'); }}>Edit loaded schedule</button>
           ) : null}
 
           <h4 style={styles.smallTitle}>Schedule config</h4>

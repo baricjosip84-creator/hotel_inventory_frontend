@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string; location?: string | null };
 type PlatformUser = { id: string; email: string; name?: string | null; role?: string };
@@ -121,6 +122,7 @@ export default function PlatformTenantTasksPage() {
 
   const startEdit = (task: TenantTask) => {
     setEditingId(task.id);
+    scrollToFormSection('platform-tenant-tasks-form');
     setTenantId(task.tenant_id);
     setForm({
       tenant_id: task.tenant_id,
@@ -167,7 +169,7 @@ export default function PlatformTenantTasksPage() {
       </div>
     </section>
 
-    {canWrite ? <section style={styles.panel}>
+    {canWrite ? <section id="platform-tenant-tasks-form" style={styles.panel}>
       <h2>{editingId ? 'Edit task' : 'Add task'} {selectedTenant ? `for ${selectedTenant.name}` : ''}</h2>
       <div style={styles.formGrid}>
         <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}>

@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem } from '../types/inventory';
 
 type StorageLocationItem = {
@@ -450,6 +451,7 @@ export default function StockTransfersPage() {
     if (!selectedTransfer || selectedTransfer.status !== 'draft') return;
 
     setEditingTransferId(selectedTransfer.id);
+    scrollToFormSection('stock-transfer-form');
     setForm({
       from_storage_location_id: selectedTransfer.from_storage_location_id,
       to_storage_location_id: selectedTransfer.to_storage_location_id,
@@ -780,7 +782,7 @@ export default function StockTransfersPage() {
         </div>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section id="stock-transfer-form" className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingTransferId ? 'Edit Transfer Draft' : 'Create Transfer Draft'}</h3>
         <p style={styles.panelSubtitle}>
           {editingTransferId

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string };
 type TenantNote = {
@@ -105,7 +106,7 @@ export default function PlatformTenantNotesPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.card}>
+        <section id="platform-tenant-notes-form" style={styles.card}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit note' : 'Add note'}</h2>
           <div style={styles.grid3}>
             <label style={styles.label}>Tenant
@@ -148,7 +149,7 @@ export default function PlatformTenantNotesPage() {
                   <div style={styles.muted}>{note.tenant_name} · {note.category} · {note.visibility} · Updated {dateLabel(note.updated_at)}</div>
                 </div>
                 <div style={styles.actions}>
-                  {canWrite ? <button style={styles.secondaryButton} onClick={() => { setEditingId(note.id); setForm({ tenant_id: note.tenant_id, category: note.category, visibility: note.visibility, title: note.title, body: note.body, pinned: note.pinned }); }}>Edit</button> : null}
+                  {canWrite ? <button style={styles.secondaryButton} onClick={() => { setEditingId(note.id); setForm({ tenant_id: note.tenant_id, category: note.category, visibility: note.visibility, title: note.title, body: note.body, pinned: note.pinned }); scrollToFormSection('platform-tenant-notes-form'); }}>Edit</button> : null}
                   {canWrite && !note.archived_at ? <button style={styles.dangerButton} onClick={() => archiveNote.mutate(note.id)}>Archive</button> : null}
                   {canWrite && note.archived_at ? <button style={styles.secondaryButton} onClick={() => restoreNote.mutate(note.id)}>Restore</button> : null}
                 </div>

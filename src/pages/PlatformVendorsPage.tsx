@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type PlatformUser = { id: string; email: string; name?: string | null };
 type Vendor = {
@@ -199,7 +200,7 @@ export default function PlatformVendorsPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.card}>
+        <section id="platform-vendors-form" style={styles.card}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit vendor' : 'Add vendor'}</h2>
           <div style={styles.grid4}>
             <label style={styles.label}>Name<input style={styles.input} value={form.name} onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))} /></label>
@@ -258,7 +259,7 @@ export default function PlatformVendorsPage() {
                   <td><span style={styles.muted}>{vendor.dependency_notes || vendor.internal_notes || '—'}</span></td>
                   <td>
                     {canWrite ? <div style={styles.rowActions}>
-                      <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(vendor.id); setForm(toForm(vendor)); }}>Edit</button>
+                      <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); }}>Edit</button>
                       {!vendor.archived_at ? <button type="button" style={styles.dangerButton} disabled={archive.isPending} onClick={() => archive.mutate(vendor.id)}>Archive</button> : null}
                     </div> : '—'}
                   </td>

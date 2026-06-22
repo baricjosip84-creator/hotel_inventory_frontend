@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 
 type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | string;
@@ -1508,6 +1509,7 @@ export default function PurchaseOrdersPage() {
     setEditingId(selectedDetail.id);
     setForm(detailToForm(selectedDetail));
     setFormError(null);
+    scrollToFormSection('purchase-order-form');
   };
 
   const addItem = () => {
@@ -2071,7 +2073,7 @@ export default function PurchaseOrdersPage() {
       </section>
 
       <section style={styles.twoColumn}>
-        <form style={styles.card} onSubmit={submitForm}>
+        <form id="purchase-order-form" style={styles.card} onSubmit={submitForm}>
           <h3 style={styles.h3}>{editingId ? 'Edit Draft Purchase Order' : 'Create Purchase Order'}</h3>
           <label style={styles.label}>Supplier</label>
           <select

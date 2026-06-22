@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string; location?: string | null };
 type Contact = {
@@ -93,6 +94,7 @@ export default function PlatformTenantContactsPage() {
   const startEdit = (contact: Contact) => {
     setTenantId(contact.tenant_id);
     setEditingId(contact.id);
+    scrollToFormSection('platform-tenant-contacts-form');
     setForm({
       contact_type: contact.contact_type || 'operations',
       name: contact.name || '',
@@ -125,7 +127,7 @@ export default function PlatformTenantContactsPage() {
       </div>
     </section>
 
-    {canWrite ? <section style={styles.panel}>
+    {canWrite ? <section id="platform-tenant-contacts-form" style={styles.panel}>
       <h2>{editingId ? 'Edit contact' : 'Add contact'} {selectedTenant ? `for ${selectedTenant.name}` : ''}</h2>
       <div style={styles.formGrid}>
         {!tenantId ? <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>

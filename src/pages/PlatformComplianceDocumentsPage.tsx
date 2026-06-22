@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string };
 type PlatformUser = { id: string; email: string; name?: string | null };
@@ -147,7 +148,7 @@ export default function PlatformComplianceDocumentsPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.card}>
+        <section id="platform-compliance-documents-form" style={styles.card}>
           <h2 style={styles.cardTitle}>{editingId ? 'Edit compliance document' : 'Add compliance document'}</h2>
           <div style={styles.formGrid}>
             <select value={form.tenant_id} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })} style={styles.input}>
@@ -190,7 +191,7 @@ export default function PlatformComplianceDocumentsPage() {
                   <td style={styles.td}>{dateOnly(row.expires_at)}</td>
                   <td style={styles.td}>
                     {canWrite ? <div style={styles.rowActions}>
-                      <button type="button" style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm({ tenant_id: row.tenant_id || '', title: row.title, document_type: row.document_type, status: row.status, owner_platform_user_id: row.owner_platform_user_id || '', external_url: row.external_url || '', notes: row.notes || '', effective_at: row.effective_at?.slice(0, 10) || '', expires_at: row.expires_at?.slice(0, 10) || '' }); }}>Edit</button>
+                      <button type="button" style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm({ tenant_id: row.tenant_id || '', title: row.title, document_type: row.document_type, status: row.status, owner_platform_user_id: row.owner_platform_user_id || '', external_url: row.external_url || '', notes: row.notes || '', effective_at: row.effective_at?.slice(0, 10) || '', expires_at: row.expires_at?.slice(0, 10) || '' }); scrollToFormSection('platform-compliance-documents-form'); }}>Edit</button>
                       <button type="button" style={styles.smallButton} onClick={() => reviewDocument.mutate({ id: row.id, status: 'active' })}>Reviewed</button>
                       <button type="button" style={styles.dangerButton} onClick={() => archiveDocument.mutate(row.id)}>Archive</button>
                     </div> : '—'}

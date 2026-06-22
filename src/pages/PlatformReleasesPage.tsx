@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type PlatformUser = { id: string; email: string };
 type Release = {
@@ -162,7 +163,7 @@ export default function PlatformReleasesPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.panel}>
+        <section id="platform-releases-form" style={styles.panel}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit release' : 'Create release'}</h2>
           <div style={styles.grid3}>
             <input value={form.version} onChange={(event) => setForm((prev) => ({ ...prev, version: event.target.value }))} placeholder="Version, e.g. 1.7.0" style={styles.input} />
@@ -202,7 +203,7 @@ export default function PlatformReleasesPage() {
                   <td style={styles.td}>
                     {canWrite ? (
                       <div style={styles.rowActions}>
-                        <button type="button" onClick={() => { setEditingId(release.id); setForm(toForm(release)); }} style={styles.smallButton}>Edit</button>
+                        <button type="button" onClick={() => { setEditingId(release.id); setForm(toForm(release)); scrollToFormSection('platform-releases-form'); }} style={styles.smallButton}>Edit</button>
                         {release.status !== 'in_progress' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'in_progress' })} style={styles.smallButton}>Start</button> : null}
                         {release.status !== 'deployed' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'deployed' })} style={styles.smallButton}>Deploy</button> : null}
                         {release.status !== 'rolled_back' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'rolled_back' })} style={styles.dangerButton}>Rollback</button> : null}

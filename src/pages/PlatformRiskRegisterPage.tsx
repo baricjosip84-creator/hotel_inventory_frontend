@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type Tenant = { id: string; name: string };
 type PlatformUser = { id: string; email: string };
@@ -158,7 +159,7 @@ export default function PlatformRiskRegisterPage() {
       </section>
 
       {canWrite ? (
-        <section style={styles.panel}>
+        <section id="platform-risk-register-form" style={styles.panel}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit risk' : 'Create risk'}</h2>
           <div style={styles.grid3}>
             <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Risk title" style={styles.input} />
@@ -195,7 +196,7 @@ export default function PlatformRiskRegisterPage() {
                   <td style={styles.td}>{dateTime(risk.review_due_at)}<br /><span style={styles.muted}>Updated {dateTime(risk.updated_at)}</span></td>
                   <td style={styles.td}><strong>Mitigation:</strong> {risk.mitigation_plan || '—'}<br /><strong>Contingency:</strong> {risk.contingency_plan || '—'}</td>
                   <td style={styles.td}>
-                    {canWrite ? <button type="button" onClick={() => { setEditingId(risk.id); setForm(toForm(risk)); }} style={styles.secondaryButton}>Edit</button> : null}
+                    {canWrite ? <button type="button" onClick={() => { setEditingId(risk.id); setForm(toForm(risk)); scrollToFormSection('platform-risk-register-form'); }} style={styles.secondaryButton}>Edit</button> : null}
                     {canWrite && !['closed', 'cancelled'].includes(risk.status) ? <button type="button" onClick={() => transition.mutate({ id: risk.id, status: 'closed' })} style={styles.secondaryButton}>Close</button> : null}
                     {canWrite && risk.status !== 'mitigating' && !['closed', 'cancelled'].includes(risk.status) ? <button type="button" onClick={() => transition.mutate({ id: risk.id, status: 'mitigating' })} style={styles.secondaryButton}>Mitigate</button> : null}
                   </td>
