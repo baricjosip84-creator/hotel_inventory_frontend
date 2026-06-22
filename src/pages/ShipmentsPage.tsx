@@ -1008,27 +1008,49 @@ export default function ShipmentsPage() {
   }, [highlightedItemId, shipmentItems]);
 
   useEffect(() => {
-    if (!highlightedItemId || !selectedScannerLocationId || shipmentItems.length === 0) {
+    if (!selectedScannerLocationId || shipmentItems.length === 0) {
       return;
     }
 
-    const matchedItem = shipmentItems.find((item) => item.id === highlightedItemId);
+    setReceiveDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
 
-    if (!matchedItem) {
-      return;
-    }
+      shipmentItems.forEach((item) => {
+        const ordered = toNumber(item.quantity);
+        const received = toNumber(item.received_quantity);
+        const remaining = Math.max(ordered - received, 0);
 
-    setReceiveDrafts((current) => ({
-      ...current,
-      [matchedItem.id]: {
-        ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
-        storage_location_id: selectedScannerLocationId
-      }
-    }));
-  }, [highlightedItemId, selectedScannerLocationId, shipmentItems]);
+        if (remaining <= 0) {
+          return;
+        }
+
+        const existing = next[item.id] ?? makeDefaultReceiveDraft(item);
+
+        if (!existing.storage_location_id) {
+          next[item.id] = {
+            ...existing,
+            storage_location_id: selectedScannerLocationId
+          };
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [selectedScannerLocationId, shipmentItems]);
 
   const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
-    return receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
+    const draft = receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
+
+    if (!draft.storage_location_id && selectedScannerLocationId) {
+      return {
+        ...draft,
+        storage_location_id: selectedScannerLocationId
+      };
+    }
+
+    return draft;
   };
 
   useEffect(() => {
