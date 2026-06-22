@@ -1892,6 +1892,10 @@ export default function ShipmentsPage() {
                 </div>
               </div>
 
+              <div style={styles.receiveDiagnosticBanner}>
+                RECEIVE TEST BUILD 42 ACTIVE — if you do not see this yellow box on the Shipments page, Vercel is still serving an older frontend bundle.
+              </div>
+
               {canManageShipments ? (
                 <div style={styles.selectedActionRow}>
                   <button
@@ -2269,6 +2273,36 @@ export default function ShipmentsPage() {
                 </div>
               ) : null}
 
+              {shipmentItems.length > 0 ? (
+                <div style={styles.forceReceivePanel}>
+                  <strong>Receive emergency test control</strong>
+                  <span>
+                    This button uses the first not-yet-received line and the selected/default location. It is intentionally never disabled so a click cannot silently disappear.
+                  </span>
+                  <button
+                    type="button"
+                    style={styles.forceReceiveButton}
+                    onClick={() => {
+                      const firstOpenLine = shipmentItems.find((line) => {
+                        const ordered = toNumber(line.quantity);
+                        const received = toNumber(line.received_quantity);
+                        return Math.max(ordered - received, 0) > 0;
+                      });
+
+                      if (!firstOpenLine) {
+                        setPageError('Force Receive clicked, but no open shipment line remains. The line may already be fully received.');
+                        setPageMessage(null);
+                        return;
+                      }
+
+                      handleReceiveLine(firstOpenLine);
+                    }}
+                  >
+                    FORCE RECEIVE FIRST OPEN LINE
+                  </button>
+                </div>
+              ) : null}
+
               {shipmentItemsQuery.isLoading ? (
                 <p style={styles.emptyState}>Loading shipment items...</p>
               ) : shipmentItems.length === 0 ? (
@@ -2450,7 +2484,7 @@ export default function ShipmentsPage() {
                               : {})
                           }}
                           onClick={() => handleReceiveLine(item)}
-                          disabled={remaining <= 0 || selectedShipment.status === 'received'}
+                          aria-disabled={remaining <= 0 || selectedShipment.status === 'received'}
                         >
                           {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
                         </button>
@@ -2574,7 +2608,7 @@ export default function ShipmentsPage() {
                                 type="button"
                                 style={styles.secondaryButton}
                                 onClick={() => handleReceiveLine(item)}
-                                disabled={remaining <= 0 || selectedShipment.status === 'received'}
+                                aria-disabled={remaining <= 0 || selectedShipment.status === 'received'}
                                 title={
                                   remaining <= 0
                                     ? 'This line is already fully received.'
@@ -2646,6 +2680,35 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     marginTop: 12,
     marginBottom: 16
+  },
+  receiveDiagnosticBanner: {
+    border: '2px solid #facc15',
+    background: '#fef9c3',
+    color: '#713f12',
+    padding: '12px 14px',
+    borderRadius: 10,
+    fontWeight: 800,
+    marginBottom: 14
+  },
+  forceReceivePanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    padding: 14,
+    border: '2px solid #f97316',
+    background: '#fff7ed',
+    borderRadius: 12,
+    marginBottom: 16
+  },
+  forceReceiveButton: {
+    border: 'none',
+    borderRadius: 10,
+    padding: '12px 16px',
+    background: '#ea580c',
+    color: '#ffffff',
+    fontWeight: 900,
+    cursor: 'pointer',
+    alignSelf: 'flex-start'
   },
   inlineButtonRow: {
     display: 'flex',
