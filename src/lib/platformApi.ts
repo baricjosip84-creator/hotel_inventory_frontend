@@ -12,6 +12,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 let refreshPromise: Promise<string | null> | null = null;
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const PLATFORM_MUTATION_FEEDBACK_EVENT = 'platform-mutation-feedback';
 
 type ApiErrorResponse = {
   error?: {
@@ -67,6 +68,41 @@ function createIdempotencyKey(): string {
   }
 
   return `platform-idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function platformMutationActionLabel(path: string, method: string): string {
+  const normalizedPath = path.toLowerCase();
+  const normalizedMethod = method.toUpperCase();
+
+  if (normalizedPath.includes('/billing')) return 'Billing profile';
+  if (normalizedPath.includes('/tenants')) return 'Tenant configuration';
+  if (normalizedPath.includes('/users')) return 'Platform user';
+  if (normalizedPath.includes('/runbooks')) return 'Runbook';
+  if (normalizedPath.includes('/support')) return 'Support operation';
+  if (normalizedPath.includes('/communications')) return 'Tenant communication';
+  if (normalizedPath.includes('/contacts')) return 'Tenant contact';
+  if (normalizedPath.includes('/tasks')) return 'Tenant task';
+  if (normalizedPath.includes('/notes')) return 'Tenant note';
+
+  if (normalizedMethod === 'POST') return 'Platform item';
+  if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return 'Platform changes';
+  if (normalizedMethod === 'DELETE') return 'Platform item';
+
+  return 'Platform request';
+}
+
+function platformMutationSuccessMessage(path: string, method: string): string {
+  const label = platformMutationActionLabel(path, method);
+  const normalizedMethod = method.toUpperCase();
+
+  if (normalizedMethod === 'POST') return `${label} created successfully.`;
+  if (normalizedMethod === 'DELETE') return `${label} deleted successfully.`;
+  return `${label} saved successfully.`;
+}
+
+function dispatchPlatformMutationFeedback(detail: { type: 'success' | 'error'; message: string; requestId?: string }): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(PLATFORM_MUTATION_FEEDBACK_EVENT, { detail }));
 }
 
 function withPlatformMutationSafetyHeaders(
@@ -225,6 +261,8 @@ export async function platformApiRequest<T>(
   const isLoginRequest = isPlatformLoginRequest(path);
   const isRefreshRequest = isPlatformRefreshRequest(path);
   const requestOptions = withPlatformMutationSafetyHeaders(path, options);
+  const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
+  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest;
 
   if (
     !isLoginRequest &&
@@ -239,6 +277,9 @@ export async function platformApiRequest<T>(
   try {
     response = await performRequest(path, requestOptions);
   } catch (error: any) {
+    if (shouldShowMutationFeedback) {
+      dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+    }
     throw new ApiError(error?.message || 'Network error while contacting backend', 0);
   }
 
@@ -249,13 +290,20 @@ export async function platformApiRequest<T>(
       try {
         response = await performRequest(path, requestOptions);
       } catch (error: any) {
+        if (shouldShowMutationFeedback) {
+          dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+        }
         throw new ApiError(error?.message || 'Network error while contacting backend', 0);
       }
     }
   }
 
   try {
-    return await parseResponse<T>(response);
+    const result = await parseResponse<T>(response);
+    if (shouldShowMutationFeedback) {
+      dispatchPlatformMutationFeedback({ type: 'success', message: platformMutationSuccessMessage(path, method) });
+    }
+    return result;
   } catch (error) {
     if (
       error instanceof ApiError &&
@@ -265,6 +313,14 @@ export async function platformApiRequest<T>(
     ) {
       clearPlatformAuthTokens();
       redirectToPlatformLoginAfterExpiredSession();
+    }
+
+    if (shouldShowMutationFeedback) {
+      dispatchPlatformMutationFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Platform change failed.',
+        requestId: error instanceof ApiError ? error.requestId : undefined
+      });
     }
 
     throw error;
