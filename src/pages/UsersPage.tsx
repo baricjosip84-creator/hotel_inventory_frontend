@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 
@@ -270,6 +271,7 @@ export default function UsersPage() {
       role: user.role,
       password: ''
     });
+    scrollToFormSection('tenant-user-form-panel');
   };
 
   const handleDelete = (user: UserItem) => {
@@ -324,7 +326,7 @@ export default function UsersPage() {
           ...(isMobile ? styles.contentGridMobile : styles.contentGridDesktop)
         }}
       >
-        <section className="app-panel app-panel--padded" style={styles.panel}>
+        <section id="tenant-user-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.sectionHeader}>
             <div style={styles.sectionHeaderText}>
               <h2 style={styles.sectionTitle}>{editingUser ? 'Edit User' : 'Create User'}</h2>

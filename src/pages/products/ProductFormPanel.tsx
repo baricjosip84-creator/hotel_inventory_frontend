@@ -29,7 +29,7 @@ export function ProductFormPanel({
   setForm
 }: ProductFormPanelProps) {
   return (
-    <section style={styles.panel}>
+    <section id="product-form-panel" style={styles.panel}>
       <h3 style={styles.panelTitle}>{editingProduct ? 'Edit Product' : 'Create Product'}</h3>
       <p style={styles.panelSubtitle}>
         {canManageProducts

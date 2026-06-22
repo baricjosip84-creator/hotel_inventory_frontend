@@ -1,6 +1,7 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import type { ProductItem, ProductPackageItem } from '../../types/inventory';
 import { emptyPackageForm, emptyProductForm } from './productFormDefaults';
+import { scrollToFormSection } from '../../lib/scrollToForm';
 import type { ProductFormState } from './productCoreApi';
 import type { PackageFormState } from './productPackageApi';
 
@@ -172,6 +173,7 @@ export function buildProductActionHandlers({
       supplier_id: product.supplier_id || '',
       barcode: product.barcode || ''
     });
+    scrollToFormSection('product-form-panel');
   };
 
   const handleCancelEdit = () => {

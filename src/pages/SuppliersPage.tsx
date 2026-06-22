@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
+import { scrollToFormSection } from '../lib/scrollToForm';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 
@@ -338,6 +339,7 @@ export default function SuppliersPage() {
       email: supplier.email || '',
       contact_info: supplier.contact_info || ''
     });
+    scrollToFormSection('supplier-form-panel');
   };
 
   const handleCancelEdit = () => {
@@ -400,7 +402,7 @@ export default function SuppliersPage() {
         </div>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section id="supplier-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
         <p style={styles.panelSubtitle}>
           {(canManageSuppliers
