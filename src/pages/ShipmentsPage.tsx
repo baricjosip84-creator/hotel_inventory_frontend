@@ -1368,37 +1368,68 @@ export default function ShipmentsPage() {
   const handleReceiveLine = (item: ShipmentItem) => {
     if (!canReceiveShipments) {
       setPageError('Your current role cannot receive shipments.');
+      setPageMessage(null);
       return;
     }
 
-    setPageError(null);
-    setPageMessage(null);
-
     if (!selectedShipment) {
       setPageError('Select a shipment first.');
+      setPageMessage(null);
+      return;
+    }
+
+    if (receiveShipmentMutation.isPending) {
+      setPageError('A receive request is already in progress. Wait for it to finish, then try again.');
+      setPageMessage(null);
       return;
     }
 
     const draft = getReceiveDraft(item);
-    const quantityReceived = Number(draft.quantity_received);
     const ordered = toNumber(item.quantity);
     const received = toNumber(item.received_quantity);
-    const remaining = ordered - received;
+    const remaining = Math.max(ordered - received, 0);
+    const quantityReceived = Number(draft.quantity_received);
+    const safeStorageLocationId =
+      draft.storage_location_id ||
+      selectedScannerLocationId ||
+      item.storage_location_id ||
+      (storageLocations.length === 1 ? storageLocations[0].id : '');
 
     if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-      setPageError('Quantity received must be greater than zero.');
+      setPageError('Receive button clicked, but quantity received must be greater than zero.');
+      setPageMessage(null);
+      return;
+    }
+
+    if (remaining <= 0) {
+      setPageError('Receive button clicked, but this shipment line is already fully received.');
+      setPageMessage(null);
       return;
     }
 
     if (quantityReceived > remaining) {
-      setPageError('Quantity received cannot exceed remaining quantity.');
+      setPageError('Receive button clicked, but quantity received cannot exceed remaining quantity.');
+      setPageMessage(null);
       return;
     }
 
-    if (!draft.storage_location_id) {
-      setPageError('Select a storage location.');
+    if (!safeStorageLocationId) {
+      setPageError('Receive button clicked, but no storage location is selected. Choose a row storage location or set the shipment scan/default location.');
+      setPageMessage(null);
       return;
     }
+
+    setReceiveDrafts((current) => ({
+      ...current,
+      [item.id]: {
+        ...(current[item.id] ?? makeDefaultReceiveDraft(item)),
+        ...draft,
+        storage_location_id: safeStorageLocationId
+      }
+    }));
+
+    setPageError(null);
+    setPageMessage(`Receiving ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} for ${item.product_name || item.product_id}...`);
 
     receiveShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
@@ -1406,7 +1437,7 @@ export default function ShipmentsPage() {
       item: {
         product_id: item.product_id,
         quantity_received: quantityReceived,
-        storage_location_id: draft.storage_location_id,
+        storage_location_id: safeStorageLocationId,
         discrepancy_reason: draft.discrepancy_reason.trim() || null,
         receiving_note: draft.receiving_note.trim() || null
       }
@@ -2553,9 +2584,15 @@ export default function ShipmentsPage() {
                                 style={styles.secondaryButton}
                                 onClick={() => handleReceiveLine(item)}
                                 disabled={
-                                  receiveShipmentMutation.isPending ||
                                   remaining <= 0 ||
                                   selectedShipment.status === 'received'
+                                }
+                                title={
+                                  remaining <= 0
+                                    ? 'This line is already fully received.'
+                                    : selectedShipment.status === 'received'
+                                      ? 'This shipment is already received.'
+                                      : 'Receive this shipment line into stock.'
                                 }
                               >
                                 {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
