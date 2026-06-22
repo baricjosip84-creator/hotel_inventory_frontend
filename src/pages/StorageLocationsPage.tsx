@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
 
 type StorageLocationItem = {
   id: string;
@@ -198,6 +199,7 @@ export default function StorageLocationsPage() {
     setFormMessage(null);
     setEditingId(location.id);
     setEditForm(formFromLocation(location));
+    scrollToFormSection('storage-location-edit-panel');
   };
 
   const cancelEdit = () => {
@@ -275,7 +277,7 @@ export default function StorageLocationsPage() {
         </div>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section id="storage-location-create-panel" className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Storage Location</h3>
         <p style={styles.panelSubtitle}>
           Maintain receiving and storage areas used across stock and shipment workflows.
@@ -322,6 +324,65 @@ export default function StorageLocationsPage() {
           </div>
         </form>
       </section>
+
+
+      {editingId ? (
+        <section id="storage-location-edit-panel" className="app-panel app-panel--padded" style={styles.editPanel}>
+          <h3 style={styles.panelTitle}>Edit Storage Location</h3>
+          <p style={styles.panelSubtitle}>
+            Update the selected storage area here. The list remains below for review after saving.
+          </p>
+
+          {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
+          {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
+
+          <form
+            onSubmit={(event) => {
+              const selectedLocation = locations.find((location) => location.id === editingId);
+              if (!selectedLocation) {
+                event.preventDefault();
+                setFormError('Selected storage location is no longer available. Refresh the list and try again.');
+                return;
+              }
+
+              handleEditSubmit(event, selectedLocation);
+            }}
+            style={styles.formGrid}
+          >
+            <div>
+              <label style={styles.label}>Name</label>
+              <input
+                style={styles.input}
+                value={editForm.name}
+                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Example: Main Warehouse"
+                required
+                disabled={writeBusy}
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>Temperature Zone</label>
+              <input
+                style={styles.input}
+                value={editForm.temperature_zone}
+                onChange={(event) => setEditForm((current) => ({ ...current, temperature_zone: event.target.value }))}
+                placeholder="Example: ambient, chilled, frozen"
+                disabled={writeBusy}
+              />
+            </div>
+
+            <div className="app-actions" style={styles.formActions}>
+              <button type="submit" style={styles.primaryButton} disabled={writeBusy}>
+                {updateMutation.isPending ? 'Saving...' : 'Save Storage Location'}
+              </button>
+              <button type="button" style={styles.secondaryButton} onClick={cancelEdit} disabled={writeBusy}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Storage Location List</h3>
@@ -372,38 +433,13 @@ export default function StorageLocationsPage() {
                     const isEditing = editingId === location.id;
 
                     return (
-                      <tr key={location.id}>
+                      <tr key={location.id} style={isEditing ? styles.editingRow : undefined}>
                         <td style={styles.td}>
-                          {isEditing ? (
-                            <form id={`storage-location-edit-${location.id}`} onSubmit={(event) => handleEditSubmit(event, location)}>
-                              <input
-                                style={styles.input}
-                                value={editForm.name}
-                                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
-                                required
-                                disabled={writeBusy}
-                              />
-                            </form>
-                          ) : (
-                            <>
-                              <div style={styles.rowTitle}>{location.name}</div>
-                              <div style={styles.rowSubtle}>Location ID: {location.id}</div>
-                            </>
-                          )}
+                          <div style={styles.rowTitle}>{location.name}</div>
+                          <div style={styles.rowSubtle}>Location ID: {location.id}</div>
+                          {isEditing ? <div style={styles.editHint}>Editing in the form above.</div> : null}
                         </td>
-                        <td style={styles.td}>
-                          {isEditing ? (
-                            <input
-                              style={styles.input}
-                              value={editForm.temperature_zone}
-                              onChange={(event) => setEditForm((current) => ({ ...current, temperature_zone: event.target.value }))}
-                              placeholder="Example: ambient, chilled, frozen"
-                              disabled={writeBusy}
-                            />
-                          ) : (
-                            location.temperature_zone || '-'
-                          )}
-                        </td>
+                        <td style={styles.td}>{location.temperature_zone || '-'}</td>
                         <td style={styles.td}>{formatDateTime(location.created_at)}</td>
                         <td style={styles.td}>
                           <span style={location.deleted_at ? styles.badgeDeleted : styles.badgeActive}>
@@ -413,45 +449,22 @@ export default function StorageLocationsPage() {
                         <td style={styles.td}>
                           {canManageStorageLocations && !location.deleted_at ? (
                             <div style={styles.rowActions}>
-                              {isEditing ? (
-                                <>
-                                  <button
-                                    type="submit"
-                                    form={`storage-location-edit-${location.id}`}
-                                    style={styles.smallPrimaryButton}
-                                    disabled={writeBusy}
-                                  >
-                                    {updateMutation.isPending ? 'Saving...' : 'Save'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    style={styles.smallSecondaryButton}
-                                    onClick={cancelEdit}
-                                    disabled={writeBusy}
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    style={styles.smallSecondaryButton}
-                                    onClick={() => beginEdit(location)}
-                                    disabled={writeBusy}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    style={styles.smallDangerButton}
-                                    onClick={() => handleDelete(location)}
-                                    disabled={writeBusy}
-                                  >
-                                    {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                type="button"
+                                style={styles.smallSecondaryButton}
+                                onClick={() => beginEdit(location)}
+                                disabled={writeBusy}
+                              >
+                                {isEditing ? 'Edit selected' : 'Edit'}
+                              </button>
+                              <button
+                                type="button"
+                                style={styles.smallDangerButton}
+                                onClick={() => handleDelete(location)}
+                                disabled={writeBusy}
+                              >
+                                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                              </button>
                             </div>
                           ) : (
                             <span style={styles.rowSubtle}>Read only</span>
@@ -508,6 +521,13 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     overflow: 'hidden'
   },
+  editPanel: {
+    marginBottom: '20px',
+    minWidth: 0,
+    overflow: 'hidden',
+    borderColor: '#bfdbfe',
+    boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.08)'
+  },
   panelTitle: {
     marginTop: 0,
     marginBottom: '8px',
@@ -548,6 +568,15 @@ const styles: Record<string, CSSProperties> = {
   formActions: {
     alignItems: 'end',
     minWidth: 0
+  },
+  secondaryButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: '10px',
+    padding: '12px 16px',
+    background: '#ffffff',
+    color: '#111827',
+    fontWeight: 600,
+    cursor: 'pointer'
   },
   primaryButton: {
     border: 'none',
@@ -616,6 +645,19 @@ const styles: Record<string, CSSProperties> = {
     color: '#6b7280',
     lineHeight: 1.4,
     wordBreak: 'break-all'
+  },
+  editHint: {
+    marginTop: '8px',
+    display: 'inline-block',
+    padding: '4px 8px',
+    borderRadius: '999px',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    fontSize: '12px',
+    fontWeight: 700
+  },
+  editingRow: {
+    background: '#eff6ff'
   },
   rowActions: {
     display: 'flex',
