@@ -789,11 +789,14 @@ export default function InventoryUsagePage() {
     URL.revokeObjectURL(url);
   };
 
+  const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;
+  const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
+
   return (
     <InventoryUsageDashboard
       permissions={{
-        canRecord: permissions.canRecordInventoryUsage,
-        canBulkRecord: permissions.canBulkRecordInventoryUsage,
+        canRecord: canRecordStockUsage,
+        canBulkRecord: canBulkRecordStockUsage,
         canReverse: permissions.canReverseInventoryUsage,
         canReview: permissions.canReviewInventoryUsage,
         canClosePeriods: permissions.canCloseInventoryUsagePeriods,
