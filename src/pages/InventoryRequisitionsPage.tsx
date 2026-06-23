@@ -12,6 +12,14 @@ type StorageLocationOption = {
   temperature_zone?: string | null;
 };
 
+type ProductOptionsResponse =
+  | ProductItem[]
+  | { products?: ProductItem[]; data?: ProductItem[]; items?: ProductItem[]; results?: ProductItem[] };
+
+type StorageLocationOptionsResponse =
+  | StorageLocationOption[]
+  | { storageLocations?: StorageLocationOption[]; storage_locations?: StorageLocationOption[]; locations?: StorageLocationOption[]; data?: StorageLocationOption[]; items?: StorageLocationOption[]; results?: StorageLocationOption[] };
+
 type RequisitionStatus =
   | 'draft'
   | 'submitted'
@@ -1050,6 +1058,42 @@ function formatNumber(value: number | string | null | undefined): string {
 }
 
 
+function extractApiList<T>(response: unknown, keys: string[]): T[] {
+  if (Array.isArray(response)) {
+    return response as T[];
+  }
+
+  if (!response || typeof response !== 'object') {
+    return [];
+  }
+
+  const record = response as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value as T[];
+    }
+  }
+
+  return [];
+}
+
+function normalizeProductOptions(response: ProductOptionsResponse): ProductItem[] {
+  return extractApiList<ProductItem>(response, ['products', 'data', 'items', 'results']);
+}
+
+function normalizeStorageLocationOptions(response: StorageLocationOptionsResponse): StorageLocationOption[] {
+  return extractApiList<StorageLocationOption>(response, [
+    'storageLocations',
+    'storage_locations',
+    'locations',
+    'data',
+    'items',
+    'results'
+  ]);
+}
+
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
@@ -1441,7 +1485,7 @@ export default function InventoryRequisitionsPage() {
 
   const productsQuery = useQuery({
     queryKey: ['products', 'requisition-options'],
-    queryFn: () => apiRequest<ProductItem[]>('/products?limit=500')
+    queryFn: async () => normalizeProductOptions(await apiRequest<ProductOptionsResponse>('/products?limit=500'))
   });
 
   const productCategoryOptions = useMemo(() => {
@@ -1463,7 +1507,7 @@ export default function InventoryRequisitionsPage() {
 
   const locationsQuery = useQuery({
     queryKey: ['storage-locations', 'requisition-options'],
-    queryFn: () => apiRequest<StorageLocationOption[]>('/storage-locations?limit=500')
+    queryFn: async () => normalizeStorageLocationOptions(await apiRequest<StorageLocationOptionsResponse>('/storage-locations?limit=500'))
   });
 
   const detailQuery = useQuery({
