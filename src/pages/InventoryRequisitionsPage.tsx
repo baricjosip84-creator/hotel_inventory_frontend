@@ -1380,6 +1380,7 @@ export default function InventoryRequisitionsPage() {
   const [productFilter, setProductFilter] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<RequisitionFormState>(() => emptyForm());
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
@@ -1985,6 +1986,40 @@ export default function InventoryRequisitionsPage() {
         ? { notes: workflowNotes.trim() || null }
         : { reason: workflowNotes.trim() };
     workflowMutation.mutate({ id: selected.id, action, body });
+  };
+
+  const filtersActive = Boolean(status || dueState || fulfillmentState || slaState || ageBucket || approvalThresholdLevel || approvalThresholdReason || approvalThresholdWatch || approvalThresholdNextLevel || approvalThresholdNoteDepthState || minApprovalThresholdGapFilter || maxApprovalThresholdGapFilter || minRemainingValueFilter || maxRemainingValueFilter || minRemainingQuantityFilter || maxRemainingQuantityFilter || priorityFilter || departmentFilter || targetDepartmentFilter || sourceLocationFilter || targetLocationFilter || requesterFilter || neededByFromFilter || neededByToFilter || createdFromFilter || createdToFilter || productFilter || productCategoryFilter || queueSearch);
+
+  const clearQueueFilters = () => {
+    setStatus('');
+    setDueState('');
+    setFulfillmentState('');
+    setSlaState('');
+    setAgeBucket('');
+    setApprovalThresholdLevel('');
+    setApprovalThresholdReason('');
+    setApprovalThresholdWatch('');
+    setApprovalThresholdNextLevel('');
+    setApprovalThresholdNoteDepthState('');
+    setMinApprovalThresholdGapFilter('');
+    setMaxApprovalThresholdGapFilter('');
+    setMinRemainingValueFilter('');
+    setMaxRemainingValueFilter('');
+    setMinRemainingQuantityFilter('');
+    setMaxRemainingQuantityFilter('');
+    setPriorityFilter('');
+    setDepartmentFilter('');
+    setTargetDepartmentFilter('');
+    setSourceLocationFilter('');
+    setTargetLocationFilter('');
+    setRequesterFilter('');
+    setNeededByFromFilter('');
+    setNeededByToFilter('');
+    setCreatedFromFilter('');
+    setCreatedToFilter('');
+    setProductFilter('');
+    setProductCategoryFilter('');
+    setQueueSearch('');
   };
 
   const visibleBulkFulfillmentIds = useMemo(() => new Set(requisitionsQuery.data?.map((item) => item.id) || []), [requisitionsQuery.data]);
@@ -2796,7 +2831,7 @@ export default function InventoryRequisitionsPage() {
       </section>
 
       <section style={styles.grid}>
-        <form id="inventory-requisition-form" style={styles.card} onSubmit={handleSaveDraft}>
+        <form id="inventory-requisition-form" style={styles.sideCard} onSubmit={handleSaveDraft}>
           <div style={styles.lineHeader}>
             <h3 style={styles.sectionTitle}>{editingDraftId ? 'Edit draft request' : 'Create request'}</h3>
             {editingDraftId && <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>Cancel edit</button>}
@@ -2924,269 +2959,170 @@ export default function InventoryRequisitionsPage() {
           </button>
         </form>
 
-        <section style={styles.card}>
+        <section style={styles.queueCard}>
           <div style={styles.lineHeader}>
             <h3 style={styles.sectionTitle}>Request queue</h3>
-            <div style={styles.filterGroup}>
-              <input
-                style={styles.smallInput}
-                value={queueSearch}
-                onChange={(event) => setQueueSearch(event.target.value)}
-                placeholder="Search number or notes"
-              />
-              <input
-                style={styles.smallInput}
-                value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
-                placeholder="Requesting department"
-              />
-              <input
-                style={styles.smallInput}
-                value={targetDepartmentFilter}
-                onChange={(event) => setTargetDepartmentFilter(event.target.value)}
-                placeholder="Target department"
-              />
-              <select style={styles.smallSelect} value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="submitted">Submitted</option>
-                <option value="approved">Approved</option>
-                <option value="partially_fulfilled">Partially fulfilled</option>
-                <option value="fulfilled">Fulfilled</option>
-                <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-              <select style={styles.smallSelect} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
-                <option value="">All priorities</option>
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-              <select style={styles.smallSelect} value={dueState} onChange={(event) => setDueState(event.target.value)}>
-                <option value="">All due states</option>
-                <option value="open">Open only</option>
-                <option value="overdue">Overdue</option>
-                <option value="due_soon">Due soon</option>
-              </select>
-              <select style={styles.smallSelect} value={fulfillmentState} onChange={(event) => setFulfillmentState(event.target.value)}>
-                <option value="">All fulfillment</option>
-                <option value="unfulfilled">Unfulfilled</option>
-                <option value="partially_fulfilled">Partially fulfilled</option>
-                <option value="stale_partial">Stale partials</option>
-                <option value="complete">Complete</option>
-              </select>
-              <select style={styles.smallSelect} value={slaState} onChange={(event) => setSlaState(event.target.value)}>
-                <option value="">All SLA states</option>
-                <option value="approval_breached">Approval SLA breached</option>
-                <option value="fulfillment_breached">Fulfillment SLA breached</option>
-                <option value="due_breached">Past needed-by date</option>
-                <option value="urgent_stale">Urgent stale</option>
-              </select>
-              <select style={styles.smallSelect} value={ageBucket} onChange={(event) => setAgeBucket(event.target.value)}>
-                <option value="">All age buckets</option>
-                <option value="under_24h">Open under 24h</option>
-                <option value="one_to_three_days">Open 1-3 days</option>
-                <option value="three_to_seven_days">Open 3-7 days</option>
-                <option value="over_seven_days">Open over 7 days</option>
-              </select>
-              <select style={styles.smallSelect} value={approvalThresholdLevel} onChange={(event) => setApprovalThresholdLevel(event.target.value)}>
-                <option value="">All approval thresholds</option>
-                <option value="standard">Standard approvals</option>
-                <option value="elevated">Elevated approvals</option>
-                <option value="executive_value">Executive value approvals</option>
-              </select>
-              <select style={styles.smallSelect} value={approvalThresholdReason} onChange={(event) => setApprovalThresholdReason(event.target.value)}>
-                <option value="">All threshold reasons</option>
-                <option value="standard">Standard approval</option>
-                <option value="high_priority">High priority threshold</option>
-                <option value="high_value">High value threshold</option>
-                <option value="executive_value">Executive value threshold</option>
-              </select>
-              <select style={styles.smallSelect} value={approvalThresholdWatch} onChange={(event) => setApprovalThresholdWatch(event.target.value)}>
-                <option value="">All threshold watchlist</option>
-                <option value="near_high_value">Near high-value threshold</option>
-                <option value="near_executive_value">Near executive threshold</option>
-                <option value="any_near_threshold">Any near-threshold</option>
-              </select>
-              <select style={styles.smallSelect} value={approvalThresholdNextLevel} onChange={(event) => setApprovalThresholdNextLevel(event.target.value)}>
-                <option value="">All next thresholds</option>
-                <option value="high_value">Next: high value</option>
-                <option value="executive_value">Next: executive value</option>
-                <option value="none">No next threshold</option>
-              </select>
-              <select style={styles.smallSelect} value={approvalThresholdNoteDepthState} onChange={(event) => setApprovalThresholdNoteDepthState(event.target.value)}>
-                <option value="">All note-depth states</option>
-                <option value="complete">Threshold notes complete</option>
-                <option value="incomplete">Threshold notes incomplete</option>
-              </select>
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={minApprovalThresholdGapFilter}
-                onChange={(event) => setMinApprovalThresholdGapFilter(event.target.value)}
-                placeholder="Min threshold gap"
-              />
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={maxApprovalThresholdGapFilter}
-                onChange={(event) => setMaxApprovalThresholdGapFilter(event.target.value)}
-                placeholder="Max threshold gap"
-              />
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={minRemainingValueFilter}
-                onChange={(event) => setMinRemainingValueFilter(event.target.value)}
-                placeholder="Min remaining value"
-              />
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={maxRemainingValueFilter}
-                onChange={(event) => setMaxRemainingValueFilter(event.target.value)}
-                placeholder="Max remaining value"
-              />
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={minRemainingQuantityFilter}
-                onChange={(event) => setMinRemainingQuantityFilter(event.target.value)}
-                placeholder="Min remaining qty"
-              />
-              <input
-                style={styles.smallInput}
-                type="number"
-                min="0"
-                step="0.01"
-                value={maxRemainingQuantityFilter}
-                onChange={(event) => setMaxRemainingQuantityFilter(event.target.value)}
-                placeholder="Max remaining qty"
-              />
-              <select style={styles.smallSelect} value={sourceLocationFilter} onChange={(event) => setSourceLocationFilter(event.target.value)}>
-                <option value="">All source locations</option>
-                {locationsQuery.data?.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}</option>
-                ))}
-              </select>
-              <select style={styles.smallSelect} value={targetLocationFilter} onChange={(event) => setTargetLocationFilter(event.target.value)}>
-                <option value="">All target locations</option>
-                {locationsQuery.data?.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}</option>
-                ))}
-              </select>
-              <select style={styles.smallSelect} value={requesterFilter} onChange={(event) => setRequesterFilter(event.target.value)}>
-                <option value="">All requesters</option>
-                {summaryQuery.data?.top_requesters?.filter((requester) => requester.requester_user_id).map((requester) => (
-                  <option key={requester.requester_user_id} value={requester.requester_user_id || ''}>{requester.requester_user_name}</option>
-                ))}
-              </select>
-              <input
-                style={styles.smallInput}
-                type="date"
-                value={neededByFromFilter}
-                onChange={(event) => setNeededByFromFilter(event.target.value)}
-                aria-label="Needed by from"
-                title="Needed by from"
-              />
-              <input
-                style={styles.smallInput}
-                type="date"
-                value={neededByToFilter}
-                onChange={(event) => setNeededByToFilter(event.target.value)}
-                aria-label="Needed by to"
-                title="Needed by to"
-              />
-              <input
-                style={styles.smallInput}
-                type="date"
-                value={createdFromFilter}
-                onChange={(event) => setCreatedFromFilter(event.target.value)}
-                aria-label="Created from"
-                title="Created from"
-              />
-              <input
-                style={styles.smallInput}
-                type="date"
-                value={createdToFilter}
-                onChange={(event) => setCreatedToFilter(event.target.value)}
-                aria-label="Created to"
-                title="Created to"
-              />
-              <select style={styles.smallSelect} value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
-                <option value="">All products</option>
-                {productsQuery.data?.map((product) => (
-                  <option key={product.id} value={product.id}>{product.name}</option>
-                ))}
-              </select>
-              <select style={styles.smallSelect} value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}>
-                <option value="">All product categories</option>
-                {productCategoryOptions.map((category) => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => exportQueueMutation.mutate()}
-                disabled={exportQueueMutation.isPending}
-              >
-                {exportQueueMutation.isPending ? 'Exporting…' : 'Export queue CSV'}
-              </button>
-              {(status || dueState || fulfillmentState || slaState || ageBucket || approvalThresholdLevel || approvalThresholdReason || approvalThresholdWatch || approvalThresholdNextLevel || approvalThresholdNoteDepthState || minApprovalThresholdGapFilter || maxApprovalThresholdGapFilter || minRemainingValueFilter || maxRemainingValueFilter || minRemainingQuantityFilter || maxRemainingQuantityFilter || priorityFilter || departmentFilter || targetDepartmentFilter || sourceLocationFilter || targetLocationFilter || requesterFilter || neededByFromFilter || neededByToFilter || createdFromFilter || createdToFilter || productFilter || productCategoryFilter || queueSearch) && (
+            <div style={styles.queueFilterPanel}>
+              <div style={styles.quickFilterGroup}>
+                <input
+                  style={styles.smallInput}
+                  value={queueSearch}
+                  onChange={(event) => setQueueSearch(event.target.value)}
+                  placeholder="Search number or notes"
+                />
+                <select style={styles.smallSelect} value={status} onChange={(event) => setStatus(event.target.value)}>
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="approved">Approved</option>
+                  <option value="partially_fulfilled">Partially fulfilled</option>
+                  <option value="fulfilled">Fulfilled</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <select style={styles.smallSelect} value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
+                  <option value="">All products</option>
+                  {productsQuery.data?.map((product) => (
+                    <option key={product.id} value={product.id}>{product.name}</option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   style={styles.secondaryButton}
-                  onClick={() => {
-                    setStatus('');
-                    setDueState('');
-                    setFulfillmentState('');
-                    setSlaState('');
-                    setAgeBucket('');
-                    setApprovalThresholdLevel('');
-                    setApprovalThresholdReason('');
-                    setApprovalThresholdWatch('');
-                    setApprovalThresholdNextLevel('');
-                    setApprovalThresholdNoteDepthState('');
-                    setMinApprovalThresholdGapFilter('');
-                    setMaxApprovalThresholdGapFilter('');
-                    setMinRemainingValueFilter('');
-                    setMaxRemainingValueFilter('');
-                    setMinRemainingQuantityFilter('');
-                    setMaxRemainingQuantityFilter('');
-                    setPriorityFilter('');
-                    setDepartmentFilter('');
-                    setTargetDepartmentFilter('');
-                    setSourceLocationFilter('');
-                    setTargetLocationFilter('');
-                    setRequesterFilter('');
-                    setNeededByFromFilter('');
-                    setNeededByToFilter('');
-                    setCreatedFromFilter('');
-                    setCreatedToFilter('');
-                    setProductFilter('');
-                    setProductCategoryFilter('');
-                    setQueueSearch('');
-                  }}
+                  onClick={() => setShowAdvancedFilters((current) => !current)}
                 >
-                  Clear filters
+                  {showAdvancedFilters ? 'Hide advanced filters' : 'Advanced filters'}
                 </button>
+                {filtersActive && (
+                  <button type="button" style={styles.secondaryButton} onClick={clearQueueFilters}>Clear filters</button>
+                )}
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  onClick={() => exportQueueMutation.mutate()}
+                  disabled={exportQueueMutation.isPending}
+                >
+                  {exportQueueMutation.isPending ? 'Exporting…' : 'Export queue CSV'}
+                </button>
+              </div>
+              {showAdvancedFilters && (
+                <div style={styles.advancedFilterGroup}>
+                  <input
+                    style={styles.smallInput}
+                    value={departmentFilter}
+                    onChange={(event) => setDepartmentFilter(event.target.value)}
+                    placeholder="Requesting department"
+                  />
+                  <input
+                    style={styles.smallInput}
+                    value={targetDepartmentFilter}
+                    onChange={(event) => setTargetDepartmentFilter(event.target.value)}
+                    placeholder="Target department"
+                  />
+                  <select style={styles.smallSelect} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+                    <option value="">All priorities</option>
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <select style={styles.smallSelect} value={dueState} onChange={(event) => setDueState(event.target.value)}>
+                    <option value="">All due states</option>
+                    <option value="open">Open only</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="due_soon">Due soon</option>
+                  </select>
+                  <select style={styles.smallSelect} value={fulfillmentState} onChange={(event) => setFulfillmentState(event.target.value)}>
+                    <option value="">All fulfillment</option>
+                    <option value="unfulfilled">Unfulfilled</option>
+                    <option value="partially_fulfilled">Partially fulfilled</option>
+                    <option value="stale_partial">Stale partials</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                  <select style={styles.smallSelect} value={slaState} onChange={(event) => setSlaState(event.target.value)}>
+                    <option value="">All SLA states</option>
+                    <option value="approval_breached">Approval SLA breached</option>
+                    <option value="fulfillment_breached">Fulfillment SLA breached</option>
+                    <option value="due_breached">Past needed-by date</option>
+                    <option value="urgent_stale">Urgent stale</option>
+                  </select>
+                  <select style={styles.smallSelect} value={ageBucket} onChange={(event) => setAgeBucket(event.target.value)}>
+                    <option value="">All age buckets</option>
+                    <option value="under_24h">Open under 24h</option>
+                    <option value="one_to_three_days">Open 1-3 days</option>
+                    <option value="three_to_seven_days">Open 3-7 days</option>
+                    <option value="over_seven_days">Open over 7 days</option>
+                  </select>
+                  <select style={styles.smallSelect} value={approvalThresholdLevel} onChange={(event) => setApprovalThresholdLevel(event.target.value)}>
+                    <option value="">All approval thresholds</option>
+                    <option value="standard">Standard approvals</option>
+                    <option value="elevated">Elevated approvals</option>
+                    <option value="executive_value">Executive value approvals</option>
+                  </select>
+                  <select style={styles.smallSelect} value={approvalThresholdReason} onChange={(event) => setApprovalThresholdReason(event.target.value)}>
+                    <option value="">All threshold reasons</option>
+                    <option value="standard">Standard approval</option>
+                    <option value="high_priority">High priority threshold</option>
+                    <option value="high_value">High value threshold</option>
+                    <option value="executive_value">Executive value threshold</option>
+                  </select>
+                  <select style={styles.smallSelect} value={approvalThresholdWatch} onChange={(event) => setApprovalThresholdWatch(event.target.value)}>
+                    <option value="">All threshold watchlist</option>
+                    <option value="near_high_value">Near high-value threshold</option>
+                    <option value="near_executive_value">Near executive threshold</option>
+                    <option value="any_near_threshold">Any near-threshold</option>
+                  </select>
+                  <select style={styles.smallSelect} value={approvalThresholdNextLevel} onChange={(event) => setApprovalThresholdNextLevel(event.target.value)}>
+                    <option value="">All next thresholds</option>
+                    <option value="high_value">Next: high value</option>
+                    <option value="executive_value">Next: executive value</option>
+                    <option value="none">No next threshold</option>
+                  </select>
+                  <select style={styles.smallSelect} value={approvalThresholdNoteDepthState} onChange={(event) => setApprovalThresholdNoteDepthState(event.target.value)}>
+                    <option value="">All note-depth states</option>
+                    <option value="complete">Threshold notes complete</option>
+                    <option value="incomplete">Threshold notes incomplete</option>
+                  </select>
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minApprovalThresholdGapFilter} onChange={(event) => setMinApprovalThresholdGapFilter(event.target.value)} placeholder="Min threshold gap" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxApprovalThresholdGapFilter} onChange={(event) => setMaxApprovalThresholdGapFilter(event.target.value)} placeholder="Max threshold gap" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingValueFilter} onChange={(event) => setMinRemainingValueFilter(event.target.value)} placeholder="Min remaining value" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingValueFilter} onChange={(event) => setMaxRemainingValueFilter(event.target.value)} placeholder="Max remaining value" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingQuantityFilter} onChange={(event) => setMinRemainingQuantityFilter(event.target.value)} placeholder="Min remaining qty" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingQuantityFilter} onChange={(event) => setMaxRemainingQuantityFilter(event.target.value)} placeholder="Max remaining qty" />
+                  <select style={styles.smallSelect} value={sourceLocationFilter} onChange={(event) => setSourceLocationFilter(event.target.value)}>
+                    <option value="">All source locations</option>
+                    {locationsQuery.data?.map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </select>
+                  <select style={styles.smallSelect} value={targetLocationFilter} onChange={(event) => setTargetLocationFilter(event.target.value)}>
+                    <option value="">All target locations</option>
+                    {locationsQuery.data?.map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </select>
+                  <select style={styles.smallSelect} value={requesterFilter} onChange={(event) => setRequesterFilter(event.target.value)}>
+                    <option value="">All requesters</option>
+                    {summaryQuery.data?.top_requesters?.filter((requester) => requester.requester_user_id).map((requester) => (
+                      <option key={requester.requester_user_id} value={requester.requester_user_id || ''}>{requester.requester_user_name}</option>
+                    ))}
+                  </select>
+                  <input style={styles.smallInput} type="date" value={neededByFromFilter} onChange={(event) => setNeededByFromFilter(event.target.value)} aria-label="Needed by from" title="Needed by from" />
+                  <input style={styles.smallInput} type="date" value={neededByToFilter} onChange={(event) => setNeededByToFilter(event.target.value)} aria-label="Needed by to" title="Needed by to" />
+                  <input style={styles.smallInput} type="date" value={createdFromFilter} onChange={(event) => setCreatedFromFilter(event.target.value)} aria-label="Created from" title="Created from" />
+                  <input style={styles.smallInput} type="date" value={createdToFilter} onChange={(event) => setCreatedToFilter(event.target.value)} aria-label="Created to" title="Created to" />
+                  <select style={styles.smallSelect} value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}>
+                    <option value="">All product categories</option>
+                    {productCategoryOptions.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
           </div>
-          {capabilities.canFulfillInventoryRequisitions && (
-            <div style={styles.workflowPanel}>
+          {capabilities.canFulfillInventoryRequisitions && bulkEligibleRequisitions.length > 0 && (
+            <div style={styles.bulkFulfillmentPanel}>
               <div style={styles.lineHeader}>
                 <h4 style={styles.sectionTitle}>Bulk fulfill selected requests</h4>
                 <span style={styles.muted}>{formatNumber(bulkFulfillmentIds.filter((id) => visibleBulkFulfillmentIds.has(id)).length)} selected</span>
@@ -3690,7 +3626,9 @@ const styles: Record<string, CSSProperties> = {
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, alignItems: 'stretch' },
   compactMetrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
   departmentRow: { display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid #e5e7eb', padding: '10px 0', fontSize: 13 },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(340px, 0.8fr)', gap: 16, alignItems: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.7fr) minmax(360px, 0.75fr)', gap: 16, alignItems: 'start' },
+  queueCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)', order: 1 },
+  sideCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)', order: 2 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)' },
   metricCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 8 },
   metricLabel: { color: '#64748b', fontSize: 13 },
@@ -3708,6 +3646,9 @@ const styles: Record<string, CSSProperties> = {
   smallSelect: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit' },
   smallInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit', minWidth: 150 },
   filterGroup: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  queueFilterPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
+  quickFilterGroup: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  advancedFilterGroup: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8, padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' },
   lineHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '16px 0 10px' },
   lineGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) 110px minmax(0, 1fr) auto', gap: 8, marginBottom: 8 },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#1d4ed8', color: '#fff', fontWeight: 700, cursor: 'pointer' },
@@ -3737,6 +3678,7 @@ const styles: Record<string, CSSProperties> = {
   th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#475569', background: '#f8fafc' },
   td: { padding: 10, borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
   workflowPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', marginTop: 16 },
+  bulkFulfillmentPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', margin: '12px 0', padding: 12, border: '1px solid #dbeafe', borderRadius: 12, background: '#eff6ff' },
   actionsRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   readinessPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 },
   activityPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 },
