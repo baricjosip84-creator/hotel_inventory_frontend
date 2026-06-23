@@ -2,6 +2,33 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import type { ProductItem } from '../types/inventory';
+
+
+type StorageLocationOption = {
+  id: string;
+  name: string;
+  temperature_zone?: string | null;
+};
+
+type ProductListResponse = ProductItem[] | {
+  products?: ProductItem[];
+  rows?: ProductItem[];
+  data?: ProductItem[] | { products?: ProductItem[]; rows?: ProductItem[] };
+};
+
+type StorageLocationListResponse = StorageLocationOption[] | {
+  storage_locations?: StorageLocationOption[];
+  storageLocations?: StorageLocationOption[];
+  locations?: StorageLocationOption[];
+  rows?: StorageLocationOption[];
+  data?: StorageLocationOption[] | {
+    storage_locations?: StorageLocationOption[];
+    storageLocations?: StorageLocationOption[];
+    locations?: StorageLocationOption[];
+    rows?: StorageLocationOption[];
+  };
+};
 
 type ReservationStatus =
   | 'draft'
@@ -241,6 +268,58 @@ function buildReservationQuery(filters: Filters, limit = '100'): string {
   return `/inventory-reservations?${params.toString()}`;
 }
 
+
+function normalizeProductsResponse(response: ProductListResponse): ProductItem[] {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response.products)) return response.products;
+  if (Array.isArray(response.rows)) return response.rows;
+  if (Array.isArray(response.data)) return response.data;
+  if (response.data && !Array.isArray(response.data)) {
+    if (Array.isArray(response.data.products)) return response.data.products;
+    if (Array.isArray(response.data.rows)) return response.data.rows;
+  }
+  return [];
+}
+
+function normalizeStorageLocationsResponse(response: StorageLocationListResponse): StorageLocationOption[] {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response.storage_locations)) return response.storage_locations;
+  if (Array.isArray(response.storageLocations)) return response.storageLocations;
+  if (Array.isArray(response.locations)) return response.locations;
+  if (Array.isArray(response.rows)) return response.rows;
+  if (Array.isArray(response.data)) return response.data;
+  if (response.data && !Array.isArray(response.data)) {
+    if (Array.isArray(response.data.storage_locations)) return response.data.storage_locations;
+    if (Array.isArray(response.data.storageLocations)) return response.data.storageLocations;
+    if (Array.isArray(response.data.locations)) return response.data.locations;
+    if (Array.isArray(response.data.rows)) return response.data.rows;
+  }
+  return [];
+}
+
+async function fetchProductsForReservationOptions(): Promise<ProductItem[]> {
+  const response = await apiRequest<ProductListResponse>('/products?limit=500');
+  return normalizeProductsResponse(response);
+}
+
+async function fetchStorageLocationsForReservationOptions(): Promise<StorageLocationOption[]> {
+  const response = await apiRequest<StorageLocationListResponse>('/storage-locations?limit=500');
+  return normalizeStorageLocationsResponse(response);
+}
+
+function getSelectedProductLabel(product?: ProductItem): string {
+  if (!product) return '';
+  const unit = product.unit ? ` (${product.unit})` : '';
+  const barcode = product.barcode ? ` · ${product.barcode}` : '';
+  return `${product.name}${unit}${barcode}`;
+}
+
+function getSelectedLocationLabel(location?: StorageLocationOption): string {
+  if (!location) return '';
+  const zone = location.temperature_zone ? ` · ${location.temperature_zone}` : '';
+  return `${location.name}${zone}`;
+}
+
 async function fetchReservations(filters: Filters): Promise<InventoryReservation[]> {
   return apiRequest<InventoryReservation[]>(buildReservationQuery(filters));
 }
@@ -358,6 +437,28 @@ export default function InventoryReservationsPage() {
   const [actionNote, setActionNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  const productsQuery = useQuery({
+    queryKey: ['products', 'reservation-options'],
+    queryFn: fetchProductsForReservationOptions
+  });
+
+  const locationsQuery = useQuery({
+    queryKey: ['storage-locations', 'reservation-options'],
+    queryFn: fetchStorageLocationsForReservationOptions
+  });
+
+  const productById = useMemo(() => {
+    const map = new Map<string, ProductItem>();
+    (productsQuery.data || []).forEach((product) => map.set(product.id, product));
+    return map;
+  }, [productsQuery.data]);
+
+  const locationById = useMemo(() => {
+    const map = new Map<string, StorageLocationOption>();
+    (locationsQuery.data || []).forEach((location) => map.set(location.id, location));
+    return map;
+  }, [locationsQuery.data]);
 
   const reservationsQuery = useQuery({
     queryKey: ['inventory-reservations', filters],
@@ -502,7 +603,7 @@ export default function InventoryReservationsPage() {
     ];
   }, [summaryQuery.data]);
 
-  const latestError = createMutation.error || updateDraftMutation.error || actionMutation.error || expireDueMutation.error || conflictResolutionMutation.error || reservationsQuery.error || summaryQuery.error || sourceSummaryQuery.error || projectedFreeStockQuery.error || conflictsQuery.error || detailQuery.error || auditTrailQuery.error;
+  const latestError = createMutation.error || updateDraftMutation.error || actionMutation.error || expireDueMutation.error || conflictResolutionMutation.error || productsQuery.error || locationsQuery.error || reservationsQuery.error || summaryQuery.error || sourceSummaryQuery.error || projectedFreeStockQuery.error || conflictsQuery.error || detailQuery.error || auditTrailQuery.error;
 
   const handleExportCsv = async () => {
     try {
@@ -593,13 +694,27 @@ export default function InventoryReservationsPage() {
           <div style={pageStyles.tableWrap}>
             <table style={pageStyles.table}>
               <thead>
-                <tr><th style={pageStyles.th}>Product ID</th><th style={pageStyles.th}>Storage location ID</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Strategy</th><th style={pageStyles.th}>Note</th><th style={pageStyles.th}></th></tr>
+                <tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Strategy</th><th style={pageStyles.th}>Note</th><th style={pageStyles.th}></th></tr>
               </thead>
               <tbody>
                 {draft.items.map((item, index) => (
                   <tr key={index}>
-                    <td style={pageStyles.td}><input style={pageStyles.input} value={item.product_id} onChange={(event) => updateDraftLine(index, { product_id: event.target.value })} /></td>
-                    <td style={pageStyles.td}><input style={pageStyles.input} value={item.storage_location_id} onChange={(event) => updateDraftLine(index, { storage_location_id: event.target.value })} /></td>
+                    <td style={pageStyles.td}>
+                      <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateDraftLine(index, { product_id: event.target.value })}>
+                        <option value="">{productsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
+                        {(productsQuery.data || []).map((product) => (
+                          <option key={product.id} value={product.id}>{getSelectedProductLabel(product)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={pageStyles.td}>
+                      <select style={pageStyles.input} value={item.storage_location_id} onChange={(event) => updateDraftLine(index, { storage_location_id: event.target.value })}>
+                        <option value="">{locationsQuery.isLoading ? 'Loading locations…' : 'Any / choose during allocation'}</option>
+                        {(locationsQuery.data || []).map((location) => (
+                          <option key={location.id} value={location.id}>{getSelectedLocationLabel(location)}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateDraftLine(index, { requested_quantity: event.target.value })} /></td>
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateDraftLine(index, { allocation_strategy: event.target.value })}>
@@ -778,12 +893,28 @@ export default function InventoryReservationsPage() {
                 </div>
                 <div style={{ ...pageStyles.tableWrap, marginTop: '0.75rem' }}>
                   <table style={pageStyles.table}>
-                    <thead><tr><th style={pageStyles.th}>Product ID</th><th style={pageStyles.th}>Storage location ID</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Strategy</th><th style={pageStyles.th}>Note</th><th style={pageStyles.th}></th></tr></thead>
+                    <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Strategy</th><th style={pageStyles.th}>Note</th><th style={pageStyles.th}></th></tr></thead>
                     <tbody>
                       {editDraft.items.map((item, index) => (
                         <tr key={index}>
-                          <td style={pageStyles.td}><input style={pageStyles.input} value={item.product_id} onChange={(event) => updateEditDraftLine(index, { product_id: event.target.value })} /></td>
-                          <td style={pageStyles.td}><input style={pageStyles.input} value={item.storage_location_id} onChange={(event) => updateEditDraftLine(index, { storage_location_id: event.target.value })} /></td>
+                          <td style={pageStyles.td}>
+                            <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateEditDraftLine(index, { product_id: event.target.value })}>
+                              <option value="">{productsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
+                              {(productsQuery.data || []).map((product) => (
+                                <option key={product.id} value={product.id}>{getSelectedProductLabel(product)}</option>
+                              ))}
+                            </select>
+                            {item.product_id && !productById.has(item.product_id) ? <p style={pageStyles.muted}>Current product ID: {item.product_id}</p> : null}
+                          </td>
+                          <td style={pageStyles.td}>
+                            <select style={pageStyles.input} value={item.storage_location_id} onChange={(event) => updateEditDraftLine(index, { storage_location_id: event.target.value })}>
+                              <option value="">{locationsQuery.isLoading ? 'Loading locations…' : 'Any / choose during allocation'}</option>
+                              {(locationsQuery.data || []).map((location) => (
+                                <option key={location.id} value={location.id}>{getSelectedLocationLabel(location)}</option>
+                              ))}
+                            </select>
+                            {item.storage_location_id && !locationById.has(item.storage_location_id) ? <p style={pageStyles.muted}>Current location ID: {item.storage_location_id}</p> : null}
+                          </td>
                           <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateEditDraftLine(index, { requested_quantity: event.target.value })} /></td>
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateEditDraftLine(index, { allocation_strategy: event.target.value })}>
@@ -913,12 +1044,12 @@ export default function InventoryReservationsPage() {
         <p style={pageStyles.muted}>Projected free = current stock minus open reserved quantity.</p>
         <div style={pageStyles.tableWrap}>
           <table style={pageStyles.table}>
-            <thead><tr><th style={pageStyles.th}>Product ID</th><th style={pageStyles.th}>Location ID</th><th style={pageStyles.th}>On hand</th><th style={pageStyles.th}>Reserved</th><th style={pageStyles.th}>Projected free</th></tr></thead>
+            <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>On hand</th><th style={pageStyles.th}>Reserved</th><th style={pageStyles.th}>Projected free</th></tr></thead>
             <tbody>
               {(projectedFreeStockQuery.data || []).slice(0, 50).map((row) => (
                 <tr key={`${row.product_id}-${row.storage_location_id || 'none'}`}>
-                  <td style={pageStyles.td}>{row.product_id}</td>
-                  <td style={pageStyles.td}>{row.storage_location_id || '—'}</td>
+                  <td style={pageStyles.td}>{productById.get(row.product_id)?.name || row.product_id}</td>
+                  <td style={pageStyles.td}>{row.storage_location_id ? locationById.get(row.storage_location_id)?.name || row.storage_location_id : '—'}</td>
                   <td style={pageStyles.td}>{formatNumber(row.on_hand_quantity)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.reserved_quantity)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.projected_free_quantity)}</td>
