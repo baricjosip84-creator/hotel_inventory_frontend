@@ -12,14 +12,6 @@ type StorageLocationOption = {
   temperature_zone?: string | null;
 };
 
-type ProductOptionsResponse =
-  | ProductItem[]
-  | { products?: ProductItem[]; data?: ProductItem[]; items?: ProductItem[]; results?: ProductItem[] };
-
-type StorageLocationOptionsResponse =
-  | StorageLocationOption[]
-  | { storageLocations?: StorageLocationOption[]; storage_locations?: StorageLocationOption[]; locations?: StorageLocationOption[]; data?: StorageLocationOption[]; items?: StorageLocationOption[]; results?: StorageLocationOption[] };
-
 type RequisitionStatus =
   | 'draft'
   | 'submitted'
@@ -1058,42 +1050,6 @@ function formatNumber(value: number | string | null | undefined): string {
 }
 
 
-function extractApiList<T>(response: unknown, keys: string[]): T[] {
-  if (Array.isArray(response)) {
-    return response as T[];
-  }
-
-  if (!response || typeof response !== 'object') {
-    return [];
-  }
-
-  const record = response as Record<string, unknown>;
-
-  for (const key of keys) {
-    const value = record[key];
-    if (Array.isArray(value)) {
-      return value as T[];
-    }
-  }
-
-  return [];
-}
-
-function normalizeProductOptions(response: ProductOptionsResponse): ProductItem[] {
-  return extractApiList<ProductItem>(response, ['products', 'data', 'items', 'results']);
-}
-
-function normalizeStorageLocationOptions(response: StorageLocationOptionsResponse): StorageLocationOption[] {
-  return extractApiList<StorageLocationOption>(response, [
-    'storageLocations',
-    'storage_locations',
-    'locations',
-    'data',
-    'items',
-    'results'
-  ]);
-}
-
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
@@ -1485,7 +1441,7 @@ export default function InventoryRequisitionsPage() {
 
   const productsQuery = useQuery({
     queryKey: ['products', 'requisition-options'],
-    queryFn: async () => normalizeProductOptions(await apiRequest<ProductOptionsResponse>('/products?limit=500'))
+    queryFn: () => apiRequest<ProductItem[]>('/products?limit=500')
   });
 
   const productCategoryOptions = useMemo(() => {
@@ -1507,7 +1463,7 @@ export default function InventoryRequisitionsPage() {
 
   const locationsQuery = useQuery({
     queryKey: ['storage-locations', 'requisition-options'],
-    queryFn: async () => normalizeStorageLocationOptions(await apiRequest<StorageLocationOptionsResponse>('/storage-locations?limit=500'))
+    queryFn: () => apiRequest<StorageLocationOption[]>('/storage-locations?limit=500')
   });
 
   const detailQuery = useQuery({
@@ -2108,6 +2064,13 @@ export default function InventoryRequisitionsPage() {
   const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && capabilities.canCancelInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && capabilities.canCreateInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
+  const selectedStatus = String(selected?.status || '');
+  const showSubmitAction = selectedStatus === 'draft' && capabilities.canSubmitInventoryRequisitions;
+  const showApproveAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
+  const showRejectAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
+  const showCancelAction = ['draft', 'submitted', 'approved'].includes(selectedStatus) && capabilities.canCancelInventoryRequisitions;
+  const showReopenAction = ['rejected', 'cancelled'].includes(selectedStatus) && capabilities.canCreateInventoryRequisitions;
+  const showWorkflowActions = showSubmitAction || showApproveAction || showRejectAction || showCancelAction || showReopenAction;
   const approvalThresholdApiRequirements = Array.isArray(selected?.approval_threshold_action_requirements)
     ? selected.approval_threshold_action_requirements.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : [];
@@ -3488,29 +3451,41 @@ export default function InventoryRequisitionsPage() {
               </table>
             </div>
 
-            <div style={styles.workflowPanel}>
-              <label style={styles.field}>
-                Workflow notes / reason
-                <input
-                  style={styles.input}
-                  value={workflowNotes}
-                  onChange={(event) => setWorkflowNotes(event.target.value)}
-                  placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required for threshold approve/reject/cancel/reopen` : 'Required for reject/cancel/reopen'}
-                />
-              </label>
-              {approvalThresholdNotesRequired && (
-                <p style={styles.warningBox}>
-                  Approval, rejection, cancellation, or reopen notes of at least {selectedApprovalThresholdNoteMinLength} characters are required for this {approvalThresholdLabel(selected?.approval_threshold_level)} request ({approvalThresholdReasonLabel(selected?.approval_threshold_reason)}). Current note depth: {workflowNotesLength}/{selectedApprovalThresholdNoteMinLength}.
-                </p>
-              )}
-              <div style={styles.actionsRow}>
-                <button style={styles.secondaryButton} disabled={!canSubmit || workflowMutation.isPending} onClick={() => runWorkflow('submit')}>Submit</button>
-                <button style={styles.primaryButton} disabled={!canApprove || workflowMutation.isPending} onClick={() => runWorkflow('approve')}>Approve</button>
-                <button style={styles.dangerButton} disabled={!canReject || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reject')}>Reject</button>
-                <button style={styles.dangerButton} disabled={!canCancel || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('cancel')}>Cancel</button>
-                <button style={styles.secondaryButton} disabled={!canReopen || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reopen')}>Reopen to draft</button>
+            {showWorkflowActions && (
+              <div style={styles.workflowPanel}>
+                <label style={styles.field}>
+                  Workflow notes / reason
+                  <input
+                    style={styles.input}
+                    value={workflowNotes}
+                    onChange={(event) => setWorkflowNotes(event.target.value)}
+                    placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required for threshold approve/reject/cancel/reopen` : 'Required for reject/cancel/reopen'}
+                  />
+                </label>
+                {approvalThresholdNotesRequired && (
+                  <p style={styles.warningBox}>
+                    Approval, rejection, cancellation, or reopen notes of at least {selectedApprovalThresholdNoteMinLength} characters are required for this {approvalThresholdLabel(selected?.approval_threshold_level)} request ({approvalThresholdReasonLabel(selected?.approval_threshold_reason)}). Current note depth: {workflowNotesLength}/{selectedApprovalThresholdNoteMinLength}.
+                  </p>
+                )}
+                <div style={styles.actionsRow}>
+                  {showSubmitAction && (
+                    <button style={styles.secondaryButton} disabled={!canSubmit || workflowMutation.isPending} onClick={() => runWorkflow('submit')}>Submit</button>
+                  )}
+                  {showApproveAction && (
+                    <button style={styles.primaryButton} disabled={!canApprove || workflowMutation.isPending} onClick={() => runWorkflow('approve')}>Approve</button>
+                  )}
+                  {showRejectAction && (
+                    <button style={styles.dangerButton} disabled={!canReject || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reject')}>Reject</button>
+                  )}
+                  {showCancelAction && (
+                    <button style={styles.dangerButton} disabled={!canCancel || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('cancel')}>Cancel</button>
+                  )}
+                  {showReopenAction && (
+                    <button style={styles.secondaryButton} disabled={!canReopen || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reopen')}>Reopen to draft</button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={styles.workflowPanel}>
               <label style={styles.field}>
