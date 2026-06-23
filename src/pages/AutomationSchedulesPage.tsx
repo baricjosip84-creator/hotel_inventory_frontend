@@ -147,91 +147,27 @@ export default function AutomationSchedulesPage() {
         return;
       }
 
-      const [response, typeResponse, readinessResponse, executiveSummaryResponse, runnerStatusResponse, releaseGuardResponse, changeControlPackResponse, rollbackPlanResponse, rollbackVerificationResponse, certificationReportResponse, certificationEvidenceResponse, launchAttestationResponse, safetyReportResponse, governancePackResponse, preflightResponse, accountabilityDigestResponse, operationsReviewResponse, policyMatrixResponse, activationChecklistResponse, containmentReportResponse, driftReportResponse, postLaunchMonitorResponse, incidentDrillResponse, closeoutReportResponse, archiveManifestResponse, retentionReportResponse, handoffBriefResponse, stewardshipChecklistResponse, stewardshipLedgerResponse, auditBundleResponse, observabilitySnapshotResponse, productionSafetyLockResponse, readinessCertificationResponse, moduleClosureResponse, closureSealResponse, finalizationManifestResponse, runEventsResponse] = await Promise.all([
+      const [response, typeResponse, readinessResponse, executiveSummaryResponse, runnerStatusResponse, launchAttestationResponse] = await Promise.all([
         apiRequest<AutomationScheduleListResponse>(`/automation-schedules?${query}`),
         apiRequest<AutomationScheduleTypesResponse>('/automation-schedules/types'),
         apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness'),
         canViewExecutionRequests ? apiRequest<AutomationRunnerExecutiveSummaryResponse>('/automation-schedules/runner-executive-summary') : Promise.resolve(null),
         apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner-status'),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerReleaseGuardResponse>('/automation-schedules/runner-release-guard') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerChangeControlPackResponse>('/automation-schedules/runner-change-control-pack') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerRollbackPlanResponse>('/automation-schedules/runner-rollback-plan') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerRollbackVerificationResponse>('/automation-schedules/runner-rollback-verification') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerCertificationReportResponse>('/automation-schedules/runner-certification-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerCertificationEvidenceResponse>('/automation-schedules/runner-certification-evidence') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerLaunchAttestationResponse>('/automation-schedules/runner-launch-attestation') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerSafetyReportResponse>('/automation-schedules/runner-safety-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerGovernancePackResponse>('/automation-schedules/runner-governance-pack') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerPreflightResponse>('/automation-schedules/runner-preflight') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerAccountabilityDigestResponse>('/automation-schedules/runner-accountability-digest') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerOperationsReviewResponse>('/automation-schedules/runner-operations-review') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerPolicyMatrixResponse>('/automation-schedules/runner-policy-matrix') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerActivationChecklistResponse>('/automation-schedules/runner-activation-checklist') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerContainmentReportResponse>('/automation-schedules/runner-containment-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerDriftReportResponse>('/automation-schedules/runner-drift-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerPostLaunchMonitorResponse>('/automation-schedules/runner-post-launch-monitor') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerIncidentDrillResponse>('/automation-schedules/runner-incident-drill') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerCloseoutReportResponse>('/automation-schedules/runner-closeout-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerArchiveManifestResponse>('/automation-schedules/runner-archive-manifest') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerRetentionReportResponse>('/automation-schedules/runner-retention-report') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerHandoffBriefResponse>('/automation-schedules/runner-handoff-brief') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerStewardshipChecklistResponse>('/automation-schedules/runner-stewardship-checklist') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerStewardshipLedgerResponse>('/automation-schedules/runner-stewardship-ledger') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerAuditBundleResponse>('/automation-schedules/runner-audit-bundle') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerObservabilitySnapshotResponse>('/automation-schedules/runner-observability-snapshot') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerProductionSafetyLockResponse>('/automation-schedules/runner-production-safety-lock') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerReadinessCertificationResponse>('/automation-schedules/runner-readiness-certification') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerModuleClosureResponse>('/automation-schedules/runner-module-closure') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerClosureSealResponse>('/automation-schedules/runner-closure-seal') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerFinalizationManifestResponse>('/automation-schedules/runner-finalization-manifest') : Promise.resolve(null),
-        canViewExecutionRequests ? apiRequest<AutomationScheduleRunEventsResponse>('/automation-schedules/run-events?limit=10') : Promise.resolve(null)
+        canViewExecutionRequests ? apiRequest<AutomationRunnerLaunchAttestationResponse>('/automation-schedules/runner-launch-attestation') : Promise.resolve(null)
       ]);
       setData(response);
       setTypes(typeResponse);
       setRunnerReadiness(readinessResponse);
       setRunnerExecutiveSummary(executiveSummaryResponse);
       setRunnerStatus(runnerStatusResponse);
-      setRunnerReleaseGuard(releaseGuardResponse);
-      setRunnerChangeControlPack(changeControlPackResponse);
-      setRunnerRollbackPlan(rollbackPlanResponse);
-      setRunnerRollbackVerification(rollbackVerificationResponse);
-      setRunnerCertificationReport(certificationReportResponse);
-      setRunnerCertificationEvidence(certificationEvidenceResponse);
       setRunnerLaunchAttestation(launchAttestationResponse);
-      setRunnerSafetyReport(safetyReportResponse);
-      setRunnerGovernancePack(governancePackResponse);
-      setRunnerPreflight(preflightResponse);
-      setRunnerAccountabilityDigest(accountabilityDigestResponse);
-      setRunnerOperationsReview(operationsReviewResponse);
-      setRunnerPolicyMatrix(policyMatrixResponse);
-      setRunnerActivationChecklist(activationChecklistResponse);
-      setRunnerContainmentReport(containmentReportResponse);
-      setRunnerDriftReport(driftReportResponse);
-      setRunnerPostLaunchMonitor(postLaunchMonitorResponse);
-      setRunnerIncidentDrill(incidentDrillResponse);
-      setRunnerCloseoutReport(closeoutReportResponse);
-      setRunnerArchiveManifest(archiveManifestResponse);
-      setRunnerRetentionReport(retentionReportResponse);
-      setRunnerHandoffBrief(handoffBriefResponse);
-      setRunnerStewardshipChecklist(stewardshipChecklistResponse);
-      setRunnerStewardshipLedger(stewardshipLedgerResponse);
-      setRunnerAuditBundle(auditBundleResponse);
-      setRunnerObservabilitySnapshot(observabilitySnapshotResponse);
-      setRunnerProductionSafetyLock(productionSafetyLockResponse);
-      setRunnerReadinessCertification(readinessCertificationResponse);
-      setRunnerModuleClosure(moduleClosureResponse);
-      setRunnerClosureSeal(closureSealResponse);
-      setRunnerFinalizationManifest(finalizationManifestResponse);
-      setRunEvents(runEventsResponse);
-      if (selected) {
-        setSelected(response.rows.find((row) => row.id === selected.id) || null);
-      }
+      setSelected((current) => (current ? response.rows.find((row) => row.id === current.id) || current : null));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load automation schedules');
     } finally {
       setLoading(false);
     }
-  }, [query, selected, canViewExecutionRequests]);
+  }, [query, canViewExecutionRequests]);
 
   useEffect(() => {
     void loadSchedules();
