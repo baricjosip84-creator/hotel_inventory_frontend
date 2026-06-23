@@ -250,6 +250,12 @@ function formatAuditMetadata(metadata?: Record<string, unknown> | null): string 
   }
 }
 
+function getReservationSourceIdForPayload(draft: ReservationDraft): string | undefined {
+  if (draft.source_type === 'manual') return undefined;
+  const value = draft.source_id.trim();
+  return value || undefined;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return 'Unknown request failure.';
@@ -408,7 +414,7 @@ function buildDraftFromReservation(reservation: InventoryReservation): Reservati
 function buildCreatePayload(draft: ReservationDraft) {
   return {
     source_type: draft.source_type,
-    source_id: draft.source_id.trim() || undefined,
+    source_id: getReservationSourceIdForPayload(draft),
     requesting_department: draft.requesting_department.trim() || undefined,
     target_department: draft.target_department.trim() || undefined,
     priority: draft.priority,
@@ -653,7 +659,7 @@ export default function InventoryReservationsPage() {
           <h2 style={pageStyles.sectionTitle}>Create draft reservation</h2>
           <div style={pageStyles.formGrid}>
             <label style={pageStyles.label}>Source type
-              <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value })}>
+              <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : draft.source_id })}>
                 <option value="manual">Manual</option>
                 <option value="requisition">Requisition</option>
                 <option value="event">Event</option>
@@ -662,9 +668,11 @@ export default function InventoryReservationsPage() {
                 <option value="forecast">Forecast</option>
               </select>
             </label>
-            <label style={pageStyles.label}>Source ID
-              <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} />
-            </label>
+            {draft.source_type !== 'manual' ? (
+              <label style={pageStyles.label}>Source ID
+                <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} placeholder="Required UUID for linked source" />
+              </label>
+            ) : null}
             <label style={pageStyles.label}>Requesting department
               <input style={pageStyles.input} value={draft.requesting_department} onChange={(event) => setDraft({ ...draft, requesting_department: event.target.value })} />
             </label>
@@ -855,7 +863,7 @@ export default function InventoryReservationsPage() {
                 <h3 style={pageStyles.sectionTitle}>Edit draft reservation</h3>
                 <div style={pageStyles.formGrid}>
                   <label style={pageStyles.label}>Source type
-                    <select style={pageStyles.input} value={editDraft.source_type} onChange={(event) => setEditDraft({ ...editDraft, source_type: event.target.value })}>
+                    <select style={pageStyles.input} value={editDraft.source_type} onChange={(event) => setEditDraft({ ...editDraft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : editDraft.source_id })}>
                       <option value="manual">Manual</option>
                       <option value="requisition">Requisition</option>
                       <option value="event">Event</option>
@@ -864,9 +872,11 @@ export default function InventoryReservationsPage() {
                       <option value="forecast">Forecast</option>
                     </select>
                   </label>
-                  <label style={pageStyles.label}>Source ID
-                    <input style={pageStyles.input} value={editDraft.source_id} onChange={(event) => setEditDraft({ ...editDraft, source_id: event.target.value })} />
-                  </label>
+                  {editDraft.source_type !== 'manual' ? (
+                    <label style={pageStyles.label}>Source ID
+                      <input style={pageStyles.input} value={editDraft.source_id} onChange={(event) => setEditDraft({ ...editDraft, source_id: event.target.value })} placeholder="Required UUID for linked source" />
+                    </label>
+                  ) : null}
                   <label style={pageStyles.label}>Requesting department
                     <input style={pageStyles.input} value={editDraft.requesting_department} onChange={(event) => setEditDraft({ ...editDraft, requesting_department: event.target.value })} />
                   </label>
