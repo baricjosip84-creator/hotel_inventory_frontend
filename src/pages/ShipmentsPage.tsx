@@ -52,6 +52,7 @@ type ShipmentItem = {
   discrepancy_reason?: string | null;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
+  unit_cost?: number | string | null;
   version?: number;
 };
 
@@ -92,6 +93,7 @@ type ShipmentFormState = {
 type ItemFormState = {
   product_id: string;
   quantity: string;
+  unit_cost: string;
 };
 
 type ReceiveDraft = {
@@ -231,13 +233,15 @@ async function addShipmentItem(input: {
   shipment_id: string;
   product_id: string;
   quantity: number;
+  unit_cost?: number | null;
 }): Promise<ShipmentItem> {
   return apiRequest<ShipmentItem>('/shipment-items', {
     method: 'POST',
     body: JSON.stringify({
       shipment_id: input.shipment_id,
       product_id: input.product_id,
-      quantity: input.quantity
+      quantity: input.quantity,
+      unit_cost: input.unit_cost ?? null
     })
   });
 }
@@ -327,6 +331,16 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
+function formatCurrency(value: number | string | null | undefined): string {
+  const numeric = toNumber(value);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number.isFinite(numeric) ? numeric : 0);
+}
+
 function clampPercentage(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
@@ -344,7 +358,8 @@ function emptyShipmentForm(): ShipmentFormState {
 function emptyItemForm(): ItemFormState {
   return {
     product_id: '',
-    quantity: '1'
+    quantity: '1',
+    unit_cost: ''
   };
 }
 
@@ -1358,10 +1373,18 @@ export default function ShipmentsPage() {
       return;
     }
 
+    const parsedUnitCost = itemForm.unit_cost.trim() === '' ? null : Number(itemForm.unit_cost);
+
+    if (parsedUnitCost !== null && (!Number.isFinite(parsedUnitCost) || parsedUnitCost < 0)) {
+      setPageError('Unit cost must be a valid non-negative number, or left blank.');
+      return;
+    }
+
     addShipmentItemMutation.mutate({
       shipment_id: selectedShipmentId,
       product_id: itemForm.product_id,
-      quantity: Number(itemForm.quantity)
+      quantity: Number(itemForm.quantity),
+      unit_cost: parsedUnitCost
     });
   };
 
@@ -2155,6 +2178,27 @@ export default function ShipmentsPage() {
                   />
                 </div>
 
+                <div>
+                  <label style={styles.label}>Unit Cost</label>
+                  <input
+                    style={styles.input}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={itemForm.unit_cost}
+                    onChange={(event) =>
+                      setItemForm((current) => ({
+                        ...current,
+                        unit_cost: event.target.value
+                      }))
+                    }
+                    placeholder="Optional cost per unit"
+                  />
+                  <div style={styles.inlineHint}>
+                    Used by inventory valuation reports after receiving.
+                  </div>
+                </div>
+
                 <div style={styles.formActionRow}>
                   <button
                     type="submit"
@@ -2328,6 +2372,10 @@ export default function ShipmentsPage() {
                             <div>{remaining}</div>
                           </div>
                           <div>
+                            <strong>Unit Cost</strong>
+                            <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost)}</div>
+                          </div>
+                          <div>
                             <strong>Product ID</strong>
                             <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
                           </div>
@@ -2467,6 +2515,7 @@ export default function ShipmentsPage() {
                         <th style={styles.th}>Ordered</th>
                         <th style={styles.th}>Received</th>
                         <th style={styles.th}>Remaining</th>
+                        <th style={styles.th}>Unit Cost</th>
                         <th style={styles.th}>Storage Location</th>
                         <th style={styles.th}>Receive Quantity</th>
                         <th style={styles.th}>Discrepancy Reason</th>
@@ -2502,6 +2551,9 @@ export default function ShipmentsPage() {
                             <td style={styles.td}>{ordered}</td>
                             <td style={styles.td}>{received}</td>
                             <td style={styles.td}>{remaining}</td>
+                            <td style={styles.td}>
+                              {item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost)}
+                            </td>
                             <td style={styles.td}>
                               <select
                                 style={styles.inputCompact}

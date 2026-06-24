@@ -834,7 +834,7 @@ export default function ReportsPage() {
           id={getReportPanelId('inventory-valuation')}
           labelledBy={getReportTabId('inventory-valuation')}
           title="Inventory Valuation"
-          subtitle="Estimated stock value by product and storage location using the latest available shipment item cost."
+          subtitle="Estimated stock value by product and storage location using the latest available movement, shipment, or standard product cost."
           actions={
             <button
               type="button"
