@@ -263,6 +263,16 @@ function isAuthForm(form: HTMLFormElement): boolean {
   return Boolean(form.closest('[data-auth-form="true"]')) || /login|password|mfa/i.test(normalizedFormLabel(form));
 }
 
+function shouldSuppressGenericFormSubmitFeedback(form: HTMLFormElement): boolean {
+  const label = normalizedFormLabel(form).toLowerCase();
+
+  return (
+    label === 'create product' ||
+    label === 'edit product' ||
+    label.endsWith(' product')
+  );
+}
+
 function useGlobalButtonActionSafety(): void {
   useEffect(() => {
     const originalConfirm = window.confirm.bind(window);
@@ -341,7 +351,14 @@ function useGlobalButtonActionSafety(): void {
 
     const handleGlobalFormSubmit = (event: SubmitEvent) => {
       const form = event.target;
-      if (!(form instanceof HTMLFormElement) || isFormExplicitlySkipped(form) || isAuthForm(form)) return;
+      if (
+        !(form instanceof HTMLFormElement) ||
+        isFormExplicitlySkipped(form) ||
+        isAuthForm(form) ||
+        shouldSuppressGenericFormSubmitFeedback(form)
+      ) {
+        return;
+      }
 
       window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
         detail: { type: 'info', message: `${normalizedFormLabel(form)} submitted.` }

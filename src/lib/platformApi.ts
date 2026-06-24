@@ -92,8 +92,18 @@ function platformMutationActionLabel(path: string, method: string): string {
 }
 
 function platformMutationSuccessMessage(path: string, method: string): string {
-  const label = platformMutationActionLabel(path, method);
+  const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
+
+  if (/\/platform\/tenants\/[^/]+\/lock$/.test(normalizedPath) && normalizedMethod === 'POST') {
+    return 'Tenant locked successfully.';
+  }
+
+  if (/\/platform\/tenants\/[^/]+\/unlock$/.test(normalizedPath) && normalizedMethod === 'POST') {
+    return 'Tenant unlocked successfully.';
+  }
+
+  const label = platformMutationActionLabel(path, method);
 
   if (normalizedMethod === 'POST') return `${label} created successfully.`;
   if (normalizedMethod === 'DELETE') return `${label} deleted successfully.`;
