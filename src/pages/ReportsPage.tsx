@@ -656,7 +656,7 @@ export default function ReportsPage() {
           <StatCard
             title="Estimated Inventory Value"
             value={formatCurrency(inventoryValuationQuery.data?.totals.estimated_inventory_value)}
-            subtitle="Based on the latest known shipment item unit cost per product"
+            subtitle="Based on the latest available movement, shipment, or standard product cost"
           />
           <StatCard
             title="Tracked Valuation Rows"
