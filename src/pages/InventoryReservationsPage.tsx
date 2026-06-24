@@ -256,6 +256,33 @@ function getReservationSourceIdForPayload(draft: ReservationDraft): string | und
   return value || undefined;
 }
 
+
+function getReservationActionState(reservation: InventoryReservation) {
+  const status = String(reservation.status || '').toLowerCase();
+  const requestedQuantity = toNumber(reservation.requested_quantity_total);
+  const reservedQuantity = toNumber(reservation.reserved_quantity_total);
+  const fulfilledQuantity = toNumber(reservation.fulfilled_quantity_total);
+  const releasedQuantity = toNumber(reservation.released_quantity_total);
+  const openReservedQuantity = toNumber(reservation.open_reserved_quantity_total);
+  const remainingRequestedQuantity = Math.max(requestedQuantity - reservedQuantity - fulfilledQuantity - releasedQuantity, 0);
+
+  const isDraft = status === 'draft';
+  const isActive = status === 'active';
+  const isPartiallyAllocated = status === 'partially_allocated';
+  const isAllocated = status === 'allocated';
+  const isPartiallyFulfilled = status === 'partially_fulfilled';
+  const isClosed = ['fulfilled', 'released', 'expired', 'cancelled'].includes(status);
+
+  return {
+    canActivate: isDraft,
+    canAllocate: !isClosed && (isActive || isPartiallyAllocated) && remainingRequestedQuantity > 0,
+    canFulfill: (isAllocated || isPartiallyFulfilled) && openReservedQuantity > 0,
+    canRelease: !isClosed && !isDraft && openReservedQuantity > 0,
+    canExpire: !isClosed && !isDraft,
+    canCancel: isDraft || isActive || isPartiallyAllocated || isAllocated
+  };
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return 'Unknown request failure.';
@@ -850,14 +877,31 @@ export default function InventoryReservationsPage() {
             <label style={pageStyles.label}>Lifecycle note
               <input style={pageStyles.input} value={actionNote} onChange={(event) => setActionNote(event.target.value)} placeholder="Reason for release, cancel, or expiration" />
             </label>
-            <div style={pageStyles.buttonRow}>
-              {permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'activate' })}>Activate</button> : null}
-              {permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'allocate' })}>Allocate</button> : null}
-              {permissions.canFulfillInventoryReservations ? <button type="button" style={pageStyles.button} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'fulfill' })}>Fulfill all reserved</button> : null}
-              {permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'release' })}>Release</button> : null}
-              {permissions.canExpireInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'expire' })}>Expire</button> : null}
-              {permissions.canCancelInventoryReservations ? <button type="button" style={pageStyles.dangerButton} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'cancel' })}>Cancel</button> : null}
-            </div>
+            {(() => {
+              const actionState = getReservationActionState(selectedReservation);
+              const hasVisibleAction =
+                (permissions.canAllocateInventoryReservations && actionState.canActivate) ||
+                (permissions.canAllocateInventoryReservations && actionState.canAllocate) ||
+                (permissions.canFulfillInventoryReservations && actionState.canFulfill) ||
+                (permissions.canReleaseInventoryReservations && actionState.canRelease) ||
+                (permissions.canExpireInventoryReservations && actionState.canExpire) ||
+                (permissions.canCancelInventoryReservations && actionState.canCancel);
+
+              if (!hasVisibleAction) {
+                return <p style={pageStyles.muted}>No lifecycle actions are currently available for this reservation.</p>;
+              }
+
+              return (
+                <div style={pageStyles.buttonRow}>
+                  {permissions.canAllocateInventoryReservations && actionState.canActivate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'activate' })}>Activate</button> : null}
+                  {permissions.canAllocateInventoryReservations && actionState.canAllocate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'allocate' })}>Allocate</button> : null}
+                  {permissions.canFulfillInventoryReservations && actionState.canFulfill ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'fulfill' })}>Fulfill all reserved</button> : null}
+                  {permissions.canReleaseInventoryReservations && actionState.canRelease ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'release' })}>Release</button> : null}
+                  {permissions.canExpireInventoryReservations && actionState.canExpire ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'expire' })}>Expire</button> : null}
+                  {permissions.canCancelInventoryReservations && actionState.canCancel ? <button type="button" style={pageStyles.dangerButton} disabled={actionMutation.isPending} onClick={() => actionMutation.mutate({ id: selectedReservation.id, action: 'cancel' })}>Cancel</button> : null}
+                </div>
+              );
+            })()}
             {editDraft && selectedReservation.status === 'draft' ? (
               <div style={pageStyles.card}>
                 <h3 style={pageStyles.sectionTitle}>Edit draft reservation</h3>
