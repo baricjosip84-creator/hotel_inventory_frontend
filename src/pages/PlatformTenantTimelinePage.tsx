@@ -27,6 +27,101 @@ type TimelineResponse = {
   events: TimelineEvent[];
 };
 
+
+const sourceVisuals: Record<string, { icon: string; accent: string; label: string }> = {
+  audit: { icon: '🧾', accent: '#6366f1', label: 'Audit' },
+  support_session: { icon: '🎧', accent: '#0ea5e9', label: 'Support session' },
+  incident: { icon: '⚠️', accent: '#dc2626', label: 'Incident' },
+  maintenance: { icon: '🛠️', accent: '#f97316', label: 'Maintenance' },
+  tenant_task: { icon: '📝', accent: '#7c3aed', label: 'Task' },
+  tenant_communication: { icon: '📧', accent: '#0891b2', label: 'Communication' },
+  billing_event: { icon: '💰', accent: '#16a34a', label: 'Billing' },
+  data_retention: { icon: '🗄️', accent: '#475569', label: 'Retention' },
+  offboarding: { icon: '🚪', accent: '#be123c', label: 'Offboarding' }
+};
+
+const eventTitleMap: Record<string, string> = {
+  create: 'Tenant created',
+  update: 'Tenant updated',
+  'tenant.create': 'Tenant created',
+  'tenant.update': 'Tenant updated',
+  'tenant.lock': 'Tenant locked',
+  'tenant.unlock': 'Tenant unlocked',
+  'tenant.contact.create': 'Contact created',
+  'tenant.contact.update': 'Contact updated',
+  'tenant.contact.delete': 'Contact deleted',
+  'tenant.communication.create': 'Communication logged',
+  'tenant.communication.update': 'Communication updated',
+  'tenant.communication.resolve_followup': 'Follow-up resolved',
+  'tenant.communication.archive': 'Communication archived',
+  'tenant.task.create': 'Task created',
+  'tenant.task.update': 'Task updated',
+  'tenant.task.delete': 'Task deleted',
+  tenant_create: 'Tenant created',
+  tenant_update: 'Tenant updated',
+  tenant_lock: 'Tenant locked',
+  tenant_unlock: 'Tenant unlocked',
+  tenant_contact_create: 'Contact created',
+  tenant_contact_update: 'Contact updated',
+  tenant_contact_delete: 'Contact deleted',
+  tenant_communication_create: 'Communication logged',
+  tenant_communication_update: 'Communication updated',
+  tenant_communication_resolve_followup: 'Follow-up resolved',
+  tenant_communication_archive: 'Communication archived',
+  tenant_task_create: 'Task created',
+  tenant_task_update: 'Task updated',
+  tenant_task_delete: 'Task deleted'
+};
+
+function friendlyEventTitle(event: TimelineEvent): string {
+  const raw = event.title || '';
+  const normalized = raw.trim().toLowerCase();
+  const mapped = eventTitleMap[normalized] || eventTitleMap[normalized.replace(/\./g, '_')];
+  if (mapped) return mapped;
+  return raw
+    .replace(/^tenant[._-]/i, '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function relativeTime(value?: string | null): string {
+  if (!value) return '';
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return '';
+  const diffSeconds = Math.round((Date.now() - time) / 1000);
+  const absSeconds = Math.abs(diffSeconds);
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['year', 31536000],
+    ['month', 2592000],
+    ['week', 604800],
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+    ['second', 1]
+  ];
+  const [unit, seconds] = units.find(([, size]) => absSeconds >= size) || ['second', 1];
+  const valueInUnit = Math.round(diffSeconds / seconds) * -1;
+  return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(valueInUnit, unit);
+}
+
+function eventSearchText(event: TimelineEvent): string {
+  return [
+    event.title,
+    friendlyEventTitle(event),
+    event.details,
+    event.source,
+    readableSource(event.source),
+    event.tenant_name,
+    event.status,
+    event.severity,
+    event.actor_email,
+    ...importantMetadata(event.metadata)
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 const sourceOptions = [
   { value: '', label: 'All sources' },
   { value: 'audit', label: 'Audit' },
@@ -62,6 +157,7 @@ export default function PlatformTenantTimelinePage() {
   const [days, setDays] = useState('90');
   const [limit, setLimit] = useState('150');
   const [source, setSource] = useState('');
+  const [search, setSearch] = useState('');
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'timeline'],
@@ -84,6 +180,11 @@ export default function PlatformTenantTimelinePage() {
 
   const counts = timeline.data?.counts || {};
   const events = timeline.data?.events || [];
+  const visibleEvents = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase();
+    if (!searchTerm) return events;
+    return events.filter((event) => eventSearchText(event).includes(searchTerm));
+  }, [events, search]);
 
   return (
     <div style={styles.page}>
@@ -110,6 +211,7 @@ export default function PlatformTenantTimelinePage() {
           </select>
           <input style={styles.input} type="number" min="1" max="3650" value={days} onChange={(event) => setDays(event.target.value)} placeholder="Days" />
           <input style={styles.input} type="number" min="1" max="500" value={limit} onChange={(event) => setLimit(event.target.value)} placeholder="Limit" />
+          <input style={styles.input} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search timeline" />
           <button type="button" style={styles.button} onClick={() => void timeline.refetch()} disabled={timeline.isFetching}>
             {timeline.isFetching ? 'Loading...' : 'Refresh'}
           </button>
@@ -131,16 +233,23 @@ export default function PlatformTenantTimelinePage() {
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Events</h2>
-        {events.length === 0 && !timeline.isFetching ? <p style={styles.muted}>No timeline events found for the selected filters.</p> : null}
+        {visibleEvents.length === 0 && !timeline.isFetching ? <p style={styles.muted}>No timeline events found for the selected filters.</p> : null}
         <div style={styles.eventList}>
-          {events.map((event) => {
+          {visibleEvents.map((event) => {
             const metadata = importantMetadata(event.metadata);
+            const visual = sourceVisuals[event.source] || { icon: '•', accent: '#64748b', label: readableSource(event.source) };
+            const displayTitle = friendlyEventTitle(event);
+            const relative = relativeTime(event.happened_at);
             return (
-              <article key={event.id} style={styles.eventCard}>
+              <article key={event.id} style={{ ...styles.eventCard, borderLeftColor: visual.accent }}>
                 <div style={styles.eventHeader}>
-                  <div>
-                    <div style={styles.eventTitle}>{event.title}</div>
-                    <div style={styles.muted}>{event.tenant_name} · {readableSource(event.source)} · {formatDate(event.happened_at)}</div>
+                  <div style={styles.eventTitleWrap}>
+                    <span style={styles.eventIcon} aria-hidden="true">{visual.icon}</span>
+                    <div>
+                      <div style={styles.eventTitle}>{displayTitle}</div>
+                      <div style={styles.muted}>{event.tenant_name} · {visual.label} · {formatDate(event.happened_at)}{relative ? ` · ${relative}` : ''}</div>
+                      {displayTitle !== event.title ? <div style={styles.rawEventKey}>{event.title}</div> : null}
+                    </div>
                   </div>
                   <div style={styles.badgeGroup}>
                     {event.status ? <span style={styles.badge}>{event.status}</span> : null}
@@ -173,9 +282,12 @@ const styles: Record<string, CSSProperties> = {
   summaryLabel: { color: '#6b7280', fontSize: 13 },
   error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b' },
   eventList: { display: 'grid', gap: 12 },
-  eventCard: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff' },
+  eventCard: { border: '1px solid #e5e7eb', borderLeft: '5px solid #64748b', borderRadius: 14, padding: 14, background: '#fff' },
   eventHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
+  eventTitleWrap: { display: 'flex', gap: 10, alignItems: 'flex-start' },
+  eventIcon: { width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 999, background: '#f8fafc', fontSize: 16, flex: '0 0 auto' },
   eventTitle: { fontWeight: 800, fontSize: 16 },
+  rawEventKey: { marginTop: 3, color: '#94a3b8', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' },
   details: { margin: '10px 0', color: '#374151' },
   metaLine: { fontSize: 13, color: '#6b7280', marginTop: 4 },
   badgeGroup: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
