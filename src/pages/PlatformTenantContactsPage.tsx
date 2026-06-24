@@ -130,21 +130,37 @@ export default function PlatformTenantContactsPage() {
     {canWrite ? <section id="platform-tenant-contacts-form" style={styles.panel}>
       <h2>{editingId ? 'Edit contact' : 'Add contact'} {selectedTenant ? `for ${selectedTenant.name}` : ''}</h2>
       <div style={styles.formGrid}>
-        {!tenantId ? <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
-          <option value="">Select tenant first</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select> : null}
-        <select style={styles.input} value={form.contact_type} onChange={(event) => setForm({ ...form, contact_type: event.target.value })}>
-          {contactTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-        </select>
-        <input style={styles.input} placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-        <input style={styles.input} placeholder="Title / role" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-        <input style={styles.input} placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-        <input style={styles.input} placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <input style={styles.input} type="number" min={1} max={99} placeholder="Escalation order" value={form.escalation_order} onChange={(event) => setForm({ ...form, escalation_order: Number(event.target.value) })} />
+        {!tenantId ? <label style={styles.fieldLabel}>Tenant
+          <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
+            <option value="">Select tenant first</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label> : null}
+        <label style={styles.fieldLabel}>Contact type
+          <select style={styles.input} value={form.contact_type} onChange={(event) => setForm({ ...form, contact_type: event.target.value })}>
+            {contactTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>Contact name
+          <input style={styles.input} placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Title / role
+          <input style={styles.input} placeholder="Title / role" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Email
+          <input style={styles.input} placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Phone
+          <input style={styles.input} placeholder="Phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Escalation order
+          <input style={styles.input} type="number" min={1} max={99} placeholder="Escalation order" value={form.escalation_order} onChange={(event) => setForm({ ...form, escalation_order: Number(event.target.value) })} />
+        </label>
         <label style={styles.checkboxLabel}><input type="checkbox" checked={form.is_primary} onChange={(event) => setForm({ ...form, is_primary: event.target.checked })} /> Primary contact</label>
       </div>
-      <textarea style={styles.textarea} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+      <label style={styles.fieldLabel}>Notes
+        <textarea style={styles.textarea} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+      </label>
       <div style={styles.actions}>
         <button style={styles.button} disabled={!tenantId || !form.name || create.isPending || update.isPending} onClick={() => editingId ? update.mutate(editingId) : create.mutate()}>{editingId ? 'Save contact' : 'Add contact'}</button>
         {editingId ? <button style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(blankForm); }}>Cancel edit</button> : null}
@@ -188,8 +204,9 @@ const styles: Record<string, CSSProperties> = {
   muted: { color: '#6b7280', margin: '4px 0' },
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '18px', display: 'grid', gap: '12px' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px' },
-  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px' },
+  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', width: '100%' },
+  fieldLabel: { display: 'grid', gap: '6px', color: '#374151', fontSize: '13px', fontWeight: 700 },
+  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px', width: '100%' },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px' },
   actions: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', width: 'fit-content' },
