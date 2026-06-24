@@ -74,7 +74,7 @@ export default function PlatformDashboardPage() {
 
       <section style={styles.grid}>
         <div style={styles.panel}><h2>Locked tenants</h2>{data.attention?.locked_tenants.length ? data.attention.locked_tenants.map((tenant) => <div key={tenant.id} style={styles.item}><b>{tenant.name}</b><span>{tenant.status} / {tenant.billing_status}</span></div>) : <Empty label="No locked tenants" />}</div>
-        <div style={styles.panel}><h2>Inactive tenants</h2>{data.attention?.stale_tenants.length ? data.attention.stale_tenants.map((tenant) => <div key={tenant.id} style={styles.item}><b>{tenant.name}</b><span>Last seen: {tenant.last_seen_at ? new Date(tenant.last_seen_at).toLocaleString() : 'never'}</span></div>) : <Empty label="No inactive active/trial tenants" />}</div>
+        <div style={styles.panel}><h2>Inactive tenants</h2>{data.attention?.stale_tenants.length ? data.attention.stale_tenants.map((tenant) => <div key={tenant.id} style={styles.item}><b>{tenant.name}</b><span>Last seen: {tenant.last_seen_at ? new Date(tenant.last_seen_at).toLocaleString() : 'Never active'}</span></div>) : <Empty label="No inactive active/trial tenants" />}</div>
       </section>
     </> : null}
   </div>;
