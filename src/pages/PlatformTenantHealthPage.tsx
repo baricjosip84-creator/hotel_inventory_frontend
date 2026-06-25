@@ -76,10 +76,16 @@ export default function PlatformTenantHealthPage() {
     queryFn: () => platformApiRequest<HealthResponse>(`/platform/tenant-health${query ? `?${query}` : ''}`)
   });
 
+  const selectedTenantName = tenants.data?.find((tenant) => tenant.id === tenantId)?.name || '';
+  const syncScopeLabel = tenantId ? selectedTenantName || 'selected tenant' : 'all non-archived tenants';
+
   const scan = useMutation({
     mutationFn: () => platformApiRequest<ScanResult>('/platform/tenant-health/scan', {
       method: 'POST',
-      body: JSON.stringify({ threshold: Math.max(0, Math.min(Number(threshold), 100)) })
+      body: JSON.stringify({
+        threshold: Math.max(0, Math.min(Number(threshold), 100)),
+        ...(tenantId ? { tenant_id: tenantId } : {})
+      })
     }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-health'] });
@@ -123,10 +129,10 @@ export default function PlatformTenantHealthPage() {
           ) : null}
         </div>
         {canScan ? (
-          <p style={styles.helpText}>This action scans all non-archived tenants. Tenants at or below the threshold get one open tenant-health platform notification; existing open tenant-health notifications are refreshed instead of duplicated.</p>
+          <p style={styles.helpText}>This action scans {syncScopeLabel}. Tenants at or below the threshold get one open tenant-health platform notification; existing open tenant-health notifications are refreshed instead of duplicated.</p>
         ) : null}
         {scan.data ? (
-          <p style={styles.successText}>Health notification sync complete: {scan.data.unhealthy_tenants} tenant(s) at or below {scan.data.threshold}; {scan.data.created} created, {scan.data.refreshed} refreshed, {scan.data.notifications_touched} total touched.</p>
+          <p style={styles.successText}>Health notification sync complete: checked {scan.data.tenants_checked} tenant(s); {scan.data.unhealthy_tenants} tenant(s) at or below {scan.data.threshold}; {scan.data.created} created, {scan.data.refreshed} refreshed, {scan.data.notifications_touched} total touched.</p>
         ) : null}
         {scan.error ? <p style={styles.errorText}>{scan.error instanceof Error ? scan.error.message : 'Scan failed'}</p> : null}
       </section>
