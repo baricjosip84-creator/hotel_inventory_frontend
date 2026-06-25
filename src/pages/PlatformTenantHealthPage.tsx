@@ -79,7 +79,7 @@ export default function PlatformTenantHealthPage() {
   const scan = useMutation({
     mutationFn: () => platformApiRequest<ScanResult>('/platform/tenant-health/scan', {
       method: 'POST',
-      body: JSON.stringify({ threshold: Number(threshold) || 70 })
+      body: JSON.stringify({ threshold: Math.max(0, Math.min(Number(threshold), 100)) })
     }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-health'] });
@@ -98,7 +98,7 @@ export default function PlatformTenantHealthPage() {
       </header>
 
       <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Filters and scan</h2>
+        <h2 style={styles.sectionTitle}>Filters and health notification sync</h2>
         <div style={styles.filterGrid}>
           <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
             <option value="">All tenants</option>
@@ -111,16 +111,22 @@ export default function PlatformTenantHealthPage() {
             <option value="risk">Risk</option>
             <option value="critical">Critical</option>
           </select>
-          <input style={styles.input} type="number" min="0" max="100" value={threshold} onChange={(event) => setThreshold(event.target.value)} placeholder="Scan threshold" />
+          <label style={styles.fieldLabel}>
+            Notification threshold
+            <input style={styles.input} type="number" min="0" max="100" value={threshold} onChange={(event) => setThreshold(event.target.value)} placeholder="Notification threshold" />
+          </label>
           <button type="button" style={styles.button} onClick={() => void health.refetch()} disabled={health.isFetching}>Refresh</button>
           {canScan ? (
             <button type="button" style={styles.secondaryButton} onClick={() => scan.mutate()} disabled={scan.isPending}>
-              {scan.isPending ? 'Scanning...' : 'Create health notifications'}
+              {scan.isPending ? 'Syncing...' : 'Sync health notifications'}
             </button>
           ) : null}
         </div>
+        {canScan ? (
+          <p style={styles.helpText}>This action scans all non-archived tenants. Tenants at or below the threshold get one open tenant-health platform notification; existing open tenant-health notifications are refreshed instead of duplicated.</p>
+        ) : null}
         {scan.data ? (
-          <p style={styles.muted}>Scan complete: {scan.data.unhealthy_tenants} unhealthy tenant(s), {scan.data.notifications_touched} notification(s) touched.</p>
+          <p style={styles.successText}>Health notification sync complete: {scan.data.unhealthy_tenants} tenant(s) at or below {scan.data.threshold}; {scan.data.created} created, {scan.data.refreshed} refreshed, {scan.data.notifications_touched} total touched.</p>
         ) : null}
         {scan.error ? <p style={styles.errorText}>{scan.error instanceof Error ? scan.error.message : 'Scan failed'}</p> : null}
       </section>
@@ -198,13 +204,16 @@ const styles: Record<string, CSSProperties> = {
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)' },
   sectionTitle: { marginTop: 0 },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff' },
+  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', width: '100%', boxSizing: 'border-box' },
+  fieldLabel: { display: 'grid', gap: 6, color: '#374151', fontSize: 13, fontWeight: 700 },
   button: { padding: '10px 14px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
   secondaryButton: { padding: '10px 14px', borderRadius: 10, border: '1px solid #111827', background: '#fff', color: '#111827', cursor: 'pointer' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 },
   summaryCard: { background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 4 },
   error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b' },
   errorText: { color: '#991b1b' },
+  helpText: { color: '#6b7280', margin: '10px 0 0', fontSize: 13 },
+  successText: { color: '#166534', margin: '10px 0 0', fontWeight: 700 },
   cardList: { display: 'grid', gap: 14 },
   tenantCard: { border: '1px solid #e5e7eb', borderRadius: 16, padding: 16, background: '#fff', display: 'grid', gap: 12 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
