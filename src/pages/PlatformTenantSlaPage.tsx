@@ -159,23 +159,45 @@ export default function PlatformTenantSlaPage() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>SLA policy</h2>
           <div style={styles.formGrid}>
-            <select style={styles.input} value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}>
-              <option value="">Select tenant</option>
-              {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-            </select>
-            <input style={styles.input} type="number" min="1" value={form.response_target_minutes} onChange={(event) => setForm((current) => ({ ...current, response_target_minutes: event.target.value }))} placeholder="Response target minutes" />
-            <input style={styles.input} type="number" min="1" value={form.incident_resolution_target_hours} onChange={(event) => setForm((current) => ({ ...current, incident_resolution_target_hours: event.target.value }))} placeholder="Incident resolution hours" />
-            <input style={styles.input} type="number" min="0" value={form.task_overdue_grace_hours} onChange={(event) => setForm((current) => ({ ...current, task_overdue_grace_hours: event.target.value }))} placeholder="Task overdue grace hours" />
-            <select style={styles.input} value={form.review_frequency} onChange={(event) => setForm((current) => ({ ...current, review_frequency: event.target.value as FormState['review_frequency'] }))}>
-              <option value="daily">Daily review</option>
-              <option value="weekly">Weekly review</option>
-              <option value="monthly">Monthly review</option>
-            </select>
-            <label style={styles.checkboxLabel}>
-              <input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />
-              Active policy
+            <label style={styles.fieldLabel}>
+              Tenant
+              <select style={styles.input} value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}>
+                <option value="">Select tenant</option>
+                {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+              </select>
             </label>
-            <textarea style={{ ...styles.input, gridColumn: '1 / -1', minHeight: 80 }} value={form.escalation_notes} onChange={(event) => setForm((current) => ({ ...current, escalation_notes: event.target.value }))} placeholder="Escalation notes" />
+            <label style={styles.fieldLabel}>
+              Response SLA (minutes)
+              <input style={styles.input} type="number" min="1" value={form.response_target_minutes} onChange={(event) => setForm((current) => ({ ...current, response_target_minutes: event.target.value }))} />
+            </label>
+            <label style={styles.fieldLabel}>
+              Incident SLA (hours)
+              <input style={styles.input} type="number" min="1" value={form.incident_resolution_target_hours} onChange={(event) => setForm((current) => ({ ...current, incident_resolution_target_hours: event.target.value }))} />
+            </label>
+            <label style={styles.fieldLabel}>
+              Task grace period (hours)
+              <input style={styles.input} type="number" min="0" value={form.task_overdue_grace_hours} onChange={(event) => setForm((current) => ({ ...current, task_overdue_grace_hours: event.target.value }))} />
+            </label>
+            <label style={styles.fieldLabel}>
+              Review cadence
+              <select style={styles.input} value={form.review_frequency} onChange={(event) => setForm((current) => ({ ...current, review_frequency: event.target.value as FormState['review_frequency'] }))}>
+                <option value="daily">Daily review</option>
+                <option value="weekly">Weekly review</option>
+                <option value="monthly">Monthly review</option>
+              </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Active policy
+              <span style={styles.checkboxField}>
+                <input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />
+                Policy is active
+              </span>
+            </label>
+            <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>
+              Escalation notes
+              <textarea style={{ ...styles.input, minHeight: 96, resize: 'vertical' }} value={form.escalation_notes} onChange={(event) => setForm((current) => ({ ...current, escalation_notes: event.target.value }))} placeholder="Add escalation instructions, owner notes, or review context." />
+            </label>
+            <p style={styles.helperText}>These thresholds determine when tenant work is considered overdue and when SLA notifications are generated.</p>
             <button type="button" style={styles.button} onClick={() => savePolicy.mutate()} disabled={!form.tenant_id || savePolicy.isPending}>{savePolicy.isPending ? 'Saving...' : 'Save policy'}</button>
           </div>
         </section>
@@ -220,6 +242,9 @@ const styles: Record<string, CSSProperties> = {
   filterGrid: { display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) auto auto auto', gap: 12, alignItems: 'center' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, alignItems: 'center' },
   input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff' },
+  fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, color: '#374151', fontSize: 13, fontWeight: 700 },
+  helperText: { gridColumn: '1 / -1', margin: '0 0 2px', color: '#6b7280', fontSize: 13 },
+  checkboxField: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center', color: '#111827', fontSize: 14, fontWeight: 500, background: '#fff' },
   checkboxLabel: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 },
   button: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', fontWeight: 700, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #111827', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#111827', fontWeight: 700, cursor: 'pointer' },
