@@ -35,6 +35,16 @@ type PolicyResponse = {
   }>;
 };
 
+type SlaScanResult = {
+  scanned_at: string;
+  tenants_checked: number;
+  breached_tenants: number;
+  created: number;
+  refreshed: number;
+  notifications_touched: number;
+  summary: SlaOverview['summary'];
+};
+
 type FormState = {
   tenant_id: string;
   response_target_minutes: string;
@@ -103,7 +113,7 @@ export default function PlatformTenantSlaPage() {
   });
 
   const scan = useMutation({
-    mutationFn: () => platformApiRequest('/platform/tenant-sla/scan', { method: 'POST' }),
+    mutationFn: () => platformApiRequest<SlaScanResult>('/platform/tenant-sla/scan', { method: 'POST' }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
       void queryClient.invalidateQueries({ queryKey: ['platform', 'notifications'] });
@@ -151,8 +161,15 @@ export default function PlatformTenantSlaPage() {
             Breached only
           </label>
           <button type="button" style={styles.button} onClick={() => void overview.refetch()} disabled={overview.isFetching}>Refresh</button>
-          {canWrite ? <button type="button" style={styles.secondaryButton} onClick={() => scan.mutate()} disabled={scan.isPending}>{scan.isPending ? 'Scanning...' : 'Create SLA notifications'}</button> : null}
+          {canWrite ? <button type="button" style={styles.secondaryButton} onClick={() => scan.mutate()} disabled={scan.isPending}>{scan.isPending ? 'Syncing...' : 'Sync SLA notifications'}</button> : null}
         </div>
+        {canWrite ? (
+          <p style={styles.helpText}>This action scans the current SLA overview and keeps one open SLA platform notification for each active breached tenant; existing open SLA notifications are refreshed instead of duplicated.</p>
+        ) : null}
+        {scan.data ? (
+          <p style={styles.successText}>SLA notification sync complete: checked {scan.data.tenants_checked} tenant(s); {scan.data.breached_tenants} breached tenant(s); {scan.data.created} created, {scan.data.refreshed} refreshed, {scan.data.notifications_touched} total touched.</p>
+        ) : null}
+        {scan.error ? <p style={styles.errorText}>{scan.error instanceof Error ? scan.error.message : 'SLA notification sync failed'}</p> : null}
       </section>
 
       {canWrite ? (
@@ -244,6 +261,9 @@ const styles: Record<string, CSSProperties> = {
   input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff' },
   fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, color: '#374151', fontSize: 13, fontWeight: 700 },
   helperText: { gridColumn: '1 / -1', margin: '0 0 2px', color: '#6b7280', fontSize: 13 },
+  helpText: { margin: '12px 0 0', color: '#6b7280', fontSize: 13 },
+  successText: { margin: '12px 0 0', color: '#166534', fontSize: 14, fontWeight: 700 },
+  errorText: { margin: '12px 0 0', color: '#991b1b', fontSize: 14, fontWeight: 700 },
   checkboxField: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center', color: '#111827', fontSize: 14, fontWeight: 500, background: '#fff' },
   checkboxLabel: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 },
   button: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', fontWeight: 700, cursor: 'pointer' },

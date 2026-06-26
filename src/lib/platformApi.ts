@@ -103,6 +103,10 @@ function platformMutationSuccessMessage(path: string, method: string): string {
     return 'Tenant unlocked successfully.';
   }
 
+  if (normalizedPath === '/platform/tenant-sla/scan' && normalizedMethod === 'POST') {
+    return 'SLA notification sync completed successfully.';
+  }
+
   const label = platformMutationActionLabel(path, method);
 
   if (normalizedMethod === 'POST') return `${label} created successfully.`;
