@@ -120,24 +120,24 @@ export default function PlatformChangeManagementPage() {
   };
 
   const createChange = useMutation({
-    mutationFn: () => platformApiRequest<ChangeRequest>('/platform/change-management', {
+    mutationFn: ({ submitForApproval = false }: { submitForApproval?: boolean } = {}) => platformApiRequest<ChangeRequest>('/platform/change-management', {
       method: 'POST',
-      body: JSON.stringify(payloadFromDraft())
+      body: JSON.stringify(payloadFromDraft({ submit_for_approval: submitForApproval }))
     }),
     onSuccess: (change) => {
-      setStatusMessage(`Change request created as ${change.status}.`);
+      setStatusMessage(change.status === 'pending_approval' ? 'Change request submitted for approval.' : 'Draft saved successfully.');
       resetForm();
       refreshAll();
     }
   });
 
   const updateChange = useMutation({
-    mutationFn: ({ id, submitForApproval = false }: { id: string; submitForApproval?: boolean }) => platformApiRequest<ChangeRequest>(`/platform/change-management/${id}`, {
+    mutationFn: ({ id, submitForApproval = false, draftOverride }: { id: string; submitForApproval?: boolean; draftOverride?: DraftState }) => platformApiRequest<ChangeRequest>(`/platform/change-management/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(payloadFromDraft(submitForApproval ? { submit_for_approval: true } : {}))
+      body: JSON.stringify(payloadFromDraft({ ...(draftOverride ?? {}), ...(submitForApproval ? { submit_for_approval: true } : {}) }))
     }),
     onSuccess: (change) => {
-      setStatusMessage(change.status === 'pending_approval' ? 'Change request submitted for approval.' : 'Change request updated.');
+      setStatusMessage(change.status === 'pending_approval' ? 'Change request submitted for approval.' : 'Draft saved successfully.');
       resetForm();
       refreshAll();
     }
@@ -157,14 +157,14 @@ export default function PlatformChangeManagementPage() {
 
   const handleSubmitForm = (submitForApproval = false) => {
     if (!draft.title.trim()) {
-      setFormError('Title is required before a change request can be created or saved.');
+      setFormError('Title is required before saving or submitting a change request.');
       return;
     }
     setFormError('');
     if (editingId) {
       updateChange.mutate({ id: editingId, submitForApproval });
     } else {
-      createChange.mutate();
+      createChange.mutate({ submitForApproval });
     }
   };
 
@@ -220,13 +220,12 @@ export default function PlatformChangeManagementPage() {
             <label style={styles.fieldLabel}>Planned start<input style={styles.input} type="datetime-local" value={draft.planned_start_at} onChange={(event) => setDraft((current) => ({ ...current, planned_start_at: event.target.value }))} /></label>
             <label style={styles.fieldLabel}>Planned end<input style={styles.input} type="datetime-local" value={draft.planned_end_at} onChange={(event) => setDraft((current) => ({ ...current, planned_end_at: event.target.value }))} /></label>
             <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>Description / rollback / customer impact<textarea style={{ ...styles.input, minHeight: 80 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="What will change, why, rollback notes, customer impact" /></label>
-            <label style={styles.checkbox}><input type="checkbox" checked={draft.submit_for_approval} onChange={(event) => setDraft((current) => ({ ...current, submit_for_approval: event.target.checked }))} /> Submit for approval immediately</label>
           </div>
           {formError ? <p style={styles.errorText}>{formError}</p> : null}
           {statusMessage ? <p style={styles.successText}>{statusMessage}</p> : null}
           <div style={styles.actions}>
-            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(false)}>{editingId ? 'Save change request' : 'Create change request'}</button>
-            {editingId ? <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(true)}>Save and submit for approval</button> : null}
+            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(false)}>Save draft</button>
+            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(true)}>Submit for approval</button>
           </div>
         </section>
       ) : null}
@@ -261,7 +260,7 @@ export default function PlatformChangeManagementPage() {
               {change.execution_notes ? <p style={styles.muted}><strong>Execution notes:</strong> {change.execution_notes}</p> : null}
               <div style={styles.actions}>
                 {canWrite && ['draft', 'pending_approval'].includes(change.status) ? <button type="button" style={styles.secondaryButton} onClick={() => startEdit(change)}>Edit</button> : null}
-                {canWrite && change.status === 'draft' ? <button type="button" style={styles.button} onClick={() => { setDraft(changeToDraft(change)); setEditingId(change.id); updateChange.mutate({ id: change.id, submitForApproval: true }); }}>Submit for approval</button> : null}
+                {canWrite && change.status === 'draft' ? <button type="button" style={styles.button} onClick={() => updateChange.mutate({ id: change.id, submitForApproval: true, draftOverride: changeToDraft(change) })}>Submit for approval</button> : null}
                 {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'approve' })}>Approve</button> : null}
                 {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.dangerButton} onClick={() => runAction.mutate({ id: change.id, action: 'reject' })}>Reject</button> : null}
                 {canExecute && change.status === 'approved' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'execute' })}>Mark executed</button> : null}
