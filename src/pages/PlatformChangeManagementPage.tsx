@@ -38,9 +38,43 @@ type SummaryResponse = {
   open_by_risk: Array<{ risk_level: string; count: number }>;
 };
 
+type DraftState = {
+  title: string;
+  description: string;
+  category: string;
+  risk_level: string;
+  tenant_id: string;
+  planned_start_at: string;
+  planned_end_at: string;
+  submit_for_approval: boolean;
+};
+
 const categories = ['maintenance', 'billing', 'entitlement', 'security', 'migration', 'operational', 'support'];
 const risks = ['low', 'medium', 'high', 'critical'];
 const statuses = ['draft', 'pending_approval', 'approved', 'rejected', 'cancelled', 'executed'];
+const defaultDraft: DraftState = { title: '', description: '', category: 'operational', risk_level: 'medium', tenant_id: '', planned_start_at: '', planned_end_at: '', submit_for_approval: true };
+
+function toLocalDateTimeInput(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function changeToDraft(change: ChangeRequest): DraftState {
+  return {
+    title: change.title || '',
+    description: change.description || '',
+    category: change.category || 'operational',
+    risk_level: change.risk_level || 'medium',
+    tenant_id: change.tenant_id || '',
+    planned_start_at: toLocalDateTimeInput(change.planned_start_at),
+    planned_end_at: toLocalDateTimeInput(change.planned_end_at),
+    submit_for_approval: change.status === 'pending_approval'
+  };
+}
 
 export default function PlatformChangeManagementPage() {
   const queryClient = useQueryClient();
@@ -48,8 +82,11 @@ export default function PlatformChangeManagementPage() {
   const canApprove = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_APPROVE);
   const canExecute = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_EXECUTE);
   const [filters, setFilters] = useState({ status: '', category: '', risk_level: '', tenant_id: '', search: '' });
-  const [draft, setDraft] = useState({ title: '', description: '', category: 'operational', risk_level: 'medium', tenant_id: '', planned_start_at: '', planned_end_at: '', submit_for_approval: true });
+  const [draft, setDraft] = useState<DraftState>(defaultDraft);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [actionReason, setActionReason] = useState('');
+  const [formError, setFormError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -66,24 +103,80 @@ export default function PlatformChangeManagementPage() {
     void queryClient.invalidateQueries({ queryKey: ['platform', 'change-management'] });
   };
 
+  const resetForm = () => {
+    setDraft(defaultDraft);
+    setEditingId(null);
+    setFormError('');
+  };
+
+  const payloadFromDraft = (override: Partial<DraftState> = {}) => {
+    const next = { ...draft, ...override };
+    return {
+      ...next,
+      tenant_id: next.tenant_id || null,
+      planned_start_at: next.planned_start_at || null,
+      planned_end_at: next.planned_end_at || null
+    };
+  };
+
   const createChange = useMutation({
-    mutationFn: () => platformApiRequest('/platform/change-management', {
+    mutationFn: () => platformApiRequest<ChangeRequest>('/platform/change-management', {
       method: 'POST',
-      body: JSON.stringify({ ...draft, tenant_id: draft.tenant_id || null, planned_start_at: draft.planned_start_at || null, planned_end_at: draft.planned_end_at || null })
+      body: JSON.stringify(payloadFromDraft())
     }),
-    onSuccess: () => {
-      setDraft({ title: '', description: '', category: 'operational', risk_level: 'medium', tenant_id: '', planned_start_at: '', planned_end_at: '', submit_for_approval: true });
+    onSuccess: (change) => {
+      setStatusMessage(`Change request created as ${change.status}.`);
+      resetForm();
+      refreshAll();
+    }
+  });
+
+  const updateChange = useMutation({
+    mutationFn: ({ id, submitForApproval = false }: { id: string; submitForApproval?: boolean }) => platformApiRequest<ChangeRequest>(`/platform/change-management/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payloadFromDraft(submitForApproval ? { submit_for_approval: true } : {}))
+    }),
+    onSuccess: (change) => {
+      setStatusMessage(change.status === 'pending_approval' ? 'Change request submitted for approval.' : 'Change request updated.');
+      resetForm();
       refreshAll();
     }
   });
 
   const runAction = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'cancel' | 'execute' }) => platformApiRequest(`/platform/change-management/${id}/${action}`, {
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'cancel' | 'execute' }) => platformApiRequest<ChangeRequest>(`/platform/change-management/${id}/${action}`, {
       method: 'POST',
       body: JSON.stringify(action === 'execute' ? { notes: actionReason } : { reason: actionReason })
     }),
-    onSuccess: () => { setActionReason(''); refreshAll(); }
+    onSuccess: (change) => {
+      setStatusMessage(`Change request ${change.status}.`);
+      setActionReason('');
+      refreshAll();
+    }
   });
+
+  const handleSubmitForm = (submitForApproval = false) => {
+    if (!draft.title.trim()) {
+      setFormError('Title is required before a change request can be created or saved.');
+      return;
+    }
+    setFormError('');
+    if (editingId) {
+      updateChange.mutate({ id: editingId, submitForApproval });
+    } else {
+      createChange.mutate();
+    }
+  };
+
+  const startEdit = (change: ChangeRequest) => {
+    setDraft(changeToDraft(change));
+    setEditingId(change.id);
+    setFormError('');
+    setStatusMessage(`Editing change request: ${change.title}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const isMutating = createChange.isPending || updateChange.isPending || runAction.isPending;
 
   return (
     <div style={styles.page}>
@@ -104,35 +197,43 @@ export default function PlatformChangeManagementPage() {
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Filters</h2>
         <div style={styles.formGrid}>
-          <select style={styles.input} value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}><option value="">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <select style={styles.input} value={filters.category} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}><option value="">All categories</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <select style={styles.input} value={filters.risk_level} onChange={(event) => setFilters((current) => ({ ...current, risk_level: event.target.value }))}><option value="">All risks</option>{risks.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">All tenants</option>{tenants.data?.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select>
-          <input style={styles.input} value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search title/description" />
+          <label style={styles.fieldLabel}>Status<select style={styles.input} value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}><option value="">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Category<select style={styles.input} value={filters.category} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}><option value="">All categories</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Risk<select style={styles.input} value={filters.risk_level} onChange={(event) => setFilters((current) => ({ ...current, risk_level: event.target.value }))}><option value="">All risks</option>{risks.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Tenant<select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">All tenants</option>{tenants.data?.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Search<input style={styles.input} value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search title/description" /></label>
           <button type="button" style={styles.button} onClick={refreshAll}>Refresh</button>
         </div>
       </section>
 
       {canWrite ? (
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Create change request</h2>
+          <div style={styles.formHeader}>
+            <h2 style={styles.sectionTitle}>{editingId ? 'Edit change request' : 'Create change request'}</h2>
+            {editingId ? <button type="button" style={styles.secondaryButton} onClick={resetForm}>Cancel edit</button> : null}
+          </div>
           <div style={styles.formGrid}>
-            <input style={styles.input} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Title" />
-            <select style={styles.input} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-            <select style={styles.input} value={draft.risk_level} onChange={(event) => setDraft((current) => ({ ...current, risk_level: event.target.value }))}>{risks.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-            <select style={styles.input} value={draft.tenant_id} onChange={(event) => setDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Platform-wide / no tenant</option>{tenants.data?.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select>
-            <input style={styles.input} type="datetime-local" value={draft.planned_start_at} onChange={(event) => setDraft((current) => ({ ...current, planned_start_at: event.target.value }))} />
-            <input style={styles.input} type="datetime-local" value={draft.planned_end_at} onChange={(event) => setDraft((current) => ({ ...current, planned_end_at: event.target.value }))} />
-            <textarea style={{ ...styles.input, gridColumn: '1 / -1', minHeight: 80 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="What will change, why, rollback notes, customer impact" />
+            <label style={styles.fieldLabel}>Title<input style={styles.input} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Title" /></label>
+            <label style={styles.fieldLabel}>Category<select style={styles.input} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Risk<select style={styles.input} value={draft.risk_level} onChange={(event) => setDraft((current) => ({ ...current, risk_level: event.target.value }))}>{risks.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Tenant<select style={styles.input} value={draft.tenant_id} onChange={(event) => setDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Platform-wide / no tenant</option>{tenants.data?.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Planned start<input style={styles.input} type="datetime-local" value={draft.planned_start_at} onChange={(event) => setDraft((current) => ({ ...current, planned_start_at: event.target.value }))} /></label>
+            <label style={styles.fieldLabel}>Planned end<input style={styles.input} type="datetime-local" value={draft.planned_end_at} onChange={(event) => setDraft((current) => ({ ...current, planned_end_at: event.target.value }))} /></label>
+            <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>Description / rollback / customer impact<textarea style={{ ...styles.input, minHeight: 80 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="What will change, why, rollback notes, customer impact" /></label>
             <label style={styles.checkbox}><input type="checkbox" checked={draft.submit_for_approval} onChange={(event) => setDraft((current) => ({ ...current, submit_for_approval: event.target.checked }))} /> Submit for approval immediately</label>
           </div>
-          <button type="button" style={styles.button} disabled={!draft.title || createChange.isPending} onClick={() => createChange.mutate()}>Create change request</button>
+          {formError ? <p style={styles.errorText}>{formError}</p> : null}
+          {statusMessage ? <p style={styles.successText}>{statusMessage}</p> : null}
+          <div style={styles.actions}>
+            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(false)}>{editingId ? 'Save change request' : 'Create change request'}</button>
+            {editingId ? <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(true)}>Save and submit for approval</button> : null}
+          </div>
         </section>
       ) : null}
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Change requests</h2>
-        <input style={{ ...styles.input, marginBottom: 12 }} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="Reason / execution notes for next action" />
+        <label style={{ ...styles.fieldLabel, maxWidth: 420 }}>Reason / execution notes<input style={{ ...styles.input, marginBottom: 12 }} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="Reason / execution notes for next action" /></label>
         <div style={styles.list}>
           {changes.data?.change_requests.map((change) => (
             <article key={change.id} style={styles.card}>
@@ -154,7 +255,13 @@ export default function PlatformChangeManagementPage() {
                 <span><strong>Planned:</strong> {change.planned_start_at ? new Date(change.planned_start_at).toLocaleString() : 'Not set'}</span>
                 <span><strong>Approved by:</strong> {change.approved_by_email || '-'}</span>
               </div>
+              {change.approval_reason ? <p style={styles.muted}><strong>Approval reason:</strong> {change.approval_reason}</p> : null}
+              {change.rejection_reason ? <p style={styles.muted}><strong>Rejection reason:</strong> {change.rejection_reason}</p> : null}
+              {change.cancellation_reason ? <p style={styles.muted}><strong>Cancellation reason:</strong> {change.cancellation_reason}</p> : null}
+              {change.execution_notes ? <p style={styles.muted}><strong>Execution notes:</strong> {change.execution_notes}</p> : null}
               <div style={styles.actions}>
+                {canWrite && ['draft', 'pending_approval'].includes(change.status) ? <button type="button" style={styles.secondaryButton} onClick={() => startEdit(change)}>Edit</button> : null}
+                {canWrite && change.status === 'draft' ? <button type="button" style={styles.button} onClick={() => { setDraft(changeToDraft(change)); setEditingId(change.id); updateChange.mutate({ id: change.id, submitForApproval: true }); }}>Submit for approval</button> : null}
                 {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'approve' })}>Approve</button> : null}
                 {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.dangerButton} onClick={() => runAction.mutate({ id: change.id, action: 'reject' })}>Reject</button> : null}
                 {canExecute && change.status === 'approved' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'execute' })}>Mark executed</button> : null}
@@ -187,12 +294,16 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: { marginTop: 0, fontSize: 18 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   summaryCard: { display: 'grid', gap: 4, padding: 16, borderRadius: 12, background: '#f9fafb' },
+  formHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 },
-  input: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', font: 'inherit' },
+  fieldLabel: { display: 'grid', gap: 6, fontSize: 12, fontWeight: 700, color: '#111827' },
+  input: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', font: 'inherit', fontWeight: 400 },
   checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#374151' },
   button: { padding: '10px 12px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
   secondaryButton: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' },
   dangerButton: { padding: '10px 12px', borderRadius: 10, border: 0, background: '#991b1b', color: '#fff', cursor: 'pointer' },
+  errorText: { color: '#991b1b', fontWeight: 700, margin: '0 0 12px' },
+  successText: { color: '#166534', fontWeight: 700, margin: '0 0 12px' },
   list: { display: 'grid', gap: 12 },
   card: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, display: 'grid', gap: 12 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },

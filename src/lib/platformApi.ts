@@ -107,6 +107,15 @@ function platformMutationSuccessMessage(path: string, method: string): string {
     return 'SLA notification sync completed successfully.';
   }
 
+  if (normalizedPath.includes('/change-management')) {
+    if (normalizedPath.endsWith('/approve') && normalizedMethod === 'POST') return 'Change request approved successfully.';
+    if (normalizedPath.endsWith('/reject') && normalizedMethod === 'POST') return 'Change request rejected successfully.';
+    if (normalizedPath.endsWith('/cancel') && normalizedMethod === 'POST') return 'Change request cancelled successfully.';
+    if (normalizedPath.endsWith('/execute') && normalizedMethod === 'POST') return 'Change request marked executed successfully.';
+    if (normalizedMethod === 'POST') return 'Change request created successfully.';
+    if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return 'Change request saved successfully.';
+  }
+
   const label = platformMutationActionLabel(path, method);
 
   if (normalizedMethod === 'POST') return `${label} created successfully.`;
