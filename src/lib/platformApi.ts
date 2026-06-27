@@ -107,6 +107,10 @@ function platformMutationSuccessMessage(path: string, method: string): string {
     return 'SLA notification sync completed successfully.';
   }
 
+  if (normalizedPath === '/platform/notifications/integration-monitoring-scan' && normalizedMethod === 'POST') {
+    return 'Integration monitoring scan completed successfully.';
+  }
+
   if (normalizedPath.includes('/change-management')) {
     if (normalizedPath.endsWith('/approve') && normalizedMethod === 'POST') return 'Change request approved successfully.';
     if (normalizedPath.endsWith('/reject') && normalizedMethod === 'POST') return 'Change request rejected successfully.';
