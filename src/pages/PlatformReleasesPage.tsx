@@ -86,6 +86,10 @@ function payload(form: ReleaseForm) {
     release_notes: form.release_notes || null
   };
 }
+
+function canStartRelease(status: string) { return status === 'planned'; }
+function canDeployRelease(status: string) { return status === 'in_progress'; }
+function canRollbackRelease(status: string) { return status === 'in_progress' || status === 'deployed'; }
 function statusStyle(status: string): CSSProperties {
   if (status === 'rolled_back' || status === 'cancelled') return styles.badgeDanger;
   if (status === 'in_progress') return styles.badgeWarn;
@@ -206,9 +210,9 @@ export default function PlatformReleasesPage() {
                     {canWrite ? (
                       <div style={styles.rowActions}>
                         <button type="button" onClick={() => { setEditingId(release.id); setForm(toForm(release)); scrollToFormSection('platform-releases-form'); }} style={styles.smallButton}>Edit</button>
-                        {release.status !== 'in_progress' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'in_progress' })} style={styles.smallButton}>Start</button> : null}
-                        {release.status !== 'deployed' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'deployed' })} style={styles.smallButton}>Deploy</button> : null}
-                        {release.status !== 'rolled_back' ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'rolled_back' })} style={styles.dangerButton}>Rollback</button> : null}
+                        {canStartRelease(release.status) ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'in_progress' })} style={styles.smallButton}>Start</button> : null}
+                        {canDeployRelease(release.status) ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'deployed' })} style={styles.smallButton}>Deploy</button> : null}
+                        {canRollbackRelease(release.status) ? <button type="button" onClick={() => transition.mutate({ id: release.id, status: 'rolled_back' })} style={styles.dangerButton}>Rollback</button> : null}
                       </div>
                     ) : '—'}
                   </td>
