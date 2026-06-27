@@ -100,6 +100,7 @@ export default function PlatformReleasesPage() {
   const [filters, setFilters] = useState({ status: '', environment: '', release_type: '', search: '', upcoming_only: false });
   const [form, setForm] = useState<ReleaseForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const releaseFormValid = form.version.trim().length > 0 && form.title.trim().length > 0;
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -165,22 +166,23 @@ export default function PlatformReleasesPage() {
       {canWrite ? (
         <section id="platform-releases-form" style={styles.panel}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit release' : 'Create release'}</h2>
+          {!releaseFormValid ? <div style={styles.validation}>Version and title are required before creating a release.</div> : null}
           <div style={styles.grid3}>
-            <input value={form.version} onChange={(event) => setForm((prev) => ({ ...prev, version: event.target.value }))} placeholder="Version, e.g. 1.7.0" style={styles.input} />
-            <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Release title" style={styles.input} />
-            <input type="datetime-local" value={form.planned_at} onChange={(event) => setForm((prev) => ({ ...prev, planned_at: event.target.value }))} style={styles.input} />
-            <select value={form.release_type} onChange={(event) => setForm((prev) => ({ ...prev, release_type: event.target.value }))} style={styles.input}>{releaseTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.environment} onChange={(event) => setForm((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.tenant_impact} onChange={(event) => setForm((prev) => ({ ...prev, tenant_impact: event.target.value }))} style={styles.input}>{impacts.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.owner_platform_user_id} onChange={(event) => setForm((prev) => ({ ...prev, owner_platform_user_id: event.target.value }))} style={styles.input}><option value="">No owner</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select>
+            <label style={styles.fieldLabel}>Version<input value={form.version} onChange={(event) => setForm((prev) => ({ ...prev, version: event.target.value }))} placeholder="Example: 1.7.0" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Release title<input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Release title" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Planned at<input type="datetime-local" value={form.planned_at} onChange={(event) => setForm((prev) => ({ ...prev, planned_at: event.target.value }))} style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Release type<select value={form.release_type} onChange={(event) => setForm((prev) => ({ ...prev, release_type: event.target.value }))} style={styles.input}>{releaseTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Status<select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Environment<select value={form.environment} onChange={(event) => setForm((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Tenant impact<select value={form.tenant_impact} onChange={(event) => setForm((prev) => ({ ...prev, tenant_impact: event.target.value }))} style={styles.input}>{impacts.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Owner<select value={form.owner_platform_user_id} onChange={(event) => setForm((prev) => ({ ...prev, owner_platform_user_id: event.target.value }))} style={styles.input}><option value="">No owner</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>
             <label style={styles.checkRow}><input type="checkbox" checked={form.requires_maintenance} onChange={(event) => setForm((prev) => ({ ...prev, requires_maintenance: event.target.checked }))} /> Requires maintenance</label>
           </div>
-          <textarea value={form.summary} onChange={(event) => setForm((prev) => ({ ...prev, summary: event.target.value }))} placeholder="Short operational summary" style={styles.textarea} />
-          <textarea value={form.release_notes} onChange={(event) => setForm((prev) => ({ ...prev, release_notes: event.target.value }))} placeholder="Release notes" style={styles.textarea} />
-          <textarea value={form.rollback_plan} onChange={(event) => setForm((prev) => ({ ...prev, rollback_plan: event.target.value }))} placeholder="Rollback plan" style={styles.textarea} />
+          <label style={styles.fieldLabel}>Summary<textarea value={form.summary} onChange={(event) => setForm((prev) => ({ ...prev, summary: event.target.value }))} placeholder="Short operational summary" style={styles.textarea} /></label>
+          <label style={styles.fieldLabel}>Release notes<textarea value={form.release_notes} onChange={(event) => setForm((prev) => ({ ...prev, release_notes: event.target.value }))} placeholder="Release notes" style={styles.textarea} /></label>
+          <label style={styles.fieldLabel}>Rollback plan<textarea value={form.rollback_plan} onChange={(event) => setForm((prev) => ({ ...prev, rollback_plan: event.target.value }))} placeholder="Rollback plan" style={styles.textarea} /></label>
           <div style={styles.actions}>
-            <button type="button" onClick={() => save.mutate()} disabled={save.isPending} style={styles.primaryButton}>{editingId ? 'Save release' : 'Create release'}</button>
+            <button type="button" onClick={() => save.mutate()} disabled={save.isPending || !releaseFormValid} style={save.isPending || !releaseFormValid ? styles.disabledButton : styles.primaryButton}>{editingId ? 'Save release' : 'Create release'}</button>
             {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} style={styles.secondaryButton}>Cancel edit</button> : null}
           </div>
         </section>
@@ -233,10 +235,13 @@ const styles: Record<string, CSSProperties> = {
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 },
   grid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
   input: { border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 12px', width: '100%' },
+  fieldLabel: { display: 'grid', gap: 6, color: '#374151', fontSize: 12, fontWeight: 600 },
+  validation: { border: '1px solid #facc15', borderRadius: 8, padding: '10px 12px', background: '#fffbeb', color: '#92400e' },
   textarea: { border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 12px', minHeight: 76, width: '100%' },
   checkRow: { display: 'flex', alignItems: 'center', gap: 8, color: '#374151' },
   actions: { display: 'flex', gap: 8 },
   primaryButton: { border: 0, borderRadius: 8, padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: 8, padding: '10px 14px', background: '#6b7280', color: '#fff', cursor: 'not-allowed', opacity: 0.85 },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 14px', background: '#fff', cursor: 'pointer' },
   smallButton: { border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 6, padding: '6px 8px', background: '#fef2f2', color: '#991b1b', cursor: 'pointer' },
