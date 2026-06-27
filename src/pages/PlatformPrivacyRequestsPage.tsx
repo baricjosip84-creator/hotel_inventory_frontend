@@ -94,6 +94,9 @@ export default function PlatformPrivacyRequestsPage() {
   const statuses = requests.data?.statuses || ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
   const priorities = requests.data?.priorities || ['low', 'normal', 'high', 'urgent'];
   const rows = requests.data?.requests || [];
+  const isRequestClosed = (status: string) => ['fulfilled', 'rejected', 'cancelled'].includes(status);
+  const closeActionDisabled = closeRequest.isPending || !closeNotes.trim();
+  const rejectActionDisabled = closeRequest.isPending || !rejectReason.trim();
 
   const startEdit = (row: PrivacyRequest) => {
     const nextForm = { tenant_id: row.tenant_id || '', request_type: row.request_type, status: row.status, priority: row.priority, requester_name: row.requester_name || '', requester_email: row.requester_email, subject_identifier: row.subject_identifier || '', summary: row.summary, due_at: row.due_at ? row.due_at.slice(0, 16) : '', assigned_platform_user_id: row.assigned_platform_user_id || '' };
@@ -167,7 +170,7 @@ export default function PlatformPrivacyRequestsPage() {
                 <td>{dateLabel(row.due_at)}</td>
                 <td>{row.assignee_email || '—'}</td>
                 <td>{row.summary}</td>
-                <td style={styles.actions}>{canWrite ? <><button type="button" style={styles.smallButton} onClick={() => startEdit(row)}>Edit</button><button type="button" style={styles.smallButton} onClick={() => verifyRequest.mutate(row.id)}>Verify</button><button type="button" style={styles.smallButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'fulfilled' })}>Fulfill</button><button type="button" style={styles.dangerButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'rejected' })}>Reject</button></> : '—'}</td>
+                <td style={styles.actions}>{canWrite ? (isRequestClosed(row.status) ? <span style={styles.muted}>Closed</span> : <><button type="button" style={styles.smallButton} onClick={() => startEdit(row)} disabled={saveRequest.isPending}>Edit</button><button type="button" style={verifyRequest.isPending ? styles.disabledSmallButton : styles.smallButton} onClick={() => verifyRequest.mutate(row.id)} disabled={verifyRequest.isPending}>Verify</button><button type="button" style={closeActionDisabled ? styles.disabledSmallButton : styles.smallButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'fulfilled' })} disabled={closeActionDisabled}>Fulfill</button><button type="button" style={rejectActionDisabled ? styles.disabledDangerButton : styles.dangerButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'rejected' })} disabled={rejectActionDisabled}>Reject</button></>) : '—'}</td>
               </tr>
             ))}</tbody>
           </table>
@@ -201,6 +204,8 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '9px 12px', background: '#fff', cursor: 'pointer' },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 8px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '6px 8px', background: '#fee2e2', color: '#991b1b', cursor: 'pointer' },
+  disabledSmallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 8px', background: '#e5e7eb', color: '#64748b', cursor: 'not-allowed' },
+  disabledDangerButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '6px 8px', background: '#fee2e2', color: '#991b1b', opacity: 0.55, cursor: 'not-allowed' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
   badge: { borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
