@@ -193,21 +193,21 @@ export default function PlatformCapacityPlanningPage() {
         <section id="platform-capacity-planning-form" style={styles.panel}>
           <h2 style={styles.sectionTitle}>{editingId ? 'Edit capacity resource' : 'Add capacity resource'}</h2>
           <div style={styles.grid3}>
-            <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Resource name" style={styles.input} />
-            <select value={form.dependency_id} onChange={(event) => setForm((prev) => ({ ...prev, dependency_id: event.target.value }))} style={styles.input}><option value="">No dependency link</option>{deps.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-            <select value={form.owner_platform_user_id} onChange={(event) => setForm((prev) => ({ ...prev, owner_platform_user_id: event.target.value }))} style={styles.input}><option value="">No owner</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select>
-            <select value={form.resource_type} onChange={(event) => setForm((prev) => ({ ...prev, resource_type: event.target.value }))} style={styles.input}>{resourceTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.environment} onChange={(event) => setForm((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-            <input value={form.current_usage} onChange={(event) => setForm((prev) => ({ ...prev, current_usage: event.target.value }))} type="number" min="0" placeholder="Current usage" style={styles.input} />
-            <input value={form.capacity_limit} onChange={(event) => setForm((prev) => ({ ...prev, capacity_limit: event.target.value }))} type="number" min="0" placeholder="Capacity limit" style={styles.input} />
-            <input value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value }))} placeholder="Unit" style={styles.input} />
-            <input value={form.warning_threshold_percent} onChange={(event) => setForm((prev) => ({ ...prev, warning_threshold_percent: event.target.value }))} type="number" min="1" max="100" placeholder="Warning %" style={styles.input} />
-            <input value={form.critical_threshold_percent} onChange={(event) => setForm((prev) => ({ ...prev, critical_threshold_percent: event.target.value }))} type="number" min="1" max="100" placeholder="Critical %" style={styles.input} />
-            <input value={form.projected_exhaustion_at} onChange={(event) => setForm((prev) => ({ ...prev, projected_exhaustion_at: event.target.value }))} type="datetime-local" style={styles.input} />
+            <label style={styles.fieldLabel}>Resource name<input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Resource name" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Dependency<select value={form.dependency_id} onChange={(event) => setForm((prev) => ({ ...prev, dependency_id: event.target.value }))} style={styles.input}><option value="">No dependency link</option>{deps.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Owner<select value={form.owner_platform_user_id} onChange={(event) => setForm((prev) => ({ ...prev, owner_platform_user_id: event.target.value }))} style={styles.input}><option value="">No owner</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Resource type<select value={form.resource_type} onChange={(event) => setForm((prev) => ({ ...prev, resource_type: event.target.value }))} style={styles.input}>{resourceTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Environment<select value={form.environment} onChange={(event) => setForm((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Status<select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Current usage<input value={form.current_usage} onChange={(event) => setForm((prev) => ({ ...prev, current_usage: event.target.value }))} type="number" min="0" placeholder="Current usage" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Capacity limit<input value={form.capacity_limit} onChange={(event) => setForm((prev) => ({ ...prev, capacity_limit: event.target.value }))} type="number" min="0" placeholder="Capacity limit" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Unit<input value={form.unit} onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value }))} placeholder="Unit" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Warning threshold (%)<input value={form.warning_threshold_percent} onChange={(event) => setForm((prev) => ({ ...prev, warning_threshold_percent: event.target.value }))} type="number" min="1" max="100" placeholder="Warning %" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Critical threshold (%)<input value={form.critical_threshold_percent} onChange={(event) => setForm((prev) => ({ ...prev, critical_threshold_percent: event.target.value }))} type="number" min="1" max="100" placeholder="Critical %" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Projected exhaustion<input value={form.projected_exhaustion_at} onChange={(event) => setForm((prev) => ({ ...prev, projected_exhaustion_at: event.target.value }))} type="datetime-local" style={styles.input} /></label>
           </div>
-          <textarea value={form.scaling_plan} onChange={(event) => setForm((prev) => ({ ...prev, scaling_plan: event.target.value }))} placeholder="Scaling plan" style={styles.textarea} />
-          <textarea value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Notes" style={styles.textarea} />
+          <label style={styles.fieldLabel}>Scaling plan<textarea value={form.scaling_plan} onChange={(event) => setForm((prev) => ({ ...prev, scaling_plan: event.target.value }))} placeholder="Scaling plan" style={styles.textarea} /></label>
+          <label style={styles.fieldLabel}>Notes<textarea value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Notes" style={styles.textarea} /></label>
           <div style={styles.actions}>
             <button
               type="button"
@@ -260,6 +260,7 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: { margin: 0, fontSize: 18 },
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
   grid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
+  fieldLabel: { display: 'grid', gap: 6, color: '#334155', fontSize: 12, fontWeight: 700 },
   input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14 },
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, minHeight: 72 },
   inlineChecks: { display: 'flex', gap: 16, flexWrap: 'wrap' },
