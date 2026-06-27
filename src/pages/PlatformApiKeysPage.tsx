@@ -98,6 +98,14 @@ export default function PlatformApiKeysPage() {
 
   const scopes = apiKeys.data?.scopes || [];
   const rows = apiKeys.data?.api_keys || [];
+  const canCreateKey = Boolean(form.tenant_id && form.name.trim() && form.scopes.length);
+  const createDisabledReason = !form.tenant_id
+    ? 'Select a tenant before creating an API key.'
+    : !form.name.trim()
+      ? 'Enter an integration name before creating an API key.'
+      : !form.scopes.length
+        ? 'Select at least one scope before creating an API key.'
+        : '';
 
   return (
     <div style={styles.page}>
@@ -137,7 +145,15 @@ export default function PlatformApiKeysPage() {
           </div>
           <label style={styles.field}>Description<textarea style={styles.textarea} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></label>
           <div style={styles.scopeGrid}>{scopes.map((scope) => <label key={scope} style={styles.checkbox}><input type="checkbox" checked={form.scopes.includes(scope)} onChange={(event) => setForm((current) => ({ ...current, scopes: event.target.checked ? [...current.scopes, scope] : current.scopes.filter((item) => item !== scope) }))} /> {scope}</label>)}</div>
-          <button type="button" style={styles.primaryButton} disabled={createKey.isPending || !form.tenant_id || !form.name || !form.scopes.length} onClick={() => createKey.mutate()}>Create key</button>
+          {createDisabledReason ? <p style={styles.validation}>{createDisabledReason}</p> : null}
+          <button
+            type="button"
+            style={createKey.isPending || !canCreateKey ? styles.primaryButtonDisabled : styles.primaryButton}
+            disabled={createKey.isPending || !canCreateKey}
+            onClick={() => createKey.mutate()}
+          >
+            Create key
+          </button>
         </section>
       ) : null}
 
@@ -188,6 +204,8 @@ const styles: Record<string, CSSProperties> = {
   help: { color: '#6b7280', fontSize: '12px' },
   actions: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
   primaryButton: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer', marginTop: '12px' },
+  primaryButtonDisabled: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#9ca3af', color: '#fff', cursor: 'not-allowed', marginTop: '12px', opacity: 0.75 },
+  validation: { margin: '12px 0 0', color: '#991b1b', fontWeight: 700 },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '8px 10px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: 0, borderRadius: '10px', padding: '8px 10px', background: '#dc2626', color: '#fff', cursor: 'pointer' },
   reasonInput: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '8px 10px', minWidth: '140px' },
