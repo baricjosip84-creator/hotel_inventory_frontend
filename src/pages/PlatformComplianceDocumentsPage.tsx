@@ -31,6 +31,40 @@ const defaultForm = {
   tenant_id: '', title: '', document_type: 'other', status: 'draft', owner_platform_user_id: '', external_url: '', notes: '', effective_at: '', expires_at: ''
 };
 
+type ComplianceDocumentForm = typeof defaultForm;
+
+function normalizeFormForDirtyCheck(values: ComplianceDocumentForm) {
+  return {
+    tenant_id: values.tenant_id || '',
+    title: values.title || '',
+    document_type: values.document_type || 'other',
+    status: values.status || 'draft',
+    owner_platform_user_id: values.owner_platform_user_id || '',
+    external_url: values.external_url || '',
+    notes: values.notes || '',
+    effective_at: values.effective_at || '',
+    expires_at: values.expires_at || ''
+  };
+}
+
+function formsMatch(a: ComplianceDocumentForm, b: ComplianceDocumentForm) {
+  return JSON.stringify(normalizeFormForDirtyCheck(a)) === JSON.stringify(normalizeFormForDirtyCheck(b));
+}
+
+function formFromDocument(row: ComplianceDocument): ComplianceDocumentForm {
+  return {
+    tenant_id: row.tenant_id || '',
+    title: row.title || '',
+    document_type: row.document_type || 'other',
+    status: row.status || 'draft',
+    owner_platform_user_id: row.owner_platform_user_id || '',
+    external_url: row.external_url || '',
+    notes: row.notes || '',
+    effective_at: row.effective_at?.slice(0, 10) || '',
+    expires_at: row.expires_at?.slice(0, 10) || ''
+  };
+}
+
 function dateOnly(value?: string | null) { return value ? new Date(value).toLocaleDateString() : '—'; }
 function isExpiringSoon(row: ComplianceDocument) {
   if (!row.expires_at || row.status === 'archived') return false;
@@ -49,8 +83,9 @@ export default function PlatformComplianceDocumentsPage() {
   const queryClient = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_WRITE);
   const [filters, setFilters] = useState({ tenant_id: '', status: '', document_type: '', search: '', expiring: false });
-  const [form, setForm] = useState(defaultForm);
+  const [form, setForm] = useState<ComplianceDocumentForm>(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [originalEditForm, setOriginalEditForm] = useState<ComplianceDocumentForm | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
 
   const queryString = useMemo(() => {
@@ -87,6 +122,7 @@ export default function PlatformComplianceDocumentsPage() {
     onSuccess: () => {
       setForm(defaultForm);
       setEditingId(null);
+      setOriginalEditForm(null);
       queryClient.invalidateQueries({ queryKey: ['platform', 'compliance-documents'] });
     }
   });
@@ -107,6 +143,14 @@ export default function PlatformComplianceDocumentsPage() {
   const rows = documents.data?.documents || [];
   const types = documents.data?.document_types || ['contract', 'dpa', 'security', 'privacy', 'sla', 'billing', 'policy', 'other'];
   const statuses = documents.data?.statuses || ['draft', 'active', 'needs_review', 'expired', 'archived'];
+  const hasRequiredDocumentFields = Boolean(form.title.trim());
+  const hasDocumentChanges = editingId ? Boolean(originalEditForm && !formsMatch(form, originalEditForm)) : true;
+  const isSaveDisabled = saveDocument.isPending || !hasRequiredDocumentFields || !hasDocumentChanges;
+  const documentSaveHelp = !hasRequiredDocumentFields
+    ? 'Document title is required.'
+    : editingId && !hasDocumentChanges
+      ? 'Make a change before saving.'
+      : '';
 
   return (
     <div style={styles.page}>
@@ -168,8 +212,9 @@ export default function PlatformComplianceDocumentsPage() {
             <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Notes" style={{ ...styles.input, gridColumn: '1 / -1', minHeight: 80 }} />
           </div>
           <div style={styles.actions}>
-            <button type="button" style={styles.primaryButton} disabled={!form.title || saveDocument.isPending} onClick={() => saveDocument.mutate()}>{editingId ? 'Save changes' : 'Create document'}</button>
-            {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(defaultForm); }}>Cancel edit</button> : null}
+            <button type="button" style={isSaveDisabled ? { ...styles.primaryButton, ...styles.disabledButton } : styles.primaryButton} disabled={isSaveDisabled} onClick={() => saveDocument.mutate()}>{editingId ? 'Save changes' : 'Create document'}</button>
+            {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setOriginalEditForm(null); setForm(defaultForm); }}>Cancel edit</button> : null}
+            {documentSaveHelp ? <span style={styles.inlineHelp}>{documentSaveHelp}</span> : null}
           </div>
         </section>
       ) : null}
@@ -191,7 +236,7 @@ export default function PlatformComplianceDocumentsPage() {
                   <td style={styles.td}>{dateOnly(row.expires_at)}</td>
                   <td style={styles.td}>
                     {canWrite ? <div style={styles.rowActions}>
-                      <button type="button" style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm({ tenant_id: row.tenant_id || '', title: row.title, document_type: row.document_type, status: row.status, owner_platform_user_id: row.owner_platform_user_id || '', external_url: row.external_url || '', notes: row.notes || '', effective_at: row.effective_at?.slice(0, 10) || '', expires_at: row.expires_at?.slice(0, 10) || '' }); scrollToFormSection('platform-compliance-documents-form'); }}>Edit</button>
+                      <button type="button" style={styles.smallButton} onClick={() => { const nextForm = formFromDocument(row); setEditingId(row.id); setOriginalEditForm(nextForm); setForm(nextForm); scrollToFormSection('platform-compliance-documents-form'); }}>Edit</button>
                       <button type="button" style={styles.smallButton} onClick={() => reviewDocument.mutate({ id: row.id, status: 'active' })}>Reviewed</button>
                       <button type="button" style={styles.dangerButton} onClick={() => archiveDocument.mutate(row.id)}>Archive</button>
                     </div> : '—'}
@@ -225,6 +270,8 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer' },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: 10, padding: '9px 12px', background: '#fff', color: '#111827', cursor: 'pointer' },
+  disabledButton: { opacity: 0.5, cursor: 'not-allowed' },
+  inlineHelp: { alignSelf: 'center', color: '#6b7280', fontSize: 13 },
   smallButton: { border: '1px solid #d1d5db', borderRadius: 8, padding: '7px 9px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '7px 9px', background: '#fff1f2', color: '#be123c', cursor: 'pointer' },
   tableWrap: { overflowX: 'auto' },
