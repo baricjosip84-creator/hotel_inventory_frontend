@@ -27,7 +27,7 @@ type WebhooksResponse = { webhooks: Webhook[]; event_types: string[] };
 type CreateWebhookResponse = { webhook: Webhook; secret: string; warning: string };
 type DeliveriesResponse = { deliveries: Delivery[] };
 
-const defaultForm = { tenant_id: '', name: '', url: '', description: '', event_types: ['tenant.updated'], is_enabled: true };
+const defaultForm = { tenant_id: '', name: '', url: '', description: '', event_types: [] as string[], is_enabled: true };
 
 function badgeStyle(webhook: Webhook): CSSProperties {
   if (!webhook.is_enabled) return { ...styles.badge, background: '#f3f4f6', color: '#374151' };
@@ -88,6 +88,16 @@ export default function PlatformWebhooksPage() {
   const events = webhooks.data?.event_types || [];
   const rows = webhooks.data?.webhooks || [];
   const deliveryRows = deliveries.data?.deliveries || [];
+  const createReady = Boolean(form.tenant_id && form.name.trim() && form.url.trim() && form.event_types.length);
+  const createHelp = !form.tenant_id
+    ? 'Select a tenant before creating a webhook.'
+    : !form.name.trim()
+      ? 'Enter a webhook name before creating a webhook.'
+      : !form.url.trim()
+        ? 'Enter a webhook URL before creating a webhook.'
+        : !form.event_types.length
+          ? 'Select at least one event before creating a webhook.'
+          : '';
 
   return (
     <div style={styles.page}>
@@ -127,7 +137,8 @@ export default function PlatformWebhooksPage() {
           <label style={styles.field}>Description<textarea style={styles.textarea} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></label>
           <div style={styles.scopeGrid}>{events.map((eventName) => <label key={eventName} style={styles.checkbox}><input type="checkbox" checked={form.event_types.includes(eventName)} onChange={(event) => setForm((current) => ({ ...current, event_types: event.target.checked ? [...current.event_types, eventName] : current.event_types.filter((item) => item !== eventName) }))} /> {eventName}</label>)}</div>
           <label style={styles.checkbox}><input type="checkbox" checked={form.is_enabled} onChange={(event) => setForm((current) => ({ ...current, is_enabled: event.target.checked }))} /> Enabled immediately</label>
-          <button type="button" style={styles.primaryButton} disabled={createWebhook.isPending || !form.tenant_id || !form.name || !form.url || !form.event_types.length} onClick={() => createWebhook.mutate()}>Create webhook</button>
+          {createHelp ? <p style={styles.error}>{createHelp}</p> : null}
+          <button type="button" style={createReady ? styles.primaryButton : styles.disabledButton} disabled={createWebhook.isPending || !createReady} onClick={() => createWebhook.mutate()}>Create webhook</button>
         </section>
       ) : null}
 
@@ -191,5 +202,7 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
   primaryButton: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer', marginTop: '12px' },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '8px 10px', background: '#fff', cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#9ca3af', color: '#fff', cursor: 'not-allowed', marginTop: '12px' },
+  error: { margin: '12px 0 0', color: '#991b1b', fontWeight: 800 },
   secret: { display: 'block', background: '#111827', color: '#fff', padding: '12px', borderRadius: '10px', marginBottom: '12px', overflowWrap: 'anywhere' }
 };
