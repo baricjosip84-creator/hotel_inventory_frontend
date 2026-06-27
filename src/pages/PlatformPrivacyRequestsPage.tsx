@@ -94,6 +94,7 @@ export default function PlatformPrivacyRequestsPage() {
   const statuses = requests.data?.statuses || ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
   const priorities = requests.data?.priorities || ['low', 'normal', 'high', 'urgent'];
   const rows = requests.data?.requests || [];
+  const hasOpenRequests = rows.some((row) => !['fulfilled', 'rejected', 'cancelled'].includes(row.status));
   const isRequestClosed = (status: string) => ['fulfilled', 'rejected', 'cancelled'].includes(status);
   const closeActionDisabled = closeRequest.isPending || !closeNotes.trim();
   const rejectActionDisabled = closeRequest.isPending || !rejectReason.trim();
@@ -109,6 +110,7 @@ export default function PlatformPrivacyRequestsPage() {
   const requiredFieldsMissing = !form.requester_email.trim() || !form.summary.trim();
   const formChanged = JSON.stringify(form) !== JSON.stringify(editingId ? originalForm : defaultForm);
   const saveDisabled = saveRequest.isPending || requiredFieldsMissing || Boolean(editingId && !formChanged);
+  const showRequiredMessage = requiredFieldsMissing && (Boolean(editingId) || Boolean(form.requester_email.trim()) || Boolean(form.summary.trim()));
 
   return (
     <div style={styles.page}>
@@ -128,7 +130,7 @@ export default function PlatformPrivacyRequestsPage() {
 
       <section id="platform-privacy-requests-form" style={styles.card}>
         <h2 style={styles.cardTitle}>{editingId ? 'Edit privacy request' : 'Create privacy request'}</h2>
-        {requiredFieldsMissing ? <div style={styles.validation}>Requester email and request summary are required.</div> : null}
+        {showRequiredMessage ? <div style={styles.validation}>Requester email and request summary are required.</div> : null}
         <div style={styles.formGrid}>
           <label style={styles.fieldLabel}>Tenant<select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
           <label style={styles.fieldLabel}>Request type<select value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })} style={styles.input}>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
@@ -175,10 +177,12 @@ export default function PlatformPrivacyRequestsPage() {
             ))}</tbody>
           </table>
         </div>
-        <div style={styles.formGrid}>
-          <input value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} placeholder="Verification / resolution notes" style={styles.input} />
-          <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Rejection reason" style={styles.input} />
-        </div>
+        {canWrite && hasOpenRequests ? (
+          <div style={styles.formGrid}>
+            <label style={styles.fieldLabel}>Verification / resolution notes<input value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} placeholder="Verification / resolution notes" style={styles.input} /></label>
+            <label style={styles.fieldLabel}>Rejection reason<input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Rejection reason" style={styles.input} /></label>
+          </div>
+        ) : null}
       </section>
     </div>
   );
