@@ -115,6 +115,7 @@ export default function PlatformCapacityPlanningPage() {
   const [filters, setFilters] = useState({ status: '', resource_type: '', environment: '', search: '', attention_only: true, include_archived: false });
   const [form, setForm] = useState<CapacityForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const resourceNameEntered = form.name.trim().length > 0;
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -138,7 +139,13 @@ export default function PlatformCapacityPlanningPage() {
       if (editingId) return platformApiRequest(`/platform/capacity-planning/${editingId}`, { method: 'PATCH', body });
       return platformApiRequest('/platform/capacity-planning', { method: 'POST', body });
     },
-    onSuccess: async () => { setForm(emptyForm); setEditingId(null); await queryClient.invalidateQueries({ queryKey: ['platform', 'capacity-planning'] }); }
+    onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
+      setForm(emptyForm);
+      setEditingId(null);
+      if (!wasEditing) setFilters((prev) => (prev.attention_only ? { ...prev, attention_only: false } : prev));
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'capacity-planning'] });
+    }
   });
   const archive = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/capacity-planning/${id}/archive`, { method: 'POST', body: JSON.stringify({}) }),
@@ -202,8 +209,14 @@ export default function PlatformCapacityPlanningPage() {
           <textarea value={form.scaling_plan} onChange={(event) => setForm((prev) => ({ ...prev, scaling_plan: event.target.value }))} placeholder="Scaling plan" style={styles.textarea} />
           <textarea value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Notes" style={styles.textarea} />
           <div style={styles.actions}>
-            <button type="button" onClick={() => save.mutate()} disabled={save.isPending} style={styles.primaryButton}>{editingId ? 'Save resource' : 'Add resource'}</button>
+            <button
+              type="button"
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !resourceNameEntered}
+              style={save.isPending || !resourceNameEntered ? styles.disabledButton : styles.primaryButton}
+            >{editingId ? 'Save resource' : 'Add resource'}</button>
             {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} style={styles.secondaryButton}>Cancel edit</button> : null}
+            {!resourceNameEntered ? <span style={styles.errorText}>Enter a resource name before creating or saving a capacity resource.</span> : null}
           </div>
         </section>
       ) : null}
@@ -254,6 +267,8 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   primaryButton: { border: 0, borderRadius: 10, background: '#0f172a', color: '#fff', padding: '9px 13px', cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', padding: '7px 10px', cursor: 'pointer', marginRight: 6, marginBottom: 6 },
+  disabledButton: { border: 0, borderRadius: 10, background: '#cbd5e1', color: '#fff', padding: '9px 13px', cursor: 'not-allowed' },
+  errorText: { color: '#b91c1c', fontWeight: 700, alignSelf: 'center' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', minWidth: 980 },
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: 10, fontSize: 12, color: '#64748b' },
