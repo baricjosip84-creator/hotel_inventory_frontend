@@ -47,6 +47,7 @@ export default function PlatformPrivacyRequestsPage() {
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_WRITE);
   const [filters, setFilters] = useState({ tenant_id: '', status: '', request_type: '', search: '', overdue: false });
   const [form, setForm] = useState(defaultForm);
+  const [originalForm, setOriginalForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [closeNotes, setCloseNotes] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -83,7 +84,7 @@ export default function PlatformPrivacyRequestsPage() {
         assigned_platform_user_id: form.assigned_platform_user_id || null
       })
     }),
-    onSuccess: () => { setForm(defaultForm); setEditingId(null); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); }
+    onSuccess: () => { setForm(defaultForm); setOriginalForm(defaultForm); setEditingId(null); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); }
   });
 
   const verifyRequest = useMutation({ mutationFn: (id: string) => platformApiRequest(`/platform/privacy-requests/${id}/verify`, { method: 'POST', body: JSON.stringify({ notes: closeNotes }) }), onSuccess: () => { setCloseNotes(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
@@ -95,10 +96,16 @@ export default function PlatformPrivacyRequestsPage() {
   const rows = requests.data?.requests || [];
 
   const startEdit = (row: PrivacyRequest) => {
+    const nextForm = { tenant_id: row.tenant_id || '', request_type: row.request_type, status: row.status, priority: row.priority, requester_name: row.requester_name || '', requester_email: row.requester_email, subject_identifier: row.subject_identifier || '', summary: row.summary, due_at: row.due_at ? row.due_at.slice(0, 16) : '', assigned_platform_user_id: row.assigned_platform_user_id || '' };
     setEditingId(row.id);
+    setForm(nextForm);
+    setOriginalForm(nextForm);
     scrollToFormSection('platform-privacy-requests-form');
-    setForm({ tenant_id: row.tenant_id || '', request_type: row.request_type, status: row.status, priority: row.priority, requester_name: row.requester_name || '', requester_email: row.requester_email, subject_identifier: row.subject_identifier || '', summary: row.summary, due_at: row.due_at ? row.due_at.slice(0, 16) : '', assigned_platform_user_id: row.assigned_platform_user_id || '' });
   };
+
+  const requiredFieldsMissing = !form.requester_email.trim() || !form.summary.trim();
+  const formChanged = JSON.stringify(form) !== JSON.stringify(editingId ? originalForm : defaultForm);
+  const saveDisabled = saveRequest.isPending || requiredFieldsMissing || Boolean(editingId && !formChanged);
 
   return (
     <div style={styles.page}>
@@ -118,20 +125,21 @@ export default function PlatformPrivacyRequestsPage() {
 
       <section id="platform-privacy-requests-form" style={styles.card}>
         <h2 style={styles.cardTitle}>{editingId ? 'Edit privacy request' : 'Create privacy request'}</h2>
+        {requiredFieldsMissing ? <div style={styles.validation}>Requester email and request summary are required.</div> : null}
         <div style={styles.formGrid}>
-          <select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-          <select value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })} style={styles.input}>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={styles.input}>{statuses.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} style={styles.input}>{priorities.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <input value={form.requester_name} onChange={(e) => setForm({ ...form, requester_name: e.target.value })} placeholder="Requester name" style={styles.input} />
-          <input value={form.requester_email} onChange={(e) => setForm({ ...form, requester_email: e.target.value })} placeholder="Requester email" style={styles.input} />
-          <input value={form.subject_identifier} onChange={(e) => setForm({ ...form, subject_identifier: e.target.value })} placeholder="Subject identifier" style={styles.input} />
-          <input type="datetime-local" value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} style={styles.input} />
-          <select value={form.assigned_platform_user_id} onChange={(e) => setForm({ ...form, assigned_platform_user_id: e.target.value })} style={styles.input}><option value="">Unassigned</option>{(users.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}</select>
+          <label style={styles.fieldLabel}>Tenant<select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Request type<select value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })} style={styles.input}>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={styles.input}>{statuses.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} style={styles.input}>{priorities.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <label style={styles.fieldLabel}>Requester name<input value={form.requester_name} onChange={(e) => setForm({ ...form, requester_name: e.target.value })} placeholder="Requester name" style={styles.input} /></label>
+          <label style={styles.fieldLabel}>Requester email<input value={form.requester_email} onChange={(e) => setForm({ ...form, requester_email: e.target.value })} placeholder="requester@example.com" style={styles.input} /></label>
+          <label style={styles.fieldLabel}>Subject identifier<input value={form.subject_identifier} onChange={(e) => setForm({ ...form, subject_identifier: e.target.value })} placeholder="Subject identifier" style={styles.input} /></label>
+          <label style={styles.fieldLabel}>Due at<input type="datetime-local" value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} style={styles.input} /></label>
+          <label style={styles.fieldLabel}>Assignee<select value={form.assigned_platform_user_id} onChange={(e) => setForm({ ...form, assigned_platform_user_id: e.target.value })} style={styles.input}><option value="">Unassigned</option>{(users.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}</select></label>
         </div>
-        <textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Request summary" style={styles.textarea} />
-        {canWrite ? <button type="button" style={styles.primaryButton} onClick={() => saveRequest.mutate()} disabled={saveRequest.isPending}>{editingId ? 'Save changes' : 'Create request'}</button> : null}
-        {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(defaultForm); }}>Cancel edit</button> : null}
+        <label style={styles.fieldLabel}>Request summary<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Request summary" style={styles.textarea} /></label>
+        {canWrite ? <button type="button" style={saveDisabled ? styles.disabledButton : styles.primaryButton} onClick={() => saveRequest.mutate()} disabled={saveDisabled}>{editingId ? 'Save changes' : 'Create request'}</button> : null}
+        {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(defaultForm); setOriginalForm(defaultForm); }}>Cancel edit</button> : null}
       </section>
 
       <section style={styles.card}>
@@ -183,10 +191,13 @@ const styles: Record<string, CSSProperties> = {
   card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, background: '#fff', display: 'grid', gap: 12 },
   cardTitle: { margin: 0, fontSize: 18 },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  input: { padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 8 },
-  textarea: { minHeight: 80, padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 8 },
+  fieldLabel: { display: 'grid', gap: 6, fontSize: 12, fontWeight: 700, color: '#334155' },
+  validation: { border: '1px solid #facc15', borderRadius: 8, padding: '9px 12px', background: '#fefce8', color: '#92400e', fontWeight: 700 },
+  input: { width: '100%', boxSizing: 'border-box', padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 8 },
+  textarea: { width: '100%', boxSizing: 'border-box', minHeight: 80, padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 8 },
   checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
   primaryButton: { border: 0, borderRadius: 8, padding: '9px 12px', background: '#2563eb', color: '#fff', cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: 8, padding: '9px 12px', background: '#9ca3af', color: '#fff', cursor: 'not-allowed' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '9px 12px', background: '#fff', cursor: 'pointer' },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 8px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '6px 8px', background: '#fee2e2', color: '#991b1b', cursor: 'pointer' },
