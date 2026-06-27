@@ -125,6 +125,8 @@ export default function PlatformServiceDependenciesPage() {
   const statuses = dependencies.data?.statuses || ['operational', 'degraded', 'partial_outage', 'major_outage', 'maintenance', 'unknown', 'archived'];
   const impacts = dependencies.data?.impacts || ['low', 'medium', 'high', 'critical'];
   const summary = dependencies.data?.summary;
+  const isDependencySaveDisabled = !form.name.trim() || save.isPending;
+  const dependencySaveHelp = !form.name.trim() ? 'Enter a dependency name before creating or saving a dependency.' : '';
 
   return (
     <div style={styles.page}>
@@ -171,8 +173,16 @@ export default function PlatformServiceDependenciesPage() {
           </div>
           <label style={styles.label}>Check notes<textarea style={styles.textarea} value={form.check_notes} onChange={(e) => setForm((v) => ({ ...v, check_notes: e.target.value }))} /></label>
           <div style={styles.actions}>
-            <button type="button" style={styles.primaryButton} disabled={!form.name || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create dependency'}</button>
+            <button
+              type="button"
+              style={isDependencySaveDisabled ? styles.disabledButton : styles.primaryButton}
+              disabled={isDependencySaveDisabled}
+              onClick={() => save.mutate()}
+            >
+              {save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create dependency'}
+            </button>
             {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel edit</button> : null}
+            {dependencySaveHelp ? <span style={styles.error}>{dependencySaveHelp}</span> : null}
             {save.error ? <span style={styles.error}>{(save.error as Error).message}</span> : null}
           </div>
         </section>
@@ -229,6 +239,7 @@ const styles: Record<string, CSSProperties> = {
   checkboxLine: { display: 'inline-flex', gap: 8, alignItems: 'center', fontWeight: 500 },
   actions: { display: 'flex', gap: 10, alignItems: 'center', marginTop: 12 },
   primaryButton: { border: 0, borderRadius: 8, background: '#0f172a', color: '#fff', padding: '9px 14px', cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: 8, background: '#9ca3af', color: '#fff', padding: '9px 14px', cursor: 'not-allowed', opacity: 0.85 },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff', padding: '9px 14px', cursor: 'pointer' },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff', padding: '6px 9px', cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 8, background: '#fff1f2', color: '#991b1b', padding: '6px 9px', cursor: 'pointer' },
