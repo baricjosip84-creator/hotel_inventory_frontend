@@ -130,6 +130,8 @@ export default function PlatformRiskRegisterPage() {
   const statuses = response?.statuses || ['open', 'monitoring', 'mitigating', 'accepted', 'closed', 'cancelled'];
   const levels = response?.levels || ['low', 'medium', 'high', 'critical'];
   const summary = response?.summary;
+  const titleReady = form.title.trim().length > 0;
+  const saveDisabled = save.isPending || !titleReady;
 
   return (
     <div style={styles.page}>
@@ -175,7 +177,8 @@ export default function PlatformRiskRegisterPage() {
           <textarea value={form.mitigation_plan} onChange={(event) => setForm((prev) => ({ ...prev, mitigation_plan: event.target.value }))} placeholder="Mitigation plan" style={styles.textarea} />
           <textarea value={form.contingency_plan} onChange={(event) => setForm((prev) => ({ ...prev, contingency_plan: event.target.value }))} placeholder="Contingency plan" style={styles.textarea} />
           <div style={styles.actions}>
-            <button type="button" onClick={() => save.mutate()} disabled={save.isPending} style={styles.primaryButton}>{editingId ? 'Save risk' : 'Create risk'}</button>
+            <button type="button" onClick={() => { if (!titleReady) return; save.mutate(); }} disabled={saveDisabled} style={saveDisabled ? styles.disabledButton : styles.primaryButton}>{editingId ? 'Save risk' : 'Create risk'}</button>
+            {!titleReady ? <span style={styles.validationMessage}>Enter a risk title before creating or saving a risk.</span> : null}
             {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} style={styles.secondaryButton}>Cancel edit</button> : null}
           </div>
         </section>
@@ -226,6 +229,8 @@ const styles: Record<string, CSSProperties> = {
   checkRow: { display: 'flex', gap: 8, alignItems: 'center' },
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   primaryButton: { border: 0, borderRadius: 10, padding: '9px 12px', background: '#0f172a', color: '#fff', cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: 10, padding: '9px 12px', background: '#cbd5e1', color: '#fff', cursor: 'not-allowed' },
+  validationMessage: { color: '#b91c1c', fontWeight: 700, alignSelf: 'center' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '7px 10px', background: '#fff', cursor: 'pointer', marginRight: 6, marginTop: 4 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
