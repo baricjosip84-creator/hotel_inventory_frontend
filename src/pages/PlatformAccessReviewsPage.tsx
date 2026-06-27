@@ -100,6 +100,7 @@ export default function PlatformAccessReviewsPage() {
   const rows = reviews.data?.reviews || [];
   const selected = detail.data?.review;
   const items = detail.data?.items || [];
+  const canCreateReview = Boolean(form.title.trim());
 
   return (
     <div style={styles.page}>
@@ -125,7 +126,8 @@ export default function PlatformAccessReviewsPage() {
             <label style={styles.field}>Due date<input style={styles.input} type="datetime-local" value={form.due_at} onChange={(event) => setForm((current) => ({ ...current, due_at: event.target.value }))} /></label>
           </div>
           <label style={styles.field}>Notes<textarea style={styles.textarea} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></label>
-          <button type="button" style={styles.primaryButton} disabled={createReview.isPending || !form.title} onClick={() => createReview.mutate()}>Create review</button>
+          {!canCreateReview ? <div style={styles.validationMessage}>Title is required before creating an access review.</div> : null}
+          <button type="button" style={canCreateReview && !createReview.isPending ? styles.primaryButton : styles.disabledButton} disabled={createReview.isPending || !canCreateReview} onClick={() => createReview.mutate()}>Create review</button>
         </section>
       ) : null}
 
@@ -183,6 +185,8 @@ const styles: Record<string, CSSProperties> = {
   help: { color: '#6b7280', fontSize: '12px' },
   actions: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' },
   primaryButton: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer', marginTop: '12px' },
+  disabledButton: { border: 0, borderRadius: '10px', padding: '10px 14px', background: '#9ca3af', color: '#fff', cursor: 'not-allowed', marginTop: '12px', opacity: 0.85 },
+  validationMessage: { marginTop: '12px', border: '1px solid #facc15', background: '#fefce8', color: '#92400e', borderRadius: '10px', padding: '10px 12px', fontWeight: 700 },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '8px 10px', background: '#fff', cursor: 'pointer' },
   dangerButton: { border: 0, borderRadius: '10px', padding: '8px 10px', background: '#dc2626', color: '#fff', cursor: 'pointer' }
 };
