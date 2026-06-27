@@ -156,6 +156,8 @@ export default function PlatformVendorsPage() {
   const statuses = vendors.data?.statuses || ['active', 'watch', 'renewal_due', 'inactive', 'archived'];
   const riskLevels = vendors.data?.risk_levels || ['low', 'medium', 'high', 'critical'];
   const summary = vendors.data?.summary;
+  const isVendorSaveDisabled = !form.name.trim() || save.isPending;
+  const vendorSaveHelp = !form.name.trim() ? 'Enter a vendor name before creating or saving a vendor.' : '';
 
   return (
     <div style={styles.page}>
@@ -232,8 +234,16 @@ export default function PlatformVendorsPage() {
             <label style={styles.label}>Internal notes<textarea style={styles.textarea} value={form.internal_notes} onChange={(e) => setForm((v) => ({ ...v, internal_notes: e.target.value }))} /></label>
           </div>
           <div style={styles.actions}>
-            <button type="button" style={styles.primaryButton} disabled={!form.name || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create vendor'}</button>
+            <button
+              type="button"
+              style={isVendorSaveDisabled ? styles.disabledButton : styles.primaryButton}
+              disabled={isVendorSaveDisabled}
+              onClick={() => save.mutate()}
+            >
+              {save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create vendor'}
+            </button>
             {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel edit</button> : null}
+            {vendorSaveHelp ? <span style={styles.error}>{vendorSaveHelp}</span> : null}
             {save.error ? <span style={styles.error}>{(save.error as Error).message}</span> : null}
           </div>
         </section>
@@ -294,6 +304,7 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   rowActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', fontWeight: 800, cursor: 'pointer' },
+  disabledButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#9ca3af', color: '#fff', fontWeight: 800, cursor: 'not-allowed', opacity: 0.85 },
   secondaryButton: { border: '1px solid #d7dbe7', borderRadius: 10, padding: '8px 10px', background: '#fff', color: '#111827', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '8px 10px', background: '#fff1f2', color: '#991b1b', fontWeight: 700, cursor: 'pointer' },
   error: { color: '#b91c1c', fontWeight: 700 },
