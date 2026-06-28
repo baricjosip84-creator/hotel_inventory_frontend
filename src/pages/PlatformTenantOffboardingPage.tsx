@@ -88,6 +88,7 @@ export default function PlatformTenantOffboardingPage() {
   const [originalForm, setOriginalForm] = useState<typeof blankForm | null>(null);
   const [archiveOnComplete, setArchiveOnComplete] = useState(true);
   const [workflowMessage, setWorkflowMessage] = useState('');
+  const [loadedWorkflowId, setLoadedWorkflowId] = useState<string | null>(null);
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'for-offboarding'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
   const users = useQuery({ queryKey: ['platform', 'users', 'for-offboarding'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite });
@@ -120,7 +121,10 @@ export default function PlatformTenantOffboardingPage() {
     }),
     onSuccess: async () => {
       await invalidate();
-      setOriginalForm({ ...form, tenant_id: form.tenant_id || tenantId, checklist: { ...form.checklist } });
+      const savedForm = { ...form, tenant_id: form.tenant_id || tenantId, checklist: { ...form.checklist } };
+      setOriginalForm(savedForm);
+      setLoadedWorkflowId(selected?.id || loadedWorkflowId);
+      setWorkflowMessage(selected ? 'Workflow changes saved.' : 'Workflow created.');
     }
   });
   const complete = useMutation({
@@ -148,14 +152,18 @@ export default function PlatformTenantOffboardingPage() {
     setTenantId(row.tenant_id);
     setForm(nextForm);
     setOriginalForm(nextForm);
+    setLoadedWorkflowId(row.id);
     setWorkflowMessage('Workflow loaded for editing.');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const selectedTenantId = form.tenant_id || tenantId;
-  const isEditingWorkflow = originalForm !== null && selectedTenantId === originalForm.tenant_id;
-  const isFormDirty = isEditingWorkflow ? normalizeForm(form) !== normalizeForm(originalForm) : Boolean(selectedTenantId);
-  const canSaveWorkflow = Boolean(selectedTenantId) && isFormDirty && !save.isPending;
+  const isExistingSelectedWorkflow = Boolean(selected && selected.tenant_id === selectedTenantId);
+  const isEditingWorkflow = Boolean(originalForm && loadedWorkflowId && selected?.id === loadedWorkflowId);
+  const isCreateWorkflow = Boolean(selectedTenantId && !isExistingSelectedWorkflow);
+  const isFormDirty = isEditingWorkflow && originalForm ? normalizeForm(form) !== normalizeForm(originalForm) : false;
+  const hasCreateRequiredFields = Boolean(selectedTenantId && form.reason.trim());
+  const canSaveWorkflow = !save.isPending && (isEditingWorkflow ? isFormDirty : isCreateWorkflow && hasCreateRequiredFields);
   const blockCount = checks ? checks.active_tenant_sessions + checks.active_support_sessions + checks.open_incidents + checks.open_tasks : 0;
   const isTerminalWorkflow = selected?.status === 'completed' || selected?.status === 'cancelled';
   const completionBlockers = [
@@ -177,7 +185,7 @@ export default function PlatformTenantOffboardingPage() {
       <h2>Filters</h2>
       <div style={styles.grid}>
         <label style={styles.fieldLabel}>Tenant
-          <select style={styles.input} value={tenantId} onChange={(event) => { setTenantId(event.target.value); setOriginalForm(null); }}>
+          <select style={styles.input} value={tenantId} onChange={(event) => { setTenantId(event.target.value); setForm({ ...blankForm, tenant_id: event.target.value }); setOriginalForm(null); setLoadedWorkflowId(null); setWorkflowMessage(''); }}>
             <option value="">All tenants</option>
             {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
           </select>
@@ -209,10 +217,12 @@ export default function PlatformTenantOffboardingPage() {
       <h2>{selected ? 'Update offboarding workflow' : 'Start offboarding workflow'}</h2>
       {workflowMessage ? <div style={styles.info}>{workflowMessage}</div> : null}
       {!selectedTenantId ? <div style={styles.warning}>Select a tenant before saving an offboarding workflow.</div> : null}
+      {isCreateWorkflow && selectedTenantId && !form.reason.trim() ? <div style={styles.warning}>Reason is required before creating an offboarding workflow.</div> : null}
+      {isExistingSelectedWorkflow && !isEditingWorkflow ? <div style={styles.info}>Existing workflow selected. Use Load/Edit before saving changes.</div> : null}
       {isEditingWorkflow && !isFormDirty ? <div style={styles.info}>No changes to save.</div> : null}
       <div style={styles.grid}>
         <label style={styles.fieldLabel}>Tenant
-          <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => { setForm({ ...form, tenant_id: event.target.value }); setTenantId(event.target.value); setOriginalForm(null); }}>
+          <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => { setForm({ ...blankForm, tenant_id: event.target.value }); setTenantId(event.target.value); setOriginalForm(null); setLoadedWorkflowId(null); setWorkflowMessage(''); }}>
             <option value="">Select tenant</option>
             {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
           </select>
@@ -243,7 +253,7 @@ export default function PlatformTenantOffboardingPage() {
         </label>)}
       </div>
       <div style={styles.actions}>
-        <button style={canSaveWorkflow ? styles.button : styles.disabledButton} disabled={!canSaveWorkflow} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : selected ? 'Save changes' : 'Save workflow'}</button>
+        <button style={canSaveWorkflow ? styles.button : styles.disabledButton} disabled={!canSaveWorkflow} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : isEditingWorkflow ? 'Save changes' : 'Save workflow'}</button>
         {tenantId ? <>
           <label style={styles.checkboxLabel}><input type="checkbox" checked={archiveOnComplete} onChange={(event) => setArchiveOnComplete(event.target.checked)} /> Archive tenant on completion</label>
           <button style={canCompleteWorkflow ? styles.dangerButton : styles.disabledDangerButton} disabled={!canCompleteWorkflow} onClick={() => canCompleteWorkflow && complete.mutate(tenantId)}>Complete offboarding</button>
