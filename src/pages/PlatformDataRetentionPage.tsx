@@ -141,8 +141,8 @@ export default function PlatformDataRetentionPage() {
 
       <section style={cardStyle}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <label>Tenant<select value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={inputStyle}>
-            <option value="">All tenants</option>
+          <label>Tenant<select value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={inputStyle} disabled={tenantsQuery.isLoading}>
+            <option value="">{tenantsQuery.isLoading ? 'Loading tenants…' : 'All tenants'}</option>
             {(tenantsQuery.data || []).map((tenant) => (
               <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status || 'unknown'} · {tenant.plan_code || 'no plan'}</option>
             ))}
