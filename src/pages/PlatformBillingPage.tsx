@@ -328,6 +328,20 @@ export default function PlatformBillingPage() {
     }
   });
 
+  const handlePreviewReconciliation = () => {
+    setReconciliationResult(null);
+    reconcileBilling.mutate(true);
+  };
+
+  const handleApplyReconciliation = () => {
+    const confirmed = window.confirm(
+      'Apply billing reconciliation now? This can change tenant billing statuses and create billing events.'
+    );
+    if (!confirmed) return;
+    setReconciliationResult(null);
+    reconcileBilling.mutate(false);
+  };
+
   const createEvent = useMutation({
     mutationFn: () => platformApiRequest(`/platform/billing/${selectedTenantId}/events`, {
       method: 'POST',
@@ -363,8 +377,12 @@ export default function PlatformBillingPage() {
           </label>
           {canWrite ? (
             <div style={styles.toolbarActions}>
-              <button style={styles.secondaryButton} onClick={() => reconcileBilling.mutate(true)} disabled={reconcileBilling.isPending}>Preview billing reconciliation</button>
-              <button style={styles.button} onClick={() => reconcileBilling.mutate(false)} disabled={reconcileBilling.isPending}>Apply billing reconciliation</button>
+              <button style={styles.secondaryButton} onClick={handlePreviewReconciliation} disabled={reconcileBilling.isPending}>
+                {reconcileBilling.isPending ? 'Working...' : 'Preview billing reconciliation'}
+              </button>
+              <button style={styles.button} onClick={handleApplyReconciliation} disabled={reconcileBilling.isPending}>
+                {reconcileBilling.isPending ? 'Working...' : 'Apply billing reconciliation'}
+              </button>
             </div>
           ) : null}
         </div>
