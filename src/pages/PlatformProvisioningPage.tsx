@@ -128,6 +128,13 @@ export default function PlatformProvisioningPage() {
     }
   });
 
+  const updateCreateForm = (patch: Partial<typeof createForm>) => {
+    if (createTenant.isSuccess || createTenant.error) {
+      createTenant.reset();
+    }
+    setCreateForm((current) => ({ ...current, ...patch }));
+  };
+
   const applyPreset = useMutation({
     mutationFn: () => platformApiRequest(`/platform/provisioning/tenants/${selectedTenantId}/apply`, {
       method: 'POST',
@@ -172,35 +179,35 @@ export default function PlatformProvisioningPage() {
           <h2>Create tenant from preset</h2>
           <div style={styles.formGrid}>
             <label style={styles.label}>Preset
-              <select style={styles.input} value={createForm.preset} onChange={(event) => setCreateForm({ ...createForm, preset: event.target.value })}>
+              <select style={styles.input} value={createForm.preset} onChange={(event) => updateCreateForm({ preset: event.target.value })}>
                 {(presetsQuery.data || []).map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
               </select>
             </label>
             <label style={styles.label}>Tenant name
-              <input style={styles.input} value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} />
+              <input style={styles.input} value={createForm.name} onChange={(event) => updateCreateForm({ name: event.target.value })} />
             </label>
             <label style={styles.label}>Location
-              <input style={styles.input} value={createForm.location} onChange={(event) => setCreateForm({ ...createForm, location: event.target.value })} />
+              <input style={styles.input} value={createForm.location} onChange={(event) => updateCreateForm({ location: event.target.value })} />
             </label>
             <label style={styles.label}>Plan code
-              <input style={styles.input} value={createForm.plan_code} onChange={(event) => setCreateForm({ ...createForm, plan_code: event.target.value })} />
+              <input style={styles.input} value={createForm.plan_code} onChange={(event) => updateCreateForm({ plan_code: event.target.value })} />
             </label>
             <label style={styles.label}>Initial admin email
-              <input style={styles.input} value={createForm.initial_admin_email} onChange={(event) => setCreateForm({ ...createForm, initial_admin_email: event.target.value })} />
+              <input style={styles.input} value={createForm.initial_admin_email} onChange={(event) => updateCreateForm({ initial_admin_email: event.target.value })} />
             </label>
             <label style={styles.label}>Initial admin name
-              <input style={styles.input} value={createForm.initial_admin_name} onChange={(event) => setCreateForm({ ...createForm, initial_admin_name: event.target.value })} />
+              <input style={styles.input} value={createForm.initial_admin_name} onChange={(event) => updateCreateForm({ initial_admin_name: event.target.value })} />
             </label>
             <label style={styles.label}>Initial admin password
-              <input style={styles.input} type="password" value={createForm.initial_admin_password} onChange={(event) => setCreateForm({ ...createForm, initial_admin_password: event.target.value })} />
+              <input style={styles.input} type="password" value={createForm.initial_admin_password} onChange={(event) => updateCreateForm({ initial_admin_password: event.target.value })} />
             </label>
             <label style={styles.checkboxLabel}>
-              <input type="checkbox" checked={createForm.create_onboarding_tasks} onChange={(event) => setCreateForm({ ...createForm, create_onboarding_tasks: event.target.checked })} />
+              <input type="checkbox" checked={createForm.create_onboarding_tasks} onChange={(event) => updateCreateForm({ create_onboarding_tasks: event.target.checked })} />
               Create customer onboarding tasks automatically
             </label>
           </div>
-          {hasPartialAdmin ? <div style={styles.warning}>Initial admin email, name, and password must be filled together, or all left empty.</div> : null}
-          {!createForm.name.trim() ? <div style={styles.warning}>Tenant name is required before creating a provisioned tenant.</div> : null}
+          {!createTenant.isSuccess && hasPartialAdmin ? <div style={styles.warning}>Initial admin email, name, and password must be filled together, or all left empty.</div> : null}
+          {!createTenant.isSuccess && !createForm.name.trim() ? <div style={styles.warning}>Tenant name is required before creating a provisioned tenant.</div> : null}
           <button type="button" style={createTenantFormValid && !createTenant.isPending ? styles.button : styles.buttonDisabled} disabled={!createTenantFormValid || createTenant.isPending} onClick={() => createTenant.mutate()}>
             Create provisioned tenant
           </button>
