@@ -64,12 +64,27 @@ export default function PlatformAnnouncementsPage() {
     queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
   });
 
+  const trimmedTitle = form.title.trim();
+  const trimmedMessage = form.message.trim();
+  const startsAtValid = Boolean(form.starts_at && !Number.isNaN(new Date(form.starts_at).getTime()));
+  const endsAtValid = !form.ends_at || (!Number.isNaN(new Date(form.ends_at).getTime()) && new Date(form.ends_at).getTime() > new Date(form.starts_at).getTime());
+  const createBlockedReason = !trimmedTitle
+    ? 'Enter an announcement title before creating.'
+    : !trimmedMessage
+      ? 'Enter an announcement message before creating.'
+      : form.audience === 'tenant' && !form.tenant_id
+        ? 'Select a tenant for a tenant-specific announcement.'
+        : !startsAtValid
+          ? 'Select a valid start time.'
+          : !endsAtValid
+            ? 'End time must be after start time.'
+            : '';
   const create = useMutation({
     mutationFn: () => platformApiRequest<Announcement>('/platform/announcements', {
       method: 'POST',
       body: JSON.stringify({
-        title: form.title,
-        message: form.message,
+        title: trimmedTitle,
+        message: trimmedMessage,
         audience: form.audience,
         tenant_id: form.audience === 'tenant' ? form.tenant_id : null,
         severity: form.severity,
@@ -95,6 +110,7 @@ export default function PlatformAnnouncementsPage() {
     onSuccess: async () => qc.invalidateQueries({ queryKey: ['platform', 'announcements'] })
   });
 
+  const canCreateAnnouncement = canWrite && !createBlockedReason && !create.isPending;
   const rows = announcements.data || [];
   const currentCount = useMemo(() => rows.filter((row) => row.is_current).length, [rows]);
 
@@ -114,43 +130,66 @@ export default function PlatformAnnouncementsPage() {
     {canWrite ? <section style={styles.panel}>
       <h2>Create announcement</h2>
       <div style={styles.formGrid}>
-        <input style={styles.input} placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <select style={styles.input} value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value, tenant_id: '' })}>
-          <option value="all">All tenants and platform</option>
-          <option value="tenant">One tenant</option>
-          <option value="platform">Platform staff only</option>
-        </select>
-        {form.audience === 'tenant' ? <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
-          <option value="">Select tenant</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select> : null}
-        <select style={styles.input} value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
-          <option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option>
-        </select>
-        <select style={styles.input} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-          <option value="published">Publish now</option><option value="draft">Save as draft</option>
-        </select>
-        <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-        <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
+        <label style={styles.field}>Title
+          <input style={styles.input} placeholder="Announcement title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </label>
+        <label style={styles.field}>Audience
+          <select style={styles.input} value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value, tenant_id: '' })}>
+            <option value="all">All tenants and platform</option>
+            <option value="tenant">One tenant</option>
+            <option value="platform">Platform staff only</option>
+          </select>
+        </label>
+        {form.audience === 'tenant' ? <label style={styles.field}>Tenant
+          <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
+            <option value="">Select tenant</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label> : null}
+        <label style={styles.field}>Severity
+          <select style={styles.input} value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
+            <option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option>
+          </select>
+        </label>
+        <label style={styles.field}>Publish state
+          <select style={styles.input} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+            <option value="published">Publish now</option><option value="draft">Save as draft</option>
+          </select>
+        </label>
+        <label style={styles.field}>Starts at
+          <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
+        </label>
+        <label style={styles.field}>Ends at
+          <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
+        </label>
         <label style={styles.checkboxLabel}><input type="checkbox" checked={form.dismissible} onChange={(e) => setForm({ ...form, dismissible: e.target.checked })} /> Dismissible</label>
       </div>
-      <textarea style={styles.textarea} placeholder="Message shown to the selected audience" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-      <button style={styles.button} onClick={() => create.mutate()} disabled={create.isPending || !form.title || !form.message || (form.audience === 'tenant' && !form.tenant_id)}>Create announcement</button>
+      <label style={styles.field}>Message
+        <textarea style={styles.textarea} placeholder="Message shown to the selected audience" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+      </label>
+      {createBlockedReason ? <div style={styles.warning}>{createBlockedReason}</div> : null}
+      <button style={canCreateAnnouncement ? styles.button : styles.disabledButton} onClick={() => create.mutate()} disabled={!canCreateAnnouncement}>Create announcement</button>
       {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
     </section> : null}
 
     <section style={styles.panel}>
       <h2>Filters</h2>
       <div style={styles.filters}>
-        <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-          <option value="">All statuses</option><option value="draft">draft</option><option value="published">published</option><option value="cancelled">cancelled</option><option value="expired">expired</option>
-        </select>
-        <select style={styles.input} value={filters.audience} onChange={(e) => setFilters({ ...filters, audience: e.target.value })}>
-          <option value="">All audiences</option><option value="tenant">tenant</option><option value="platform">platform</option><option value="all">all</option>
-        </select>
-        <select style={styles.input} value={filters.include_expired} onChange={(e) => setFilters({ ...filters, include_expired: e.target.value })}>
-          <option value="false">Current/future only</option><option value="true">Include expired</option>
-        </select>
+        <label style={styles.field}>Status
+          <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="">All statuses</option><option value="draft">draft</option><option value="published">published</option><option value="cancelled">cancelled</option><option value="expired">expired</option>
+          </select>
+        </label>
+        <label style={styles.field}>Audience
+          <select style={styles.input} value={filters.audience} onChange={(e) => setFilters({ ...filters, audience: e.target.value })}>
+            <option value="">All audiences</option><option value="tenant">tenant</option><option value="platform">platform</option><option value="all">all</option>
+          </select>
+        </label>
+        <label style={styles.field}>Visibility
+          <select style={styles.input} value={filters.include_expired} onChange={(e) => setFilters({ ...filters, include_expired: e.target.value })}>
+            <option value="false">Current/future only</option><option value="true">Include expired</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -171,8 +210,10 @@ export default function PlatformAnnouncementsPage() {
         {row.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {row.cancelled_by_email || '-'} · Reason: {row.cancellation_reason || '-'}</p> : null}
         {canWrite && row.status === 'draft' ? <button style={styles.button} onClick={() => publish.mutate(row.id)} disabled={publish.isPending}>Publish</button> : null}
         {canWrite && row.status !== 'cancelled' ? <div style={styles.cancelRow}>
-          <input style={styles.input} placeholder="Cancellation reason" value={cancelReasonById[row.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [row.id]: e.target.value })} />
-          <button style={styles.dangerButton} onClick={() => cancel.mutate({ id: row.id, reason: cancelReasonById[row.id] || '' })} disabled={cancel.isPending}>Cancel</button>
+          <label style={styles.field}>Cancellation reason
+            <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[row.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [row.id]: e.target.value })} />
+          </label>
+          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => cancel.mutate({ id: row.id, reason: (cancelReasonById[row.id] || '').trim() })} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
         </div> : null}
       </article>)}
       {!announcements.isLoading && rows.length === 0 ? <div style={styles.empty}>No announcements match the current filters.</div> : null}
@@ -189,11 +230,15 @@ const styles: Record<string, CSSProperties> = {
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '18px', display: 'grid', gap: '12px' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' },
   filters: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
+  field: { display: 'grid', gap: '6px', fontWeight: 600 },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px' },
-  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '90px' },
+  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '90px', fontWeight: 400 },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px' },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', width: 'fit-content' },
+  disabledButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d1d5db', color: '#fff', cursor: 'not-allowed', width: 'fit-content' },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
+  disabledDangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d6c3c3', color: '#fff', cursor: 'not-allowed' },
+  warning: { color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px' },
   error: { color: '#991b1b', background: '#fee2e2', borderRadius: '10px', padding: '10px' },
   list: { display: 'grid', gap: '12px' },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '16px' },
