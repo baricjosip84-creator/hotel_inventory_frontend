@@ -77,6 +77,15 @@ export default function PlatformProvisioningPage() {
     [presetsQuery.data, selectedPreset]
   );
 
+  const adminFields = [
+    createForm.initial_admin_email.trim(),
+    createForm.initial_admin_name.trim(),
+    createForm.initial_admin_password
+  ];
+  const hasPartialAdmin = adminFields.some(Boolean) && !adminFields.every(Boolean);
+  const createTenantFormValid = Boolean(createForm.name.trim() && createForm.preset) && !hasPartialAdmin;
+  const applyPresetFormValid = Boolean(canUpdate && selectedTenantId && selectedPreset);
+
   useEffect(() => {
     if (!presetsQuery.data?.length) return;
     if (!presetsQuery.data.some((preset) => preset.key === selectedPreset)) {
@@ -91,14 +100,14 @@ export default function PlatformProvisioningPage() {
     mutationFn: () => platformApiRequest('/platform/provisioning/tenants', {
       method: 'POST',
       body: JSON.stringify({
-        name: createForm.name,
-        location: createForm.location || null,
+        name: createForm.name.trim(),
+        location: createForm.location.trim() || null,
         preset: createForm.preset,
-        plan_code: createForm.plan_code || 'standard',
+        plan_code: createForm.plan_code.trim() || 'standard',
         create_storage_locations: true,
-        initial_admin: createForm.initial_admin_email ? {
-          email: createForm.initial_admin_email,
-          name: createForm.initial_admin_name,
+        initial_admin: adminFields.every(Boolean) ? {
+          email: createForm.initial_admin_email.trim(),
+          name: createForm.initial_admin_name.trim(),
           password: createForm.initial_admin_password
         } : undefined,
         create_onboarding_tasks: createForm.create_onboarding_tasks
@@ -190,7 +199,9 @@ export default function PlatformProvisioningPage() {
               Create customer onboarding tasks automatically
             </label>
           </div>
-          <button type="button" style={styles.button} disabled={createTenant.isPending || !createForm.name} onClick={() => createTenant.mutate()}>
+          {hasPartialAdmin ? <div style={styles.warning}>Initial admin email, name, and password must be filled together, or all left empty.</div> : null}
+          {!createForm.name.trim() ? <div style={styles.warning}>Tenant name is required before creating a provisioned tenant.</div> : null}
+          <button type="button" style={createTenantFormValid && !createTenant.isPending ? styles.button : styles.buttonDisabled} disabled={!createTenantFormValid || createTenant.isPending} onClick={() => createTenant.mutate()}>
             Create provisioned tenant
           </button>
           {createTenant.error ? <div style={styles.error}>{readableError(createTenant.error)}</div> : null}
@@ -241,7 +252,8 @@ export default function PlatformProvisioningPage() {
           <label><input type="checkbox" checked={createStorageLocations} onChange={(event) => setCreateStorageLocations(event.target.checked)} /> Create missing starter storage locations</label>
           <label><input type="checkbox" checked={updateEntitlements} onChange={(event) => setUpdateEntitlements(event.target.checked)} /> Update tenant feature flags and limits</label>
         </div>
-        <button type="button" style={styles.button} disabled={!canUpdate || !selectedTenantId || applyPreset.isPending} onClick={() => applyPreset.mutate()}>
+        {!selectedTenantId ? <div style={styles.warning}>Select a tenant before applying a preset.</div> : null}
+        <button type="button" style={applyPresetFormValid && !applyPreset.isPending ? styles.button : styles.buttonDisabled} disabled={!applyPresetFormValid || applyPreset.isPending} onClick={() => applyPreset.mutate()}>
           Apply preset
         </button>
         {!canUpdate ? <div style={styles.muted}>You need tenant update permission to apply provisioning to an existing tenant.</div> : null}
@@ -265,6 +277,7 @@ const styles: Record<string, CSSProperties> = {
   checkboxLabel: { display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.9rem', color: '#374151' },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10 },
   button: { width: 'fit-content', padding: '10px 14px', border: 0, borderRadius: 10, background: '#111827', color: '#fff', cursor: 'pointer' },
+  buttonDisabled: { width: 'fit-content', padding: '10px 14px', border: 0, borderRadius: 10, background: '#9ca3af', color: '#fff', cursor: 'not-allowed' },
   buttonSecondary: { width: 'fit-content', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', cursor: 'pointer' },
   muted: { color: '#6b7280' },
   meta: { fontSize: 13, color: '#374151' },
@@ -272,5 +285,6 @@ const styles: Record<string, CSSProperties> = {
   previewBox: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, display: 'grid', gap: 8 },
   options: { display: 'grid', gap: 8 },
   error: { color: '#b91c1c', fontWeight: 700 },
+  warning: { border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', borderRadius: 10, padding: '10px 12px', fontWeight: 700 },
   success: { color: '#166534', fontWeight: 700 }
 };
