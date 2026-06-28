@@ -87,6 +87,7 @@ export default function PlatformTenantOffboardingPage() {
   const [form, setForm] = useState(blankForm);
   const [originalForm, setOriginalForm] = useState<typeof blankForm | null>(null);
   const [archiveOnComplete, setArchiveOnComplete] = useState(true);
+  const [workflowMessage, setWorkflowMessage] = useState('');
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'for-offboarding'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
   const users = useQuery({ queryKey: ['platform', 'users', 'for-offboarding'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite });
@@ -128,7 +129,10 @@ export default function PlatformTenantOffboardingPage() {
   });
   const cancel = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/tenant-offboarding/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Cancelled from platform UI' }) }),
-    onSuccess: invalidate
+    onSuccess: async () => {
+      await invalidate();
+      setWorkflowMessage('Workflow cancelled.');
+    }
   });
 
   const loadIntoForm = (row: OffboardingRow) => {
@@ -144,6 +148,8 @@ export default function PlatformTenantOffboardingPage() {
     setTenantId(row.tenant_id);
     setForm(nextForm);
     setOriginalForm(nextForm);
+    setWorkflowMessage('Workflow loaded for editing.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const selectedTenantId = form.tenant_id || tenantId;
@@ -151,6 +157,15 @@ export default function PlatformTenantOffboardingPage() {
   const isFormDirty = isEditingWorkflow ? normalizeForm(form) !== normalizeForm(originalForm) : Boolean(selectedTenantId);
   const canSaveWorkflow = Boolean(selectedTenantId) && isFormDirty && !save.isPending;
   const blockCount = checks ? checks.active_tenant_sessions + checks.active_support_sessions + checks.open_incidents + checks.open_tasks : 0;
+  const isTerminalWorkflow = selected?.status === 'completed' || selected?.status === 'cancelled';
+  const completionBlockers = [
+    !selected ? 'Create or load a workflow before completing offboarding.' : '',
+    selected && !selected.checklist_complete ? 'Complete all checklist items before completing offboarding.' : '',
+    selected && blockCount > 0 ? 'Clear active sessions, support sessions, open incidents, and open tasks before completing offboarding.' : '',
+    selected && isTerminalWorkflow ? 'Completed or cancelled workflows cannot be completed again.' : ''
+  ].filter(Boolean);
+  const canCompleteWorkflow = Boolean(selected && selected.checklist_complete && blockCount === 0 && !isTerminalWorkflow && !complete.isPending);
+  const canCancelWorkflow = Boolean(selected && !isTerminalWorkflow && !cancel.isPending);
 
   return <div style={styles.page}>
     <header>
@@ -192,6 +207,7 @@ export default function PlatformTenantOffboardingPage() {
 
     {canWrite ? <section style={styles.panel}>
       <h2>{selected ? 'Update offboarding workflow' : 'Start offboarding workflow'}</h2>
+      {workflowMessage ? <div style={styles.info}>{workflowMessage}</div> : null}
       {!selectedTenantId ? <div style={styles.warning}>Select a tenant before saving an offboarding workflow.</div> : null}
       {isEditingWorkflow && !isFormDirty ? <div style={styles.info}>No changes to save.</div> : null}
       <div style={styles.grid}>
@@ -230,10 +246,11 @@ export default function PlatformTenantOffboardingPage() {
         <button style={canSaveWorkflow ? styles.button : styles.disabledButton} disabled={!canSaveWorkflow} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : selected ? 'Save changes' : 'Save workflow'}</button>
         {tenantId ? <>
           <label style={styles.checkboxLabel}><input type="checkbox" checked={archiveOnComplete} onChange={(event) => setArchiveOnComplete(event.target.checked)} /> Archive tenant on completion</label>
-          <button style={styles.dangerButton} disabled={!selected?.checklist_complete || blockCount > 0 || complete.isPending} onClick={() => complete.mutate(tenantId)}>Complete offboarding</button>
-          <button style={styles.secondaryButton} disabled={cancel.isPending} onClick={() => cancel.mutate(tenantId)}>Cancel workflow</button>
+          <button style={canCompleteWorkflow ? styles.dangerButton : styles.disabledDangerButton} disabled={!canCompleteWorkflow} onClick={() => canCompleteWorkflow && complete.mutate(tenantId)}>Complete offboarding</button>
+          <button style={canCancelWorkflow ? styles.secondaryButton : styles.disabledButton} disabled={!canCancelWorkflow} onClick={() => canCancelWorkflow && cancel.mutate(tenantId)}>Cancel workflow</button>
         </> : null}
       </div>
+      {completionBlockers.length ? <div style={styles.warning}>{completionBlockers[0]}</div> : null}
       {save.error ? <div style={styles.error}>{readableError(save.error)}</div> : null}
       {complete.error ? <div style={styles.error}>{readableError(complete.error)}</div> : null}
       {cancel.error ? <div style={styles.error}>{readableError(cancel.error)}</div> : null}
@@ -253,7 +270,7 @@ export default function PlatformTenantOffboardingPage() {
         <p>{row.reason || 'No reason recorded.'}</p>
         <div style={styles.muted}>Owner: {row.owner_platform_user_email || 'unassigned'} · Scheduled: {formatDate(row.scheduled_for)} · Completed: {formatDate(row.completed_at)}</div>
         <div style={styles.progress}>{checklistKeys.filter((key) => row.checklist?.[key]).length}/{checklistKeys.length} checklist items done {row.checklist_complete ? '· ready' : ''}</div>
-        <div style={styles.actions}><button style={styles.secondaryButton} onClick={() => loadIntoForm(row)}>Load/Edit</button></div>
+        <div style={styles.actions}><button style={styles.secondaryButton} onClick={() => loadIntoForm(row)}>{selected?.id === row.id && isEditingWorkflow ? 'Loaded for editing' : 'Load/Edit'}</button></div>
       </article>)}
       {!list.isLoading && rows.length === 0 ? <div style={styles.panel}>No offboarding workflows found.</div> : null}
     </section>
@@ -279,6 +296,7 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 },
   button: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#111827', color: '#fff', cursor: 'pointer' },
   disabledButton: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#9ca3af', color: '#fff', cursor: 'not-allowed' },
+  disabledDangerButton: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#d1d5db', color: '#6b7280', cursor: 'not-allowed' },
   secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', cursor: 'pointer' },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#991b1b', color: '#fff', cursor: 'pointer' },
   error: { color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', padding: 12, borderRadius: 10 },
