@@ -83,10 +83,10 @@ export default function PlatformSupportSessionsPage() {
       method: 'POST',
       body: JSON.stringify({
         tenant_id: form.tenant_id,
-        reason: form.reason,
+        reason: form.reason.trim(),
         access_level: form.access_level,
-        ticket_reference: form.ticket_reference || null,
-        customer_consent_note: form.customer_consent_note || null
+        ticket_reference: form.ticket_reference.trim() || null,
+        customer_consent_note: form.customer_consent_note.trim() || null
       })
     }),
     onSuccess: async () => {
@@ -113,7 +113,22 @@ export default function PlatformSupportSessionsPage() {
     onSuccess: invalidateSessions
   });
 
+  const trimmedReason = form.reason.trim();
+  const trimmedTicketReference = form.ticket_reference.trim();
+  const startValidationMessage = !form.tenant_id
+    ? 'Select a tenant before starting a support session.'
+    : trimmedTicketReference.length === 0
+      ? 'Enter a ticket/reference before starting a support session.'
+      : trimmedReason.length < 10
+        ? 'Enter a support reason of at least 10 characters.'
+        : '';
+  const canSubmitStart = canStart && !startValidationMessage && !start.isPending;
   const rows = sessions.data || [];
+
+  const updateForm = (patch: Partial<typeof form>) => {
+    if (start.error) start.reset();
+    setForm({ ...form, ...patch });
+  };
 
   return (
     <div style={styles.page}>
@@ -127,13 +142,13 @@ export default function PlatformSupportSessionsPage() {
         <div style={styles.note}>Emergency admin requests are created as pending approval. A different authorized platform user must approve them.</div>
         <div style={styles.formGrid}>
           <label style={styles.label}>Tenant
-            <select style={styles.input} value={form.tenant_id} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}>
+            <select style={styles.input} value={form.tenant_id} onChange={(event) => updateForm({ tenant_id: event.target.value })}>
               <option value="">Select tenant</option>
               {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} ({tenant.status || 'active'})</option>)}
             </select>
           </label>
           <label style={styles.label}>Access level
-            <select style={styles.input} value={form.access_level} onChange={(event) => setForm({ ...form, access_level: event.target.value })}>
+            <select style={styles.input} value={form.access_level} onChange={(event) => updateForm({ access_level: event.target.value })}>
               <option value="read_only">Read-only</option>
               <option value="inventory_support">Inventory support</option>
               <option value="procurement_support">Procurement support</option>
@@ -141,17 +156,18 @@ export default function PlatformSupportSessionsPage() {
             </select>
           </label>
           <label style={styles.label}>Ticket/reference
-            <input style={styles.input} value={form.ticket_reference} onChange={(event) => setForm({ ...form, ticket_reference: event.target.value })} />
+            <input style={styles.input} value={form.ticket_reference} onChange={(event) => updateForm({ ticket_reference: event.target.value })} placeholder="Support ticket, case, or customer reference" />
           </label>
           <label style={styles.label}>Reason
-            <input style={styles.input} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+            <input style={styles.input} value={form.reason} onChange={(event) => updateForm({ reason: event.target.value })} placeholder="At least 10 characters" />
           </label>
           <label style={styles.label}>Customer consent note
-            <input style={styles.input} value={form.customer_consent_note} onChange={(event) => setForm({ ...form, customer_consent_note: event.target.value })} />
+            <input style={styles.input} value={form.customer_consent_note} onChange={(event) => updateForm({ customer_consent_note: event.target.value })} placeholder="Optional unless required by tenant policy" />
           </label>
-          <button style={styles.button} onClick={() => start.mutate()} disabled={!canStart || start.isPending}>Start/request</button>
+          <button style={canSubmitStart ? styles.button : styles.buttonDisabled} onClick={() => start.mutate()} disabled={!canSubmitStart}>Start/request</button>
         </div>
         {!canStart ? <div style={styles.error}>Your platform role cannot start support sessions.</div> : null}
+        {canStart && startValidationMessage ? <div style={styles.warning}>{startValidationMessage}</div> : null}
         {start.error ? <div style={styles.error}>{readableError(start.error)}</div> : null}
       </section>
 
@@ -237,7 +253,9 @@ const styles: Record<string, CSSProperties> = {
   input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
   inputSmall: { padding: 8, border: '1px solid #d1d5db', borderRadius: 8, minWidth: 150 },
   button: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
+  buttonDisabled: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'not-allowed', background: '#e5e7eb', color: '#6b7280' },
   buttonSmall: { padding: '7px 9px', borderRadius: 8, border: '1px solid #d1d5db', cursor: 'pointer' },
+  warning: { background: '#fffbeb', color: '#92400e', border: '1px solid #f59e0b', borderRadius: 12, padding: 12, marginTop: 12 },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, marginTop: 12 },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   table: { width: '100%', borderCollapse: 'collapse' },
