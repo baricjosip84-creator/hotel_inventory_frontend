@@ -63,8 +63,8 @@ export default function PlatformMaintenancePage() {
     mutationFn: () => platformApiRequest<MaintenanceWindow>('/platform/maintenance', {
       method: 'POST',
       body: JSON.stringify({
-        title: form.title,
-        message: form.message || null,
+        title: trimmedTitle,
+        message: form.message.trim() || null,
         scope: form.scope,
         tenant_id: form.scope === 'tenant' ? form.tenant_id : null,
         starts_at: new Date(form.starts_at).toISOString(),
@@ -85,6 +85,20 @@ export default function PlatformMaintenancePage() {
 
   const windows = maintenance.data || [];
   const activeOrUpcoming = useMemo(() => windows.filter((w) => w.status !== 'completed' && w.status !== 'cancelled'), [windows]);
+  const trimmedTitle = form.title.trim();
+  const startsAtTime = form.starts_at ? new Date(form.starts_at).getTime() : Number.NaN;
+  const endsAtTime = form.ends_at ? new Date(form.ends_at).getTime() : Number.NaN;
+  const isTenantScoped = form.scope === 'tenant';
+  const createValidationMessage = !trimmedTitle
+    ? 'Enter a maintenance title before creating.'
+    : isTenantScoped && !form.tenant_id
+      ? 'Select a tenant for tenant-specific maintenance.'
+      : Number.isNaN(startsAtTime) || Number.isNaN(endsAtTime)
+        ? 'Select valid start and end times.'
+        : endsAtTime <= startsAtTime
+          ? 'End time must be after start time.'
+          : '';
+  const canCreateWindow = !createValidationMessage && !create.isPending;
 
   return <div style={styles.page}>
     <header>
@@ -102,36 +116,55 @@ export default function PlatformMaintenancePage() {
     {canWrite ? <section style={styles.panel}>
       <h2>Create maintenance window</h2>
       <div style={styles.formGrid}>
-        <input style={styles.input} placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <select style={styles.input} value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, tenant_id: '' })}>
-          <option value="platform">Platform-wide</option>
-          <option value="tenant">Tenant-specific</option>
-        </select>
-        {form.scope === 'tenant' ? <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
-          <option value="">Select tenant</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select> : null}
-        <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-        <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
+        <label style={styles.fieldLabel}>Title
+          <input style={styles.input} placeholder="Maintenance title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Scope
+          <select style={styles.input} value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, tenant_id: '' })}>
+            <option value="platform">Platform-wide</option>
+            <option value="tenant">Tenant-specific</option>
+          </select>
+        </label>
+        {isTenantScoped ? <label style={styles.fieldLabel}>Tenant
+          <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
+            <option value="">Select tenant</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label> : null}
+        <label style={styles.fieldLabel}>Starts at
+          <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Ends at
+          <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
+        </label>
         <label style={styles.checkboxLabel}><input type="checkbox" checked={form.lock_writes} onChange={(e) => setForm({ ...form, lock_writes: e.target.checked })} /> Lock writes during window</label>
       </div>
-      <textarea style={styles.textarea} placeholder="Message shown to tenant users" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-      <button style={styles.button} onClick={() => create.mutate()} disabled={create.isPending || !form.title || (form.scope === 'tenant' && !form.tenant_id)}>Create window</button>
+      <label style={styles.fieldLabel}>Tenant message
+        <textarea style={styles.textarea} placeholder="Message shown to tenant users" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+      </label>
+      {createValidationMessage ? <div style={styles.warning}>{createValidationMessage}</div> : null}
+      <button style={{ ...styles.button, ...(canCreateWindow ? {} : styles.disabledButton) }} onClick={() => create.mutate()} disabled={!canCreateWindow}>Create window</button>
       {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
     </section> : null}
 
     <section style={styles.panel}>
       <h2>Filters</h2>
       <div style={styles.filters}>
-        <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-          <option value="">All statuses</option><option value="scheduled">scheduled</option><option value="active">active</option><option value="completed">completed</option><option value="cancelled">cancelled</option>
-        </select>
-        <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
-          <option value="">All scopes</option><option value="platform">platform</option><option value="tenant">tenant</option>
-        </select>
-        <select style={styles.input} value={filters.include_past} onChange={(e) => setFilters({ ...filters, include_past: e.target.value })}>
-          <option value="false">Upcoming/current only</option><option value="true">Include past</option>
-        </select>
+        <label style={styles.fieldLabel}>Status
+          <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="">All statuses</option><option value="scheduled">scheduled</option><option value="active">active</option><option value="completed">completed</option><option value="cancelled">cancelled</option>
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>Scope
+          <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
+            <option value="">All scopes</option><option value="platform">platform</option><option value="tenant">tenant</option>
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>Visibility
+          <select style={styles.input} value={filters.include_past} onChange={(e) => setFilters({ ...filters, include_past: e.target.value })}>
+            <option value="false">Upcoming/current only</option><option value="true">Include past</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -151,8 +184,14 @@ export default function PlatformMaintenancePage() {
         <p style={styles.muted}>Lock writes: {window.lock_writes ? 'yes' : 'no'} · Created by: {window.created_by_email || '-'}</p>
         {window.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {window.cancelled_by_email || '-'} · Reason: {window.cancellation_reason || '-'}</p> : null}
         {canWrite && window.status !== 'cancelled' && window.status !== 'completed' ? <div style={styles.cancelRow}>
-          <input style={styles.input} placeholder="Cancellation reason" value={cancelReasonById[window.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [window.id]: e.target.value })} />
-          <button style={styles.dangerButton} onClick={() => cancel.mutate({ id: window.id, reason: cancelReasonById[window.id] || '' })} disabled={cancel.isPending}>Cancel</button>
+          <label style={styles.fieldLabel}>Cancellation reason
+            <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[window.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [window.id]: e.target.value })} />
+          </label>
+          <button
+            style={{ ...styles.dangerButton, ...(cancel.isPending || !cancelReasonById[window.id]?.trim() ? styles.disabledDangerButton : {}) }}
+            onClick={() => cancel.mutate({ id: window.id, reason: cancelReasonById[window.id]?.trim() || '' })}
+            disabled={cancel.isPending || !cancelReasonById[window.id]?.trim()}
+          >Cancel</button>
         </div> : null}
       </article>)}
       {!maintenance.isLoading && windows.length === 0 ? <div style={styles.empty}>No maintenance windows match the current filters.</div> : null}
@@ -169,11 +208,15 @@ const styles: Record<string, CSSProperties> = {
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '18px', display: 'grid', gap: '12px' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' },
   filters: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px' },
-  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px' },
+  fieldLabel: { display: 'grid', gap: '6px', fontWeight: 600 },
+  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', font: 'inherit', fontWeight: 400 },
+  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px', font: 'inherit', fontWeight: 400 },
+  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', width: 'fit-content' },
-  dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
+  disabledButton: { background: '#9ca3af', cursor: 'not-allowed' },
+  dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer', height: 'fit-content', alignSelf: 'end' },
+  disabledDangerButton: { background: '#c4a6a6', cursor: 'not-allowed' },
+  warning: { color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px' },
   error: { color: '#991b1b', background: '#fee2e2', borderRadius: '10px', padding: '10px' },
   list: { display: 'grid', gap: '12px' },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '16px' },
