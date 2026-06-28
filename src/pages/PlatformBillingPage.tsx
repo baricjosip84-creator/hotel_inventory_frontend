@@ -132,7 +132,7 @@ type PaymentProviderIngestionResult = {
 };
 
 const billingStatuses = ['not_configured', 'trialing', 'active', 'past_due', 'cancelled', 'comped'];
-const eventTypes = ['note', 'invoice_sent', 'payment_received', 'payment_failed', 'trial_extended', 'subscription_started', 'subscription_cancelled', 'comp_granted', 'billing_status_changed', 'billing_plan_changed'];
+const eventTypes = ['note', 'invoice_sent', 'payment_failed', 'subscription_cancelled', 'comp_granted', 'billing_status_changed', 'billing_plan_changed'];
 const providerEventTypes = ['invoice.payment_succeeded', 'invoice.payment_failed', 'customer.subscription.created', 'customer.subscription.updated', 'checkout.session.completed', 'customer.subscription.deleted', 'customer.subscription.cancelled', 'payment_intent.succeeded', 'payment_intent.payment_failed', 'customer.subscription.trial_extended'];
 
 function readableError(error: unknown): string {
