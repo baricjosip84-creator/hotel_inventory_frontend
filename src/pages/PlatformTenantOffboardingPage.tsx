@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -139,28 +139,39 @@ export default function PlatformTenantOffboardingPage() {
     }
   });
 
-  const loadIntoForm = (row: OffboardingRow) => {
-    const nextForm = {
-      tenant_id: row.tenant_id,
-      status: row.status,
-      reason: row.reason || '',
-      scheduled_for: row.scheduled_for ? new Date(row.scheduled_for).toISOString().slice(0, 16) : '',
-      owner_platform_user_id: row.owner_platform_user_id || '',
-      notes: row.notes || '',
-      checklist: { ...emptyChecklist, ...(row.checklist || {}) }
-    };
+  const buildFormFromWorkflow = (row: OffboardingRow): typeof blankForm => ({
+    tenant_id: row.tenant_id,
+    status: row.status,
+    reason: row.reason || '',
+    scheduled_for: row.scheduled_for ? new Date(row.scheduled_for).toISOString().slice(0, 16) : '',
+    owner_platform_user_id: row.owner_platform_user_id || '',
+    notes: row.notes || '',
+    checklist: { ...emptyChecklist, ...(row.checklist || {}) }
+  });
+
+  const loadIntoForm = (row: OffboardingRow, options?: { silent?: boolean }) => {
+    const nextForm = buildFormFromWorkflow(row);
     setTenantId(row.tenant_id);
     setForm(nextForm);
     setOriginalForm(nextForm);
     setLoadedWorkflowId(row.id);
-    setWorkflowMessage('Workflow loaded for editing.');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setWorkflowMessage(options?.silent ? '' : 'Workflow loaded for editing.');
+    if (!options?.silent) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const selectedTenantId = form.tenant_id || tenantId;
   const isExistingSelectedWorkflow = Boolean(selected && selected.tenant_id === selectedTenantId);
   const isEditingWorkflow = Boolean(originalForm && loadedWorkflowId && selected?.id === loadedWorkflowId);
   const isCreateWorkflow = Boolean(selectedTenantId && !isExistingSelectedWorkflow);
+
+  useEffect(() => {
+    if (!selected || selected.tenant_id !== selectedTenantId || loadedWorkflowId === selected.id) {
+      return;
+    }
+    loadIntoForm(selected, { silent: true });
+  }, [selected?.id, selectedTenantId, loadedWorkflowId]);
   const isFormDirty = isEditingWorkflow && originalForm ? normalizeForm(form) !== normalizeForm(originalForm) : false;
   const hasCreateRequiredFields = Boolean(selectedTenantId && form.reason.trim());
   const canSaveWorkflow = !save.isPending && (isEditingWorkflow ? isFormDirty : isCreateWorkflow && hasCreateRequiredFields);
@@ -218,7 +229,7 @@ export default function PlatformTenantOffboardingPage() {
       {workflowMessage ? <div style={styles.info}>{workflowMessage}</div> : null}
       {!selectedTenantId ? <div style={styles.warning}>Select a tenant before saving an offboarding workflow.</div> : null}
       {isCreateWorkflow && selectedTenantId && !form.reason.trim() ? <div style={styles.warning}>Reason is required before creating an offboarding workflow.</div> : null}
-      {isExistingSelectedWorkflow && !isEditingWorkflow ? <div style={styles.info}>Existing workflow selected. Use Load/Edit before saving changes.</div> : null}
+      {isExistingSelectedWorkflow && !isEditingWorkflow ? <div style={styles.info}>Loading existing workflow for this tenant...</div> : null}
       {isEditingWorkflow && !isFormDirty ? <div style={styles.info}>No changes to save.</div> : null}
       <div style={styles.grid}>
         <label style={styles.fieldLabel}>Tenant
