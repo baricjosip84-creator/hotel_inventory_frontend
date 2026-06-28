@@ -149,6 +149,41 @@ function money(cents?: number | null, currency?: string | null): string {
   return `${((cents || 0) / 100).toFixed(2)} ${currency || ''}`.trim();
 }
 
+function isValidCurrency(value: string): boolean {
+  const normalized = value.trim();
+  return !normalized || /^[A-Z]{3}$/.test(normalized);
+}
+
+function isValidNonNegativeIntegerText(value: string): boolean {
+  const normalized = value.trim();
+  return !normalized || /^(0|[1-9]\d*)$/.test(normalized);
+}
+
+function isFutureDateInput(value: string): boolean {
+  if (!value) return false;
+  const candidate = new Date(`${value}T23:59:59`);
+  if (Number.isNaN(candidate.getTime())) return false;
+  return candidate.getTime() > Date.now();
+}
+
+function isJsonObjectText(value: string): boolean {
+  if (!value.trim()) return true;
+  try {
+    const parsed = JSON.parse(value);
+    return Boolean(parsed && typeof parsed === 'object' && !Array.isArray(parsed));
+  } catch {
+    return false;
+  }
+}
+
+function providerEventRequiresCurrentPeriod(type: string): boolean {
+  return ['invoice.payment_succeeded', 'payment_intent.succeeded', 'checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated'].includes(type);
+}
+
+function providerEventRequiresTrialEnd(type: string): boolean {
+  return type === 'customer.subscription.trial_extended';
+}
+
 function formatKeyValueMap(value: Record<string, number | boolean>): string {
   const entries = Object.entries(value || {});
   if (!entries.length) return '-';
@@ -219,7 +254,6 @@ export default function PlatformBillingPage() {
   });
 
   const selectedPlan = (planCatalogQuery.data?.plans || []).find((plan) => plan.plan_code === billingForm.plan_code) || null;
-
   useEffect(() => {
     if (!detailsQuery.data?.tenant) return;
     const tenant = detailsQuery.data.tenant;
@@ -249,6 +283,9 @@ export default function PlatformBillingPage() {
       method: 'PATCH',
       body: JSON.stringify({
         ...billingForm,
+        plan_code: billingForm.plan_code.trim(),
+        billing_customer_reference: billingForm.billing_customer_reference.trim(),
+        billing_notes: billingForm.billing_notes.trim(),
         trial_ends_at: billingForm.trial_ends_at || null,
         current_period_ends_at: billingForm.current_period_ends_at || null
       })
@@ -279,9 +316,9 @@ export default function PlatformBillingPage() {
       body: JSON.stringify({
         current_period_ends_at: renewalForm.current_period_ends_at || null,
         amount_cents: renewalForm.amount_cents ? Number.parseInt(renewalForm.amount_cents, 10) : null,
-        currency: renewalForm.currency || null,
-        external_reference: renewalForm.external_reference || null,
-        note: renewalForm.note || null,
+        currency: renewalForm.currency.trim() || null,
+        external_reference: renewalForm.external_reference.trim() || null,
+        note: renewalForm.note.trim() || null,
         allow_cancelled_renewal: renewalForm.allow_cancelled_renewal
       })
     }),
@@ -305,17 +342,17 @@ export default function PlatformBillingPage() {
       return platformApiRequest<PaymentProviderIngestionResult>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
-          provider: providerEventForm.provider || 'stripe',
-          provider_event_type: providerEventForm.provider_event_type || null,
-          provider_event_id: providerEventForm.provider_event_id || null,
+          provider: providerEventForm.provider.trim() || 'stripe',
+          provider_event_type: providerEventForm.provider_event_type.trim() || null,
+          provider_event_id: providerEventForm.provider_event_id.trim() || null,
           provider_event_created_at: providerEventForm.provider_event_created_at || (rawPayload ? null : new Date().toISOString()),
-          provider_signature: providerEventForm.provider_signature || null,
-          billing_customer_reference: providerEventForm.billing_customer_reference || null,
+          provider_signature: providerEventForm.provider_signature.trim() || null,
+          billing_customer_reference: providerEventForm.billing_customer_reference.trim() || null,
           amount_cents: providerEventForm.amount_cents ? Number.parseInt(providerEventForm.amount_cents, 10) : null,
-          currency: providerEventForm.currency || null,
+          currency: providerEventForm.currency.trim() || null,
           current_period_ends_at: providerEventForm.current_period_ends_at || null,
           trial_ends_at: providerEventForm.trial_ends_at || null,
-          note: providerEventForm.note || null,
+          note: providerEventForm.note.trim() || null,
           raw_payload: rawPayload
         })
       });
@@ -348,9 +385,9 @@ export default function PlatformBillingPage() {
       body: JSON.stringify({
         event_type: eventForm.event_type,
         amount_cents: eventForm.amount_cents ? Number.parseInt(eventForm.amount_cents, 10) : null,
-        currency: eventForm.currency || null,
-        external_reference: eventForm.external_reference || null,
-        note: eventForm.note || null
+        currency: eventForm.currency.trim() || null,
+        external_reference: eventForm.external_reference.trim() || null,
+        note: eventForm.note.trim() || null
       })
     }),
     onSuccess: async () => {
@@ -359,6 +396,69 @@ export default function PlatformBillingPage() {
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
     }
   });
+
+  const selectedTenant = detailsQuery.data?.tenant || null;
+  const billingPeriodInvalid = Boolean(billingForm.trial_ends_at && billingForm.current_period_ends_at && billingForm.current_period_ends_at < billingForm.trial_ends_at);
+  const billingProfileChanged = Boolean(selectedTenant && (
+    billingForm.billing_status !== (selectedTenant.billing_status || 'not_configured')
+    || billingForm.plan_code !== (selectedTenant.plan_code || '')
+    || billingForm.billing_customer_reference.trim() !== (selectedTenant.billing_customer_reference || '')
+    || billingForm.trial_ends_at !== isoDateInput(selectedTenant.trial_ends_at)
+    || billingForm.current_period_ends_at !== isoDateInput(selectedTenant.current_period_ends_at)
+    || billingForm.billing_notes.trim() !== (selectedTenant.billing_notes || '')
+  ));
+  const billingProfileInvalid = billingPeriodInvalid || Boolean(billingForm.plan_code && !selectedPlan);
+  const billingProfileValidationMessage = billingPeriodInvalid
+    ? 'Current period end must be on or after trial end.'
+    : billingForm.plan_code && !selectedPlan
+      ? 'Pick a supported catalog plan before saving.'
+      : '';
+  const canSaveBillingProfile = Boolean(canWrite && selectedTenantId && billingProfileChanged && !billingProfileInvalid && !saveBilling.isPending);
+
+  const renewalValidationMessage = !renewalForm.current_period_ends_at
+    ? 'Enter a new paid period end date before renewing.'
+    : !isFutureDateInput(renewalForm.current_period_ends_at)
+      ? 'New paid period end must be a future date.'
+      : !isValidNonNegativeIntegerText(renewalForm.amount_cents)
+        ? 'Amount cents must be a non-negative whole number.'
+        : !isValidCurrency(renewalForm.currency)
+          ? 'Currency must be a 3-letter code, for example EUR.'
+          : '';
+  const canRenewSubscription = Boolean(canWrite && selectedTenantId && !renewalValidationMessage && !renewBilling.isPending);
+
+  const providerRawPayloadInvalid = !isJsonObjectText(providerEventForm.raw_payload);
+  const providerHasRawPayload = Boolean(providerEventForm.raw_payload.trim());
+  const providerValidationMessage = !providerEventForm.provider.trim()
+    ? 'Enter a provider before ingesting.'
+    : providerEventForm.provider.trim().toLowerCase() === 'manual'
+      ? 'Use Add billing event for manual lifecycle changes; provider ingestion requires a real provider.'
+      : providerRawPayloadInvalid
+        ? 'Raw provider payload must be valid JSON object text.'
+        : !providerHasRawPayload && !providerEventForm.provider_event_type.trim()
+          ? 'Select a provider event type or paste a raw payload.'
+          : !providerHasRawPayload && !providerEventForm.provider_event_id.trim()
+            ? 'Enter a provider event ID or paste a raw payload.'
+            : !providerHasRawPayload && providerEventRequiresCurrentPeriod(providerEventForm.provider_event_type) && !providerEventForm.current_period_ends_at
+              ? 'Paid/subscription provider events require current period end.'
+              : !providerHasRawPayload && providerEventRequiresTrialEnd(providerEventForm.provider_event_type) && !providerEventForm.trial_ends_at
+                ? 'Trial-extension provider events require trial end.'
+                : !selectedTenantId && !providerEventForm.billing_customer_reference.trim() && !providerHasRawPayload
+                  ? 'Enter a billing customer reference when no tenant is selected.'
+                  : !isValidNonNegativeIntegerText(providerEventForm.amount_cents)
+                    ? 'Amount cents must be a non-negative whole number.'
+                    : !isValidCurrency(providerEventForm.currency)
+                      ? 'Currency must be a 3-letter code, for example EUR.'
+                      : '';
+  const canIngestProviderEvent = Boolean(canWrite && selectedTenantId && !providerValidationMessage && !ingestProviderEvent.isPending);
+
+  const billingEventValidationMessage = !eventForm.event_type
+    ? 'Select a billing event type before adding an event.'
+    : !isValidNonNegativeIntegerText(eventForm.amount_cents)
+      ? 'Amount cents must be a non-negative whole number.'
+      : !isValidCurrency(eventForm.currency)
+        ? 'Currency must be a 3-letter code, for example EUR.'
+        : '';
+  const canCreateBillingEvent = Boolean(canWrite && selectedTenantId && !billingEventValidationMessage && !createEvent.isPending);
 
   return (
     <div style={styles.page}>
@@ -500,8 +600,9 @@ export default function PlatformBillingPage() {
                   <span>Limits: {formatKeyValueMap(selectedPlan.limits)}</span>
                   <span>Features: {formatKeyValueMap(selectedPlan.feature_flags)}</span>
                 </div>
-              ) : billingForm.plan_code ? <div style={styles.error}>Unsupported plan code. Pick a catalog plan before saving.</div> : null}
-              <button style={styles.button} onClick={() => saveBilling.mutate()} disabled={saveBilling.isPending || Boolean(billingForm.plan_code && !selectedPlan)}>Save billing profile</button>
+              ) : null}
+              {billingProfileValidationMessage ? <div style={styles.inlineWarning}>{billingProfileValidationMessage}</div> : null}
+              <button style={canSaveBillingProfile ? styles.button : styles.disabledButton} onClick={() => saveBilling.mutate()} disabled={!canSaveBillingProfile}>{saveBilling.isPending ? 'Saving...' : 'Save billing profile'}</button>
             </div>
           ) : null}
           {saveBilling.error ? <div style={styles.error}>{readableError(saveBilling.error)}</div> : null}
@@ -530,7 +631,8 @@ export default function PlatformBillingPage() {
                   <input type="checkbox" checked={renewalForm.allow_cancelled_renewal} onChange={(event) => setRenewalForm({ ...renewalForm, allow_cancelled_renewal: event.target.checked })} />
                   Allow cancelled tenant renewal override
                 </label>
-                <button style={styles.button} onClick={() => renewBilling.mutate()} disabled={renewBilling.isPending || !renewalForm.current_period_ends_at}>Renew subscription</button>
+                {renewalValidationMessage ? <div style={styles.inlineWarning}>{renewalValidationMessage}</div> : null}
+                <button style={canRenewSubscription ? styles.button : styles.disabledButton} onClick={() => renewBilling.mutate()} disabled={!canRenewSubscription}>{renewBilling.isPending ? 'Renewing...' : 'Renew subscription'}</button>
               </div>
               {renewBilling.error ? <div style={styles.error}>{readableError(renewBilling.error)}</div> : null}
             </div>
@@ -576,7 +678,8 @@ export default function PlatformBillingPage() {
                 <label style={{ ...styles.label, gridColumn: '1 / -1' }}>Provider note
                   <textarea style={styles.textarea} value={providerEventForm.note} onChange={(event) => setProviderEventForm({ ...providerEventForm, note: event.target.value })} />
                 </label>
-                <button style={styles.button} onClick={() => ingestProviderEvent.mutate()} disabled={ingestProviderEvent.isPending || !providerEventForm.provider.trim() || (!providerEventForm.raw_payload.trim() && !providerEventForm.provider_event_id) || (!selectedTenantId && !providerEventForm.billing_customer_reference && !providerEventForm.raw_payload.trim())}>Ingest provider event</button>
+                {providerValidationMessage ? <div style={styles.inlineWarning}>{providerValidationMessage}</div> : null}
+                <button style={canIngestProviderEvent ? styles.button : styles.disabledButton} onClick={() => ingestProviderEvent.mutate()} disabled={!canIngestProviderEvent}>{ingestProviderEvent.isPending ? 'Ingesting...' : 'Ingest provider event'}</button>
               </div>
               {ingestProviderEvent.error ? <div style={styles.error}>{readableError(ingestProviderEvent.error)}</div> : null}
               {providerEventResult ? (
@@ -609,7 +712,8 @@ export default function PlatformBillingPage() {
                 <label style={{ ...styles.label, gridColumn: '1 / -1' }}>Note
                   <textarea style={styles.textarea} value={eventForm.note} onChange={(event) => setEventForm({ ...eventForm, note: event.target.value })} />
                 </label>
-                <button style={styles.button} onClick={() => createEvent.mutate()} disabled={createEvent.isPending}>Add event</button>
+                {billingEventValidationMessage ? <div style={styles.inlineWarning}>{billingEventValidationMessage}</div> : null}
+                <button style={canCreateBillingEvent ? styles.button : styles.disabledButton} onClick={() => createEvent.mutate()} disabled={!canCreateBillingEvent}>{createEvent.isPending ? 'Adding...' : 'Add event'}</button>
               </div>
               {createEvent.error ? <div style={styles.error}>{readableError(createEvent.error)}</div> : null}
             </div>
@@ -651,6 +755,8 @@ const styles: Record<string, CSSProperties> = {
   input: { padding: '10px', border: '1px solid #d1d5db', borderRadius: '10px' },
   textarea: { padding: '10px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px' },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', fontWeight: 700 },
+  disabledButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d1d5db', color: '#fff', cursor: 'not-allowed', fontWeight: 700 },
+  inlineWarning: { gridColumn: '1 / -1', color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px', borderRadius: '10px', fontSize: '13px' },
   secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#fff', color: '#111827', cursor: 'pointer', fontWeight: 700 },
   eventBox: { marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' },
   planSummary: { gridColumn: '1 / -1', display: 'grid', gap: '6px', padding: '12px', border: '1px solid #bfdbfe', borderRadius: '12px', background: '#eff6ff', color: '#1e3a8a', fontSize: '13px' },
