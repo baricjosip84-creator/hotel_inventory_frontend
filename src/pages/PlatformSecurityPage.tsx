@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import qrCodeSvg from '../lib/qrCodeSvg';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 type Security = {
@@ -63,7 +64,7 @@ export default function PlatformSecurityPage() {
   const qc = useQueryClient();
   const [pwd, setPwd] = useState({ current_password: '', new_password: '' });
   const [mfaCode, setMfaCode] = useState('');
-  const [setup, setSetup] = useState<{ secret: string; current_test_code: string } | null>(null);
+  const [setup, setSetup] = useState<{ secret: string; otpauth_url: string; algorithm?: string; digits?: number; period_seconds?: number } | null>(null);
   const canReadAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ);
   const canWriteAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_WRITE);
 
@@ -83,7 +84,7 @@ export default function PlatformSecurityPage() {
   });
 
   const setupMfa = useMutation({
-    mutationFn: () => platformApiRequest<{ secret: string; current_test_code: string }>('/platform/security/me/mfa/setup', { method: 'POST' }),
+    mutationFn: () => platformApiRequest<{ secret: string; otpauth_url: string; algorithm?: string; digits?: number; period_seconds?: number }>('/platform/security/me/mfa/setup', { method: 'POST' }),
     onSuccess: setSetup
   });
 
@@ -145,10 +146,28 @@ export default function PlatformSecurityPage() {
         <h2>MFA</h2>
         <button style={styles.button} onClick={() => setupMfa.mutate()} disabled={setupMfa.isPending}>Start MFA setup</button>{' '}
         <button style={styles.button} onClick={() => disable.mutate()} disabled={disable.isPending}>Disable MFA</button>
-        {setup ? <div style={styles.notice}>Secret: <b>{setup.secret}</b><br />Current setup code: <b>{setup.current_test_code}</b></div> : null}
+        {setup ? (
+          <div style={styles.mfaSetup}>
+            <div>
+              <h3 style={styles.mfaTitle}>Scan this QR code</h3>
+              <p style={styles.muted}>Use Google Authenticator, Microsoft Authenticator, Authy, or another TOTP app.</p>
+              <img
+                src={qrCodeSvg.createQrSvgDataUri(setup.otpauth_url)}
+                alt="Authenticator app setup QR code"
+                style={styles.qrCode}
+              />
+            </div>
+            <div style={styles.secretBox}>
+              <b>Manual setup key</b>
+              <code style={styles.secretCode}>{setup.secret}</code>
+              <p style={styles.muted}>Use this only if your authenticator app cannot scan the QR code.</p>
+              <p style={styles.muted}>Algorithm: {setup.algorithm || 'SHA1'} · Digits: {setup.digits || 6} · Period: {setup.period_seconds || 30}s</p>
+            </div>
+          </div>
+        ) : null}
         <div style={styles.form}>
-          <input style={styles.input} placeholder="Code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
-          <button style={styles.button} onClick={() => confirm.mutate()} disabled={confirm.isPending}>Confirm MFA</button>
+          <input style={styles.input} placeholder="6-digit authenticator code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+          <button style={styles.button} onClick={() => confirm.mutate()} disabled={confirm.isPending || mfaCode.trim().length !== 6}>Confirm MFA</button>
         </div>
         {confirm.error ? <p style={styles.error}>{confirm.error instanceof Error ? confirm.error.message : 'MFA confirmation failed'}</p> : null}
       </section>
@@ -201,6 +220,11 @@ const styles: Record<string, CSSProperties> = {
   input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
   button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
   notice: { background: '#eef2ff', padding: 12, borderRadius: 12, marginTop: 10 },
+  mfaSetup: { background: '#eef2ff', padding: 16, borderRadius: 12, marginTop: 10, display: 'grid', gridTemplateColumns: 'minmax(180px, 260px) 1fr', gap: 16, alignItems: 'start' },
+  mfaTitle: { margin: '0 0 6px' },
+  qrCode: { width: 220, height: 220, border: '1px solid #d1d5db', borderRadius: 12, background: '#fff', padding: 8 },
+  secretBox: { display: 'flex', flexDirection: 'column', gap: 8 },
+  secretCode: { display: 'block', padding: 10, borderRadius: 10, background: '#fff', border: '1px solid #d1d5db', wordBreak: 'break-all' },
   success: { background: '#dcfce7', color: '#166534', borderRadius: 12, padding: 12 },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 },
   table: { width: '100%', borderCollapse: 'collapse', marginTop: 12 },
