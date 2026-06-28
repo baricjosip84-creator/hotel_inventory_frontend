@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties, ReactNode } from 'react';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+
+type TenantRow = { id: string; name: string; status?: string; plan_code?: string };
 
 type RetentionRow = {
   tenant_id: string;
@@ -28,6 +31,10 @@ export default function PlatformDataRetentionPage() {
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_WRITE);
   const [rows, setRows] = useState<RetentionRow[]>([]);
   const [tenantId, setTenantId] = useState('');
+  const tenantsQuery = useQuery({
+    queryKey: ['platform', 'tenants', 'data-retention-filter'],
+    queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants')
+  });
   const [legalHold, setLegalHold] = useState('');
   const [dueOnly, setDueOnly] = useState('false');
   const [editing, setEditing] = useState<RetentionRow | null>(null);
@@ -134,13 +141,19 @@ export default function PlatformDataRetentionPage() {
 
       <section style={cardStyle}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <label>Tenant ID<input value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="optional tenant UUID" style={inputStyle} /></label>
+          <label>Tenant<select value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={inputStyle}>
+            <option value="">All tenants</option>
+            {(tenantsQuery.data || []).map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status || 'unknown'} · {tenant.plan_code || 'no plan'}</option>
+            ))}
+          </select></label>
           <label>Legal hold<select value={legalHold} onChange={(e) => setLegalHold(e.target.value)} style={inputStyle}><option value="">Any</option><option value="true">Yes</option><option value="false">No</option></select></label>
           <label>Due only<select value={dueOnly} onChange={(e) => setDueOnly(e.target.value)} style={inputStyle}><option value="false">No</option><option value="true">Yes</option></select></label>
           <button onClick={load} disabled={loading} style={buttonStyle}>{loading ? 'Loading…' : 'Apply'}</button>
         </div>
       </section>
 
+      {tenantsQuery.error ? <div style={errorStyle}>{tenantsQuery.error instanceof Error ? tenantsQuery.error.message : 'Failed to load tenants'}</div> : null}
       {message ? <div style={successStyle}>{message}</div> : null}
       {error ? <div style={errorStyle}>{error}</div> : null}
 
