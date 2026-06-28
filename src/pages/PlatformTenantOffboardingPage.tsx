@@ -147,8 +147,8 @@ export default function PlatformTenantOffboardingPage() {
   };
 
   const selectedTenantId = form.tenant_id || tenantId;
-  const isEditingWorkflow = Boolean(originalForm && selectedTenantId === originalForm.tenant_id);
-  const isFormDirty = !isEditingWorkflow || normalizeForm(form) !== normalizeForm(originalForm);
+  const isEditingWorkflow = originalForm !== null && selectedTenantId === originalForm.tenant_id;
+  const isFormDirty = isEditingWorkflow ? normalizeForm(form) !== normalizeForm(originalForm) : Boolean(selectedTenantId);
   const canSaveWorkflow = Boolean(selectedTenantId) && isFormDirty && !save.isPending;
   const blockCount = checks ? checks.active_tenant_sessions + checks.active_support_sessions + checks.open_incidents + checks.open_tasks : 0;
 
