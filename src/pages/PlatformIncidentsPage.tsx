@@ -119,6 +119,19 @@ export default function PlatformIncidentsPage() {
 
   const rows = incidents.data || [];
   const openIncidents = useMemo(() => rows.filter((incident) => !['resolved', 'cancelled'].includes(incident.status)), [rows]);
+  const trimmedTitle = form.title.trim();
+  const tenantIncidentNeedsTenant = form.scope === 'tenant' && !form.tenant_id;
+  const missingStartedAt = !form.started_at || Number.isNaN(new Date(form.started_at).getTime());
+  const createDisabled = create.isPending || !trimmedTitle || tenantIncidentNeedsTenant || missingStartedAt;
+  const createDisabledReason = !trimmedTitle
+    ? 'Enter an incident title before creating.'
+    : tenantIncidentNeedsTenant
+      ? 'Select a tenant for tenant-specific incidents.'
+      : missingStartedAt
+        ? 'Select a valid start date and time.'
+        : '';
+  const updateDisabled = addUpdate.isPending || !updateForm.message.trim();
+  const cancelDisabled = cancel.isPending || !cancelReason.trim();
 
   return <div style={styles.page}>
     <header>
@@ -135,45 +148,86 @@ export default function PlatformIncidentsPage() {
 
     {canWrite ? <section style={styles.panel}>
       <h2>Create incident</h2>
+      <p style={styles.muted}>Scope only controls whether the incident is platform-wide or tied to one tenant. The four cards above are counters, not create options.</p>
       <div style={styles.formGrid}>
-        <input style={styles.input} placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <select style={styles.input} value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
-          <option value="minor">minor</option><option value="major">major</option><option value="critical">critical</option>
-        </select>
-        <select style={styles.input} value={form.impact} onChange={(e) => setForm({ ...form, impact: e.target.value })}>
-          <option value="none">none</option><option value="degraded">degraded</option><option value="partial_outage">partial outage</option><option value="major_outage">major outage</option>
-        </select>
-        <select style={styles.input} value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, tenant_id: '' })}>
-          <option value="platform">Platform-wide</option><option value="tenant">Tenant-specific</option>
-        </select>
-        {form.scope === 'tenant' ? <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
-          <option value="">Select tenant</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select> : null}
-        <input style={styles.input} type="datetime-local" value={form.started_at} onChange={(e) => setForm({ ...form, started_at: e.target.value })} />
+        <label style={styles.fieldLabel}>
+          Title
+          <input style={styles.input} placeholder="Incident title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>
+          Severity
+          <select style={styles.input} value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
+            <option value="minor">Minor</option><option value="major">Major</option><option value="critical">Critical</option>
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>
+          Impact
+          <select style={styles.input} value={form.impact} onChange={(e) => setForm({ ...form, impact: e.target.value })}>
+            <option value="none">None</option><option value="degraded">Degraded</option><option value="partial_outage">Partial outage</option><option value="major_outage">Major outage</option>
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>
+          Scope
+          <select style={styles.input} value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, tenant_id: '' })}>
+            <option value="platform">Platform-wide</option><option value="tenant">Tenant-specific</option>
+          </select>
+        </label>
+        {form.scope === 'tenant' ? <label style={styles.fieldLabel}>
+          Tenant
+          <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
+            <option value="">Select tenant</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label> : null}
+        <label style={styles.fieldLabel}>
+          Started at
+          <input style={styles.input} type="datetime-local" value={form.started_at} onChange={(e) => setForm({ ...form, started_at: e.target.value })} />
+        </label>
       </div>
-      <textarea style={styles.textarea} placeholder="Internal summary" value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
-      <textarea style={styles.textarea} placeholder="Public message shown to affected tenant users" value={form.public_message} onChange={(e) => setForm({ ...form, public_message: e.target.value })} />
-      <textarea style={styles.textarea} placeholder="Internal notes" value={form.internal_notes} onChange={(e) => setForm({ ...form, internal_notes: e.target.value })} />
-      <button style={styles.button} onClick={() => create.mutate()} disabled={create.isPending || !form.title || (form.scope === 'tenant' && !form.tenant_id)}>Create incident</button>
+      <label style={styles.fieldLabel}>
+        Internal summary
+        <textarea style={styles.textarea} placeholder="Brief internal summary" value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
+      </label>
+      <label style={styles.fieldLabel}>
+        Public message
+        <textarea style={styles.textarea} placeholder="Message shown to affected tenant users" value={form.public_message} onChange={(e) => setForm({ ...form, public_message: e.target.value })} />
+      </label>
+      <label style={styles.fieldLabel}>
+        Internal notes
+        <textarea style={styles.textarea} placeholder="Internal notes" value={form.internal_notes} onChange={(e) => setForm({ ...form, internal_notes: e.target.value })} />
+      </label>
+      {createDisabledReason ? <div style={styles.inlineHint}>{createDisabledReason}</div> : null}
+      <button style={createDisabled ? styles.disabledButton : styles.button} onClick={() => create.mutate()} disabled={createDisabled}>Create incident</button>
       {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
     </section> : null}
 
     <section style={styles.panel}>
       <h2>Filters</h2>
       <div style={styles.filters}>
-        <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-          <option value="">All statuses</option><option value="investigating">investigating</option><option value="identified">identified</option><option value="monitoring">monitoring</option><option value="resolved">resolved</option><option value="cancelled">cancelled</option>
-        </select>
-        <select style={styles.input} value={filters.severity} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
-          <option value="">All severities</option><option value="minor">minor</option><option value="major">major</option><option value="critical">critical</option>
-        </select>
-        <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
-          <option value="">All scopes</option><option value="platform">platform</option><option value="tenant">tenant</option>
-        </select>
-        <select style={styles.input} value={filters.include_resolved} onChange={(e) => setFilters({ ...filters, include_resolved: e.target.value })}>
-          <option value="false">Open only</option><option value="true">Include resolved/cancelled</option>
-        </select>
+        <label style={styles.filterLabel}>
+          Status
+          <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="">All statuses</option><option value="investigating">Investigating</option><option value="identified">Identified</option><option value="monitoring">Monitoring</option><option value="resolved">Resolved</option><option value="cancelled">Cancelled</option>
+          </select>
+        </label>
+        <label style={styles.filterLabel}>
+          Severity
+          <select style={styles.input} value={filters.severity} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
+            <option value="">All severities</option><option value="minor">Minor</option><option value="major">Major</option><option value="critical">Critical</option>
+          </select>
+        </label>
+        <label style={styles.filterLabel}>
+          Scope
+          <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
+            <option value="">All scopes</option><option value="platform">Platform-wide</option><option value="tenant">Tenant-specific</option>
+          </select>
+        </label>
+        <label style={styles.filterLabel}>
+          Visibility
+          <select style={styles.input} value={filters.include_resolved} onChange={(e) => setFilters({ ...filters, include_resolved: e.target.value })}>
+            <option value="false">Open only</option><option value="true">Include resolved/cancelled</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -204,15 +258,24 @@ export default function PlatformIncidentsPage() {
           {selectedIncident.data.internal_notes ? <p><b>Internal:</b> {selectedIncident.data.internal_notes}</p> : null}
           {canWrite && !['resolved', 'cancelled'].includes(selectedIncident.data.status) ? <div style={styles.updateBox}>
             <h3>Add update</h3>
-            <select style={styles.input} value={updateForm.status} onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}>
-              <option value="investigating">investigating</option><option value="identified">identified</option><option value="monitoring">monitoring</option><option value="resolved">resolved</option>
-            </select>
-            <textarea style={styles.textarea} placeholder="Update message" value={updateForm.message} onChange={(e) => setUpdateForm({ ...updateForm, message: e.target.value })} />
+            <label style={styles.fieldLabel}>
+              New status
+              <select style={styles.input} value={updateForm.status} onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}>
+                <option value="investigating">Investigating</option><option value="identified">Identified</option><option value="monitoring">Monitoring</option><option value="resolved">Resolved</option>
+              </select>
+            </label>
+            <label style={styles.fieldLabel}>
+              Update message
+              <textarea style={styles.textarea} placeholder="Update message" value={updateForm.message} onChange={(e) => setUpdateForm({ ...updateForm, message: e.target.value })} />
+            </label>
             <label style={styles.checkboxLabel}><input type="checkbox" checked={updateForm.is_public} onChange={(e) => setUpdateForm({ ...updateForm, is_public: e.target.checked })} /> Visible to affected tenant users</label>
-            <button style={styles.button} onClick={() => addUpdate.mutate()} disabled={addUpdate.isPending || !updateForm.message}>Add update</button>
+            <button style={updateDisabled ? styles.disabledButton : styles.button} onClick={() => addUpdate.mutate()} disabled={updateDisabled}>Add update</button>
             <div style={styles.cancelRow}>
-              <input style={styles.input} placeholder="Cancel reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
-              <button style={styles.dangerButton} onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel incident</button>
+              <label style={styles.fieldLabel}>
+                Cancel reason
+                <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+              </label>
+              <button style={cancelDisabled ? styles.disabledDangerButton : styles.dangerButton} onClick={() => cancel.mutate()} disabled={cancelDisabled}>Cancel incident</button>
             </div>
             {addUpdate.error ? <div style={styles.error}>{readableError(addUpdate.error)}</div> : null}
             {cancel.error ? <div style={styles.error}>{readableError(cancel.error)}</div> : null}
@@ -245,10 +308,15 @@ const styles: Record<string, CSSProperties> = {
   badges: { display: 'flex', gap: '6px', alignItems: 'start', flexWrap: 'wrap' },
   badge: { background: '#eef2ff', color: '#3730a3', padding: '4px 10px', borderRadius: '999px', height: 'fit-content' },
   criticalBadge: { background: '#7f1d1d', color: '#fff', padding: '4px 10px', borderRadius: '999px', height: 'fit-content' },
+  fieldLabel: { display: 'grid', gap: '6px', fontWeight: 600 },
+  filterLabel: { display: 'grid', gap: '6px', fontWeight: 600 },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px' },
-  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px' },
+  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '80px', fontFamily: 'inherit' },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', width: 'fit-content' },
+  disabledButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#9ca3af', color: '#fff', cursor: 'not-allowed', width: 'fit-content', opacity: 0.75 },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
+  disabledDangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#bca5a5', color: '#fff', cursor: 'not-allowed', opacity: 0.75 },
+  inlineHint: { color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px' },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px' },
   cancelRow: { display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' },
   updateBox: { border: '1px solid #e5e7eb', borderRadius: '12px', padding: '12px', display: 'grid', gap: '10px' },
