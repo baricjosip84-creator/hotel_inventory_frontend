@@ -66,6 +66,17 @@ function readableError(error: unknown): string { return error instanceof Error ?
 function formatDate(value?: string | null): string { return value ? new Date(value).toLocaleString() : '-'; }
 function dateTimeLocalToIso(value: string): string | null { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); }
 function pretty(value: string): string { return value.replaceAll('_', ' '); }
+function normalizeForm(value: typeof blankForm) {
+  return JSON.stringify({
+    tenant_id: value.tenant_id || '',
+    status: value.status || 'planned',
+    reason: value.reason || '',
+    scheduled_for: value.scheduled_for || '',
+    owner_platform_user_id: value.owner_platform_user_id || '',
+    notes: value.notes || '',
+    checklist: checklistKeys.reduce<Record<string, boolean>>((acc, key) => ({ ...acc, [key]: Boolean(value.checklist?.[key]) }), {})
+  });
+}
 
 export default function PlatformTenantOffboardingPage() {
   const qc = useQueryClient();
@@ -74,6 +85,7 @@ export default function PlatformTenantOffboardingPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [form, setForm] = useState(blankForm);
+  const [originalForm, setOriginalForm] = useState<typeof blankForm | null>(null);
   const [archiveOnComplete, setArchiveOnComplete] = useState(true);
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'for-offboarding'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
@@ -105,7 +117,10 @@ export default function PlatformTenantOffboardingPage() {
       method: 'POST',
       body: JSON.stringify({ ...form, tenant_id: form.tenant_id || tenantId, scheduled_for: dateTimeLocalToIso(form.scheduled_for), owner_platform_user_id: form.owner_platform_user_id || null })
     }),
-    onSuccess: invalidate
+    onSuccess: async () => {
+      await invalidate();
+      setOriginalForm({ ...form, tenant_id: form.tenant_id || tenantId, checklist: { ...form.checklist } });
+    }
   });
   const complete = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/tenant-offboarding/${id}/complete`, { method: 'POST', body: JSON.stringify({ archiveTenant: archiveOnComplete }) }),
@@ -117,8 +132,7 @@ export default function PlatformTenantOffboardingPage() {
   });
 
   const loadIntoForm = (row: OffboardingRow) => {
-    setTenantId(row.tenant_id);
-    setForm({
+    const nextForm = {
       tenant_id: row.tenant_id,
       status: row.status,
       reason: row.reason || '',
@@ -126,9 +140,16 @@ export default function PlatformTenantOffboardingPage() {
       owner_platform_user_id: row.owner_platform_user_id || '',
       notes: row.notes || '',
       checklist: { ...emptyChecklist, ...(row.checklist || {}) }
-    });
+    };
+    setTenantId(row.tenant_id);
+    setForm(nextForm);
+    setOriginalForm(nextForm);
   };
 
+  const selectedTenantId = form.tenant_id || tenantId;
+  const isEditingWorkflow = Boolean(originalForm && selectedTenantId === originalForm.tenant_id);
+  const isFormDirty = !isEditingWorkflow || normalizeForm(form) !== normalizeForm(originalForm);
+  const canSaveWorkflow = Boolean(selectedTenantId) && isFormDirty && !save.isPending;
   const blockCount = checks ? checks.active_tenant_sessions + checks.active_support_sessions + checks.open_incidents + checks.open_tasks : 0;
 
   return <div style={styles.page}>
@@ -140,14 +161,18 @@ export default function PlatformTenantOffboardingPage() {
     <section style={styles.panel}>
       <h2>Filters</h2>
       <div style={styles.grid}>
-        <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
-          <option value="">All tenants</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select>
-        <select style={styles.input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="">All statuses</option>
-          {statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}
-        </select>
+        <label style={styles.fieldLabel}>Tenant
+          <select style={styles.input} value={tenantId} onChange={(event) => { setTenantId(event.target.value); setOriginalForm(null); }}>
+            <option value="">All tenants</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>Status
+          <select style={styles.input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">All statuses</option>
+            {statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}
+          </select>
+        </label>
         <label style={styles.checkboxLabel}><input type="checkbox" checked={includeCompleted} onChange={(event) => setIncludeCompleted(event.target.checked)} /> Include completed/cancelled</label>
       </div>
     </section>
@@ -167,20 +192,34 @@ export default function PlatformTenantOffboardingPage() {
 
     {canWrite ? <section style={styles.panel}>
       <h2>{selected ? 'Update offboarding workflow' : 'Start offboarding workflow'}</h2>
+      {!selectedTenantId ? <div style={styles.warning}>Select a tenant before saving an offboarding workflow.</div> : null}
+      {isEditingWorkflow && !isFormDirty ? <div style={styles.info}>No changes to save.</div> : null}
       <div style={styles.grid}>
-        <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}>
-          <option value="">Select tenant</option>
-          {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-        </select>
-        <select style={styles.input} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}</select>
-        <input style={styles.input} type="datetime-local" value={form.scheduled_for} onChange={(event) => setForm({ ...form, scheduled_for: event.target.value })} />
-        <select style={styles.input} value={form.owner_platform_user_id} onChange={(event) => setForm({ ...form, owner_platform_user_id: event.target.value })}>
-          <option value="">No owner</option>
-          {(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-        </select>
+        <label style={styles.fieldLabel}>Tenant
+          <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => { setForm({ ...form, tenant_id: event.target.value }); setTenantId(event.target.value); setOriginalForm(null); }}>
+            <option value="">Select tenant</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          </select>
+        </label>
+        <label style={styles.fieldLabel}>Workflow status
+          <select style={styles.input} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}</select>
+        </label>
+        <label style={styles.fieldLabel}>Planned date
+          <input style={styles.input} type="datetime-local" value={form.scheduled_for} onChange={(event) => setForm({ ...form, scheduled_for: event.target.value })} />
+        </label>
+        <label style={styles.fieldLabel}>Owner
+          <select style={styles.input} value={form.owner_platform_user_id} onChange={(event) => setForm({ ...form, owner_platform_user_id: event.target.value })}>
+            <option value="">No owner</option>
+            {(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
+          </select>
+        </label>
       </div>
-      <input style={styles.input} placeholder="Reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-      <textarea style={styles.textarea} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+      <label style={styles.fieldLabel}>Reason
+        <input style={styles.input} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+      </label>
+      <label style={styles.fieldLabel}>Notes
+        <textarea style={styles.textarea} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+      </label>
       <div style={styles.checklist}>
         {checklistKeys.map((key) => <label key={key} style={styles.checkItem}>
           <input type="checkbox" checked={Boolean(form.checklist[key])} onChange={(event) => setForm({ ...form, checklist: { ...form.checklist, [key]: event.target.checked } })} />
@@ -188,7 +227,7 @@ export default function PlatformTenantOffboardingPage() {
         </label>)}
       </div>
       <div style={styles.actions}>
-        <button style={styles.button} disabled={!(form.tenant_id || tenantId) || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : 'Save workflow'}</button>
+        <button style={canSaveWorkflow ? styles.button : styles.disabledButton} disabled={!canSaveWorkflow} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : selected ? 'Save changes' : 'Save workflow'}</button>
         {tenantId ? <>
           <label style={styles.checkboxLabel}><input type="checkbox" checked={archiveOnComplete} onChange={(event) => setArchiveOnComplete(event.target.checked)} /> Archive tenant on completion</label>
           <button style={styles.dangerButton} disabled={!selected?.checklist_complete || blockCount > 0 || complete.isPending} onClick={() => complete.mutate(tenantId)}>Complete offboarding</button>
@@ -227,16 +266,19 @@ const styles: Record<string, CSSProperties> = {
   muted: { color: '#6b7280', fontSize: 13 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, width: '100%' },
+  fieldLabel: { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: '#111827' },
   textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, width: '100%', minHeight: 80, marginTop: 12 },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#374151' },
   metrics: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 },
   metric: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 4 },
   warning: { background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, marginTop: 12 },
+  info: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 10, padding: 12, marginTop: 12 },
   success: { background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 10, padding: 12, marginTop: 12 },
   checklist: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 12 },
   checkItem: { display: 'flex', gap: 8, alignItems: 'center', background: '#f9fafb', padding: 10, borderRadius: 10 },
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 },
   button: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#111827', color: '#fff', cursor: 'pointer' },
+  disabledButton: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#9ca3af', color: '#fff', cursor: 'not-allowed' },
   secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', cursor: 'pointer' },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: 10, background: '#991b1b', color: '#fff', cursor: 'pointer' },
   error: { color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', padding: 12, borderRadius: 10 },
