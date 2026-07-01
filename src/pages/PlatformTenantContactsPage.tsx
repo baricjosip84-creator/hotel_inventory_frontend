@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -41,10 +42,12 @@ const blankForm = {
 export default function PlatformTenantContactsPage() {
   const qc = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UPDATE);
-  const [tenantId, setTenantId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
   const [contactType, setContactType] = useState('');
   const [form, setForm] = useState(blankForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-contacts'],
@@ -60,16 +63,31 @@ export default function PlatformTenantContactsPage() {
     queryFn: () => platformApiRequest<Contact[]>(`/platform/tenant-contacts?${query.toString()}`)
   });
 
+  const refreshAll = async () => {
+    setMessage('');
+    await Promise.all([tenants.refetch(), contacts.refetch()]);
+  };
+
   const rows = contacts.data || [];
   const selectedTenant = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId), [tenants.data, tenantId]);
+
+  const contactPayload = () => ({
+    ...form,
+    name: form.name.trim(),
+    email: form.email.trim(),
+    phone: form.phone.trim(),
+    title: form.title.trim(),
+    notes: form.notes.trim()
+  });
 
   const create = useMutation({
     mutationFn: () => platformApiRequest<Contact>(`/platform/tenant-contacts/tenants/${tenantId}`, {
       method: 'POST',
-      body: JSON.stringify(form)
+      body: JSON.stringify(contactPayload())
     }),
     onSuccess: async () => {
       setForm(blankForm);
+      setMessage('Contact saved.');
       await qc.invalidateQueries({ queryKey: ['platform', 'tenant-contacts'] });
     }
   });
@@ -77,19 +95,28 @@ export default function PlatformTenantContactsPage() {
   const update = useMutation({
     mutationFn: (id: string) => platformApiRequest<Contact>(`/platform/tenant-contacts/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(form)
+      body: JSON.stringify(contactPayload())
     }),
     onSuccess: async () => {
       setEditingId(null);
       setForm(blankForm);
+      setMessage('Contact updated.');
       await qc.invalidateQueries({ queryKey: ['platform', 'tenant-contacts'] });
     }
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/tenant-contacts/${id}`, { method: 'DELETE' }),
-    onSuccess: async () => qc.invalidateQueries({ queryKey: ['platform', 'tenant-contacts'] })
+    onSuccess: async () => {
+      setMessage('Contact deleted.');
+      await qc.invalidateQueries({ queryKey: ['platform', 'tenant-contacts'] });
+    }
   });
+
+  const deleteContact = (contact: Contact) => {
+    const ok = window.confirm(`Delete tenant contact ${contact.name}?`);
+    if (ok) remove.mutate(contact.id);
+  };
 
   const startEdit = (contact: Contact) => {
     setTenantId(contact.tenant_id);
@@ -108,10 +135,20 @@ export default function PlatformTenantContactsPage() {
   };
 
   return <div style={styles.page}>
-    <header>
-      <h1 style={styles.title}>Tenant contacts</h1>
-      <p style={styles.muted}>Store real customer contacts for billing, technical support, ownership, emergencies, and escalation. This is platform-only operational information.</p>
+    <header style={styles.header}>
+      <div>
+        <h1 style={styles.title}>Tenant contacts</h1>
+        <p style={styles.muted}>Store real customer contacts for billing, technical support, ownership, emergencies, and escalation. This is platform-only operational information.</p>
+      </div>
+      <button style={styles.secondaryButton} onClick={refreshAll} disabled={tenants.isFetching || contacts.isFetching}>{tenants.isFetching || contacts.isFetching ? 'Refreshing...' : 'Refresh'}</button>
     </header>
+
+    <section style={styles.metadataGrid}>
+      <div style={styles.metadataCard}><b>Source</b><span>GET /platform/tenant-contacts</span></div>
+      <div style={styles.metadataCard}><b>Tenant filter</b><span>{selectedTenant?.name || 'All tenants'}</span></div>
+      <div style={styles.metadataCard}><b>Contact type</b><span>{contactType || 'All contact types'}</span></div>
+      <div style={styles.metadataCard}><b>Loaded rows</b><span>{contacts.isLoading ? 'Loading...' : rows.length}</span></div>
+    </section>
 
     <section style={styles.panel}>
       <h2>Filters</h2>
@@ -162,14 +199,16 @@ export default function PlatformTenantContactsPage() {
         <textarea style={styles.textarea} placeholder="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </label>
       <div style={styles.actions}>
-        <button style={styles.button} disabled={!tenantId || !form.name || create.isPending || update.isPending} onClick={() => editingId ? update.mutate(editingId) : create.mutate()}>{editingId ? 'Save contact' : 'Add contact'}</button>
+        <button style={styles.button} disabled={!tenantId || !form.name.trim() || create.isPending || update.isPending} onClick={() => editingId ? update.mutate(editingId) : create.mutate()}>{editingId ? 'Save contact' : 'Add contact'}</button>
         {editingId ? <button style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(blankForm); }}>Cancel edit</button> : null}
       </div>
       {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
       {update.error ? <div style={styles.error}>{readableError(update.error)}</div> : null}
     </section> : null}
 
-    {contacts.error ? <div style={styles.error}>{readableError(contacts.error)}</div> : null}
+    {message ? <div style={styles.success}>{message}</div> : null}
+    {tenants.error ? <div style={styles.error}>Tenant list failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => tenants.refetch()}>Retry tenants</button></div> : null}
+    {contacts.error ? <div style={styles.error}>Tenant contacts failed: {readableError(contacts.error)} <button style={styles.inlineButton} onClick={() => contacts.refetch()}>Retry contacts</button></div> : null}
 
     <section style={styles.summaryGrid}>
       <div style={styles.summaryCard}><b>Total contacts</b><span>{rows.length}</span></div>
@@ -190,7 +229,7 @@ export default function PlatformTenantContactsPage() {
         {contact.notes ? <p>{contact.notes}</p> : null}
         {canWrite ? <div style={styles.actions}>
           <button style={styles.secondaryButton} onClick={() => startEdit(contact)}>Edit</button>
-          <button style={styles.dangerButton} onClick={() => remove.mutate(contact.id)} disabled={remove.isPending}>Delete</button>
+          <button style={styles.dangerButton} onClick={() => deleteContact(contact)} disabled={remove.isPending}>Delete</button>
         </div> : null}
       </article>)}
       {!contacts.isLoading && rows.length === 0 ? <div style={styles.empty}>No tenant contacts match the current filters.</div> : null}
@@ -200,6 +239,7 @@ export default function PlatformTenantContactsPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: '20px' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' },
   title: { margin: 0, fontSize: '28px' },
   muted: { color: '#6b7280', margin: '4px 0' },
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '18px', display: 'grid', gap: '12px' },
@@ -213,6 +253,10 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#fff', color: '#111827', cursor: 'pointer' },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
   error: { color: '#991b1b', background: '#fee2e2', borderRadius: '10px', padding: '10px' },
+  success: { color: '#065f46', background: '#d1fae5', borderRadius: '10px', padding: '10px' },
+  inlineButton: { marginLeft: '8px', padding: '6px 10px', border: '1px solid #991b1b', borderRadius: '8px', background: '#fff', color: '#991b1b', cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
+  metadataCard: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '4px' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' },
   summaryCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between' },
   list: { display: 'grid', gap: '12px' },

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -25,19 +26,24 @@ type NotesResponse = { notes: TenantNote[]; categories: string[]; visibilities: 
 
 const defaultForm = { tenant_id: '', category: 'general', visibility: 'internal', title: '', body: '', pinned: false };
 function dateLabel(value?: string | null) { return value ? new Date(value).toLocaleString() : '—'; }
+function readableError(error: unknown): string { return error instanceof Error ? error.message : 'Unknown error'; }
 
 export default function PlatformTenantNotesPage() {
   const queryClient = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UPDATE);
-  const [filters, setFilters] = useState({ tenant_id: '', category: '', search: '', include_archived: false });
-  const [form, setForm] = useState(defaultForm);
+  const [searchParams] = useSearchParams();
+  const initialTenantId = searchParams.get('tenant_id') || '';
+  const initialCategory = searchParams.get('category') || '';
+  const [filters, setFilters] = useState({ tenant_id: initialTenantId, category: initialCategory, search: searchParams.get('search') || '', include_archived: searchParams.get('include_archived') === 'true' });
+  const [form, setForm] = useState({ ...defaultForm, tenant_id: initialTenantId, category: initialCategory || defaultForm.category });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
     if (filters.category) params.set('category', filters.category);
-    if (filters.search) params.set('search', filters.search);
+    if (filters.search.trim()) params.set('search', filters.search.trim());
     if (filters.include_archived) params.set('include_archived', 'true');
     params.set('limit', '300');
     return params.toString();
@@ -46,31 +52,76 @@ export default function PlatformTenantNotesPage() {
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'notes-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
   const notes = useQuery({ queryKey: ['platform', 'tenant-notes', filters], queryFn: () => platformApiRequest<NotesResponse>(`/platform/tenant-notes?${queryString}`) });
 
+  const refreshAll = async () => {
+    setMessage('');
+    await Promise.all([tenants.refetch(), notes.refetch()]);
+  };
+
+  const noteRows = notes.data?.notes || [];
+  const selectedTenant = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === filters.tenant_id || tenant.id === form.tenant_id), [tenants.data, filters.tenant_id, form.tenant_id]);
+
+  const notePayload = () => ({
+    category: form.category,
+    visibility: form.visibility,
+    title: form.title.trim(),
+    body: form.body.trim(),
+    pinned: form.pinned
+  });
+
+  const resetForm = () => {
+    setForm({ ...defaultForm, tenant_id: filters.tenant_id || initialTenantId, category: filters.category || defaultForm.category });
+    setEditingId(null);
+  };
+
   const saveNote = useMutation({
     mutationFn: () => {
-      const body = JSON.stringify({ category: form.category, visibility: form.visibility, title: form.title, body: form.body, pinned: form.pinned });
+      const body = JSON.stringify(notePayload());
       if (editingId) return platformApiRequest(`/platform/tenant-notes/${editingId}`, { method: 'PATCH', body });
       return platformApiRequest(`/platform/tenant-notes/tenants/${form.tenant_id}`, { method: 'POST', body });
     },
     onSuccess: async () => {
-      setForm(defaultForm);
-      setEditingId(null);
+      setMessage(editingId ? 'Tenant note updated.' : 'Tenant note created.');
+      resetForm();
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-notes'] });
     }
   });
 
   const archiveNote = useMutation({
     mutationFn: (noteId: string) => platformApiRequest(`/platform/tenant-notes/${noteId}/archive`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-notes'] })
+    onSuccess: async () => {
+      setMessage('Tenant note archived.');
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-notes'] });
+    }
   });
 
   const restoreNote = useMutation({
     mutationFn: (noteId: string) => platformApiRequest(`/platform/tenant-notes/${noteId}/restore`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-notes'] })
+    onSuccess: async () => {
+      setMessage('Tenant note restored.');
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-notes'] });
+    }
   });
 
   const categories = notes.data?.categories || ['general', 'support', 'billing', 'security', 'onboarding', 'risk', 'operations', 'handover'];
   const visibilities = notes.data?.visibilities || ['internal', 'support', 'leadership'];
+  const canSave = Boolean(form.title.trim()) && Boolean(form.body.trim()) && (Boolean(editingId) || Boolean(form.tenant_id));
+
+  const startEdit = (note: TenantNote) => {
+    setMessage('');
+    setEditingId(note.id);
+    setForm({ tenant_id: note.tenant_id, category: note.category, visibility: note.visibility, title: note.title, body: note.body, pinned: note.pinned });
+    scrollToFormSection('platform-tenant-notes-form');
+  };
+
+  const archiveSelectedNote = (note: TenantNote) => {
+    const ok = window.confirm(`Archive tenant note "${note.title}"?`);
+    if (ok) archiveNote.mutate(note.id);
+  };
+
+  const restoreSelectedNote = (note: TenantNote) => {
+    const ok = window.confirm(`Restore tenant note "${note.title}"?`);
+    if (ok) restoreNote.mutate(note.id);
+  };
 
   return (
     <div style={styles.page}>
@@ -79,10 +130,19 @@ export default function PlatformTenantNotesPage() {
           <h1 style={styles.title}>Tenant notes</h1>
           <p style={styles.subtitle}>Internal HLA notes for support handovers, risks, billing context, onboarding details, and tenant-specific operational memory.</p>
         </div>
+        <button style={styles.secondaryButton} onClick={refreshAll} disabled={tenants.isFetching || notes.isFetching}>{tenants.isFetching || notes.isFetching ? 'Refreshing...' : 'Refresh'}</button>
       </header>
+
+      <section style={styles.metadataGrid}>
+        <div style={styles.metadataCard}><b>Source</b><span>GET /platform/tenant-notes</span></div>
+        <div style={styles.metadataCard}><b>Tenant filter</b><span>{selectedTenant?.name || 'All tenants'}</span></div>
+        <div style={styles.metadataCard}><b>Category</b><span>{filters.category || 'All categories'}</span></div>
+        <div style={styles.metadataCard}><b>Loaded rows</b><span>{notes.isLoading ? 'Loading...' : noteRows.length}</span></div>
+      </section>
 
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Filters</h2>
+        {initialTenantId ? <p style={styles.muted}>Opened with tenant_id from URL.</p> : null}
         <div style={styles.grid4}>
           <label style={styles.label}>Tenant
             <select style={styles.input} value={filters.tenant_id} onChange={(e) => setFilters((v) => ({ ...v, tenant_id: e.target.value }))}>
@@ -130,28 +190,35 @@ export default function PlatformTenantNotesPage() {
           </label>
           <div style={styles.actions}>
             <label style={styles.checkboxLine}><input type="checkbox" checked={form.pinned} onChange={(e) => setForm((v) => ({ ...v, pinned: e.target.checked }))} /> Pin note</label>
-            <button style={styles.primaryButton} disabled={!form.title || !form.body || (!editingId && !form.tenant_id) || saveNote.isPending} onClick={() => saveNote.mutate()}>{editingId ? 'Save changes' : 'Create note'}</button>
-            {editingId ? <button style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(defaultForm); }}>Cancel edit</button> : null}
+            <button style={styles.primaryButton} disabled={!canSave || saveNote.isPending} onClick={() => saveNote.mutate()}>{editingId ? 'Save changes' : 'Create note'}</button>
+            {editingId ? <button style={styles.secondaryButton} onClick={resetForm}>Cancel edit</button> : null}
           </div>
+          {saveNote.error ? <div style={styles.error}>Save failed: {readableError(saveNote.error)}</div> : null}
         </section>
       ) : null}
 
+      {message ? <div style={styles.success}>{message}</div> : null}
+      {tenants.error ? <div style={styles.error}>Tenant list failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => tenants.refetch()}>Retry tenants</button></div> : null}
+      {notes.error ? <div style={styles.error}>Tenant notes failed: {readableError(notes.error)} <button style={styles.inlineButton} onClick={() => notes.refetch()}>Retry notes</button></div> : null}
+      {archiveNote.error ? <div style={styles.error}>Archive failed: {readableError(archiveNote.error)}</div> : null}
+      {restoreNote.error ? <div style={styles.error}>Restore failed: {readableError(restoreNote.error)}</div> : null}
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Notes</h2>
-        {notes.isLoading ? <p>Loading notes…</p> : null}
-        {!notes.isLoading && !(notes.data?.notes || []).length ? <p style={styles.muted}>No tenant notes found.</p> : null}
+        {notes.isLoading ? <p>Loading notes...</p> : null}
+        {!notes.isLoading && !noteRows.length ? <p style={styles.muted}>No tenant notes found.</p> : null}
         <div style={styles.noteList}>
-          {(notes.data?.notes || []).map((note) => (
+          {noteRows.map((note) => (
             <article key={note.id} style={{ ...styles.note, opacity: note.archived_at ? 0.65 : 1 }}>
               <div style={styles.noteTop}>
                 <div>
-                  <strong>{note.pinned ? '📌 ' : ''}{note.title}</strong>
+                  <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
                   <div style={styles.muted}>{note.tenant_name} · {note.category} · {note.visibility} · Updated {dateLabel(note.updated_at)}</div>
                 </div>
                 <div style={styles.actions}>
-                  {canWrite ? <button style={styles.secondaryButton} onClick={() => { setEditingId(note.id); setForm({ tenant_id: note.tenant_id, category: note.category, visibility: note.visibility, title: note.title, body: note.body, pinned: note.pinned }); scrollToFormSection('platform-tenant-notes-form'); }}>Edit</button> : null}
-                  {canWrite && !note.archived_at ? <button style={styles.dangerButton} onClick={() => archiveNote.mutate(note.id)}>Archive</button> : null}
-                  {canWrite && note.archived_at ? <button style={styles.secondaryButton} onClick={() => restoreNote.mutate(note.id)}>Restore</button> : null}
+                  {canWrite ? <button style={styles.secondaryButton} onClick={() => startEdit(note)}>Edit</button> : null}
+                  {canWrite && !note.archived_at ? <button style={styles.dangerButton} onClick={() => archiveSelectedNote(note)} disabled={archiveNote.isPending}>Archive</button> : null}
+                  {canWrite && note.archived_at ? <button style={styles.secondaryButton} onClick={() => restoreSelectedNote(note)} disabled={restoreNote.isPending}>Restore</button> : null}
                 </div>
               </div>
               <p style={styles.body}>{note.body}</p>
@@ -185,5 +252,10 @@ const styles: Record<string, CSSProperties> = {
   noteList: { display: 'grid', gap: 12 },
   note: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc' },
   noteTop: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  body: { whiteSpace: 'pre-wrap', margin: '12px 0', color: '#0f172a' }
+  body: { whiteSpace: 'pre-wrap', margin: '12px 0', color: '#0f172a' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  metadataCard: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, display: 'grid', gap: 4 },
+  success: { color: '#065f46', background: '#d1fae5', borderRadius: 10, padding: 10 },
+  error: { color: '#991b1b', background: '#fee2e2', borderRadius: 10, padding: 10 },
+  inlineButton: { marginLeft: 8, padding: '6px 10px', border: '1px solid #991b1b', borderRadius: 8, background: '#fff', color: '#991b1b', cursor: 'pointer' }
 };

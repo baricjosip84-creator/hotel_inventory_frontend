@@ -36,7 +36,7 @@ function downloadJson(filename: string, payload: unknown) {
 }
 
 export default function PlatformTenantExportsPage() {
-  const [tenantId, setTenantId] = useState('');
+  const [tenantId, setTenantId] = useState(() => new URLSearchParams(window.location.search).get('tenant_id') || '');
   const [mode, setMode] = useState<'summary' | 'full'>('full');
   const [maxRowsPerTable, setMaxRowsPerTable] = useState(5000);
 

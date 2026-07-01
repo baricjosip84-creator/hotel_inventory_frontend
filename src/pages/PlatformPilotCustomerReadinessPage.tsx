@@ -1,4 +1,5 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -51,17 +52,34 @@ function badgeStyle(value: string): CSSProperties {
 function formatEvidenceValue(value: string | number | boolean | null | undefined) {
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
   if (value === null || value === undefined || value === '') return 'none';
+  if (typeof value === 'string' && value.includes('T')) return new Date(value).toLocaleString();
   return String(value);
 }
 
+type Tenant = { id: string; name: string };
+
 export default function PlatformPilotCustomerReadinessPage() {
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
+  const [limit, setLimit] = useState(searchParams.get('limit') || '100');
+
+  const tenants = useQuery({
+    queryKey: ['platform', 'tenants', 'for-pilot-customer-readiness'],
+    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+  });
+
+  const query = new URLSearchParams();
+  if (tenantId) query.set('tenant_id', tenantId);
+  query.set('limit', limit);
+
   const pilot = useQuery({
-    queryKey: ['platform', 'pilot-customer-readiness'],
-    queryFn: () => platformApiRequest<PilotCustomerReadinessPackage>('/platform/pilot-customer-readiness')
+    queryKey: ['platform', 'pilot-customer-readiness', tenantId, limit],
+    queryFn: () => platformApiRequest<PilotCustomerReadinessPackage>(`/platform/pilot-customer-readiness?${query.toString()}`)
   });
 
   const data = pilot.data;
   const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const selectedTenantName = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId)?.name, [tenantId, tenants.data]);
 
   return (
     <div style={styles.page}>
@@ -80,11 +98,40 @@ export default function PlatformPilotCustomerReadinessPage() {
         </div>
       </section>
 
+      <section style={styles.card}>
+        <div style={styles.filterGrid}>
+          <label style={styles.label}>Tenant filter
+            <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
+              <option value="">All tenants</option>
+              {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>Tenant limit
+            <select style={styles.input} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={Boolean(tenantId)}>
+              <option value="25">Latest 25 tenants</option>
+              <option value="50">Latest 50 tenants</option>
+              <option value="100">Latest 100 tenants</option>
+              <option value="300">Latest 300 tenants</option>
+            </select>
+          </label>
+          <button style={styles.secondaryButton} onClick={() => pilot.refetch()} disabled={pilot.isFetching}>
+            {pilot.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+        {selectedTenantName ? <span style={styles.help}>Showing pilot readiness evidence for {selectedTenantName}.</span> : <span style={styles.help}>Showing the latest {limit} tenants by pilot activity or creation date.</span>}
+      </section>
+
       {pilot.isLoading ? <div style={styles.card}>Loading pilot customer readiness...</div> : null}
-      {pilot.error ? <div style={styles.error}>Failed to load pilot customer readiness.</div> : null}
+      {pilot.error ? <div style={styles.error}>Failed to load pilot customer readiness. <button style={styles.inlineButton} onClick={() => pilot.refetch()}>Retry</button></div> : null}
 
       {data ? (
         <>
+          <section style={styles.metaCard}>
+            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
+            <div><strong>Generated</strong><br /><span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span></div>
+            <div style={styles.note}>{data.validation_note}</div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -139,6 +186,14 @@ export default function PlatformPilotCustomerReadinessPage() {
                   </div>
 
                   <p style={styles.nextInline}><strong>Next:</strong> {tenant.next_best_step}</p>
+                  <div style={styles.actionRow}>
+                    <Link style={styles.linkButton} to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}&category=pilot`}>Open pilot tasks</Link>
+                    <Link style={styles.linkButton} to={`/platform/tenant-notes?tenant_id=${tenant.tenant_id}&category=pilot`}>Open pilot notes</Link>
+                    <Link style={styles.linkButton} to={`/platform/incidents?tenant_id=${tenant.tenant_id}&scope=tenant&include_resolved=false`}>Open tenant incidents</Link>
+                    <Link style={styles.linkButton} to={`/platform/customer-onboarding-checklist?tenant_id=${tenant.tenant_id}`}>Open onboarding evidence</Link>
+                    <Link style={styles.linkButton} to={`/platform/support-operations-cockpit?tenant_id=${tenant.tenant_id}`}>Open support cockpit</Link>
+                    <Link style={styles.linkButton} to={`/platform/production-monitoring-readiness?tenant_id=${tenant.tenant_id}`}>Open monitoring readiness</Link>
+                  </div>
                 </article>
               ))}
             </div>
@@ -168,9 +223,13 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 980, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
+  label: { display: 'grid', gap: 6, color: '#374151', fontSize: 13, fontWeight: 800 },
+  input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', background: '#fff' },
   generated: { color: '#6b7280', fontSize: 12 },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  metaCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
   metricValue: { fontSize: 26, fontWeight: 900 },
@@ -190,7 +249,11 @@ const styles: Record<string, CSSProperties> = {
   help: { color: '#6b7280', fontSize: 12 },
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
   nextInline: { margin: 0, color: '#1e3a8a' },
+  actionRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  linkButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '8px 10px', color: '#111827', fontWeight: 800, textDecoration: 'none', fontSize: 12 },
   nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
   note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
+  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
+  inlineButton: { marginLeft: 10, border: '1px solid #d1d5db', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 }
 };

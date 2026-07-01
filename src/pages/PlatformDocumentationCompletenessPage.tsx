@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -66,14 +67,49 @@ export default function PlatformDocumentationCompletenessPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void documentation.refetch()}
+            disabled={documentation.isFetching}
+          >
+            {documentation.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/runbooks?category=documentation">Documentation runbooks</Link>
+          <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding checklist</Link>
+          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
+          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
+          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
         </div>
       </section>
 
       {documentation.isLoading ? <div style={styles.card}>Loading documentation completeness...</div> : null}
-      {documentation.error ? <div style={styles.error}>Failed to load documentation completeness.</div> : null}
+      {documentation.error ? (
+        <div style={styles.error}>
+          Failed to load documentation completeness.
+          <button type="button" style={styles.errorButton} onClick={() => void documentation.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -156,5 +192,10 @@ const styles: Record<string, CSSProperties> = {
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
   nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
   note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 }
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
+  errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
 };

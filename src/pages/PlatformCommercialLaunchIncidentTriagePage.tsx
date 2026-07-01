@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -38,6 +39,45 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+
+function getTriageEvidenceLink(row: TriageRow) {
+  const bySource: Record<string, string> = {
+    service_health_observation_recorded: '/platform/system-health',
+    customer_feedback_window_opened: '/platform/communications',
+    support_intake_reviewed: '/platform/support-operations-cockpit',
+    billing_activation_confirmed_or_held: '/platform/billing-subscription-activation',
+    incident_review_completed: '/platform/incidents',
+    rollback_readiness_reconfirmed: '/platform/deployment-validation',
+    first_adoption_signal_reviewed: '/platform/pilot-customer-readiness',
+    launch_handoff_closure_prepared: '/platform/commercial-launch-post-launch-observation'
+  };
+  const byDomain: Record<string, string> = {
+    'Service health': '/platform/system-health',
+    'Customer feedback': '/platform/communications',
+    'Support intake': '/platform/support-operations-cockpit',
+    'Billing confirmation': '/platform/billing-subscription-activation',
+    'Incident review': '/platform/incidents',
+    'Rollback readiness': '/platform/deployment-validation',
+    'Adoption signal': '/platform/pilot-customer-readiness',
+    'Handoff closure': '/platform/commercial-launch-post-launch-observation'
+  };
+  return bySource[row.source_observation_code] || byDomain[row.domain] || '/platform/commercial-launch-post-launch-observation';
+}
+
+function getTriageEvidenceLabel(row: TriageRow) {
+  const bySource: Record<string, string> = {
+    service_health_observation_recorded: 'Open system health',
+    customer_feedback_window_opened: 'Open communications',
+    support_intake_reviewed: 'Open support cockpit',
+    billing_activation_confirmed_or_held: 'Open billing activation',
+    incident_review_completed: 'Open incidents',
+    rollback_readiness_reconfirmed: 'Open deployment validation',
+    first_adoption_signal_reviewed: 'Open pilot readiness',
+    launch_handoff_closure_prepared: 'Open post-launch observation'
+  };
+  return bySource[row.source_observation_code] || 'Open post-launch observation';
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('sev1') || value.includes('rollback')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('waiting') || value.includes('manual') || value.includes('watch') || value.includes('not_reviewed')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -68,14 +108,51 @@ export default function PlatformCommercialLaunchIncidentTriagePage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void triage.refetch()}
+            disabled={triage.isFetching}
+          >
+            {triage.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting incident triage pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
+          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
+          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
+          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
         </div>
       </section>
 
       {triage.isLoading ? <div style={styles.card}>Loading commercial launch incident triage queue...</div> : null}
-      {triage.error ? <div style={styles.error}>Failed to load commercial launch incident triage queue.</div> : null}
+      {triage.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch incident triage queue.
+          <button type="button" style={styles.errorButton} onClick={() => void triage.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -88,10 +165,10 @@ export default function PlatformCommercialLaunchIncidentTriagePage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source postures</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong></div>
+              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-post-launch-observation">Open Post Launch Observation</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
             </div>
           </section>
 
@@ -111,6 +188,7 @@ export default function PlatformCommercialLaunchIncidentTriagePage() {
                   <div style={styles.statusRow}><span>Source status</span><span style={badgeStyle(row.source_observation_status)}>{humanize(row.source_observation_status)}</span></div>
                   <div style={styles.statusRow}><span>Default severity</span><span style={badgeStyle(row.default_severity)}>{humanize(row.default_severity)}</span></div>
                   <div style={styles.statusRow}><span>Escalation trigger</span><strong>{humanize(row.escalation_trigger)}</strong></div>
+                  <Link style={styles.packetLink} to={getTriageEvidenceLink(row)}>{getTriageEvidenceLabel(row)}</Link>
                   <div style={styles.evidenceBox}>
                     <span style={styles.evidenceLabel}>Triage actions</span>
                     <ul style={styles.list}>{row.triage_actions.map((item) => <li key={item}>{item}</li>)}</ul>
@@ -155,6 +233,13 @@ const styles: Record<string, CSSProperties> = {
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },

@@ -50,8 +50,8 @@ export default function PlatformRunbooksPage() {
   const queryClient = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_WRITE);
   const canExecute = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_EXECUTE);
-  const [category, setCategory] = useState('');
-  const [severity, setSeverity] = useState('');
+  const [category, setCategory] = useState(() => new URLSearchParams(window.location.search).get('category') || '');
+  const [severity, setSeverity] = useState(() => new URLSearchParams(window.location.search).get('severity') || '');
   const [selectedRunbookId, setSelectedRunbookId] = useState('');
   const [selectedExecutionId, setSelectedExecutionId] = useState('');
   const [draft, setDraft] = useState({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] });

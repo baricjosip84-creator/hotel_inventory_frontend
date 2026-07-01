@@ -471,6 +471,19 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function anchorId(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('missing')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('required') || value.includes('ready_for_operator')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -695,8 +708,10 @@ function isGateReadyForLiveExecution(gate: ReadinessGate) {
 }
 
 function renderGate(title: string, gate: ReadinessGate) {
+  const id = `gate-${anchorId(gate.step || title)}`;
+
   return (
-    <section style={styles.card}>
+    <section id={id} style={styles.card}>
       <div style={styles.controlHeader}>
         <div>
           <h2 style={styles.sectionTitle}>{title}</h2>
@@ -751,6 +766,23 @@ function renderGate(title: string, gate: ReadinessGate) {
   );
 }
 
+function collectGateEntries(data: VerificationProgram) {
+  return Object.entries(data)
+    .filter(([, value]) => {
+      const maybeGate = value as Partial<ReadinessGate> | undefined;
+      return Boolean(maybeGate?.summary && Array.isArray(maybeGate.controls) && Array.isArray(maybeGate.execution_order));
+    })
+    .map(([key, value]) => {
+      const gate = value as ReadinessGate;
+      const baseLabel = key
+        .replace(/_verification_gate$/, '')
+        .replace(/_gate$/, '')
+        .replaceAll('_', ' ');
+      const title = `${baseLabel} gate`;
+      return { key, title, gate, href: `#gate-${anchorId(gate.step || title)}` };
+    });
+}
+
 export default function PlatformCommercialReadinessVerificationProgramPage() {
   const query = useQuery({
     queryKey: ['platform', 'commercial-readiness-verification-program'],
@@ -759,6 +791,7 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
 
   const data = query.data;
   const domainEntries = data ? Object.entries(data.summary.by_domain) : [];
+  const gateEntries = data ? collectGateEntries(data) : [];
 
   return (
     <div style={styles.page}>
@@ -767,17 +800,36 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
           <h1 style={styles.title}>Commercial readiness verification program</h1>
           <p style={styles.subtitle}>Final operator checklist for deployment, migrations, security, tenant isolation, workflows, monitoring, backup, load testing, automated testing evidence, data integrity, billing/subscription readiness, onboarding readiness, support/incident-response readiness, commercial launch go/no-go readiness, commercial readiness closure evidence, post-launch stabilization verification, customer-success handoff verification, retention/renewal verification, revenue operations verification, legal/compliance verification, enterprise procurement verification, enterprise implementation verification, customer data migration verification, enterprise security assurance verification, enterprise privacy assurance verification, enterprise data residency verification, enterprise audit assurance verification, enterprise business continuity verification, and enterprise vendor risk verification, enterprise change management verification, enterprise board governance verification, enterprise strategic planning verification, enterprise portfolio governance verification, enterprise customer reference verification, enterprise partner ecosystem verification, enterprise marketplace listing verification, enterprise sales enablement verification, and launch governance.</p>
         </div>
-        {data ? <span style={badgeStyle(data.posture)}>{humanize(data.posture)}</span> : null}
+        <div style={styles.headerActions}>
+          {data ? <span style={badgeStyle(data.posture)}>{humanize(data.posture)}</span> : null}
+          <button
+            type="button"
+            style={styles.button}
+            onClick={() => query.refetch()}
+            disabled={query.isFetching}
+          >
+            {query.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </header>
 
       {query.isLoading ? <section style={styles.card}>Loading verification program…</section> : null}
-      {query.error ? <section style={styles.card}>Unable to load verification program.</section> : null}
+      {query.error ? (
+        <section style={styles.card}>
+          <div style={styles.controlHeader}>
+            <div>Unable to load verification program.</div>
+            <button type="button" style={styles.button} onClick={() => query.refetch()} disabled={query.isFetching}>
+              {query.isFetching ? 'Retrying…' : 'Retry'}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {data ? (
         <>
           <section style={styles.metaCard}>
             <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
-            <div><strong>Generated</strong><br /><span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span></div>
+            <div><strong>Generated</strong><br /><span style={styles.help}>{formatTimestamp(data.generated_at)}</span></div>
             <div style={styles.note}>{data.validation_note}</div>
           </section>
 
@@ -786,6 +838,23 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
             <div style={styles.card}><strong>Surfaces present</strong><div style={styles.metric}>{data.summary.verification_surfaces_present}</div></div>
             <div style={styles.card}><strong>Runtime/manual runs required</strong><div style={styles.metric}>{data.summary.runtime_or_manual_runs_required}</div></div>
             <div style={styles.card}><strong>Ready for execution</strong><div style={styles.metric}>{data.summary.ready_for_execution ? 'Yes' : 'No'}</div></div>
+          </section>
+
+          <section style={styles.card}>
+            <div style={styles.controlHeader}>
+              <div>
+                <h2 style={styles.sectionTitle}>Verification gate index</h2>
+                <div style={styles.help}>Use these links to jump directly to a gate. The page remains read-only.</div>
+              </div>
+              <span style={styles.help}>{gateEntries.length} gates</span>
+            </div>
+            <div style={styles.linkGrid}>
+              {gateEntries.map((entry) => (
+                <a key={entry.key} href={entry.href} style={styles.linkCard}>
+                  {entry.gate.summary.controls_total} controls · {entry.title}
+                </a>
+              ))}
+            </div>
           </section>
 
           {data.deployment_verification_gate ? renderGate('Deployment verification gate', data.deployment_verification_gate) : null}
@@ -1012,15 +1081,19 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 20 },
   header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  headerActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
   title: { margin: 0, fontSize: 28 },
   subtitle: { margin: '6px 0 0', color: '#6b7280', maxWidth: 940, lineHeight: 1.5 },
   badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, whiteSpace: 'nowrap', fontSize: 12, textTransform: 'capitalize' },
+  button: { border: '1px solid #d1d5db', borderRadius: 999, background: '#fff', padding: '8px 12px', fontWeight: 800, color: '#111827', cursor: 'pointer' },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
   metaCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
   note: { color: '#374151', lineHeight: 1.5 },
   help: { color: '#6b7280', fontSize: 12, lineHeight: 1.5 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 },
   domainGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  linkGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 },
+  linkCard: { display: 'block', padding: 10, border: '1px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700, lineHeight: 1.4 },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 },
   metric: { fontSize: 28, fontWeight: 900, marginTop: 8 },
   sectionTitle: { margin: '0 0 10px', fontSize: 20 },

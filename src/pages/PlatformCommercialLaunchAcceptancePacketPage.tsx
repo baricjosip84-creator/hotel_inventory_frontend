@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -35,6 +36,38 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function getPacketReviewLink(packet: AcceptancePacket) {
+  const bySourceControl: Record<string, string> = {
+    tenant_provisioning_accepted: '/platform/tenant-provisioning-hardening',
+    customer_onboarding_accepted: '/platform/customer-onboarding-checklist',
+    billing_subscription_accepted: '/platform/billing-subscription-activation',
+    support_operations_accepted: '/platform/support-operations-cockpit',
+    production_monitoring_accepted: '/platform/production-monitoring-readiness',
+    backup_restore_accepted: '/platform/backup-restore-validation',
+    deployment_validation_accepted: '/platform/deployment-validation',
+    documentation_completeness_accepted: '/platform/documentation-completeness',
+    pilot_customer_readiness_accepted: '/platform/pilot-customer-readiness',
+    commercial_readiness_closure_accepted: '/platform/commercial-readiness-verification-program'
+  };
+  return bySourceControl[packet.source_control] || '/platform/commercial-launch-certificate';
+}
+
+function getPacketReviewLabel(packet: AcceptancePacket) {
+  const bySourceControl: Record<string, string> = {
+    tenant_provisioning_accepted: 'Open provisioning evidence',
+    customer_onboarding_accepted: 'Open onboarding evidence',
+    billing_subscription_accepted: 'Open billing activation',
+    support_operations_accepted: 'Open support cockpit',
+    production_monitoring_accepted: 'Open monitoring readiness',
+    backup_restore_accepted: 'Open backup restore',
+    deployment_validation_accepted: 'Open deployment validation',
+    documentation_completeness_accepted: 'Open documentation completeness',
+    pilot_customer_readiness_accepted: 'Open pilot readiness',
+    commercial_readiness_closure_accepted: 'Open readiness verification'
+  };
+  return bySourceControl[packet.source_control] || 'Open certificate evidence';
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('missing')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('manual') || value.includes('required') || value.includes('ready')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -65,14 +98,54 @@ export default function PlatformCommercialLaunchAcceptancePacketPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void packet.refetch()}
+            disabled={packet.isFetching}
+          >
+            {packet.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting readiness pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness</Link>
+          <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
+          <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
+          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
+          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring</Link>
+          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
+          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
+          <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
+          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
         </div>
       </section>
 
       {packet.isLoading ? <div style={styles.card}>Loading commercial launch acceptance packet...</div> : null}
-      {packet.error ? <div style={styles.error}>Failed to load commercial launch acceptance packet.</div> : null}
+      {packet.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch acceptance packet.
+          <button type="button" style={styles.errorButton} onClick={() => void packet.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -112,6 +185,7 @@ export default function PlatformCommercialLaunchAcceptancePacketPage() {
                     <span style={styles.evidenceLabel}>Required evidence</span>
                     <strong>{item.required_evidence}</strong>
                   </div>
+                  <Link style={styles.packetLink} to={getPacketReviewLink(item)}>{getPacketReviewLabel(item)}</Link>
                   <div style={styles.evidenceBox}>
                     <span style={styles.evidenceLabel}>Acceptance artifact</span>
                     <strong>{item.acceptance_artifact}</strong>
@@ -186,5 +260,11 @@ const styles: Record<string, CSSProperties> = {
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
   nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
   note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginLeft: 12, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  quickLink: { color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
+  packetLink: { justifySelf: 'start', color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 }
 };

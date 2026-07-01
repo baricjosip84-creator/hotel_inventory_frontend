@@ -23,6 +23,107 @@ type RetentionRenewalReviewRow = {
   release_condition: string;
 };
 
+
+type PageLink = {
+  label: string;
+  to: string;
+};
+
+const supportingLinks: PageLink[] = [
+  { label: 'Evidence Retention Seal', to: '/platform/commercial-launch-evidence-retention-seal' },
+  { label: 'Final Evidence Archive', to: '/platform/commercial-launch-final-evidence-archive' },
+  { label: 'Durable Closure', to: '/platform/commercial-launch-durable-closure-certification' },
+  { label: 'Resolution Verification', to: '/platform/commercial-launch-steady-state-resolution-verification' },
+  { label: 'Recurrence Resolution', to: '/platform/commercial-launch-steady-state-recurrence-resolution' },
+  { label: 'Recurrence Audit', to: '/platform/commercial-launch-steady-state-recurrence-audit' },
+  { label: 'Exception Closure', to: '/platform/commercial-launch-steady-state-exception-closure' },
+  { label: 'Exception Review', to: '/platform/commercial-launch-steady-state-exception-review' },
+  { label: 'Operations Cadence', to: '/platform/commercial-launch-steady-state-operations-cadence' },
+  { label: 'Steady-State Transition', to: '/platform/commercial-launch-steady-state-transition' },
+  { label: 'Support Cockpit', to: '/platform/support-cockpit' },
+  { label: 'Billing', to: '/platform/billing' },
+  { label: 'Backup Restore', to: '/platform/backup-restore-validation' },
+  { label: 'Runbooks', to: '/platform/runbooks' }
+];
+
+const sourcePostureLinks: PageLink[] = [
+  { label: 'Evidence retention seal', to: '/platform/commercial-launch-evidence-retention-seal' },
+  { label: 'Final evidence archive', to: '/platform/commercial-launch-final-evidence-archive' },
+  { label: 'Durable closure', to: '/platform/commercial-launch-durable-closure-certification' },
+  { label: 'Resolution verification', to: '/platform/commercial-launch-steady-state-resolution-verification' },
+  { label: 'Recurrence resolution', to: '/platform/commercial-launch-steady-state-recurrence-resolution' },
+  { label: 'Recurrence audit', to: '/platform/commercial-launch-steady-state-recurrence-audit' },
+  { label: 'Exception closure', to: '/platform/commercial-launch-steady-state-exception-closure' },
+  { label: 'Exception review', to: '/platform/commercial-launch-steady-state-exception-review' },
+  { label: 'Operations cadence', to: '/platform/commercial-launch-steady-state-operations-cadence' },
+  { label: 'Steady-state transition', to: '/platform/commercial-launch-steady-state-transition' }
+];
+
+function evidenceLinksForRow(row: RetentionRenewalReviewRow): PageLink[] {
+  const links: PageLink[] = [
+    { label: 'Evidence Retention Seal', to: '/platform/commercial-launch-evidence-retention-seal' },
+    { label: 'Final Evidence Archive', to: '/platform/commercial-launch-final-evidence-archive' },
+    { label: 'Durable Closure', to: '/platform/commercial-launch-durable-closure-certification' },
+    { label: 'Resolution Verification', to: '/platform/commercial-launch-steady-state-resolution-verification' },
+    { label: 'Recurrence Resolution', to: '/platform/commercial-launch-steady-state-recurrence-resolution' },
+    { label: 'Recurrence Audit', to: '/platform/commercial-launch-steady-state-recurrence-audit' },
+    { label: 'Exception Closure', to: '/platform/commercial-launch-steady-state-exception-closure' }
+  ];
+
+  if (row.domain.includes('missed_cadence')) {
+    links.push({ label: 'Operations Cadence', to: '/platform/commercial-launch-steady-state-operations-cadence' });
+    links.push({ label: 'Monitoring Readiness', to: '/platform/monitoring-readiness' });
+  }
+  if (row.domain.includes('health_regression')) {
+    links.push({ label: 'System Health', to: '/platform/system-health' });
+    links.push({ label: 'Dependencies', to: '/platform/dependencies' });
+    links.push({ label: 'Deployment Validation', to: '/platform/deployment-validation' });
+  }
+  if (row.domain.includes('customer_adoption')) {
+    links.push({ label: 'Customer Success', to: '/platform/customer-success' });
+    links.push({ label: 'Announcements', to: '/platform/announcements' });
+  }
+  if (row.domain.includes('support_sla')) {
+    links.push({ label: 'Support Cockpit', to: '/platform/support-cockpit' });
+    links.push({ label: 'Incidents', to: '/platform/incidents' });
+  }
+  if (row.domain.includes('billing_entitlement')) {
+    links.push({ label: 'Billing', to: '/platform/billing' });
+    links.push({ label: 'Tenants', to: '/platform/tenants' });
+  }
+  if (row.domain.includes('backup_restore')) {
+    links.push({ label: 'Backup Restore', to: '/platform/backup-restore-validation' });
+    links.push({ label: 'Tenant Exports', to: '/platform/tenant-exports' });
+    links.push({ label: 'Runbooks', to: '/platform/runbooks' });
+  }
+  if (row.domain.includes('deployment_smoke_test')) {
+    links.push({ label: 'Smoke Test', to: '/platform/commercial-launch-smoke-test-checklist' });
+    links.push({ label: 'Releases', to: '/platform/releases' });
+  }
+  if (row.domain.includes('incident_prevention')) {
+    links.push({ label: 'Incident Closure', to: '/platform/commercial-launch-incident-closure' });
+    links.push({ label: 'Prevention Verification', to: '/platform/commercial-launch-prevention-verification' });
+    links.push({ label: 'Runbooks', to: '/platform/runbooks' });
+  }
+  if (row.domain.includes('growth_governance')) {
+    links.push({ label: 'Growth Observation', to: '/platform/commercial-launch-additional-growth-observation' });
+    links.push({ label: 'Additional Growth Authorization', to: '/platform/commercial-launch-additional-growth-authorization' });
+    links.push({ label: 'Expansion Health', to: '/platform/commercial-launch-expansion-health-observation' });
+  }
+
+  return links;
+}
+
+function renderLinks(links: PageLink[]) {
+  return (
+    <div style={styles.linkList}>
+      {links.map((link) => (
+        <a key={`${link.label}-${link.to}`} href={link.to} style={styles.link}>{link.label}</a>
+      ))}
+    </div>
+  );
+}
+
 type RetentionRenewalReview = {
   phase: string;
   step: string;
@@ -80,6 +181,9 @@ export default function PlatformCommercialLaunchRetentionRenewalReviewPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button type="button" style={styles.button} onClick={() => retentionRenewalReview.refetch()} disabled={retentionRenewalReview.isFetching}>
+            {retentionRenewalReview.isFetching ? 'Refreshing...' : retentionRenewalReview.error ? 'Retry' : 'Refresh'}
+          </button>
         </div>
       </section>
 
@@ -98,18 +202,38 @@ export default function PlatformCommercialLaunchRetentionRenewalReviewPage() {
           </section>
 
           <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metaGrid}>
+              <span><strong>Phase:</strong> {data.phase}</span>
+              <span><strong>Step:</strong> {data.step}</span>
+              <span><strong>Generated:</strong> {new Date(data.generated_at).toLocaleString()}</span>
+              <span><strong>Overall posture:</strong> {humanize(data.posture)}</span>
+            </div>
+            <div style={styles.supportingLinks}>{renderLinks(supportingLinks)}</div>
+          </section>
+
+          <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Retention renewal dependency chain</h2>
             <div style={styles.chainGrid}>
-              <span>Evidence retention seal: <strong>{humanize(data.evidence_retention_seal_posture)}</strong></span>
-              <span>Final evidence archive: <strong>{humanize(data.final_evidence_archive_posture)}</strong></span>
-              <span>Durable closure: <strong>{humanize(data.durable_closure_certification_posture)}</strong></span>
-              <span>Resolution verification: <strong>{humanize(data.resolution_verification_posture)}</strong></span>
-              <span>Recurrence resolution: <strong>{humanize(data.recurrence_resolution_posture)}</strong></span>
-              <span>Recurrence audit: <strong>{humanize(data.recurrence_audit_posture)}</strong></span>
-              <span>Exception closure: <strong>{humanize(data.exception_closure_posture)}</strong></span>
-              <span>Exception review: <strong>{humanize(data.exception_review_posture)}</strong></span>
-              <span>Operations cadence: <strong>{humanize(data.operations_cadence_posture)}</strong></span>
-              <span>Steady-state transition: <strong>{humanize(data.steady_state_transition_posture)}</strong></span>
+              {sourcePostureLinks.map((link) => {
+                const postureMap: Record<string, string> = {
+                  'Evidence retention seal': data.evidence_retention_seal_posture,
+                  'Final evidence archive': data.final_evidence_archive_posture,
+                  'Durable closure': data.durable_closure_certification_posture,
+                  'Resolution verification': data.resolution_verification_posture,
+                  'Recurrence resolution': data.recurrence_resolution_posture,
+                  'Recurrence audit': data.recurrence_audit_posture,
+                  'Exception closure': data.exception_closure_posture,
+                  'Exception review': data.exception_review_posture,
+                  'Operations cadence': data.operations_cadence_posture,
+                  'Steady-state transition': data.steady_state_transition_posture
+                };
+                return (
+                  <span key={link.label}>
+                    <a href={link.to} style={styles.inlineLink}>{link.label}</a>: <strong>{humanize(postureMap[link.label] || 'unknown')}</strong>
+                  </span>
+                );
+              })}
             </div>
           </section>
 
@@ -126,6 +250,7 @@ export default function PlatformCommercialLaunchRetentionRenewalReviewPage() {
                     <th style={styles.th}>Renewal status</th>
                     <th style={styles.th}>Required renewal evidence</th>
                     <th style={styles.th}>Controls</th>
+                    <th style={styles.th}>Evidence links</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -147,6 +272,7 @@ export default function PlatformCommercialLaunchRetentionRenewalReviewPage() {
                       <td style={styles.td}><span style={badgeStyle(row.retention_renewal_review_status)}>{humanize(row.retention_renewal_review_status)}</span></td>
                       <td style={styles.td}>{row.required_retention_renewal_review.join(', ')}</td>
                       <td style={styles.td}><ul style={styles.list}>{row.retention_renewal_review_controls.map((control) => <li key={control}>{control}</li>)}</ul></td>
+                      <td style={styles.td}>{renderLinks(evidenceLinksForRow(row))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -200,5 +326,11 @@ const styles: Record<string, CSSProperties> = {
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' },
   note: { margin: '0.75rem 0 0', color: '#64748b', lineHeight: 1.6 },
   small: { color: '#64748b', fontSize: '0.78rem' },
-  error: { border: '1px solid #fecaca', borderRadius: '1rem', padding: '1rem', background: '#fef2f2', color: '#991b1b' }
+  error: { border: '1px solid #fecaca', borderRadius: '1rem', padding: '1rem', background: '#fef2f2', color: '#991b1b' },
+  button: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '0.45rem 0.75rem', background: '#ffffff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem', color: '#475569' },
+  supportingLinks: { marginTop: '0.8rem' },
+  linkList: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem' },
+  link: { display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: '999px', padding: '0.35rem 0.6rem', color: '#2563eb', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 700 },
+  inlineLink: { color: '#2563eb', textDecoration: 'none', fontWeight: 700 }
 };

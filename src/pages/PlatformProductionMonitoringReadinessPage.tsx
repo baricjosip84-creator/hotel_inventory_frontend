@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
@@ -57,8 +58,14 @@ function formatValue(value: number | string | boolean | null | undefined) {
   return String(value);
 }
 
+function tenantIncidentLink(tenantId: string) {
+  const params = new URLSearchParams({ scope: 'tenant', tenant_id: tenantId, include_resolved: 'false' });
+  return `/platform/incidents?${params.toString()}`;
+}
+
 export default function PlatformProductionMonitoringReadinessPage() {
-  const [tenantId, setTenantId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-production-monitoring-readiness'],
@@ -70,7 +77,10 @@ export default function PlatformProductionMonitoringReadinessPage() {
 
   const monitoring = useQuery({
     queryKey: ['platform', 'production-monitoring-readiness', tenantId],
-    queryFn: () => platformApiRequest<MonitoringPackage>(`/platform/production-monitoring-readiness?${query.toString()}`)
+    queryFn: () => {
+      const queryString = query.toString();
+      return platformApiRequest<MonitoringPackage>(`/platform/production-monitoring-readiness${queryString ? `?${queryString}` : ''}`);
+    }
   });
 
   const data = monitoring.data;
@@ -91,6 +101,14 @@ export default function PlatformProductionMonitoringReadinessPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => { void tenants.refetch(); void monitoring.refetch(); }}
+            disabled={tenants.isFetching || monitoring.isFetching}
+          >
+            {tenants.isFetching || monitoring.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </section>
 
@@ -105,10 +123,25 @@ export default function PlatformProductionMonitoringReadinessPage() {
       </section>
 
       {monitoring.isLoading ? <div style={styles.card}>Loading production monitoring readiness...</div> : null}
-      {monitoring.error ? <div style={styles.error}>Failed to load production monitoring readiness.</div> : null}
+      {monitoring.error ? (
+        <div style={styles.error}>
+          Failed to load production monitoring readiness.
+          <button type="button" style={styles.errorButton} onClick={() => void monitoring.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -160,7 +193,16 @@ export default function PlatformProductionMonitoringReadinessPage() {
                 <tbody>
                   {data.tenants.map((tenant) => (
                     <tr key={tenant.tenant_id}>
-                      <td style={styles.td}>{tenant.tenant_name}<br /><span style={styles.muted}>{tenant.tenant_status}</span></td>
+                      <td style={styles.td}>
+                        <strong>{tenant.tenant_name}</strong><br />
+                        <span style={styles.muted}>{tenant.tenant_status}</span>
+                        <div style={styles.quickLinks}>
+                          <Link style={styles.quickLink} to={`/platform/system-health?tenant_id=${tenant.tenant_id}`}>System health</Link>
+                          <Link style={styles.quickLink} to={tenantIncidentLink(tenant.tenant_id)}>Incidents</Link>
+                          <Link style={styles.quickLink} to="/platform/service-dependencies?only_attention=true">Dependencies</Link>
+                          <Link style={styles.quickLink} to="/platform/integration-monitoring">Integrations</Link>
+                        </div>
+                      </td>
                       <td style={styles.td}><span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span></td>
                       <td style={styles.td}>
                         Issues: {formatValue(tenant.evidence.system_health_issues)}<br />
@@ -222,5 +264,10 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px', color: '#334155', fontSize: '13px' },
   td: { borderBottom: '1px solid #f1f5f9', padding: '10px', verticalAlign: 'top', color: '#334155', fontSize: '13px', lineHeight: 1.45 },
-  badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block' }
+  badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: '10px', padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
+  errorButton: { marginLeft: '12px', border: '1px solid #fca5a5', background: '#fff', color: '#991b1b', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
 };

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
@@ -56,16 +57,22 @@ function formatDate(value?: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function selectedTenantName(tenants: Tenant[], tenantId: string): string {
+  return tenants.find((tenant) => tenant.id === tenantId)?.name || tenantId;
+}
+
 export default function PlatformTenantTasksPage() {
   const qc = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UPDATE);
-  const [tenantId, setTenantId] = useState('');
-  const [status, setStatus] = useState('');
-  const [category, setCategory] = useState('');
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
+  const [status, setStatus] = useState(searchParams.get('status') || '');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
   const [includeClosed, setIncludeClosed] = useState(false);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [form, setForm] = useState(blankForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const tenants = useQuery({ queryKey: ['platform', 'tenants', 'for-tasks'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
   const users = useQuery({ queryKey: ['platform', 'users', 'for-tasks'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite });
@@ -84,11 +91,20 @@ export default function PlatformTenantTasksPage() {
   });
 
   const rows = tasks.data || [];
+  const activeFilters = [
+    tenantId ? `tenant: ${selectedTenantName(tenants.data || [], tenantId)}` : 'tenant: all',
+    status ? `status: ${status}` : 'status: all',
+    category ? `category: ${category}` : 'category: all',
+    includeClosed ? 'closed: included' : 'closed: hidden',
+    overdueOnly ? 'overdue only' : 'overdue: all'
+  ];
   const selectedTenant = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId), [tenants.data, tenantId]);
 
   const payload = () => ({
     ...form,
-    tenant_id: form.tenant_id || tenantId,
+    tenant_id: (form.tenant_id || tenantId).trim(),
+    title: form.title.trim(),
+    description: form.description.trim() || null,
     due_at: dateTimeLocalToIso(form.due_at),
     assigned_platform_user_id: form.assigned_platform_user_id || null
   });
@@ -102,22 +118,22 @@ export default function PlatformTenantTasksPage() {
 
   const create = useMutation({
     mutationFn: () => platformApiRequest<TenantTask>('/platform/tenant-tasks', { method: 'POST', body: JSON.stringify(payload()) }),
-    onSuccess: async () => { setForm(blankForm); await invalidate(); }
+    onSuccess: async () => { setSuccessMessage('Task created.'); setForm(blankForm); await invalidate(); }
   });
 
   const update = useMutation({
     mutationFn: (id: string) => platformApiRequest<TenantTask>(`/platform/tenant-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload()) }),
-    onSuccess: async () => { setEditingId(null); setForm(blankForm); await invalidate(); }
+    onSuccess: async () => { setSuccessMessage('Task updated.'); setEditingId(null); setForm(blankForm); await invalidate(); }
   });
 
   const complete = useMutation({
     mutationFn: (id: string) => platformApiRequest<TenantTask>(`/platform/tenant-tasks/${id}/complete`, { method: 'POST' }),
-    onSuccess: invalidate
+    onSuccess: async () => { setSuccessMessage('Task completed.'); await invalidate(); }
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/tenant-tasks/${id}`, { method: 'DELETE' }),
-    onSuccess: invalidate
+    onSuccess: async () => { setSuccessMessage('Task deleted.'); await invalidate(); }
   });
 
   const startEdit = (task: TenantTask) => {
@@ -140,7 +156,21 @@ export default function PlatformTenantTasksPage() {
     <header>
       <h1 style={styles.title}>Tenant tasks</h1>
       <p style={styles.muted}>Track platform/HLA work that has to happen for a tenant: onboarding, support follow-up, billing, security, migrations, and offboarding.</p>
+      <div style={styles.actions}>
+        <button style={styles.secondaryButton} onClick={() => { setSuccessMessage(''); summary.refetch(); tasks.refetch(); tenants.refetch(); if (canWrite) users.refetch(); }}>Refresh</button>
+      </div>
     </header>
+
+    <section style={styles.metaPanel}>
+      <span><b>Source:</b> Platform tenant tasks API</span>
+      <span><b>Filters:</b> {activeFilters.join(' · ')}</span>
+      <span><b>Rows shown:</b> {tasks.isLoading ? 'loading' : rows.length}</span>
+      <span><b>Summary:</b> {summary.isLoading ? 'loading' : 'loaded'}</span>
+    </section>
+
+    {successMessage ? <div style={styles.success}>{successMessage}</div> : null}
+    {tenants.error ? <div style={styles.error}>{readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => tenants.refetch()}>Retry tenants</button></div> : null}
+    {summary.error ? <div style={styles.error}>{readableError(summary.error)} <button style={styles.inlineButton} onClick={() => summary.refetch()}>Retry summary</button></div> : null}
 
     <section style={styles.summaryGrid}>
       <div style={styles.summaryCard}><b>Open</b><span>{summary.data?.open_count ?? '-'}</span></div>
@@ -188,14 +218,14 @@ export default function PlatformTenantTasksPage() {
       </div>
       <textarea style={styles.textarea} placeholder="Description / next step" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       <div style={styles.actions}>
-        <button style={styles.button} disabled={!(form.tenant_id || tenantId) || !form.title || create.isPending || update.isPending} onClick={() => editingId ? update.mutate(editingId) : create.mutate()}>{editingId ? 'Save task' : 'Create task'}</button>
+        <button style={styles.button} disabled={!(form.tenant_id || tenantId).trim() || !form.title.trim() || create.isPending || update.isPending} onClick={() => editingId ? update.mutate(editingId) : create.mutate()}>{editingId ? 'Save task' : 'Create task'}</button>
         {editingId ? <button style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(blankForm); }}>Cancel edit</button> : null}
       </div>
       {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
       {update.error ? <div style={styles.error}>{readableError(update.error)}</div> : null}
     </section> : null}
 
-    {tasks.error ? <div style={styles.error}>{readableError(tasks.error)}</div> : null}
+    {tasks.error ? <div style={styles.error}>{readableError(tasks.error)} <button style={styles.inlineButton} onClick={() => tasks.refetch()}>Retry tasks</button></div> : null}
 
     <section style={styles.list}>
       {rows.map((task) => <article key={task.id} style={{ ...styles.card, borderColor: task.is_overdue ? '#f97316' : '#e5e7eb' }}>
@@ -213,9 +243,9 @@ export default function PlatformTenantTasksPage() {
         {task.description ? <p>{task.description}</p> : null}
         <p style={styles.muted}>Assigned: {task.assigned_platform_user_email || 'unassigned'} · Created by: {task.created_by_platform_user_email || '-'}</p>
         {canWrite ? <div style={styles.actions}>
-          {!task.is_closed ? <button style={styles.button} disabled={complete.isPending} onClick={() => complete.mutate(task.id)}>Complete</button> : null}
+          {!task.is_closed ? <button style={styles.button} disabled={complete.isPending} onClick={() => { if (window.confirm('Mark this tenant task as complete?')) complete.mutate(task.id); }}>Complete</button> : null}
           <button style={styles.secondaryButton} onClick={() => startEdit(task)}>Edit</button>
-          <button style={styles.dangerButton} disabled={remove.isPending} onClick={() => remove.mutate(task.id)}>Delete</button>
+          <button style={styles.dangerButton} disabled={remove.isPending} onClick={() => { if (window.confirm('Delete this tenant task? This cannot be undone.')) remove.mutate(task.id); }}>Delete</button>
         </div> : null}
       </article>)}
       {!tasks.isLoading && rows.length === 0 ? <div style={styles.empty}>No tenant tasks match the current filters.</div> : null}
@@ -237,6 +267,9 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#fff', color: '#111827', cursor: 'pointer' },
   dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
   error: { color: '#991b1b', background: '#fee2e2', borderRadius: '10px', padding: '10px' },
+  success: { color: '#065f46', background: '#d1fae5', borderRadius: '10px', padding: '10px' },
+  inlineButton: { marginLeft: '10px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '8px', background: '#fff', color: '#111827', cursor: 'pointer' },
+  metaPanel: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '12px 14px', display: 'flex', gap: '12px', flexWrap: 'wrap', color: '#374151', fontSize: '13px' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' },
   summaryCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between' },
   list: { display: 'grid', gap: '12px' },

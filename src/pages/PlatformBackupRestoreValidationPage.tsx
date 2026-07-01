@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
@@ -61,6 +62,11 @@ function formatValue(value: string | number | boolean | Record<string, number> |
   return String(value);
 }
 
+function tenantExportLink(tenantId: string) {
+  const params = new URLSearchParams({ tenant_id: tenantId });
+  return `/platform/tenant-exports?${params.toString()}`;
+}
+
 export default function PlatformBackupRestoreValidationPage() {
   const [tenantId, setTenantId] = useState('');
 
@@ -94,6 +100,14 @@ export default function PlatformBackupRestoreValidationPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => { void tenants.refetch(); void validation.refetch(); }}
+            disabled={tenants.isFetching || validation.isFetching}
+          >
+            {tenants.isFetching || validation.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </section>
 
@@ -108,10 +122,25 @@ export default function PlatformBackupRestoreValidationPage() {
       </section>
 
       {validation.isLoading ? <div style={styles.card}>Loading backup restore validation...</div> : null}
-      {validation.error ? <div style={styles.error}>Failed to load backup restore validation.</div> : null}
+      {validation.error ? (
+        <div style={styles.error}>
+          Failed to load backup restore validation.
+          <button type="button" style={styles.errorButton} onClick={() => void validation.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -153,6 +182,11 @@ export default function PlatformBackupRestoreValidationPage() {
                   <div>
                     <h2 style={styles.tenantTitle}>{tenant.tenant_name}</h2>
                     <span style={styles.help}>Tenant status: {humanize(tenant.tenant_status || 'unknown')}</span>
+                    <div style={styles.quickLinks}>
+                      <Link style={styles.quickLink} to={tenantExportLink(tenant.tenant_id)}>Tenant export</Link>
+                      <Link style={styles.quickLink} to="/platform/runbooks?category=maintenance">Runbooks</Link>
+                      <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
+                    </div>
                   </div>
                   <span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span>
                 </div>
@@ -222,5 +256,10 @@ const styles: Record<string, CSSProperties> = {
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
   nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 12, color: '#1e3a8a', lineHeight: 1.5 },
   note: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 14, color: '#9a3412', lineHeight: 1.5 },
-  error: { background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 14, padding: 14, color: '#991b1b' }
+  error: { background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 14, padding: 14, color: '#991b1b', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
+  errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
 };

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -73,7 +74,8 @@ function badgeStyle(status: SlaRow['status']): CSSProperties {
 
 export default function PlatformTenantSlaPage() {
   const queryClient = useQueryClient();
-  const [tenantId, setTenantId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
   const [onlyBreached, setOnlyBreached] = useState(false);
   const [form, setForm] = useState<FormState>(defaultForm);
 

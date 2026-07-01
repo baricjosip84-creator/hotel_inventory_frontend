@@ -130,13 +130,13 @@ export default function PlatformTenantsPage() {
     mutationFn: () => platformApiRequest('/platform/tenants', {
       method: 'POST',
       body: JSON.stringify({
-        name: form.name,
-        location: form.location,
+        name: form.name.trim(),
+        location: form.location.trim(),
         preset: form.preset,
         plan_code: form.plan_code,
-        initial_admin: form.initial_admin_email ? {
-          email: form.initial_admin_email,
-          name: form.initial_admin_name,
+        initial_admin: hasCompleteInitialAdmin ? {
+          email: form.initial_admin_email.trim(),
+          name: form.initial_admin_name.trim(),
           password: form.initial_admin_password
         } : undefined,
         create_onboarding_tasks: form.create_onboarding_tasks
@@ -259,6 +259,25 @@ const lock = useMutation({
   const selectedTenantName = detailsQuery.data?.tenant.name || 'Tenant detail';
   const tenantUsers = detailsQuery.data?.users || [];
   const tenantUserActionPending = resetTenantUserPassword.isPending || setTenantUserStatus.isPending || deleteTenantUser.isPending;
+  const initialAdminValues = [form.initial_admin_email.trim(), form.initial_admin_name.trim(), form.initial_admin_password];
+  const hasAnyInitialAdminValue = initialAdminValues.some(Boolean);
+  const hasCompleteInitialAdmin = initialAdminValues.every(Boolean);
+  const hasValidInitialAdminPassword = !hasAnyInitialAdminValue || form.initial_admin_password.length >= 10;
+  const createTenantBlockedReason = !form.name.trim()
+    ? 'Enter a tenant name before creating a tenant.'
+    : hasAnyInitialAdminValue && !hasCompleteInitialAdmin
+      ? 'Complete initial admin email, name, and password, or leave all three blank.'
+      : !hasValidInitialAdminPassword
+        ? 'Initial admin password must be at least 10 characters.'
+        : '';
+  const canSubmitTenant = !createTenantBlockedReason && !createTenant.isPending;
+
+  const refreshTenants = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
+    if (selected) {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants', selected] });
+    }
+  };
 
   const handleResetTenantUserPassword = (user: TenantUser) => {
     const password = window.prompt(`Enter a new password for ${user.email}. Minimum 10 characters.`);
@@ -280,10 +299,29 @@ const lock = useMutation({
 
   return (
     <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Tenants</h1>
-        <p style={styles.subtitle}>Create, inspect, lock, lifecycle-manage, export, and control tenant entitlements.</p>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Tenants</h1>
+          <p style={styles.subtitle}>Create, inspect, lock, lifecycle-manage, export, and control tenant entitlements.</p>
+        </div>
+        <button style={styles.button} onClick={() => void refreshTenants()} disabled={tenantsQuery.isFetching || detailsQuery.isFetching}>
+          {tenantsQuery.isFetching || detailsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
       </header>
+
+      <section style={styles.metaPanel}>
+        <span><strong>Source:</strong> GET /platform/tenants{selected ? ` + /platform/tenants/${selected}` : ''}</span>
+        <span><strong>List status:</strong> {tenantsQuery.isError ? 'Error' : tenantsQuery.isFetching ? 'Refreshing' : 'Loaded'}</span>
+        <span><strong>Selected tenant:</strong> {selectedTenantName}</span>
+        <span><strong>Permissions:</strong> create {canCreate ? 'yes' : 'no'} · update {canUpdate ? 'yes' : 'no'} · export {canExport ? 'yes' : 'no'}</span>
+      </section>
+
+      {tenantsQuery.error ? (
+        <div style={styles.error}>
+          <span>{readableError(tenantsQuery.error)}</span>
+          <button style={styles.button} onClick={() => void tenantsQuery.refetch()}>Retry list</button>
+        </div>
+      ) : null}
 
       {canCreate ? (
         <section style={styles.panel}>
@@ -314,13 +352,12 @@ const lock = useMutation({
               <input type="checkbox" checked={form.create_onboarding_tasks} onChange={(event) => setForm({ ...form, create_onboarding_tasks: event.target.checked })} />
               Create customer onboarding tasks automatically
             </label>
-            <button style={styles.button} onClick={() => createTenant.mutate()} disabled={createTenant.isPending}>Create tenant</button>
+            <button style={styles.button} onClick={() => createTenant.mutate()} disabled={!canSubmitTenant}>Create tenant</button>
           </div>
+          {createTenantBlockedReason ? <div style={styles.noteBox}>{createTenantBlockedReason}</div> : null}
           {createTenant.error ? <div style={styles.error}>{readableError(createTenant.error)}</div> : null}
         </section>
       ) : null}
-
-      {tenantsQuery.error ? <div style={styles.error}>{readableError(tenantsQuery.error)}</div> : null}
 
       <section style={styles.panel}>
         <table style={styles.table}>
@@ -357,7 +394,12 @@ const lock = useMutation({
       {selected ? (
         <section style={styles.panel}>
           <h2>{selectedTenantName}</h2>
-          {detailsQuery.error ? <div style={styles.error}>{readableError(detailsQuery.error)}</div> : null}
+          {detailsQuery.error ? (
+            <div style={styles.error}>
+              <span>{readableError(detailsQuery.error)}</span>
+              <button style={styles.button} onClick={() => void detailsQuery.refetch()}>Retry tenant detail</button>
+            </div>
+          ) : null}
           {detailsQuery.isLoading ? 'Loading…' : detailsQuery.data ? (
             <>
               <div style={styles.grid}>
@@ -558,9 +600,11 @@ const lock = useMutation({
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 20 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
   title: { margin: 0, fontSize: 30 },
   subtitle: { margin: '8px 0 0', color: '#6b7280' },
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 12px 36px rgba(15,23,42,.08)', overflowX: 'auto' },
+  metaPanel: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 16, padding: 14, display: 'flex', flexWrap: 'wrap', gap: 12, color: '#374151' },
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 },
   input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
   button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
@@ -569,7 +613,8 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: 10, color: '#6b7280', fontSize: 13 },
   td: { borderBottom: '1px solid #f3f4f6', padding: '12px 10px' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, marginTop: 12 },
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, marginTop: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' },
+  noteBox: { background: '#eff6ff', color: '#1d4ed8', borderRadius: 12, padding: 12, marginTop: 12 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginTop: 12 },
   card: { background: '#f9fafb', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12 },
   pre: { background: '#111827', color: '#fff', borderRadius: 12, padding: 12, overflowX: 'auto' },

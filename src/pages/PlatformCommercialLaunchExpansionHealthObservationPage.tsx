@@ -38,6 +38,75 @@ type ExpansionHealthObservation = {
   validation_note: string;
 };
 
+
+type PageLink = {
+  label: string;
+  to: string;
+};
+
+const supportingLinks: PageLink[] = [
+  { label: 'Rollout Expansion', to: '/platform/commercial-launch-rollout-expansion-authorization' },
+  { label: 'Prevention Verification', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident Closure', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident Triage', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch Observation', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Launch Command Center', to: '/platform/commercial-launch-day-command-center' },
+  { label: 'Launch Smoke Test', to: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Launch Go/No-Go', to: '/platform/commercial-launch-go-no-go-register' }
+];
+
+const sourcePostureLinks: PageLink[] = [
+  { label: 'Rollout expansion authorization', to: '/platform/commercial-launch-rollout-expansion-authorization' },
+  { label: 'Prevention verification', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Command center', to: '/platform/commercial-launch-day-command-center' },
+  { label: 'Smoke test', to: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Go/no-go register', to: '/platform/commercial-launch-go-no-go-register' }
+];
+
+function evidenceLinksForRow(row: ObservationRow): PageLink[] {
+  const links: PageLink[] = [
+    { label: 'Expansion evidence', to: '/platform/commercial-launch-rollout-expansion-authorization' },
+    { label: 'Prevention evidence', to: '/platform/commercial-launch-prevention-verification' }
+  ];
+
+  if (row.domain.includes('service_health')) {
+    links.push({ label: 'System Health', to: '/platform/system-health' });
+  }
+  if (row.domain.includes('customer_feedback') || row.domain.includes('adoption_signal')) {
+    links.push({ label: 'Customer Success', to: '/platform/customer-success' });
+  }
+  if (row.domain.includes('support_intake')) {
+    links.push({ label: 'Support Cockpit', to: '/platform/support-cockpit' });
+  }
+  if (row.domain.includes('billing_confirmation')) {
+    links.push({ label: 'Billing', to: '/platform/billing' });
+  }
+  if (row.domain.includes('incident_review')) {
+    links.push({ label: 'Incidents', to: '/platform/incidents' });
+  }
+  if (row.domain.includes('rollback_readiness')) {
+    links.push({ label: 'Runbooks', to: '/platform/runbooks' });
+  }
+  if (row.domain.includes('handoff_closure')) {
+    links.push({ label: 'Operational Jobs', to: '/platform/operational-jobs' });
+  }
+
+  return links;
+}
+
+function renderLinks(links: PageLink[]) {
+  return (
+    <div style={styles.linkList}>
+      {links.map((link) => (
+        <a key={`${link.label}-${link.to}`} href={link.to} style={styles.link}>{link.label}</a>
+      ))}
+    </div>
+  );
+}
+
 function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
@@ -73,6 +142,9 @@ export default function PlatformCommercialLaunchExpansionHealthObservationPage()
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button type="button" style={styles.button} onClick={() => observation.refetch()} disabled={observation.isFetching}>
+            {observation.isFetching ? 'Refreshing...' : observation.error ? 'Retry' : 'Refresh'}
+          </button>
         </div>
       </section>
 
@@ -91,16 +163,36 @@ export default function PlatformCommercialLaunchExpansionHealthObservationPage()
           </section>
 
           <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metaGrid}>
+              <span><strong>Phase:</strong> {data.phase}</span>
+              <span><strong>Step:</strong> {data.step}</span>
+              <span><strong>Generated:</strong> {new Date(data.generated_at).toLocaleString()}</span>
+              <span><strong>Overall posture:</strong> {humanize(data.posture)}</span>
+            </div>
+            <div style={styles.supportingLinks}>{renderLinks(supportingLinks)}</div>
+          </section>
+
+          <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Observation chain</h2>
             <div style={styles.chainGrid}>
-              <span>Rollout expansion authorization: <strong>{humanize(data.rollout_expansion_authorization_posture)}</strong></span>
-              <span>Prevention verification: <strong>{humanize(data.prevention_verification_posture)}</strong></span>
-              <span>Incident closure: <strong>{humanize(data.incident_closure_posture)}</strong></span>
-              <span>Incident triage: <strong>{humanize(data.incident_triage_posture)}</strong></span>
-              <span>Post-launch observation: <strong>{humanize(data.post_launch_observation_posture)}</strong></span>
-              <span>Command center: <strong>{humanize(data.command_center_posture)}</strong></span>
-              <span>Smoke test: <strong>{humanize(data.smoke_test_posture)}</strong></span>
-              <span>Go/no-go register: <strong>{humanize(data.go_no_go_register_posture)}</strong></span>
+              {sourcePostureLinks.map((link) => {
+                const postureMap: Record<string, string> = {
+                  'Rollout expansion authorization': data.rollout_expansion_authorization_posture,
+                  'Prevention verification': data.prevention_verification_posture,
+                  'Incident closure': data.incident_closure_posture,
+                  'Incident triage': data.incident_triage_posture,
+                  'Post-launch observation': data.post_launch_observation_posture,
+                  'Command center': data.command_center_posture,
+                  'Smoke test': data.smoke_test_posture,
+                  'Go/no-go register': data.go_no_go_register_posture
+                };
+                return (
+                  <span key={link.label}>
+                    <a href={link.to} style={styles.inlineLink}>{link.label}</a>: <strong>{humanize(postureMap[link.label])}</strong>
+                  </span>
+                );
+              })}
             </div>
           </section>
 
@@ -116,6 +208,7 @@ export default function PlatformCommercialLaunchExpansionHealthObservationPage()
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Required evidence</th>
                     <th style={styles.th}>Requirements</th>
+                    <th style={styles.th}>Evidence links</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -129,6 +222,7 @@ export default function PlatformCommercialLaunchExpansionHealthObservationPage()
                       <td style={styles.td}>
                         <ul style={styles.list}>{row.observation_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
                       </td>
+                      <td style={styles.td}>{renderLinks(evidenceLinksForRow(row))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -165,6 +259,7 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: '0.25rem 0', fontSize: '1.875rem', color: '#111827' },
   description: { margin: 0, color: '#4b5563', lineHeight: 1.6 },
   headerMeta: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', minWidth: '220px' },
+  button: { border: '1px solid #4f46e5', background: '#4f46e5', color: '#fff', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' },
   generated: { color: '#6b7280', fontSize: '0.85rem' },
   badge: { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' },
@@ -172,8 +267,13 @@ const styles: Record<string, CSSProperties> = {
   metricLabel: { display: 'block', color: '#6b7280', fontSize: '0.8rem', textTransform: 'capitalize' },
   metricValue: { display: 'block', marginTop: '0.35rem', color: '#111827', fontSize: '1.5rem' },
   card: { padding: '1.25rem', background: '#fff', borderRadius: '16px', border: '1px solid #e5e7eb' },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', color: '#374151' },
+  supportingLinks: { marginTop: '1rem' },
   sectionTitle: { margin: '0 0 0.75rem', color: '#111827', fontSize: '1.1rem' },
   chainGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', color: '#374151' },
+  linkList: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem' },
+  link: { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', border: '1px solid #c7d2fe', padding: '0.25rem 0.55rem', color: '#4338ca', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 },
+  inlineLink: { color: '#4338ca', fontWeight: 700, textDecoration: 'none' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#374151', fontSize: '0.8rem' },

@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -38,6 +39,46 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+
+
+function getClosureEvidenceLink(row: ClosureRow) {
+  const bySource: Record<string, string> = {
+    service_health_observation_recorded_triage: '/platform/system-health',
+    customer_feedback_window_opened_triage: '/platform/communications',
+    support_intake_reviewed_triage: '/platform/support-operations-cockpit',
+    billing_activation_confirmed_or_held_triage: '/platform/billing-subscription-activation',
+    incident_review_completed_triage: '/platform/incidents',
+    rollback_readiness_reconfirmed_triage: '/platform/deployment-validation',
+    first_adoption_signal_reviewed_triage: '/platform/pilot-customer-readiness',
+    launch_handoff_closure_prepared_triage: '/platform/commercial-launch-post-launch-observation'
+  };
+  const byDomain: Record<string, string> = {
+    service_health: '/platform/system-health',
+    customer_feedback: '/platform/communications',
+    support_intake: '/platform/support-operations-cockpit',
+    billing_confirmation: '/platform/billing-subscription-activation',
+    incident_review: '/platform/incidents',
+    rollback_readiness: '/platform/deployment-validation',
+    adoption_signal: '/platform/pilot-customer-readiness',
+    handoff_closure: '/platform/commercial-launch-post-launch-observation'
+  };
+  return bySource[row.source_triage_code] || byDomain[row.domain] || '/platform/commercial-launch-incident-triage';
+}
+
+function getClosureEvidenceLabel(row: ClosureRow) {
+  const byDomain: Record<string, string> = {
+    service_health: 'Open system health',
+    customer_feedback: 'Open communications',
+    support_intake: 'Open support cockpit',
+    billing_confirmation: 'Open billing activation',
+    incident_review: 'Open incidents',
+    rollback_readiness: 'Open deployment validation',
+    adoption_signal: 'Open pilot readiness',
+    handoff_closure: 'Open post-launch observation'
+  };
+  return byDomain[row.domain] || 'Open incident triage';
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('sev1') || value.includes('rollback')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('waiting') || value.includes('manual') || value.includes('watch') || value.includes('not_reviewed')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -69,14 +110,50 @@ export default function PlatformCommercialLaunchIncidentClosurePage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void closure.refetch()}
+            disabled={closure.isFetching}
+          >
+            {closure.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting incident closure pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-incident-triage">Incident triage</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
+          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
+          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
         </div>
       </section>
 
       {closure.isLoading ? <div style={styles.card}>Loading commercial launch incident closure board...</div> : null}
-      {closure.error ? <div style={styles.error}>Failed to load commercial launch incident closure board.</div> : null}
+      {closure.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch incident closure board.
+          <button type="button" style={styles.errorButton} onClick={() => void closure.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -89,11 +166,11 @@ export default function PlatformCommercialLaunchIncidentClosurePage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source postures</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Incident triage</span><strong>{humanize(data.incident_triage_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong></div>
+              <div style={styles.inputCard}><span style={styles.help}>Incident triage</span><strong>{humanize(data.incident_triage_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-incident-triage">Open Incident Triage</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-post-launch-observation">Open Post Launch Observation</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
             </div>
           </section>
 
@@ -113,6 +190,7 @@ export default function PlatformCommercialLaunchIncidentClosurePage() {
                   <div style={styles.statusRow}><span>Source status</span><span style={badgeStyle(row.source_triage_status)}>{humanize(row.source_triage_status)}</span></div>
                   <div style={styles.statusRow}><span>Source default severity</span><span style={badgeStyle(row.source_default_severity)}>{humanize(row.source_default_severity)}</span></div>
                   <div style={styles.statusRow}><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                  <Link style={styles.packetLink} to={getClosureEvidenceLink(row)}>{getClosureEvidenceLabel(row)}</Link>
                   <div style={styles.evidenceBox}>
                     <span style={styles.evidenceLabel}>Closure requirements</span>
                     <ul style={styles.list}>{row.closure_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
@@ -157,6 +235,13 @@ const styles: Record<string, CSSProperties> = {
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },

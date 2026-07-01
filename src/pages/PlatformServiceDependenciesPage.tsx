@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -82,9 +83,17 @@ function statusStyle(status: string): CSSProperties {
 
 export default function PlatformServiceDependenciesPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_WRITE);
   const canReadUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
-  const [filters, setFilters] = useState({ status: '', category: '', business_impact: '', search: '', only_attention: false, include_archived: false });
+  const [filters, setFilters] = useState({
+    status: searchParams.get('status') || '',
+    category: searchParams.get('category') || '',
+    business_impact: searchParams.get('business_impact') || '',
+    search: searchParams.get('search') || '',
+    only_attention: searchParams.get('only_attention') === 'true',
+    include_archived: searchParams.get('include_archived') === 'true'
+  });
   const [form, setForm] = useState<DependencyForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
 

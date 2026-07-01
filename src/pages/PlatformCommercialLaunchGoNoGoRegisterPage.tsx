@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -38,6 +39,39 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+
+function getDecisionEvidenceLink(row: GoNoGoRow) {
+  const bySourceControl: Record<string, string> = {
+    tenant_provisioning_accepted: '/platform/tenant-provisioning-hardening',
+    customer_onboarding_accepted: '/platform/customer-onboarding-checklist',
+    billing_subscription_accepted: '/platform/billing-subscription-activation',
+    support_operations_accepted: '/platform/support-operations-cockpit',
+    production_monitoring_accepted: '/platform/production-monitoring-readiness',
+    backup_restore_accepted: '/platform/backup-restore-validation',
+    deployment_validation_accepted: '/platform/deployment-validation',
+    documentation_completeness_accepted: '/platform/documentation-completeness',
+    pilot_customer_readiness_accepted: '/platform/pilot-customer-readiness',
+    commercial_readiness_closure_accepted: '/platform/commercial-readiness-verification-program'
+  };
+  return bySourceControl[row.source_control] || '/platform/commercial-launch-acceptance-packet';
+}
+
+function getDecisionEvidenceLabel(row: GoNoGoRow) {
+  const bySourceControl: Record<string, string> = {
+    tenant_provisioning_accepted: 'Open provisioning evidence',
+    customer_onboarding_accepted: 'Open onboarding evidence',
+    billing_subscription_accepted: 'Open billing activation',
+    support_operations_accepted: 'Open support cockpit',
+    production_monitoring_accepted: 'Open monitoring readiness',
+    backup_restore_accepted: 'Open backup restore',
+    deployment_validation_accepted: 'Open deployment validation',
+    documentation_completeness_accepted: 'Open documentation completeness',
+    pilot_customer_readiness_accepted: 'Open pilot readiness',
+    commercial_readiness_closure_accepted: 'Open readiness verification'
+  };
+  return bySourceControl[row.source_control] || 'Open acceptance packet';
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('no_go')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('manual') || value.includes('conditional') || value.includes('ready') || value.includes('not_recorded')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -68,14 +102,55 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void register.refetch()}
+            disabled={register.isFetching}
+          >
+            {register.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting launch pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness</Link>
+          <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
+          <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
+          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
+          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring</Link>
+          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
+          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
+          <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
+          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
         </div>
       </section>
 
       {register.isLoading ? <div style={styles.card}>Loading commercial launch go/no-go register...</div> : null}
-      {register.error ? <div style={styles.error}>Failed to load commercial launch go/no-go register.</div> : null}
+      {register.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch go/no-go register.
+          <button type="button" style={styles.errorButton} onClick={() => void register.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -88,9 +163,9 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source postures</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Launch readiness</span><strong>{humanize(data.launch_readiness_posture)}</strong></div>
+              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Launch readiness</span><strong>{humanize(data.launch_readiness_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-readiness">Open Launch Readiness</Link></div>
             </div>
           </section>
 
@@ -110,6 +185,7 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
                     <span style={styles.evidenceLabel}>Required evidence</span>
                     <strong>{row.required_evidence}</strong>
                   </div>
+                  <Link style={styles.packetLink} to={getDecisionEvidenceLink(row)}>{getDecisionEvidenceLabel(row)}</Link>
                   <div style={styles.statusRow}><span>Default decision</span><span style={badgeStyle(row.default_decision)}>{humanize(row.default_decision)}</span></div>
                   <div style={styles.statusRow}><span>Acceptance packet</span><span style={badgeStyle(row.packet_status)}>{humanize(row.packet_status)}</span></div>
                   <div>
@@ -178,5 +254,12 @@ const styles: Record<string, CSSProperties> = {
   list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.6 },
   nextStep: { background: '#eef2ff', border: '1px solid #c7d2fe', color: '#3730a3', borderRadius: 14, padding: 14 },
   note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14 },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginLeft: 12, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  quickLink: { color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
+  packetLink: { justifySelf: 'start', color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
+  sourceLink: { justifySelf: 'start', color: '#1d4ed8', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
   error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 }
 };

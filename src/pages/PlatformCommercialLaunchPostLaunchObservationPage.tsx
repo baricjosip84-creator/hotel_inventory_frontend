@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
@@ -41,6 +42,45 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+
+function getObservationEvidenceLink(row: ObservationRow) {
+  const byCode: Record<string, string> = {
+    service_health_observation_recorded: '/platform/system-health',
+    customer_feedback_window_opened: '/platform/communications',
+    support_intake_reviewed: '/platform/support-operations-cockpit',
+    billing_activation_confirmed_or_held: '/platform/billing-subscription-activation',
+    incident_review_completed: '/platform/incidents',
+    rollback_readiness_reconfirmed: '/platform/deployment-validation',
+    first_adoption_signal_reviewed: '/platform/pilot-customer-readiness',
+    launch_handoff_closure_prepared: '/platform/commercial-launch-day-command-center'
+  };
+  const byDomain: Record<string, string> = {
+    'Service health': '/platform/system-health',
+    'Customer feedback': '/platform/communications',
+    'Support intake': '/platform/support-operations-cockpit',
+    'Billing confirmation': '/platform/billing-subscription-activation',
+    'Incident review': '/platform/incidents',
+    'Rollback readiness': '/platform/deployment-validation',
+    'Adoption signal': '/platform/pilot-customer-readiness',
+    'Handoff closure': '/platform/commercial-launch-day-command-center'
+  };
+  return byCode[row.code] || byDomain[row.domain] || '/platform/commercial-launch-day-command-center';
+}
+
+function getObservationEvidenceLabel(row: ObservationRow) {
+  const byCode: Record<string, string> = {
+    service_health_observation_recorded: 'Open system health',
+    customer_feedback_window_opened: 'Open communications',
+    support_intake_reviewed: 'Open support cockpit',
+    billing_activation_confirmed_or_held: 'Open billing activation',
+    incident_review_completed: 'Open incidents',
+    rollback_readiness_reconfirmed: 'Open deployment validation',
+    first_adoption_signal_reviewed: 'Open pilot readiness',
+    launch_handoff_closure_prepared: 'Open command center'
+  };
+  return byCode[row.code] || 'Open command center';
+}
+
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('missing') || value.includes('degradation')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('waiting') || value.includes('manual') || value.includes('watch') || value.includes('not_reviewed')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -71,14 +111,53 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => void observation.refetch()}
+            disabled={observation.isFetching}
+          >
+            {observation.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>Supporting launch and observation pages</h2>
+        <div style={styles.quickLinks}>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
+          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
+          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
+          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
+          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
         </div>
       </section>
 
       {observation.isLoading ? <div style={styles.card}>Loading commercial launch post-launch observation board...</div> : null}
-      {observation.error ? <div style={styles.error}>Failed to load commercial launch post-launch observation board.</div> : null}
+      {observation.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch post-launch observation board.
+          <button type="button" style={styles.errorButton} onClick={() => void observation.refetch()}>Retry</button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -91,11 +170,11 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source launch postures</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong></div>
+              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
             </div>
           </section>
 
@@ -115,6 +194,7 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
                     <span style={styles.evidenceLabel}>Required evidence</span>
                     <strong>{row.required_evidence}</strong>
                   </div>
+                  <Link style={styles.packetLink} to={getObservationEvidenceLink(row)}>{getObservationEvidenceLabel(row)}</Link>
                   <div style={styles.statusRow}><span>Default observation</span><span style={badgeStyle(row.default_observation_status)}>{humanize(row.default_observation_status)}</span></div>
                   <div style={styles.statusRow}><span>Escalation trigger</span><strong>{humanize(row.escalation_trigger)}</strong></div>
                   <div style={styles.statusRow}><span>Source checkpoints</span><strong>{row.source_checkpoints_total} total · {row.source_checkpoints_blocked} blocked · {row.source_checkpoints_waiting_for_go_no_go_decisions} waiting · {row.source_not_reviewed_decisions} not reviewed</strong></div>
@@ -159,6 +239,13 @@ const styles: Record<string, CSSProperties> = {
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
   metricValue: { fontSize: 26, fontWeight: 900 },

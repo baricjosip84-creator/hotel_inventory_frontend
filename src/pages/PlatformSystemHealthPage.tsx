@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
@@ -38,6 +39,8 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 export default function PlatformSystemHealthPage() {
+  const [searchParams] = useSearchParams();
+  const selectedTenantId = searchParams.get('tenant_id') || '';
   const canViewPlatformDiagnostics = hasPlatformPermission(PLATFORM_PERMISSIONS.DIAGNOSTICS_READ);
 
   const systemHealthQuery = useQuery({
@@ -51,7 +54,8 @@ export default function PlatformSystemHealthPage() {
     enabled: canViewPlatformDiagnostics
   });
 
-  const rows = systemHealthQuery.data?.tenants || [];
+  const allRows = systemHealthQuery.data?.tenants || [];
+  const rows = selectedTenantId ? allRows.filter((row) => row.tenant_id === selectedTenantId) : allRows;
   const stuckIdempotencyRows = diagnosticsQuery.data || [];
 
   return (
@@ -67,6 +71,11 @@ export default function PlatformSystemHealthPage() {
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Tenant Health</h2>
         <div style={styles.generatedAt}>Generated: {systemHealthQuery.data?.generated_at || '-'}</div>
+        {selectedTenantId ? (
+          <div style={styles.filterNotice}>
+            Focused by tenant_id from URL. <Link to="/platform/system-health" style={styles.filterLink}>Show all tenants</Link>
+          </div>
+        ) : null}
         <table style={styles.table}>
           <thead>
             <tr>
@@ -136,6 +145,8 @@ const styles: Record<string, CSSProperties> = {
   sectionSubtitle: { margin: '0 0 18px', color: '#6b7280' },
   smallTitle: { margin: '16px 0 10px', fontSize: '16px' },
   generatedAt: { color: '#6b7280', marginBottom: '14px' },
+  filterNotice: { background: '#ecfeff', border: '1px solid #a5f3fc', borderRadius: '12px', color: '#155e75', padding: '10px', marginBottom: '12px' },
+  filterLink: { color: '#0f766e', fontWeight: 700, marginLeft: '8px' },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px', color: '#6b7280', fontSize: '13px' },

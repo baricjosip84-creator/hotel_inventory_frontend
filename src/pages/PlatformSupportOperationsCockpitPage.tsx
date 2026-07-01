@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
@@ -57,7 +58,8 @@ function formatValue(value: string | number | boolean | null | undefined) {
 }
 
 export default function PlatformSupportOperationsCockpitPage() {
-  const [tenantId, setTenantId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-support-operations-cockpit'],
@@ -74,6 +76,7 @@ export default function PlatformSupportOperationsCockpitPage() {
 
   const data = cockpit.data;
   const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const selectedTenantName = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId)?.name, [tenantId, tenants.data]);
 
   return (
     <div style={styles.page}>
@@ -93,20 +96,34 @@ export default function PlatformSupportOperationsCockpitPage() {
       </section>
 
       <section style={styles.card}>
-        <label style={styles.label} htmlFor="tenant-filter">Tenant filter</label>
-        <select id="tenant-filter" value={tenantId} onChange={(event) => setTenantId(event.target.value)} style={styles.select}>
-          <option value="">All tenants</option>
-          {(tenants.data || []).map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
-          ))}
-        </select>
+        <div style={styles.filterGrid}>
+          <div>
+            <label style={styles.label} htmlFor="tenant-filter">Tenant filter</label>
+            <select id="tenant-filter" value={tenantId} onChange={(event) => setTenantId(event.target.value)} style={styles.select}>
+              <option value="">All tenants</option>
+              {(tenants.data || []).map((tenant) => (
+                <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
+              ))}
+            </select>
+          </div>
+          <button style={styles.secondaryButton} onClick={() => cockpit.refetch()} disabled={cockpit.isFetching}>
+            {cockpit.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+        {selectedTenantName ? <span style={styles.help}>Showing support operations evidence for {selectedTenantName}.</span> : <span style={styles.help}>Showing support operations evidence for all tenants.</span>}
       </section>
 
       {cockpit.isLoading ? <div style={styles.card}>Loading support operations cockpit...</div> : null}
-      {cockpit.error ? <div style={styles.error}>Failed to load support operations cockpit.</div> : null}
+      {cockpit.error ? <div style={styles.error}>Failed to load support operations cockpit. <button type="button" style={styles.inlineButton} onClick={() => cockpit.refetch()}>Retry</button></div> : null}
 
       {data ? (
         <>
+          <section style={styles.metaCard}>
+            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
+            <div><strong>Generated</strong><br /><span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span></div>
+            <div style={styles.note}>{data.validation_note}</div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -147,7 +164,17 @@ export default function PlatformSupportOperationsCockpitPage() {
                 <tbody>
                   {data.tenants.map((tenant) => (
                     <tr key={tenant.tenant_id}>
-                      <td style={styles.td}>{tenant.tenant_name}</td>
+                      <td style={styles.td}>
+                        <strong>{tenant.tenant_name}</strong><br />
+                        <span style={styles.help}>{tenant.tenant_id}</span>
+                        <div style={styles.actionRowCompact}>
+                          <Link style={styles.linkButton} to={`/platform/tenant-contacts?tenant_id=${tenant.tenant_id}`}>Contacts</Link>
+                          <Link style={styles.linkButton} to={`/platform/tenant-sla?tenant_id=${tenant.tenant_id}`}>SLA</Link>
+                          <Link style={styles.linkButton} to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}&category=support`}>Tasks</Link>
+                          <Link style={styles.linkButton} to="/platform/incidents">Incidents</Link>
+                          <Link style={styles.linkButton} to="/platform/support-sessions">Sessions</Link>
+                        </div>
+                      </td>
                       <td style={styles.td}><span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span></td>
                       <td style={styles.td}>
                         Primary: {formatValue(tenant.evidence.primary_contacts)}<br />
@@ -171,12 +198,8 @@ export default function PlatformSupportOperationsCockpitPage() {
                   ))}
                 </tbody>
               </table>
+              {!cockpit.isLoading && data.tenants.length === 0 ? <div style={styles.emptyState}>No tenants found for this support operations cockpit.</div> : null}
             </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Validation note</h2>
-            <p style={styles.muted}>{data.validation_note}</p>
           </section>
         </>
       ) : null}
@@ -193,8 +216,14 @@ const styles: Record<string, CSSProperties> = {
   headerMeta: { display: 'grid', gap: '8px', justifyItems: 'end' },
   generated: { color: '#64748b', fontSize: '13px' },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' },
+  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' },
+  note: { color: '#374151', lineHeight: 1.5 },
+  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', alignItems: 'end' },
   label: { display: 'block', fontWeight: 700, marginBottom: '8px', color: '#334155' },
   select: { minWidth: '280px', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' },
+  help: { color: '#64748b', fontSize: '12px' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: '10px', padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
+  inlineButton: { marginLeft: 10, border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
   metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px' },
@@ -205,10 +234,13 @@ const styles: Record<string, CSSProperties> = {
   controlCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', background: '#f8fafc' },
   controlTitle: { margin: '0 0 8px', fontSize: '16px', color: '#0f172a' },
   muted: { color: '#64748b', margin: 0, lineHeight: 1.5 },
+  emptyState: { padding: '16px', color: '#64748b' },
   code: { display: 'inline-block', marginTop: '10px', background: '#e2e8f0', padding: '4px 8px', borderRadius: '8px', fontSize: '12px' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px', color: '#334155', fontSize: '13px' },
   td: { borderBottom: '1px solid #f1f5f9', padding: '10px', verticalAlign: 'top', color: '#334155', fontSize: '13px', lineHeight: 1.45 },
+  actionRowCompact: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '4px 8px', fontWeight: 800, color: '#0f172a', textDecoration: 'none', fontSize: '12px' },
   badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block' }
 };

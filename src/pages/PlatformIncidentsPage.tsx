@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -36,8 +37,15 @@ function localDateTimeValue(date: Date): string {
 
 export default function PlatformIncidentsPage() {
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_WRITE);
-  const [filters, setFilters] = useState({ status: '', severity: '', scope: '', include_resolved: 'false' });
+  const [filters, setFilters] = useState({
+    status: searchParams.get('status') || '',
+    severity: searchParams.get('severity') || '',
+    scope: searchParams.get('scope') || '',
+    tenant_id: searchParams.get('tenant_id') || '',
+    include_resolved: searchParams.get('include_resolved') || 'false'
+  });
   const [form, setForm] = useState({
     title: '',
     summary: '',
@@ -58,6 +66,7 @@ export default function PlatformIncidentsPage() {
   if (filters.status) query.set('status', filters.status);
   if (filters.severity) query.set('severity', filters.severity);
   if (filters.scope) query.set('scope', filters.scope);
+  if (filters.tenant_id) query.set('tenant_id', filters.tenant_id);
 
   const incidents = useQuery({
     queryKey: ['platform', 'incidents', filters],
@@ -203,6 +212,7 @@ export default function PlatformIncidentsPage() {
 
     <section style={styles.panel}>
       <h2>Filters</h2>
+      {searchParams.get('tenant_id') ? <p style={styles.muted}>Opened with tenant_id from URL. <Link to="/platform/incidents">Clear URL filter</Link></p> : null}
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
           Status
@@ -220,6 +230,13 @@ export default function PlatformIncidentsPage() {
           Scope
           <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
             <option value="">All scopes</option><option value="platform">Platform-wide</option><option value="tenant">Tenant-specific</option>
+          </select>
+        </label>
+        <label style={styles.filterLabel}>
+          Tenant
+          <select style={styles.input} value={filters.tenant_id} onChange={(e) => setFilters({ ...filters, tenant_id: e.target.value, scope: e.target.value ? 'tenant' : filters.scope })}>
+            <option value="">All tenants</option>
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
           </select>
         </label>
         <label style={styles.filterLabel}>

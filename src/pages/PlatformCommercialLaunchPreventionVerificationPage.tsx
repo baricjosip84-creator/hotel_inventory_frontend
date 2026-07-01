@@ -36,6 +36,63 @@ type PreventionVerification = {
   validation_note: string;
 };
 
+
+const SOURCE_POSTURE_LINKS = [
+  { label: 'Incident closure', key: 'incident_closure_posture', href: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', key: 'incident_triage_posture', href: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', key: 'post_launch_observation_posture', href: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Command center', key: 'command_center_posture', href: '/platform/commercial-launch-day-command-center' },
+  { label: 'Smoke test', key: 'smoke_test_posture', href: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Go/no-go register', key: 'go_no_go_register_posture', href: '/platform/commercial-launch-go-no-go-register' }
+] as const;
+
+const SUPPORTING_LINKS = [
+  { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident Triage', href: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch Observation', href: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Rollout Expansion Authorization', href: '/platform/commercial-launch-rollout-expansion-authorization' }
+];
+
+const DOMAIN_EVIDENCE_LINKS: Record<string, { label: string; href: string }[]> = {
+  service_health: [
+    { label: 'System Health', href: '/platform/system-health' },
+    { label: 'Monitoring Readiness', href: '/platform/production-monitoring-readiness' }
+  ],
+  customer_feedback: [
+    { label: 'Customer Success', href: '/platform/customer-success-admin' },
+    { label: 'Communications', href: '/platform/tenant-communications' }
+  ],
+  support_intake: [
+    { label: 'Support Cockpit', href: '/platform/support-operations-cockpit' },
+    { label: 'Tenant SLA', href: '/platform/tenant-sla' }
+  ],
+  billing_confirmation: [
+    { label: 'Billing', href: '/platform/billing' },
+    { label: 'Billing Activation', href: '/platform/billing-subscription-activation' },
+    { label: 'License Enforcement', href: '/platform/license-plan-enforcement' }
+  ],
+  incident_review: [
+    { label: 'Incidents', href: '/platform/incidents' },
+    { label: 'Incident Triage', href: '/platform/commercial-launch-incident-triage' }
+  ],
+  rollback_readiness: [
+    { label: 'Runbooks', href: '/platform/runbooks' },
+    { label: 'Launch Command Center', href: '/platform/commercial-launch-day-command-center' }
+  ],
+  adoption_signal: [
+    { label: 'Tenant Health', href: '/platform/tenant-health' },
+    { label: 'Customer Success', href: '/platform/customer-success-admin' }
+  ],
+  handoff_closure: [
+    { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
+    { label: 'Rollout Expansion Authorization', href: '/platform/commercial-launch-rollout-expansion-authorization' }
+  ]
+};
+
+function getDomainLinks(domain: string) {
+  return DOMAIN_EVIDENCE_LINKS[domain] || [{ label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' }];
+}
+
 function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
@@ -72,14 +129,46 @@ export default function PlatformCommercialLaunchPreventionVerificationPage() {
         <div style={styles.headerMeta}>
           <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
           <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+          <button type="button" style={styles.button} onClick={() => prevention.refetch()} disabled={prevention.isFetching}>
+            {prevention.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </section>
 
       {prevention.isLoading ? <div style={styles.card}>Loading commercial launch prevention verification board...</div> : null}
-      {prevention.error ? <div style={styles.error}>Failed to load commercial launch prevention verification board.</div> : null}
+      {prevention.error ? (
+        <div style={styles.error}>
+          Failed to load commercial launch prevention verification board.
+          <button type="button" style={styles.errorButton} onClick={() => prevention.refetch()} disabled={prevention.isFetching}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
+          <section style={styles.metaGrid}>
+            <div style={styles.metaCard}>
+              <span style={styles.help}>Snapshot generated</span>
+              <strong>{new Date(data.generated_at).toLocaleString()}</strong>
+            </div>
+            <div style={styles.metaCard}>
+              <span style={styles.help}>Phase</span>
+              <strong>{humanize(data.phase)}</strong>
+            </div>
+            <div style={styles.metaCard}>
+              <span style={styles.help}>Step</span>
+              <strong>{humanize(data.step)}</strong>
+            </div>
+          </section>
+
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Supporting pages</h2>
+            <div style={styles.linkRow}>
+              {SUPPORTING_LINKS.map((link) => <a key={link.href} href={link.href} style={styles.linkButton}>{link.label}</a>)}
+            </div>
+          </section>
+
           <section style={styles.grid}>
             {summary.map(([key, value]) => (
               <div key={key} style={styles.metric}>
@@ -92,12 +181,13 @@ export default function PlatformCommercialLaunchPreventionVerificationPage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source postures</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Incident closure</span><strong>{humanize(data.incident_closure_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Incident triage</span><strong>{humanize(data.incident_triage_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong></div>
+              {SOURCE_POSTURE_LINKS.map((source) => (
+                <a key={source.key} href={source.href} style={styles.inputCardLink}>
+                  <span style={styles.help}>{source.label}</span>
+                  <strong>{humanize(String(data[source.key]))}</strong>
+                  <span style={styles.openHint}>Open source board →</span>
+                </a>
+              ))}
             </div>
           </section>
 
@@ -117,6 +207,10 @@ export default function PlatformCommercialLaunchPreventionVerificationPage() {
                   <div style={styles.statusRow}><span>Source status</span><span style={badgeStyle(row.source_closure_status)}>{humanize(row.source_closure_status)}</span></div>
                   <div style={styles.statusRow}><span>Source default severity</span><span style={badgeStyle(row.source_default_severity)}>{humanize(row.source_default_severity)}</span></div>
                   <div style={styles.statusRow}><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                  <div>
+                    <span style={styles.evidenceLabel}>Evidence links</span>
+                    <div style={styles.linkRow}>{getDomainLinks(row.domain).map((link) => <a key={`${row.code}-${link.href}`} href={link.href} style={styles.smallLinkButton}>{link.label}</a>)}</div>
+                  </div>
                   <div style={styles.evidenceBox}>
                     <span style={styles.evidenceLabel}>Prevention requirements</span>
                     <ul style={styles.list}>{row.prevention_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
@@ -161,7 +255,10 @@ const styles: Record<string, CSSProperties> = {
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
+  button: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  metaCard: { background: '#fff', border: '1px solid #dbeafe', borderRadius: 14, padding: 14, display: 'grid', gap: 6 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
   metricValue: { fontSize: 26, fontWeight: 900 },
@@ -170,6 +267,11 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
   inputCard: { display: 'grid', gap: 6, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb' },
+  inputCardLink: { display: 'grid', gap: 6, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', color: 'inherit', textDecoration: 'none' },
+  openHint: { color: '#2563eb', fontSize: 12, fontWeight: 800 },
+  linkRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  linkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: 999, padding: '7px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  smallLinkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: 999, padding: '5px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', marginTop: 6 },
   checkGrid: { display: 'grid', gap: 12 },
   checkCard: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, display: 'grid', gap: 12 },
   rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
@@ -183,5 +285,6 @@ const styles: Record<string, CSSProperties> = {
   list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.55 },
   nextStep: { background: '#ecfeff', border: '1px solid #a5f3fc', color: '#155e75', borderRadius: 14, padding: 14 },
   note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13 },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 14 }
+  error: { display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 14 },
+  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 10, padding: '7px 10px', fontWeight: 800, cursor: 'pointer' }
 };
