@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
@@ -94,6 +95,8 @@ export default function PlatformTenantHealthPage() {
   });
 
   const rows = (health.data?.tenants || []).filter((tenant) => !bandFilter || tenant.band === bandFilter);
+  const loadedTenantCount = health.data?.tenants?.length || 0;
+  const visibleTenantCount = rows.length;
   const canScan = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_WRITE);
 
   return (
@@ -137,6 +140,26 @@ export default function PlatformTenantHealthPage() {
         {scan.error ? <p style={styles.errorText}>{scan.error instanceof Error ? scan.error.message : 'Scan failed'}</p> : null}
       </section>
 
+      <section style={styles.metadataPanel}>
+        <div><strong>Snapshot source</strong><span>GET /platform/tenant-health{query ? `?${query}` : ''}</span></div>
+        <div><strong>Generated</strong><span>{health.data?.generated_at ? formatDate(health.data.generated_at) : 'not loaded yet'}</span></div>
+        <div><strong>Scope</strong><span>{tenantId ? selectedTenantName || tenantId : 'All tenants'} · Band: {bandFilter || 'all'} · Showing {visibleTenantCount} of {loadedTenantCount}</span></div>
+        <div><strong>Notification sync</strong><span>{canScan ? `Available · threshold ${Math.max(0, Math.min(Number(threshold) || 0, 100))}` : 'Not available for current permissions'}</span></div>
+      </section>
+
+      <section style={styles.panel}>
+        <h2 style={styles.sectionTitle}>Supporting platform pages</h2>
+        <div style={styles.linkGrid}>
+          <Link style={styles.linkButton} to="/platform/tenants">Tenants</Link>
+          <Link style={styles.linkButton} to="/platform/billing">Billing</Link>
+          <Link style={styles.linkButton} to="/platform/incidents">Incidents</Link>
+          <Link style={styles.linkButton} to="/platform/notifications">Notifications</Link>
+          <Link style={styles.linkButton} to="/platform/tenant-tasks">Tenant tasks</Link>
+          <Link style={styles.linkButton} to="/platform/support-sessions">Support sessions</Link>
+          <Link style={styles.linkButton} to="/platform/tenant-timeline">Tenant timeline</Link>
+        </div>
+      </section>
+
       {health.data ? (
         <section style={styles.summaryGrid}>
           <div style={styles.summaryCard}><span>Total</span><strong>{health.data.summary.total}</strong></div>
@@ -147,8 +170,13 @@ export default function PlatformTenantHealthPage() {
         </section>
       ) : null}
 
+      {tenants.error ? (
+        <section style={styles.error}>Tenant picker failed to load: {tenants.error instanceof Error ? tenants.error.message : 'Failed to load tenants'} <button type="button" style={styles.inlineButton} onClick={() => void tenants.refetch()}>Retry tenants</button></section>
+      ) : null}
       {health.isLoading ? <section style={styles.panel}>Loading tenant health…</section> : null}
-      {health.error ? <section style={styles.error}>{health.error instanceof Error ? health.error.message : 'Failed to load tenant health'}</section> : null}
+      {health.error ? (
+        <section style={styles.error}>Tenant health failed to load: {health.error instanceof Error ? health.error.message : 'Failed to load tenant health'} <button type="button" style={styles.inlineButton} onClick={() => void health.refetch()}>Retry health</button></section>
+      ) : null}
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Tenants</h2>
@@ -174,6 +202,16 @@ export default function PlatformTenantHealthPage() {
                 <span>Incidents: <b>{tenant.counts.open_incidents || 0}</b></span>
                 <span>Notifications: <b>{tenant.counts.open_notifications || 0}</b></span>
                 <span>Overdue tasks: <b>{tenant.counts.overdue_tasks || 0}</b></span>
+              </div>
+
+              <div style={styles.evidenceLinks}>
+                <span style={styles.evidenceLabel}>Evidence:</span>
+                <Link style={styles.inlineLink} to="/platform/tenant-timeline">timeline</Link>
+                <Link style={styles.inlineLink} to="/platform/incidents">incidents</Link>
+                <Link style={styles.inlineLink} to="/platform/notifications">notifications</Link>
+                <Link style={styles.inlineLink} to="/platform/tenant-tasks">tasks</Link>
+                <Link style={styles.inlineLink} to="/platform/billing">billing</Link>
+                <Link style={styles.inlineLink} to="/platform/tenants">tenant settings</Link>
               </div>
 
               {tenant.usage.length ? (
@@ -208,17 +246,21 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: 28 },
   muted: { color: '#6b7280', margin: '4px 0' },
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)' },
+  metadataPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, color: '#334155' },
   sectionTitle: { marginTop: 0 },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', width: '100%', boxSizing: 'border-box' },
   fieldLabel: { display: 'grid', gap: 6, color: '#374151', fontSize: 13, fontWeight: 700 },
   button: { padding: '10px 14px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
+  inlineButton: { marginLeft: 10, padding: '6px 10px', borderRadius: 8, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', cursor: 'pointer' },
   secondaryButton: { padding: '10px 14px', borderRadius: 10, border: '1px solid #111827', background: '#fff', color: '#111827', cursor: 'pointer' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 },
   summaryCard: { background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 4 },
   error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b' },
   errorText: { color: '#991b1b' },
   helpText: { color: '#6b7280', margin: '10px 0 0', fontSize: 13 },
+  linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 10 },
+  linkButton: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '8px 12px', color: '#0f172a', textDecoration: 'none', background: '#f8fafc', fontWeight: 700 },
   successText: { color: '#166534', margin: '10px 0 0', fontWeight: 700 },
   cardList: { display: 'grid', gap: 14 },
   tenantCard: { border: '1px solid #e5e7eb', borderRadius: 16, padding: 16, background: '#fff', display: 'grid', gap: 12 },
@@ -228,6 +270,9 @@ const styles: Record<string, CSSProperties> = {
   score: { fontSize: 32 },
   badge: { borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 800, textTransform: 'uppercase' },
   metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, color: '#374151' },
+  evidenceLinks: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderTop: '1px solid #f3f4f6', paddingTop: 10 },
+  evidenceLabel: { color: '#475569', fontWeight: 800, fontSize: 13 },
+  inlineLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
   usageList: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   usagePill: { borderRadius: 999, background: '#f3f4f6', padding: '6px 10px', fontSize: 13 },
   issueList: { display: 'grid', gap: 8 },

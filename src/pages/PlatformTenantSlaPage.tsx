@@ -102,13 +102,14 @@ export default function PlatformTenantSlaPage() {
       body: JSON.stringify({
         response_target_minutes: Number(form.response_target_minutes) || 60,
         incident_resolution_target_hours: Number(form.incident_resolution_target_hours) || 24,
-        task_overdue_grace_hours: Number(form.task_overdue_grace_hours) || 24,
+        task_overdue_grace_hours: Number(form.task_overdue_grace_hours),
         review_frequency: form.review_frequency,
-        escalation_notes: form.escalation_notes,
+        escalation_notes: form.escalation_notes.trim(),
         is_active: form.is_active
       })
     }),
     onSuccess: () => {
+      window.alert('SLA policy saved.');
       setForm(defaultForm);
       void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
     }
@@ -124,6 +125,20 @@ export default function PlatformTenantSlaPage() {
 
   const rows = (overview.data?.tenants || []).filter((row) => !onlyBreached || row.breach_count > 0);
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_WRITE);
+  const tenantError = tenants.error instanceof Error ? tenants.error.message : tenants.error ? 'Tenant list failed to load' : '';
+  const overviewError = overview.error instanceof Error ? overview.error.message : overview.error ? 'Tenant SLA overview failed to load' : '';
+  const policiesError = policies.error instanceof Error ? policies.error.message : policies.error ? 'Tenant SLA policies failed to load' : '';
+  const selectedTenantName = tenantId ? tenants.data?.find((tenant) => tenant.id === tenantId)?.name || 'Selected tenant' : 'All tenants';
+  const responseTarget = Number(form.response_target_minutes);
+  const incidentTarget = Number(form.incident_resolution_target_hours);
+  const taskGrace = Number(form.task_overdue_grace_hours);
+  const formIsValid = Boolean(form.tenant_id) && Number.isInteger(responseTarget) && responseTarget >= 1 && responseTarget <= 10080 && Number.isInteger(incidentTarget) && incidentTarget >= 1 && incidentTarget <= 8760 && Number.isInteger(taskGrace) && taskGrace >= 0 && taskGrace <= 8760;
+
+  function refreshAll() {
+    void tenants.refetch();
+    void overview.refetch();
+    void policies.refetch();
+  }
 
   function loadPolicy(tenant: SlaRow) {
     const existing = policies.data?.policies.find((policy) => policy.tenant_id === tenant.tenant_id);
@@ -140,13 +155,40 @@ export default function PlatformTenantSlaPage() {
 
   return (
     <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Tenant SLA</h1>
-        <p style={styles.muted}>Operational targets for HLA/platform response, incident resolution, and overdue tenant work. This turns support expectations into visible breaches instead of hidden promises.</p>
+      <header style={styles.headerRow}>
+        <div>
+          <h1 style={styles.title}>Tenant SLA</h1>
+          <p style={styles.muted}>Operational targets for HLA/platform response, incident resolution, and overdue tenant work. This turns support expectations into visible breaches instead of hidden promises.</p>
+        </div>
+        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={tenants.isFetching || overview.isFetching || policies.isFetching}>Refresh</button>
       </header>
+
+      <section style={styles.metaPanel}>
+        <span><strong>Snapshot:</strong> {overview.data?.generated_at ? new Date(overview.data.generated_at).toLocaleString() : 'Not loaded'}</span>
+        <span><strong>Tenant scope:</strong> {selectedTenantName}</span>
+        <span><strong>Breached filter:</strong> {onlyBreached ? 'Breached only' : 'All SLA rows'}</span>
+        <span><strong>Rows shown:</strong> {rows.length}</span>
+      </section>
+
+      <nav style={styles.linkRow} aria-label="Related SLA source pages">
+        <a style={styles.link} href="/platform/tenant-health">Tenant Health</a>
+        <a style={styles.link} href="/platform/incidents">Incidents</a>
+        <a style={styles.link} href="/platform/tenant-tasks">Tenant Tasks</a>
+        <a style={styles.link} href="/platform/support-sessions">Support Sessions</a>
+        <a style={styles.link} href="/platform/notifications">Notifications</a>
+      </nav>
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Overview</h2>
+        {tenantError || overviewError || policiesError ? (
+          <div style={styles.errorBox}>
+            <strong>Load problem</strong>
+            {tenantError ? <span>{tenantError}</span> : null}
+            {overviewError ? <span>{overviewError}</span> : null}
+            {policiesError ? <span>{policiesError}</span> : null}
+            <button type="button" style={styles.smallButton} onClick={refreshAll}>Retry</button>
+          </div>
+        ) : null}
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}><strong>{overview.data?.summary.tenants ?? 0}</strong><span>Tenants tracked</span></div>
           <div style={styles.summaryCard}><strong>{overview.data?.summary.breached ?? 0}</strong><span>Breached</span></div>
@@ -162,7 +204,7 @@ export default function PlatformTenantSlaPage() {
             <input type="checkbox" checked={onlyBreached} onChange={(event) => setOnlyBreached(event.target.checked)} />
             Breached only
           </label>
-          <button type="button" style={styles.button} onClick={() => void overview.refetch()} disabled={overview.isFetching}>Refresh</button>
+          <button type="button" style={styles.button} onClick={refreshAll} disabled={tenants.isFetching || overview.isFetching || policies.isFetching}>Refresh</button>
           {canWrite ? <button type="button" style={styles.secondaryButton} onClick={() => scan.mutate()} disabled={scan.isPending}>{scan.isPending ? 'Syncing...' : 'Sync SLA notifications'}</button> : null}
         </div>
         {canWrite ? (
@@ -216,8 +258,8 @@ export default function PlatformTenantSlaPage() {
               Escalation notes
               <textarea style={{ ...styles.input, minHeight: 96, resize: 'vertical' }} value={form.escalation_notes} onChange={(event) => setForm((current) => ({ ...current, escalation_notes: event.target.value }))} placeholder="Add escalation instructions, owner notes, or review context." />
             </label>
-            <p style={styles.helperText}>These thresholds determine when tenant work is considered overdue and when SLA notifications are generated.</p>
-            <button type="button" style={styles.button} onClick={() => savePolicy.mutate()} disabled={!form.tenant_id || savePolicy.isPending}>{savePolicy.isPending ? 'Saving...' : 'Save policy'}</button>
+            <p style={styles.helperText}>These thresholds determine when tenant work is considered overdue and when SLA notifications are generated. Response must be 1-10080 minutes, incident must be 1-8760 hours, and task grace must be 0-8760 hours.</p>
+            <button type="button" style={styles.button} onClick={() => savePolicy.mutate()} disabled={!formIsValid || savePolicy.isPending}>{savePolicy.isPending ? 'Saving...' : 'Save policy'}</button>
           </div>
         </section>
       ) : null}
@@ -238,7 +280,14 @@ export default function PlatformTenantSlaPage() {
                   <td>{row.response_target_minutes}m response<br />{row.incident_resolution_target_hours}h incident<br />{row.task_overdue_grace_hours}h task grace</td>
                   <td>{row.breach_count}<br /><span style={styles.muted}>Incident {row.counts.breached_open_incidents} · Task {row.counts.overdue_tasks_after_grace} · Support {row.counts.support_response_breaches}</span></td>
                   <td>Incidents {row.counts.open_incidents}<br />Tasks {row.counts.open_tasks}<br />Support approvals {row.counts.pending_support_approvals}</td>
-                  <td>{canWrite ? <button type="button" style={styles.smallButton} onClick={() => loadPolicy(row)}>Edit policy</button> : null}</td>
+                  <td>
+                    <div style={styles.actionStack}>
+                      {canWrite ? <button type="button" style={styles.smallButton} onClick={() => loadPolicy(row)}>Edit policy</button> : null}
+                      <a style={styles.rowLink} href={`/platform/tenant-health?tenant_id=${row.tenant_id}`}>Health</a>
+                      <a style={styles.rowLink} href={`/platform/tenant-tasks?tenant_id=${row.tenant_id}`}>Tasks</a>
+                      <a style={styles.rowLink} href={`/platform/tenant-timeline?tenant_id=${row.tenant_id}`}>Timeline</a>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {rows.length === 0 ? <tr><td colSpan={6} style={styles.empty}>No SLA rows match the current filters.</td></tr> : null}
@@ -252,9 +301,16 @@ export default function PlatformTenantSlaPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 24 },
+  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
   title: { margin: 0, fontSize: 30 },
   muted: { color: '#6b7280', fontSize: 13 },
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)' },
+  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, color: '#374151', fontSize: 13 },
+  linkRow: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
+  link: { border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 10px', color: '#1d4ed8', textDecoration: 'none', fontSize: 13, fontWeight: 700, background: '#eff6ff' },
+  rowLink: { color: '#1d4ed8', fontSize: 12, fontWeight: 700, textDecoration: 'none' },
+  actionStack: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
+  errorBox: { display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #fecaca', borderRadius: 12, padding: 12, marginBottom: 16, background: '#fef2f2', color: '#991b1b', fontSize: 13 },
   sectionTitle: { marginTop: 0, fontSize: 18 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 },
   summaryCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 4 },

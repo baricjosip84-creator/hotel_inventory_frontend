@@ -180,6 +180,15 @@ export default function PlatformTenantTimelinePage() {
 
   const counts = timeline.data?.counts || {};
   const events = timeline.data?.events || [];
+  const selectedTenant = (tenants.data || []).find((tenant) => tenant.id === tenantId);
+  const selectedSourceLabel = sourceOptions.find((option) => option.value === source)?.label || 'All sources';
+  const backendFilterText = [
+    selectedTenant ? `Tenant: ${selectedTenant.name}` : 'Tenant: All tenants',
+    `Source: ${selectedSourceLabel}`,
+    `Days: ${timeline.data?.days ?? (days || '90')}`,
+    `Limit: ${timeline.data?.limit ?? (limit || '150')}`
+  ].join(' · ');
+  const sourceTotal = Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
   const visibleEvents = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
     if (!searchTerm) return events;
@@ -189,11 +198,26 @@ export default function PlatformTenantTimelinePage() {
   return (
     <div style={styles.page}>
       <header>
-        <h1 style={styles.title}>Tenant timeline</h1>
-        <p style={styles.muted}>
-          A combined operational history for tenant activity across audit logs, support sessions, incidents, maintenance, tasks, billing, retention, and offboarding.
-        </p>
+        <div style={styles.headerRow}>
+          <div>
+            <h1 style={styles.title}>Tenant timeline</h1>
+            <p style={styles.muted}>
+              A combined operational history for tenant activity across audit logs, support sessions, incidents, maintenance, tasks, billing, retention, and offboarding.
+            </p>
+          </div>
+          <button type="button" style={styles.secondaryButton} onClick={() => void timeline.refetch()} disabled={timeline.isFetching}>
+            {timeline.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </header>
+
+      <section style={styles.metadataPanel} aria-label="Timeline source metadata">
+        <strong>Snapshot metadata</strong>
+        <span>Endpoint: GET /platform/tenant-timeline</span>
+        <span>{backendFilterText}</span>
+        <span>Returned events: {events.length} · Visible after search: {visibleEvents.length} · Source-count total: {sourceTotal}</span>
+        <span>Search is local to the returned backend result set.</span>
+      </section>
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Filters</h2>
@@ -227,12 +251,23 @@ export default function PlatformTenantTimelinePage() {
         ))}
       </section>
 
+      {tenants.error ? (
+        <div style={styles.errorAction}>
+          <span>{tenants.error instanceof Error ? tenants.error.message : 'Failed to load tenants'}</span>
+          <button type="button" style={styles.retryButton} onClick={() => void tenants.refetch()} disabled={tenants.isFetching}>Retry tenants</button>
+        </div>
+      ) : null}
+
       {timeline.error ? (
-        <div style={styles.error}>{timeline.error instanceof Error ? timeline.error.message : 'Failed to load timeline'}</div>
+        <div style={styles.errorAction}>
+          <span>{timeline.error instanceof Error ? timeline.error.message : 'Failed to load timeline'}</span>
+          <button type="button" style={styles.retryButton} onClick={() => void timeline.refetch()} disabled={timeline.isFetching}>Retry timeline</button>
+        </div>
       ) : null}
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Events</h2>
+        <p style={styles.muted}>{backendFilterText} · Search: {search.trim() || 'none'}</p>
         {visibleEvents.length === 0 && !timeline.isFetching ? <p style={styles.muted}>No timeline events found for the selected filters.</p> : null}
         <div style={styles.eventList}>
           {visibleEvents.map((event) => {
@@ -270,6 +305,7 @@ export default function PlatformTenantTimelinePage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: 20 },
+  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: 28 },
   muted: { color: '#6b7280', margin: '4px 0' },
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)' },
@@ -277,10 +313,14 @@ const styles: Record<string, CSSProperties> = {
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' },
   input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff' },
   button: { padding: '10px 14px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
+  secondaryButton: { padding: '10px 14px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: '#111827', cursor: 'pointer' },
+  retryButton: { padding: '8px 12px', borderRadius: 10, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', cursor: 'pointer' },
+  metadataPanel: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, color: '#475569', fontSize: 13 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 },
   summaryCard: { background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 4 },
   summaryLabel: { color: '#6b7280', fontSize: 13 },
   error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b' },
+  errorAction: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   eventList: { display: 'grid', gap: 12 },
   eventCard: { border: '1px solid #e5e7eb', borderLeft: '5px solid #64748b', borderRadius: 14, padding: 14, background: '#fff' },
   eventHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
