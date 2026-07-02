@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
@@ -77,6 +78,8 @@ type IntegrationMonitoringSurface = {
     critical_unrouted_active_integration_notifications?: number;
     critical_open_sla_breaches?: number;
     warning_open_sla_breaches?: number;
+    routed_response_overdue_active_integration_notifications?: number;
+    critical_routed_response_overdue_active_integration_notifications?: number;
   };
   monitoring_controls: {
     read_only: boolean;
@@ -101,10 +104,14 @@ type IntegrationMonitoringSurface = {
     stale_notification_ids: string[];
     critical_open_sla_breaches?: number;
     warning_open_sla_breaches?: number;
+    routed_response_overdue_active_integration_notifications?: number;
+    critical_routed_response_overdue_active_integration_notifications?: number;
     critical_open_sla_breach_ids?: string[];
     warning_open_sla_breach_ids?: string[];
     unrouted_notification_ids?: string[];
     critical_unrouted_notification_ids?: string[];
+    routed_response_overdue_notification_ids?: string[];
+    critical_routed_response_overdue_notification_ids?: string[];
   };
   webhooks: WebhookItem[];
   service_dependencies: DependencyItem[];
@@ -122,6 +129,35 @@ function FlagList({ flags }: { flags: string[] }) {
   return <div style={styles.flags}>{flags.map((flag) => <span key={flag} style={styles.flag}>{flag}</span>)}</div>;
 }
 
+function formatTimestamp(value?: string | null) {
+  if (!value) return 'Not reported';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function sourcePageForItem(type: string) {
+  if (type === 'webhook') return { to: '/platform/webhooks', label: 'Open Webhooks' };
+  if (type === 'service_dependency') return { to: '/platform/service-dependencies', label: 'Open Service Dependencies' };
+  if (type === 'api_client') return { to: '/platform/api-keys', label: 'Open API Keys' };
+  return { to: '/platform/notifications', label: 'Open Notifications' };
+}
+
+function itemEvidenceSummary(item: RiskItem) {
+  if (item.type === 'webhook') {
+    const webhook = item as WebhookItem;
+    return `enabled ${String(webhook.is_enabled)} · events ${webhook.event_types.length} · failures ${webhook.consecutive_failure_count} · last status ${webhook.last_delivery_status || 'not reported'}`;
+  }
+  if (item.type === 'service_dependency') {
+    const dependency = item as DependencyItem;
+    return `${dependency.status} · impact ${dependency.business_impact} · owner ${dependency.owner_email || 'missing'} · last checked ${dependency.days_since_last_checked ?? 'not reported'} day(s) ago`;
+  }
+  if (item.type === 'api_client') {
+    const client = item as ApiClientItem;
+    return `prefix ${client.key_prefix || 'not reported'} · scopes ${client.scopes.length} · allowed IPs ${client.allowed_ip_count} · last used ${client.days_since_last_used ?? 'not reported'} day(s) ago`;
+  }
+  return 'Evidence from integration monitoring surface.';
+}
+
 export default function PlatformIntegrationMonitoringPage() {
   const queryClient = useQueryClient();
   const canWriteNotifications = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_WRITE);
@@ -135,11 +171,13 @@ export default function PlatformIntegrationMonitoringPage() {
     mutationFn: () => platformApiRequest<IntegrationNotificationScanResponse>('/platform/notifications/integration-monitoring-scan', { method: 'POST' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform', 'integration-monitoring'] });
+      queryClient.invalidateQueries({ queryKey: ['platform', 'notifications'] });
     }
   });
 
   const data = monitoringQuery.data;
   const summary = data?.summary;
+  const loadedAt = data ? formatTimestamp(new Date().toISOString()) : null;
   const evidence: RiskItem[] = [...(data?.webhooks || []), ...(data?.service_dependencies || []), ...(data?.api_clients || [])];
 
   return (
@@ -149,11 +187,36 @@ export default function PlatformIntegrationMonitoringPage() {
           <h1 style={styles.title}>Integration monitoring</h1>
           <p style={styles.subtitle}>Commercial readiness posture for webhooks, service dependencies, API clients, and tenant integration health.</p>
         </div>
-        {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
+        <div style={styles.headerActions}>
+          {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
+          <button type="button" style={styles.secondaryButton} onClick={() => monitoringQuery.refetch()} disabled={monitoringQuery.isFetching}>
+            {monitoringQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </header>
 
+      <section style={styles.metaStrip}>
+        <span>Source: /api/platform/integration-monitoring/surface</span>
+        <span>Snapshot: {loadedAt || 'Not loaded'}</span>
+        <span>Records: {evidence.length} evidence rows</span>
+        <span>Filter: none; backend returns the full monitoring surface</span>
+      </section>
+
+      <section style={styles.linksCard}>
+        <strong>Supporting Platform pages:</strong>
+        <Link to="/platform/webhooks">Webhooks</Link>
+        <Link to="/platform/service-dependencies">Service Dependencies</Link>
+        <Link to="/platform/api-keys">API Keys</Link>
+        <Link to="/platform/notifications">Notifications</Link>
+      </section>
+
       {monitoringQuery.isLoading ? <section style={styles.card}>Loading integration monitoring…</section> : null}
-      {monitoringQuery.error ? <section style={styles.card}>Unable to load integration monitoring.</section> : null}
+      {monitoringQuery.error ? (
+        <section style={styles.card}>
+          <p style={styles.error}>Unable to load integration monitoring.</p>
+          <button type="button" style={styles.secondaryButton} onClick={() => monitoringQuery.refetch()} disabled={monitoringQuery.isFetching}>Retry</button>
+        </section>
+      ) : null}
 
       {summary ? (
         <section style={styles.summaryGrid}>
@@ -172,6 +235,7 @@ export default function PlatformIntegrationMonitoringPage() {
           <div style={styles.card}><strong>Critical unrouted notifications</strong><div style={styles.metric}>{summary.critical_unrouted_active_integration_notifications || 0}</div></div>
           <div style={styles.card}><strong>Critical SLA breaches</strong><div style={styles.metric}>{summary.critical_open_sla_breaches || 0}</div></div>
           <div style={styles.card}><strong>Warning SLA breaches</strong><div style={styles.metric}>{summary.warning_open_sla_breaches || 0}</div></div>
+          <div style={styles.card}><strong>Routed response overdue</strong><div style={styles.metric}>{summary.routed_response_overdue_active_integration_notifications || 0}</div></div>
         </section>
       ) : null}
 
@@ -182,6 +246,8 @@ export default function PlatformIntegrationMonitoringPage() {
               <h2 style={styles.cardTitle}>Monitoring controls</h2>
               <p style={styles.subtitle}>Read-only surface: {String(data.monitoring_controls.read_only)} · No secret export: {String(data.monitoring_controls.no_secret_export)} · No secret hash export: {String(data.monitoring_controls.no_secret_hash_export)}</p>
               <p style={styles.subtitle}>Mutation owners: {data.monitoring_controls.mutation_owners.join(', ')}</p>
+              <p style={styles.subtitle}>Source routes: {data.monitoring_controls.source_routes.join(', ')}</p>
+              <p style={styles.subtitle}>Blocked secret fields: {data.monitoring_controls.secret_material_fields_blocked.join(', ')}</p>
               <p style={styles.subtitle}>Acknowledgement SLA: critical {data.monitoring_controls.critical_notification_ack_sla_hours || 4}h · warning {data.monitoring_controls.warning_notification_ack_sla_hours || 24}h</p>
               <p style={styles.subtitle}>Refresh-safe SLA: scans update notification evidence without resetting original creation time, so overdue open risks still breach SLA.</p>
               <p style={styles.subtitle}>SLA auto-escalation: overdue critical notifications are marked escalated; overdue warning notifications are promoted to critical for commercial operations review.</p>
@@ -207,6 +273,7 @@ export default function PlatformIntegrationMonitoringPage() {
               {(data.notification_coverage.critical_unrouted_active_integration_notifications || 0) > 0 ? <div style={styles.errorText}>{data.notification_coverage.critical_unrouted_active_integration_notifications} critical integration notification(s) are unrouted and will be routing-escalated by the scan until assigned.</div> : null}
               {(data.notification_coverage.critical_open_sla_breaches || 0) > 0 ? <div style={styles.errorText}>{data.notification_coverage.critical_open_sla_breaches} critical integration notification(s) breached acknowledgement SLA.</div> : null}
               {(data.notification_coverage.warning_open_sla_breaches || 0) > 0 ? <div style={styles.warningText}>{data.notification_coverage.warning_open_sla_breaches} warning integration notification(s) breached acknowledgement SLA.</div> : null}
+              {(data.notification_coverage.routed_response_overdue_active_integration_notifications || 0) > 0 ? <div style={styles.warningText}>{data.notification_coverage.routed_response_overdue_active_integration_notifications} routed integration notification(s) missed the routing response due date.</div> : null}
             </div>
           ) : null}
           {!canWriteNotifications ? <p style={styles.help}>You need platform notification write permission to create operational notifications from this monitoring scan.</p> : null}
@@ -228,19 +295,21 @@ export default function PlatformIntegrationMonitoringPage() {
                 <th style={styles.th}>Tenant</th>
                 <th style={styles.th}>Health</th>
                 <th style={styles.th}>Flags</th>
+                <th style={styles.th}>Source</th>
               </tr>
             </thead>
             <tbody>
               {evidence.map((item) => (
                 <tr key={`${item.type}:${item.id}`}>
-                  <td style={styles.td}><strong>{item.name}</strong></td>
+                  <td style={styles.td}><strong>{item.name}</strong><div style={styles.help}>{itemEvidenceSummary(item)}</div></td>
                   <td style={styles.td}>{item.type}</td>
                   <td style={styles.td}>{item.tenant_name || 'Platform-wide'}</td>
                   <td style={styles.td}><span style={badgeStyle(item.health_state)}>{item.health_state}</span></td>
                   <td style={styles.td}><FlagList flags={item.risk_flags} /></td>
+                  <td style={styles.td}><Link to={sourcePageForItem(item.type).to}>{sourcePageForItem(item.type).label}</Link></td>
                 </tr>
               ))}
-              {!evidence.length ? <tr><td style={styles.td} colSpan={5}>No integrations available for monitoring review.</td></tr> : null}
+              {!evidence.length ? <tr><td style={styles.td} colSpan={6}>No integrations available for monitoring review.</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -252,9 +321,12 @@ export default function PlatformIntegrationMonitoringPage() {
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 20 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  headerActions: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
   title: { margin: 0, fontSize: 28 },
   subtitle: { margin: '6px 0 0', color: '#6b7280' },
   badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap' },
+  metaStrip: { display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid #dbeafe', background: '#eff6ff', color: '#1e3a8a', fontSize: 12, fontWeight: 700 },
+  linksCard: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
@@ -270,6 +342,7 @@ const styles: Record<string, CSSProperties> = {
   errorText: { marginTop: 6, color: '#991b1b', fontWeight: 800 },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', fontWeight: 800, cursor: 'pointer' },
   disabledButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#d1d5db', color: '#6b7280', fontWeight: 800, cursor: 'not-allowed' },
+  secondaryButton: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#111827', fontWeight: 800, cursor: 'pointer' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px 8px', color: '#374151', fontSize: 13 },

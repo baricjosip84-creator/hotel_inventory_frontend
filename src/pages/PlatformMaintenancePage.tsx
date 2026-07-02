@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
-type Tenant = { id: string; name: string };
+type Tenant = { id: string; name: string; status?: string | null; plan_code?: string | null };
 type MaintenanceWindow = {
   id: string;
   title: string;
@@ -44,6 +44,7 @@ export default function PlatformMaintenancePage() {
     lock_writes: false
   });
   const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
+  const [statusMessage, setStatusMessage] = useState('');
 
   const query = new URLSearchParams({ limit: '200', include_past: filters.include_past });
   if (filters.status) query.set('status', filters.status);
@@ -72,15 +73,20 @@ export default function PlatformMaintenancePage() {
         lock_writes: form.lock_writes
       })
     }),
-    onSuccess: async () => {
+    onSuccess: async (createdWindow) => {
+      setStatusMessage(`Maintenance window created: ${createdWindow.title}`);
       setForm({ ...form, title: '', message: '' });
       await qc.invalidateQueries({ queryKey: ['platform', 'maintenance'] });
     }
   });
 
   const cancel = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/maintenance/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => qc.invalidateQueries({ queryKey: ['platform', 'maintenance'] })
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/maintenance/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
+    onSuccess: async (_result, variables) => {
+      setStatusMessage('Maintenance window cancelled.');
+      setCancelReasonById((current) => ({ ...current, [variables.id]: '' }));
+      await qc.invalidateQueries({ queryKey: ['platform', 'maintenance'] });
+    }
   });
 
   const windows = maintenance.data || [];
@@ -99,12 +105,38 @@ export default function PlatformMaintenancePage() {
           ? 'End time must be after start time.'
           : '';
   const canCreateWindow = !createValidationMessage && !create.isPending;
+  const refreshAll = async () => {
+    setStatusMessage('');
+    await Promise.all([maintenance.refetch(), tenants.refetch()]);
+  };
+  const filteredScopeLabel = filters.scope || 'all scopes';
+  const filteredStatusLabel = filters.status || 'all statuses';
+  const visibleFilterLabel = filters.include_past === 'true' ? 'including past windows' : 'upcoming/current only';
 
   return <div style={styles.page}>
-    <header>
-      <h1 style={styles.title}>Maintenance windows</h1>
-      <p style={styles.muted}>Schedule platform-wide or tenant-specific maintenance that is visible inside tenant accounts.</p>
+    <header style={styles.headerRow}>
+      <div>
+        <h1 style={styles.title}>Maintenance windows</h1>
+        <p style={styles.muted}>Schedule platform-wide or tenant-specific maintenance that is visible inside tenant accounts.</p>
+      </div>
+      <button style={styles.secondaryButton} onClick={() => void refreshAll()} disabled={maintenance.isFetching || tenants.isFetching}>Refresh</button>
     </header>
+
+    <section style={styles.metadataPanel}>
+      <span><b>Snapshot:</b> {maintenance.isFetching ? 'Refreshing' : 'Loaded'} · {new Date().toLocaleString()}</span>
+      <span><b>Source:</b> /platform/maintenance, /platform/tenants, /incident-context/current</span>
+      <span><b>Filters:</b> {filteredStatusLabel} · {filteredScopeLabel} · {visibleFilterLabel}</span>
+      <span><b>Rows:</b> {windows.length} listed · {activeOrUpcoming.length} visible</span>
+    </section>
+
+    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
+      <a style={styles.supportLink} href="/platform/incidents">Incidents</a>
+      <a style={styles.supportLink} href="/platform/releases">Releases</a>
+      <a style={styles.supportLink} href="/platform/announcements">Announcements</a>
+      <a style={styles.supportLink} href="/platform/audit">Audit</a>
+    </nav>
+
+    {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
 
     <section style={styles.summaryGrid}>
       <div style={styles.summaryCard}><b>Visible windows</b><span>{activeOrUpcoming.length}</span></div>
@@ -128,7 +160,7 @@ export default function PlatformMaintenancePage() {
         {isTenantScoped ? <label style={styles.fieldLabel}>Tenant
           <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
             <option value="">Select tenant</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status ? ` (${tenant.status})` : ''}</option>)}
           </select>
         </label> : null}
         <label style={styles.fieldLabel}>Starts at
@@ -168,7 +200,8 @@ export default function PlatformMaintenancePage() {
       </div>
     </section>
 
-    {maintenance.error ? <div style={styles.error}>{readableError(maintenance.error)}</div> : null}
+    {maintenance.error ? <div style={styles.error}>Maintenance load failed: {readableError(maintenance.error)} <button style={styles.inlineButton} onClick={() => void maintenance.refetch()}>Retry</button></div> : null}
+    {tenants.error ? <div style={styles.error}>Tenant list load failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => void tenants.refetch()}>Retry</button></div> : null}
 
     <section style={styles.list}>
       {windows.map((window) => <article key={window.id} style={styles.card}>
@@ -182,6 +215,11 @@ export default function PlatformMaintenancePage() {
         {window.message ? <p>{window.message}</p> : null}
         <p style={styles.muted}>Starts: {new Date(window.starts_at).toLocaleString()} · Ends: {new Date(window.ends_at).toLocaleString()}</p>
         <p style={styles.muted}>Lock writes: {window.lock_writes ? 'yes' : 'no'} · Created by: {window.created_by_email || '-'}</p>
+        <p style={styles.muted}>Evidence: window {window.id} · Tenant context source: /incident-context/current</p>
+        <div style={styles.evidenceLinks}>
+          <a style={styles.evidenceLink} href={`/platform/audit?target=${encodeURIComponent(window.id)}`}>Audit evidence</a>
+          {window.scope === 'tenant' && window.tenant_id ? <a style={styles.evidenceLink} href={`/platform/tenants?tenant=${encodeURIComponent(window.tenant_id)}`}>Tenant record</a> : null}
+        </div>
         {window.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {window.cancelled_by_email || '-'} · Reason: {window.cancellation_reason || '-'}</p> : null}
         {canWrite && window.status !== 'cancelled' && window.status !== 'completed' ? <div style={styles.cancelRow}>
           <label style={styles.fieldLabel}>Cancellation reason
@@ -189,7 +227,7 @@ export default function PlatformMaintenancePage() {
           </label>
           <button
             style={{ ...styles.dangerButton, ...(cancel.isPending || !cancelReasonById[window.id]?.trim() ? styles.disabledDangerButton : {}) }}
-            onClick={() => cancel.mutate({ id: window.id, reason: cancelReasonById[window.id]?.trim() || '' })}
+            onClick={() => { const reason = cancelReasonById[window.id]?.trim() || ''; if (globalThis.confirm(`Cancel maintenance window \"${window.title}\"?`)) cancel.mutate({ id: window.id, reason }); }}
             disabled={cancel.isPending || !cancelReasonById[window.id]?.trim()}
           >Cancel</button>
         </div> : null}
@@ -200,6 +238,15 @@ export default function PlatformMaintenancePage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  headerRow: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' },
+  metadataPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px', display: 'grid', gap: '6px', color: '#475569' },
+  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+  supportLink: { color: '#1d4ed8', textDecoration: 'none', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '6px 10px', fontWeight: 600 },
+  evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' },
+  evidenceLink: { color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 },
+  secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#fff', color: '#111827', cursor: 'pointer', width: 'fit-content' },
+  inlineButton: { marginLeft: '8px', padding: '4px 8px', border: '1px solid #fecaca', borderRadius: '8px', background: '#fff', color: '#991b1b', cursor: 'pointer' },
+  success: { color: '#065f46', background: '#d1fae5', borderRadius: '10px', padding: '10px' },
   page: { display: 'grid', gap: '20px' },
   title: { margin: 0, fontSize: '28px' },
   muted: { color: '#6b7280', margin: '4px 0' },

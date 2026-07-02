@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -64,15 +64,34 @@ function toForm(row: Dependency): DependencyForm {
     check_notes: row.check_notes || ''
   };
 }
+function clean(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function payload(form: DependencyForm) {
   return {
-    ...form,
-    vendor_id: form.vendor_id || null,
-    owner_platform_user_id: form.owner_platform_user_id || null,
-    status_page_url: form.status_page_url || null,
-    escalation_url: form.escalation_url || null,
-    check_notes: form.check_notes || null
+    name: form.name.trim(),
+    vendor_id: clean(form.vendor_id),
+    category: form.category,
+    status: form.status,
+    business_impact: form.business_impact,
+    owner_platform_user_id: clean(form.owner_platform_user_id),
+    status_page_url: clean(form.status_page_url),
+    escalation_url: clean(form.escalation_url),
+    check_notes: clean(form.check_notes)
   };
+}
+
+function isInvalidUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return !['http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return true;
+  }
 }
 function statusStyle(status: string): CSSProperties {
   if (status === 'major_outage' || status === 'partial_outage') return styles.badgeDanger;
@@ -96,6 +115,7 @@ export default function PlatformServiceDependenciesPage() {
   });
   const [form, setForm] = useState<DependencyForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -119,23 +139,43 @@ export default function PlatformServiceDependenciesPage() {
       if (editingId) return platformApiRequest(`/platform/service-dependencies/${editingId}`, { method: 'PATCH', body });
       return platformApiRequest('/platform/service-dependencies', { method: 'POST', body });
     },
-    onSuccess: async () => { setForm(emptyForm); setEditingId(null); await queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] }); }
+    onSuccess: async () => {
+      const action = editingId ? 'Dependency changes saved.' : 'Dependency created.';
+      setForm(emptyForm);
+      setEditingId(null);
+      setMessage(action);
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] });
+    }
   });
   const markChecked = useMutation({
     mutationFn: (dependency: Dependency) => platformApiRequest(`/platform/service-dependencies/${dependency.id}/check`, { method: 'POST', body: JSON.stringify({ status: dependency.status, check_notes: dependency.check_notes || null }) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] })
+    onSuccess: async (_data, dependency) => {
+      setMessage(`Dependency checked: ${dependency.name}`);
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] });
+    }
   });
   const archive = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/service-dependencies/${id}/archive`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] })
+    mutationFn: (dependency: Dependency) => platformApiRequest(`/platform/service-dependencies/${dependency.id}/archive`, { method: 'POST' }),
+    onSuccess: async (_data, dependency) => {
+      setMessage(`Dependency archived: ${dependency.name}`);
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'service-dependencies'] });
+    }
   });
 
   const categories = dependencies.data?.categories || ['payment', 'email', 'sms', 'storage', 'hosting', 'monitoring', 'integration', 'security', 'support', 'other'];
   const statuses = dependencies.data?.statuses || ['operational', 'degraded', 'partial_outage', 'major_outage', 'maintenance', 'unknown', 'archived'];
   const impacts = dependencies.data?.impacts || ['low', 'medium', 'high', 'critical'];
   const summary = dependencies.data?.summary;
-  const isDependencySaveDisabled = !form.name.trim() || save.isPending;
-  const dependencySaveHelp = !form.name.trim() ? 'Enter a dependency name before creating or saving a dependency.' : '';
+  const hasInvalidStatusPageUrl = isInvalidUrl(form.status_page_url);
+  const hasInvalidEscalationUrl = isInvalidUrl(form.escalation_url);
+  const isDependencySaveDisabled = !form.name.trim() || hasInvalidStatusPageUrl || hasInvalidEscalationUrl || save.isPending;
+  const dependencySaveHelp = !form.name.trim()
+    ? 'Enter a dependency name before creating or saving a dependency.'
+    : hasInvalidStatusPageUrl
+      ? 'Status page URL must be a valid HTTP or HTTPS URL.'
+      : hasInvalidEscalationUrl
+        ? 'Escalation URL must be a valid HTTP or HTTPS URL.'
+        : '';
 
   return (
     <div style={styles.page}>
@@ -144,7 +184,26 @@ export default function PlatformServiceDependenciesPage() {
           <h1 style={styles.title}>Service dependencies</h1>
           <p style={styles.subtitle}>Track external services HLA depends on: payments, email, SMS, hosting, storage, security, integrations, and support vendors.</p>
         </div>
+        <button type="button" style={styles.secondaryButton} onClick={() => dependencies.refetch()} disabled={dependencies.isFetching}>
+          {dependencies.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
       </header>
+
+      <section style={styles.metaCard}>
+        <span>Source: GET /platform/service-dependencies</span>
+        <span>Limit: 300</span>
+        <span>Visible dependencies: {dependencies.data?.dependencies.length ?? 0}</span>
+        <span>Filters: {queryString || 'limit=300'}</span>
+      </section>
+
+      <section style={styles.linkCard}>
+        <strong>Supporting Platform pages:</strong>
+        <Link to="/platform/vendors">Vendors</Link>
+        <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
+        <Link to="/platform/notifications">Notifications</Link>
+      </section>
+
+      {message ? <div style={styles.success}>{message}</div> : null}
 
       <section style={styles.metrics}>
         <div style={styles.metric}><strong>{summary?.total ?? 0}</strong><span>Total shown</span></div>
@@ -200,7 +259,12 @@ export default function PlatformServiceDependenciesPage() {
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Dependencies</h2>
         {dependencies.isLoading ? <p>Loading dependencies…</p> : null}
-        {dependencies.error ? <p style={styles.error}>{(dependencies.error as Error).message}</p> : null}
+        {dependencies.error ? (
+          <div style={styles.errorPanel}>
+            <span>{(dependencies.error as Error).message}</span>
+            <button type="button" style={styles.smallButton} onClick={() => dependencies.refetch()}>Retry</button>
+          </div>
+        ) : null}
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead><tr><th>Name</th><th>Vendor</th><th>Status</th><th>Impact</th><th>Owner</th><th>Last check</th><th>Links</th><th>Notes</th><th>Actions</th></tr></thead>
@@ -218,7 +282,9 @@ export default function PlatformServiceDependenciesPage() {
                   <td>{canWrite ? <div style={styles.rowActions}>
                     <button style={styles.smallButton} onClick={() => { setEditingId(row.id); setForm(toForm(row)); scrollToFormSection('platform-service-dependencies-form'); }}>Edit</button>
                     <button style={styles.smallButton} disabled={markChecked.isPending} onClick={() => markChecked.mutate(row)}>Mark checked</button>
-                    {!row.archived_at ? <button style={styles.dangerButton} disabled={archive.isPending} onClick={() => archive.mutate(row.id)}>Archive</button> : null}
+                    {!row.archived_at ? <button style={styles.dangerButton} disabled={archive.isPending} onClick={() => {
+                      if (window.confirm(`Archive dependency ${row.name}?`)) archive.mutate(row);
+                    }}>Archive</button> : null}
                   </div> : '—'}</td>
                 </tr>
               ))}
@@ -237,6 +303,9 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: 28 },
   subtitle: { margin: '6px 0 0', color: '#64748b' },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.04)' },
+  metaCard: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#475569', fontSize: 12 },
+  linkCard: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 12, fontSize: 13 },
+  success: { background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', fontSize: 13 },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   metrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'grid', gap: 4 },
@@ -260,5 +329,6 @@ const styles: Record<string, CSSProperties> = {
   badgeDanger: { display: 'inline-block', borderRadius: 999, background: '#fef2f2', color: '#991b1b', padding: '3px 8px', fontSize: 12 },
   badgeMuted: { display: 'inline-block', borderRadius: 999, background: '#f1f5f9', color: '#475569', padding: '3px 8px', fontSize: 12 },
   muted: { color: '#64748b', fontSize: 12 },
-  error: { color: '#b91c1c' }
+  error: { color: '#b91c1c' },
+  errorPanel: { display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, marginBottom: 12 }
 };

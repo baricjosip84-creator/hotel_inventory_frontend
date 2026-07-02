@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
@@ -233,6 +234,7 @@ export default function PlatformBillingPage() {
     allow_cancelled_renewal: false
   });
   const [reconciliationResult, setReconciliationResult] = useState<BillingReconciliationResult | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_WRITE);
   const overviewQuery = useQuery({
@@ -252,6 +254,26 @@ export default function PlatformBillingPage() {
     queryFn: () => platformApiRequest<BillingDetails>(`/platform/billing/${selectedTenantId}`),
     enabled: Boolean(selectedTenantId)
   });
+
+  const hasLoadError = Boolean(overviewQuery.error || planCatalogQuery.error || webhookReadinessQuery.error || detailsQuery.error);
+  const snapshotGeneratedAt = new Date().toLocaleString();
+  const currentFilterLabel = statusFilter || 'all statuses';
+  const billingRows = overviewQuery.data || [];
+  const totalEvents = billingRows.reduce((sum, tenant) => sum + (tenant.billing_event_count || 0), 0);
+  const selectedTenantForLinks = selectedTenantId || '';
+  const auditBillingLink = '/platform/audit?category=billing';
+  const selectedTenantAuditLink = selectedTenantForLinks ? `/platform/audit?tenant_id=${encodeURIComponent(selectedTenantForLinks)}&category=billing` : '/platform/audit?category=billing';
+
+  const refetchBillingSnapshot = async () => {
+    setStatusMessage('Refreshing billing snapshot...');
+    await Promise.all([
+      overviewQuery.refetch(),
+      planCatalogQuery.refetch(),
+      webhookReadinessQuery.refetch(),
+      selectedTenantId ? detailsQuery.refetch() : Promise.resolve()
+    ]);
+    setStatusMessage('Billing snapshot refreshed.');
+  };
 
   const selectedPlan = (planCatalogQuery.data?.plans || []).find((plan) => plan.plan_code === billingForm.plan_code) || null;
   useEffect(() => {
@@ -291,6 +313,7 @@ export default function PlatformBillingPage() {
       })
     }),
     onSuccess: async () => {
+      setStatusMessage('Billing profile saved.');
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
     }
@@ -305,6 +328,7 @@ export default function PlatformBillingPage() {
     }),
     onSuccess: async (result) => {
       setReconciliationResult(result);
+      setStatusMessage(result.dry_run ? 'Billing reconciliation preview generated.' : 'Billing reconciliation applied.');
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing'] });
       if (selectedTenantId) await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
     }
@@ -323,6 +347,7 @@ export default function PlatformBillingPage() {
       })
     }),
     onSuccess: async () => {
+      setStatusMessage('Subscription renewed.');
       setRenewalForm({ current_period_ends_at: '', amount_cents: '', currency: 'EUR', external_reference: '', note: '', allow_cancelled_renewal: false });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
@@ -359,6 +384,7 @@ export default function PlatformBillingPage() {
     },
     onSuccess: async (result) => {
       setProviderEventResult(result);
+      setStatusMessage(result.duplicate ? 'Duplicate provider event ignored.' : 'Provider event ingested.');
       setProviderEventForm((current) => ({ ...current, provider_event_id: '', provider_event_created_at: '', provider_signature: '', amount_cents: '', note: '', raw_payload: '' }));
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
@@ -379,6 +405,12 @@ export default function PlatformBillingPage() {
     reconcileBilling.mutate(false);
   };
 
+  const handleRenewSubscription = () => {
+    const confirmed = window.confirm('Renew this subscription and record billing evidence?');
+    if (!confirmed) return;
+    renewBilling.mutate();
+  };
+
   const createEvent = useMutation({
     mutationFn: () => platformApiRequest(`/platform/billing/${selectedTenantId}/events`, {
       method: 'POST',
@@ -391,6 +423,7 @@ export default function PlatformBillingPage() {
       })
     }),
     onSuccess: async () => {
+      setStatusMessage('Billing event added.');
       setEventForm({ event_type: 'note', amount_cents: '', currency: 'EUR', external_reference: '', note: '' });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'billing', selectedTenantId] });
@@ -449,7 +482,7 @@ export default function PlatformBillingPage() {
                     : !isValidCurrency(providerEventForm.currency)
                       ? 'Currency must be a 3-letter code, for example EUR.'
                       : '';
-  const canIngestProviderEvent = Boolean(canWrite && selectedTenantId && !providerValidationMessage && !ingestProviderEvent.isPending);
+  const canIngestProviderEvent = Boolean(canWrite && (selectedTenantId || providerEventForm.billing_customer_reference.trim() || providerHasRawPayload) && !providerValidationMessage && !ingestProviderEvent.isPending);
 
   const billingEventValidationMessage = !eventForm.event_type
     ? 'Select a billing event type before adding an event.'
@@ -462,12 +495,37 @@ export default function PlatformBillingPage() {
 
   return (
     <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Billing</h1>
-        <p style={styles.subtitle}>Track tenant billing status, plan references, renewal dates, invoice/payment events, and billing notes. This is internal billing operations, not a payment-provider integration.</p>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Billing</h1>
+          <p style={styles.subtitle}>Track tenant billing status, plan references, renewal dates, invoice/payment events, and billing notes. This is internal billing operations, not a payment-provider integration.</p>
+        </div>
+        <button style={styles.secondaryButton} onClick={() => void refetchBillingSnapshot()} disabled={overviewQuery.isFetching || planCatalogQuery.isFetching || webhookReadinessQuery.isFetching || detailsQuery.isFetching}>
+          {overviewQuery.isFetching || planCatalogQuery.isFetching || webhookReadinessQuery.isFetching || detailsQuery.isFetching ? 'Refreshing...' : 'Refresh'}
+        </button>
       </header>
 
       <section style={styles.panel}>
+        <div style={styles.snapshotGrid}>
+          <div style={styles.snapshotCard}><strong>Snapshot</strong><span>{snapshotGeneratedAt}</span></div>
+          <div style={styles.snapshotCard}><strong>Source</strong><span>GET /platform/billing · plan catalog · webhook readiness</span></div>
+          <div style={styles.snapshotCard}><strong>Filter</strong><span>{currentFilterLabel}</span></div>
+          <div style={styles.snapshotCard}><strong>Rows / events</strong><span>{billingRows.length} tenants · {totalEvents} billing events</span></div>
+        </div>
+        <div style={styles.supportLinks}>
+          <Link style={styles.supportLink} to="/platform/tenants">Tenants</Link>
+          <Link style={styles.supportLink} to="/platform/billing-subscription-activation">Billing activation</Link>
+          <Link style={styles.supportLink} to="/platform/webhooks">Webhooks</Link>
+          <Link style={styles.supportLink} to={auditBillingLink}>Billing audit evidence</Link>
+        </div>
+        {statusMessage ? <div style={styles.successBox}>{statusMessage}</div> : null}
+        {hasLoadError ? (
+          <div style={styles.errorBox}>
+            <strong>Some billing data failed to load.</strong>
+            <span>Retry the billing snapshot, plan catalog, webhook readiness, or selected-tenant details before making billing changes.</span>
+            <button style={styles.secondaryButton} onClick={() => void refetchBillingSnapshot()}>Retry billing load</button>
+          </div>
+        ) : null}
         <div style={styles.toolbar}>
           <label>Status filter{' '}
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -567,6 +625,11 @@ export default function PlatformBillingPage() {
       {selectedTenantId && detailsQuery.data ? (
         <section style={styles.panel}>
           <h2>{detailsQuery.data.tenant.name}</h2>
+          <div style={styles.supportLinks}>
+            <Link style={styles.supportLink} to={selectedTenantAuditLink}>Tenant billing audit evidence</Link>
+            <Link style={styles.supportLink} to={`/platform/tenant-health?tenant_id=${encodeURIComponent(detailsQuery.data.tenant.id)}`}>Tenant health</Link>
+            <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant exports</Link>
+          </div>
           {canWrite ? (
             <div style={styles.grid}>
               <label style={styles.label}>Billing status
@@ -632,7 +695,7 @@ export default function PlatformBillingPage() {
                   Allow cancelled tenant renewal override
                 </label>
                 {renewalValidationMessage ? <div style={styles.inlineWarning}>{renewalValidationMessage}</div> : null}
-                <button style={canRenewSubscription ? styles.button : styles.disabledButton} onClick={() => renewBilling.mutate()} disabled={!canRenewSubscription}>{renewBilling.isPending ? 'Renewing...' : 'Renew subscription'}</button>
+                <button style={canRenewSubscription ? styles.button : styles.disabledButton} onClick={handleRenewSubscription} disabled={!canRenewSubscription}>{renewBilling.isPending ? 'Renewing...' : 'Renew subscription'}</button>
               </div>
               {renewBilling.error ? <div style={styles.error}>{readableError(renewBilling.error)}</div> : null}
             </div>
@@ -727,6 +790,7 @@ export default function PlatformBillingPage() {
                 <span>{new Date(event.created_at).toLocaleString()}</span>
                 <span>{money(event.amount_cents, event.currency)}</span>
                 <span>{event.external_reference || '-'}</span>
+                <Link style={styles.supportLink} to={`/platform/audit?search=${encodeURIComponent(event.id || event.event_type)}`}>Audit evidence</Link>
                 <p>{event.note || 'No note'}</p>
               </div>
             ))}
@@ -740,9 +804,14 @@ export default function PlatformBillingPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: '24px' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: '30px' },
   subtitle: { color: '#6b7280', maxWidth: '820px' },
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '20px', boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)' },
+  snapshotGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' },
+  snapshotCard: { display: 'grid', gap: '4px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f9fafb', color: '#374151', fontSize: '13px' },
+  supportLinks: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' },
+  supportLink: { color: '#2563eb', fontWeight: 700, fontSize: '13px', textDecoration: 'none' },
   toolbar: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' },
   toolbarActions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   table: { width: '100%', borderCollapse: 'collapse' },

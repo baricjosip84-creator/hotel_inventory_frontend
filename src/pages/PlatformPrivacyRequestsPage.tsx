@@ -41,6 +41,10 @@ function badgeStyle(row: PrivacyRequest): CSSProperties {
   if (row.priority === 'urgent' || row.priority === 'high') return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
 }
+function trimOrNull(value: string) { const trimmed = value.trim(); return trimmed || null; }
+function isValidEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
+function isValidDateInput(value: string) { return !value || !Number.isNaN(new Date(value).getTime()); }
+function SourceLink({ href, children }: { href: string; children: string }) { return <a href={href} style={styles.link}>{children}</a>; }
 
 export default function PlatformPrivacyRequestsPage() {
   const queryClient = useQueryClient();
@@ -51,13 +55,14 @@ export default function PlatformPrivacyRequestsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [closeNotes, setCloseNotes] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
     if (filters.status) params.set('status', filters.status);
     if (filters.request_type) params.set('request_type', filters.request_type);
-    if (filters.search) params.set('search', filters.search);
+    if (filters.search.trim()) params.set('search', filters.search.trim());
     if (filters.overdue) params.set('overdue', 'true');
     params.set('limit', '200');
     return params.toString();
@@ -67,6 +72,15 @@ export default function PlatformPrivacyRequestsPage() {
   const users = useQuery({ queryKey: ['platform', 'users', 'privacy-assignee-picker'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users') });
   const summary = useQuery({ queryKey: ['platform', 'privacy-requests', 'summary'], queryFn: () => platformApiRequest<SummaryResponse>('/platform/privacy-requests/summary') });
   const requests = useQuery({ queryKey: ['platform', 'privacy-requests', filters], queryFn: () => platformApiRequest<RequestsResponse>(`/platform/privacy-requests?${queryString}`) });
+  const isLoading = tenants.isLoading || users.isLoading || summary.isLoading || requests.isLoading;
+  const loadError = tenants.error || users.error || summary.error || requests.error;
+  const refreshAll = () => {
+    setStatusMessage('Refreshing privacy request evidence...');
+    tenants.refetch();
+    users.refetch();
+    summary.refetch();
+    requests.refetch();
+  };
 
   const saveRequest = useMutation({
     mutationFn: () => platformApiRequest(editingId ? `/platform/privacy-requests/${editingId}` : '/platform/privacy-requests', {
@@ -76,19 +90,19 @@ export default function PlatformPrivacyRequestsPage() {
         request_type: form.request_type,
         status: form.status,
         priority: form.priority,
-        requester_name: form.requester_name || null,
-        requester_email: form.requester_email,
-        subject_identifier: form.subject_identifier || null,
-        summary: form.summary,
+        requester_name: trimOrNull(form.requester_name),
+        requester_email: form.requester_email.trim(),
+        subject_identifier: trimOrNull(form.subject_identifier),
+        summary: form.summary.trim(),
         due_at: form.due_at || null,
         assigned_platform_user_id: form.assigned_platform_user_id || null
       })
     }),
-    onSuccess: () => { setForm(defaultForm); setOriginalForm(defaultForm); setEditingId(null); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); }
+    onSuccess: () => { setStatusMessage(editingId ? 'Privacy request updated.' : 'Privacy request created.'); setForm(defaultForm); setOriginalForm(defaultForm); setEditingId(null); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); }
   });
 
-  const verifyRequest = useMutation({ mutationFn: (id: string) => platformApiRequest(`/platform/privacy-requests/${id}/verify`, { method: 'POST', body: JSON.stringify({ notes: closeNotes }) }), onSuccess: () => { setCloseNotes(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
-  const closeRequest = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => platformApiRequest(`/platform/privacy-requests/${id}/close`, { method: 'POST', body: JSON.stringify({ status, resolution_notes: closeNotes, rejection_reason: rejectReason }) }), onSuccess: () => { setCloseNotes(''); setRejectReason(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
+  const verifyRequest = useMutation({ mutationFn: (id: string) => platformApiRequest(`/platform/privacy-requests/${id}/verify`, { method: 'POST', body: JSON.stringify({ notes: closeNotes.trim() }) }), onSuccess: () => { setStatusMessage('Privacy request verified.'); setCloseNotes(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
+  const closeRequest = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => platformApiRequest(`/platform/privacy-requests/${id}/close`, { method: 'POST', body: JSON.stringify({ status, resolution_notes: closeNotes.trim(), rejection_reason: rejectReason.trim() }) }), onSuccess: (_data, variables) => { setStatusMessage(variables.status === 'rejected' ? 'Privacy request rejected.' : 'Privacy request fulfilled.'); setCloseNotes(''); setRejectReason(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
 
   const requestTypes = requests.data?.request_types || ['access', 'export', 'deletion', 'correction', 'consent', 'restriction', 'objection', 'other'];
   const statuses = requests.data?.statuses || ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
@@ -108,8 +122,10 @@ export default function PlatformPrivacyRequestsPage() {
   };
 
   const requiredFieldsMissing = !form.requester_email.trim() || !form.summary.trim();
+  const invalidEmail = Boolean(form.requester_email.trim()) && !isValidEmail(form.requester_email);
+  const invalidDueAt = !isValidDateInput(form.due_at);
   const formChanged = JSON.stringify(form) !== JSON.stringify(editingId ? originalForm : defaultForm);
-  const saveDisabled = saveRequest.isPending || requiredFieldsMissing || Boolean(editingId && !formChanged);
+  const saveDisabled = saveRequest.isPending || requiredFieldsMissing || invalidEmail || invalidDueAt || Boolean(editingId && !formChanged);
   const showRequiredMessage = requiredFieldsMissing && (Boolean(editingId) || Boolean(form.requester_email.trim()) || Boolean(form.summary.trim()));
 
   return (
@@ -119,7 +135,17 @@ export default function PlatformPrivacyRequestsPage() {
           <h1 style={styles.title}>Privacy requests</h1>
           <p style={styles.subtitle}>Track data-subject/privacy requests, deadlines, verification, and closure across tenants.</p>
         </div>
+        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={isLoading}>{isLoading ? 'Refreshing...' : 'Refresh'}</button>
       </header>
+
+      {statusMessage ? <div style={styles.notice}>{statusMessage}</div> : null}
+      {loadError ? (
+        <section style={styles.errorPanel}>
+          <strong>Privacy request data could not be loaded.</strong>
+          <span>Retry the source lists, summary, and request table before making workflow decisions.</span>
+          <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
+        </section>
+      ) : null}
 
       <section style={styles.grid}>
         <div style={styles.metric}><strong>{summary.data?.summary.open ?? 0}</strong><span>Open</span></div>
@@ -128,9 +154,27 @@ export default function PlatformPrivacyRequestsPage() {
         <div style={styles.metric}><strong>{summary.data?.summary.high_priority_open ?? 0}</strong><span>High priority</span></div>
       </section>
 
+      <section style={styles.metaGrid}>
+        <div><strong>Snapshot source</strong><span>GET /platform/privacy-requests/summary and /platform/privacy-requests?limit=200</span></div>
+        <div><strong>Current filters</strong><span>{filters.tenant_id || 'all tenants'} · {filters.status || 'all statuses'} · {filters.request_type || 'all types'} · {filters.overdue ? 'overdue only' : 'all due states'}</span></div>
+        <div><strong>Rows shown</strong><span>{rows.length} request records</span></div>
+        <div><strong>Workflow owner</strong><span>Platform Privacy Requests; source evidence is stored in platform audit events.</span></div>
+      </section>
+
+      <section style={styles.supportingLinks}>
+        <strong>Supporting Platform pages</strong>
+        <SourceLink href="/platform/compliance-docs">Compliance Docs</SourceLink>
+        <SourceLink href="/platform/compliance-export">Compliance Export</SourceLink>
+        <SourceLink href="/platform/legal-compliance-reporting">Legal & Compliance Reporting</SourceLink>
+        <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
+        <SourceLink href="/platform/tenants">Tenants</SourceLink>
+      </section>
+
       <section id="platform-privacy-requests-form" style={styles.card}>
         <h2 style={styles.cardTitle}>{editingId ? 'Edit privacy request' : 'Create privacy request'}</h2>
         {showRequiredMessage ? <div style={styles.validation}>Requester email and request summary are required.</div> : null}
+        {invalidEmail ? <div style={styles.validation}>Requester email must be a valid email address.</div> : null}
+        {invalidDueAt ? <div style={styles.validation}>Due at must be a valid date/time.</div> : null}
         <div style={styles.formGrid}>
           <label style={styles.fieldLabel}>Tenant<select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
           <label style={styles.fieldLabel}>Request type<select value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })} style={styles.input}>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
@@ -171,8 +215,8 @@ export default function PlatformPrivacyRequestsPage() {
                 <td><span style={badgeStyle(row)}>{row.is_overdue ? 'overdue' : row.status}</span></td>
                 <td>{dateLabel(row.due_at)}</td>
                 <td>{row.assignee_email || '—'}</td>
-                <td>{row.summary}</td>
-                <td style={styles.actions}>{canWrite ? (isRequestClosed(row.status) ? <span style={styles.muted}>Closed</span> : <><button type="button" style={styles.smallButton} onClick={() => startEdit(row)} disabled={saveRequest.isPending}>Edit</button><button type="button" style={verifyRequest.isPending ? styles.disabledSmallButton : styles.smallButton} onClick={() => verifyRequest.mutate(row.id)} disabled={verifyRequest.isPending}>Verify</button><button type="button" style={closeActionDisabled ? styles.disabledSmallButton : styles.smallButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'fulfilled' })} disabled={closeActionDisabled}>Fulfill</button><button type="button" style={rejectActionDisabled ? styles.disabledDangerButton : styles.dangerButton} onClick={() => closeRequest.mutate({ id: row.id, status: 'rejected' })} disabled={rejectActionDisabled}>Reject</button></>) : '—'}</td>
+                <td>{row.summary}<br /><span style={styles.muted}>Created {dateLabel(row.created_at)} · Updated {dateLabel(row.updated_at)}</span>{row.verified_at ? <><br /><span style={styles.muted}>Verified {dateLabel(row.verified_at)}</span></> : null}{row.completed_at ? <><br /><span style={styles.muted}>Closed {dateLabel(row.completed_at)}</span></> : null}{row.resolution_notes ? <><br /><span style={styles.muted}>Notes: {row.resolution_notes}</span></> : null}{row.rejection_reason ? <><br /><span style={styles.muted}>Reject reason: {row.rejection_reason}</span></> : null}<br /><SourceLink href="/platform/audit">Audit evidence</SourceLink></td>
+                <td style={styles.actions}>{canWrite ? (isRequestClosed(row.status) ? <span style={styles.muted}>Closed</span> : <><button type="button" style={styles.smallButton} onClick={() => startEdit(row)} disabled={saveRequest.isPending}>Edit</button><button type="button" style={verifyRequest.isPending ? styles.disabledSmallButton : styles.smallButton} onClick={() => { if (window.confirm('Verify this privacy request and move it to in_progress?')) verifyRequest.mutate(row.id); }} disabled={verifyRequest.isPending}>Verify</button><button type="button" style={closeActionDisabled ? styles.disabledSmallButton : styles.smallButton} onClick={() => { if (window.confirm('Fulfill and close this privacy request?')) closeRequest.mutate({ id: row.id, status: 'fulfilled' }); }} disabled={closeActionDisabled}>Fulfill</button><button type="button" style={rejectActionDisabled ? styles.disabledDangerButton : styles.dangerButton} onClick={() => { if (window.confirm('Reject and close this privacy request?')) closeRequest.mutate({ id: row.id, status: 'rejected' }); }} disabled={rejectActionDisabled}>Reject</button></>) : '—'}</td>
               </tr>
             ))}</tbody>
           </table>
@@ -193,9 +237,13 @@ const styles: Record<string, CSSProperties> = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   title: { margin: 0, fontSize: 28 },
   subtitle: { margin: '6px 0 0', color: '#64748b' },
+  notice: { border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 12px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 },
+  errorPanel: { border: '1px solid #fecaca', borderRadius: 12, padding: 16, background: '#fef2f2', color: '#991b1b', display: 'grid', gap: 8 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
   metric: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, background: '#fff', display: 'grid', gap: 4 },
   card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, background: '#fff', display: 'grid', gap: 12 },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
+  supportingLinks: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   cardTitle: { margin: 0, fontSize: 18 },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
   fieldLabel: { display: 'grid', gap: 6, fontSize: 12, fontWeight: 700, color: '#334155' },
@@ -214,5 +262,6 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse' },
   badge: { borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   muted: { color: '#64748b', fontSize: 12 },
+  link: { color: '#2563eb', fontWeight: 700, textDecoration: 'none' },
   actions: { display: 'flex', gap: 6, flexWrap: 'wrap' }
 };

@@ -36,12 +36,26 @@ function readableError(error: unknown): string {
   return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
 }
 
+function trimOrNull(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function SourceLink({ href, children }: { href: string; children: string }) {
+  return <a href={href} style={styles.link}>{children}</a>;
+}
+
 export default function PlatformProvisioningPage() {
   const queryClient = useQueryClient();
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('hotel');
   const [createStorageLocations, setCreateStorageLocations] = useState(true);
   const [updateEntitlements, setUpdateEntitlements] = useState(true);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
     name: '',
     location: '',
@@ -83,8 +97,21 @@ export default function PlatformProvisioningPage() {
     createForm.initial_admin_password
   ];
   const hasPartialAdmin = adminFields.some(Boolean) && !adminFields.every(Boolean);
-  const createTenantFormValid = Boolean(createForm.name.trim() && createForm.preset) && !hasPartialAdmin;
+  const hasCompleteAdmin = adminFields.every(Boolean);
+  const invalidAdminEmail = Boolean(createForm.initial_admin_email.trim()) && !isValidEmail(createForm.initial_admin_email);
+  const invalidAdminPassword = Boolean(createForm.initial_admin_password) && createForm.initial_admin_password.length < 10;
+  const tenantNameMissing = !createForm.name.trim();
+  const createTenantFormValid = Boolean(createForm.name.trim() && createForm.preset) && !hasPartialAdmin && !invalidAdminEmail && !invalidAdminPassword;
   const applyPresetFormValid = Boolean(canUpdate && selectedTenantId && selectedPreset);
+  const selectedTenant = (tenantsQuery.data || []).find((tenant) => tenant.id === selectedTenantId);
+  const rowsShown = tenantsQuery.data?.length ?? 0;
+  const refreshAll = () => {
+    setStatusMessage('Refreshing provisioning source data...');
+    presetsQuery.refetch();
+    tenantsQuery.refetch();
+    previewQuery.refetch();
+  };
+  const loadError = presetsQuery.error || tenantsQuery.error || previewQuery.error;
 
   useEffect(() => {
     if (!presetsQuery.data?.length) return;
@@ -101,11 +128,11 @@ export default function PlatformProvisioningPage() {
       method: 'POST',
       body: JSON.stringify({
         name: createForm.name.trim(),
-        location: createForm.location.trim() || null,
+        location: trimOrNull(createForm.location),
         preset: createForm.preset,
         plan_code: createForm.plan_code.trim() || 'standard',
         create_storage_locations: true,
-        initial_admin: adminFields.every(Boolean) ? {
+        initial_admin: hasCompleteAdmin ? {
           email: createForm.initial_admin_email.trim(),
           name: createForm.initial_admin_name.trim(),
           password: createForm.initial_admin_password
@@ -114,6 +141,7 @@ export default function PlatformProvisioningPage() {
       })
     }),
     onSuccess: async () => {
+      setStatusMessage('Tenant created with preset defaults.');
       setCreateForm({
         name: '',
         location: '',
@@ -132,6 +160,7 @@ export default function PlatformProvisioningPage() {
     if (createTenant.isSuccess || createTenant.error) {
       createTenant.reset();
     }
+    setStatusMessage(null);
     setCreateForm((current) => ({ ...current, ...patch }));
   };
 
@@ -145,6 +174,7 @@ export default function PlatformProvisioningPage() {
       })
     }),
     onSuccess: async () => {
+      setStatusMessage('Preset applied.');
       await queryClient.invalidateQueries({ queryKey: ['platform', 'tenants'] });
       await queryClient.invalidateQueries({ queryKey: ['platform', 'provisioning', 'preview', selectedTenantId, selectedPreset] });
     }
@@ -152,12 +182,38 @@ export default function PlatformProvisioningPage() {
 
   return (
     <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Provisioning</h1>
-        <p style={styles.subtitle}>Apply realistic starter setups for different tenant types without manually creating every default location and entitlement.</p>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Provisioning</h1>
+          <p style={styles.subtitle}>Apply realistic starter setups for different tenant types without manually creating every default location and entitlement.</p>
+        </div>
+        <button type="button" style={styles.buttonSecondary} onClick={refreshAll} disabled={presetsQuery.isLoading || tenantsQuery.isLoading || previewQuery.isLoading}>{presetsQuery.isLoading || tenantsQuery.isLoading || previewQuery.isLoading ? 'Refreshing...' : 'Refresh'}</button>
       </header>
 
-      {presetsQuery.error ? <div style={styles.error}>{readableError(presetsQuery.error)}</div> : null}
+      {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
+      {loadError ? (
+        <section style={styles.errorPanel}>
+          <strong>Provisioning source data could not be loaded.</strong>
+          <span>{readableError(loadError)}</span>
+          <button type="button" style={styles.buttonSecondary} onClick={refreshAll}>Retry</button>
+        </section>
+      ) : null}
+
+      <section style={styles.metaGrid}>
+        <div><strong>Snapshot source</strong><span>GET /platform/provisioning/presets, /platform/tenants, and tenant preview when selected</span></div>
+        <div><strong>Selected tenant</strong><span>{selectedTenant ? `${selectedTenant.name} · ${selectedTenant.status || 'status unknown'} · ${selectedTenant.plan_code || 'no plan code'}` : 'No tenant selected'}</span></div>
+        <div><strong>Current preset</strong><span>{selectedPresetDetails ? `${selectedPresetDetails.label} · ${selectedPresetDetails.organization_type}` : selectedPreset}</span></div>
+        <div><strong>Tenant rows loaded</strong><span>{rowsShown} tenant records available for provisioning</span></div>
+      </section>
+
+      <section style={styles.supportingLinks}>
+        <strong>Supporting Platform pages</strong>
+        <SourceLink href="/platform/tenants">Tenants</SourceLink>
+        <SourceLink href="/platform/tenant-tasks">Tenant Tasks</SourceLink>
+        <SourceLink href="/platform/tenant-lifecycle">Tenant Lifecycle</SourceLink>
+        <SourceLink href="/platform/tenant-health">Tenant Health</SourceLink>
+        <SourceLink href="/platform/audit">Platform Audit</SourceLink>
+      </section>
 
       <section style={styles.panel}>
         <h2>Available presets</h2>
@@ -168,7 +224,7 @@ export default function PlatformProvisioningPage() {
               <p style={styles.muted}>{preset.description}</p>
               <div style={styles.meta}>Type: {preset.organization_type}</div>
               <div style={styles.meta}>Locations: {preset.storage_locations.length}</div>
-              <button type="button" style={styles.buttonSecondary} onClick={() => setSelectedPreset(preset.key)}>Use this preset</button>
+              <button type="button" style={styles.buttonSecondary} onClick={() => { setStatusMessage(`Preset selected: ${preset.label}.`); setSelectedPreset(preset.key); }}>Use this preset</button>
             </article>
           ))}
         </div>
@@ -207,7 +263,9 @@ export default function PlatformProvisioningPage() {
             </label>
           </div>
           {!createTenant.isSuccess && hasPartialAdmin ? <div style={styles.warning}>Initial admin email, name, and password must be filled together, or all left empty.</div> : null}
-          {!createTenant.isSuccess && !createForm.name.trim() ? <div style={styles.warning}>Tenant name is required before creating a provisioned tenant.</div> : null}
+          {!createTenant.isSuccess && tenantNameMissing ? <div style={styles.warning}>Tenant name is required before creating a provisioned tenant.</div> : null}
+          {!createTenant.isSuccess && invalidAdminEmail ? <div style={styles.warning}>Initial admin email must be a valid email address.</div> : null}
+          {!createTenant.isSuccess && invalidAdminPassword ? <div style={styles.warning}>Initial admin password must be at least 10 characters.</div> : null}
           <button type="button" style={createTenantFormValid && !createTenant.isPending ? styles.button : styles.buttonDisabled} disabled={!createTenantFormValid || createTenant.isPending} onClick={() => createTenant.mutate()}>
             Create provisioned tenant
           </button>
@@ -247,6 +305,8 @@ export default function PlatformProvisioningPage() {
           <div style={styles.previewBox}>
             <h3>Preview for {previewQuery.data.tenant.name}</h3>
             <p style={styles.muted}>New storage locations to create: {previewQuery.data.storage_locations_to_create.length}. Existing matching locations skipped: {previewQuery.data.skipped_existing_storage_locations}.</p>
+            <div style={styles.meta}>Evidence source: /platform/provisioning/tenants/{selectedTenantId}/preview/{selectedPreset}</div>
+            <div><SourceLink href="/platform/storage-locations">Review storage locations</SourceLink> <SourceLink href="/platform/audit">Provisioning audit evidence</SourceLink></div>
             <ul>
               {previewQuery.data.storage_locations_to_create.map((location) => (
                 <li key={location.name}>{location.name} {location.temperature_zone ? `(${location.temperature_zone})` : ''}</li>
@@ -260,7 +320,10 @@ export default function PlatformProvisioningPage() {
           <label><input type="checkbox" checked={updateEntitlements} onChange={(event) => setUpdateEntitlements(event.target.checked)} /> Update tenant feature flags and limits</label>
         </div>
         {!selectedTenantId ? <div style={styles.warning}>Select a tenant before applying a preset.</div> : null}
-        <button type="button" style={applyPresetFormValid && !applyPreset.isPending ? styles.button : styles.buttonDisabled} disabled={!applyPresetFormValid || applyPreset.isPending} onClick={() => applyPreset.mutate()}>
+        <button type="button" style={applyPresetFormValid && !applyPreset.isPending ? styles.button : styles.buttonDisabled} disabled={!applyPresetFormValid || applyPreset.isPending} onClick={() => {
+          const ok = window.confirm('Apply this provisioning preset to the selected tenant? This can create starter storage locations and update feature flags/limits depending on the selected options.');
+          if (ok) applyPreset.mutate();
+        }}>
           Apply preset
         </button>
         {!canUpdate ? <div style={styles.muted}>You need tenant update permission to apply provisioning to an existing tenant.</div> : null}
@@ -273,6 +336,7 @@ export default function PlatformProvisioningPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: 24 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
   title: { margin: 0, fontSize: 32 },
   subtitle: { color: '#6b7280', marginTop: 8 },
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'grid', gap: 16 },
@@ -287,11 +351,15 @@ const styles: Record<string, CSSProperties> = {
   buttonDisabled: { width: 'fit-content', padding: '10px 14px', border: 0, borderRadius: 10, background: '#9ca3af', color: '#fff', cursor: 'not-allowed' },
   buttonSecondary: { width: 'fit-content', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', cursor: 'pointer' },
   muted: { color: '#6b7280' },
+  link: { color: '#2563eb', fontWeight: 700, textDecoration: 'none' },
   meta: { fontSize: 13, color: '#374151' },
   pre: { background: '#f3f4f6', borderRadius: 10, padding: 12, overflow: 'auto' },
   previewBox: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, display: 'grid', gap: 8 },
   options: { display: 'grid', gap: 8 },
   error: { color: '#b91c1c', fontWeight: 700 },
   warning: { border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', borderRadius: 10, padding: '10px 12px', fontWeight: 700 },
-  success: { color: '#166534', fontWeight: 700 }
+  success: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 10, padding: '10px 12px', fontWeight: 700 },
+  errorPanel: { border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14, display: 'grid', gap: 8 },
+  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  supportingLinks: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }
 };

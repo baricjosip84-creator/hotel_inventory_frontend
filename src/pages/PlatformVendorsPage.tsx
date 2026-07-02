@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
@@ -94,20 +95,28 @@ function toForm(vendor: Vendor): VendorForm {
   };
 }
 
+function clean(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function payloadFromForm(form: VendorForm) {
   return {
-    ...form,
-    primary_contact_name: form.primary_contact_name || null,
-    primary_contact_email: form.primary_contact_email || null,
-    primary_contact_phone: form.primary_contact_phone || null,
-    website_url: form.website_url || null,
-    account_reference: form.account_reference || null,
-    sla_reference: form.sla_reference || null,
-    contract_start_date: form.contract_start_date || null,
-    contract_renewal_date: form.contract_renewal_date || null,
-    owner_platform_user_id: form.owner_platform_user_id || null,
-    dependency_notes: form.dependency_notes || null,
-    internal_notes: form.internal_notes || null
+    name: form.name.trim(),
+    category: form.category,
+    status: form.status,
+    risk_level: form.risk_level,
+    primary_contact_name: clean(form.primary_contact_name),
+    primary_contact_email: clean(form.primary_contact_email),
+    primary_contact_phone: clean(form.primary_contact_phone),
+    website_url: clean(form.website_url),
+    account_reference: clean(form.account_reference),
+    sla_reference: clean(form.sla_reference),
+    contract_start_date: clean(form.contract_start_date),
+    contract_renewal_date: clean(form.contract_renewal_date),
+    owner_platform_user_id: clean(form.owner_platform_user_id),
+    dependency_notes: clean(form.dependency_notes),
+    internal_notes: clean(form.internal_notes)
   };
 }
 
@@ -118,6 +127,7 @@ export default function PlatformVendorsPage() {
   const [filters, setFilters] = useState({ category: '', status: '', risk_level: '', search: '', renewal_due: false, include_archived: false });
   const [form, setForm] = useState<VendorForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -141,23 +151,33 @@ export default function PlatformVendorsPage() {
       return platformApiRequest('/platform/vendors', { method: 'POST', body });
     },
     onSuccess: async () => {
+      const action = editingId ? 'Vendor changes saved.' : 'Vendor created.';
       setForm(emptyForm);
       setEditingId(null);
+      setMessage(action);
       await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] });
     }
   });
 
   const archive = useMutation({
-    mutationFn: (vendorId: string) => platformApiRequest(`/platform/vendors/${vendorId}/archive`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] })
+    mutationFn: (vendor: Vendor) => platformApiRequest(`/platform/vendors/${vendor.id}/archive`, { method: 'POST' }),
+    onSuccess: async (_data, vendor) => {
+      setMessage(`Vendor archived: ${vendor.name}`);
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] });
+    }
   });
 
   const categories = vendors.data?.categories || ['payment', 'infrastructure', 'messaging', 'integrations', 'support', 'security', 'legal', 'other'];
   const statuses = vendors.data?.statuses || ['active', 'watch', 'renewal_due', 'inactive', 'archived'];
   const riskLevels = vendors.data?.risk_levels || ['low', 'medium', 'high', 'critical'];
   const summary = vendors.data?.summary;
-  const isVendorSaveDisabled = !form.name.trim() || save.isPending;
-  const vendorSaveHelp = !form.name.trim() ? 'Enter a vendor name before creating or saving a vendor.' : '';
+  const hasInvalidContractWindow = Boolean(form.contract_start_date && form.contract_renewal_date && form.contract_renewal_date < form.contract_start_date);
+  const isVendorSaveDisabled = !form.name.trim() || hasInvalidContractWindow || save.isPending;
+  const vendorSaveHelp = !form.name.trim()
+    ? 'Enter a vendor name before creating or saving a vendor.'
+    : hasInvalidContractWindow
+      ? 'Renewal date must be on or after contract start date.'
+      : '';
 
   return (
     <div style={styles.page}>
@@ -166,7 +186,26 @@ export default function PlatformVendorsPage() {
           <h1 style={styles.title}>Platform vendors</h1>
           <p style={styles.subtitle}>Track HLA vendors and partners that affect platform operations: infrastructure, payments, messaging, integrations, support, legal, and security.</p>
         </div>
+        <button type="button" style={styles.secondaryButton} onClick={() => vendors.refetch()} disabled={vendors.isFetching}>
+          {vendors.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
       </header>
+
+      <section style={styles.metaCard}>
+        <span>Source: GET /platform/vendors</span>
+        <span>Limit: 300</span>
+        <span>Visible vendors: {vendors.data?.vendors.length ?? 0}</span>
+        <span>Filters: {queryString || 'limit=300'}</span>
+      </section>
+
+      <section style={styles.linkCard}>
+        <strong>Supporting Platform pages:</strong>
+        <Link to="/platform/service-dependencies">Service Dependencies</Link>
+        <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
+        <Link to="/platform/legal-compliance-reporting">Legal Compliance Reporting</Link>
+      </section>
+
+      {message ? <div style={styles.success}>{message}</div> : null}
 
       <section style={styles.metrics}>
         <div style={styles.metric}><strong>{summary?.total ?? 0}</strong><span>Total shown</span></div>
@@ -238,11 +277,11 @@ export default function PlatformVendorsPage() {
               type="button"
               style={isVendorSaveDisabled ? styles.disabledButton : styles.primaryButton}
               disabled={isVendorSaveDisabled}
-              onClick={() => save.mutate()}
+              onClick={() => { setMessage(''); save.mutate(); }}
             >
               {save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create vendor'}
             </button>
-            {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel edit</button> : null}
+            {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(emptyForm); setMessage('Vendor edit cancelled.'); }}>Cancel edit</button> : null}
             {vendorSaveHelp ? <span style={styles.error}>{vendorSaveHelp}</span> : null}
             {save.error ? <span style={styles.error}>{(save.error as Error).message}</span> : null}
           </div>
@@ -252,7 +291,7 @@ export default function PlatformVendorsPage() {
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Vendors</h2>
         {vendors.isLoading ? <p>Loading vendors…</p> : null}
-        {vendors.error ? <p style={styles.error}>{(vendors.error as Error).message}</p> : null}
+        {vendors.error ? <p style={styles.error}>{(vendors.error as Error).message} <button type="button" style={styles.secondaryButton} onClick={() => vendors.refetch()}>Retry</button></p> : null}
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Risk</th><th>Contact</th><th>Owner</th><th>Renewal</th><th>Notes</th><th>Actions</th></tr></thead>
@@ -266,11 +305,11 @@ export default function PlatformVendorsPage() {
                   <td>{vendor.primary_contact_name || '—'}<br /><span style={styles.muted}>{vendor.primary_contact_email || vendor.primary_contact_phone || ''}</span></td>
                   <td>{vendor.owner_email || '—'}</td>
                   <td>{dateOnly(vendor.contract_renewal_date) || '—'}<br /><span style={styles.muted}>{vendor.sla_reference || ''}</span></td>
-                  <td><span style={styles.muted}>{vendor.dependency_notes || vendor.internal_notes || '—'}</span></td>
+                  <td><span style={styles.muted}>{vendor.dependency_notes || vendor.internal_notes || '—'}</span><br /><span style={styles.muted}>Updated {dateOnly(vendor.updated_at) || '—'}</span></td>
                   <td>
                     {canWrite ? <div style={styles.rowActions}>
-                      <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); }}>Edit</button>
-                      {!vendor.archived_at ? <button type="button" style={styles.dangerButton} disabled={archive.isPending} onClick={() => archive.mutate(vendor.id)}>Archive</button> : null}
+                      <button type="button" style={styles.secondaryButton} onClick={() => { setMessage(''); setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); }}>Edit</button>
+                      {!vendor.archived_at ? <button type="button" style={styles.dangerButton} disabled={archive.isPending} onClick={() => { if (window.confirm(`Archive vendor ${vendor.name}?`)) archive.mutate(vendor); }}>Archive</button> : null}
                     </div> : '—'}
                   </td>
                 </tr>
@@ -292,6 +331,8 @@ const styles: Record<string, CSSProperties> = {
   metrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
   metric: { background: '#fff', border: '1px solid #e6e8ef', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 4 },
   card: { background: '#fff', border: '1px solid #e6e8ef', borderRadius: 16, padding: 18, boxShadow: '0 8px 18px rgba(15,23,42,0.04)' },
+  metaCard: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid #e6e8ef', borderRadius: 14, padding: '10px 12px', color: '#475569', fontSize: 12, fontWeight: 700 },
+  linkCard: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#fff', border: '1px solid #e6e8ef', borderRadius: 14, padding: '10px 12px', alignItems: 'center' },
   sectionTitle: { margin: '0 0 14px', fontSize: 18 },
   grid6: { display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12 },
   grid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 12 },
@@ -308,6 +349,7 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #d7dbe7', borderRadius: 10, padding: '8px 10px', background: '#fff', color: '#111827', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '8px 10px', background: '#fff1f2', color: '#991b1b', fontWeight: 700, cursor: 'pointer' },
   error: { color: '#b91c1c', fontWeight: 700 },
+  success: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: '10px 12px', fontWeight: 800 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   muted: { color: '#6b7280', fontSize: 12 },

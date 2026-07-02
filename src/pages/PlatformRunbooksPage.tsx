@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
@@ -56,6 +57,7 @@ export default function PlatformRunbooksPage() {
   const [selectedExecutionId, setSelectedExecutionId] = useState('');
   const [draft, setDraft] = useState({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] });
   const [executionDraft, setExecutionDraft] = useState({ runbook_id: '', tenant_id: '', reason: '', notes: '' });
+  const [message, setMessage] = useState('');
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -76,24 +78,48 @@ export default function PlatformRunbooksPage() {
     void queryClient.invalidateQueries({ queryKey: ['platform', 'runbooks'] });
   };
 
+  const runbookPayload = () => ({
+    ...draft,
+    title: draft.title.trim(),
+    description: draft.description.trim() || null,
+    owner_role: draft.owner_role.trim() || null,
+    steps: draft.steps.map((step) => ({
+      ...step,
+      title: step.title.trim(),
+      instructions: step.instructions.trim() || null,
+      expected_result: step.expected_result.trim() || null
+    }))
+  });
+
+  const executionPayload = () => ({
+    ...executionDraft,
+    runbook_id: executionDraft.runbook_id,
+    tenant_id: executionDraft.tenant_id || null,
+    reason: executionDraft.reason.trim(),
+    notes: executionDraft.notes.trim() || null
+  });
+
+  const canCreateRunbook = draft.title.trim().length > 0 && draft.steps.every((step) => step.title.trim().length > 0);
+  const canStartExecution = Boolean(executionDraft.runbook_id) && executionDraft.reason.trim().length > 0;
+
   const createRunbook = useMutation({
-    mutationFn: () => platformApiRequest('/platform/runbooks', { method: 'POST', body: JSON.stringify(draft) }),
-    onSuccess: () => { setDraft({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] }); refreshAll(); }
+    mutationFn: () => platformApiRequest('/platform/runbooks', { method: 'POST', body: JSON.stringify(runbookPayload()) }),
+    onSuccess: () => { setDraft({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] }); setMessage('Runbook created successfully.'); refreshAll(); }
   });
 
   const startExecution = useMutation({
-    mutationFn: () => platformApiRequest('/platform/runbooks/executions', { method: 'POST', body: JSON.stringify({ ...executionDraft, tenant_id: executionDraft.tenant_id || null }) }),
-    onSuccess: () => { setExecutionDraft({ runbook_id: '', tenant_id: '', reason: '', notes: '' }); refreshAll(); }
+    mutationFn: () => platformApiRequest('/platform/runbooks/executions', { method: 'POST', body: JSON.stringify(executionPayload()) }),
+    onSuccess: () => { setExecutionDraft({ runbook_id: '', tenant_id: '', reason: '', notes: '' }); setMessage('Runbook execution started successfully.'); refreshAll(); }
   });
 
   const updateStep = useMutation({
     mutationFn: ({ executionId, stepId, status }: { executionId: string; stepId: string; status: 'done' | 'skipped' | 'pending' }) => platformApiRequest(`/platform/runbooks/executions/${executionId}/steps/${stepId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-    onSuccess: () => refreshAll()
+    onSuccess: () => { setMessage('Execution step updated successfully.'); refreshAll(); }
   });
 
   const closeExecution = useMutation({
     mutationFn: ({ executionId, action }: { executionId: string; action: 'complete' | 'cancel' }) => platformApiRequest(`/platform/runbooks/executions/${executionId}/${action}`, { method: 'POST' }),
-    onSuccess: () => refreshAll()
+    onSuccess: (_data, variables) => { setMessage(variables.action === 'complete' ? 'Runbook execution completed successfully.' : 'Runbook execution cancelled successfully.'); refreshAll(); }
   });
 
   function updateDraftStep(index: number, patch: Partial<StepDraft>) {
@@ -101,14 +127,48 @@ export default function PlatformRunbooksPage() {
   }
 
   function addStep() { setDraft((current) => ({ ...current, steps: [...current.steps, { ...defaultStep }] })); }
-  function removeStep(index: number) { setDraft((current) => ({ ...current, steps: current.steps.filter((_, stepIndex) => stepIndex !== index) })); }
+  function removeStep(index: number) {
+    if (!window.confirm('Remove this runbook step?')) return;
+    setDraft((current) => ({ ...current, steps: current.steps.filter((_, stepIndex) => stepIndex !== index) }));
+  }
+
+  function closeSelectedExecution(action: 'complete' | 'cancel') {
+    if (!selectedExecution.data) return;
+    const label = action === 'complete' ? 'complete' : 'cancel';
+    if (!window.confirm(`Are you sure you want to ${label} this runbook execution?`)) return;
+    closeExecution.mutate({ executionId: selectedExecution.data.id, action });
+  }
 
   return (
     <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Platform runbooks</h1>
-        <p style={styles.muted}>Operational checklists for real HLA work: incidents, billing issues, security events, maintenance, support, offboarding, and tenant recovery. Executions create an auditable record of who followed which steps.</p>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Platform runbooks</h1>
+          <p style={styles.muted}>Operational checklists for real HLA work: incidents, billing issues, security events, maintenance, support, offboarding, and tenant recovery. Executions create an auditable record of who followed which steps.</p>
+          <p style={styles.metaText}>Source: platform runbooks API · Snapshot: live query · Filters: category {category || 'all'}, severity {severity || 'all'}</p>
+        </div>
+        <button type="button" style={styles.button} onClick={refreshAll}>Refresh</button>
       </header>
+
+      {message ? <div style={styles.successMessage}>{message}</div> : null}
+
+      <section style={styles.linkPanel}>
+        <strong>Supporting platform pages</strong>
+        <div style={styles.linkRow}>
+          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
+          <Link style={styles.quickLink} to="/platform/maintenance">Maintenance</Link>
+          <Link style={styles.quickLink} to="/platform/tenant-tasks">Tenant tasks</Link>
+          <Link style={styles.quickLink} to="/platform/audit">Platform audit</Link>
+        </div>
+      </section>
+
+      {(summary.isError || runbooks.isError || executions.isError || tenants.isError) ? (
+        <section style={styles.errorPanel}>
+          <strong>Runbook data could not be loaded.</strong>
+          <span style={styles.muted}>Retry reloads summary, filters, tenant options, and recent executions.</span>
+          <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
+        </section>
+      ) : null}
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Summary</h2>
@@ -128,19 +188,19 @@ export default function PlatformRunbooksPage() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Create runbook</h2>
           <div style={styles.formGrid}>
-            <input style={styles.input} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Title" />
-            <select style={styles.input} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-            <select style={styles.input} value={draft.severity} onChange={(event) => setDraft((current) => ({ ...current, severity: event.target.value }))}>{severities.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-            <input style={styles.input} value={draft.owner_role} onChange={(event) => setDraft((current) => ({ ...current, owner_role: event.target.value }))} placeholder="Owner role, optional" />
-            <textarea style={{ ...styles.input, gridColumn: '1 / -1', minHeight: 70 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Description" />
+            <label style={styles.fieldLabel}>Title<input style={styles.input} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Title" /></label>
+            <label style={styles.fieldLabel}>Category<select style={styles.input} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Severity<select style={styles.input} value={draft.severity} onChange={(event) => setDraft((current) => ({ ...current, severity: event.target.value }))}>{severities.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Owner role<input style={styles.input} value={draft.owner_role} onChange={(event) => setDraft((current) => ({ ...current, owner_role: event.target.value }))} placeholder="Owner role, optional" /></label>
+            <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>Description<textarea style={{ ...styles.input, minHeight: 70 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Description" /></label>
           </div>
           <h3 style={styles.smallHeading}>Steps</h3>
           <div style={styles.stepsList}>
             {draft.steps.map((step, index) => (
               <div key={index} style={styles.stepEditor}>
-                <input style={styles.input} value={step.title} onChange={(event) => updateDraftStep(index, { title: event.target.value })} placeholder={`Step ${index + 1} title`} />
-                <textarea style={styles.input} value={step.instructions} onChange={(event) => updateDraftStep(index, { instructions: event.target.value })} placeholder="Instructions" />
-                <input style={styles.input} value={step.expected_result} onChange={(event) => updateDraftStep(index, { expected_result: event.target.value })} placeholder="Expected result" />
+                <label style={styles.fieldLabel}>Step title<input style={styles.input} value={step.title} onChange={(event) => updateDraftStep(index, { title: event.target.value })} placeholder={`Step ${index + 1} title`} /></label>
+                <label style={styles.fieldLabel}>Instructions<textarea style={styles.input} value={step.instructions} onChange={(event) => updateDraftStep(index, { instructions: event.target.value })} placeholder="Instructions" /></label>
+                <label style={styles.fieldLabel}>Expected result<input style={styles.input} value={step.expected_result} onChange={(event) => updateDraftStep(index, { expected_result: event.target.value })} placeholder="Expected result" /></label>
                 <label style={styles.checkboxLabel}><input type="checkbox" checked={step.is_required} onChange={(event) => updateDraftStep(index, { is_required: event.target.checked })} /> Required</label>
                 {draft.steps.length > 1 ? <button type="button" style={styles.dangerButton} onClick={() => removeStep(index)}>Remove</button> : null}
               </div>
@@ -148,7 +208,7 @@ export default function PlatformRunbooksPage() {
           </div>
           <div style={styles.actionRow}>
             <button type="button" style={styles.secondaryButton} onClick={addStep}>Add step</button>
-            <button type="button" style={styles.button} disabled={!draft.title || draft.steps.some((step) => !step.title) || createRunbook.isPending} onClick={() => createRunbook.mutate()}>{createRunbook.isPending ? 'Creating...' : 'Create runbook'}</button>
+            <button type="button" style={styles.button} disabled={!canCreateRunbook || createRunbook.isPending} onClick={() => createRunbook.mutate()}>{createRunbook.isPending ? 'Creating...' : 'Create runbook'}</button>
           </div>
         </section>
       ) : null}
@@ -157,11 +217,11 @@ export default function PlatformRunbooksPage() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Start runbook execution</h2>
           <div style={styles.formGrid}>
-            <select style={styles.input} value={executionDraft.runbook_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, runbook_id: event.target.value }))}><option value="">Select runbook</option>{(runbooks.data?.runbooks || []).filter((runbook) => runbook.is_active).map((runbook) => <option key={runbook.id} value={runbook.id}>{runbook.title}</option>)}</select>
-            <select style={styles.input} value={executionDraft.tenant_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">No tenant / platform-wide</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select>
-            <input style={styles.input} value={executionDraft.reason} onChange={(event) => setExecutionDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason / ticket / incident context" />
-            <input style={styles.input} value={executionDraft.notes} onChange={(event) => setExecutionDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes, optional" />
-            <button type="button" style={styles.button} disabled={!executionDraft.runbook_id || !executionDraft.reason || startExecution.isPending} onClick={() => startExecution.mutate()}>{startExecution.isPending ? 'Starting...' : 'Start execution'}</button>
+            <label style={styles.fieldLabel}>Runbook<select style={styles.input} value={executionDraft.runbook_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, runbook_id: event.target.value }))}><option value="">Select runbook</option>{(runbooks.data?.runbooks || []).filter((runbook) => runbook.is_active).map((runbook) => <option key={runbook.id} value={runbook.id}>{runbook.title}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Tenant<select style={styles.input} value={executionDraft.tenant_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">No tenant / platform-wide</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
+            <label style={styles.fieldLabel}>Reason / ticket / incident context<input style={styles.input} value={executionDraft.reason} onChange={(event) => setExecutionDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason / ticket / incident context" /></label>
+            <label style={styles.fieldLabel}>Notes<input style={styles.input} value={executionDraft.notes} onChange={(event) => setExecutionDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes, optional" /></label>
+            <button type="button" style={styles.button} disabled={!canStartExecution || startExecution.isPending} onClick={() => startExecution.mutate()}>{startExecution.isPending ? 'Starting...' : 'Start execution'}</button>
           </div>
         </section>
       ) : null}
@@ -206,7 +266,7 @@ export default function PlatformRunbooksPage() {
                   <td>{execution.tenant_name || 'Platform-wide'}</td>
                   <td>{execution.done_steps ?? 0}/{execution.total_steps ?? 0}</td>
                   <td>{new Date(execution.started_at).toLocaleString()}</td>
-                  <td><button type="button" style={styles.smallButton} onClick={() => setSelectedExecutionId(execution.id)}>Open</button></td>
+                  <td><div style={styles.actionRow}><button type="button" style={styles.smallButton} onClick={() => setSelectedExecutionId(execution.id)}>Open</button><Link style={styles.tableLink} to="/platform/audit">Audit evidence</Link></div></td>
                 </tr>
               ))}
             </tbody>
@@ -235,8 +295,8 @@ export default function PlatformRunbooksPage() {
           </div>
           {canExecute && selectedExecution.data.status === 'in_progress' ? (
             <div style={styles.actionRow}>
-              <button type="button" style={styles.button} onClick={() => closeExecution.mutate({ executionId: selectedExecution.data!.id, action: 'complete' })}>Complete execution</button>
-              <button type="button" style={styles.dangerButton} onClick={() => closeExecution.mutate({ executionId: selectedExecution.data!.id, action: 'cancel' })}>Cancel execution</button>
+              <button type="button" style={styles.button} onClick={() => closeSelectedExecution('complete')}>Complete execution</button>
+              <button type="button" style={styles.dangerButton} onClick={() => closeSelectedExecution('cancel')}>Cancel execution</button>
             </div>
           ) : null}
         </section>
@@ -247,8 +307,16 @@ export default function PlatformRunbooksPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 24 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
   title: { margin: 0, fontSize: 30 },
   muted: { color: '#6b7280', fontSize: 13 },
+  metaText: { color: '#4b5563', fontSize: 12, marginTop: 8 },
+  successMessage: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: 12 },
+  errorPanel: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
+  linkPanel: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 },
+  linkRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  quickLink: { border: '1px solid #d1d5db', borderRadius: 999, padding: '6px 10px', color: '#111827', textDecoration: 'none', background: '#fff', fontSize: 13 },
+  tableLink: { color: '#1d4ed8', fontSize: 12, textDecoration: 'none' },
   panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)' },
   sectionTitle: { marginTop: 0, fontSize: 18 },
   smallHeading: { marginBottom: 8, fontSize: 15 },
@@ -256,7 +324,8 @@ const styles: Record<string, CSSProperties> = {
   summaryCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 4 },
   filterGrid: { display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) minmax(160px, 1fr) auto', gap: 12, alignItems: 'center' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, alignItems: 'start' },
-  input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff' },
+  input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' },
+  fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, color: '#374151', fontSize: 13, fontWeight: 600 },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#374151' },
   button: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#111827', color: '#fff', cursor: 'pointer' },
   secondaryButton: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#111827', cursor: 'pointer' },

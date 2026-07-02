@@ -22,6 +22,10 @@ type Announcement = {
   cancelled_by_email?: string | null;
   cancellation_reason?: string | null;
   is_current?: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  published_at?: string | null;
+  cancelled_at?: string | null;
 };
 
 function readableError(error: unknown): string {
@@ -38,6 +42,7 @@ export default function PlatformAnnouncementsPage() {
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_WRITE);
   const [filters, setFilters] = useState({ status: '', audience: '', include_expired: 'false' });
   const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
+  const [statusMessage, setStatusMessage] = useState('');
   const [form, setForm] = useState({
     title: '',
     message: '',
@@ -94,7 +99,8 @@ export default function PlatformAnnouncementsPage() {
         dismissible: form.dismissible
       })
     }),
-    onSuccess: async () => {
+    onSuccess: async (createdAnnouncement) => {
+      setStatusMessage(`Announcement created: ${createdAnnouncement.title}`);
       setForm({ ...form, title: '', message: '' });
       await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
     }
@@ -102,23 +108,56 @@ export default function PlatformAnnouncementsPage() {
 
   const publish = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/announcements/${id}/publish`, { method: 'POST' }),
-    onSuccess: async () => qc.invalidateQueries({ queryKey: ['platform', 'announcements'] })
+    onSuccess: async () => {
+      setStatusMessage('Announcement published.');
+      await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
+    }
   });
 
   const cancel = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/announcements/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => qc.invalidateQueries({ queryKey: ['platform', 'announcements'] })
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/announcements/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
+    onSuccess: async (_result, variables) => {
+      setStatusMessage('Announcement cancelled.');
+      setCancelReasonById((current) => ({ ...current, [variables.id]: '' }));
+      await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
+    }
   });
 
   const canCreateAnnouncement = canWrite && !createBlockedReason && !create.isPending;
   const rows = announcements.data || [];
   const currentCount = useMemo(() => rows.filter((row) => row.is_current).length, [rows]);
+  const refreshAll = async () => {
+    setStatusMessage('');
+    await Promise.all([announcements.refetch(), tenants.refetch()]);
+  };
+  const filteredStatusLabel = filters.status || 'all statuses';
+  const filteredAudienceLabel = filters.audience || 'all audiences';
+  const visibilityLabel = filters.include_expired === 'true' ? 'including expired' : 'current/future only';
 
   return <div style={styles.page}>
-    <header>
-      <h1 style={styles.title}>Platform announcements</h1>
-      <p style={styles.muted}>Publish non-maintenance messages to tenants or platform staff. Use maintenance windows only when there is an actual service window.</p>
+    <header style={styles.headerRow}>
+      <div>
+        <h1 style={styles.title}>Platform announcements</h1>
+        <p style={styles.muted}>Publish non-maintenance messages to tenants or platform staff. Use maintenance windows only when there is an actual service window.</p>
+      </div>
+      <button style={styles.secondaryButton} onClick={() => void refreshAll()} disabled={announcements.isFetching || tenants.isFetching}>Refresh</button>
     </header>
+
+    <section style={styles.metadataPanel}>
+      <span><b>Snapshot:</b> {announcements.isFetching ? 'Refreshing' : 'Loaded'} · {new Date().toLocaleString()}</span>
+      <span><b>Source:</b> /platform/announcements, /platform/tenants, /announcement-context/current</span>
+      <span><b>Filters:</b> {filteredStatusLabel} · {filteredAudienceLabel} · {visibilityLabel}</span>
+      <span><b>Rows:</b> {rows.length} listed · {currentCount} current tenant-visible candidates</span>
+    </section>
+
+    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
+      <a style={styles.supportLink} href="/platform/maintenance">Maintenance</a>
+      <a style={styles.supportLink} href="/platform/incidents">Incidents</a>
+      <a style={styles.supportLink} href="/platform/tenants">Tenants</a>
+      <a style={styles.supportLink} href="/platform/audit">Audit</a>
+    </nav>
+
+    {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
 
     <section style={styles.summaryGrid}>
       <div style={styles.summaryCard}><b>Current</b><span>{currentCount}</span></div>
@@ -169,7 +208,7 @@ export default function PlatformAnnouncementsPage() {
       </label>
       {createBlockedReason ? <div style={styles.warning}>{createBlockedReason}</div> : null}
       <button style={canCreateAnnouncement ? styles.button : styles.disabledButton} onClick={() => create.mutate()} disabled={!canCreateAnnouncement}>Create announcement</button>
-      {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
+      {create.error ? <div style={styles.error}>Create failed: {readableError(create.error)}</div> : null}
     </section> : null}
 
     <section style={styles.panel}>
@@ -193,7 +232,10 @@ export default function PlatformAnnouncementsPage() {
       </div>
     </section>
 
-    {announcements.error ? <div style={styles.error}>{readableError(announcements.error)}</div> : null}
+    {announcements.error ? <div style={styles.error}>Announcements load failed: {readableError(announcements.error)} <button style={styles.inlineButton} onClick={() => void announcements.refetch()}>Retry</button></div> : null}
+    {tenants.error ? <div style={styles.error}>Tenant list load failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => void tenants.refetch()}>Retry</button></div> : null}
+    {publish.error ? <div style={styles.error}>Publish failed: {readableError(publish.error)}</div> : null}
+    {cancel.error ? <div style={styles.error}>Cancel failed: {readableError(cancel.error)}</div> : null}
 
     <section style={styles.list}>
       {rows.map((row) => <article key={row.id} style={styles.card}>
@@ -205,15 +247,21 @@ export default function PlatformAnnouncementsPage() {
           <div style={styles.badgeStack}><span style={styles.badge}>{row.status}</span><span style={styles.badge}>{row.severity}</span></div>
         </div>
         <p>{row.message}</p>
-        <p style={styles.muted}>Starts: {new Date(row.starts_at).toLocaleString()} · Ends: {row.ends_at ? new Date(row.ends_at).toLocaleString() : 'no end'} · Dismissible: {row.dismissible ? 'yes' : 'no'}</p>
-        <p style={styles.muted}>Created by: {row.created_by_email || '-'} · Published by: {row.published_by_email || '-'}</p>
-        {row.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {row.cancelled_by_email || '-'} · Reason: {row.cancellation_reason || '-'}</p> : null}
+        <p style={styles.muted}>Starts: {new Date(row.starts_at).toLocaleString()} · Ends: {row.ends_at ? new Date(row.ends_at).toLocaleString() : 'no end'} · Dismissible: {row.dismissible ? 'yes' : 'no'} · Current: {row.is_current ? 'yes' : 'no'}</p>
+        <p style={styles.muted}>Created by: {row.created_by_email || '-'} · Published by: {row.published_by_email || '-'}{row.published_at ? ` · Published at: ${new Date(row.published_at).toLocaleString()}` : ''}</p>
+        <p style={styles.muted}>Evidence: announcement {row.id} · Tenant context source: /announcement-context/current</p>
+        <div style={styles.evidenceLinks}>
+          <a style={styles.evidenceLink} href={`/platform/audit?target=${encodeURIComponent(row.id)}`}>Audit evidence</a>
+          {row.audience === 'tenant' && row.tenant_id ? <a style={styles.evidenceLink} href={`/platform/tenants?tenant=${encodeURIComponent(row.tenant_id)}`}>Tenant record</a> : null}
+          {row.audience !== 'platform' ? <a style={styles.evidenceLink} href="/platform/maintenance">Maintenance comparison</a> : null}
+        </div>
+        {row.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {row.cancelled_by_email || '-'}{row.cancelled_at ? ` · Cancelled at: ${new Date(row.cancelled_at).toLocaleString()}` : ''} · Reason: {row.cancellation_reason || '-'}</p> : null}
         {canWrite && row.status === 'draft' ? <button style={styles.button} onClick={() => publish.mutate(row.id)} disabled={publish.isPending}>Publish</button> : null}
         {canWrite && row.status !== 'cancelled' ? <div style={styles.cancelRow}>
           <label style={styles.field}>Cancellation reason
             <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[row.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [row.id]: e.target.value })} />
           </label>
-          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => cancel.mutate({ id: row.id, reason: (cancelReasonById[row.id] || '').trim() })} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
+          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => { const reason = (cancelReasonById[row.id] || '').trim(); if (globalThis.confirm(`Cancel announcement \"${row.title}\"?`)) cancel.mutate({ id: row.id, reason }); }} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
         </div> : null}
       </article>)}
       {!announcements.isLoading && rows.length === 0 ? <div style={styles.empty}>No announcements match the current filters.</div> : null}
@@ -222,6 +270,15 @@ export default function PlatformAnnouncementsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  headerRow: { display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' },
+  metadataPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px', display: 'grid', gap: '6px', color: '#475569' },
+  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+  supportLink: { color: '#1d4ed8', textDecoration: 'none', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '6px 10px', fontWeight: 600 },
+  evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' },
+  evidenceLink: { color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 },
+  secondaryButton: { padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#fff', color: '#111827', cursor: 'pointer', width: 'fit-content' },
+  inlineButton: { marginLeft: '8px', padding: '4px 8px', border: '1px solid #fecaca', borderRadius: '8px', background: '#fff', color: '#991b1b', cursor: 'pointer' },
+  success: { color: '#065f46', background: '#d1fae5', borderRadius: '10px', padding: '10px' },
   page: { display: 'grid', gap: '20px' },
   title: { margin: 0, fontSize: '28px' },
   muted: { color: '#6b7280', margin: '4px 0' },
@@ -231,13 +288,13 @@ const styles: Record<string, CSSProperties> = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' },
   filters: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
   field: { display: 'grid', gap: '6px', fontWeight: 600 },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px' },
-  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '90px', fontWeight: 400 },
+  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', font: 'inherit', fontWeight: 400 },
+  textarea: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '10px', minHeight: '90px', font: 'inherit', fontWeight: 400 },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px' },
   button: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#111827', color: '#fff', cursor: 'pointer', width: 'fit-content' },
   disabledButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d1d5db', color: '#fff', cursor: 'not-allowed', width: 'fit-content' },
-  dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer' },
-  disabledDangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d6c3c3', color: '#fff', cursor: 'not-allowed' },
+  dangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#991b1b', color: '#fff', cursor: 'pointer', height: 'fit-content', alignSelf: 'end' },
+  disabledDangerButton: { padding: '10px 14px', border: 0, borderRadius: '10px', background: '#d6c3c3', color: '#fff', cursor: 'not-allowed', height: 'fit-content', alignSelf: 'end' },
   warning: { color: '#92400e', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px' },
   error: { color: '#991b1b', background: '#fee2e2', borderRadius: '10px', padding: '10px' },
   list: { display: 'grid', gap: '12px' },

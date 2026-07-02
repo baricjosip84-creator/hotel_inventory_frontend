@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -92,19 +93,19 @@ function toForm(row: CapacityResource): CapacityForm {
 function payload(form: CapacityForm) {
   return {
     dependency_id: form.dependency_id || null,
-    name: form.name,
+    name: form.name.trim(),
     resource_type: form.resource_type,
     environment: form.environment,
     status: form.status,
-    unit: form.unit || 'units',
+    unit: form.unit.trim() || 'units',
     current_usage: Number(form.current_usage || 0),
     capacity_limit: Number(form.capacity_limit || 0),
     warning_threshold_percent: Number(form.warning_threshold_percent || 75),
     critical_threshold_percent: Number(form.critical_threshold_percent || 90),
     projected_exhaustion_at: form.projected_exhaustion_at ? new Date(form.projected_exhaustion_at).toISOString() : null,
     owner_platform_user_id: form.owner_platform_user_id || null,
-    scaling_plan: form.scaling_plan || null,
-    notes: form.notes || null
+    scaling_plan: form.scaling_plan.trim() || null,
+    notes: form.notes.trim() || null
   };
 }
 
@@ -115,7 +116,16 @@ export default function PlatformCapacityPlanningPage() {
   const [filters, setFilters] = useState({ status: '', resource_type: '', environment: '', search: '', attention_only: true, include_archived: false });
   const [form, setForm] = useState<CapacityForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const resourceNameEntered = form.name.trim().length > 0;
+  const currentUsageValid = form.current_usage !== '' && Number.isFinite(Number(form.current_usage)) && Number(form.current_usage) >= 0;
+  const capacityLimitValid = form.capacity_limit !== '' && Number.isFinite(Number(form.capacity_limit)) && Number(form.capacity_limit) >= 0;
+  const warningThreshold = Number(form.warning_threshold_percent);
+  const criticalThreshold = Number(form.critical_threshold_percent);
+  const warningThresholdValid = Number.isInteger(warningThreshold) && warningThreshold >= 1 && warningThreshold <= 100;
+  const criticalThresholdValid = Number.isInteger(criticalThreshold) && criticalThreshold >= 1 && criticalThreshold <= 100;
+  const thresholdWindowValid = warningThresholdValid && criticalThresholdValid && warningThreshold < criticalThreshold;
+  const canSaveResource = resourceNameEntered && currentUsageValid && capacityLimitValid && thresholdWindowValid;
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -144,12 +154,16 @@ export default function PlatformCapacityPlanningPage() {
       setForm(emptyForm);
       setEditingId(null);
       if (!wasEditing) setFilters((prev) => (prev.attention_only ? { ...prev, attention_only: false } : prev));
+      setStatusMessage(wasEditing ? 'Capacity resource updated.' : 'Capacity resource created.');
       await queryClient.invalidateQueries({ queryKey: ['platform', 'capacity-planning'] });
     }
   });
   const archive = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/capacity-planning/${id}/archive`, { method: 'POST', body: JSON.stringify({}) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform', 'capacity-planning'] })
+    onSuccess: async () => {
+      setStatusMessage('Capacity resource archived.');
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'capacity-planning'] });
+    }
   });
 
   const response = capacity.data;
@@ -158,6 +172,15 @@ export default function PlatformCapacityPlanningPage() {
   const statuses = response?.statuses || ['tracking', 'watch', 'scaling_needed', 'scaling_in_progress', 'resolved', 'archived'];
   const deps = dependencies.data?.dependencies || [];
   const summary = response?.summary;
+  const loadedAt = capacity.dataUpdatedAt ? new Date(capacity.dataUpdatedAt).toLocaleString() : null;
+  const activeFilterSummary = [
+    filters.status ? `status=${filters.status}` : null,
+    filters.resource_type ? `type=${filters.resource_type}` : null,
+    filters.environment ? `environment=${filters.environment}` : null,
+    filters.search.trim() ? `search=${filters.search.trim()}` : null,
+    filters.attention_only ? 'attention only' : null,
+    filters.include_archived ? 'include archived' : null
+  ].filter(Boolean).join(' · ') || 'none';
 
   return (
     <div style={styles.page}>
@@ -166,7 +189,35 @@ export default function PlatformCapacityPlanningPage() {
           <h1 style={styles.title}>Capacity planning</h1>
           <p style={styles.subtitle}>Track platform limits before they become tenant outages: database, storage, queues, integrations, support capacity, and other shared resources.</p>
         </div>
+        <button type="button" onClick={() => capacity.refetch()} disabled={capacity.isFetching} style={styles.secondaryButton}>
+          {capacity.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
       </header>
+
+      <section style={styles.metaStrip}>
+        <span>Source: /api/platform/capacity-planning</span>
+        <span>Snapshot: {loadedAt || 'Not loaded'}</span>
+        <span>Records: {response?.resources.length ?? 0} capacity resources</span>
+        <span>Filters: {activeFilterSummary}</span>
+      </section>
+
+      <section style={styles.linksCard}>
+        <strong>Supporting Platform pages:</strong>
+        <Link to="/platform/service-dependencies">Service Dependencies</Link>
+        <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
+        <Link to="/platform/risk-register">Risk Register</Link>
+        <Link to="/platform/vendors">Vendors</Link>
+      </section>
+
+      {statusMessage ? <section style={styles.successBox}>{statusMessage}</section> : null}
+      {capacity.error ? (
+        <section style={styles.panel}>
+          <p style={styles.errorText}>Unable to load capacity planning resources.</p>
+          <button type="button" style={styles.secondaryButton} onClick={() => capacity.refetch()} disabled={capacity.isFetching}>Retry</button>
+        </section>
+      ) : null}
+
+      {capacity.isLoading ? <section style={styles.panel}>Loading capacity planning resources…</section> : null}
 
       <section style={styles.metrics}>
         <div style={styles.metric}><strong>{summary?.total ?? 0}</strong><span>Total shown</span></div>
@@ -212,11 +263,14 @@ export default function PlatformCapacityPlanningPage() {
             <button
               type="button"
               onClick={() => save.mutate()}
-              disabled={save.isPending || !resourceNameEntered}
-              style={save.isPending || !resourceNameEntered ? styles.disabledButton : styles.primaryButton}
+              disabled={save.isPending || !canSaveResource}
+              style={save.isPending || !canSaveResource ? styles.disabledButton : styles.primaryButton}
             >{editingId ? 'Save resource' : 'Add resource'}</button>
             {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} style={styles.secondaryButton}>Cancel edit</button> : null}
             {!resourceNameEntered ? <span style={styles.errorText}>Enter a resource name before creating or saving a capacity resource.</span> : null}
+            {resourceNameEntered && !currentUsageValid ? <span style={styles.errorText}>Current usage must be zero or greater.</span> : null}
+            {resourceNameEntered && !capacityLimitValid ? <span style={styles.errorText}>Capacity limit must be zero or greater.</span> : null}
+            {resourceNameEntered && !thresholdWindowValid ? <span style={styles.errorText}>Warning and critical thresholds must be whole percentages from 1 to 100, with warning lower than critical.</span> : null}
           </div>
         </section>
       ) : null}
@@ -237,7 +291,7 @@ export default function PlatformCapacityPlanningPage() {
                     <td style={styles.td}>{resource.owner_email || '—'}</td>
                     <td style={styles.td}>{dateTime(resource.projected_exhaustion_at)}<br /><span style={styles.muted}>Updated {dateTime(resource.updated_at)}</span></td>
                     <td style={styles.td}><strong>Scaling:</strong> {resource.scaling_plan || '—'}<br /><strong>Notes:</strong> {resource.notes || '—'}</td>
-                    <td style={styles.td}>{canWrite ? <button type="button" onClick={() => { setEditingId(resource.id); setForm(toForm(resource)); scrollToFormSection('platform-capacity-planning-form'); }} style={styles.secondaryButton}>Edit</button> : null}{canWrite && resource.status !== 'archived' ? <button type="button" onClick={() => archive.mutate(resource.id)} style={styles.secondaryButton}>Archive</button> : null}</td>
+                    <td style={styles.td}>{canWrite ? <button type="button" onClick={() => { setEditingId(resource.id); setForm(toForm(resource)); scrollToFormSection('platform-capacity-planning-form'); }} style={styles.secondaryButton}>Edit</button> : null}{canWrite && resource.status !== 'archived' ? <button type="button" onClick={() => { if (window.confirm(`Archive capacity resource ${resource.name}?`)) archive.mutate(resource.id); }} style={styles.secondaryButton}>Archive</button> : null}</td>
                   </tr>
                 );
               })}
@@ -264,6 +318,9 @@ const styles: Record<string, CSSProperties> = {
   input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14 },
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, minHeight: 72 },
   inlineChecks: { display: 'flex', gap: 16, flexWrap: 'wrap' },
+  metaStrip: { border: '1px solid #dbeafe', borderRadius: 12, padding: 12, background: '#eff6ff', color: '#1e3a8a', display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, fontWeight: 700 },
+  linksCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#fff', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' },
+  successBox: { border: '1px solid #bbf7d0', borderRadius: 12, padding: 12, background: '#f0fdf4', color: '#166534', fontWeight: 700 },
   checkRow: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   primaryButton: { border: 0, borderRadius: 10, background: '#0f172a', color: '#fff', padding: '9px 13px', cursor: 'pointer' },

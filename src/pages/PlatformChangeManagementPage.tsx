@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
@@ -76,6 +77,36 @@ function changeToDraft(change: ChangeRequest): DraftState {
   };
 }
 
+function trimOptional(value?: string | null): string | null {
+  const trimmed = (value || '').trim();
+  return trimmed || null;
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return 'Not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function activeFilterLabel(filters: { status: string; category: string; risk_level: string; tenant_id: string; search: string }, tenants?: Tenant[]): string {
+  const tenantName = tenants?.find((tenant) => tenant.id === filters.tenant_id)?.name;
+  const parts = [
+    filters.status ? `status=${filters.status}` : null,
+    filters.category ? `category=${filters.category}` : null,
+    filters.risk_level ? `risk=${filters.risk_level}` : null,
+    filters.tenant_id ? `tenant=${tenantName || filters.tenant_id}` : null,
+    filters.search.trim() ? `search="${filters.search.trim()}"` : null
+  ].filter(Boolean);
+  return parts.length ? parts.join(' | ') : 'No filters active';
+}
+
+function linkToAudit(change: ChangeRequest): string {
+  const params = new URLSearchParams({ target_type: 'platform_change_requests', target_id: change.id });
+  return `/platform/audit?${params.toString()}`;
+}
+
+
 export default function PlatformChangeManagementPage() {
   const queryClient = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_WRITE);
@@ -113,11 +144,18 @@ export default function PlatformChangeManagementPage() {
     const next = { ...draft, ...override };
     return {
       ...next,
+      title: next.title.trim(),
+      description: trimOptional(next.description),
       tenant_id: next.tenant_id || null,
       planned_start_at: next.planned_start_at || null,
       planned_end_at: next.planned_end_at || null
     };
   };
+
+  const hasInvalidDateRange = Boolean(draft.planned_start_at && draft.planned_end_at && new Date(draft.planned_start_at).getTime() >= new Date(draft.planned_end_at).getTime());
+  const isFormValid = Boolean(draft.title.trim()) && !hasInvalidDateRange;
+  const loadError = tenants.error || summary.error || changes.error;
+  const snapshotText = `Source: /platform/change-management + /platform/change-management/summary | Limit: 200 | ${activeFilterLabel(filters, tenants.data)}`;
 
   const createChange = useMutation({
     mutationFn: ({ submitForApproval = false }: { submitForApproval?: boolean } = {}) => platformApiRequest<ChangeRequest>('/platform/change-management', {
@@ -146,7 +184,7 @@ export default function PlatformChangeManagementPage() {
   const runAction = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'cancel' | 'execute' }) => platformApiRequest<ChangeRequest>(`/platform/change-management/${id}/${action}`, {
       method: 'POST',
-      body: JSON.stringify(action === 'execute' ? { notes: actionReason } : { reason: actionReason })
+      body: JSON.stringify(action === 'execute' ? { notes: actionReason.trim() } : { reason: actionReason.trim() })
     }),
     onSuccess: (change) => {
       setStatusMessage(`Change request ${change.status}.`);
@@ -158,6 +196,10 @@ export default function PlatformChangeManagementPage() {
   const handleSubmitForm = (submitForApproval = false) => {
     if (!draft.title.trim()) {
       setFormError('Title is required before saving or submitting a change request.');
+      return;
+    }
+    if (hasInvalidDateRange) {
+      setFormError('Planned end must be after planned start.');
       return;
     }
     setFormError('');
@@ -183,7 +225,21 @@ export default function PlatformChangeManagementPage() {
       <header>
         <h1 style={styles.title}>Platform change management</h1>
         <p style={styles.muted}>Review risky HLA/platform work before it is executed. Use this for migrations, security changes, entitlement changes, billing changes, maintenance work, and operational fixes that need approval.</p>
+        <div style={styles.actions}>
+          <button type="button" style={styles.button} onClick={refreshAll}>Refresh</button>
+          <Link style={styles.linkButton} to="/platform/runbooks">Runbooks</Link>
+          <Link style={styles.linkButton} to="/platform/maintenance">Maintenance</Link>
+          <Link style={styles.linkButton} to="/platform/audit">Platform audit</Link>
+        </div>
       </header>
+
+      {loadError ? (
+        <section style={styles.errorPanel}>
+          <strong>Change management data could not be loaded.</strong>
+          <p style={styles.muted}>Retry reloads tenants, summary, and the filtered change request list.</p>
+          <button type="button" style={styles.button} onClick={refreshAll}>Retry</button>
+        </section>
+      ) : null}
 
       <section style={styles.panel}>
         <h2 style={styles.sectionTitle}>Summary</h2>
@@ -192,6 +248,12 @@ export default function PlatformChangeManagementPage() {
           <div style={styles.summaryCard}><strong>{summary.data?.open_high_risk ?? 0}</strong><span>Open high/critical risk</span></div>
           <div style={styles.summaryCard}><strong>{changes.data?.change_requests.length ?? 0}</strong><span>Visible changes</span></div>
         </div>
+      </section>
+
+      <section style={styles.metaPanel}>
+        <strong>Snapshot metadata</strong>
+        <span>{snapshotText}</span>
+        <span>Summary rows: {summary.data?.by_status?.length ?? 0} status groups / {summary.data?.open_by_risk?.length ?? 0} open risk groups</span>
       </section>
 
       <section style={styles.panel}>
@@ -221,11 +283,12 @@ export default function PlatformChangeManagementPage() {
             <label style={styles.fieldLabel}>Planned end<input style={styles.input} type="datetime-local" value={draft.planned_end_at} onChange={(event) => setDraft((current) => ({ ...current, planned_end_at: event.target.value }))} /></label>
             <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>Description / rollback / customer impact<textarea style={{ ...styles.input, minHeight: 80 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="What will change, why, rollback notes, customer impact" /></label>
           </div>
+          {hasInvalidDateRange ? <p style={styles.errorText}>Planned end must be after planned start.</p> : null}
           {formError ? <p style={styles.errorText}>{formError}</p> : null}
           {statusMessage ? <p style={styles.successText}>{statusMessage}</p> : null}
           <div style={styles.actions}>
-            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(false)}>Save draft</button>
-            <button type="button" style={styles.button} disabled={isMutating} onClick={() => handleSubmitForm(true)}>Submit for approval</button>
+            <button type="button" style={styles.button} disabled={isMutating || !isFormValid} onClick={() => handleSubmitForm(false)}>Save draft</button>
+            <button type="button" style={styles.button} disabled={isMutating || !isFormValid} onClick={() => handleSubmitForm(true)}>Submit for approval</button>
           </div>
         </section>
       ) : null}
@@ -251,8 +314,17 @@ export default function PlatformChangeManagementPage() {
                 <span><strong>Tenant:</strong> {change.tenant_name || 'Platform-wide'}</span>
                 <span><strong>Requested by:</strong> {change.requested_by_email || 'Unknown'}</span>
                 <span><strong>Created:</strong> {new Date(change.created_at).toLocaleString()}</span>
-                <span><strong>Planned:</strong> {change.planned_start_at ? new Date(change.planned_start_at).toLocaleString() : 'Not set'}</span>
+                <span><strong>Planned start:</strong> {formatDateTime(change.planned_start_at)}</span>
+                <span><strong>Planned end:</strong> {formatDateTime(change.planned_end_at)}</span>
                 <span><strong>Approved by:</strong> {change.approved_by_email || '-'}</span>
+                {change.maintenance_window_title ? <span><strong>Maintenance:</strong> {change.maintenance_window_title}</span> : null}
+                {change.runbook_title ? <span><strong>Runbook:</strong> {change.runbook_title}</span> : null}
+              </div>
+              <div style={styles.actions}>
+                <Link style={styles.inlineLink} to={linkToAudit(change)}>Audit evidence</Link>
+                {change.tenant_id ? <Link style={styles.inlineLink} to={`/platform/tenants?tenant_id=${change.tenant_id}`}>Tenant source</Link> : null}
+                {change.runbook_title ? <Link style={styles.inlineLink} to="/platform/runbooks">Runbook source</Link> : null}
+                {change.maintenance_window_title ? <Link style={styles.inlineLink} to="/platform/maintenance">Maintenance source</Link> : null}
               </div>
               {change.approval_reason ? <p style={styles.muted}><strong>Approval reason:</strong> {change.approval_reason}</p> : null}
               {change.rejection_reason ? <p style={styles.muted}><strong>Rejection reason:</strong> {change.rejection_reason}</p> : null}
@@ -261,10 +333,10 @@ export default function PlatformChangeManagementPage() {
               <div style={styles.actions}>
                 {canWrite && ['draft', 'pending_approval'].includes(change.status) ? <button type="button" style={styles.secondaryButton} onClick={() => startEdit(change)}>Edit</button> : null}
                 {canWrite && change.status === 'draft' ? <button type="button" style={styles.button} onClick={() => updateChange.mutate({ id: change.id, submitForApproval: true, draftOverride: changeToDraft(change) })}>Submit for approval</button> : null}
-                {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'approve' })}>Approve</button> : null}
-                {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.dangerButton} onClick={() => runAction.mutate({ id: change.id, action: 'reject' })}>Reject</button> : null}
-                {canExecute && change.status === 'approved' ? <button type="button" style={styles.button} onClick={() => runAction.mutate({ id: change.id, action: 'execute' })}>Mark executed</button> : null}
-                {canWrite && !['cancelled', 'executed', 'rejected'].includes(change.status) ? <button type="button" style={styles.secondaryButton} onClick={() => runAction.mutate({ id: change.id, action: 'cancel' })}>Cancel</button> : null}
+                {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.button} onClick={() => window.confirm('Approve this change request?') && runAction.mutate({ id: change.id, action: 'approve' })}>Approve</button> : null}
+                {canApprove && change.status === 'pending_approval' ? <button type="button" style={styles.dangerButton} onClick={() => window.confirm('Reject this change request?') && runAction.mutate({ id: change.id, action: 'reject' })}>Reject</button> : null}
+                {canExecute && change.status === 'approved' ? <button type="button" style={styles.button} onClick={() => window.confirm('Mark this approved change as executed?') && runAction.mutate({ id: change.id, action: 'execute' })}>Mark executed</button> : null}
+                {canWrite && !['cancelled', 'executed', 'rejected'].includes(change.status) ? <button type="button" style={styles.secondaryButton} onClick={() => window.confirm('Cancel this change request?') && runAction.mutate({ id: change.id, action: 'cancel' })}>Cancel</button> : null}
               </div>
             </article>
           ))}
@@ -290,6 +362,8 @@ const styles: Record<string, CSSProperties> = {
   title: { fontSize: 28, fontWeight: 800, margin: 0 },
   muted: { color: '#6b7280', margin: '4px 0' },
   panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  metaPanel: { display: 'grid', gap: 4, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, color: '#374151' },
+  errorPanel: { display: 'grid', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 14, padding: 14, color: '#7f1d1d' },
   sectionTitle: { marginTop: 0, fontSize: 18 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   summaryCard: { display: 'grid', gap: 4, padding: 16, borderRadius: 12, background: '#f9fafb' },
@@ -300,6 +374,8 @@ const styles: Record<string, CSSProperties> = {
   checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#374151' },
   button: { padding: '10px 12px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
   secondaryButton: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' },
+  linkButton: { padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: '#111827', cursor: 'pointer', textDecoration: 'none' },
+  inlineLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
   dangerButton: { padding: '10px 12px', borderRadius: 10, border: 0, background: '#991b1b', color: '#fff', cursor: 'pointer' },
   errorText: { color: '#991b1b', fontWeight: 700, margin: '0 0 12px' },
   successText: { color: '#166534', fontWeight: 700, margin: '0 0 12px' },
