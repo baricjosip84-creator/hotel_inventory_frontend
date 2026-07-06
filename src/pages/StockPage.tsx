@@ -631,6 +631,24 @@ export default function StockPage() {
     return currentQuantity + change;
   }, [currentQuantity, draft.action, draft.change, draft.quantity, selectedRow]);
 
+  const refreshStockWorkbench = async () => {
+    setOperationFeedback('');
+    setOperationError('');
+
+    await Promise.all([
+      stockQuery.refetch(),
+      selectedProductId ? movementsQuery.refetch() : Promise.resolve(),
+      selectedProductId ? usageLogsQuery.refetch() : Promise.resolve(),
+      selectedProductId ? usageSummaryQuery.refetch() : Promise.resolve()
+    ]);
+  };
+
+  const isRefreshingStockWorkbench =
+    stockQuery.isFetching ||
+    movementsQuery.isFetching ||
+    usageLogsQuery.isFetching ||
+    usageSummaryQuery.isFetching;
+
   const stockWorkflowSteps = [
     {
       label: '1. Select Stock Row',
@@ -782,9 +800,25 @@ export default function StockPage() {
               history without leaving the page.
             </p>
           </div>
-          <Link style={styles.secondaryLinkButton} to="/stock-movements">
-            Open Full Stock Ledger
-          </Link>
+          <div style={styles.panelActions}>
+            <button
+              type="button"
+              style={
+                isRefreshingStockWorkbench
+                  ? styles.secondaryButtonDisabled
+                  : styles.secondaryButton
+              }
+              disabled={isRefreshingStockWorkbench}
+              onClick={() => {
+                void refreshStockWorkbench();
+              }}
+            >
+              {isRefreshingStockWorkbench ? 'Refreshing...' : 'Refresh Stock'}
+            </button>
+            <Link style={styles.secondaryLinkButton} to="/stock-movements">
+              Open Full Stock Ledger
+            </Link>
+          </div>
         </div>
 
         <div style={styles.roleGrid}>
@@ -1669,6 +1703,42 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5,
     maxWidth: '880px',
     wordBreak: 'break-word'
+  },
+  panelActions: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  secondaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#ffffff',
+    color: '#111827',
+    border: '1px solid #d1d5db',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    fontSize: '14px',
+    fontWeight: 700,
+    minHeight: '46px',
+    cursor: 'pointer'
+  },
+  secondaryButtonDisabled: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f3f4f6',
+    color: '#6b7280',
+    border: '1px solid #d1d5db',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    fontSize: '14px',
+    fontWeight: 700,
+    minHeight: '46px',
+    cursor: 'not-allowed',
+    opacity: 0.85
   },
   secondaryLinkButton: {
     display: 'inline-flex',

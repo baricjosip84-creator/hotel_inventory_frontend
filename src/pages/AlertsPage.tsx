@@ -134,6 +134,10 @@ function severityStyle(severity: string): CSSProperties {
   return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
 }
 
+function isBlockingAlertType(type: string): boolean {
+  return type.trim().toUpperCase().endsWith('_BLOCKING');
+}
+
 function nextActionLink(alert: AlertRow): { to: string; label: string } {
   if (alert.product_id) {
     return {
@@ -583,7 +587,7 @@ export default function AlertsPage() {
                       </button>
                     ) : null}
 
-                    {canOverrideAlerts && !alert.resolved && alert.type.toUpperCase().includes('BLOCKING') ? (
+                    {canOverrideAlerts && !alert.resolved && isBlockingAlertType(alert.type) ? (
                       <div style={styles.overrideBox}>
                         <textarea
                           style={styles.textarea}

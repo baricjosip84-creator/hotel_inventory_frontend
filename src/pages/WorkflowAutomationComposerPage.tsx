@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 
-type WorkflowDomain = 'execution' | 'procurement' | 'integration' | 'control_tower' | 'financial' | 'multi_domain';
+type WorkflowDomain = 'execution' | 'reservation' | 'procurement' | 'fulfillment' | 'replenishment' | 'transfer' | 'supplier' | 'carrier' | 'external_partner' | 'multi_domain';
 type BlueprintUrgency = 'critical' | 'high' | 'medium' | 'low';
 
 type WorkflowBlueprint = {
@@ -87,10 +87,14 @@ type WorkflowComposerResponse = {
 const WORKFLOW_DOMAINS: Array<{ value: 'all' | WorkflowDomain; label: string }> = [
   { value: 'all', label: 'All domains' },
   { value: 'execution', label: 'Execution' },
+  { value: 'reservation', label: 'Reservation' },
   { value: 'procurement', label: 'Procurement' },
-  { value: 'integration', label: 'Integration' },
-  { value: 'control_tower', label: 'Control tower' },
-  { value: 'financial', label: 'Financial' },
+  { value: 'fulfillment', label: 'Fulfillment' },
+  { value: 'replenishment', label: 'Replenishment' },
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'carrier', label: 'Carrier' },
+  { value: 'external_partner', label: 'External partner' },
   { value: 'multi_domain', label: 'Multi-domain' }
 ];
 

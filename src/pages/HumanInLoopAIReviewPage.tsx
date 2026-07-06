@@ -3894,6 +3894,28 @@ export default function HumanInLoopAIReviewPage() {
     enabled: Boolean(selectedReadinessFeatureKey)
   });
 
+  const allReviewAndReadinessQueries = [
+    reviewQuery,
+    readinessQuery,
+    readinessAuditPackQuery,
+    hardeningPlanQuery,
+    signoffChecklistQuery,
+    releaseDecisionBoardQuery,
+    operationalRunbookQuery,
+    validationSuiteQuery,
+    enablementManifestQuery,
+    monitoringContractQuery,
+    remediationWorkbenchQuery,
+    evidenceMatrixQuery,
+    featureDetailQuery
+  ];
+
+  const isRefreshingAnyAIReviewData = allReviewAndReadinessQueries.some((query) => query.isFetching);
+
+  const refreshAllAIReviewData = () => {
+    void Promise.all(allReviewAndReadinessQueries.map((query) => query.refetch()));
+  };
+
   const response = reviewQuery.data;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
@@ -4108,6 +4130,24 @@ export default function HumanInLoopAIReviewPage() {
 
   return (
     <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={toolbarStyle}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={refreshAllAIReviewData}
+            disabled={isRefreshingAnyAIReviewData}
+          >
+            {isRefreshingAnyAIReviewData ? 'Refreshing AI review…' : 'Refresh AI review'}
+          </button>
+          <Link className="button button--secondary" to="/action-center">Open action center</Link>
+          <Link className="button button--secondary" to="/workflow-composer">Open workflow composer</Link>
+        </div>
+        <p className="card__subtext" style={{ marginTop: 10 }}>
+          Refreshes the human review queue and all AI/intelligence readiness panels without executing recommendations, approvals, overrides, inventory mutations, model training, or external AI calls.
+        </p>
+      </div>
+
       <div className="card-grid" style={gridStyle}>
         <div className="card">
           <div className="card__label">AI review queue</div>

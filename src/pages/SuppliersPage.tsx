@@ -21,6 +21,9 @@ type SupplierSlaBreachesResponse = {
 type SupplierSlaBreachItem = {
   supplier_id?: string;
   supplier_name?: string;
+  late_shipments?: number | string | null;
+  earliest_missed_delivery?: string | null;
+  latest_missed_delivery?: string | null;
   shipment_id?: string;
   shipment_number?: string;
   status?: string;
@@ -123,6 +126,49 @@ function normalizeBreaches(response: SupplierSlaBreachesResponse | undefined): S
   if (Array.isArray(response)) return response as SupplierSlaBreachItem[];
   if (Array.isArray(response.rows)) return response.rows;
   return [];
+}
+
+function getSlaBreachLateShipmentCount(breach: SupplierSlaBreachItem): number {
+  const aggregateValue = breach.late_shipments;
+
+  if (typeof aggregateValue === 'number' && Number.isFinite(aggregateValue)) {
+    return aggregateValue;
+  }
+
+  if (typeof aggregateValue === 'string') {
+    const parsed = Number(aggregateValue);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const rowLevelDaysLate = breach.days_late;
+
+  if (rowLevelDaysLate !== undefined && rowLevelDaysLate !== null && rowLevelDaysLate !== '') {
+    return 1;
+  }
+
+  return 0;
+}
+
+function formatSlaBreachLateShipments(breach: SupplierSlaBreachItem): string {
+  const value = breach.late_shipments;
+
+  if (value !== undefined && value !== null && value !== '') {
+    return formatUnknown(value);
+  }
+
+  if (breach.shipment_id || breach.shipment_number) {
+    return '1';
+  }
+
+  return '-';
+}
+
+function getSlaBreachEarliestMissedDelivery(breach: SupplierSlaBreachItem): string | null | undefined {
+  return breach.earliest_missed_delivery || breach.expected_delivery_date;
+}
+
+function getSlaBreachLatestMissedDelivery(breach: SupplierSlaBreachItem): string | null | undefined {
+  return breach.latest_missed_delivery || breach.received_date || breach.expected_delivery_date;
 }
 
 function getPerformanceTitle(performance: SupplierPerformanceResponse | undefined, fallback?: SupplierItem | null): string {
@@ -282,12 +328,18 @@ export default function SuppliersPage() {
       (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
     ).length;
 
+    const lateShipments = slaBreaches.reduce(
+      (total, breach) => total + getSlaBreachLateShipmentCount(breach),
+      0
+    );
+
     return {
       total: suppliers.length,
       active,
       withEmail,
       withContact,
-      slaBreaches: slaBreaches.length
+      slaBreachSuppliers: slaBreaches.length,
+      slaBreaches: lateShipments
     };
   }, [suppliers, slaBreaches]);
 
@@ -391,7 +443,7 @@ export default function SuppliersPage() {
         <StatCard
           title="SLA Breaches"
           value={summary.slaBreaches}
-          subtitle="Backend-reported supplier SLA exceptions"
+          subtitle={`${summary.slaBreachSuppliers} suppliers with late pending or partial shipments`}
           tone={summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
@@ -477,7 +529,7 @@ export default function SuppliersPage() {
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>Supplier SLA Breaches</h3>
         <p style={styles.panelSubtitle}>
-          This uses the existing backend `/suppliers/sla-breaches` endpoint that was previously not surfaced in the supplier frontend.
+          This uses the existing backend `/suppliers/sla-breaches` endpoint and renders its supplier-level aggregate breach rows.
         </p>
 
         {slaBreachesQuery.isLoading ? <p>Loading supplier SLA breaches...</p> : null}
@@ -494,18 +546,15 @@ export default function SuppliersPage() {
               <thead>
                 <tr>
                   <th style={styles.th}>Supplier</th>
-                  <th style={styles.th}>Shipment</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Expected</th>
-                  <th style={styles.th}>Received</th>
-                  <th style={styles.th}>Days Late</th>
-                  <th style={styles.th}>Severity</th>
+                  <th style={styles.th}>Late Shipments</th>
+                  <th style={styles.th}>Earliest Missed</th>
+                  <th style={styles.th}>Latest Missed</th>
                 </tr>
               </thead>
               <tbody>
                 {slaBreaches.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={7}>
+                    <td style={styles.emptyCell} colSpan={4}>
                       No supplier SLA breaches returned by the backend.
                     </td>
                   </tr>
@@ -514,18 +563,13 @@ export default function SuppliersPage() {
                     <tr key={`${breach.supplier_id || 'supplier'}-${breach.shipment_id || index}`}>
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{formatUnknown(breach.supplier_name || breach.supplier_id)}</div>
-                        <div style={styles.rowSubtle}>{formatUnknown(breach.breach_type)}</div>
+                        <div style={styles.rowSubtle}>Supplier ID: {formatUnknown(breach.supplier_id)}</div>
                       </td>
                       <td style={styles.td}>
-                        <div>{formatUnknown(breach.shipment_number || breach.shipment_id)}</div>
+                        <span style={styles.badgeDeleted}>{formatSlaBreachLateShipments(breach)}</span>
                       </td>
-                      <td style={styles.td}>{formatUnknown(breach.status)}</td>
-                      <td style={styles.td}>{formatDateTime(breach.expected_delivery_date)}</td>
-                      <td style={styles.td}>{formatDateTime(breach.received_date)}</td>
-                      <td style={styles.td}>{formatUnknown(breach.days_late)}</td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeDeleted}>{formatUnknown(breach.severity || 'breach')}</span>
-                      </td>
+                      <td style={styles.td}>{formatDateTime(getSlaBreachEarliestMissedDelivery(breach))}</td>
+                      <td style={styles.td}>{formatDateTime(getSlaBreachLatestMissedDelivery(breach))}</td>
                     </tr>
                   ))
                 )}

@@ -64,6 +64,14 @@ function normalizeDateInput(value: string | null | undefined): string {
   return String(value).slice(0, 10);
 }
 
+function formatRefreshTimestamp(timestamp: number): string {
+  if (!timestamp) {
+    return 'Not loaded yet';
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
+
 function formatMetadata(metadata: Record<string, unknown> | null | undefined): string {
   if (!metadata || Object.keys(metadata).length === 0) {
     return '{}';
@@ -175,6 +183,8 @@ export default function TenantSettingsPage() {
   });
 
   const isSaving = updateMutation.isPending;
+  const isRefreshing = tenantsQuery.isFetching && !tenantsQuery.isLoading;
+  const lastRefreshedLabel = formatRefreshTimestamp(tenantsQuery.dataUpdatedAt);
 
   const updateField = (field: keyof TenantSettingsFormState, value: string) => {
     setFormState((current) => ({
@@ -188,6 +198,30 @@ export default function TenantSettingsPage() {
     setFormState(createFormState(tenant));
     setFormError(null);
     setSuccessMessage(null);
+  };
+
+  const handleRefresh = async () => {
+    setFormError(null);
+    setSuccessMessage(null);
+
+    const result = await tenantsQuery.refetch();
+
+    if (result.error) {
+      setFormError(readableError(result.error));
+      return;
+    }
+
+    setSuccessMessage('Tenant settings refreshed. Use Reset to latest values to reload the form from the latest backend response.');
+  };
+
+  const handleResetForm = () => {
+    if (!selectedTenant) {
+      return;
+    }
+
+    setFormState(createFormState(selectedTenant));
+    setFormError(null);
+    setSuccessMessage('Form reset to the latest loaded tenant settings.');
   };
 
   const validatePayload = (): TenantPayload | null => {
@@ -261,6 +295,17 @@ export default function TenantSettingsPage() {
           <p style={styles.subtitle}>
             Tenant-scoped settings for the current tenant. Creation and deletion belong to the platform tenant control plane.
           </p>
+        </div>
+        <div style={styles.headerActions}>
+          <span style={styles.refreshMeta}>Last refreshed: {lastRefreshedLabel}</span>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleRefresh}
+            disabled={tenantsQuery.isFetching}
+          >
+            {isRefreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
         </div>
       </header>
 
@@ -375,10 +420,21 @@ export default function TenantSettingsPage() {
                 disabled={!canUpdateTenants || isSaving}
                 rows={8}
               />
+              <span style={styles.helperText}>
+                {'Metadata must be a valid JSON object, for example {"region":"coastal"}. Arrays, null, and primitive values are rejected.'}
+              </span>
             </label>
           </div>
 
           <div style={styles.actions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={handleResetForm}
+              disabled={!selectedTenant || isSaving}
+            >
+              Reset to latest values
+            </button>
             <button
               type="submit"
               style={styles.primaryButton}
@@ -409,6 +465,18 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     alignItems: 'flex-start',
     flexWrap: 'wrap'
+  },
+  headerActions: {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end'
+  },
+  refreshMeta: {
+    color: '#64748b',
+    fontSize: '13px',
+    fontWeight: 700
   },
   eyebrow: {
     margin: 0,
@@ -570,6 +638,11 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '14px',
     padding: '16px',
     color: '#64748b'
+  },
+  helperText: {
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.45
   },
   permissionHint: {
     color: '#64748b',

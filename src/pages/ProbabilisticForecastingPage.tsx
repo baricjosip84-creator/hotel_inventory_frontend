@@ -1,5 +1,141 @@
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+
+
+const FORECAST_DOMAIN_OPTIONS = [
+  'inventory',
+  'procurement',
+  'reservation',
+  'execution',
+  'optimization',
+  'control_tower',
+  'financial',
+  'integration',
+  'system'
+];
+
+const FORECAST_TYPE_OPTIONS = [
+  'depletion_probability',
+  'demand_distribution',
+  'supplier_reliability_probability',
+  'service_risk_probability',
+  'cost_exposure_distribution',
+  'labor_capacity_probability',
+  'logistics_delay_probability',
+  'multi_domain_uncertainty',
+  'general'
+];
+
+const MODEL_STATUS_OPTIONS = [
+  'draft',
+  'observing',
+  'calibrating',
+  'ready_for_review',
+  'approved_for_advisory_use',
+  'retired'
+];
+
+const UNCERTAINTY_METHOD_OPTIONS = [
+  'confidence_interval',
+  'quantile_band',
+  'scenario_distribution',
+  'probability_curve',
+  'calibration_observation',
+  'general'
+];
+
+const RISK_TYPE_OPTIONS = [
+  'depletion_risk',
+  'stockout_risk',
+  'supplier_failure_risk',
+  'service_level_risk',
+  'budget_overrun_risk',
+  'labor_shortfall_risk',
+  'logistics_delay_risk',
+  'multi_domain_cascade_risk',
+  'general'
+];
+
+const CALIBRATION_TYPE_OPTIONS = [
+  'interval_capture',
+  'probability_accuracy',
+  'quantile_accuracy',
+  'bias_measurement',
+  'forecast_error',
+  'general'
+];
+
+const LIMIT_OPTIONS = ['25', '50', '100', '200'];
+
+type ForecastFilterState = {
+  forecast_domain: string;
+  forecast_type: string;
+  model_status: string;
+  uncertainty_method: string;
+  risk_type: string;
+  calibration_type: string;
+  limit: string;
+};
+
+const DEFAULT_FILTERS: ForecastFilterState = {
+  forecast_domain: '',
+  forecast_type: '',
+  model_status: '',
+  uncertainty_method: '',
+  risk_type: '',
+  calibration_type: '',
+  limit: '25'
+};
+
+const FILTER_LABELS: Record<keyof ForecastFilterState, string> = {
+  forecast_domain: 'Forecast domain',
+  forecast_type: 'Forecast type',
+  model_status: 'Model status',
+  uncertainty_method: 'Uncertainty method',
+  risk_type: 'Risk type',
+  calibration_type: 'Calibration type',
+  limit: 'Result limit'
+};
+
+const formatOptionLabel = (value: string) => value.replaceAll('_', ' ');
+
+const formatDateTime = (timestamp: number) => {
+  if (!timestamp) return 'Not loaded yet';
+  return new Date(timestamp).toLocaleString();
+};
+
+function FilterSelect({
+  name,
+  value,
+  options,
+  onChange,
+  allowAll = true
+}: {
+  name: keyof ForecastFilterState;
+  value: string;
+  options: string[];
+  onChange: (name: keyof ForecastFilterState, value: string) => void;
+  allowAll?: boolean;
+}) {
+  return (
+    <label className="space-y-1 text-sm text-slate-700">
+      <span className="font-medium text-slate-800">{FILTER_LABELS[name]}</span>
+      <select
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        value={value}
+        onChange={(event) => onChange(name, event.target.value)}
+      >
+        {allowAll ? <option value="">All</option> : null}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {formatOptionLabel(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 type ForecastCalibrationFeedbackLoop = {
   feedback_loop_type?: string;
@@ -290,7 +426,7 @@ function CheckList({ title, items }: { title: string; items?: Array<Record<strin
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
       <div className="mt-4 space-y-3">
         {(items || []).length === 0 ? (
-          <p className="text-sm text-slate-500">No entries returned.</p>
+          <p className="text-sm text-slate-500">No items reported for the current filters.</p>
         ) : (
           (items || []).map((item, index) => (
             <div key={`${String(item.key || item.label || index)}`} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -313,10 +449,31 @@ function CheckList({ title, items }: { title: string; items?: Array<Record<strin
 }
 
 export default function ProbabilisticForecastingPage() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['probabilistic-forecasting-summary'],
-    queryFn: () => apiRequest<ProbabilisticForecastingSummary>('/decision-intelligence/probabilistic-forecasting-summary?limit=25')
+  const [filters, setFilters] = useState<ForecastFilterState>(DEFAULT_FILTERS);
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    (Object.entries(filters) as Array<[keyof ForecastFilterState, string]>).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+    if (!params.has('limit')) {
+      params.set('limit', DEFAULT_FILTERS.limit);
+    }
+    return params.toString();
+  }, [filters]);
+
+  const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
+    queryKey: ['probabilistic-forecasting-summary', filters],
+    queryFn: () => apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)
   });
+
+  const updateFilter = (name: keyof ForecastFilterState, value: string) => {
+    setFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value)) || filters.limit !== DEFAULT_FILTERS.limit;
 
   const feedback = data?.calibration_feedback_loop;
   const reconciliation = data?.forecast_outcome_reconciliation;
@@ -327,19 +484,76 @@ export default function ProbabilisticForecastingPage() {
   const degradationWorkflow = data?.forecast_degradation_incident_workflow;
   const lifecycleBoard = data?.forecast_lifecycle_control_board;
   const contractAudit = data?.forecast_response_contract_audit;
+  const totalForecastRecords = (data?.models?.length || 0) + (data?.intervals?.length || 0) + (data?.risk_probabilities?.length || 0) + (data?.calibration?.length || 0);
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decision Intelligence</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">Probabilistic Forecasting</h1>
-        <p className="mt-2 max-w-4xl text-slate-600">
-          Uncertainty-aware forecast visibility, calibration observations, and manual forecast feedback-loop readiness.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decision Intelligence</p>
+          <h1 className="mt-1 text-3xl font-bold text-slate-950">Probabilistic Forecasting</h1>
+          <p className="mt-2 max-w-4xl text-slate-600">
+            Uncertainty-aware forecast visibility, calibration observations, and manual forecast feedback-loop readiness.
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          <div className="font-medium text-slate-900">Last refreshed</div>
+          <div className="mt-1">{formatDateTime(dataUpdatedAt)}</div>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            {isFetching && !isLoading ? 'Refreshing...' : 'Refresh summary'}
+          </button>
+        </div>
       </div>
 
-      {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-600">Loading forecasting summary…</div> : null}
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">Unable to load probabilistic forecasting summary.</div> : null}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Forecast filters</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              These controls use the existing validated backend query contract and only change the read-only summary view.
+            </p>
+          </div>
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FilterSelect name="forecast_domain" value={filters.forecast_domain} options={FORECAST_DOMAIN_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="forecast_type" value={filters.forecast_type} options={FORECAST_TYPE_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="model_status" value={filters.model_status} options={MODEL_STATUS_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="uncertainty_method" value={filters.uncertainty_method} options={UNCERTAINTY_METHOD_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="risk_type" value={filters.risk_type} options={RISK_TYPE_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="calibration_type" value={filters.calibration_type} options={CALIBRATION_TYPE_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="limit" value={filters.limit} options={LIMIT_OPTIONS} onChange={updateFilter} allowAll={false} />
+        </div>
+      </section>
+
+      {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-600">Loading forecasting summary...</div> : null}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">
+          <div className="font-semibold">Unable to load probabilistic forecasting summary.</div>
+          <p className="mt-1 text-sm">Check Decision Intelligence access, tenant context, and whether the selected filters are valid for the backend contract.</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-red-300"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {data ? (
         <>
@@ -349,6 +563,13 @@ export default function ProbabilisticForecastingPage() {
             <MetricCard label="Risk probabilities" value={data.risk_probabilities?.length || 0} />
             <MetricCard label="Calibration observations" value={data.calibration?.length || 0} />
           </div>
+
+          {totalForecastRecords === 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+              No probabilistic forecast models, intervals, risk probabilities, or calibration observations match the current filters yet.
+              Clear filters or confirm that tenant forecasting evidence has been loaded.
+            </div>
+          ) : null}
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

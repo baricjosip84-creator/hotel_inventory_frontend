@@ -2164,7 +2164,7 @@ export interface AutomationSchedule {
   name: string;
   description?: string | null;
   automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | string;
-  status: 'draft' | 'paused' | 'disabled' | string;
+  status: 'draft' | 'active' | 'paused' | 'disabled' | string;
   schedule_kind: 'manual' | 'daily' | 'weekly' | 'monthly' | string;
   schedule_config: Record<string, unknown>;
   request_defaults: Record<string, unknown>;

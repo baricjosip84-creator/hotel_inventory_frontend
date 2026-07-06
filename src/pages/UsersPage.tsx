@@ -236,6 +236,24 @@ export default function UsersPage() {
     };
   }, [users]);
 
+  const lastRefreshedText = usersQuery.dataUpdatedAt
+    ? `Last refreshed ${formatDateTime(new Date(usersQuery.dataUpdatedAt).toISOString())}`
+    : 'Not refreshed yet';
+
+  const handleRefreshUsers = async () => {
+    setPageError(null);
+    setPageMessage(null);
+
+    const result = await usersQuery.refetch();
+
+    if (result.error) {
+      setPageError(result.error instanceof Error ? result.error.message : 'Failed to refresh users.');
+      return;
+    }
+
+    setPageMessage('Users refreshed.');
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPageError(null);
@@ -455,6 +473,15 @@ export default function UsersPage() {
                 Review all user accounts for the current tenant and filter by name, email, or role.
               </p>
             </div>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={handleRefreshUsers}
+              disabled={usersQuery.isFetching}
+              title="Reload tenant users from the server"
+            >
+              {usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+            </button>
           </div>
 
           <div className="app-grid-toolbar" style={styles.toolbarGrid}>
@@ -464,11 +491,16 @@ export default function UsersPage() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search users"
             />
+            <span style={styles.refreshMeta}>{lastRefreshedText}</span>
           </div>
 
           {filteredUsers.length === 0 ? (
             <div className="app-empty-state" style={styles.emptyState}>
-              No users matched the current search.
+              {users.length === 0
+                ? canWrite
+                  ? 'No tenant users exist yet. Create the first tenant user from the form.'
+                  : 'No tenant users exist yet. Ask a tenant admin to create user accounts.'
+                : 'No users matched the current search. Clear or change the search text to see loaded users.'}
             </div>
           ) : (
             <div style={styles.userList}>
@@ -601,6 +633,8 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     gap: '14px',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     marginBottom: '16px',
     minWidth: 0
   },
@@ -723,6 +757,11 @@ const styles: Record<string, CSSProperties> = {
       - Prevents the search control from looking artificially narrow and improves consistency with the other pages.
     */
     maxWidth: '100%'
+  },
+  refreshMeta: {
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.4
   },
   emptyState: {
     margin: 0

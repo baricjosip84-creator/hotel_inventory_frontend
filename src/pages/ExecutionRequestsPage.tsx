@@ -8,6 +8,7 @@ import type {
   ExecutionModuleHardeningSummaryResponse,
   ExecutionRequest,
   ExecutionRequestAuditPackResponse,
+  ExecutionRequestExecutionReview,
   ExecutionRequestExecutionReviewResponse,
   ExecutionRequestListResponse,
   ExecutionRequestSecurityAuditResponse
@@ -37,6 +38,33 @@ function formatDateTime(value?: string | null): string {
 
 function label(value?: string | null): string {
   return value ? value.replace(/_/g, ' ') : '-';
+}
+
+const beforeAfterFieldLabels: Record<string, string> = {
+  standard_unit_cost: 'Standard Cost',
+  standard_cost_updated_at: 'Standard Cost Updated At',
+  standard_cost_updated_by_user_id: 'Standard Cost Updated By',
+  min_stock: 'Minimum Stock',
+  unit_price: 'Unit Price',
+  version: 'Version'
+};
+
+function labelBeforeAfterField(key: string): string {
+  return beforeAfterFieldLabels[key] || label(key);
+}
+
+function formatBeforeAfterValue(key: string, value: unknown): string {
+  if (key.endsWith('_at')) {
+    return formatDateTime(formatUnknown(value));
+  }
+  return formatUnknown(value);
+}
+
+function getBeforeAfterFieldKeys(before?: Record<string, unknown> | null, after?: Record<string, unknown> | null): string[] {
+  const keys = new Set<string>();
+  Object.keys(before || {}).forEach((key) => keys.add(key));
+  Object.keys(after || {}).forEach((key) => keys.add(key));
+  return Array.from(keys).filter((key) => key !== 'product_id' && key !== 'product_name');
 }
 
 function getRecommendationCodes(request: ExecutionRequest): string[] {
@@ -102,19 +130,26 @@ export default function ExecutionRequestsPage() {
       setData(response);
       setAdapterRegistry(adapters);
       setHardeningSummary(hardening);
-      if (selected) {
-        const nextSelected = response.rows.find((row) => row.id === selected.id) || null;
-        setSelected(nextSelected);
-        if (!nextSelected || auditPack?.request_id !== nextSelected.id) setAuditPack(null);
-        if (!nextSelected || securityAudit?.request_id !== nextSelected.id) setSecurityAudit(null);
-        if (!nextSelected || executionReview?.request_id !== nextSelected.id) setExecutionReview(null);
-      }
+      setSelected((currentSelected) => {
+        if (!currentSelected) return currentSelected;
+        const nextSelected = response.rows.find((row) => row.id === currentSelected.id) || null;
+        if (!nextSelected) {
+          setAuditPack(null);
+          setSecurityAudit(null);
+          setExecutionReview(null);
+          return null;
+        }
+        setAuditPack((currentAuditPack) => (currentAuditPack?.request_id === nextSelected.id ? currentAuditPack : null));
+        setSecurityAudit((currentSecurityAudit) => (currentSecurityAudit?.request_id === nextSelected.id ? currentSecurityAudit : null));
+        setExecutionReview((currentExecutionReview) => (currentExecutionReview?.request_id === nextSelected.id ? currentExecutionReview : null));
+        return nextSelected;
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load execution requests');
     } finally {
       setLoading(false);
     }
-  }, [query, selected, auditPack?.request_id, securityAudit?.request_id, executionReview?.request_id]);
+  }, [query]);
 
   useEffect(() => {
     void loadRequests();
@@ -520,10 +555,13 @@ export default function ExecutionRequestsPage() {
         <div>
           <h1 style={styles.title}>Execution Requests</h1>
           <p style={styles.subtitle}>
-            Safe registry for proposed actions. Step 246 adds a controlled min-stock update executor while preserving approval gates, audit evidence, retry preparation, and duplicate execution blocking.
+            Safe registry for proposed actions. Controlled product-field executors are approval-gated, audit-backed, retry-prepared, and duplicate-execution blocked.
           </p>
         </div>
         <div style={styles.actions}>
+          <button type="button" className="btn btn-secondary" onClick={loadRequests} disabled={loading || saving}>
+            {loading ? 'Refreshing...' : 'Refresh execution requests'}
+          </button>
           {canCreateExecutionRequests ? (
             <>
               <button type="button" className="btn btn-primary" onClick={createSystemRecommendation} disabled={saving}>
@@ -584,7 +622,7 @@ export default function ExecutionRequestsPage() {
           </span>
         </div>
         <p style={styles.note}>
-          Adapters define which request types can execute. Step 246 surfaces controlled standard-cost and min-stock executors plus explicit retry preparation control.
+          Adapters define which request types can execute. The current controlled real executors cover standard cost, minimum stock, and unit price updates with explicit retry preparation control.
         </p>
         <div style={styles.adapterGrid}>
           {(adapterRegistry?.adapters || []).map((adapter) => (
@@ -938,23 +976,46 @@ function ExecutionReviewPanel({ request, executionReview }: { request: Execution
       ) : null}
 
       {review.before_after ? (
-        <div style={styles.beforeAfterGrid}>
-          <div style={styles.snapshotCard}>
-            <strong>Before</strong>
-            <KeyValue label="Standard Cost" value={formatUnknown(review.before_after.before?.standard_unit_cost)} />
-            <KeyValue label="Updated At" value={formatDateTime(formatUnknown(review.before_after.before?.standard_cost_updated_at))} />
-            <KeyValue label="Version" value={formatUnknown(review.before_after.before?.version)} />
-          </div>
-          <div style={styles.snapshotCard}>
-            <strong>After</strong>
-            <KeyValue label="Standard Cost" value={formatUnknown(review.before_after.after?.standard_unit_cost)} />
-            <KeyValue label="Updated At" value={formatDateTime(formatUnknown(review.before_after.after?.standard_cost_updated_at))} />
-            <KeyValue label="Version" value={formatUnknown(review.before_after.after?.version)} />
-          </div>
-        </div>
+        <BeforeAfterEvidence beforeAfter={review.before_after} />
       ) : null}
 
       {review.review_notes?.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+    </div>
+  );
+}
+
+function BeforeAfterEvidence({ beforeAfter }: { beforeAfter: NonNullable<ExecutionRequestExecutionReview['before_after']> }) {
+  const before = beforeAfter.before || {};
+  const after = beforeAfter.after || {};
+  const fieldKeys = getBeforeAfterFieldKeys(before, after);
+
+  return (
+    <div style={styles.reviewPanel}>
+      <div style={styles.reviewHeader}>
+        <div>
+          <strong>Before / After Evidence</strong>
+          <div style={styles.meta}>{beforeAfter.product_name || beforeAfter.product_id || 'Product-field execution snapshot'}</div>
+        </div>
+        <span style={{ ...styles.badge, ...(beforeAfter.changed ? styles.successTone : styles.pendingTone) }}>
+          {beforeAfter.changed ? 'Changed' : 'No field change'}
+        </span>
+      </div>
+      <div style={styles.beforeAfterGrid}>
+        <div style={styles.snapshotCard}>
+          <strong>Before</strong>
+          {fieldKeys.map((key) => (
+            <KeyValue key={key} label={labelBeforeAfterField(key)} value={formatBeforeAfterValue(key, before[key])} />
+          ))}
+          {!fieldKeys.length ? <div style={styles.meta}>No before-state fields were returned.</div> : null}
+        </div>
+        <div style={styles.snapshotCard}>
+          <strong>After</strong>
+          {fieldKeys.map((key) => (
+            <KeyValue key={key} label={labelBeforeAfterField(key)} value={formatBeforeAfterValue(key, after[key])} />
+          ))}
+          {!fieldKeys.length ? <div style={styles.meta}>No after-state fields were returned.</div> : null}
+        </div>
+      </div>
     </div>
   );
 }

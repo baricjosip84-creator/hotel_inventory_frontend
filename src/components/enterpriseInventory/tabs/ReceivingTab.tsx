@@ -72,6 +72,17 @@ export function ReceivingTab({
   shipmentsQuery,
   storageLocations
 }: ReceivingTabProps) {
+  const barcodeLookupDisabledReason = !selectedReceivingShipment
+    ? 'Select an active shipment before resolving a barcode.'
+    : barcodeLookupMutation.isPending
+      ? 'Barcode lookup is already running.'
+      : '';
+  const receiptDisabledReason = !selectedReceivingShipment
+    ? 'Select an active shipment before posting a receipt.'
+    : receiveShipmentMutation.isPending
+      ? 'Receipt posting is already running.'
+      : '';
+
   return (
     <section style={styles.grid}>
       <div style={styles.stack}>
@@ -91,7 +102,8 @@ export function ReceivingTab({
           <p style={styles.helper}>Uses the real GET /shipments/:shipmentId/barcode/:barcode route to resolve package barcodes against the selected shipment before posting receipt.</p>
           <InputField label="Package / product barcode" value={shipmentBarcodeScanForm.barcode} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, barcode: value }))} required />
           <InputField label="Packages scanned" type="number" min="1" value={shipmentBarcodeScanForm.package_count} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, package_count: value }))} required />
-          <button type="submit" disabled={barcodeLookupMutation.isPending || !selectedReceivingShipment} style={styles.secondaryButton}>Resolve barcode</button>
+          <button type="submit" disabled={barcodeLookupMutation.isPending || !selectedReceivingShipment} title={barcodeLookupDisabledReason || undefined} style={barcodeLookupDisabledReason ? styles.disabledButton : styles.secondaryButton}>Resolve barcode</button>
+          {barcodeLookupDisabledReason ? <p style={styles.helper}>{barcodeLookupDisabledReason}</p> : null}
           {lastBarcodeLookup ? (
             <div style={styles.metricCard}>
               <span style={styles.metricLabel}>Last barcode match</span>
@@ -144,7 +156,8 @@ export function ReceivingTab({
           <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required />
           <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} />
           <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} />
-          <button type="submit" disabled={receiveShipmentMutation.isPending || !selectedReceivingShipment} style={styles.primaryButton}>Post receipt</button>
+          <button type="submit" disabled={receiveShipmentMutation.isPending || !selectedReceivingShipment} title={receiptDisabledReason || undefined} style={receiptDisabledReason ? styles.disabledButton : styles.primaryButton}>Post receipt</button>
+          {receiptDisabledReason ? <p style={styles.helper}>{receiptDisabledReason}</p> : null}
         </form>
       </div>
 
@@ -170,7 +183,7 @@ export function ReceivingTab({
             })}
           />
           {selectedReceivingShipment && selectedReceivingShipment.status !== 'received' ? (
-            <button type="button" onClick={() => finalizeShipmentMutation.mutate(selectedReceivingShipment)} disabled={finalizeShipmentMutation.isPending} style={styles.secondaryButton}>Finalize selected shipment</button>
+            <button type="button" onClick={() => finalizeShipmentMutation.mutate(selectedReceivingShipment)} disabled={finalizeShipmentMutation.isPending} title={finalizeShipmentMutation.isPending ? 'Finalization is already running.' : undefined} style={finalizeShipmentMutation.isPending ? styles.disabledButton : styles.secondaryButton}>Finalize selected shipment</button>
           ) : null}
         </section>
 

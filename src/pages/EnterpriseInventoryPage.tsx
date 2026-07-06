@@ -9,6 +9,7 @@ function EnterpriseInventoryPage() {
     errorMessage,
     formState,
     pageData,
+    lastRefreshedAt,
     refreshSystemContext,
     setActiveTab,
     statusMessage,
@@ -20,6 +21,7 @@ function EnterpriseInventoryPage() {
       onActiveTabChange={setActiveTab}
       statusMessage={statusMessage}
       errorMessage={errorMessage}
+      lastRefreshedAt={lastRefreshedAt}
       onEvaluateParLevels={() => actions.evaluateParLevelsMutation.mutate()}
       evaluatingParLevels={actions.evaluateParLevelsMutation.isPending}
     >

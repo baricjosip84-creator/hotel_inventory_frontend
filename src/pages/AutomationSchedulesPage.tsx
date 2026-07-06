@@ -1938,7 +1938,6 @@ export default function AutomationSchedulesPage() {
               <span>Future request default</span>
               <select style={styles.input} value={form.default_status} onChange={(event) => setForm({ ...form, default_status: event.target.value as FormState['default_status'] })}>
                 <option value="draft">Draft</option>
-                  <option value="active">Active</option>
                 <option value="pending_review">Pending review</option>
               </select>
             </label>
@@ -2172,7 +2171,6 @@ export default function AutomationSchedulesPage() {
                   <span>Future request default</span>
                   <select style={styles.input} value={editForm.default_status} onChange={(event) => setEditForm({ ...editForm, default_status: event.target.value as FormState['default_status'] })}>
                     <option value="draft">Draft</option>
-                  <option value="active">Active</option>
                     <option value="pending_review">Pending review</option>
                   </select>
                 </label>

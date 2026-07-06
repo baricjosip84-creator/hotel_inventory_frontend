@@ -27,6 +27,17 @@ type ReliabilitySummaryResponse = {
 
 type RiskRegisterResponse = {
   risk_count?: number;
+  risks?: Array<{
+    risk_id?: string;
+    label?: string;
+    severity?: string;
+    readiness?: string;
+    score?: number;
+    recommended_owner?: string;
+    recommended_runbook?: string;
+    recommended_next_action?: string;
+    source_surface?: string;
+  }>;
   readiness_risks?: Array<{
     risk_id?: string;
     label?: string;
@@ -71,6 +82,8 @@ type ClosureBoardItem = {
 
 type ClosureBoardResponse = {
   generated_at?: string;
+  min_readiness_filter?: string;
+  min_severity_filter?: string | null;
   source_reliability_score?: number;
   source_readiness?: string;
   closure_item_count?: number;
@@ -104,6 +117,17 @@ function formatLabel(value?: string | number | null): string {
 function formatNumber(value?: number | null): string {
   if (typeof value !== 'number' || Number.isNaN(value)) return '0';
   return new Intl.NumberFormat().format(value);
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return 'Not reported';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatAppliedFilter(value?: string | number | null): string {
+  if (value === undefined || value === null || value === '') return 'All';
+  return formatLabel(value);
 }
 
 function getTone(value?: string): CSSProperties {
@@ -145,9 +169,10 @@ export default function ReliabilityCommandPage() {
   });
 
   const closureItems = commandQuery.data?.closureBoard.closure_board || [];
-  const riskItems = commandQuery.data?.risks.readiness_risks || [];
+  const riskItems = commandQuery.data?.risks.risks || commandQuery.data?.risks.readiness_risks || [];
   const summary = commandQuery.data?.summary;
   const closureBoard = commandQuery.data?.closureBoard;
+  const generatedAt = closureBoard?.generated_at || summary?.generated_at;
 
   const safetyFlags = useMemo(() => {
     const contract = closureBoard?.closure_board_contract || summary?.safety_contract || {};
@@ -180,6 +205,14 @@ export default function ReliabilityCommandPage() {
           </select>
         </label>
         <button className="button" type="button" onClick={() => commandQuery.refetch()} disabled={commandQuery.isFetching}>{commandQuery.isFetching ? 'Refreshing…' : 'Refresh command board'}</button>
+        {commandQuery.data ? (
+          <div style={styles.metadata} aria-label="Reliability command snapshot metadata">
+            <span style={styles.metadataItem}>Generated: {formatDateTime(generatedAt)}</span>
+            <span style={styles.metadataItem}>Readiness: {formatAppliedFilter(closureBoard?.min_readiness_filter || readiness)}</span>
+            <span style={styles.metadataItem}>Severity: {formatAppliedFilter(closureBoard?.min_severity_filter || severity)}</span>
+            <span style={styles.metadataItem}>Limit: 25</span>
+          </div>
+        ) : null}
       </section>
 
       {commandQuery.isLoading ? <p style={styles.muted}>Loading reliability command board…</p> : null}
@@ -237,6 +270,7 @@ export default function ReliabilityCommandPage() {
                 <span style={{ ...styles.badge, ...getTone(risk.severity) }}>{formatLabel(risk.severity)}</span>
               </div>
             ))}
+            {!commandQuery.isLoading && riskItems.length === 0 ? <p style={styles.muted}>No readiness risks matched the selected filters.</p> : null}
           </div>
         </div>
         <div style={styles.panel}>
@@ -248,6 +282,7 @@ export default function ReliabilityCommandPage() {
                 <strong>{String(value)}</strong>
               </div>
             ))}
+            {!commandQuery.isLoading && safetyFlags.length === 0 ? <p style={styles.muted}>No safety contract flags matched the display filter.</p> : null}
           </div>
         </div>
       </section>
@@ -273,6 +308,8 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: 34, lineHeight: 1.1 },
   subtitle: { margin: '10px 0 0', maxWidth: 760, color: '#d1d5db', lineHeight: 1.6 },
   filters: { display: 'flex', alignItems: 'end', gap: 12, flexWrap: 'wrap', padding: 16, background: 'white', border: '1px solid #e5e7eb', borderRadius: 18 },
+  metadata: { flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  metadataItem: { display: 'inline-flex', padding: '6px 9px', borderRadius: 999, background: '#f3f4f6', color: '#4b5563', fontSize: 12, fontWeight: 700 },
   label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { minWidth: 190, border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', background: 'white', color: '#111827' },
   grid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 },

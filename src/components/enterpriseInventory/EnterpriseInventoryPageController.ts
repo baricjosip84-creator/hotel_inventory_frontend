@@ -3,6 +3,10 @@ import { useEnterpriseInventoryFormState } from "./EnterpriseInventoryFormState"
 import { useEnterpriseInventoryPageActions } from "./EnterpriseInventoryPageActions";
 import { useEnterpriseInventoryPageData } from "./EnterpriseInventoryPageData";
 import { useEnterpriseInventoryPageFeedback } from "./EnterpriseInventoryPageFeedback";
+import {
+  getEnterpriseInventoryActiveTabQueryError,
+  getEnterpriseInventoryLastUpdatedAt,
+} from "./EnterpriseInventoryQueryStatus";
 
 export function useEnterpriseInventoryPageController() {
   const [activeTab, setActiveTab] = useState("par-levels");
@@ -42,6 +46,9 @@ export function useEnterpriseInventoryPageController() {
   });
 
   const { products, purchaseOrders, shipments } = pageData.stableData;
+  const queryStatusInput = pageData.queries as unknown as Parameters<typeof getEnterpriseInventoryLastUpdatedAt>[0];
+  const activeTabQueryError = getEnterpriseInventoryActiveTabQueryError(activeTab, queryStatusInput);
+  const lastRefreshedAt = getEnterpriseInventoryLastUpdatedAt(queryStatusInput);
 
   const actions = useEnterpriseInventoryPageActions({
     formState,
@@ -56,9 +63,10 @@ export function useEnterpriseInventoryPageController() {
   return {
     actions,
     activeTab,
-    errorMessage,
+    errorMessage: errorMessage ?? activeTabQueryError,
     formState,
     pageData,
+    lastRefreshedAt,
     refreshSystemContext,
     setActiveTab,
     statusMessage,

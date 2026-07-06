@@ -184,6 +184,7 @@ export default function ScannerPage() {
   const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
   const shipmentId = searchParams.get('shipmentId') || '';
   const locationId = searchParams.get('locationId') || '';
+  const isProductContextMissing = mode === 'product' && !shipmentId;
 
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -196,6 +197,7 @@ export default function ScannerPage() {
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing;
 
   const stopScanner = async () => {
     if (scannerRef.current) {
@@ -330,6 +332,11 @@ export default function ScannerPage() {
 
   const startScanner = async () => {
     setError(null);
+
+    if (isProductContextMissing) {
+      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before scanning a barcode.');
+      return;
+    }
     setResult(null);
     setResolvedShipmentId(null);
     setResolvedShipmentItemId(null);
@@ -423,6 +430,11 @@ export default function ScannerPage() {
   const handleManualSubmit = async () => {
     const trimmed = manualCode.trim();
 
+    if (isProductContextMissing) {
+      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before entering a barcode.');
+      return;
+    }
+
     if (!trimmed) {
       setError('Enter a code first.');
       return;
@@ -438,6 +450,11 @@ export default function ScannerPage() {
   };
 
   const handleChooseImage = () => {
+    if (isProductContextMissing) {
+      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before uploading a barcode image.');
+      return;
+    }
+
     fileInputRef.current?.click();
   };
 
@@ -510,16 +527,33 @@ export default function ScannerPage() {
         {mode === 'product' ? (
           <div style={styles.contextPanel}>
             <div style={styles.contextGrid}>
-              <div style={styles.contextCard}>
+              <div style={shipmentId ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>Selected shipment</div>
                 <div style={styles.contextValue}>{shipmentId || 'Missing shipment ID'}</div>
               </div>
 
-              <div style={styles.contextCard}>
+              <div style={locationId ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>Default scan location</div>
                 <div style={styles.contextValue}>{locationId || 'Missing default location'}</div>
               </div>
+
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>Return path</div>
+                <button
+                  type="button"
+                  onClick={() => navigate(shipmentId ? `/shipments?shipmentId=${encodeURIComponent(shipmentId)}` : '/shipments')}
+                  style={styles.inlineButton}
+                >
+                  {shipmentId ? 'Open selected shipment' : 'Open shipments'}
+                </button>
+              </div>
             </div>
+          </div>
+        ) : null}
+
+        {isProductContextMissing ? (
+          <div className="app-warning-state" style={styles.infoBanner}>
+            Product scanning is disabled until a shipmentId is present. Open the scanner from a selected shipment to preserve receiving context.
           </div>
         ) : null}
 
@@ -531,12 +565,14 @@ export default function ScannerPage() {
               <div>Move a little farther back than you would for a QR code.</div>
               <div>Use strong light and avoid glare.</div>
               <div>If live scan fails, use manual entry or image upload below.</div>
+              <div>Camera scanning requires HTTPS and browser camera permission.</div>
             </>
           ) : (
             <>
               <strong>QR scan tips:</strong>
               <div>Center the QR code inside the square scan area.</div>
               <div>If live scan fails, use manual entry or image upload below.</div>
+              <div>Camera scanning requires HTTPS and browser camera permission.</div>
             </>
           )}
         </div>
@@ -544,8 +580,12 @@ export default function ScannerPage() {
         <div className="app-actions" style={styles.actionGrid}>
           <button
             onClick={() => void startScanner()}
-            disabled={isRunning || isResolving || isDecodingImage}
-            style={styles.primaryButton}
+            disabled={isRunning || scannerInputDisabled}
+            title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+            style={{
+              ...styles.primaryButton,
+              ...(isRunning || scannerInputDisabled ? styles.disabledButton : {})
+            }}
           >
             {isRunning ? 'Scanner Running' : 'Start Scanner'}
           </button>
@@ -553,7 +593,10 @@ export default function ScannerPage() {
           <button
             onClick={() => void stopScanner()}
             disabled={!isRunning}
-            style={styles.secondaryButton}
+            style={{
+              ...styles.secondaryButton,
+              ...(!isRunning ? styles.disabledButton : {})
+            }}
           >
             Stop Scanner
           </button>
@@ -561,8 +604,12 @@ export default function ScannerPage() {
           <button
             type="button"
             onClick={handleChooseImage}
-            disabled={isResolving || isDecodingImage}
-            style={styles.secondaryButton}
+            disabled={scannerInputDisabled}
+            title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+            style={{
+              ...styles.secondaryButton,
+              ...(scannerInputDisabled ? styles.disabledButton : {})
+            }}
           >
             Upload Image
           </button>
@@ -619,7 +666,12 @@ export default function ScannerPage() {
               value={manualCode}
               onChange={(event) => setManualCode(event.target.value)}
               placeholder={mode === 'product' ? 'Enter product barcode' : 'Enter shipment QR text'}
-              style={styles.input}
+              disabled={isProductContextMissing}
+              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              style={{
+                ...styles.input,
+                ...(isProductContextMissing ? styles.disabledInput : {})
+              }}
             />
           </div>
 
@@ -627,8 +679,12 @@ export default function ScannerPage() {
             <button
               type="button"
               onClick={() => void handleManualSubmit()}
-              disabled={isResolving || isDecodingImage}
-              style={styles.primaryButton}
+              disabled={scannerInputDisabled}
+              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              style={{
+                ...styles.primaryButton,
+                ...(scannerInputDisabled ? styles.disabledButton : {})
+              }}
             >
               Submit Manual Code
             </button>
@@ -636,8 +692,12 @@ export default function ScannerPage() {
             <button
               type="button"
               onClick={handleChooseImage}
-              disabled={isResolving || isDecodingImage}
-              style={styles.secondaryButton}
+              disabled={scannerInputDisabled}
+              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              style={{
+                ...styles.secondaryButton,
+                ...(scannerInputDisabled ? styles.disabledButton : {})
+              }}
             >
               Upload Image
             </button>
@@ -785,6 +845,13 @@ const styles: Record<string, CSSProperties> = {
     padding: '14px',
     minWidth: 0
   },
+  contextCardWarn: {
+    background: '#fff7ed',
+    border: '1px solid #fdba74',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
   contextLabel: {
     fontSize: '12px',
     fontWeight: 800,
@@ -848,6 +915,19 @@ const styles: Record<string, CSSProperties> = {
     color: '#111827',
     fontWeight: 700,
     cursor: 'pointer'
+  },
+  inlineButton: {
+    border: '1px solid #93c5fd',
+    borderRadius: '10px',
+    padding: '8px 10px',
+    background: '#ffffff',
+    color: '#1d4ed8',
+    fontWeight: 800,
+    cursor: 'pointer'
+  },
+  disabledButton: {
+    opacity: 0.55,
+    cursor: 'not-allowed'
   },
   errorBanner: {
     lineHeight: 1.5
@@ -926,6 +1006,11 @@ const styles: Record<string, CSSProperties> = {
     padding: '12px 14px',
     fontSize: '14px',
     background: '#ffffff'
+  },
+  disabledInput: {
+    background: '#f3f4f6',
+    color: '#6b7280',
+    cursor: 'not-allowed'
   },
   formActions: {
     minWidth: 0

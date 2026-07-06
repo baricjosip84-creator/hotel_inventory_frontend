@@ -15,6 +15,9 @@ type SessionItem = {
   revoked: boolean;
   is_current?: boolean;
   is_active?: boolean;
+  session_type?: string | null;
+  access_level?: string | null;
+  reason?: string | null;
 };
 
 async function fetchSessions(): Promise<SessionItem[]> {
@@ -60,6 +63,30 @@ function formatIp(value: string | null | undefined): string {
   }
 
   return value;
+}
+
+function formatSessionType(value: string | null | undefined): string {
+  if (value === 'support_session') {
+    return 'Support session';
+  }
+
+  if (!value) {
+    return 'Tenant session';
+  }
+
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatLastRefreshed(timestamp: number): string {
+  if (!timestamp) {
+    return 'Not refreshed yet';
+  }
+
+  return `Last refreshed ${new Date(timestamp).toLocaleString()}`;
 }
 
 function StatCard(props: {
@@ -115,6 +142,7 @@ export default function SessionsPage() {
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
 
   const sessionsQuery = useQuery({
     queryKey: ['auth-sessions'],
@@ -135,6 +163,9 @@ export default function SessionsPage() {
         setPageError('Failed to revoke session.');
       }
       setPageMessage(null);
+    },
+    onSettled: () => {
+      setRevokingSessionId(null);
     }
   });
 
@@ -198,9 +229,35 @@ export default function SessionsPage() {
     };
   }, [sessions]);
 
+  const handleRefresh = async () => {
+    setPageError(null);
+    setPageMessage(null);
+
+    try {
+      const result = await sessionsQuery.refetch();
+      if (result.error) {
+        if (result.error instanceof ApiError) {
+          setPageError(result.error.message);
+        } else {
+          setPageError((result.error as Error).message || 'Failed to refresh sessions.');
+        }
+        return;
+      }
+
+      setPageMessage('Sessions refreshed.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setPageError(error.message);
+      } else {
+        setPageError('Failed to refresh sessions.');
+      }
+    }
+  };
+
   const handleRevokeOne = (sessionId: string) => {
     setPageError(null);
     setPageMessage(null);
+    setRevokingSessionId(sessionId);
     revokeOneMutation.mutate(sessionId);
   };
 
@@ -219,14 +276,25 @@ export default function SessionsPage() {
   };
 
   if (sessionsQuery.isLoading) {
-    return <p>Loading sessions...</p>;
+    return <div className="app-loading-state" style={styles.statePanel}>Loading sessions...</div>;
   }
 
   if (sessionsQuery.isError) {
     return (
-      <p>
-        Failed to load sessions: {(sessionsQuery.error as Error).message || 'Unknown error'}
-      </p>
+      <div style={styles.page}>
+        <div className="app-error-state" style={styles.statePanel}>
+          <strong>Failed to load sessions.</strong>
+          <p style={styles.stateText}>{(sessionsQuery.error as Error).message || 'Unknown error'}</p>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleRefresh}
+            disabled={sessionsQuery.isFetching}
+          >
+            {sessionsQuery.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -241,15 +309,32 @@ export default function SessionsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          style={styles.dangerButton}
-          onClick={handleRevokeAll}
-          disabled={revokeAllMutation.isPending}
-        >
-          {revokeAllMutation.isPending ? 'Revoking...' : 'Revoke All Sessions'}
-        </button>
+        <div style={styles.headerActions}>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleRefresh}
+            disabled={sessionsQuery.isFetching || revokeAllMutation.isPending}
+          >
+            {sessionsQuery.isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            style={styles.dangerButton}
+            onClick={handleRevokeAll}
+            disabled={revokeAllMutation.isPending}
+            title="Revokes every account session, including this browser."
+          >
+            {revokeAllMutation.isPending ? 'Revoking...' : 'Revoke All Sessions'}
+          </button>
+        </div>
       </div>
+
+      <div style={styles.warningBox}>
+        Revoke All Sessions includes the current browser session. After it succeeds, local auth tokens are cleared and you are returned to login.
+      </div>
+
+      <div style={styles.metaText}>{formatLastRefreshed(sessionsQuery.dataUpdatedAt)}</div>
 
       {pageError ? (
         <div className="app-error-state" style={styles.messageBox}>
@@ -326,6 +411,15 @@ export default function SessionsPage() {
                       : new Date(session.expires_at).getTime() <= Date.now();
                   const isCurrent = Boolean(session.is_current);
                   const canRevoke = !session.revoked && !isExpired && !isCurrent;
+                  const isRowPending = revokingSessionId === session.id && revokeOneMutation.isPending;
+                  const revokeDisabled = !canRevoke || revokeOneMutation.isPending || revokeAllMutation.isPending;
+                  const revokeTitle = isCurrent
+                    ? 'Current session cannot be revoked individually. Use Revoke All Sessions to sign out everywhere.'
+                    : session.revoked
+                      ? 'Session is already revoked.'
+                      : isExpired
+                        ? 'Expired sessions cannot be revoked.'
+                        : 'Revoke this stale session.';
 
                   return (
                     <tr key={session.id}>
@@ -346,6 +440,10 @@ export default function SessionsPage() {
                           {isCurrent ? (
                             <span style={styles.badgeInfo}>Current</span>
                           ) : null}
+
+                          {session.session_type ? (
+                            <span style={styles.badgeNeutral}>{formatSessionType(session.session_type)}</span>
+                          ) : null}
                         </div>
                       </td>
 
@@ -362,11 +460,12 @@ export default function SessionsPage() {
                       <td style={styles.td}>
                         <button
                           type="button"
-                          style={!canRevoke ? styles.disabledButton : styles.secondaryButton}
+                          style={revokeDisabled ? styles.disabledButton : styles.secondaryButton}
                           onClick={() => handleRevokeOne(session.id)}
-                          disabled={!canRevoke || revokeOneMutation.isPending}
+                          disabled={revokeDisabled}
+                          title={revokeTitle}
                         >
-                          {revokeOneMutation.isPending ? 'Working...' : 'Revoke'}
+                          {isRowPending ? 'Revoking...' : 'Revoke'}
                         </button>
                       </td>
                     </tr>
@@ -397,6 +496,12 @@ const styles: Record<string, CSSProperties> = {
   },
   headerTextBlock: {
     minWidth: 0
+  },
+  headerActions: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    flexWrap: 'wrap'
   },
   title: {
     margin: 0,
@@ -469,6 +574,30 @@ const styles: Record<string, CSSProperties> = {
   },
   messageBox: {
     marginBottom: '16px'
+  },
+  warningBox: {
+    marginBottom: '12px',
+    border: '1px solid #fde68a',
+    background: '#fffbeb',
+    color: '#92400e',
+    borderRadius: '12px',
+    padding: '12px 14px',
+    fontSize: '14px',
+    lineHeight: 1.5
+  },
+  metaText: {
+    margin: '0 0 16px',
+    color: '#6b7280',
+    fontSize: '13px'
+  },
+  statePanel: {
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '16px'
+  },
+  stateText: {
+    margin: '8px 0 14px',
+    lineHeight: 1.5
   },
   panel: {
     minWidth: 0,
@@ -593,6 +722,16 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     background: '#dbeafe',
     color: '#1d4ed8'
+  },
+  badgeNeutral: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    fontWeight: 700,
+    background: '#f3f4f6',
+    color: '#374151'
   },
   secondaryButton: {
     border: '1px solid #d1d5db',

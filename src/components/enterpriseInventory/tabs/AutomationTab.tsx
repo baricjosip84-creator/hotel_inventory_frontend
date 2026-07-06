@@ -162,8 +162,8 @@ export function AutomationTab({
               {schedule.description ? <p style={styles.helper}>{schedule.description}</p> : null}
               <div style={styles.actions}>
                 <button type="button" style={styles.secondarySmallButton} onClick={() => dryRunAutomationScheduleMutation.mutate(schedule.id)}>Dry run</button>
-                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.smallButton} disabled={schedule.status === 'disabled'} onClick={() => runAutomationScheduleMutation.mutate(schedule.id)}>Manual run</button>
-                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled'} onClick={() => pauseAutomationScheduleMutation.mutate(schedule.id)}>Pause</button>
+                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.smallButton} disabled={schedule.status === 'disabled'} title={schedule.status === 'disabled' ? 'Disabled automation schedules cannot be run manually.' : undefined} onClick={() => runAutomationScheduleMutation.mutate(schedule.id)}>Manual run</button>
+                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled'} title={schedule.status === 'disabled' ? 'Disabled automation schedules are already blocked.' : undefined} onClick={() => pauseAutomationScheduleMutation.mutate(schedule.id)}>Pause</button>
                 {schedule.status === 'paused' ? <button type="button" style={styles.disabledButton} disabled title="Resume is intentionally blocked until the automation runner is enabled.">Resume locked</button> : null}
               </div>
               <div style={{ ...styles.actions, marginTop: 8 }}>
@@ -177,6 +177,7 @@ export function AutomationTab({
                   type="button"
                   style={schedule.status === 'disabled' ? styles.disabledButton : styles.dangerButton}
                   disabled={schedule.status === 'disabled'}
+                  title={schedule.status === 'disabled' ? 'This schedule is already disabled.' : undefined}
                   onClick={() => disableAutomationScheduleMutation.mutate({ id: schedule.id, reason: automationDisableReasons[schedule.id] ?? '' })}
                 >
                   Disable

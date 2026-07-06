@@ -28,6 +28,7 @@ type StockTransferListItem = {
   created_at: string;
   executed_at?: string | null;
   cancelled_at?: string | null;
+  version: number | string;
   item_count?: number | string;
   total_quantity?: number | string;
 };
@@ -217,13 +218,14 @@ async function createTransfer(input: TransferFormState): Promise<StockTransferDe
   });
 }
 
-async function updateTransfer(id: string, input: TransferFormState): Promise<StockTransferDetail> {
+async function updateTransfer(id: string, input: TransferFormState, version: number | string): Promise<StockTransferDetail> {
   return apiRequest<StockTransferDetail>(`/stock-transfers/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({
       from_storage_location_id: input.from_storage_location_id,
       to_storage_location_id: input.to_storage_location_id,
       notes: input.notes.trim() || null,
+      version: Number(version),
       items: input.items.map((item) => ({
         product_id: item.product_id,
         quantity: Number(item.quantity)
@@ -335,6 +337,26 @@ export default function StockTransfersPage() {
     productFilter
   );
 
+  const isRefreshingTransfers = Boolean(
+    transfersQuery.isFetching ||
+    productsQuery.isFetching ||
+    locationsQuery.isFetching ||
+    transferDetailQuery.isFetching ||
+    transferAvailabilityQuery.isFetching ||
+    transferMovementsQuery.isFetching
+  );
+
+  const refreshTransferBoard = async () => {
+    await Promise.all([
+      transfersQuery.refetch(),
+      productsQuery.refetch(),
+      locationsQuery.refetch(),
+      selectedTransferId ? transferDetailQuery.refetch() : Promise.resolve(),
+      selectedTransferId ? transferMovementsQuery.refetch() : Promise.resolve(),
+      selectedTransferId && transferDetailQuery.data?.status === 'draft' ? transferAvailabilityQuery.refetch() : Promise.resolve()
+    ]);
+  };
+
   const summary = useMemo(() => {
     const drafts = transfers.filter((transfer) => transfer.status === 'draft').length;
     const executed = transfers.filter((transfer) => transfer.status === 'executed').length;
@@ -366,7 +388,7 @@ export default function StockTransfersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: TransferFormState }) => updateTransfer(id, input),
+    mutationFn: ({ id, input, version }: { id: string; input: TransferFormState; version: number | string }) => updateTransfer(id, input, version),
     onSuccess: async (transfer) => {
       setEditingTransferId(null);
       setForm(emptyTransferForm());
@@ -523,7 +545,12 @@ export default function StockTransfersPage() {
     }
 
     if (editingTransferId) {
-      updateMutation.mutate({ id: editingTransferId, input: form });
+      const draftVersion = selectedTransfer?.id === editingTransferId ? selectedTransfer.version : null;
+      if (!draftVersion) {
+        setError('Refresh the selected transfer before saving draft changes.');
+        return;
+      }
+      updateMutation.mutate({ id: editingTransferId, input: form, version: draftVersion });
       return;
     }
 
@@ -930,6 +957,14 @@ export default function StockTransfersPage() {
             <p style={styles.panelSubtitle}>Review draft and executed transfers.</p>
           </div>
           <div style={styles.filterActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={refreshTransferBoard}
+              disabled={isRefreshingTransfers}
+            >
+              {isRefreshingTransfers ? 'Refreshing…' : 'Refresh transfers'}
+            </button>
             <button
               type="button"
               style={styles.secondaryButton}

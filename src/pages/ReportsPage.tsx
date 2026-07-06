@@ -17,6 +17,7 @@ const MAX_REPORT_FILTER_LENGTH = 120;
 const DOWNLOAD_ERROR_STATUS_ID = 'report-download-error-status';
 const DOWNLOAD_SUCCESS_STATUS_ID = 'report-download-success-status';
 const REPORT_TAB_LOCK_HINT_ID = 'report-tab-export-lock-hint';
+const FORECAST_ACCESS_NOTE_ID = 'forecast-access-note';
 const PRODUCT_MOVEMENT_LIMIT_OPTIONS = [25, 50, 100, 200, 500] as const;
 const MAX_PRODUCT_MOVEMENT_REPORT_LIMIT = PRODUCT_MOVEMENT_LIMIT_OPTIONS[PRODUCT_MOVEMENT_LIMIT_OPTIONS.length - 1];
 
@@ -239,6 +240,47 @@ function formatDateTime(value: string | null | undefined): string {
   return parsed.toLocaleString();
 }
 
+function formatLastRefreshed(timestamp: number): string {
+  if (!timestamp) {
+    return 'Not loaded yet';
+  }
+
+  return formatDateTime(new Date(timestamp).toISOString());
+}
+
+function RefreshReportButton(props: {
+  label: string;
+  isRefreshing: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+  onRefresh: () => void;
+}) {
+  const disabled = Boolean(props.disabled || props.isRefreshing);
+  const title = props.disabledReason || (props.isRefreshing ? `${props.label} is refreshing.` : `Refresh ${props.label}.`);
+
+  return (
+    <button
+      type="button"
+      onClick={props.onRefresh}
+      disabled={disabled}
+      aria-disabled={disabled}
+      aria-busy={props.isRefreshing}
+      title={title}
+      style={styles.secondaryButton}
+    >
+      {props.isRefreshing ? 'Refreshing...' : 'Refresh'}
+    </button>
+  );
+}
+
+function LastRefreshedText(props: { timestamp: number }) {
+  return (
+    <p style={styles.refreshMeta}>
+      Last refreshed: {formatLastRefreshed(props.timestamp)}
+    </p>
+  );
+}
+
 function buildQueryString(
   params: Record<string, string | number | null | undefined>
 ): string {
@@ -405,7 +447,7 @@ export default function ReportsPage() {
     [locationCategoryFilter]
   );
 
-  const { role: currentUserRole } = getRoleCapabilities();
+  const { role: currentUserRole, canViewInsights } = getRoleCapabilities();
 
   const subscriptionAccessQuery = useQuery({
     queryKey: ['tenant-subscription-access', 'reports'],
@@ -414,6 +456,14 @@ export default function ReportsPage() {
   const reportsEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'reports');
   const reportsEntitled = reportsEntitlement ? reportsEntitlement.allowed : true;
   const reportsFeatureReady = Boolean(subscriptionAccessQuery.data) && reportsEntitled;
+  const forecastingEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'forecasting');
+  const forecastingFeatureAllowed = forecastingEntitlement ? forecastingEntitlement.allowed : true;
+  const forecastFeatureReady = reportsFeatureReady && forecastingFeatureAllowed && canViewInsights;
+  const forecastUnavailableReason = !canViewInsights
+    ? 'Forecast requires insights.read in addition to reports.read.'
+    : forecastingEntitlement && !forecastingEntitlement.allowed
+      ? `Forecasting is not enabled for this tenant plan. Required feature flags: ${(forecastingEntitlement.required_flags || ['forecasting']).join(', ')}.`
+      : null;
 
   const inventoryValuationQuery = useQuery({
     queryKey: ['reports', 'inventory-valuation'],
@@ -442,7 +492,7 @@ export default function ReportsPage() {
   const forecastQuery = useQuery({
     queryKey: ['reports', 'forecast'],
     queryFn: fetchForecast,
-    enabled: reportsFeatureReady
+    enabled: forecastFeatureReady
   });
 
   const inventoryValuationRows = inventoryValuationQuery.data?.rows ?? [];
@@ -485,7 +535,7 @@ export default function ReportsPage() {
     stockByLocationQuery.error,
     productMovementsQuery.error,
     procurementSummaryQuery.error,
-    forecastQuery.error
+    forecastFeatureReady ? forecastQuery.error : null
   ].some((error) => getErrorStatus(error) === 403);
 
   const clearDownloadStatus = () => {
@@ -585,6 +635,34 @@ export default function ReportsPage() {
       setDownloadError(getReadableError(error));
     } finally {
       setDownloadingReport(null);
+    }
+  };
+
+  const refreshReport = (report: ReportTab) => {
+    clearDownloadStatus();
+
+    if (report === 'inventory-valuation') {
+      void inventoryValuationQuery.refetch();
+      return;
+    }
+
+    if (report === 'stock-by-location') {
+      void stockByLocationQuery.refetch();
+      return;
+    }
+
+    if (report === 'product-movements') {
+      void productMovementsQuery.refetch();
+      return;
+    }
+
+    if (report === 'procurement-summary') {
+      void procurementSummaryQuery.refetch();
+      return;
+    }
+
+    if (forecastFeatureReady) {
+      void forecastQuery.refetch();
     }
   };
 
@@ -836,19 +914,29 @@ export default function ReportsPage() {
           title="Inventory Valuation"
           subtitle="Estimated stock value by product and storage location using the latest available movement, shipment, or standard product cost."
           actions={
-            <button
-              type="button"
-              onClick={() => downloadReportCsv('inventory-valuation')}
-              disabled={downloadingReport !== null}
-              style={styles.actionButton}
-              aria-busy={downloadingReport === 'inventory-valuation'}
-              title={getExportButtonTitle('inventory-valuation', downloadingReport)}
-              aria-label={getExportButtonAriaLabel('inventory-valuation', downloadingReport)}
-            >
-              {getExportButtonLabel('inventory-valuation', downloadingReport)}
-            </button>
+            <div className="app-actions" style={styles.filterRow}>
+              <RefreshReportButton
+                label="inventory valuation report"
+                isRefreshing={inventoryValuationQuery.isFetching}
+                disabled={downloadingReport !== null}
+                disabledReason={downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined}
+                onRefresh={() => refreshReport('inventory-valuation')}
+              />
+              <button
+                type="button"
+                onClick={() => downloadReportCsv('inventory-valuation')}
+                disabled={downloadingReport !== null}
+                style={styles.actionButton}
+                aria-busy={downloadingReport === 'inventory-valuation'}
+                title={getExportButtonTitle('inventory-valuation', downloadingReport)}
+                aria-label={getExportButtonAriaLabel('inventory-valuation', downloadingReport)}
+              >
+                {getExportButtonLabel('inventory-valuation', downloadingReport)}
+              </button>
+            </div>
           }
         >
+          <LastRefreshedText timestamp={inventoryValuationQuery.dataUpdatedAt} />
           {inventoryValuationQuery.isLoading ? <div>Loading inventory valuation...</div> : null}
           {inventoryValuationQuery.isError ? (
             <ErrorState
@@ -942,6 +1030,13 @@ export default function ReportsPage() {
           subtitle="Grouped stock totals per storage location using the existing backend stock-by-location report."
           actions={
             <div className="app-actions" style={styles.filterRow}>
+              <RefreshReportButton
+                label="stock by location report"
+                isRefreshing={stockByLocationQuery.isFetching}
+                disabled={downloadingReport !== null}
+                disabledReason={downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined}
+                onRefresh={() => refreshReport('stock-by-location')}
+              />
               <button
                 type="button"
                 onClick={() => downloadReportCsv('stock-by-location')}
@@ -949,7 +1044,7 @@ export default function ReportsPage() {
                 style={styles.actionButton}
                 aria-busy={downloadingReport === 'stock-by-location'}
                 title={getExportButtonTitle('stock-by-location', downloadingReport)}
-              aria-label={getExportButtonAriaLabel('stock-by-location', downloadingReport)}
+                aria-label={getExportButtonAriaLabel('stock-by-location', downloadingReport)}
               >
                 {getExportButtonLabel('stock-by-location', downloadingReport)}
               </button>
@@ -975,6 +1070,7 @@ export default function ReportsPage() {
             </div>
           }
         >
+          <LastRefreshedText timestamp={stockByLocationQuery.dataUpdatedAt} />
           {stockByLocationQuery.isLoading ? <div>Loading stock by location...</div> : null}
           {stockByLocationQuery.isError ? (
             <ErrorState
@@ -1048,6 +1144,13 @@ export default function ReportsPage() {
           subtitle="Product-level movement summary using your existing product movement report endpoint."
           actions={
             <div className="app-actions" style={styles.filterRow}>
+              <RefreshReportButton
+                label="product movements report"
+                isRefreshing={productMovementsQuery.isFetching}
+                disabled={downloadingReport !== null}
+                disabledReason={downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined}
+                onRefresh={() => refreshReport('product-movements')}
+              />
               <button
                 type="button"
                 onClick={() => downloadReportCsv('product-movements')}
@@ -1055,7 +1158,7 @@ export default function ReportsPage() {
                 style={styles.actionButton}
                 aria-busy={downloadingReport === 'product-movements'}
                 title={getExportButtonTitle('product-movements', downloadingReport)}
-              aria-label={getExportButtonAriaLabel('product-movements', downloadingReport)}
+                aria-label={getExportButtonAriaLabel('product-movements', downloadingReport)}
               >
                 {getExportButtonLabel('product-movements', downloadingReport)}
               </button>
@@ -1084,6 +1187,7 @@ export default function ReportsPage() {
             </div>
           }
         >
+          <LastRefreshedText timestamp={productMovementsQuery.dataUpdatedAt} />
           {productMovementsQuery.isLoading ? <div>Loading product movements...</div> : null}
           {productMovementsQuery.isError ? (
             <ErrorState
@@ -1167,19 +1271,29 @@ export default function ReportsPage() {
           title="Procurement Summary"
           subtitle="Shipment and line-level procurement summary from your existing backend procurement report."
           actions={
-            <button
-              type="button"
-              onClick={() => downloadReportCsv('procurement-summary')}
-              disabled={downloadingReport !== null}
-              style={styles.actionButton}
-              aria-busy={downloadingReport === 'procurement-summary'}
-              title={getExportButtonTitle('procurement-summary', downloadingReport)}
-              aria-label={getExportButtonAriaLabel('procurement-summary', downloadingReport)}
-            >
-              {getExportButtonLabel('procurement-summary', downloadingReport)}
-            </button>
+            <div className="app-actions" style={styles.filterRow}>
+              <RefreshReportButton
+                label="procurement summary report"
+                isRefreshing={procurementSummaryQuery.isFetching}
+                disabled={downloadingReport !== null}
+                disabledReason={downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined}
+                onRefresh={() => refreshReport('procurement-summary')}
+              />
+              <button
+                type="button"
+                onClick={() => downloadReportCsv('procurement-summary')}
+                disabled={downloadingReport !== null}
+                style={styles.actionButton}
+                aria-busy={downloadingReport === 'procurement-summary'}
+                title={getExportButtonTitle('procurement-summary', downloadingReport)}
+                aria-label={getExportButtonAriaLabel('procurement-summary', downloadingReport)}
+              >
+                {getExportButtonLabel('procurement-summary', downloadingReport)}
+              </button>
+            </div>
           }
         >
+          <LastRefreshedText timestamp={procurementSummaryQuery.dataUpdatedAt} />
           {procurementSummaryQuery.isLoading ? <div>Loading procurement summary...</div> : null}
           {procurementSummaryQuery.isError ? (
             <ErrorState
@@ -1246,14 +1360,33 @@ export default function ReportsPage() {
           labelledBy={getReportTabId('forecast')}
           title="Demand Forecast"
           subtitle="Usage-based demand forecast from recent negative stock movements over the last 30 days."
+          actions={
+            <RefreshReportButton
+              label="forecast report"
+              isRefreshing={forecastQuery.isFetching}
+              disabled={downloadingReport !== null || !forecastFeatureReady}
+              disabledReason={
+                forecastUnavailableReason ||
+                (downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined)
+              }
+              onRefresh={() => refreshReport('forecast')}
+            />
+          }
         >
-          {forecastQuery.isLoading ? <div>Loading forecast...</div> : null}
-          {forecastQuery.isError ? (
+          <p id={FORECAST_ACCESS_NOTE_ID} style={styles.infoNote}>
+            Forecast is read-only, has no CSV export, and requires forecasting feature access plus insights.read separately from reports.read.
+          </p>
+          {forecastUnavailableReason ? (
+            <ErrorState message={forecastUnavailableReason} />
+          ) : null}
+          <LastRefreshedText timestamp={forecastQuery.dataUpdatedAt} />
+          {forecastFeatureReady && forecastQuery.isLoading ? <div>Loading forecast...</div> : null}
+          {forecastFeatureReady && forecastQuery.isError ? (
             <ErrorState
               message={`Failed to load forecast: ${getReadableError(forecastQuery.error)}`}
             />
           ) : null}
-          {!forecastQuery.isLoading && !forecastQuery.isError ? (
+          {forecastFeatureReady && !forecastQuery.isLoading && !forecastQuery.isError ? (
             forecastRows.length === 0 ? (
               <EmptyState message="No recent consumption data was available to produce a forecast." />
             ) : (
@@ -1564,6 +1697,31 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '14px',
     background: '#ffffff',
     boxSizing: 'border-box'
+  },
+  secondaryButton: {
+    border: '1px solid #94a3b8',
+    background: '#ffffff',
+    color: '#0f172a',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
+  refreshMeta: {
+    margin: '0 0 12px 0',
+    color: '#64748b',
+    fontSize: '12px',
+    fontWeight: 600
+  },
+  infoNote: {
+    margin: '0 0 12px 0',
+    color: '#475569',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '10px 12px',
+    lineHeight: 1.45
   },
   actionButton: {
     border: '1px solid #0f172a',

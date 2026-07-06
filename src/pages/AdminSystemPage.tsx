@@ -78,6 +78,16 @@ function formatDateTime(value: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
 }
 
+function formatUpdatedAt(value: number): string {
+  if (!value) return '-';
+  return formatDateTime(new Date(value).toISOString());
+}
+
+function formatCount(count: number | undefined, isLoading: boolean): string {
+  if (isLoading) return 'loading';
+  return String(count ?? 0);
+}
+
 function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <section className="app-panel app-panel--padded" style={styles.panel}>
@@ -132,6 +142,39 @@ export default function AdminSystemPage() {
     enabled: canViewTenantDiagnostics
   });
 
+  const isAdminSystemRefreshing =
+    systemStatusQuery.isFetching ||
+    blockingAlertsQuery.isFetching ||
+    stockIntegrityQuery.isFetching ||
+    brokenShipmentsQuery.isFetching;
+
+  const lastUpdatedAt = Math.max(
+    systemStatusQuery.dataUpdatedAt,
+    canViewTenantDiagnostics ? blockingAlertsQuery.dataUpdatedAt : 0,
+    canViewTenantDiagnostics ? stockIntegrityQuery.dataUpdatedAt : 0,
+    canViewTenantDiagnostics ? brokenShipmentsQuery.dataUpdatedAt : 0
+  );
+
+  const handleManualRefresh = async () => {
+    setActionMessage(null);
+    setActionError(null);
+
+    try {
+      await Promise.all([
+        systemStatusQuery.refetch(),
+        ...(canViewTenantDiagnostics
+          ? [
+              blockingAlertsQuery.refetch(),
+              stockIntegrityQuery.refetch(),
+              brokenShipmentsQuery.refetch()
+            ]
+          : [])
+      ]);
+      setActionMessage('Admin system data refreshed.');
+    } catch (error) {
+      setActionError(readableError(error));
+    }
+  };
 
   const refreshAdminAlertData = async () => {
     await Promise.all([
@@ -189,6 +232,19 @@ export default function AdminSystemPage() {
 
   return (
     <div style={styles.page}>
+      <div style={styles.toolbar}>
+        <div style={styles.toolbarText}>Last refreshed: {formatUpdatedAt(lastUpdatedAt)}</div>
+        <button
+          type="button"
+          className="app-button app-button--secondary"
+          style={styles.secondaryButton}
+          onClick={() => void handleManualRefresh()}
+          disabled={isAdminSystemRefreshing}
+        >
+          {isAdminSystemRefreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
       <section className="app-grid-stats" style={styles.statsGrid}>
         <StatCard title="Write Status" value={writeLock} subtitle="Current system write-lock posture." tone={writeLock === 'Locked' ? 'bad' : 'default'} />
         <StatCard title="Maintenance" value={maintenance} subtitle="Maintenance-mode visibility from system flags." tone={maintenance === 'Enabled' ? 'warn' : 'default'} />
@@ -216,7 +272,7 @@ export default function AdminSystemPage() {
           {!canViewTenantDiagnostics ? <div className="app-warning-state">Diagnostics require tenant diagnostics permission.</div> : null}
           {canViewTenantDiagnostics ? (
             <div style={styles.list}>
-              <h4 style={styles.sectionSubheading}>Blocking Diagnostics</h4>
+              <h4 style={styles.sectionSubheading}>Blocking Diagnostics <span style={styles.countLabel}>{formatCount(blockingAlertsQuery.data?.length, blockingAlertsQuery.isLoading)}</span></h4>
               {blockingAlertsQuery.error ? <div className="app-error-state">{readableError(blockingAlertsQuery.error)}</div> : null}
               {blockingAlertsQuery.isLoading ? <div className="app-empty-state">Loading blocking diagnostics...</div> : null}
               {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => {
@@ -292,7 +348,7 @@ export default function AdminSystemPage() {
                 );
               }) : !blockingAlertsQuery.isLoading ? <div className="app-empty-state">No blocking diagnostics returned.</div> : null}
 
-              <h4 style={styles.sectionSubheading}>Stock Integrity</h4>
+              <h4 style={styles.sectionSubheading}>Stock Integrity <span style={styles.countLabel}>{formatCount(stockIntegrityQuery.data?.length, stockIntegrityQuery.isLoading)}</span></h4>
               {stockIntegrityQuery.error ? <div className="app-error-state">{readableError(stockIntegrityQuery.error)}</div> : null}
               {stockIntegrityQuery.isLoading ? <div className="app-empty-state">Loading stock integrity issues...</div> : null}
               {stockIntegrityQuery.data?.length ? stockIntegrityQuery.data.map((row) => (
@@ -303,7 +359,7 @@ export default function AdminSystemPage() {
                 </article>
               )) : !stockIntegrityQuery.isLoading ? <div className="app-empty-state">No negative stock integrity issues returned.</div> : null}
 
-              <h4 style={styles.sectionSubheading}>Broken Shipments</h4>
+              <h4 style={styles.sectionSubheading}>Broken Shipments <span style={styles.countLabel}>{formatCount(brokenShipmentsQuery.data?.length, brokenShipmentsQuery.isLoading)}</span></h4>
               {brokenShipmentsQuery.error ? <div className="app-error-state">{readableError(brokenShipmentsQuery.error)}</div> : null}
               {brokenShipmentsQuery.isLoading ? <div className="app-empty-state">Loading broken shipments...</div> : null}
               {brokenShipmentsQuery.data?.length ? brokenShipmentsQuery.data.map((row) => (
@@ -323,6 +379,8 @@ export default function AdminSystemPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: '20px', width: '100%', minWidth: 0 },
+  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%', minWidth: 0 },
+  toolbarText: { color: '#475569', fontSize: '0.9rem', fontWeight: 700 },
   statsGrid: { width: '100%', minWidth: 0 },
   statCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '18px', minWidth: 0 },
   statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
@@ -341,6 +399,7 @@ const styles: Record<string, CSSProperties> = {
   itemTextMono: { color: '#0f172a', fontFamily: 'monospace', wordBreak: 'break-all', overflowWrap: 'anywhere' },
   itemMeta: { color: '#64748b', fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word' },
   sectionSubheading: { color: '#0f172a', fontWeight: 800, margin: '4px 0 0' },
+  countLabel: { display: 'inline-flex', marginLeft: '6px', padding: '0.1rem 0.45rem', borderRadius: '999px', background: '#f1f5f9', color: '#475569', fontSize: '0.78rem', fontWeight: 800, verticalAlign: 'middle' },
   keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 },
   actions: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' },
   primaryButton: { border: '1px solid #bbf7d0', borderRadius: '12px', background: '#dcfce7', color: '#166534', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },

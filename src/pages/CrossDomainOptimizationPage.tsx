@@ -1,5 +1,81 @@
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+
+const OPTIMIZATION_DOMAIN_OPTIONS = [
+  'inventory',
+  'procurement',
+  'reservation',
+  'execution',
+  'optimization',
+  'control_tower',
+  'financial',
+  'integration',
+  'multi_domain',
+  'system'
+];
+
+const OPTIMIZATION_STATUS_OPTIONS = [
+  'draft',
+  'candidate_generated',
+  'tradeoff_review',
+  'governance_review_required',
+  'approved_for_manual_planning',
+  'rejected',
+  'archived'
+];
+
+const OBJECTIVE_TYPE_OPTIONS = [
+  'sla_risk',
+  'profitability',
+  'labor_cost',
+  'carrying_cost',
+  'supplier_reliability',
+  'working_capital',
+  'facility_load',
+  'integration_resilience',
+  'general'
+];
+
+const OPTION_STATUS_OPTIONS = [
+  'generated',
+  'ranked',
+  'tradeoff_review',
+  'governance_review_required',
+  'approved_for_manual_planning',
+  'rejected',
+  'superseded'
+];
+
+const IMPACT_DIRECTION_OPTIONS = ['positive', 'negative', 'neutral', 'mixed'];
+const LIMIT_OPTIONS = ['25', '50', '100', '200'];
+
+type OptimizationFilterState = {
+  optimization_domain: string;
+  optimization_status: string;
+  objective_type: string;
+  option_status: string;
+  impact_direction: string;
+  limit: string;
+};
+
+const DEFAULT_FILTERS: OptimizationFilterState = {
+  optimization_domain: '',
+  optimization_status: '',
+  objective_type: '',
+  option_status: '',
+  impact_direction: '',
+  limit: '25'
+};
+
+const FILTER_LABELS: Record<keyof OptimizationFilterState, string> = {
+  optimization_domain: 'Optimization domain',
+  optimization_status: 'Optimization status',
+  objective_type: 'Objective type',
+  option_status: 'Option status',
+  impact_direction: 'Impact direction',
+  limit: 'Result limit'
+};
 
 type OptimizationSummary = {
   feature?: string;
@@ -133,6 +209,45 @@ type OptimizationSummary = {
 
 const formatLabel = (value: unknown) => String(value ?? 'n/a').replace(/_/g, ' ');
 
+const formatDateTime = (timestamp: number) => {
+  if (!timestamp) return 'Not loaded yet';
+  return new Date(timestamp).toLocaleString();
+};
+
+const formatOptionLabel = (value: string) => value.replaceAll('_', ' ');
+
+function FilterSelect({
+  name,
+  value,
+  options,
+  onChange,
+  allowAll = true
+}: {
+  name: keyof OptimizationFilterState;
+  value: string;
+  options: string[];
+  onChange: (name: keyof OptimizationFilterState, value: string) => void;
+  allowAll?: boolean;
+}) {
+  return (
+    <label className="space-y-1 text-sm text-slate-700">
+      <span className="font-medium text-slate-800">{FILTER_LABELS[name]}</span>
+      <select
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        value={value}
+        onChange={(event) => onChange(name, event.target.value)}
+      >
+        {allowAll ? <option value="">All</option> : null}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {formatOptionLabel(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="stat-card">
@@ -173,10 +288,31 @@ function SimpleTable({ title, rows }: { title: string; rows: Array<Record<string
 }
 
 export default function CrossDomainOptimizationPage() {
+  const [filters, setFilters] = useState<OptimizationFilterState>(DEFAULT_FILTERS);
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    (Object.entries(filters) as Array<[keyof OptimizationFilterState, string]>).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+    if (!params.has('limit')) {
+      params.set('limit', DEFAULT_FILTERS.limit);
+    }
+    return params.toString();
+  }, [filters]);
+
   const summaryQuery = useQuery({
-    queryKey: ['cross-domain-optimization-summary'],
-    queryFn: () => apiRequest<OptimizationSummary>('/decision-intelligence/cross-domain-optimization-summary?limit=25')
+    queryKey: ['cross-domain-optimization-summary', filters],
+    queryFn: () => apiRequest<OptimizationSummary>(`/decision-intelligence/cross-domain-optimization-summary?${queryString}`)
   });
+
+  const updateFilter = (name: keyof OptimizationFilterState, value: string) => {
+    setFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value)) || filters.limit !== DEFAULT_FILTERS.limit;
 
   const summary = summaryQuery.data;
   const loop = summary?.execution_feedback_loop;
@@ -187,6 +323,7 @@ export default function CrossDomainOptimizationPage() {
   const lifecycleReview = summary?.pattern_lifecycle_review;
   const portfolioScalingGuard = summary?.portfolio_scaling_guard;
   const governance = summary?.governance || {};
+  const totalOptimizationRecords = (summary?.optimization_runs?.length || 0) + (summary?.objectives?.length || 0) + (summary?.options?.length || 0) + (summary?.tradeoffs?.length || 0);
 
   return (
     <div className="page-shell">
@@ -198,7 +335,70 @@ export default function CrossDomainOptimizationPage() {
             Review optimization runs, objectives, options, tradeoffs, and the new manual execution feedback loop before any operational trial evidence is captured.
           </p>
         </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          <div className="font-medium text-slate-900">Last refreshed</div>
+          <div className="mt-1">{formatDateTime(summaryQuery.dataUpdatedAt)}</div>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            onClick={() => summaryQuery.refetch()}
+            disabled={summaryQuery.isFetching}
+          >
+            {summaryQuery.isFetching && !summaryQuery.isLoading ? 'Refreshing...' : 'Refresh summary'}
+          </button>
+        </div>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" style={{ marginBottom: 16 }}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Optimization filters</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              These controls use the existing validated backend query contract and only change the read-only summary view.
+            </p>
+          </div>
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FilterSelect name="optimization_domain" value={filters.optimization_domain} options={OPTIMIZATION_DOMAIN_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="optimization_status" value={filters.optimization_status} options={OPTIMIZATION_STATUS_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="objective_type" value={filters.objective_type} options={OBJECTIVE_TYPE_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="option_status" value={filters.option_status} options={OPTION_STATUS_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="impact_direction" value={filters.impact_direction} options={IMPACT_DIRECTION_OPTIONS} onChange={updateFilter} />
+          <FilterSelect name="limit" value={filters.limit} options={LIMIT_OPTIONS} onChange={updateFilter} allowAll={false} />
+        </div>
+      </section>
+
+      {summaryQuery.isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-600" style={{ marginBottom: 16 }}>Loading cross-domain optimization summary...</div> : null}
+
+      {summaryQuery.isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700" style={{ marginBottom: 16 }}>
+          <div className="font-semibold">Unable to load cross-domain optimization summary.</div>
+          <p className="mt-1 text-sm">Check Decision Intelligence access, tenant context, and whether the selected filters are valid for the backend contract.</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-red-300"
+            onClick={() => summaryQuery.refetch()}
+            disabled={summaryQuery.isFetching}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {summary && totalOptimizationRecords === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800" style={{ marginBottom: 16 }}>
+          No cross-domain optimization runs, objectives, options, or tradeoffs match the current filters yet. Clear filters or confirm that tenant optimization evidence has been loaded.
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <StatCard label="Posture" value={governance.cross_domain_optimization_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} />
@@ -446,8 +646,6 @@ export default function CrossDomainOptimizationPage() {
           </div>
         ) : <p className="card__subtext" style={{ marginTop: 12 }}>No portfolio scaling blockers returned.</p>}
       </section>
-
-      {summaryQuery.isError ? <section className="card"><p className="card__subtext">Unable to load cross-domain optimization summary.</p></section> : null}
 
       <SimpleTable title="Optimization runs" rows={summary?.optimization_runs || []} />
       <SimpleTable title="Objectives" rows={summary?.objectives || []} />

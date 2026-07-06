@@ -1394,6 +1394,7 @@ export default function InventoryRequisitionsPage() {
   const [bulkFulfillmentIds, setBulkFulfillmentIds] = useState<string[]>([]);
   const [bulkFulfillmentLocationId, setBulkFulfillmentLocationId] = useState('');
   const [bulkFulfillmentNote, setBulkFulfillmentNote] = useState('');
+  const [isManualRefresh, setIsManualRefresh] = useState(false);
 
   const summaryQuery = useQuery({
     queryKey: ['inventory-requisition-summary'],
@@ -1524,6 +1525,19 @@ export default function InventoryRequisitionsPage() {
       queryClient.invalidateQueries({ queryKey: ['stock'] }),
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
     ]);
+  };
+
+  const refreshRequisitionPage = async () => {
+    setIsManualRefresh(true);
+    try {
+      await Promise.all([
+        invalidateRequisitions(),
+        queryClient.invalidateQueries({ queryKey: ['products', 'requisition-options'] }),
+        queryClient.invalidateQueries({ queryKey: ['storage-locations', 'requisition-options'] })
+      ]);
+    } finally {
+      setIsManualRefresh(false);
+    }
   };
 
   const saveDraftMutation = useMutation({
@@ -2136,6 +2150,19 @@ export default function InventoryRequisitionsPage() {
           <p style={styles.muted}>
             Capture department demand, route approvals, and fulfill approved requests through the backend requisition workflow.
           </p>
+          <div style={styles.actionsRow}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              disabled={isManualRefresh}
+              onClick={refreshRequisitionPage}
+            >
+              {isManualRefresh ? 'Refreshing…' : 'Refresh requisitions'}
+            </button>
+            {(summaryQuery.isFetching || requisitionsQuery.isFetching || detailQuery.isFetching) && (
+              <span style={styles.muted}>Refreshing current requisition data…</span>
+            )}
+          </div>
         </div>
         <div style={styles.metricCard}>
           <span style={styles.metricLabel}>Open requests</span>

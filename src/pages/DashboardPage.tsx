@@ -427,7 +427,7 @@ function StatCard(props: {
  */
 
 export default function DashboardPage() {
-  const { canViewInsights } = getRoleCapabilities();
+  const { canViewReports, canViewInsights } = getRoleCapabilities();
 
   /*
     WHAT CHANGED
@@ -572,8 +572,8 @@ export default function DashboardPage() {
         <ActionLink to="/products" label="Manage Products" />
         <ActionLink to="/suppliers" label="Open Suppliers" />
         <ActionLink to="/storage-locations" label="Open Locations" />
-        <ActionLink to="/reports" label="Open Reports" />
-        <ActionLink to="/insights" label="Open Insights" />
+        {canViewReports ? <ActionLink to="/reports" label="Open Reports" /> : null}
+        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" /> : null}
       </div>
 
       <div className="app-grid-stats" style={styles.kpiGrid}>

@@ -1508,6 +1508,16 @@ function formatLabel(value: unknown): string {
   return String(value).replace(/_/g, ' ');
 }
 
+function formatTimestamp(value: number | string | null | undefined): string {
+  if (!value) return 'not refreshed yet';
+  const timestamp = typeof value === 'number' ? value : Date.parse(String(value));
+  if (!Number.isFinite(timestamp)) return 'unknown';
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(timestamp));
+}
+
 function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<string, unknown> {
   const reference = safeJsonObject(form.reference);
   const expected = safeJsonObject(form.expected);
@@ -4359,6 +4369,16 @@ export default function DecisionLearningFeedbackPage() {
     setMessage(null);
   };
 
+  const refreshSummary = async () => {
+    setMessage(null);
+    const result = await summaryQuery.refetch();
+    if (result.error) {
+      setMessage(result.error instanceof Error ? result.error.message : 'Unable to refresh continuous-learning summary.');
+      return;
+    }
+    setMessage('Continuous-learning summary refreshed.');
+  };
+
   const submitFeedback = () => {
     setMessage(null);
     mutation.mutate(buildPayload(mode, form));
@@ -4374,7 +4394,25 @@ export default function DecisionLearningFeedbackPage() {
             Capture observed outcomes, forecast accuracy, policy effectiveness, and optimization results without training models, auto-updating policies, or mutating operational state.
           </p>
         </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
+            {summaryQuery.isFetching ? 'Refreshing…' : 'Refresh summary'}
+          </button>
+          <span className="card__subtext">Last refreshed: {formatTimestamp(summaryQuery.dataUpdatedAt)}</span>
+        </div>
       </div>
+
+      {summaryQuery.isError ? (
+        <section className="card card--danger">
+          <h2>Continuous-learning summary unavailable</h2>
+          <p className="card__subtext">
+            {summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load continuous-learning summary.'}
+          </p>
+          <button className="button" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
+            {summaryQuery.isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </section>
+      ) : null}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <StatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} />
@@ -4389,6 +4427,7 @@ export default function DecisionLearningFeedbackPage() {
           <div>
             <h2>Record governed feedback</h2>
             <p className="card__subtext">This writes audit-backed evidence to the new feedback endpoints and then refreshes the existing continuous-learning summary.</p>
+            <p className="card__subtext">Fields marked JSON accept JSON objects. Fields marked JSON or note also accept plain text, which is stored as a note. Submission remains evidence-only and never trains models, executes recommendations, or mutates operational state.</p>
           </div>
         </div>
 
@@ -4883,8 +4922,6 @@ export default function DecisionLearningFeedbackPage() {
         </p>
         <p className="card__subtext">Observed domains: {(governance?.observed_domains || []).join(', ') || 'none yet'}</p>
       </section>
-
-      {summaryQuery.isError ? <section className="card"><p className="card__subtext">Unable to load continuous-learning summary.</p></section> : null}
 
       <EvidenceTable title="Learning outcomes" rows={summaryQuery.data?.outcomes || []} />
       <EvidenceTable title="Forecast accuracy" rows={summaryQuery.data?.forecast_accuracy || []} />

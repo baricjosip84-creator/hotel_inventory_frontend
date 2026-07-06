@@ -79,6 +79,8 @@ export default function TenantAuditPage() {
   const [action, setAction] = useState('');
   const [entityType, setEntityType] = useState('');
   const [supportOnly, setSupportOnly] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -95,6 +97,23 @@ export default function TenantAuditPage() {
   });
 
   const rows = auditQuery.data || [];
+  const lastRefreshedText = auditQuery.dataUpdatedAt
+    ? `Last refreshed ${formatDateTime(new Date(auditQuery.dataUpdatedAt).toISOString())}`
+    : 'Not refreshed yet';
+
+  const handleRefreshAudit = async () => {
+    setRefreshMessage(null);
+    setRefreshError(null);
+
+    const result = await auditQuery.refetch();
+
+    if (result.error) {
+      setRefreshError(readableError(result.error));
+      return;
+    }
+
+    setRefreshMessage('Tenant audit refreshed.');
+  };
 
   return (
     <div style={styles.page}>
@@ -148,9 +167,25 @@ export default function TenantAuditPage() {
 
       {auditQuery.isLoading ? <div style={styles.panel}>Loading tenant audit…</div> : null}
       {auditQuery.error ? <div style={styles.error}>{readableError(auditQuery.error)}</div> : null}
+      {refreshError ? <div style={styles.error}>{refreshError}</div> : null}
+      {refreshMessage ? <div style={styles.success}>{refreshMessage}</div> : null}
 
       <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Audit Events</h2>
+        <div style={styles.sectionHeader}>
+          <div>
+            <h2 style={styles.sectionTitle}>Audit Events</h2>
+            <p style={styles.refreshMeta}>{lastRefreshedText}</p>
+          </div>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleRefreshAudit}
+            disabled={auditQuery.isFetching}
+            title="Reload tenant audit events from the server"
+          >
+            {auditQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
         {rows.length ? (
           <table style={styles.table}>
             <thead>
@@ -197,12 +232,25 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: '30px' },
   subtitle: { margin: '8px 0 0', color: '#6b7280' },
   panel: { background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 12px 36px rgba(15,23,42,0.08)', overflowX: 'auto' },
-  sectionTitle: { margin: '0 0 14px', fontSize: '20px' },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '14px' },
+  sectionTitle: { margin: '0 0 6px', fontSize: '20px' },
+  refreshMeta: { margin: 0, color: '#6b7280', fontSize: '12px' },
   filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', alignItems: 'end' },
   label: { display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#374151' },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, color: '#374151', paddingBottom: '10px' },
   input: { border: '1px solid #d1d5db', borderRadius: '10px', padding: '10px 12px', fontSize: '14px' },
+  secondaryButton: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '10px',
+    background: '#ffffff',
+    color: '#0f172a',
+    padding: '10px 14px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: '12px', padding: '12px' },
+  success: { background: '#dcfce7', color: '#166534', borderRadius: '12px', padding: '12px' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px', color: '#6b7280', fontSize: '13px', whiteSpace: 'nowrap' },
   td: { borderBottom: '1px solid #f3f4f6', padding: '12px 10px', verticalAlign: 'top' },

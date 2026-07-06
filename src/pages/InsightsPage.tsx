@@ -376,7 +376,9 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
   const actions: Array<{ title: string; detail: string; priority: 'high' | 'medium' | 'low' }> = [];
   const riskFlags = row.risk_flags ?? [];
 
-  if (riskFlags.some((flag) => flag.code === 'overdue_open_purchase_orders')) {
+  const hasRiskCode = (...codes: string[]) => riskFlags.some((flag) => codes.includes(flag.code));
+
+  if (hasRiskCode('po_overdue', 'overdue_open_purchase_orders')) {
     actions.push({
       title: 'Follow up overdue POs',
       detail: `${formatNumber(row.overdue_open_purchase_orders, 0)} open POs are overdue for this supplier.`,
@@ -384,7 +386,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
-  if (riskFlags.some((flag) => flag.code === 'closed_short_purchase_orders')) {
+  if (hasRiskCode('po_closed_short', 'closed_short_purchase_orders')) {
     actions.push({
       title: 'Review short-closed POs',
       detail: `${formatNumber(row.closed_short_purchase_orders, 0)} POs were manually closed short. Confirm whether this is supplier under-delivery or planned cancellation.`,
@@ -392,7 +394,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
-  if (riskFlags.some((flag) => flag.code === 'low_po_fill_rate')) {
+  if (hasRiskCode('po_low_fill_rate', 'low_po_fill_rate')) {
     actions.push({
       title: 'Check PO fill performance',
       detail: `PO fill rate is ${formatNumber(row.po_fill_rate_pct)}%. Compare ordered vs received quantities before new large orders.`,
@@ -400,7 +402,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
-  if (riskFlags.some((flag) => flag.code === 'po_remaining_quantity')) {
+  if (hasRiskCode('po_remaining_quantity')) {
     actions.push({
       title: 'Monitor remaining exposure',
       detail: `${formatNumber(row.po_remaining_quantity)} units remain open with estimated value ${formatNumber(row.po_remaining_value)}.`,
@@ -408,7 +410,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
-  if (riskFlags.some((flag) => flag.code === 'shipment_discrepancies')) {
+  if (hasRiskCode('shipment_discrepancy', 'shipment_discrepancies')) {
     actions.push({
       title: 'Investigate shipment discrepancies',
       detail: `Shipment discrepancy rate is ${formatNumber(row.discrepancy_rate_pct)}%. Review receiving notes and shipment audits.`,
@@ -416,7 +418,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
-  if (riskFlags.some((flag) => flag.code === 'overdue_shipments' || flag.code === 'partial_shipments')) {
+  if (hasRiskCode('shipment_overdue', 'shipment_partial', 'overdue_shipments', 'partial_shipments')) {
     actions.push({
       title: 'Review shipment reliability',
       detail: `Shipment overdue rate is ${formatNumber(row.overdue_rate_pct)}% and fill rate is ${formatNumber(row.fill_rate_pct)}%.`,
@@ -628,7 +630,7 @@ export default function InsightsPage() {
         title: 'Reorder highest urgency product',
         detail: `${reorderTop.product_name} currently recommends a reorder quantity of ${formatNumber(reorderTop.recommended_reorder_quantity)}.`,
         route: reorderTop ? `/products?search=${encodeURIComponent(reorderTop.product_name)}` : '/products',
-        linkLabel: 'Open Reports',
+        linkLabel: 'Open Products',
         tone: reorderTop.urgency === 'critical' ? 'bad' : 'warn'
       });
     }
@@ -1252,6 +1254,7 @@ export default function InsightsPage() {
 
         <Section title="Supplier Trust" subtitle="Supplier trust scores derived from shipment behavior plus PO fulfillment, short-close, and overdue PO signals.">
           {supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier trust...</div> : null}
+          {supplierTrustQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustQuery.error)}</div> : null}
           {supplierTrustProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier production review...</div> : null}
           {supplierTrustProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustProductionReviewQuery.error)}</div> : null}
           {supplierTrustProductionReviewQuery.data ? (

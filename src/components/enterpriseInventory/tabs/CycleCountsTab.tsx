@@ -90,7 +90,8 @@ export function CycleCountsTab({
                         <button
                           type="button"
                           disabled={!canReconcile || isReconciling}
-                          style={canReconcile ? styles.smallButton : styles.disabledButton}
+                          style={canReconcile && !isReconciling ? styles.smallButton : styles.disabledButton}
+                          title={!canReconcile ? 'Only draft, submitted, or approved cycle counts can be reconciled.' : isReconciling ? 'Reconciliation is already running.' : undefined}
                           onClick={() => onReconcile(item.id)}
                         >
                           Reconcile

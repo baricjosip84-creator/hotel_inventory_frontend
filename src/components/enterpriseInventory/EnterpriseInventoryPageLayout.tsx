@@ -11,6 +11,7 @@ type EnterpriseInventoryPageLayoutProps = {
   onActiveTabChange: (tab: string) => void;
   statusMessage: string | null;
   errorMessage: string | null;
+  lastRefreshedAt: number | null;
   onEvaluateParLevels: () => void;
   evaluatingParLevels: boolean;
   children: ReactNode;
@@ -21,6 +22,7 @@ export function EnterpriseInventoryPageLayout({
   onActiveTabChange,
   statusMessage,
   errorMessage,
+  lastRefreshedAt,
   onEvaluateParLevels,
   evaluatingParLevels,
   children,
@@ -36,6 +38,10 @@ export function EnterpriseInventoryPageLayout({
         statusMessage={statusMessage}
         errorMessage={errorMessage}
       />
+
+      {lastRefreshedAt ? (
+        <p style={styles.helper}>Last refreshed: {new Date(lastRefreshedAt).toLocaleString()}</p>
+      ) : null}
 
       <EnterpriseInventoryTabs
         activeTab={activeTab}

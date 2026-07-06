@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 
-type TwinDomain = 'facility' | 'inventory_flow' | 'execution_flow' | 'risk_propagation' | 'control_tower' | 'multi_domain';
-type TwinViewMode = 'topology' | 'risk_overlay' | 'congestion_heatmap' | 'dependency_map';
+type TwinDomain = 'facility' | 'inventory_flow' | 'execution_flow' | 'supplier_flow' | 'risk_propagation' | 'control_tower' | 'multi_domain';
+type TwinViewMode = 'topology' | 'flow_map' | 'risk_overlay' | 'congestion_heatmap' | 'dependency_map';
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
 
 type TwinNode = {
@@ -100,6 +100,7 @@ const DOMAIN_FILTERS: Array<{ value: 'all' | TwinDomain; label: string }> = [
   { value: 'facility', label: 'Facility' },
   { value: 'inventory_flow', label: 'Inventory flow' },
   { value: 'execution_flow', label: 'Execution flow' },
+  { value: 'supplier_flow', label: 'Supplier flow' },
   { value: 'risk_propagation', label: 'Risk propagation' },
   { value: 'control_tower', label: 'Control tower' },
   { value: 'multi_domain', label: 'Multi-domain' }
@@ -108,6 +109,7 @@ const DOMAIN_FILTERS: Array<{ value: 'all' | TwinDomain; label: string }> = [
 const VIEW_MODE_FILTERS: Array<{ value: 'all' | TwinViewMode; label: string }> = [
   { value: 'all', label: 'Backend recommended view' },
   { value: 'topology', label: 'Topology' },
+  { value: 'flow_map', label: 'Flow map' },
   { value: 'risk_overlay', label: 'Risk overlay' },
   { value: 'congestion_heatmap', label: 'Congestion heatmap' },
   { value: 'dependency_map', label: 'Dependency map' }
@@ -241,6 +243,7 @@ export default function DigitalTwinVisualizationPage() {
 
   const response = digitalTwinQuery.data;
   const summary = response?.summary || {};
+  const filters = response?.filters || {};
   const guidance = response?.guidance || {};
   const nodes = response?.nodes || [];
   const edges = response?.edges || [];
@@ -317,6 +320,31 @@ export default function DigitalTwinVisualizationPage() {
               {guidance.visualization_guidance || 'Use the twin as read-only operational context and route human actions through governed source workflows.'}
             </p>
           )}
+
+          {response ? (
+            <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
+              <div>
+                <div className="card__label">Generated at</div>
+                <strong>{formatDateTime(response.generated_at)}</strong>
+              </div>
+              <div>
+                <div className="card__label">Applied domain</div>
+                <strong>{formatLabel(filters.twin_domain || 'all')}</strong>
+              </div>
+              <div>
+                <div className="card__label">Applied view</div>
+                <strong>{formatLabel(filters.view_mode || 'backend recommended')}</strong>
+              </div>
+              <div>
+                <div className="card__label">Applied urgency</div>
+                <strong>{formatLabel(filters.urgency || 'all')}</strong>
+              </div>
+              <div>
+                <div className="card__label">Applied limit</div>
+                <strong>{filters.limit ?? 'Not reported'}</strong>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

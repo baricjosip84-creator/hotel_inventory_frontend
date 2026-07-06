@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
@@ -438,6 +439,10 @@ function buildDraftFromReservation(reservation: InventoryReservation): Reservati
   };
 }
 
+function getValidReservationLines(draft: ReservationDraft): ReservationDraftLine[] {
+  return draft.items.filter((item) => item.product_id.trim() && item.requested_quantity.trim());
+}
+
 function buildCreatePayload(draft: ReservationDraft) {
   return {
     source_type: draft.source_type,
@@ -448,8 +453,7 @@ function buildCreatePayload(draft: ReservationDraft) {
     needed_by: draft.needed_by || undefined,
     expires_at: draft.expires_at || undefined,
     notes: draft.notes.trim() || undefined,
-    items: draft.items
-      .filter((item) => item.product_id.trim() && item.requested_quantity.trim())
+    items: getValidReservationLines(draft)
       .map((item) => ({
         product_id: item.product_id.trim(),
         storage_location_id: item.storage_location_id.trim() || undefined,
@@ -462,6 +466,7 @@ function buildCreatePayload(draft: ReservationDraft) {
 
 export default function InventoryReservationsPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const permissions = getRoleCapabilities();
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedReservationId, setSelectedReservationId] = useState('');
@@ -470,6 +475,26 @@ export default function InventoryReservationsPage() {
   const [actionNote, setActionNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    const reservationIdFromUrl = searchParams.get('reservationId') || searchParams.get('reservation_id') || '';
+    if (reservationIdFromUrl && reservationIdFromUrl !== selectedReservationId) {
+      setSelectedReservationId(reservationIdFromUrl);
+    }
+  }, [searchParams, selectedReservationId]);
+
+  const validDraftLineCount = getValidReservationLines(draft).length;
+  const validEditDraftLineCount = editDraft ? getValidReservationLines(editDraft).length : 0;
+
+  const handleSelectReservation = (reservationId: string) => {
+    setSelectedReservationId(reservationId);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('reservationId', reservationId);
+      next.delete('reservation_id');
+      return next;
+    });
+  };
 
   const productsQuery = useQuery({
     queryKey: ['products', 'reservation-options'],
@@ -551,7 +576,7 @@ export default function InventoryReservationsPage() {
     onSuccess: (reservation) => {
       setFeedback(`Updated draft ${reservation.reservation_number}.`);
       setEditDraft(null);
-      setSelectedReservationId(reservation.id);
+      handleSelectReservation(reservation.id);
       refreshReservationQueries();
     }
   });
@@ -565,7 +590,7 @@ export default function InventoryReservationsPage() {
     onSuccess: (reservation) => {
       setFeedback(`Created ${reservation.reservation_number}.`);
       setDraft(defaultDraft());
-      setSelectedReservationId(reservation.id);
+      handleSelectReservation(reservation.id);
       refreshReservationQueries();
     }
   });
@@ -769,9 +794,10 @@ export default function InventoryReservationsPage() {
           </div>
           <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
             <button type="button" style={pageStyles.secondaryButton} onClick={() => setDraft((current) => ({ ...current, items: [...current.items, emptyLine()] }))}>Add line</button>
-            <button type="button" style={pageStyles.button} disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+            <button type="button" style={pageStyles.button} disabled={createMutation.isPending || validDraftLineCount === 0} onClick={() => createMutation.mutate()}>
               {createMutation.isPending ? 'Creating…' : 'Create draft reservation'}
             </button>
+            {validDraftLineCount === 0 ? <span style={pageStyles.muted}>Add at least one product line with a quantity before creating a draft.</span> : null}
           </div>
         </section>
       ) : null}
@@ -852,7 +878,7 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>{reservation.priority || 'normal'}</td>
                   <td style={pageStyles.td}>{formatDate(reservation.needed_by)}</td>
                   <td style={pageStyles.td}>{formatNumber(reservation.open_reserved_quantity_total)}</td>
-                  <td style={pageStyles.td}><button type="button" style={pageStyles.secondaryButton} onClick={() => setSelectedReservationId(reservation.id)}>Open</button></td>
+                  <td style={pageStyles.td}><button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(reservation.id)}>Open</button></td>
                 </tr>
               ))}
               {!reservations.length ? <tr><td style={pageStyles.td} colSpan={7}>{reservationsQuery.isLoading ? 'Loading reservations…' : 'No reservations match these filters.'}</td></tr> : null}
@@ -986,9 +1012,10 @@ export default function InventoryReservationsPage() {
                 </div>
                 <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
                   <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft((current) => current ? { ...current, items: [...current.items, emptyLine()] } : current)}>Add line</button>
-                  <button type="button" style={pageStyles.button} disabled={updateDraftMutation.isPending} onClick={() => updateDraftMutation.mutate({ id: selectedReservation.id, draft: editDraft })}>
+                  <button type="button" style={pageStyles.button} disabled={updateDraftMutation.isPending || validEditDraftLineCount === 0} onClick={() => updateDraftMutation.mutate({ id: selectedReservation.id, draft: editDraft })}>
                     {updateDraftMutation.isPending ? 'Saving…' : 'Save draft changes'}
                   </button>
+                  {validEditDraftLineCount === 0 ? <span style={pageStyles.muted}>Keep at least one product line with a quantity before saving draft changes.</span> : null}
                   <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(null)}>Cancel edit</button>
                 </div>
               </div>
@@ -1079,7 +1106,7 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>{formatNumber(row.conflict_quantity)}</td>
                   <td style={pageStyles.td}>
                     <div style={pageStyles.buttonRow}>
-                      <button type="button" style={pageStyles.secondaryButton} onClick={() => setSelectedReservationId(row.reservation_id)}>Open</button>
+                      <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>Open</button>
                       {permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' })}>Allocate</button> : null}
                       {permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' })}>Release</button> : null}
                       {permissions.canCancelInventoryReservations ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' })}>Cancel</button> : null}

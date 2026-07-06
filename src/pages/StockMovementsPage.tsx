@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 
@@ -28,6 +29,14 @@ import { apiRequest } from '../lib/api';
  * - reason
  * - search
  * - package_audited
+ * - cost_status
+ * - cost_source
+ *
+ * URL FILTER SUPPORT
+ * ----------------------------------------------------------------------------
+ * The page accepts direct links using product_id/productId, shipment_id/shipmentId,
+ * reason, search, package_audited/packageAudited, cost_status/costStatus, and
+ * cost_source/costSource. Filter changes are mirrored back to canonical URL keys.
  *
  * PACKAGE AUDIT SUPPORT
  * ----------------------------------------------------------------------------
@@ -96,6 +105,65 @@ type FiltersState = {
   cost_status: CostStatusFilter;
   cost_source: string;
 };
+
+
+function firstSearchParam(params: URLSearchParams, names: string[]): string {
+  for (const name of names) {
+    const value = params.get(name);
+
+    if (value && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
+function normalizePackageAuditFilter(value: string): PackageAuditFilter {
+  return value === 'true' || value === 'false' ? value : 'all';
+}
+
+function normalizeCostStatusFilter(value: string): CostStatusFilter {
+  return value === 'costed' || value === 'uncosted' ? value : 'all';
+}
+
+function filtersFromSearchParams(params: URLSearchParams): FiltersState {
+  return {
+    product_id: firstSearchParam(params, ['product_id', 'productId']),
+    shipment_id: firstSearchParam(params, ['shipment_id', 'shipmentId']),
+    reason: firstSearchParam(params, ['reason']),
+    search: firstSearchParam(params, ['search']),
+    package_audited: normalizePackageAuditFilter(firstSearchParam(params, ['package_audited', 'packageAudited'])),
+    cost_status: normalizeCostStatusFilter(firstSearchParam(params, ['cost_status', 'costStatus'])),
+    cost_source: firstSearchParam(params, ['cost_source', 'costSource'])
+  };
+}
+
+function searchParamsFromFilters(filters: FiltersState): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (filters.product_id) params.set('product_id', filters.product_id);
+  if (filters.shipment_id) params.set('shipment_id', filters.shipment_id);
+  if (filters.reason) params.set('reason', filters.reason);
+  if (filters.search.trim()) params.set('search', filters.search.trim());
+  if (filters.package_audited !== 'all') params.set('package_audited', filters.package_audited);
+  if (filters.cost_status !== 'all') params.set('cost_status', filters.cost_status);
+  if (filters.cost_source.trim()) params.set('cost_source', filters.cost_source.trim());
+
+  return params;
+}
+
+function areFiltersEqual(first: FiltersState, second: FiltersState): boolean {
+  return (
+    first.product_id === second.product_id &&
+    first.shipment_id === second.shipment_id &&
+    first.reason === second.reason &&
+    first.search === second.search &&
+    first.package_audited === second.package_audited &&
+    first.cost_status === second.cost_status &&
+    first.cost_source === second.cost_source
+  );
+}
 
 async function fetchProducts(): Promise<ProductOption[]> {
   return apiRequest<ProductOption[]>('/products');
@@ -312,39 +380,35 @@ function hasPackageAudit(movement: StockMovement): boolean {
 }
 
 export default function StockMovementsPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in your current StockMovementsPage.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const routeFilterKey = searchParams.toString();
+  const [filters, setFilters] = useState<FiltersState>(() =>
+    filtersFromSearchParams(searchParams)
+  );
 
-    Existing real behavior is preserved:
-    - same products, shipments, and stock movement endpoints
-    - same filter model
-    - same query keys
-    - same ledger columns
-    - same movement traceability behavior
-    - same shared UI class usage
+  useEffect(() => {
+    const routeFilters = filtersFromSearchParams(new URLSearchParams(routeFilterKey));
 
-    Added:
-    - package audit filter dropdown:
-      - all movements
-      - package audited only
-      - unit/manual only
+    if (!areFiltersEqual(routeFilters, filters)) {
+      setFilters(routeFilters);
+    }
 
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Operators can now quickly isolate package-based receiving movements without
-    manually searching through the full stock ledger.
-  */
-  const [filters, setFilters] = useState<FiltersState>({
-    product_id: '',
-    shipment_id: '',
-    reason: '',
-    search: '',
-    package_audited: 'all',
-    cost_status: 'all',
-    cost_source: ''
-  });
+    const normalizedRouteFilterKey = searchParamsFromFilters(routeFilters).toString();
+
+    if (normalizedRouteFilterKey !== routeFilterKey) {
+      setSearchParams(searchParamsFromFilters(routeFilters), { replace: true });
+    }
+  }, [filters, routeFilterKey, setSearchParams]);
+
+  const updateFilter = <K extends keyof FiltersState>(key: K, value: FiltersState[K]) => {
+    const nextFilters = {
+      ...filters,
+      [key]: value
+    };
+
+    setFilters(nextFilters);
+    setSearchParams(searchParamsFromFilters(nextFilters), { replace: true });
+  };
 
   const productsQuery = useQuery({
     queryKey: ['products'],
@@ -429,10 +493,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.product_id}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  product_id: event.target.value
-                }))
+                updateFilter('product_id', event.target.value)
               }
             >
               <option value="">All products</option>
@@ -450,10 +511,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.shipment_id}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  shipment_id: event.target.value
-                }))
+                updateFilter('shipment_id', event.target.value)
               }
             >
               <option value="">All shipments</option>
@@ -471,10 +529,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.reason}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  reason: event.target.value
-                }))
+                updateFilter('reason', event.target.value)
               }
             >
               <option value="">All reasons</option>
@@ -491,10 +546,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.package_audited}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  package_audited: event.target.value as PackageAuditFilter
-                }))
+                updateFilter('package_audited', event.target.value as PackageAuditFilter)
               }
             >
               <option value="all">All movements</option>
@@ -509,10 +561,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.cost_status}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  cost_status: event.target.value as CostStatusFilter
-                }))
+                updateFilter('cost_status', event.target.value as CostStatusFilter)
               }
             >
               <option value="all">All movements</option>
@@ -527,10 +576,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.cost_source}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  cost_source: event.target.value
-                }))
+                updateFilter('cost_source', event.target.value)
               }
               placeholder="shipment_item_unit_cost"
             />
@@ -542,10 +588,7 @@ export default function StockMovementsPage() {
               style={styles.input}
               value={filters.search}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  search: event.target.value
-                }))
+                updateFilter('search', event.target.value)
               }
               placeholder="Search by product, user, reason, package, barcode, note, shipment, or cost source"
             />

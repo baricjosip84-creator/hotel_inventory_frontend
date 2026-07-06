@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
+import { getRoleCapabilities } from "../lib/permissions";
 
 type RecommendationSummary = {
   total_products?: number | string;
@@ -1138,6 +1139,10 @@ function Badge({
 
 export default function ProcurementRecommendationsPage() {
   const queryClient = useQueryClient();
+  const capabilities = getRoleCapabilities();
+  const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
+  const canCreatePurchaseOrderDrafts = capabilities.canCreatePurchaseOrders;
+  const canViewGeneratedPurchaseOrderDrafts = capabilities.canViewPurchaseOrders;
   const [filters, setFilters] =
     useState<RecommendationFilters>(DEFAULT_FILTERS);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
@@ -1246,6 +1251,7 @@ export default function ProcurementRecommendationsPage() {
   const poDraftReviewQuery = useQuery({
     queryKey: ["procurement-recommendation-po-draft-review"],
     queryFn: fetchRecommendationPoDraftReview,
+    enabled: canViewGeneratedPurchaseOrderDrafts,
   });
 
 
@@ -1322,7 +1328,7 @@ export default function ProcurementRecommendationsPage() {
       runRecommendationScheduledRun(filters, {
         dryRun,
         autoApproveReady: !dryRun,
-        convertToPoDrafts: !dryRun && scheduledConvertToPo,
+        convertToPoDrafts: !dryRun && scheduledConvertToPo && canCreatePurchaseOrderDrafts,
         maxApprovals: scheduledMaxApprovals,
         note: scheduledNote,
       }),
@@ -1795,7 +1801,7 @@ export default function ProcurementRecommendationsPage() {
               style={styles.secondaryButton}
               type="button"
               onClick={() => scheduledRunMutation.mutate({ dryRun: true })}
-              disabled={scheduledRunMutation.isPending}
+              disabled={!canApproveRecommendations || scheduledRunMutation.isPending}
             >
               Preview scheduled run
             </button>
@@ -1803,7 +1809,7 @@ export default function ProcurementRecommendationsPage() {
               style={styles.primaryButton}
               type="button"
               onClick={() => scheduledRunMutation.mutate({ dryRun: false })}
-              disabled={scheduledRunMutation.isPending}
+              disabled={!canApproveRecommendations || scheduledRunMutation.isPending}
             >
               Execute scheduled run
             </button>
@@ -1833,11 +1839,18 @@ export default function ProcurementRecommendationsPage() {
             <span>Generate PO drafts after approval</span>
             <input
               type="checkbox"
-              checked={scheduledConvertToPo}
+              checked={scheduledConvertToPo && canCreatePurchaseOrderDrafts}
+              disabled={!canCreatePurchaseOrderDrafts || scheduledRunMutation.isPending}
               onChange={(event) => setScheduledConvertToPo(event.target.checked)}
             />
           </label>
         </div>
+        {!canApproveRecommendations ? (
+          <div style={styles.infoBox}>Purchase order approval permission is required to preview or execute scheduled procurement recommendation runs.</div>
+        ) : null}
+        {!canCreatePurchaseOrderDrafts ? (
+          <div style={styles.infoBox}>Purchase order create permission is required before scheduled runs can generate PO drafts.</div>
+        ) : null}
         {scheduledRunMutation.isError ? (
           <div style={styles.errorBox}>{getErrorMessage(scheduledRunMutation.error)}</div>
         ) : null}
@@ -2002,6 +2015,9 @@ export default function ProcurementRecommendationsPage() {
             Resolution {titleCase(exceptionResolutionMutation.data.action)} completed: {formatNumber(exceptionResolutionMutation.data.cleared_exception_count, 0)} cleared, {formatNumber(exceptionResolutionMutation.data.remaining_exception_count, 0)} remaining.
           </div>
         ) : null}
+        {!canApproveRecommendations ? (
+          <div style={styles.infoBox}>Purchase order approval permission is required to resolve procurement exceptions or apply recommendation decisions from this page.</div>
+        ) : null}
         {exceptions ? (
           <>
             <div style={styles.bulkGrid}>
@@ -2121,7 +2137,7 @@ export default function ProcurementRecommendationsPage() {
                             <button
                               style={styles.secondaryButton}
                               type="button"
-                              disabled={exceptionResolutionMutation.isPending}
+                              disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                               onClick={() => resolveException(exception, "assign_supplier")}
                             >
                               Assign supplier
@@ -2130,7 +2146,7 @@ export default function ProcurementRecommendationsPage() {
                           <button
                             style={styles.secondaryButton}
                             type="button"
-                            disabled={exceptionResolutionMutation.isPending}
+                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                             onClick={() => resolveException(exception, "rerun")}
                           >
                             Re-run
@@ -2138,7 +2154,7 @@ export default function ProcurementRecommendationsPage() {
                           <button
                             style={styles.secondaryButton}
                             type="button"
-                            disabled={exceptionResolutionMutation.isPending}
+                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                             onClick={() => resolveException(exception, "suppress")}
                           >
                             Suppress
@@ -2146,7 +2162,7 @@ export default function ProcurementRecommendationsPage() {
                           <button
                             style={styles.secondaryButton}
                             type="button"
-                            disabled={exceptionResolutionMutation.isPending}
+                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                             onClick={() => resolveException(exception, "defer")}
                           >
                             Defer
@@ -2155,7 +2171,7 @@ export default function ProcurementRecommendationsPage() {
                             <button
                               style={styles.primaryButton}
                               type="button"
-                              disabled={exceptionResolutionMutation.isPending}
+                              disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                               onClick={() => resolveException(exception, "approve")}
                             >
                               Approve
@@ -2164,7 +2180,7 @@ export default function ProcurementRecommendationsPage() {
                           <button
                             style={styles.dangerButton}
                             type="button"
-                            disabled={exceptionResolutionMutation.isPending}
+                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                             onClick={() => resolveException(exception, "reject")}
                           >
                             Reject
@@ -2372,6 +2388,12 @@ export default function ProcurementRecommendationsPage() {
             placeholder="Optional note applied to every selected recommendation"
           />
         </label>
+        {!canApproveRecommendations ? (
+          <div style={styles.infoBox}>Purchase order approval permission is required for bulk readiness, bulk approval, defer, and reject actions.</div>
+        ) : null}
+        {!canCreatePurchaseOrderDrafts ? (
+          <div style={styles.infoBox}>Purchase order create permission is required to convert approved recommendations into PO drafts.</div>
+        ) : null}
         {bulkReadinessMutation.isError ? (
           <div style={styles.errorBox}>
             {getErrorMessage(bulkReadinessMutation.error)}
@@ -2461,6 +2483,7 @@ export default function ProcurementRecommendationsPage() {
             style={styles.secondaryButton}
             type="button"
             disabled={
+              !canApproveRecommendations ||
               selectedProductIds.length === 0 || bulkReadinessMutation.isPending
             }
             onClick={() =>
@@ -2476,6 +2499,7 @@ export default function ProcurementRecommendationsPage() {
             style={styles.primaryButton}
             type="button"
             disabled={
+              !canApproveRecommendations ||
               selectedProductIds.length === 0 ||
               !approvalPreviewReady ||
               bulkDecisionMutation.isPending
@@ -2494,6 +2518,7 @@ export default function ProcurementRecommendationsPage() {
             style={styles.primaryButton}
             type="button"
             disabled={
+              !canCreatePurchaseOrderDrafts ||
               selectedProductIds.length === 0 ||
               poConvertibleSelectedCount !== selectedProductIds.length ||
               poDraftConversionMutation.isPending
@@ -2510,6 +2535,7 @@ export default function ProcurementRecommendationsPage() {
             style={styles.secondaryButton}
             type="button"
             disabled={
+              !canApproveRecommendations ||
               selectedProductIds.length === 0 || bulkDecisionMutation.isPending
             }
             onClick={() =>
@@ -2526,6 +2552,7 @@ export default function ProcurementRecommendationsPage() {
             style={styles.dangerButton}
             type="button"
             disabled={
+              !canApproveRecommendations ||
               selectedProductIds.length === 0 || bulkDecisionMutation.isPending
             }
             onClick={() =>
@@ -2867,7 +2894,7 @@ export default function ProcurementRecommendationsPage() {
             <button
               style={styles.secondaryButton}
               type="button"
-              disabled={!poDraftReviewQuery.data?.rows.length}
+              disabled={!canViewGeneratedPurchaseOrderDrafts || !poDraftReviewQuery.data?.rows.length}
               onClick={() => {
                 if (poDraftReviewQuery.data) {
                   exportPoDraftReviewCsv(poDraftReviewQuery.data);
@@ -2879,12 +2906,16 @@ export default function ProcurementRecommendationsPage() {
             <button
               style={styles.secondaryButton}
               type="button"
+              disabled={!canViewGeneratedPurchaseOrderDrafts}
               onClick={() => void poDraftReviewQuery.refetch()}
             >
               Refresh drafts
             </button>
           </div>
         </div>
+        {!canViewGeneratedPurchaseOrderDrafts ? (
+          <div style={styles.infoBox}>Purchase order read permission is required to load recommendation-generated PO draft review data.</div>
+        ) : null}
         {poDraftReviewQuery.isLoading ? (
           <div style={styles.infoBox}>Loading generated PO drafts...</div>
         ) : null}
@@ -3281,6 +3312,9 @@ export default function ProcurementRecommendationsPage() {
                   placeholder="Optional approval, rejection, or defer note"
                 />
               </label>
+              {!canApproveRecommendations ? (
+                <div style={styles.infoBox}>Purchase order approval permission is required to approve, defer, or reject this recommendation.</div>
+              ) : null}
               {decisionMutation.isError ? (
                 <div style={styles.errorBox}>
                   {getErrorMessage(decisionMutation.error)}
@@ -3291,6 +3325,7 @@ export default function ProcurementRecommendationsPage() {
                   style={styles.primaryButton}
                   type="button"
                   disabled={
+                    !canApproveRecommendations ||
                     !selectedDetail.detail?.can_generate_po_draft ||
                     decisionMutation.isPending
                   }
@@ -3307,7 +3342,7 @@ export default function ProcurementRecommendationsPage() {
                 <button
                   style={styles.secondaryButton}
                   type="button"
-                  disabled={decisionMutation.isPending}
+                  disabled={!canApproveRecommendations || decisionMutation.isPending}
                   onClick={() =>
                     decisionMutation.mutate({
                       productId: selectedDetail.product_id,
@@ -3321,7 +3356,7 @@ export default function ProcurementRecommendationsPage() {
                 <button
                   style={styles.dangerButton}
                   type="button"
-                  disabled={decisionMutation.isPending}
+                  disabled={!canApproveRecommendations || decisionMutation.isPending}
                   onClick={() =>
                     decisionMutation.mutate({
                       productId: selectedDetail.product_id,

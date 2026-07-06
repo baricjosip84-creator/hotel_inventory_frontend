@@ -168,6 +168,23 @@ const badgeStyle: CSSProperties = {
   textTransform: 'capitalize'
 };
 
+const metadataStyle: CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'wrap',
+  marginTop: 14
+};
+
+const metadataItemStyle: CSSProperties = {
+  border: '1px solid var(--color-border)',
+  borderRadius: 10,
+  padding: '8px 10px',
+  background: '#f9fafb',
+  color: '#374151',
+  fontSize: 12,
+  fontWeight: 700
+};
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -175,6 +192,18 @@ function numberValue(value: unknown): number {
 
 function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
+}
+
+function formatAppliedFilter(value?: string | number | null): string {
+  if (value === undefined || value === null || value === '') {
+    return 'All';
+  }
+
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  return formatLabel(value);
 }
 
 function formatDateTime(value?: string | null): string {
@@ -247,6 +276,7 @@ export default function EnterpriseCollaborationPage() {
   const response = collaborationQuery.data;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
+  const appliedFilters = response?.filters || {};
   const threads = response?.threads || [];
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
@@ -312,9 +342,18 @@ export default function EnterpriseCollaborationPage() {
                 : 'Unable to load enterprise collaboration context.'}
             </p>
           ) : (
-            <p className="card__subtext">
-              {guidance.collaboration_guidance || 'Use collaboration context to coordinate humans in governed source workflows without sending messages from this page.'}
-            </p>
+            <>
+              <p className="card__subtext">
+                {guidance.collaboration_guidance || 'Use collaboration context to coordinate humans in governed source workflows without sending messages from this page.'}
+              </p>
+              <div style={metadataStyle} aria-label="Collaboration snapshot metadata">
+                <span style={metadataItemStyle}>Generated: {formatDateTime(response?.generated_at)}</span>
+                <span style={metadataItemStyle}>Domain: {formatAppliedFilter(appliedFilters.collaboration_domain)}</span>
+                <span style={metadataItemStyle}>Thread type: {formatAppliedFilter(appliedFilters.thread_type)}</span>
+                <span style={metadataItemStyle}>Urgency: {formatAppliedFilter(appliedFilters.urgency)}</span>
+                <span style={metadataItemStyle}>Limit: {formatAppliedFilter(appliedFilters.limit)}</span>
+              </div>
+            </>
           )}
         </div>
       </section>

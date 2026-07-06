@@ -168,12 +168,20 @@ function MetricCard({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-function CheckList({ title, items }: { title: string; items?: Array<Record<string, unknown>> }) {
+function CheckList({
+  title,
+  items,
+  emptyMessage = 'No blockers or checks were returned for this section.'
+}: {
+  title: string;
+  items?: Array<Record<string, unknown>>;
+  emptyMessage?: string;
+}) {
   return (
     <section style={{ border: '1px solid #d9e2ec', borderRadius: 12, padding: 16, background: '#fff' }}>
       <h3 style={{ marginTop: 0 }}>{title}</h3>
       {!items?.length ? (
-        <p style={{ color: '#62748a' }}>No items returned.</p>
+        <p style={{ color: '#62748a' }}>{emptyMessage}</p>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {items.map((item, index) => (
@@ -181,6 +189,12 @@ function CheckList({ title, items }: { title: string; items?: Array<Record<strin
               <strong>{formatValue(item.label || item.blocker_id || item.check_id || item.summary)}</strong>
               <div style={{ color: '#62748a', marginTop: 4 }}>{formatValue(item.required_next_step || item.summary || item.severity)}</div>
               {'passed' in item ? <div>Passed: {formatValue(item.passed)}</div> : null}
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', color: '#0f5b8f' }}>View read-only evidence details</summary>
+                <pre style={{ whiteSpace: 'pre-wrap', overflowX: 'auto', background: '#f8fafc', borderRadius: 8, padding: 10 }}>
+                  {JSON.stringify(item, null, 2)}
+                </pre>
+              </details>
             </div>
           ))}
         </div>
@@ -190,7 +204,7 @@ function CheckList({ title, items }: { title: string; items?: Array<Record<strin
 }
 
 export default function AdaptivePolicyEnginePage() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['adaptive-policy-engine-summary'],
     queryFn: () => apiRequest<AdaptivePolicySummary>('/decision-intelligence/adaptive-policy-engine-summary?limit=25')
   });
@@ -201,6 +215,8 @@ export default function AdaptivePolicyEnginePage() {
   const postPromotionMonitoring = data?.post_promotion_monitoring;
   const rollbackRetirementGate = data?.rollback_retirement_gate;
   const responseContractAudit = data?.response_contract_audit;
+  const policyCount = loop?.policy_count ?? data?.policies?.length ?? 0;
+  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : 'Not refreshed yet';
 
   if (isLoading) {
     return <main style={{ padding: 24 }}>Loading adaptive policy engine…</main>;
@@ -208,21 +224,48 @@ export default function AdaptivePolicyEnginePage() {
 
   if (error) {
     return (
-      <main style={{ padding: 24 }}>
+      <main style={{ padding: 24, display: 'grid', gap: 16 }}>
         <h1>Adaptive Policy Engine</h1>
-        <p style={{ color: '#b42318' }}>Unable to load adaptive policy summary.</p>
+        <section style={{ border: '1px solid #f5c2c7', borderRadius: 12, padding: 16, background: '#fff5f5' }}>
+          <h2 style={{ marginTop: 0 }}>Unable to load adaptive policy summary.</h2>
+          <p style={{ color: '#7a271a' }}>Check Decision Intelligence access, tenant context, and the summary endpoint, then retry the read-only query.</p>
+          <button type="button" onClick={() => void refetch()}>Retry</button>
+        </section>
       </main>
     );
   }
 
   return (
     <main style={{ padding: 24, display: 'grid', gap: 20 }}>
-      <header>
-        <h1 style={{ marginBottom: 6 }}>Adaptive Policy Engine</h1>
-        <p style={{ color: '#62748a', marginTop: 0 }}>
-          Governed policy observation, recommendation review, effectiveness evidence, and manual learning feedback readiness.
+      <header style={{ display: 'grid', gap: 12 }}>
+        <div>
+          <h1 style={{ marginBottom: 6 }}>Adaptive Policy Engine</h1>
+          <p style={{ color: '#62748a', marginTop: 0 }}>
+            Governed policy observation, recommendation review, effectiveness evidence, and manual learning feedback readiness.
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <button type="button" onClick={() => void refetch()} disabled={isFetching}>
+            {isFetching ? 'Refreshing…' : 'Refresh summary'}
+          </button>
+          <span style={{ color: '#62748a' }}>Last refreshed: {lastRefreshed}</span>
+        </div>
+        <p style={{ color: '#62748a', margin: 0 }}>
+          Deployment note: Command decision-intelligence pages require the frontend role-permission map that grants
+          decision_intelligence.read to tenant admins and managers. Staff users remain excluded.
         </p>
       </header>
+
+      {policyCount === 0 ? (
+        <section style={{ border: '1px solid #d9e2ec', borderRadius: 12, padding: 16, background: '#f8fafc' }}>
+          <h2 style={{ marginTop: 0 }}>No adaptive policies returned</h2>
+          <p style={{ color: '#62748a', marginBottom: 0 }}>
+            The backend returned no adaptive policy records for this tenant and filter set. The page remains read-only; capture
+            policy, signal, recommendation, or effectiveness evidence through the supported Decision Intelligence data paths before
+            expecting readiness, promotion, or rollback blockers to appear here.
+          </p>
+        </section>
+      ) : null}
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
         <MetricCard label="Learning score" value={loop?.learning_feedback_score} />

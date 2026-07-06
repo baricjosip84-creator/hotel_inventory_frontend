@@ -158,6 +158,7 @@ export const styles: Record<string, CSSProperties> = {
   tabs: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   tab: { border: '1px solid #d1d5db', background: '#ffffff', borderRadius: 999, padding: '8px 12px', cursor: 'pointer' },
   activeTab: { border: '1px solid #2563eb', background: '#eff6ff', color: '#1d4ed8', borderRadius: 999, padding: '8px 12px', cursor: 'pointer', fontWeight: 700 },
+  disabledTab: { border: '1px solid #e5e7eb', background: '#f3f4f6', color: '#9ca3af', borderRadius: 999, padding: '8px 12px', cursor: 'not-allowed' },
   grid: { display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, alignItems: 'start' },
   stack: { display: 'flex', flexDirection: 'column', gap: 20 },
   statGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginTop: 14 },
