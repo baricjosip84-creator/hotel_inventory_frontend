@@ -2217,7 +2217,7 @@ export default function ShipmentsPage() {
                 style={{
                   ...styles.itemsHeaderRow,
                   flexDirection: isMobile ? 'column' : 'row',
-                  alignItems: isMobile ? 'stretch' : 'center'
+                  alignItems: isMobile ? 'stretch' : 'flex-start'
                 }}
               >
                 <div style={styles.itemsHeaderContent}>
@@ -2234,10 +2234,11 @@ export default function ShipmentsPage() {
 
                 <div
                   style={{
-                    display: 'flex',
+                    ...styles.shipmentItemActionRow,
                     flexDirection: isMobile ? 'column' : 'row',
-                    gap: 10,
-                    width: isMobile ? '100%' : 'auto'
+                    alignItems: isMobile ? 'stretch' : 'flex-start',
+                    justifyContent: isMobile ? 'stretch' : 'flex-end',
+                    width: isMobile ? '100%' : undefined
                   }}
                 >
                   <button
@@ -2258,36 +2259,43 @@ export default function ShipmentsPage() {
                     Scan Product Barcode
                   </button>
 
-                  <button
-                    type="button"
+                  <div
                     style={{
-                      ...styles.emailSupplierButton,
-                      width: isMobile ? '100%' : undefined,
-                      ...(!canSendShipments || shipmentItems.length === 0
-                        ? styles.emailSupplierButtonDisabled
-                        : {})
+                      ...styles.emailSupplierActionBlock,
+                      width: isMobile ? '100%' : undefined
                     }}
-                    onClick={handleSendShipmentToSupplier}
-                    disabled={
-                      sendShipmentToSupplierMutation.isPending ||
-                      !canSendShipments ||
-                      shipmentItems.length === 0
-                    }
-                    title={
-                      !canSendShipments
-                        ? 'Shipments send permission required'
-                        : shipmentItems.length === 0
-                          ? 'Add at least one shipment item before emailing the supplier'
-                          : 'Email shipment details and QR information to the supplier. This does not receive stock or finalize the shipment.'
-                    }
                   >
-                    {sendShipmentToSupplierMutation.isPending
-                      ? 'Sending...'
-                      : 'Send Shipment Email to Supplier'}
-                  </button>
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.emailSupplierButton,
+                        width: '100%',
+                        ...(!canSendShipments || shipmentItems.length === 0
+                          ? styles.emailSupplierButtonDisabled
+                          : {})
+                      }}
+                      onClick={handleSendShipmentToSupplier}
+                      disabled={
+                        sendShipmentToSupplierMutation.isPending ||
+                        !canSendShipments ||
+                        shipmentItems.length === 0
+                      }
+                      title={
+                        !canSendShipments
+                          ? 'Shipments send permission required'
+                          : shipmentItems.length === 0
+                            ? 'Add at least one shipment item before emailing the supplier'
+                            : 'Email shipment details and QR information to the supplier. This does not receive stock or finalize the shipment.'
+                      }
+                    >
+                      {sendShipmentToSupplierMutation.isPending
+                        ? 'Sending...'
+                        : 'Send Shipment Email to Supplier'}
+                    </button>
 
-                  <div style={styles.emailSupplierHint}>
-                    Supplier email sends shipment details and QR information only. It does not receive stock or finalize the shipment.
+                    <div style={styles.emailSupplierHint}>
+                      Sends shipment details and QR information only. It does not receive stock or finalize.
+                    </div>
                   </div>
 
                   <button
@@ -2855,7 +2863,10 @@ const styles: Record<string, CSSProperties> = {
     background: '#059669',
     color: '#ffffff',
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minWidth: 150,
+    whiteSpace: 'normal',
+    lineHeight: 1.25
   },
   scannerButton: {
     border: 'none',
@@ -2864,7 +2875,10 @@ const styles: Record<string, CSSProperties> = {
     background: '#2563eb',
     color: '#ffffff',
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minWidth: 170,
+    whiteSpace: 'normal',
+    lineHeight: 1.25
   },
   scannerButtonDisabled: {
     opacity: 0.5,
@@ -2877,14 +2891,23 @@ const styles: Record<string, CSSProperties> = {
     background: '#7c3aed',
     color: '#ffffff',
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    whiteSpace: 'normal',
+    lineHeight: 1.25
   },
   emailSupplierButtonDisabled: {
     opacity: 0.5,
     cursor: 'not-allowed'
   },
+  emailSupplierActionBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    flex: '1 1 230px',
+    maxWidth: 280,
+    minWidth: 220
+  },
   emailSupplierHint: {
-    maxWidth: 260,
     fontSize: 12,
     color: '#64748b',
     lineHeight: 1.4
@@ -3012,16 +3035,23 @@ const styles: Record<string, CSSProperties> = {
   itemsHeaderRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
+    gap: 16,
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     marginBottom: 14
   },
   itemsHeaderContent: {
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
-    minWidth: 0,
-    flex: 1
+    minWidth: 'min(280px, 100%)',
+    flex: '1 1 320px'
+  },
+  shipmentItemActionRow: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    flex: '2 1 420px'
   },
   fieldHint: {
     fontSize: 12,
@@ -3364,7 +3394,9 @@ const styles: Record<string, CSSProperties> = {
     padding: '10px 12px',
     background: '#f9fafb',
     color: '#374151',
-    fontSize: 13
+    fontSize: 13,
+    lineHeight: 1.45,
+    wordBreak: 'normal'
   },
   savedReasonText: {
     marginTop: 6,
