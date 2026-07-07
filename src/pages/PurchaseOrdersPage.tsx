@@ -1676,249 +1676,264 @@ export default function PurchaseOrdersPage() {
           </div>
         ) : null}
 
-        <div style={styles.filters}>
-          <input
-            value={filters.search}
-            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-            placeholder="Search PO, supplier, notes…"
-            style={styles.input}
-          />
-          <select
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select
-            value={filters.receivingStatus}
-            onChange={(event) => setFilters((current) => ({ ...current, receivingStatus: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All receiving</option>
-            <option value="not_applicable">N/A</option>
-            <option value="not_started">Not started</option>
-            <option value="partially_received">Partial</option>
-            <option value="received">Received</option>
-          </select>
-          <select
-            value={filters.varianceStatus}
-            onChange={(event) => setFilters((current) => ({ ...current, varianceStatus: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All variance</option>
-            <option value="not_applicable">N/A</option>
-            <option value="matched">Matched</option>
-            <option value="pending_receipt">Pending receipt</option>
-            <option value="open_short">Open short</option>
-            <option value="closed_short">Closed short</option>
-            <option value="over_received">Over received</option>
-          </select>
-          <select
-            value={filters.deliveryStatus}
-            onChange={(event) => setFilters((current) => ({ ...current, deliveryStatus: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All delivery</option>
-            <option value="no_date">No date</option>
-            <option value="upcoming">Upcoming</option>
-            <option value="due_today">Due today</option>
-            <option value="overdue">Overdue</option>
-            <option value="fulfilled">Fulfilled</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select
-            value={filters.nextActionStatus}
-            onChange={(event) => setFilters((current) => ({ ...current, nextActionStatus: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All next actions</option>
-            <option value="submit_for_approval">Submit for approval</option>
-            <option value="approve_or_cancel">Approve or cancel</option>
-            <option value="create_shipment">Create shipment</option>
-            <option value="receive_open_shipment">Receive shipment</option>
-            <option value="follow_up_overdue">Follow up overdue</option>
-            <option value="monitor_receiving">Monitor receiving</option>
-            <option value="none_completed">Completed</option>
-            <option value="none_cancelled">Cancelled</option>
-            <option value="none">No action</option>
-          </select>
-          <select
-            value={filters.supplierId}
-            onChange={(event) => setFilters((current) => ({ ...current, supplierId: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All suppliers</option>
-            {(suppliersQuery.data || []).map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
-          </select>
-          <select
-            value={filters.productId}
-            onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}
-            style={styles.input}
-          >
-            <option value="">All products</option>
-            {(productsQuery.data || []).map((product) => (
-              <option key={product.id} value={product.id}>{product.name}</option>
-            ))}
-          </select>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Expected from</span>
+        <div style={styles.filterPanel}>
+          <div style={styles.filterSectionHeader}>
+            <div>
+              <strong>Filter purchase orders</strong>
+              <p style={styles.smallMuted}>Narrow the list by status, supplier, product, delivery state, dates, or next action.</p>
+            </div>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => setFilters({ ...EMPTY_FILTERS })}
+            >
+              Clear filters
+            </button>
+          </div>
+
+          <div style={styles.primaryFilterGrid}>
             <input
-              type="date"
-              value={filters.expectedFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, expectedFrom: event.target.value }))}
+              value={filters.search}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Search PO, supplier, notes…"
               style={styles.input}
             />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Expected to</span>
-            <input
-              type="date"
-              value={filters.expectedTo}
-              onChange={(event) => setFilters((current) => ({ ...current, expectedTo: event.target.value }))}
+            <select
+              value={filters.status}
+              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Created from</span>
-            <input
-              type="date"
-              value={filters.createdFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, createdFrom: event.target.value }))}
+            >
+              <option value="">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="approved">Approved</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select
+              value={filters.receivingStatus}
+              onChange={(event) => setFilters((current) => ({ ...current, receivingStatus: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Created to</span>
-            <input
-              type="date"
-              value={filters.createdTo}
-              onChange={(event) => setFilters((current) => ({ ...current, createdTo: event.target.value }))}
+            >
+              <option value="">All receiving</option>
+              <option value="not_applicable">N/A</option>
+              <option value="not_started">Not started</option>
+              <option value="partially_received">Partial</option>
+              <option value="received">Received</option>
+            </select>
+            <select
+              value={filters.varianceStatus}
+              onChange={(event) => setFilters((current) => ({ ...current, varianceStatus: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Approved from</span>
-            <input
-              type="date"
-              value={filters.approvedFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, approvedFrom: event.target.value }))}
+            >
+              <option value="">All variance</option>
+              <option value="not_applicable">N/A</option>
+              <option value="matched">Matched</option>
+              <option value="pending_receipt">Pending receipt</option>
+              <option value="open_short">Open short</option>
+              <option value="closed_short">Closed short</option>
+              <option value="over_received">Over received</option>
+            </select>
+            <select
+              value={filters.deliveryStatus}
+              onChange={(event) => setFilters((current) => ({ ...current, deliveryStatus: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Approved to</span>
-            <input
-              type="date"
-              value={filters.approvedTo}
-              onChange={(event) => setFilters((current) => ({ ...current, approvedTo: event.target.value }))}
+            >
+              <option value="">All delivery</option>
+              <option value="no_date">No date</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="due_today">Due today</option>
+              <option value="overdue">Overdue</option>
+              <option value="fulfilled">Fulfilled</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select
+              value={filters.nextActionStatus}
+              onChange={(event) => setFilters((current) => ({ ...current, nextActionStatus: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Completed from</span>
-            <input
-              type="date"
-              value={filters.completedFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, completedFrom: event.target.value }))}
+            >
+              <option value="">All next actions</option>
+              <option value="submit_for_approval">Submit for approval</option>
+              <option value="approve_or_cancel">Approve or cancel</option>
+              <option value="create_shipment">Create shipment</option>
+              <option value="receive_open_shipment">Receive shipment</option>
+              <option value="follow_up_overdue">Follow up overdue</option>
+              <option value="monitor_receiving">Monitor receiving</option>
+              <option value="none_completed">Completed</option>
+              <option value="none_cancelled">Cancelled</option>
+              <option value="none">No action</option>
+            </select>
+            <select
+              value={filters.supplierId}
+              onChange={(event) => setFilters((current) => ({ ...current, supplierId: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Completed to</span>
-            <input
-              type="date"
-              value={filters.completedTo}
-              onChange={(event) => setFilters((current) => ({ ...current, completedTo: event.target.value }))}
+            >
+              <option value="">All suppliers</option>
+              {(suppliersQuery.data || []).map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+            <select
+              value={filters.productId}
+              onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Cancelled from</span>
-            <input
-              type="date"
-              value={filters.cancelledFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, cancelledFrom: event.target.value }))}
+            >
+              <option value="">All products</option>
+              {(productsQuery.data || []).map((product) => (
+                <option key={product.id} value={product.id}>{product.name}</option>
+              ))}
+            </select>
+            <select
+              value={sortKey}
+              onChange={(event) => setSortKey(event.target.value as SortKey)}
               style={styles.input}
-            />
-          </label>
-          <label style={styles.compactField}>
-            <span style={styles.compactLabel}>Cancelled to</span>
-            <input
-              type="date"
-              value={filters.cancelledTo}
-              onChange={(event) => setFilters((current) => ({ ...current, cancelledTo: event.target.value }))}
-              style={styles.input}
-            />
-          </label>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={() => setFilters({ ...EMPTY_FILTERS })}
-          >
-            Clear
-          </button>
-          <select
-            value={sortKey}
-            onChange={(event) => setSortKey(event.target.value as SortKey)}
-            style={styles.input}
-            aria-label="Sort purchase orders"
-          >
-            <option value="created_desc">Newest first</option>
-            <option value="created_asc">Oldest first</option>
-            <option value="expected_asc">Expected soonest</option>
-            <option value="expected_desc">Expected latest</option>
-            <option value="cost_desc">Highest value</option>
-            <option value="cost_asc">Lowest value</option>
-            <option value="received_percent_desc">Most received</option>
-            <option value="received_percent_asc">Least received</option>
-          </select>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={copyCurrentViewLink}
-          >
-            Copy View Link
-          </button>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={exportVisiblePurchaseOrdersCsv}
-            disabled={!displayedPurchaseOrders.length}
-          >
-            Export All CSV
-          </button>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={exportCurrentPagePurchaseOrdersCsv}
-            disabled={!paginatedPurchaseOrders.length}
-          >
-            Export Page CSV
-          </button>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'All filtered purchase orders')}
-            disabled={!displayedPurchaseOrders.length}
-          >
-            Print All
-          </button>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)}
-            disabled={!paginatedPurchaseOrders.length}
-          >
-            Print Page
-          </button>
+              aria-label="Sort purchase orders"
+            >
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="expected_asc">Expected soonest</option>
+              <option value="expected_desc">Expected latest</option>
+              <option value="cost_desc">Highest value</option>
+              <option value="cost_asc">Lowest value</option>
+              <option value="received_percent_desc">Most received</option>
+              <option value="received_percent_asc">Least received</option>
+            </select>
+          </div>
+
+          <div style={styles.dateFilterGrid}>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Expected from</span>
+              <input
+                type="date"
+                value={filters.expectedFrom}
+                onChange={(event) => setFilters((current) => ({ ...current, expectedFrom: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Expected to</span>
+              <input
+                type="date"
+                value={filters.expectedTo}
+                onChange={(event) => setFilters((current) => ({ ...current, expectedTo: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Created from</span>
+              <input
+                type="date"
+                value={filters.createdFrom}
+                onChange={(event) => setFilters((current) => ({ ...current, createdFrom: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Created to</span>
+              <input
+                type="date"
+                value={filters.createdTo}
+                onChange={(event) => setFilters((current) => ({ ...current, createdTo: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Approved from</span>
+              <input
+                type="date"
+                value={filters.approvedFrom}
+                onChange={(event) => setFilters((current) => ({ ...current, approvedFrom: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Approved to</span>
+              <input
+                type="date"
+                value={filters.approvedTo}
+                onChange={(event) => setFilters((current) => ({ ...current, approvedTo: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Completed from</span>
+              <input
+                type="date"
+                value={filters.completedFrom}
+                onChange={(event) => setFilters((current) => ({ ...current, completedFrom: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Completed to</span>
+              <input
+                type="date"
+                value={filters.completedTo}
+                onChange={(event) => setFilters((current) => ({ ...current, completedTo: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Cancelled from</span>
+              <input
+                type="date"
+                value={filters.cancelledFrom}
+                onChange={(event) => setFilters((current) => ({ ...current, cancelledFrom: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.compactField}>
+              <span style={styles.compactLabel}>Cancelled to</span>
+              <input
+                type="date"
+                value={filters.cancelledTo}
+                onChange={(event) => setFilters((current) => ({ ...current, cancelledTo: event.target.value }))}
+                style={styles.input}
+              />
+            </label>
+          </div>
+
+          <div style={styles.utilityActionRow}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={copyCurrentViewLink}
+            >
+              Copy View Link
+            </button>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={exportVisiblePurchaseOrdersCsv}
+              disabled={!displayedPurchaseOrders.length}
+            >
+              Export All CSV
+            </button>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={exportCurrentPagePurchaseOrdersCsv}
+              disabled={!paginatedPurchaseOrders.length}
+            >
+              Export Page CSV
+            </button>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'All filtered purchase orders')}
+              disabled={!displayedPurchaseOrders.length}
+            >
+              Print All
+            </button>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)}
+              disabled={!paginatedPurchaseOrders.length}
+            >
+              Print Page
+            </button>
+          </div>
         </div>
 
         <div style={styles.dateShortcuts}>
@@ -2599,6 +2614,11 @@ const styles: Record<string, CSSProperties> = {
   filterChip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '6px 10px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   clearInlineButton: { border: 'none', background: 'transparent', color: '#2563eb', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
   filters: { display: 'grid', gridTemplateColumns: 'minmax(180px, 1.5fr) repeat(7, minmax(150px, 1fr)) auto auto', gap: 10, marginTop: 18 },
+  filterPanel: { display: 'grid', gap: 12, marginTop: 18, padding: 14, border: '1px solid #e5e7eb', borderRadius: 14, background: '#f8fafc' },
+  filterSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  primaryFilterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, alignItems: 'end' },
+  dateFilterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 10, alignItems: 'end' },
+  utilityActionRow: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-start' },
   compactField: { display: 'flex', flexDirection: 'column', gap: 4 },
   compactLabel: { color: '#475569', fontSize: 12, fontWeight: 700 },
   dateShortcuts: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 12 },
