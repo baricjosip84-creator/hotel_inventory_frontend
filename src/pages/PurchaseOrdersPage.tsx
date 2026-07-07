@@ -1582,6 +1582,26 @@ export default function PurchaseOrdersPage() {
 
   const selectedCostIssue = selectedDetail ? purchaseOrderCostIssue(selectedDetail) : null;
 
+  const submitSelectedPurchaseOrder = () => {
+    if (!selectedDetail) return;
+    if (selectedCostIssue) {
+      showTenantActionError(`Submit blocked. ${selectedCostIssue}`);
+      return;
+    }
+
+    actionMutation.mutate({ id: selectedDetail.id, action: 'submit', version: selectedDetail.version });
+  };
+
+  const approveSelectedPurchaseOrder = () => {
+    if (!selectedDetail) return;
+    if (selectedCostIssue) {
+      showTenantActionError(`Approve blocked. ${selectedCostIssue}`);
+      return;
+    }
+
+    actionMutation.mutate({ id: selectedDetail.id, action: 'approve', version: selectedDetail.version });
+  };
+
   if (subscriptionAccessQuery.isLoading) {
     return (
       <div style={styles.page}>
@@ -2437,23 +2457,25 @@ export default function PurchaseOrdersPage() {
                 {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
                   <button
                     type="button"
-                    style={styles.primaryButton}
-                    disabled={actionMutation.isPending || Boolean(selectedCostIssue)}
+                    style={selectedCostIssue ? styles.blockedActionButton : styles.primaryButton}
+                    disabled={actionMutation.isPending}
+                    aria-disabled={Boolean(selectedCostIssue)}
                     title={selectedCostIssue || 'Submit this purchase order for approval'}
-                    onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit', version: selectedDetail.version })}
+                    onClick={submitSelectedPurchaseOrder}
                   >
-                    {actionMutation.isPending ? 'Submitting...' : 'Submit'}
+                    {actionMutation.isPending ? 'Submitting...' : selectedCostIssue ? 'Submit blocked' : 'Submit'}
                   </button>
                 ) : null}
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
                   <button
                     type="button"
-                    style={styles.primaryButton}
-                    disabled={actionMutation.isPending || Boolean(selectedCostIssue)}
+                    style={selectedCostIssue ? styles.blockedActionButton : styles.primaryButton}
+                    disabled={actionMutation.isPending}
+                    aria-disabled={Boolean(selectedCostIssue)}
                     title={selectedCostIssue || 'Approve this purchase order'}
-                    onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve', version: selectedDetail.version })}
+                    onClick={approveSelectedPurchaseOrder}
                   >
-                    {actionMutation.isPending ? 'Approving...' : 'Approve'}
+                    {actionMutation.isPending ? 'Approving...' : selectedCostIssue ? 'Approve blocked' : 'Approve'}
                   </button>
                 ) : null}
               </div>
@@ -2663,6 +2685,7 @@ const styles: Record<string, CSSProperties> = {
   itemBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 10, marginBottom: 10 },
   buttonRow: { display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' },
+  blockedActionButton: { border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', background: '#fff7ed', color: '#9a3412', fontWeight: 800, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', background: '#fff1f2', color: '#be123c', fontWeight: 700, cursor: 'pointer' },
   error: { color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
