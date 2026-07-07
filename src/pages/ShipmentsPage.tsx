@@ -2329,7 +2329,7 @@ export default function ShipmentsPage() {
                 <p style={styles.emptyState}>Loading shipment items...</p>
               ) : shipmentItems.length === 0 ? (
                 <p style={styles.emptyState}>No shipment items yet.</p>
-              ) : isMobile ? (
+              ) : (
                 <div style={styles.mobileItemCardList}>
                   {shipmentItems.map((item) => {
                     const ordered = toNumber(item.quantity);
@@ -2394,17 +2394,19 @@ export default function ShipmentsPage() {
                         </div>
 
                         {canManageShipmentItems ? (
-                          <div style={styles.mobileFieldGroup}>
-                            <label style={styles.label}>Ordered Quantity</label>
-                            <input
-                              style={styles.input}
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={itemEditDrafts[item.id] ?? String(ordered)}
-                              onChange={(event) => updateItemEditDraft(item.id, event.target.value)}
-                            />
-                            <div style={styles.inlineButtonRow}>
+                          <div style={styles.itemManagementPanel}>
+                            <div style={styles.itemManagementInputBlock}>
+                              <label style={styles.label}>Ordered Quantity</label>
+                              <input
+                                style={styles.input}
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={itemEditDrafts[item.id] ?? String(ordered)}
+                                onChange={(event) => updateItemEditDraft(item.id, event.target.value)}
+                              />
+                            </div>
+                            <div style={styles.itemManagementActions}>
                               <button
                                 type="button"
                                 style={styles.secondaryButton}
@@ -2431,158 +2433,13 @@ export default function ShipmentsPage() {
                           </div>
                         ) : null}
 
-                        <div style={styles.mobileFieldGroup}>
-                          <label style={styles.label}>Storage Location</label>
-                          <select
-                            style={styles.input}
-                            value={draft.storage_location_id}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                storage_location_id: event.target.value
-                              }))
-                            }
-                          >
-                            <option value="">Select location</option>
-                            {(storageLocationsQuery.data ?? []).map((location) => (
-                              <option key={location.id} value={location.id}>
-                                {location.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div style={styles.mobileFieldGroup}>
-                          <label style={styles.label}>Receive Quantity</label>
-                          <input
-                            style={styles.input}
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={draft.quantity_received}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                quantity_received: event.target.value
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <div style={styles.mobileFieldGroup}>
-                          <label style={styles.label}>Discrepancy Reason</label>
-                          <input
-                            style={styles.input}
-                            type="text"
-                            placeholder="Required if this line will remain short at finalization"
-                            value={draft.discrepancy_reason}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                discrepancy_reason: event.target.value
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <div style={styles.mobileFieldGroup}>
-                          <label style={styles.label}>Receiving Note</label>
-                          <input
-                            style={styles.input}
-                            type="text"
-                            placeholder="Optional receiving note"
-                            value={draft.receiving_note}
-                            onChange={(event) =>
-                              updateReceiveDraft(item.id, (current) => ({
-                                ...current,
-                                receiving_note: event.target.value
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.mobileReceiveButton,
-                            ...(!canReceiveShipments || remaining <= 0 || selectedShipment.status === 'received' || receiveShipmentMutation.isPending
-                              ? styles.mobileReceiveButtonDisabled
-                              : {})
-                          }}
-                          onClick={() => handleReceiveLine(item)}
-                          disabled={
-                            !canReceiveShipments ||
-                            remaining <= 0 ||
-                            selectedShipment.status === 'received' ||
-                            receiveShipmentMutation.isPending
-                          }
-                          title={
-                            !canReceiveShipments
-                              ? 'Shipments receive permission required'
-                              : remaining <= 0
-                                ? 'This line is already fully received.'
-                                : selectedShipment.status === 'received'
-                                  ? 'This shipment is already received.'
-                                  : 'Receive this shipment line into stock.'
-                          }
-                        >
-                          {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={styles.itemTableWrapper}>
-                  <table style={styles.itemTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Product</th>
-                        <th style={styles.th}>Ordered</th>
-                        <th style={styles.th}>Received</th>
-                        <th style={styles.th}>Remaining</th>
-                        <th style={styles.th}>Unit Cost</th>
-                        <th style={styles.th}>Storage Location</th>
-                        <th style={styles.th}>Receive Quantity</th>
-                        <th style={styles.th}>Discrepancy Reason</th>
-                        <th style={styles.th}>Receiving Note</th>
-                        <th style={styles.th}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shipmentItems.map((item) => {
-                        const ordered = toNumber(item.quantity);
-                        const received = toNumber(item.received_quantity);
-                        const remaining = Math.max(ordered - received, 0);
-                        const draft = getReceiveDraft(item);
-                        const isHighlighted = item.id === highlightedItemId;
-                        const hasSavedShortageReason = Boolean(item.discrepancy_reason?.trim());
-
-                        return (
-                          <tr
-                            key={item.id}
-                            style={isHighlighted ? styles.highlightedTableRow : undefined}
-                          >
-                            <td style={styles.td}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <span>{item.product_name || item.product_id}</span>
-                                {isHighlighted ? (
-                                  <span style={styles.desktopScannedBadge}>Scanned Match</span>
-                                ) : null}
-                                {remaining > 0 && hasSavedShortageReason ? (
-                                  <span style={styles.desktopDiscrepancyBadge}>Reason saved</span>
-                                ) : null}
-                              </div>
-                            </td>
-                            <td style={styles.td}>{ordered}</td>
-                            <td style={styles.td}>{received}</td>
-                            <td style={styles.td}>{remaining}</td>
-                            <td style={styles.td}>
-                              {item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost)}
-                            </td>
-                            <td style={styles.td}>
+                        <div style={styles.receiveLinePanel}>
+                          <div style={styles.receiveLinePanelTitle}>Receive this line</div>
+                          <div style={styles.receiveLineGrid}>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Storage Location</label>
                               <select
-                                style={styles.inputCompact}
+                                style={styles.input}
                                 value={draft.storage_location_id}
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
@@ -2598,10 +2455,12 @@ export default function ShipmentsPage() {
                                   </option>
                                 ))}
                               </select>
-                            </td>
-                            <td style={styles.td}>
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Receive Quantity</label>
                               <input
-                                style={styles.inputCompact}
+                                style={styles.input}
                                 type="number"
                                 min="0.01"
                                 step="0.01"
@@ -2613,12 +2472,14 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               />
-                            </td>
-                            <td style={styles.td}>
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Discrepancy Reason</label>
                               <input
-                                style={styles.inputCompact}
+                                style={styles.input}
                                 type="text"
-                                placeholder="Required if final shortage remains"
+                                placeholder="Required only if this line remains short"
                                 value={draft.discrepancy_reason}
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
@@ -2627,15 +2488,12 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               />
-                              {item.discrepancy_reason ? (
-                                <div style={styles.savedReasonText}>
-                                  Saved: {item.discrepancy_reason}
-                                </div>
-                              ) : null}
-                            </td>
-                            <td style={styles.td}>
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Receiving Note</label>
                               <input
-                                style={styles.inputCompact}
+                                style={styles.input}
                                 type="text"
                                 placeholder="Optional receiving note"
                                 value={draft.receiving_note}
@@ -2646,14 +2504,15 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               />
-                            </td>
-                            <td style={styles.td}>
+                            </div>
+
+                            <div style={styles.receiveLineActionBlock}>
                               <button
                                 type="button"
                                 style={{
-                                  ...styles.secondaryButton,
+                                  ...styles.mobileReceiveButton,
                                   ...(!canReceiveShipments || remaining <= 0 || selectedShipment.status === 'received' || receiveShipmentMutation.isPending
-                                    ? styles.secondaryButtonDisabled
+                                    ? styles.mobileReceiveButtonDisabled
                                     : {})
                                 }}
                                 onClick={() => handleReceiveLine(item)}
@@ -2673,45 +2532,16 @@ export default function ShipmentsPage() {
                                         : 'Receive this shipment line into stock.'
                                 }
                               >
-                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive'}
+                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
                               </button>
-
-                              {canManageShipmentItems ? (
-                                <div style={styles.tableActionStack}>
-                                  <input
-                                    style={styles.inputCompact}
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    value={itemEditDrafts[item.id] ?? String(ordered)}
-                                    onChange={(event) => updateItemEditDraft(item.id, event.target.value)}
-                                    aria-label="Ordered quantity"
-                                  />
-                                  <button
-                                    type="button"
-                                    style={styles.secondaryButton}
-                                    onClick={() => handleUpdateShipmentItem(item)}
-                                    disabled={updateShipmentItemMutation.isPending}
-                                  >
-                                    Save Line
-                                  </button>
-                                  <button
-                                    type="button"
-                                    style={styles.dangerButton}
-                                    onClick={() => handleDeleteShipmentItem(item)}
-                                    disabled={deleteShipmentItemMutation.isPending}
-                                  >
-                                    Delete Line
-                                  </button>
-                                </div>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+
               )}
             </>
           )}
@@ -3151,7 +2981,7 @@ const styles: Record<string, CSSProperties> = {
   },
   mobileItemMetaGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
     gap: 12,
     marginBottom: 14,
     color: '#374151',
@@ -3159,6 +2989,52 @@ const styles: Record<string, CSSProperties> = {
   },
   mobileFieldGroup: {
     marginBottom: 12
+  },
+  itemManagementPanel: {
+    display: 'flex',
+    gap: 12,
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 12,
+    background: '#f8fafc',
+    marginBottom: 14
+  },
+  itemManagementInputBlock: {
+    flex: '1 1 180px',
+    minWidth: 0
+  },
+  itemManagementActions: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  receiveLinePanel: {
+    border: '1px solid #dbeafe',
+    borderRadius: 12,
+    padding: 12,
+    background: '#eff6ff',
+    marginTop: 12
+  },
+  receiveLinePanelTitle: {
+    fontWeight: 800,
+    color: '#1e3a8a',
+    marginBottom: 10
+  },
+  receiveLineGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 12,
+    alignItems: 'end'
+  },
+  receiveLineField: {
+    minWidth: 0
+  },
+  receiveLineActionBlock: {
+    display: 'flex',
+    alignItems: 'end',
+    minWidth: 0
   },
   mobilePendingBadge: {
     display: 'inline-flex',
