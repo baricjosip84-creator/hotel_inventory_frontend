@@ -117,6 +117,27 @@ function tenantMutationSuccessMessage(path: string, method: string): string {
   return `${label} saved successfully.`;
 }
 
+function tenantMutationErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'EMAIL_NOT_CONFIGURED') {
+      return 'Email is not configured for this server. The record was not changed. Configure backend email settings before using supplier email actions.';
+    }
+
+    if (error.code === 'PURCHASE_ORDER_COST_REVIEW_REQUIRED') {
+      return 'Commercial cost review is required. Enter positive item costs before submitting or approving this purchase order.';
+    }
+
+    if (error.code === 'VALIDATION_SCHEMA_MISSING') {
+      return 'This action is temporarily unavailable because backend validation is not configured for this route.';
+    }
+
+    return error.message;
+  }
+
+  if (error instanceof Error) return error.message;
+  return 'Action failed.';
+}
+
 function dispatchTenantMutationFeedback(detail: { type: 'success' | 'error'; message: string; requestId?: string }): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, { detail }));
@@ -663,8 +684,8 @@ export async function apiRequest<T>(
     if (shouldShowMutationFeedback) {
       dispatchTenantMutationFeedback({
         type: 'error',
-        message: error instanceof Error ? error.message : 'Action failed.',
-        requestId: error instanceof ApiError ? error.requestId : undefined
+        message: tenantMutationErrorMessage(error),
+        requestId: error instanceof ApiError && error.code !== 'EMAIL_NOT_CONFIGURED' ? error.requestId : undefined
       });
     }
 
