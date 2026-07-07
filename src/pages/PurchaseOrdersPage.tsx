@@ -490,6 +490,25 @@ function isPurchaseOrderLocked(status: PurchaseOrderStatus | null | undefined): 
   return Boolean(status && !isPurchaseOrderEditable(status));
 }
 
+function purchaseOrderCostIssue(detail: PurchaseOrderDetail): string | null {
+  if (!detail.items.length) return 'At least one purchase order item is required before submission.';
+
+  const missingCostCount = detail.items.filter((item) => {
+    const parsed = Number(item.unit_cost);
+    return item.unit_cost === null || item.unit_cost === undefined || !Number.isFinite(parsed) || parsed <= 0;
+  }).length;
+
+  if (missingCostCount > 0) {
+    return `${missingCostCount} item${missingCostCount === 1 ? '' : 's'} missing positive unit cost. Edit the draft and enter supplier pricing before submitting or approving.`;
+  }
+
+  if (Number(detail.estimated_total_cost || 0) <= 0) {
+    return 'Estimated PO cost must be greater than zero before submitting or approving.';
+  }
+
+  return null;
+}
+
 function sortPurchaseOrders(rows: PurchaseOrderListItem[], sortKey: SortKey): PurchaseOrderListItem[] {
   const dateValue = (value: string | null | undefined, emptyFallback: number) => {
     if (!value) return emptyFallback;
@@ -1561,6 +1580,8 @@ export default function PurchaseOrdersPage() {
     selectedRemainingQuantity > 0
   );
 
+  const selectedCostIssue = selectedDetail ? purchaseOrderCostIssue(selectedDetail) : null;
+
   if (subscriptionAccessQuery.isLoading) {
     return (
       <div style={styles.page}>
@@ -2388,6 +2409,12 @@ export default function PurchaseOrdersPage() {
 
               {actionMutation.error ? <p style={styles.error}>{actionError}</p> : null}
 
+              {selectedCostIssue ? (
+                <div style={styles.commercialWarningBox}>
+                  <strong>Commercial cost review required.</strong> {selectedCostIssue}
+                </div>
+              ) : null}
+
               <div style={styles.buttonRow}>
                 <button type="button" style={styles.secondaryButton} onClick={exportSelectedPurchaseOrderCsv}>Export Detail CSV</button>
                 <button type="button" style={styles.secondaryButton} onClick={printSelectedPurchaseOrderDetail}>Print Detail</button>
@@ -2396,7 +2423,8 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.primaryButton}
-                    disabled={actionMutation.isPending}
+                    disabled={actionMutation.isPending || Boolean(selectedCostIssue)}
+                    title={selectedCostIssue || 'Submit this purchase order for approval'}
                     onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'submit', version: selectedDetail.version })}
                   >
                     {actionMutation.isPending ? 'Submitting...' : 'Submit'}
@@ -2406,7 +2434,8 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     style={styles.primaryButton}
-                    disabled={actionMutation.isPending}
+                    disabled={actionMutation.isPending || Boolean(selectedCostIssue)}
+                    title={selectedCostIssue || 'Approve this purchase order'}
                     onClick={() => actionMutation.mutate({ id: selectedDetail.id, action: 'approve', version: selectedDetail.version })}
                   >
                     {actionMutation.isPending ? 'Approving...' : 'Approve'}
@@ -2617,6 +2646,7 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', background: '#fff1f2', color: '#be123c', fontWeight: 700, cursor: 'pointer' },
   error: { color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
+  commercialWarningBox: { color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, marginTop: 12, lineHeight: 1.5 },
   detailHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
   detailGrid: { display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 12px', margin: '16px 0', fontSize: 14 },
   notes: { whiteSpace: 'pre-wrap', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, color: '#334155' },

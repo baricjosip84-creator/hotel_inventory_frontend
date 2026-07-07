@@ -719,7 +719,11 @@ export default function ShipmentsPage() {
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setPageError(error.message);
+        if (error.code === 'EMAIL_NOT_CONFIGURED') {
+          setPageError('Supplier email is not configured on this server. The shipment was not changed; continue receiving/finalizing manually or configure backend email settings before using supplier email.');
+        } else {
+          setPageError(error.message);
+        }
       } else {
         setPageError('Failed to email shipment to supplier.');
       }

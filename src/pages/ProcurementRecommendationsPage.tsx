@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
@@ -576,6 +577,20 @@ function formatMoney(
   }
 }
 
+
+function hasPoDraftCostWarning(po: RecommendationPoDraftReviewResponse["rows"][number]): boolean {
+  return toNumber(po.estimated_total_cost) <= 0 || po.governance_warnings.some((warning) => warning.code === "MISSING_ESTIMATED_COST");
+}
+
+function poDraftReviewLabel(po: RecommendationPoDraftReviewResponse["rows"][number]): string {
+  if (hasPoDraftCostWarning(po) && po.status === "draft") return "Needs Cost Review";
+  return titleCase(po.review_status || po.status);
+}
+
+function buildPurchaseOrderUrl(purchaseOrderId: string): string {
+  return `/purchase-orders?purchaseOrderId=${encodeURIComponent(purchaseOrderId)}`;
+}
+
 function titleCase(value: string | null | undefined): string {
   if (!value) return "-";
   return value
@@ -1138,6 +1153,7 @@ function Badge({
 }
 
 export default function ProcurementRecommendationsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
@@ -2469,10 +2485,19 @@ export default function ProcurementRecommendationsPage() {
             draft PO(s).
             <ul style={styles.reasonList}>
               {poDraftConversionMutation.data.purchase_orders.map((po) => (
-                <li key={po.purchase_order_id}>
-                  {po.po_number} · {po.supplier_name || po.supplier_id} ·{" "}
-                  {formatNumber(po.item_count, 0)} item(s) ·{" "}
-                  {formatMoney(po.estimated_total_cost)}
+                <li key={po.purchase_order_id} style={styles.conversionResultItem}>
+                  <span>
+                    {po.po_number} · {po.supplier_name || po.supplier_id} ·{" "}
+                    {formatNumber(po.item_count, 0)} item(s) ·{" "}
+                    {formatMoney(po.estimated_total_cost)}
+                  </span>
+                  <button
+                    type="button"
+                    style={styles.inlineActionButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
+                  >
+                    Open draft
+                  </button>
                 </li>
               ))}
             </ul>
@@ -2965,6 +2990,11 @@ export default function ProcurementRecommendationsPage() {
                 )}
               />
             </div>
+            {toNumber(poDraftReviewQuery.data.summary.warning_count) > 0 ? (
+              <div style={styles.commercialWarningBox}>
+                <strong>Commercial review required:</strong> one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.
+              </div>
+            ) : null}
             <div style={{ ...styles.tableWrap, marginTop: 12 }}>
               <table style={styles.table}>
                 <thead>
@@ -2976,6 +3006,7 @@ export default function ProcurementRecommendationsPage() {
                     <th style={styles.th}>Estimated spend</th>
                     <th style={styles.th}>Recommendation linkage</th>
                     <th style={styles.th}>Warnings</th>
+                    <th style={styles.th}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3006,7 +3037,7 @@ export default function ProcurementRecommendationsPage() {
                                 : "good"
                           }
                         >
-                          {titleCase(po.review_status || po.status)}
+                          {poDraftReviewLabel(po)}
                         </Badge>
                       </td>
                       <td style={styles.td}>
@@ -3067,11 +3098,23 @@ export default function ProcurementRecommendationsPage() {
                           </ul>
                         )}
                       </td>
+                      <td style={styles.td}>
+                        <button
+                          type="button"
+                          style={styles.primaryButton}
+                          onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
+                        >
+                          Open / Review PO
+                        </button>
+                        {hasPoDraftCostWarning(po) ? (
+                          <div style={styles.blockerText}>Enter positive item costs in Purchase Orders before submitting this draft.</div>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                   {poDraftReviewQuery.data.rows.length === 0 ? (
                     <tr>
-                      <td style={styles.emptyCell} colSpan={7}>
+                      <td style={styles.emptyCell} colSpan={8}>
                         No recommendation-generated PO drafts found.
                       </td>
                     </tr>
@@ -3297,7 +3340,13 @@ export default function ProcurementRecommendationsPage() {
               {selectedDetail.converted_purchase_order_id ? (
                 <div style={styles.metricLine}>
                   <strong>PO draft:</strong>{" "}
-                  {selectedDetail.converted_purchase_order_id}
+                  <button
+                    type="button"
+                    style={styles.linkButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.converted_purchase_order_id as string))}
+                  >
+                    Open in Purchase Orders
+                  </button>
                   {selectedDetail.converted_at
                     ? ` · ${new Date(selectedDetail.converted_at).toLocaleString()}`
                     : ""}
@@ -3620,6 +3669,9 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
   actionRow: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 },
+  inlineActionButton: { border: "1px solid #cbd5e1", borderRadius: 8, padding: "5px 8px", background: "#ffffff", color: "#0f172a", cursor: "pointer", fontSize: 12, fontWeight: 800 },
+  conversionResultItem: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
+  commercialWarningBox: { border: "1px solid #fed7aa", background: "#fff7ed", color: "#9a3412", borderRadius: 14, padding: 14, marginTop: 12, lineHeight: 1.5 },
   exceptionActionRow: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 },
   textarea: {
     border: "1px solid #cbd5e1",
