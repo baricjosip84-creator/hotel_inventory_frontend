@@ -558,6 +558,38 @@ function formatNumber(
   }).format(parsed);
 }
 
+
+function isActiveRecommendation(row: ReplenishmentRecommendation): boolean {
+  return (
+    toNumber(row.recommended_reorder_quantity) > 0 &&
+    !row.converted_purchase_order_id
+  );
+}
+
+function buildActiveRecommendationSummary(rows: ReplenishmentRecommendation[]) {
+  return rows.reduce(
+    (acc, row) => {
+      acc.recommended_count += 1;
+      if (row.urgency === "critical") acc.critical_count += 1;
+      if (row.urgency === "high") acc.high_count += 1;
+      if (row.urgency === "medium") acc.medium_count += 1;
+      if (row.urgency === "low") acc.low_count += 1;
+      if (!row.procurement_ready) acc.blocked_count += 1;
+      acc.estimated_total_cost += toNumber(row.estimated_total_cost);
+      return acc;
+    },
+    {
+      recommended_count: 0,
+      critical_count: 0,
+      high_count: 0,
+      medium_count: 0,
+      low_count: 0,
+      blocked_count: 0,
+      estimated_total_cost: 0,
+    },
+  );
+}
+
 function formatMoney(
   value: number | string | null | undefined,
   currency?: string | null,
@@ -1371,8 +1403,13 @@ export default function ProcurementRecommendationsPage() {
   });
 
   const data = recommendationsQuery.data;
-  const rows = data?.rows ?? [];
-  const summary = data?.summary ?? {};
+  const allRows = data?.rows ?? [];
+  const rows = useMemo(() => allRows.filter(isActiveRecommendation), [allRows]);
+  const activeSummary = useMemo(() => buildActiveRecommendationSummary(rows), [rows]);
+  const summary: RecommendationSummary = {
+    ...(data?.summary ?? {}),
+    ...activeSummary,
+  };
   const dashboard = executionDashboardQuery.data;
   const dashboardSummary = dashboard?.summary;
   const productionReview = productionReviewQuery.data;
@@ -1387,6 +1424,7 @@ export default function ProcurementRecommendationsPage() {
       low: 1,
     };
     return [...rows]
+      .filter((row) => ["critical", "high"].includes(row.urgency))
       .sort(
         (a, b) =>
           (urgencyScore[b.urgency] || 0) - (urgencyScore[a.urgency] || 0),
@@ -1407,7 +1445,7 @@ export default function ProcurementRecommendationsPage() {
 
   const canPrevious = filters.offset > 0;
   const canNext = Boolean(pagination?.has_more);
-  const totalRows = toNumber(pagination?.total ?? rows.length);
+  const totalRows = rows.length;
   const selectedDetail = detailQuery.data?.row;
   const selectedRows = rows.filter((row) =>
     selectedProductIds.includes(row.product_id),
@@ -3537,7 +3575,7 @@ export default function ProcurementRecommendationsPage() {
           ))}
           {!recommendationsQuery.isLoading && highestRiskRows.length === 0 ? (
             <div style={styles.infoBox}>
-              No high-risk recommendations to summarize.
+              No active high-risk recommendations to summarize.
             </div>
           ) : null}
         </div>
