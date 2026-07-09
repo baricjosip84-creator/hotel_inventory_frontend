@@ -101,6 +101,50 @@ const formatCodeLabel = (value: unknown): string => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+const formatCodeRecordValue = (record: Record<string, unknown> | null | undefined, key: string): string => {
+  if (!record) return '-';
+  return formatCodeLabel(record[key]);
+};
+
+const formatPercentValue = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '-';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? `${formatNumber(parsed)}%` : String(value);
+};
+
+const shouldFormatCostValueAsCurrency = (key: string): boolean => {
+  if (/(_percent|count|score|products?|rows?|status|source|date|age|current_value)$/i.test(key)) {
+    return false;
+  }
+  return /(estimated|inventory|review|received|standard|fallback|alerted|recommended|committed|overdue|spend|capital|cost|value)/i.test(key);
+};
+
+const formatCostTableValue = (key: unknown, value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '-';
+
+  const normalizedKey = String(key ?? '');
+  if (/(_at|date)$/i.test(normalizedKey)) {
+    return formatDateTime(String(value));
+  }
+  if (/_percent$/i.test(normalizedKey)) {
+    return formatPercentValue(value as number | string | null | undefined);
+  }
+  if (shouldFormatCostValueAsCurrency(normalizedKey)) {
+    return formatCurrency(value as number | string | null | undefined);
+  }
+  if (typeof value === 'number') {
+    return formatNumber(value);
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'string' && value.includes('_') && !value.includes(' ')) {
+    return formatCodeLabel(value);
+  }
+
+  return formatRecordValue({ value }, 'value');
+};
+
 const toHardeningReviewRows = (queryData: any, fallbackRows: any[]): string[][] => {
   if (Array.isArray(fallbackRows) && fallbackRows.length) {
     return fallbackRows.map((item: any) => [
@@ -446,8 +490,8 @@ export function CostControlTab({
           empty="No cost action summary rows returned."
           headers={['Action', 'Priority', 'Products', 'Estimated value', 'Reason']}
           rows={productCostActionRows.map((item: any) => [
-            formatRecordValue(item, 'action'),
-            formatRecordValue(item, 'priority'),
+            formatCodeRecordValue(item, 'action'),
+            formatCodeRecordValue(item, 'priority'),
             formatRecordValue(item, 'product_count'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
             formatRecordValue(item, 'reason')
@@ -510,7 +554,7 @@ export function CostControlTab({
             formatRecordValue(item, 'critical_products'),
             formatRecordValue(item, 'high_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_focus')
+            formatCodeRecordValue(item, 'recommended_focus')
           ])}
         />
       </section>
@@ -576,7 +620,7 @@ export function CostControlTab({
           empty="No cost source rows returned."
           headers={['Cost source', 'Products', 'Missing source', 'Estimated value', 'Recommended source action']}
           rows={productCostActionSources.map((item: any) => [
-            formatRecordValue(item, 'cost_source'),
+            formatCodeRecordValue(item, 'cost_source'),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_source_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
@@ -760,9 +804,9 @@ export function CostControlTab({
           empty="No report export rows returned."
           headers={['Section', 'Metric', 'Value']}
           rows={(productCostReportSummaryQuery.data?.export_rows ?? []).map((item: any) => [
-            formatRecordValue(item, 'section'),
-            formatRecordValue(item, 'metric'),
-            formatRecordValue(item, 'value')
+            formatCodeRecordValue(item, 'section'),
+            formatCodeRecordValue(item, 'metric'),
+            formatCostTableValue(item.metric, item.value)
           ])}
         />
       </section>
@@ -801,10 +845,10 @@ export function CostControlTab({
           empty="No remediation plan rows returned."
           headers={['Key', 'Priority', 'Action', 'Source']}
           rows={productCostGovernanceRemediationPlan.map((item: any) => [
-            formatRecordValue(item, 'key'),
-            formatRecordValue(item, 'priority'),
+            formatCodeRecordValue(item, 'key'),
+            formatCodeRecordValue(item, 'priority'),
             formatRecordValue(item, 'action'),
-            formatRecordValue(item, 'source')
+            formatCodeRecordValue(item, 'source')
           ])}
         />
         <DataTable
@@ -815,7 +859,7 @@ export function CostControlTab({
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommendation') || formatRecordValue(item, 'action')
+            formatCodeLabel(item.recommendation || item.action)
           ])}
         />
         <DataTable
@@ -823,10 +867,10 @@ export function CostControlTab({
           empty="No audit pack rows returned."
           headers={['Section', 'Key', 'Status', 'Value']}
           rows={productCostGovernanceAuditRows.slice(0, 20).map((item: any) => [
-            formatRecordValue(item, 'section'),
-            formatRecordValue(item, 'key'),
+            formatCodeRecordValue(item, 'section'),
+            formatCodeRecordValue(item, 'key'),
             formatCodeLabel(item.status),
-            formatRecordValue(item, 'value')
+            formatCostTableValue(item.key, item.value)
           ])}
         />
         <DataTable
@@ -844,9 +888,9 @@ export function CostControlTab({
           empty="No blockers or warnings returned."
           headers={['Type', 'Key', 'Severity', 'Detail']}
           rows={[...productCostGovernanceBlockers.map((item: any) => ({ ...item, issue_type: 'blocker' })), ...productCostGovernanceWarnings.map((item: any) => ({ ...item, issue_type: 'warning' }))].map((item: any) => [
-            formatRecordValue(item, 'issue_type'),
-            formatRecordValue(item, 'key'),
-            formatRecordValue(item, 'severity'),
+            formatCodeRecordValue(item, 'issue_type'),
+            formatCodeRecordValue(item, 'key'),
+            formatCodeRecordValue(item, 'severity'),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -856,7 +900,7 @@ export function CostControlTab({
           headers={['Type', 'Priority', 'Owner', 'Detail']}
           rows={productCostGovernanceQueueItems.map((item: any) => [
             formatCodeLabel(item.queue_type),
-            formatRecordValue(item, 'priority'),
+            formatCodeRecordValue(item, 'priority'),
             formatCodeLabel(item.owner_hint),
             formatRecordValue(item, 'detail')
           ])}
@@ -866,10 +910,10 @@ export function CostControlTab({
           empty="No review export rows returned."
           headers={['Section', 'Key', 'Status', 'Value']}
           rows={productCostGovernanceReviewExportRows.slice(0, 20).map((item: any) => [
-            formatRecordValue(item, 'section'),
-            formatRecordValue(item, 'key'),
+            formatCodeRecordValue(item, 'section'),
+            formatCodeRecordValue(item, 'key'),
             formatCodeLabel(item.status),
-            formatRecordValue(item, 'value')
+            formatCostTableValue(item.key, item.value)
           ])}
         />
         <DataTable
@@ -897,7 +941,7 @@ export function CostControlTab({
           empty="No owner handoff rows returned."
           headers={['Owner', 'Responsibility', 'Status']}
           rows={productCostGovernanceOwnerSummary.map((item: any) => [
-            formatRecordValue(item, 'owner'),
+            formatCodeRecordValue(item, 'owner'),
             formatRecordValue(item, 'responsibility'),
             formatCodeLabel(item.status)
           ])}
@@ -923,8 +967,8 @@ export function CostControlTab({
           empty="No operating rhythm rows returned."
           headers={['Cadence', 'Owner', 'Status', 'Action']}
           rows={productCostOperationsRhythm.map((item: any) => [
-            formatRecordValue(item, 'cadence'),
-            formatRecordValue(item, 'owner'),
+            formatCodeRecordValue(item, 'cadence'),
+            formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
             formatRecordValue(item, 'action')
           ])}
@@ -934,8 +978,8 @@ export function CostControlTab({
           empty="No escalation rules returned."
           headers={['Key', 'Current value', 'Condition', 'Escalation']}
           rows={productCostOperationsEscalationRules.map((item: any) => [
-            formatRecordValue(item, 'key'),
-            formatRecordValue(item, 'current_value'),
+            formatCodeRecordValue(item, 'key'),
+            formatCostTableValue(item.key, item.current_value),
             formatRecordValue(item, 'condition'),
             formatRecordValue(item, 'escalation')
           ])}
@@ -946,9 +990,9 @@ export function CostControlTab({
           headers={['Check', 'Owner', 'Status', 'Value', 'Detail']}
           rows={productCostOperationsControlChecks.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'owner'),
+            formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
-            formatRecordValue(item, 'value'),
+            formatCostTableValue(item.label, item.value),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -958,7 +1002,7 @@ export function CostControlTab({
           headers={['Evidence', 'Source', 'Rows', 'Status', 'Purpose']}
           rows={productCostOperationsEvidenceSections.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'source'),
+            formatCodeRecordValue(item, 'source'),
             formatRecordValue(item, 'rows'),
             formatCodeLabel(item.status),
             formatRecordValue(item, 'purpose')
@@ -971,7 +1015,7 @@ export function CostControlTab({
           rows={productCostOperationsReadinessChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatRecordValue(item, 'value'),
+            formatCostTableValue(item.label, item.value),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -987,10 +1031,10 @@ export function CostControlTab({
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
-            formatNumber(item.standard_unit_cost),
-            formatNumber(item.latest_unit_cost),
-            `${formatNumber(item.cost_variance_percent)}%`,
-            formatNumber(item.estimated_inventory_value)
+            formatCurrency(item.standard_unit_cost),
+            formatCurrency(item.latest_unit_cost),
+            formatPercentValue(item.cost_variance_percent),
+            formatCurrency(item.estimated_inventory_value)
           ])}
         />
       </section>
@@ -1005,9 +1049,9 @@ export function CostControlTab({
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
-            formatNumber(item.effective_unit_cost),
-            item.effective_cost_source || '-',
-            item.cost_variance_status || '-'
+            formatCurrency(item.effective_unit_cost),
+            formatCodeLabel(item.effective_cost_source),
+            formatCodeLabel(item.cost_variance_status)
           ])}
         />
       </section>
@@ -1022,9 +1066,9 @@ export function CostControlTab({
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
-            formatNumber(item.latest_unit_cost),
-            `${formatNumber(item.cost_history_spread_percent)}%`,
-            formatNumber(item.estimated_inventory_value)
+            formatCurrency(item.latest_unit_cost),
+            formatPercentValue(item.cost_history_spread_percent),
+            formatCurrency(item.estimated_inventory_value)
           ])}
         />
       </section>
