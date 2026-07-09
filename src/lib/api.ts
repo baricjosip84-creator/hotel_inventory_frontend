@@ -89,6 +89,7 @@ function tenantMutationActionLabel(path: string, method: string): string {
   if (normalizedPath.includes('/products')) return 'Product';
   if (normalizedPath.includes('/users')) return 'User';
   if (normalizedPath.includes('/storage-locations')) return 'Storage location';
+  if (normalizedPath.includes('/stock-transfers')) return 'Stock transfer';
   if (normalizedPath.includes('/stock-movements')) return 'Stock movement';
   if (normalizedPath.includes('/stock')) return 'Stock';
   if (normalizedPath.includes('/shipments')) return 'Shipment';
@@ -109,8 +110,17 @@ function tenantMutationActionLabel(path: string, method: string): string {
 }
 
 function tenantMutationSuccessMessage(path: string, method: string): string {
-  const label = tenantMutationActionLabel(path, method);
+  const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
+
+  if (normalizedPath.includes('/stock-transfers')) {
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/execute')) return 'Transfer executed successfully.';
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/cancel')) return 'Transfer cancelled successfully.';
+    if (normalizedMethod === 'POST') return 'Transfer draft created successfully.';
+    if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return 'Transfer draft updated successfully.';
+  }
+
+  const label = tenantMutationActionLabel(path, method);
 
   if (normalizedMethod === 'POST') return `${label} created successfully.`;
   if (normalizedMethod === 'DELETE') return `${label} deleted successfully.`;

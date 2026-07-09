@@ -140,7 +140,7 @@ export function useEnterpriseInventoryStockMutations(
         buildStockTransferPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Stock transfer draft created.",
+      "Transfer draft created successfully.",
       ["enterprise-stock-transfers", "enterprise-stock-movements"],
       () => setStockTransferForm(emptyStockTransferForm),
     ),
@@ -152,7 +152,7 @@ export function useEnterpriseInventoryStockMutations(
       postEnterpriseInventoryRequest<StockTransfer>(
         `/stock-transfers/${id}/execute`,
       ),
-    onSuccess: mutationFeedback.invalidating("Stock transfer executed.", [
+    onSuccess: mutationFeedback.invalidating("Transfer executed successfully.", [
       "enterprise-stock-transfers",
       "enterprise-stock-overview",
       "enterprise-low-stock",
@@ -168,7 +168,7 @@ export function useEnterpriseInventoryStockMutations(
         `/stock-transfers/${id}/cancel`,
         buildStockTransferCancelPayload(),
       ),
-    onSuccess: mutationFeedback.invalidating("Stock transfer cancelled.", [
+    onSuccess: mutationFeedback.invalidating("Transfer cancelled successfully.", [
       "enterprise-stock-transfers",
     ]),
     onError: mutationFeedback.error("Failed to cancel stock transfer."),
