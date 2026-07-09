@@ -94,6 +94,26 @@ type CostControlTabProps = {
   procurementSpendProductionReviewQuery: any;
 };
 
+const formatCodeLabel = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const toHardeningReviewRows = (queryData: any, fallbackRows: any[]): string[][] => {
+  if (Array.isArray(fallbackRows) && fallbackRows.length) {
+    return fallbackRows.map((item: any) => [
+      formatRecordValue(item, 'label'),
+      formatCodeLabel(item.status),
+      formatRecordValue(item, 'detail')
+    ]);
+  }
+
+  const actions = Array.isArray(queryData?.hardening_actions) ? queryData.hardening_actions : [];
+  return actions.map((action: string) => ['Hardening action', 'Review', action]);
+};
+
 export function CostControlTab({
   highVarianceCostRows,
   inconsistentCostRows,
@@ -186,6 +206,11 @@ export function CostControlTab({
   procurementSpendProductionControls,
   procurementSpendProductionReviewQuery,
 }: CostControlTabProps) {
+  const productCostHardeningReviewRows = toHardeningReviewRows(
+    productCostHardeningSummaryQuery.data,
+    productCostHardeningFailedChecklist
+  );
+
   return (
     <section style={styles.stack}>
 
@@ -194,7 +219,7 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Carrying-cost production review</h2>
         <p style={styles.helper}>Reads GET /financial-intelligence/carrying-cost/production-review. This is a read-only financial intelligence control: it reviews high-value stock, monthly carrying-cost exposure, aged stock pressure, and finance-review requirements before procurement, transfer, liquidation, or accounting follow-up.</p>
         <div style={styles.statGrid}>
-          <MetricCard label="Production status" value={carryingCostProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Production status" value={formatCodeLabel(carryingCostProductionReview?.summary?.production_status)} />
           <MetricCard label="Reviewed profiles" value={formatNumber(carryingCostProductionReview?.summary?.reviewed_profile_count)} />
           <MetricCard label="Blocked profiles" value={formatNumber(carryingCostProductionReview?.summary?.blocked_profile_count)} />
           <MetricCard label="Watch profiles" value={formatNumber(carryingCostProductionReview?.summary?.watch_profile_count)} />
@@ -208,7 +233,7 @@ export function CostControlTab({
           rows={carryingCostProductionReviewRows.map((item: any) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
-            item.readiness_state || '-',
+            formatCodeLabel(item.readiness_state),
             formatNumber(item.carrying_cost_score),
             formatCurrency(item.monthly_carrying_cost),
             Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
@@ -225,7 +250,7 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Dead-stock production review</h2>
         <p style={styles.helper}>Reads GET /financial-intelligence/dead-stock-risk/production-review. This is a read-only financial intelligence control: it reviews stale stock, capital lockup, carrying-cost exposure, and human-review requirements before any transfer, liquidation, accounting, or procurement action.</p>
         <div style={styles.statGrid}>
-          <MetricCard label="Production status" value={deadStockProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Production status" value={formatCodeLabel(deadStockProductionReview?.summary?.production_status)} />
           <MetricCard label="Reviewed profiles" value={formatNumber(deadStockProductionReview?.summary?.reviewed_profile_count)} />
           <MetricCard label="Blocked profiles" value={formatNumber(deadStockProductionReview?.summary?.blocked_profile_count)} />
           <MetricCard label="Watch profiles" value={formatNumber(deadStockProductionReview?.summary?.watch_profile_count)} />
@@ -239,7 +264,7 @@ export function CostControlTab({
           rows={deadStockProductionReviewRows.map((item: any) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
-            item.readiness_state || '-',
+            formatCodeLabel(item.readiness_state),
             formatNumber(item.dead_stock_score),
             formatCurrency(item.capital_locked_value),
             Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
@@ -259,7 +284,7 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Procurement spend production review</h2>
         <p style={styles.helper}>Reads GET /financial-intelligence/procurement-spend-intelligence/production-review. This is a read-only procurement/finance control: it reviews category spend pressure, open commitments, overdue spend, supplier concentration, and human-review requirements before approving more purchase-order spend or supplier changes.</p>
         <div style={styles.statGrid}>
-          <MetricCard label="Production status" value={procurementSpendProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Production status" value={formatCodeLabel(procurementSpendProductionReview?.summary?.production_status)} />
           <MetricCard label="Reviewed categories" value={formatNumber(procurementSpendProductionReview?.summary?.reviewed_category_count)} />
           <MetricCard label="Blocked categories" value={formatNumber(procurementSpendProductionReview?.summary?.blocked_category_count)} />
           <MetricCard label="Human-review categories" value={formatNumber(procurementSpendProductionReview?.summary?.human_review_category_count)} />
@@ -272,8 +297,8 @@ export function CostControlTab({
           headers={['Category', 'Readiness', 'Pressure', 'Committed', 'Open', 'Factors']}
           rows={procurementSpendProductionReviewRows.map((item: any) => [
             item.category || '-',
-            item.readiness_state || '-',
-            item.spend_pressure_tier || item.risk_level || '-',
+            formatCodeLabel(item.readiness_state),
+            formatCodeLabel(item.spend_pressure_tier || item.risk_level),
             formatCurrency(item.committed_spend_value),
             formatCurrency(item.open_spend_value),
             Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
@@ -290,7 +315,7 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Margin-aware replenishment production review</h2>
         <p style={styles.helper}>Reads GET /financial-intelligence/margin-aware-replenishment/production-review. This is a read-only commercial control: it reviews replenishment spend, expected margin proxy, inbound overlap, carrying-cost drag, and human-review requirements before purchase-order creation or submission.</p>
         <div style={styles.statGrid}>
-          <MetricCard label="Production status" value={marginAwareProductionReview?.summary?.production_status || '-'} />
+          <MetricCard label="Production status" value={formatCodeLabel(marginAwareProductionReview?.summary?.production_status)} />
           <MetricCard label="Reviewed profiles" value={formatNumber(marginAwareProductionReview?.summary?.reviewed_profile_count)} />
           <MetricCard label="Blocked profiles" value={formatNumber(marginAwareProductionReview?.summary?.blocked_profile_count)} />
           <MetricCard label="Watch profiles" value={formatNumber(marginAwareProductionReview?.summary?.watch_profile_count)} />
@@ -304,8 +329,8 @@ export function CostControlTab({
           rows={marginAwareProductionReviewRows.map((item: any) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
-            item.readiness_state || '-',
-            item.commercial_decision || '-',
+            formatCodeLabel(item.readiness_state),
+            formatCodeLabel(item.commercial_decision),
             formatCurrency(item.estimated_replenishment_cost),
             Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
           ])}
@@ -348,7 +373,7 @@ export function CostControlTab({
           empty="No valuation basis breakdown returned."
           headers={['Basis', 'Stocked products', 'Quantity', 'Estimated value']}
           rows={productCostBasisRows.map((item: any) => [
-            formatRecordValue(item, 'valuation_basis'),
+            formatCodeLabel(item.valuation_basis),
             formatRecordValue(item, 'stocked_products'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_value as number | string | null | undefined)
@@ -382,7 +407,7 @@ export function CostControlTab({
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
-            item.valuation_basis || '-',
+            formatCodeLabel(item.valuation_basis),
             formatCurrency(item.effective_unit_cost),
             formatCurrency(item.estimated_inventory_value)
           ])}
@@ -401,7 +426,7 @@ export function CostControlTab({
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
             formatCurrency(item.latest_unit_cost),
             formatCurrency(item.standard_unit_cost),
-            item.valuation_basis || '-',
+            formatCodeLabel(item.valuation_basis),
             formatCurrency(item.estimated_inventory_value)
           ])}
         />
@@ -446,7 +471,7 @@ export function CostControlTab({
           empty="No cost action priority bands returned."
           headers={['Priority band', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
           rows={productCostPriorityBands.map((item: any) => [
-            formatRecordValue(item, 'priority_band'),
+            formatCodeLabel(item.priority_band),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
@@ -464,10 +489,10 @@ export function CostControlTab({
           rows={productCostNextActions.map((item: any) => [
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
-            formatRecordValue(item, 'action_type'),
-            formatRecordValue(item, 'priority_band'),
+            formatCodeLabel(item.action_type),
+            formatCodeLabel(item.priority_band),
             formatRecordValue(item, 'action_priority_score'),
-            formatRecordValue(item, 'recommended_action')
+            formatCodeLabel(item.recommended_action)
           ])}
         />
       </section>
@@ -504,7 +529,7 @@ export function CostControlTab({
           empty="No cost impact rows returned."
           headers={['Impact type', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
           rows={productCostImpactRows.map((item: any) => [
-            formatRecordValue(item, 'impact_type'),
+            formatCodeLabel(item.impact_type),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
@@ -521,8 +546,8 @@ export function CostControlTab({
           headers={['Product', 'Impact type', 'Action', 'Stock', 'Value', 'Score']}
           rows={productCostTopImpactProducts.map((item: any) => [
             formatRecordValue(item, 'name'),
-            formatRecordValue(item, 'impact_type'),
-            formatRecordValue(item, 'action_type'),
+            formatCodeLabel(item.impact_type),
+            formatCodeLabel(item.action_type),
             formatRecordValue(item, 'current_stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
             formatRecordValue(item, 'action_priority_score')
@@ -543,7 +568,7 @@ export function CostControlTab({
             formatRecordValue(item, 'critical_products'),
             formatRecordValue(item, 'high_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_supplier_action')
+            formatCodeLabel(item.recommended_supplier_action)
           ])}
         />
         <DataTable
@@ -555,7 +580,7 @@ export function CostControlTab({
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_source_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_source_action')
+            formatCodeLabel(item.recommended_source_action)
           ])}
         />
       </section>
@@ -567,18 +592,18 @@ export function CostControlTab({
           <MetricCard label="No cost date" value={formatNumber(productCostActionAgeSummaryQuery.data?.totals?.no_cost_date_products)} />
           <MetricCard label="Stale received cost" value={formatNumber(productCostActionAgeSummaryQuery.data?.totals?.stale_received_cost_products)} />
           <MetricCard label="Stocked cost coverage" value={`${formatNumber(productCostActionCoverageSummaryQuery.data?.totals?.stocked_cost_coverage_percent)}%`} />
-          <MetricCard label="Coverage gaps" value={formatNumber(productCostActionCoverageSummaryQuery.data?.totals?.uncosted_stocked_products)} />
+          <MetricCard label="Uncosted stocked" value={formatNumber(productCostActionCoverageSummaryQuery.data?.totals?.uncosted_stocked_products)} />
         </div>
         <DataTable
           loading={productCostActionAgeSummaryQuery.isLoading}
           empty="No cost age bands returned."
           headers={['Age band', 'Products', 'Missing cost', 'Estimated value', 'Recommended age action']}
           rows={productCostActionAgeBands.map((item: any) => [
-            formatRecordValue(item, 'cost_age_band'),
+            formatCodeLabel(item.cost_age_band),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_cost_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_age_action')
+            formatCodeLabel(item.recommended_age_action)
           ])}
         />
         <DataTable
@@ -597,17 +622,17 @@ export function CostControlTab({
       </section>
 
       <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Cost coverage gaps</h2>
+        <h2 style={styles.cardTitle}>Cost coverage action review</h2>
         <DataTable
           loading={productCostActionCoverageSummaryQuery.isLoading}
-          empty="No cost coverage gaps returned."
-          headers={['Product', 'Category', 'Stock', 'Cost source', 'Action', 'Score']}
+          empty="No cost coverage action review rows returned."
+          headers={['Product', 'Category', 'Stock', 'Cost source', 'Review action', 'Score']}
           rows={productCostCoverageGaps.map((item: any) => [
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'current_stock_quantity'),
-            formatRecordValue(item, 'effective_cost_source'),
-            formatRecordValue(item, 'action_type'),
+            formatCodeLabel(item.effective_cost_source),
+            formatCodeLabel(item.action_type),
             formatRecordValue(item, 'action_priority_score')
           ])}
         />
@@ -628,12 +653,12 @@ export function CostControlTab({
           empty="No alert groups returned."
           headers={['Type', 'Severity', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
           rows={productCostAlertGroups.map((item: any) => [
-            formatRecordValue(item, 'alert_type'),
-            formatRecordValue(item, 'alert_severity'),
+            formatCodeLabel(item.alert_type),
+            formatCodeLabel(item.alert_severity),
             formatRecordValue(item, 'alert_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_alert_action')
+            formatCodeLabel(item.recommended_alert_action)
           ])}
         />
         <DataTable
@@ -642,8 +667,8 @@ export function CostControlTab({
           headers={['Product', 'Alert', 'Severity', 'Value', 'Variance %', 'Score']}
           rows={productCostTopAlerts.map((item: any) => [
             formatRecordValue(item, 'name'),
-            formatRecordValue(item, 'alert_type'),
-            formatRecordValue(item, 'alert_severity'),
+            formatCodeLabel(item.alert_type),
+            formatCodeLabel(item.alert_severity),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
             formatRecordValue(item, 'cost_variance_percent'),
             formatRecordValue(item, 'alert_priority_score')
@@ -665,12 +690,12 @@ export function CostControlTab({
           empty="No recommendation groups returned."
           headers={['Type', 'Priority', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
           rows={productCostRecommendationGroups.map((item: any) => [
-            formatRecordValue(item, 'recommendation_type'),
-            formatRecordValue(item, 'recommendation_priority'),
+            formatCodeLabel(item.recommendation_type),
+            formatCodeLabel(item.recommendation_priority),
             formatRecordValue(item, 'recommendation_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'recommended_action')
+            formatCodeLabel(item.recommended_action)
           ])}
         />
         <DataTable
@@ -679,8 +704,8 @@ export function CostControlTab({
           headers={['Product', 'Recommendation', 'Priority', 'Value', 'Score']}
           rows={productCostTopRecommendations.map((item: any) => [
             formatRecordValue(item, 'name'),
-            formatRecordValue(item, 'recommendation_type'),
-            formatRecordValue(item, 'recommendation_priority'),
+            formatCodeLabel(item.recommendation_type),
+            formatCodeLabel(item.recommendation_priority),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
             formatRecordValue(item, 'recommendation_score')
           ])}
@@ -694,7 +719,7 @@ export function CostControlTab({
           <MetricCard label="Dashboard value" value={formatCurrency(productCostDashboardSummaryQuery.data?.totals?.total_estimated_inventory_value)} />
           <MetricCard label="Review value" value={formatCurrency(productCostDashboardSummaryQuery.data?.totals?.review_estimated_value)} />
           <MetricCard label="Governance score" value={formatNumber(productCostGovernanceSummaryQuery.data?.readiness_score)} />
-          <MetricCard label="Governance status" value={formatRecordValue(productCostGovernanceSummaryQuery.data as unknown as Record<string, unknown>, 'governance_status')} />
+          <MetricCard label="Governance status" value={formatCodeLabel(productCostGovernanceSummaryQuery.data?.governance_status)} />
         </div>
         <DataTable
           loading={productCostDashboardSummaryQuery.isLoading}
@@ -714,8 +739,8 @@ export function CostControlTab({
           headers={['Product', 'Recommendation', 'Priority', 'Value', 'Dashboard score']}
           rows={productCostDashboardPriorityProducts.map((item: any) => [
             formatRecordValue(item, 'name'),
-            formatRecordValue(item, 'recommendation_type'),
-            formatRecordValue(item, 'recommendation_priority'),
+            formatCodeLabel(item.recommendation_type),
+            formatCodeLabel(item.recommendation_priority),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
             formatRecordValue(item, 'dashboard_priority_score')
           ])}
@@ -726,7 +751,7 @@ export function CostControlTab({
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -747,17 +772,17 @@ export function CostControlTab({
         <p style={styles.helper}>Reads the existing cost governance detail, audit-pack, sign-off, review, closure, and handoff endpoints without mutating costing or stock records.</p>
         <div style={styles.statGrid}>
           <MetricCard label="Detail readiness" value={formatNumber(productCostGovernanceDetailsQuery.data?.readiness_score)} />
-          <MetricCard label="Sign-off status" value={formatRecordValue(productCostGovernanceSignoffSummaryQuery.data as unknown as Record<string, unknown>, 'signoff_status')} />
-          <MetricCard label="Review status" value={formatRecordValue(productCostGovernanceReviewQueueQuery.data as unknown as Record<string, unknown>, 'review_status')} />
-          <MetricCard label="Handoff status" value={formatRecordValue(productCostGovernanceHandoffSummaryQuery.data as unknown as Record<string, unknown>, 'handoff_status')} />
+          <MetricCard label="Sign-off status" value={formatCodeLabel(productCostGovernanceSignoffSummaryQuery.data?.signoff_status)} />
+          <MetricCard label="Review status" value={formatCodeLabel(productCostGovernanceReviewQueueQuery.data?.review_status)} />
+          <MetricCard label="Handoff status" value={formatCodeLabel(productCostGovernanceHandoffSummaryQuery.data?.handoff_status)} />
         </div>
         <DataTable
           loading={productCostGovernanceDetailsQuery.isLoading}
-          empty="No failed governance checklist rows returned."
+          empty="No failed governance detail checklist rows returned; sign-off and handoff checks are listed below."
           headers={['Failed check', 'Status', 'Detail']}
           rows={productCostGovernanceFailedChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -767,7 +792,7 @@ export function CostControlTab({
           headers={['Watch check', 'Status', 'Detail']}
           rows={productCostGovernanceWatchChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -800,7 +825,7 @@ export function CostControlTab({
           rows={productCostGovernanceAuditRows.slice(0, 20).map((item: any) => [
             formatRecordValue(item, 'section'),
             formatRecordValue(item, 'key'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'value')
           ])}
         />
@@ -810,7 +835,7 @@ export function CostControlTab({
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceSignoffChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -830,9 +855,9 @@ export function CostControlTab({
           empty="No governance review queue items returned."
           headers={['Type', 'Priority', 'Owner', 'Detail']}
           rows={productCostGovernanceQueueItems.map((item: any) => [
-            formatRecordValue(item, 'queue_type'),
+            formatCodeLabel(item.queue_type),
             formatRecordValue(item, 'priority'),
-            formatRecordValue(item, 'owner_hint'),
+            formatCodeLabel(item.owner_hint),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -843,7 +868,7 @@ export function CostControlTab({
           rows={productCostGovernanceReviewExportRows.slice(0, 20).map((item: any) => [
             formatRecordValue(item, 'section'),
             formatRecordValue(item, 'key'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'value')
           ])}
         />
@@ -853,7 +878,7 @@ export function CostControlTab({
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceClosureChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -863,7 +888,7 @@ export function CostControlTab({
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceHandoffChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'detail')
           ])}
         />
@@ -874,7 +899,7 @@ export function CostControlTab({
           rows={productCostGovernanceOwnerSummary.map((item: any) => [
             formatRecordValue(item, 'owner'),
             formatRecordValue(item, 'responsibility'),
-            formatRecordValue(item, 'status')
+            formatCodeLabel(item.status)
           ])}
         />
       </section>
@@ -883,19 +908,15 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Cost operations readiness</h2>
         <div style={styles.metricsGrid}>
           <MetricCard label="Hardening issues" value={formatNumber(productCostHardeningSummaryQuery.data?.totals?.issue_count)} />
-          <MetricCard label="Runbook status" value={formatRecordValue(productCostOperationsRunbookSummaryQuery.data as unknown as Record<string, unknown>, 'runbook_status')} />
-          <MetricCard label="Control status" value={formatRecordValue(productCostOperationsControlSummaryQuery.data as unknown as Record<string, unknown>, 'control_status')} />
+          <MetricCard label="Runbook status" value={formatCodeLabel(productCostOperationsRunbookSummaryQuery.data?.runbook_status)} />
+          <MetricCard label="Control status" value={formatCodeLabel(productCostOperationsControlSummaryQuery.data?.control_status)} />
           <MetricCard label="Readiness score" value={formatNumber(productCostOperationsReadinessSummaryQuery.data?.readiness_score)} />
         </div>
         <DataTable
           loading={productCostHardeningSummaryQuery.isLoading}
-          empty="No cost hardening checklist issues returned."
+          empty="No cost hardening review actions returned."
           headers={['Check', 'Status', 'Detail']}
-          rows={productCostHardeningFailedChecklist.map((item: any) => [
-            formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
-            formatRecordValue(item, 'detail')
-          ])}
+          rows={productCostHardeningReviewRows}
         />
         <DataTable
           loading={productCostOperationsRunbookSummaryQuery.isLoading}
@@ -904,7 +925,7 @@ export function CostControlTab({
           rows={productCostOperationsRhythm.map((item: any) => [
             formatRecordValue(item, 'cadence'),
             formatRecordValue(item, 'owner'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'action')
           ])}
         />
@@ -926,7 +947,7 @@ export function CostControlTab({
           rows={productCostOperationsControlChecks.map((item: any) => [
             formatRecordValue(item, 'label'),
             formatRecordValue(item, 'owner'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'value'),
             formatRecordValue(item, 'detail')
           ])}
@@ -939,7 +960,7 @@ export function CostControlTab({
             formatRecordValue(item, 'label'),
             formatRecordValue(item, 'source'),
             formatRecordValue(item, 'rows'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'purpose')
           ])}
         />
@@ -949,7 +970,7 @@ export function CostControlTab({
           headers={['Check', 'Status', 'Value', 'Detail']}
           rows={productCostOperationsReadinessChecklist.map((item: any) => [
             formatRecordValue(item, 'label'),
-            formatRecordValue(item, 'status'),
+            formatCodeLabel(item.status),
             formatRecordValue(item, 'value'),
             formatRecordValue(item, 'detail')
           ])}
