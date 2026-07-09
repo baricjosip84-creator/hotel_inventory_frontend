@@ -60,9 +60,15 @@ async function withApiRequestSlot(operation) {
   at the same time.
 */
 let refreshPromise = null;
+function isProductPackageMutationPath(path) {
+    const normalizedPath = path.toLowerCase();
+    return normalizedPath.includes('/products/') && normalizedPath.includes('/packages');
+}
 function tenantMutationActionLabel(path, method) {
     const normalizedPath = path.toLowerCase();
     const normalizedMethod = method.toUpperCase();
+    if (isProductPackageMutationPath(normalizedPath))
+        return 'Package barcode';
     if (normalizedPath.includes('/suppliers'))
         return 'Supplier';
     if (normalizedPath.includes('/products'))
@@ -106,6 +112,13 @@ function tenantMutationActionLabel(path, method) {
 function tenantMutationSuccessMessage(path, method) {
     const normalizedPath = path.toLowerCase();
     const normalizedMethod = method.toUpperCase();
+    if (isProductPackageMutationPath(normalizedPath)) {
+        if (normalizedMethod === 'POST')
+            return 'Package barcode created successfully.';
+        if (normalizedMethod === 'DELETE')
+            return 'Package barcode deleted successfully.';
+        return 'Package barcode saved successfully.';
+    }
     if (normalizedPath.includes('/stock-transfers')) {
         if (normalizedMethod === 'POST' && normalizedPath.endsWith('/execute'))
             return 'Transfer executed successfully.';

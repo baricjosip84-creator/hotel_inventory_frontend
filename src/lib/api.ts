@@ -81,10 +81,16 @@ type ApiFetchResult = {
 };
 
 
+function isProductPackageMutationPath(path: string): boolean {
+  const normalizedPath = path.toLowerCase();
+  return normalizedPath.includes('/products/') && normalizedPath.includes('/packages');
+}
+
 function tenantMutationActionLabel(path: string, method: string): string {
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
 
+  if (isProductPackageMutationPath(normalizedPath)) return 'Package barcode';
   if (normalizedPath.includes('/suppliers')) return 'Supplier';
   if (normalizedPath.includes('/products')) return 'Product';
   if (normalizedPath.includes('/users')) return 'User';
@@ -112,6 +118,12 @@ function tenantMutationActionLabel(path: string, method: string): string {
 function tenantMutationSuccessMessage(path: string, method: string): string {
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
+
+  if (isProductPackageMutationPath(normalizedPath)) {
+    if (normalizedMethod === 'POST') return 'Package barcode created successfully.';
+    if (normalizedMethod === 'DELETE') return 'Package barcode deleted successfully.';
+    return 'Package barcode saved successfully.';
+  }
 
   if (normalizedPath.includes('/stock-transfers')) {
     if (normalizedMethod === 'POST' && normalizedPath.endsWith('/execute')) return 'Transfer executed successfully.';
