@@ -94,86 +94,14 @@ type CostControlTabProps = {
   procurementSpendProductionReviewQuery: any;
 };
 
-const COST_DISPLAY_LABELS: Record<string, string> = {
-  action_type: 'Action type',
-  actionable_estimated_value: 'Actionable value',
-  alert_priority_score: 'Alert priority score',
-  alerted_estimated_value: 'Alerted value',
-  alerts: 'Cost alerts',
-  audit_governance: 'Audit governance',
-  audit_governance_checklist: 'Audit governance checklist',
-  blockers: 'Blockers',
-  can_close_review: 'Can close review',
-  capital_at_review: 'Capital at review',
-  closure_status: 'Closure status',
-  control_checks: 'Control checks',
-  critical_recommendations: 'Critical recommendations',
-  dashboard: 'Dashboard',
-  dashboard_priority_score: 'Dashboard score',
-  generated_at: 'Generated at',
-  governance: 'Governance',
-  governance_checklist: 'Governance checklist',
-  governance_next_action: 'Governance next action',
-  governance_status: 'Governance status',
-  handoff_blockers: 'Handoff blockers',
-  hardening: 'Hardening checklist',
-  hardening_issues: 'Hardening issues',
-  hardening_totals: 'Hardening totals',
-  high_priority_actions: 'High-priority actions',
-  high_recommendations: 'High recommendations',
-  high_variance: 'High variance',
-  high_variance_products: 'High variance products',
-  latest_cost: 'Latest cost',
-  missing_stock_cost_products: 'Products missing stock cost',
-  next_action: 'Next action',
-  open_cost_alerts: 'Open cost alerts',
-  priority_band: 'Priority band',
-  queue_items: 'Queue items',
-  readiness_score: 'Readiness score',
-  received_cost_value: 'Received-cost value',
-  recommendation_priority: 'Recommendation priority',
-  recommendation_score: 'Recommendation score',
-  recommendation_type: 'Recommendation type',
-  recommendations: 'Recommendations',
-  remediation_plan: 'Remediation plan',
-  review_estimated_value: 'Value under review',
-  review_exposure: 'Review exposure',
-  review_pack: 'Review pack',
-  review_queue: 'Review queue',
-  review_standard_cost: 'Review standard cost',
-  standard_cost: 'Standard cost',
-  standard_fallback_stocked_products: 'Stocked products using standard cost',
-  standard_fallback_value: 'Standard-cost fallback value',
-  stocked_cost_coverage_percent: 'Stocked cost coverage',
-  stocked_products: 'Stocked products',
-  total_alerts: 'Cost alerts',
-  total_estimated_inventory_value: 'Estimated inventory value',
-  total_recommendations: 'Cost recommendations',
-  total_risk_products: 'Cost-risk products',
-  valued_inventory_review: 'Valued inventory review',
-  valuation: 'Valuation',
-  warnings: 'Warnings'
-};
-
-const humanizeIdentifier = (value: string): string => value
-  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-  .replace(/[_.-]+/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim()
-  .toLowerCase()
-  .replace(/\b\w/g, (char) => char.toUpperCase())
-  .replace(/\bApi\b/g, 'API')
-  .replace(/\bCsv\b/g, 'CSV')
-  .replace(/\bId\b/g, 'ID')
-  .replace(/\bPo\b/g, 'PO')
-  .replace(/\bSla\b/g, 'SLA');
-
 const formatCodeLabel = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '-';
-  const raw = String(value).trim();
-  if (!raw) return '-';
-  const normalized = raw.toLowerCase();
-  return COST_DISPLAY_LABELS[normalized] ?? humanizeIdentifier(raw);
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const formatCodeRecordValue = (record: Record<string, unknown> | null | undefined, key: string): string => {
@@ -181,67 +109,97 @@ const formatCodeRecordValue = (record: Record<string, unknown> | null | undefine
   return formatCodeLabel(record[key]);
 };
 
+const CODE_VALUE_KEYS = /(status|state|severity|priority|readiness|owner|source|section|key|type|basis|decision|action)$/i;
+const CODE_VALUE_WORDS = new Set([
+  'active_review',
+  'blocker',
+  'clear',
+  'control_review',
+  'critical',
+  'evidence_review',
+  'fail',
+  'followup_required',
+  'high',
+  'info',
+  'low',
+  'medium',
+  'no',
+  'no_mutation',
+  'not_ready',
+  'pass',
+  'review',
+  'review_required',
+  'warning',
+  'watch',
+  'yes'
+]);
+
+const formatCostDetailValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value !== 'string') return formatRecordValue({ value }, 'value');
+
+  return value.replace(
+    /(^|\s)(\d+(?:\.\d+)?)\s+(estimated value|estimated inventory value|inventory value|review value|alerted value|actionable value|capital|spend|cost)\b/gi,
+    (_match, prefix: string, amount: string, label: string) => `${prefix}${formatCurrency(amount)} ${label}`
+  );
+};
+
 const formatPercentValue = (value: number | string | null | undefined): string => {
   if (value === null || value === undefined || value === '') return '-';
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? `${formatNumber(parsed)}%` : formatCodeLabel(value);
+  return Number.isFinite(parsed) ? `${formatNumber(parsed)}%` : String(value);
 };
 
 const shouldFormatCostValueAsCurrency = (key: string): boolean => {
-  if (/(_percent|percent|count|score|products?|rows?|status|source|date|age|current_value)$/i.test(key)) {
+  if (/(_percent|count|score|products?|rows?|status|source|date|age|current_value)$/i.test(key)) {
     return false;
   }
   return /(estimated|inventory|review|received|standard|fallback|alerted|recommended|committed|overdue|spend|capital|cost|value)/i.test(key);
-};
-
-const looksLikeDateTime = (value: string): boolean => /^\d{4}-\d{2}-\d{2}T/.test(value);
-const looksLikeCode = (value: string): boolean => /^[a-z0-9_.:-]+$/i.test(value) && /[_-]/.test(value);
-
-const formatCostTextValue = (value: unknown): string => {
-  if (value === null || value === undefined || value === '') return '-';
-  if (typeof value === 'number') return formatNumber(value);
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (Array.isArray(value)) return value.length ? value.map(formatCostTextValue).join(', ') : '-';
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (!entries.length) return '-';
-    return entries.map(([key, entryValue]) => `${formatCodeLabel(key)}: ${formatCostTextValue(entryValue)}`).join('; ');
-  }
-
-  const text = String(value).trim();
-  if (!text) return '-';
-  if (looksLikeDateTime(text)) return formatDateTime(text);
-  if (looksLikeCode(text)) return formatCodeLabel(text);
-  return text.replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g, (match) => formatCodeLabel(match));
 };
 
 const formatCostTableValue = (key: unknown, value: unknown): string => {
   if (value === null || value === undefined || value === '') return '-';
 
   const normalizedKey = String(key ?? '');
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+
   if (/(_at|date)$/i.test(normalizedKey)) {
     return formatDateTime(String(value));
   }
-  if (/_percent$|percent$/i.test(normalizedKey)) {
+  if (/_percent$/i.test(normalizedKey)) {
     return formatPercentValue(value as number | string | null | undefined);
   }
   if (shouldFormatCostValueAsCurrency(normalizedKey)) {
     return formatCurrency(value as number | string | null | undefined);
   }
-  return formatCostTextValue(value);
+  if (CODE_VALUE_KEYS.test(normalizedKey) || CODE_VALUE_WORDS.has(normalizedValue.toLowerCase())) {
+    return formatCodeLabel(value);
+  }
+  if (typeof value === 'number') {
+    return formatNumber(value);
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'string') {
+    if (value.includes('_') && !value.includes(' ')) return formatCodeLabel(value);
+    return formatCostDetailValue(value);
+  }
+
+  return formatRecordValue({ value }, 'value');
 };
 
 const toHardeningReviewRows = (queryData: any, fallbackRows: any[]): string[][] => {
   if (Array.isArray(fallbackRows) && fallbackRows.length) {
     return fallbackRows.map((item: any) => [
-      formatCostTextValue(item.label),
+      formatRecordValue(item, 'label'),
       formatCodeLabel(item.status),
-      formatCostTextValue(item.detail)
+      formatCostDetailValue(item.detail)
     ]);
   }
 
   const actions = Array.isArray(queryData?.hardening_actions) ? queryData.hardening_actions : [];
-  return actions.map((action: string) => ['Hardening action', 'Review', formatCostTextValue(action)]);
+  return actions.map((action: string) => ['Hardening action', 'Review', action]);
 };
 
 export function CostControlTab({
@@ -341,6 +299,15 @@ export function CostControlTab({
     productCostHardeningFailedChecklist
   );
 
+  const governanceEvidenceSummaryRows = [
+    ['Audit evidence', formatNumber(productCostGovernanceAuditRows.length), productCostGovernanceAuditPackQuery.isLoading ? '-' : 'Available'],
+    ['Review export evidence', formatNumber(productCostGovernanceReviewExportRows.length), productCostGovernanceReviewPackQuery.isLoading ? '-' : 'Available'],
+    ['Follow-up queue items', formatNumber(productCostGovernanceQueueItems.length), productCostGovernanceReviewQueueQuery.isLoading ? '-' : 'Available'],
+    ['Sign-off checks', formatNumber(productCostGovernanceSignoffChecklist.length), productCostGovernanceSignoffSummaryQuery.isLoading ? '-' : 'Available'],
+    ['Closure checks', formatNumber(productCostGovernanceClosureChecklist.length), productCostGovernanceClosureSummaryQuery.isLoading ? '-' : 'Available'],
+    ['Handoff checks', formatNumber(productCostGovernanceHandoffChecklist.length), productCostGovernanceHandoffSummaryQuery.isLoading ? '-' : 'Available']
+  ];
+
   return (
     <section style={styles.stack}>
 
@@ -366,7 +333,7 @@ export function CostControlTab({
             formatCodeLabel(item.readiness_state),
             formatNumber(item.carrying_cost_score),
             formatCurrency(item.monthly_carrying_cost),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => formatCostTextValue(factor.label || factor.code)).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {carryingCostProductionControls.length ? (
@@ -397,7 +364,7 @@ export function CostControlTab({
             formatCodeLabel(item.readiness_state),
             formatNumber(item.dead_stock_score),
             formatCurrency(item.capital_locked_value),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => formatCostTextValue(factor.label || factor.code)).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {deadStockProductionControls.length ? (
@@ -431,7 +398,7 @@ export function CostControlTab({
             formatCodeLabel(item.spend_pressure_tier || item.risk_level),
             formatCurrency(item.committed_spend_value),
             formatCurrency(item.open_spend_value),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => formatCostTextValue(factor.label || factor.code)).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {procurementSpendProductionControls.length ? (
@@ -462,7 +429,7 @@ export function CostControlTab({
             formatCodeLabel(item.readiness_state),
             formatCodeLabel(item.commercial_decision),
             formatCurrency(item.estimated_replenishment_cost),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => formatCostTextValue(factor.label || factor.code)).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {marginAwareProductionControls.length ? (
@@ -580,7 +547,7 @@ export function CostControlTab({
             formatCodeRecordValue(item, 'priority'),
             formatRecordValue(item, 'product_count'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.reason)
+            formatRecordValue(item, 'reason')
           ])}
         />
       </section>
@@ -622,7 +589,7 @@ export function CostControlTab({
             formatCodeLabel(item.action_type),
             formatCodeLabel(item.priority_band),
             formatRecordValue(item, 'action_priority_score'),
-            formatCostTextValue(item.recommended_action)
+            formatCodeLabel(item.recommended_action)
           ])}
         />
       </section>
@@ -640,7 +607,7 @@ export function CostControlTab({
             formatRecordValue(item, 'critical_products'),
             formatRecordValue(item, 'high_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_focus)
+            formatCodeRecordValue(item, 'recommended_focus')
           ])}
         />
       </section>
@@ -698,7 +665,7 @@ export function CostControlTab({
             formatRecordValue(item, 'critical_products'),
             formatRecordValue(item, 'high_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_supplier_action)
+            formatCodeLabel(item.recommended_supplier_action)
           ])}
         />
         <DataTable
@@ -710,7 +677,7 @@ export function CostControlTab({
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_source_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_source_action)
+            formatCodeLabel(item.recommended_source_action)
           ])}
         />
       </section>
@@ -733,7 +700,7 @@ export function CostControlTab({
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_cost_products'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_age_action)
+            formatCodeLabel(item.recommended_age_action)
           ])}
         />
         <DataTable
@@ -745,7 +712,7 @@ export function CostControlTab({
             formatRecordValue(item, 'stocked_products'),
             formatRecordValue(item, 'stocked_products_with_cost_basis'),
             formatRecordValue(item, 'uncosted_stocked_products'),
-            formatPercentValue(item.stocked_cost_coverage_percent),
+            `${formatRecordValue(item, 'stocked_cost_coverage_percent')}%`,
             formatCurrency(item.actionable_estimated_value as number | string | null | undefined)
           ])}
         />
@@ -788,7 +755,7 @@ export function CostControlTab({
             formatRecordValue(item, 'alert_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_alert_action)
+            formatCodeLabel(item.recommended_alert_action)
           ])}
         />
         <DataTable
@@ -800,7 +767,7 @@ export function CostControlTab({
             formatCodeLabel(item.alert_type),
             formatCodeLabel(item.alert_severity),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatPercentValue(item.cost_variance_percent),
+            formatRecordValue(item, 'cost_variance_percent'),
             formatRecordValue(item, 'alert_priority_score')
           ])}
         />
@@ -825,7 +792,7 @@ export function CostControlTab({
             formatRecordValue(item, 'recommendation_count'),
             formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommended_action)
+            formatCodeLabel(item.recommended_action)
           ])}
         />
         <DataTable
@@ -880,15 +847,15 @@ export function CostControlTab({
           empty="No governance checklist returned."
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
           loading={productCostReportSummaryQuery.isLoading}
           empty="No report export rows returned."
-          headers={['Area', 'Metric', 'Value']}
+          headers={['Section', 'Metric', 'Value']}
           rows={(productCostReportSummaryQuery.data?.export_rows ?? []).map((item: any) => [
             formatCodeRecordValue(item, 'section'),
             formatCodeRecordValue(item, 'metric'),
@@ -911,9 +878,9 @@ export function CostControlTab({
           empty="No failed governance detail checklist rows returned; sign-off and handoff checks are listed below."
           headers={['Failed check', 'Status', 'Detail']}
           rows={productCostGovernanceFailedChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
@@ -921,19 +888,19 @@ export function CostControlTab({
           empty="No watch governance checklist rows returned."
           headers={['Watch check', 'Status', 'Detail']}
           rows={productCostGovernanceWatchChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No remediation plan rows returned."
-          headers={['Item', 'Priority', 'Action', 'Evidence']}
+          headers={['Key', 'Priority', 'Action', 'Source']}
           rows={productCostGovernanceRemediationPlan.map((item: any) => [
             formatCodeRecordValue(item, 'key'),
             formatCodeRecordValue(item, 'priority'),
-            formatCostTextValue(item.action),
+            formatCostDetailValue(item.action),
             formatCodeRecordValue(item, 'source')
           ])}
         />
@@ -945,61 +912,34 @@ export function CostControlTab({
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCostTextValue(item.recommendation || item.action)
+            formatCodeLabel(item.recommendation || item.action)
           ])}
         />
         <DataTable
-          loading={productCostGovernanceAuditPackQuery.isLoading}
-          empty="No audit pack rows returned."
-          headers={['Area', 'Item', 'Status', 'Value']}
-          rows={productCostGovernanceAuditRows.slice(0, 20).map((item: any) => [
-            formatCodeRecordValue(item, 'section'),
-            formatCodeRecordValue(item, 'key'),
-            formatCodeLabel(item.status),
-            formatCostTableValue(item.key, item.value)
-          ])}
+          loading={productCostGovernanceAuditPackQuery.isLoading || productCostGovernanceReviewPackQuery.isLoading}
+          empty="No governance evidence summary returned."
+          headers={['Evidence', 'Rows', 'Status']}
+          rows={governanceEvidenceSummaryRows}
         />
         <DataTable
           loading={productCostGovernanceSignoffSummaryQuery.isLoading}
           empty="No sign-off checklist rows returned."
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceSignoffChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
           loading={productCostGovernanceSignoffSummaryQuery.isLoading}
           empty="No blockers or warnings returned."
-          headers={['Issue', 'Item', 'Severity', 'Detail']}
+          headers={['Type', 'Key', 'Severity', 'Detail']}
           rows={[...productCostGovernanceBlockers.map((item: any) => ({ ...item, issue_type: 'blocker' })), ...productCostGovernanceWarnings.map((item: any) => ({ ...item, issue_type: 'warning' }))].map((item: any) => [
             formatCodeRecordValue(item, 'issue_type'),
             formatCodeRecordValue(item, 'key'),
             formatCodeRecordValue(item, 'severity'),
-            formatCostTextValue(item.detail)
-          ])}
-        />
-        <DataTable
-          loading={productCostGovernanceReviewQueueQuery.isLoading}
-          empty="No governance review queue items returned."
-          headers={['Type', 'Priority', 'Owner', 'Detail']}
-          rows={productCostGovernanceQueueItems.map((item: any) => [
-            formatCodeLabel(item.queue_type),
-            formatCodeRecordValue(item, 'priority'),
-            formatCodeLabel(item.owner_hint),
-            formatCostTextValue(item.detail)
-          ])}
-        />
-        <DataTable
-          loading={productCostGovernanceReviewPackQuery.isLoading}
-          empty="No review export rows returned."
-          headers={['Area', 'Item', 'Status', 'Value']}
-          rows={productCostGovernanceReviewExportRows.slice(0, 20).map((item: any) => [
-            formatCodeRecordValue(item, 'section'),
-            formatCodeRecordValue(item, 'key'),
-            formatCodeLabel(item.status),
-            formatCostTableValue(item.key, item.value)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
@@ -1007,9 +947,9 @@ export function CostControlTab({
           empty="No closure checklist rows returned."
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceClosureChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
@@ -1017,9 +957,9 @@ export function CostControlTab({
           empty="No handoff checklist rows returned."
           headers={['Check', 'Status', 'Detail']}
           rows={productCostGovernanceHandoffChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
@@ -1028,7 +968,7 @@ export function CostControlTab({
           headers={['Owner', 'Responsibility', 'Status']}
           rows={productCostGovernanceOwnerSummary.map((item: any) => [
             formatCodeRecordValue(item, 'owner'),
-            formatCostTextValue(item.responsibility),
+            formatRecordValue(item, 'responsibility'),
             formatCodeLabel(item.status)
           ])}
         />
@@ -1056,18 +996,18 @@ export function CostControlTab({
             formatCodeRecordValue(item, 'cadence'),
             formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.action)
+            formatCostDetailValue(item.action)
           ])}
         />
         <DataTable
           loading={productCostOperationsRunbookSummaryQuery.isLoading}
           empty="No escalation rules returned."
-          headers={['Item', 'Current value', 'Condition', 'Escalation']}
+          headers={['Key', 'Current value', 'Condition', 'Escalation']}
           rows={productCostOperationsEscalationRules.map((item: any) => [
             formatCodeRecordValue(item, 'key'),
             formatCostTableValue(item.key, item.current_value),
-            formatCostTextValue(item.condition),
-            formatCostTextValue(item.escalation)
+            formatCostDetailValue(item.condition),
+            formatCostDetailValue(item.escalation)
           ])}
         />
         <DataTable
@@ -1075,23 +1015,23 @@ export function CostControlTab({
           empty="No control checks returned."
           headers={['Check', 'Owner', 'Status', 'Value', 'Detail']}
           rows={productCostOperationsControlChecks.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
             formatCostTableValue(item.label, item.value),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
         <DataTable
           loading={productCostOperationsEvidenceSummaryQuery.isLoading}
           empty="No evidence sections returned."
-          headers={['Evidence', 'Evidence source', 'Rows', 'Status', 'Purpose']}
+          headers={['Evidence', 'Source', 'Rows', 'Status', 'Purpose']}
           rows={productCostOperationsEvidenceSections.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeRecordValue(item, 'source'),
             formatRecordValue(item, 'rows'),
             formatCodeLabel(item.status),
-            formatCostTextValue(item.purpose)
+            formatRecordValue(item, 'purpose')
           ])}
         />
         <DataTable
@@ -1099,10 +1039,10 @@ export function CostControlTab({
           empty="No readiness checklist rows returned."
           headers={['Check', 'Status', 'Value', 'Detail']}
           rows={productCostOperationsReadinessChecklist.map((item: any) => [
-            formatCostTextValue(item.label),
+            formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
             formatCostTableValue(item.label, item.value),
-            formatCostTextValue(item.detail)
+            formatCostDetailValue(item.detail)
           ])}
         />
       </section>
@@ -1165,7 +1105,7 @@ export function CostControlTab({
           loading={productCostRiskSummaryQuery.isLoading}
           empty="No recommended cost actions returned."
           headers={['Action']}
-          rows={(productCostRiskSummary?.recommended_actions ?? []).map((action: any) => [formatCostTextValue(action)])}
+          rows={(productCostRiskSummary?.recommended_actions ?? []).map((action: any) => [action])}
         />
       </section>
     </section>
