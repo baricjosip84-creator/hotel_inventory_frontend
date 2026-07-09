@@ -98,7 +98,7 @@ const formatCodeLabel = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '-';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return String(value)
-    .replace(/_/g, ' ')
+    .replace(/[_-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
@@ -151,7 +151,12 @@ const formatPercentValue = (value: number | string | null | undefined): string =
 };
 
 const shouldFormatCostValueAsCurrency = (key: string): boolean => {
+  const readableKey = key.replace(/[_-]/g, ' ').toLowerCase();
+
   if (/(_percent|count|score|products?|rows?|status|source|date|age|current_value)$/i.test(key)) {
+    return false;
+  }
+  if (/\b(alerts?|recommendations?|issues?|blockers?|products?|checks?|rows?|sections?|coverage)\b/i.test(readableKey)) {
     return false;
   }
   return /(estimated|inventory|review|received|standard|fallback|alerted|recommended|committed|overdue|spend|capital|cost|value)/i.test(key);
@@ -214,7 +219,6 @@ export function CostControlTab({
   productCostActionCoverageSummaryQuery,
   productCostActionImpactSummaryQuery,
   productCostActionPlanSummaryQuery,
-  productCostActionRows,
   productCostActionSourceSummaryQuery,
   productCostActionSources,
   productCostActionSummaryQuery,
@@ -230,7 +234,6 @@ export function CostControlTab({
   productCostDashboardSummaryQuery,
   productCostGovernanceAuditPackQuery,
   productCostGovernanceAuditRows,
-  productCostGovernanceBlockers,
   productCostGovernanceChecklist,
   productCostGovernanceClosureChecklist,
   productCostGovernanceClosureSummaryQuery,
@@ -248,7 +251,6 @@ export function CostControlTab({
   productCostGovernanceSignoffChecklist,
   productCostGovernanceSignoffSummaryQuery,
   productCostGovernanceSummaryQuery,
-  productCostGovernanceWarnings,
   productCostGovernanceWatchChecklist,
   productCostHardeningFailedChecklist,
   productCostHardeningSummaryQuery,
@@ -306,6 +308,22 @@ export function CostControlTab({
     ['Sign-off checks', formatNumber(productCostGovernanceSignoffChecklist.length), productCostGovernanceSignoffSummaryQuery.isLoading ? '-' : 'Available'],
     ['Closure checks', formatNumber(productCostGovernanceClosureChecklist.length), productCostGovernanceClosureSummaryQuery.isLoading ? '-' : 'Available'],
     ['Handoff checks', formatNumber(productCostGovernanceHandoffChecklist.length), productCostGovernanceHandoffSummaryQuery.isLoading ? '-' : 'Available']
+  ];
+
+  const costActionBreakdownRows = Array.isArray(productCostActionSummaryQuery.data?.action_breakdown)
+    ? productCostActionSummaryQuery.data.action_breakdown
+    : [];
+  const costActionTotals = productCostActionSummaryQuery.data?.totals ?? {};
+  const costActionPlanTotals = productCostActionPlanSummaryQuery.data?.totals ?? {};
+  const costActionableProducts =
+    costActionTotals.total_actionable_products ?? costActionPlanTotals.total_actionable_products;
+  const costActionableStock = costActionTotals.actionable_stock_quantity;
+  const costActionableValue = costActionTotals.actionable_estimated_inventory_value;
+
+  const governanceCheckpointRows = [
+    ...productCostGovernanceSignoffChecklist.map((item: any) => ({ ...item, area: 'Sign-off' })),
+    ...productCostGovernanceClosureChecklist.map((item: any) => ({ ...item, area: 'Closure' })),
+    ...productCostGovernanceHandoffChecklist.map((item: any) => ({ ...item, area: 'Handoff' }))
   ];
 
   return (
@@ -533,21 +551,21 @@ export function CostControlTab({
         <h2 style={styles.cardTitle}>Cost action summary</h2>
         <p style={styles.helper}>Reads the existing GET /products/cost-action-summary endpoint for prioritized cost remediation signals.</p>
         <div style={styles.statGrid}>
-          <MetricCard label="Total actions" value={formatNumber(productCostActionSummaryQuery.data?.totals?.total_actions)} />
-          <MetricCard label="Critical actions" value={formatNumber(productCostActionSummaryQuery.data?.totals?.critical_actions)} />
-          <MetricCard label="High priority" value={formatNumber(productCostActionSummaryQuery.data?.totals?.high_priority_actions)} />
-          <MetricCard label="Generated" value={formatDateTime(productCostActionSummaryQuery.data?.generated_at)} />
+          <MetricCard label="Actionable products" value={formatNumber(costActionableProducts)} />
+          <MetricCard label="Actionable stock" value={formatNumber(costActionableStock)} />
+          <MetricCard label="Actionable value" value={formatCurrency(costActionableValue)} />
+          <MetricCard label="Action groups" value={formatNumber(costActionBreakdownRows.length)} />
         </div>
         <DataTable
           loading={productCostActionSummaryQuery.isLoading}
           empty="No cost action summary rows returned."
-          headers={['Action', 'Priority', 'Products', 'Estimated value', 'Reason']}
-          rows={productCostActionRows.map((item: any) => [
-            formatCodeRecordValue(item, 'action'),
-            formatCodeRecordValue(item, 'priority'),
+          headers={['Action', 'Products', 'Stock quantity', 'Estimated value', 'Recommended action']}
+          rows={costActionBreakdownRows.map((item: any) => [
+            formatCodeLabel(item.action_type),
             formatRecordValue(item, 'product_count'),
+            formatRecordValue(item, 'stock_quantity'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatRecordValue(item, 'reason')
+            formatCostDetailValue(item.recommended_action)
           ])}
         />
       </section>
@@ -589,7 +607,7 @@ export function CostControlTab({
             formatCodeLabel(item.action_type),
             formatCodeLabel(item.priority_band),
             formatRecordValue(item, 'action_priority_score'),
-            formatCodeLabel(item.recommended_action)
+            formatCostDetailValue(item.recommended_action)
           ])}
         />
       </section>
@@ -873,16 +891,18 @@ export function CostControlTab({
           <MetricCard label="Review status" value={formatCodeLabel(productCostGovernanceReviewQueueQuery.data?.review_status)} />
           <MetricCard label="Handoff status" value={formatCodeLabel(productCostGovernanceHandoffSummaryQuery.data?.handoff_status)} />
         </div>
-        <DataTable
-          loading={productCostGovernanceDetailsQuery.isLoading}
-          empty="No failed governance detail checklist rows returned; sign-off and handoff checks are listed below."
-          headers={['Failed check', 'Status', 'Detail']}
-          rows={productCostGovernanceFailedChecklist.map((item: any) => [
-            formatRecordValue(item, 'label'),
-            formatCodeLabel(item.status),
-            formatCostDetailValue(item.detail)
-          ])}
-        />
+        {productCostGovernanceFailedChecklist.length ? (
+          <DataTable
+            loading={productCostGovernanceDetailsQuery.isLoading}
+            empty="No failed governance detail checklist rows returned."
+            headers={['Failed check', 'Status', 'Detail']}
+            rows={productCostGovernanceFailedChecklist.map((item: any) => [
+              formatRecordValue(item, 'label'),
+              formatCodeLabel(item.status),
+              formatCostDetailValue(item.detail)
+            ])}
+          />
+        ) : null}
         <DataTable
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No watch governance checklist rows returned."
@@ -896,7 +916,7 @@ export function CostControlTab({
         <DataTable
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No remediation plan rows returned."
-          headers={['Key', 'Priority', 'Action', 'Source']}
+          headers={['Item', 'Priority', 'Action', 'Evidence']}
           rows={productCostGovernanceRemediationPlan.map((item: any) => [
             formatCodeRecordValue(item, 'key'),
             formatCodeRecordValue(item, 'priority'),
@@ -912,7 +932,7 @@ export function CostControlTab({
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
-            formatCodeLabel(item.recommendation || item.action)
+            formatCostDetailValue(item.recommendation || item.action)
           ])}
         />
         <DataTable
@@ -922,41 +942,11 @@ export function CostControlTab({
           rows={governanceEvidenceSummaryRows}
         />
         <DataTable
-          loading={productCostGovernanceSignoffSummaryQuery.isLoading}
-          empty="No sign-off checklist rows returned."
-          headers={['Check', 'Status', 'Detail']}
-          rows={productCostGovernanceSignoffChecklist.map((item: any) => [
-            formatRecordValue(item, 'label'),
-            formatCodeLabel(item.status),
-            formatCostDetailValue(item.detail)
-          ])}
-        />
-        <DataTable
-          loading={productCostGovernanceSignoffSummaryQuery.isLoading}
-          empty="No blockers or warnings returned."
-          headers={['Type', 'Key', 'Severity', 'Detail']}
-          rows={[...productCostGovernanceBlockers.map((item: any) => ({ ...item, issue_type: 'blocker' })), ...productCostGovernanceWarnings.map((item: any) => ({ ...item, issue_type: 'warning' }))].map((item: any) => [
-            formatCodeRecordValue(item, 'issue_type'),
-            formatCodeRecordValue(item, 'key'),
-            formatCodeRecordValue(item, 'severity'),
-            formatCostDetailValue(item.detail)
-          ])}
-        />
-        <DataTable
-          loading={productCostGovernanceClosureSummaryQuery.isLoading}
-          empty="No closure checklist rows returned."
-          headers={['Check', 'Status', 'Detail']}
-          rows={productCostGovernanceClosureChecklist.map((item: any) => [
-            formatRecordValue(item, 'label'),
-            formatCodeLabel(item.status),
-            formatCostDetailValue(item.detail)
-          ])}
-        />
-        <DataTable
-          loading={productCostGovernanceHandoffSummaryQuery.isLoading}
-          empty="No handoff checklist rows returned."
-          headers={['Check', 'Status', 'Detail']}
-          rows={productCostGovernanceHandoffChecklist.map((item: any) => [
+          loading={productCostGovernanceSignoffSummaryQuery.isLoading || productCostGovernanceClosureSummaryQuery.isLoading || productCostGovernanceHandoffSummaryQuery.isLoading}
+          empty="No sign-off, closure, or handoff checks returned."
+          headers={['Area', 'Check', 'Status', 'Detail']}
+          rows={governanceCheckpointRows.map((item: any) => [
+            item.area,
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
             formatCostDetailValue(item.detail)
