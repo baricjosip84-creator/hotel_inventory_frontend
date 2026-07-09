@@ -17,8 +17,11 @@ export function useStableActionsOrRows<T>(data: ActionsOrRowsPayload<T>): T[] {
   return useMemo(() => data?.actions ?? data?.rows ?? [], [data]);
 }
 
-export function useStableSnapshotRows<T>(data: SnapshotRowsPayload<T>): T[] {
-  return useMemo(() => data?.rows ?? data?.snapshots ?? [], [data]);
+export function useStableSnapshotRows<T>(data: SnapshotRowsPayload<T> | OptionalArray<T>): T[] {
+  return useMemo(() => {
+    if (Array.isArray(data)) return data;
+    return data?.rows ?? data?.snapshots ?? [];
+  }, [data]);
 }
 
 export function useStableFieldArray<T, K extends string>(

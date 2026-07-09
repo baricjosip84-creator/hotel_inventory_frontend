@@ -878,6 +878,15 @@ export type SystemStatusResponse = {
 export type SystemContextResponse = {
   generated_at?: string;
   tenant?: Record<string, unknown>;
+  context?: {
+    inventory?: Record<string, unknown>;
+    procurement?: Record<string, unknown>;
+    costing?: Record<string, unknown>;
+    alerts?: Record<string, unknown>;
+    audit?: Record<string, unknown>;
+    access?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
   inventory?: Record<string, unknown>;
   procurement?: Record<string, unknown>;
   costing?: Record<string, unknown>;
@@ -922,7 +931,7 @@ export type SystemContextSnapshotList = {
 };
 
 export type TenantPublicContext = {
-  active?: boolean;
+  active?: boolean | unknown[];
   enabled?: boolean;
   maintenance?: Record<string, unknown> | null;
   announcements?: unknown[];

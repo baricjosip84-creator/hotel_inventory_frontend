@@ -12,6 +12,26 @@ type SnapshotMutation = {
   isPending: boolean;
 };
 
+
+const getSystemContextSection = (
+  data: SystemContextResponse | undefined,
+  section: 'inventory' | 'procurement' | 'costing' | 'alerts' | 'audit' | 'access'
+): Record<string, unknown> | undefined => {
+  return data?.context?.[section] ?? data?.[section];
+};
+
+const hasValues = (value: unknown): boolean => {
+  return Array.isArray(value) ? value.length > 0 : Boolean(value);
+};
+
+const getMaintenanceStatus = (data: TenantPublicContext | undefined): string => {
+  if (!data) return 'Inactive';
+  if (data.active === true || hasValues(data.active)) return 'Active';
+  if (hasValues(data.upcoming)) return 'Upcoming';
+  if (data.enabled === true) return 'Enabled';
+  return 'Inactive';
+};
+
 type SystemContextTabProps = {
   systemExecutionGateQuery: QueryState<SystemExecutionGateResponse>;
   systemContextQuery: QueryState<SystemContextResponse>;
@@ -41,6 +61,13 @@ export function SystemContextTab({
   captureSystemContextSnapshotMutation,
   refreshSystemContextQueries
 }: SystemContextTabProps) {
+  const inventoryContext = getSystemContextSection(systemContextQuery.data, 'inventory');
+  const procurementContext = getSystemContextSection(systemContextQuery.data, 'procurement');
+  const costingContext = getSystemContextSection(systemContextQuery.data, 'costing');
+  const alertsContext = getSystemContextSection(systemContextQuery.data, 'alerts');
+  const auditContext = getSystemContextSection(systemContextQuery.data, 'audit');
+  const accessContext = getSystemContextSection(systemContextQuery.data, 'access');
+
   return (
     <section style={styles.stack}>
       <div style={styles.actions}>
@@ -54,11 +81,11 @@ export function SystemContextTab({
 
       <div style={styles.metricsGrid}>
         <MetricCard label="Execution gate" value={systemExecutionGateQuery.data?.status || (systemExecutionGateQuery.data?.allowed ? 'allowed' : 'blocked')} helper={(systemExecutionGateQuery.data?.reasons ?? []).join(', ') || 'Read-only execution readiness'} />
-        <MetricCard label="Products" value={formatRecordValue(systemContextQuery.data?.inventory, 'total_products')} helper="System context inventory count" />
-        <MetricCard label="Low stock" value={formatRecordValue(systemContextQuery.data?.inventory, 'low_stock_products')} helper="Products at or below minimum" />
-        <MetricCard label="Open POs" value={formatRecordValue(systemContextQuery.data?.procurement, 'open_purchase_orders')} helper="Draft/submitted/approved" />
-        <MetricCard label="Unresolved alerts" value={formatRecordValue(systemContextQuery.data?.alerts, 'unresolved_alerts')} helper={`${formatRecordValue(systemContextQuery.data?.alerts, 'critical_unresolved_alerts')} critical`} />
-        <MetricCard label="Support sessions" value={formatRecordValue(systemContextQuery.data?.access, 'active_support_sessions')} helper="Active platform access" />
+        <MetricCard label="Products" value={formatRecordValue(inventoryContext, 'total_products')} helper="System context inventory count" />
+        <MetricCard label="Low stock" value={formatRecordValue(inventoryContext, 'low_stock_products')} helper="Products at or below minimum" />
+        <MetricCard label="Open POs" value={formatRecordValue(procurementContext, 'open_purchase_orders')} helper="Draft/submitted/approved" />
+        <MetricCard label="Unresolved alerts" value={formatRecordValue(alertsContext, 'unresolved_alerts')} helper={`${formatRecordValue(alertsContext, 'critical_unresolved_alerts')} critical`} />
+        <MetricCard label="Support sessions" value={formatRecordValue(accessContext, 'active_support_sessions')} helper="Active platform access" />
       </div>
 
       <section style={styles.card}>
@@ -68,8 +95,8 @@ export function SystemContextTab({
           empty="No tenant context returned."
           headers={['Context', 'Status', 'Details']}
           rows={[
-            ['Support session', supportContextQuery.data?.active ? 'Active' : 'Inactive', formatValue(supportContextQuery.data)],
-            ['Maintenance', maintenanceContextQuery.data?.active || maintenanceContextQuery.data?.enabled ? 'Active' : 'Inactive', formatValue(maintenanceContextQuery.data)],
+            ['Support session', hasValues(supportContextQuery.data?.active) ? 'Active' : 'Inactive', formatValue(supportContextQuery.data)],
+            ['Maintenance', getMaintenanceStatus(maintenanceContextQuery.data), formatValue(maintenanceContextQuery.data)],
             ['Announcements', Array.isArray(announcementContextQuery.data?.announcements) && announcementContextQuery.data.announcements.length ? 'Active' : 'None', formatValue(announcementContextQuery.data)],
             ['Incidents', Array.isArray(incidentContextQuery.data?.incidents) && incidentContextQuery.data.incidents.length ? 'Open' : 'None', formatValue(incidentContextQuery.data)]
           ]}
@@ -84,12 +111,12 @@ export function SystemContextTab({
           headers={['Section', 'Summary']}
           rows={[
             ['Tenant', formatValue(systemContextQuery.data?.tenant)],
-            ['Inventory', formatValue(systemContextQuery.data?.inventory)],
-            ['Procurement', formatValue(systemContextQuery.data?.procurement)],
-            ['Costing', formatValue(systemContextQuery.data?.costing)],
-            ['Alerts', formatValue(systemContextQuery.data?.alerts)],
-            ['Audit', formatValue(systemContextQuery.data?.audit)],
-            ['Access', formatValue(systemContextQuery.data?.access)]
+            ['Inventory', formatValue(inventoryContext)],
+            ['Procurement', formatValue(procurementContext)],
+            ['Costing', formatValue(costingContext)],
+            ['Alerts', formatValue(alertsContext)],
+            ['Audit', formatValue(auditContext)],
+            ['Access', formatValue(accessContext)]
           ]}
         />
       </section>
