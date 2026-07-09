@@ -16,6 +16,7 @@ export function EnterpriseInventoryOperationalAnalyticsPanels({
     dashboardRecentActivityQuery,
     dashboardSupplierPerformanceQuery,
     dashboardUnresolvedAlertsQuery,
+    stockOverviewQuery,
     demandForecastQuery,
     forecastAccuracyBacktestQuery,
     forecastCalibrationReviewQuery,
@@ -62,6 +63,8 @@ export function EnterpriseInventoryOperationalAnalyticsPanels({
           supplierPerformanceLoading={
             dashboardSupplierPerformanceQuery.isLoading
           }
+          currentStockRows={stockOverviewQuery.data ?? []}
+          currentStockLoading={stockOverviewQuery.isLoading}
         />
       </EnterpriseInventoryTabPanel>
 

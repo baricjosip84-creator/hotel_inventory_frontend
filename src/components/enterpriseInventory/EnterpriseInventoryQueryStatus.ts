@@ -15,7 +15,8 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
     'dashboardOverdueShipmentsQuery',
     'dashboardUnresolvedAlertsQuery',
     'dashboardRecentActivityQuery',
-    'dashboardSupplierPerformanceQuery'
+    'dashboardSupplierPerformanceQuery',
+    'stockOverviewQuery'
   ],
   'par-levels': ['parLevelsQuery'],
   'cycle-counts': ['cycleCountsQuery'],

@@ -162,6 +162,10 @@ export async function fetchSupplierPerformance(supplierId: string): Promise<Supp
   return apiRequest<SupplierPerformance>(`/suppliers/${supplierId}/performance`);
 }
 
+export async function fetchStockOverview(): Promise<StockItem[]> {
+  return apiRequest<StockItem[]>('/stock');
+}
+
 export async function fetchLowStock(): Promise<StockItem[]> {
   return apiRequest<StockItem[]>('/stock?low_stock=true');
 }

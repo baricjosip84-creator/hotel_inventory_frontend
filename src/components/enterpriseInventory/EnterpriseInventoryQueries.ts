@@ -27,6 +27,7 @@ import {
   fetchAvailableSuppliers,
   fetchSupplierSlaBreaches,
   fetchSupplierPerformance,
+  fetchStockOverview,
   fetchLowStock,
   fetchStockMovements,
   fetchDashboardSummary,
@@ -187,6 +188,7 @@ export function useEnterpriseInventoryQueries({
     queryFn: () => fetchSupplierPerformance(selectedSupplierPerformanceId),
     enabled: canReadSuppliers && Boolean(selectedSupplierPerformanceId)
   });
+  const stockOverviewQuery = useQuery({ queryKey: ['enterprise-stock-overview'], queryFn: fetchStockOverview, enabled: canReadStock });
   const lowStockQuery = useQuery({ queryKey: ['enterprise-low-stock'], queryFn: fetchLowStock, enabled: canReadStock });
   const stockMovementsQuery = useQuery({ queryKey: ['enterprise-stock-movements'], queryFn: fetchStockMovements, enabled: canReadStockMovements });
   const dashboardSummaryQuery = useQuery({ queryKey: ['enterprise-dashboard-summary'], queryFn: fetchDashboardSummary, enabled: canReadDashboard });
@@ -296,6 +298,7 @@ export function useEnterpriseInventoryQueries({
     availableSuppliersQuery,
     supplierSlaBreachesQuery,
     supplierPerformanceQuery,
+    stockOverviewQuery,
     lowStockQuery,
     stockMovementsQuery,
     dashboardSummaryQuery,

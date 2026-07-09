@@ -5,6 +5,7 @@ import type {
   DashboardLowStockRow,
   DashboardOverdueShipment,
   DashboardSupplierPerformance,
+  StockItem,
   StockMovement
 } from '../EnterpriseInventoryTypes';
 
@@ -31,6 +32,8 @@ type OperationsDashboardTabProps = {
   recentActivityLoading: boolean;
   supplierPerformance: DashboardSupplierPerformance[];
   supplierPerformanceLoading: boolean;
+  currentStockRows: StockItem[];
+  currentStockLoading: boolean;
 };
 
 export function OperationsDashboardTab({
@@ -44,7 +47,9 @@ export function OperationsDashboardTab({
   recentActivity,
   recentActivityLoading,
   supplierPerformance,
-  supplierPerformanceLoading
+  supplierPerformanceLoading,
+  currentStockRows,
+  currentStockLoading
 }: OperationsDashboardTabProps) {
   return (
     <section style={styles.stack}>
@@ -56,6 +61,24 @@ export function OperationsDashboardTab({
         <MetricCard label="Low-stock rows" value={summary.lowStockRows} helper={`${summary.lowStockRate.toFixed(1)}% of stock rows`} />
         <MetricCard label="Critical alerts" value={summary.criticalAlerts} helper={`${summary.unresolvedAlerts} unresolved total`} />
       </div>
+
+      <SectionCard title="Current stock by product and location">
+        <p style={styles.helper}>Live stock rows from the operational stock endpoint, grouped by product and storage location.</p>
+        <DataTable
+          loading={currentStockLoading}
+          empty="No current stock rows returned."
+          headers={['Product', 'Location', 'On hand', 'Reserved', 'Free', 'Min', 'Updated']}
+          rows={currentStockRows.map((item) => [
+            item.product_name || item.product_id,
+            item.storage_location_name || item.storage_location_id,
+            `${formatNumber(item.quantity)} ${item.product_unit || ''}`.trim(),
+            formatNumber(item.reserved_quantity ?? 0),
+            `${formatNumber(item.projected_free_quantity ?? item.quantity)} ${item.product_unit || ''}`.trim(),
+            formatNumber(item.effective_min_quantity ?? item.min_quantity ?? item.product_min_stock),
+            formatDateTime(item.updated_at)
+          ])}
+        />
+      </SectionCard>
 
       <section style={styles.grid}>
         <SectionCard title="Dashboard low stock">

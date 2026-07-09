@@ -251,6 +251,12 @@ export type StockItem = {
   storage_location_name?: string | null;
   quantity: number | string;
   min_quantity?: number | string | null;
+  effective_min_quantity?: number | string | null;
+  reserved_quantity?: number | string | null;
+  allocated_quantity?: number | string | null;
+  projected_free_quantity?: number | string | null;
+  estimated_unit_cost?: number | string | null;
+  estimated_stock_value?: number | string | null;
   product_min_stock?: number | string | null;
   updated_at?: string | null;
 };
