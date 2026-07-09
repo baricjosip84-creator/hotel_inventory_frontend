@@ -17,6 +17,7 @@ type EnterpriseInventoryStableDataInput = Pick<
   | 'availableSuppliersQuery'
   | 'supplierSlaBreachesQuery'
   | 'lowStockQuery'
+  | 'stockOverviewQuery'
   | 'stockMovementsQuery'
   | 'dashboardLowStockQuery'
   | 'dashboardOverdueShipmentsQuery'
@@ -52,6 +53,7 @@ export function useEnterpriseInventoryStableData({
   availableSuppliersQuery,
   supplierSlaBreachesQuery,
   lowStockQuery,
+  stockOverviewQuery,
   stockMovementsQuery,
   dashboardLowStockQuery,
   dashboardOverdueShipmentsQuery,
@@ -86,6 +88,7 @@ export function useEnterpriseInventoryStableData({
     availableSuppliers: useStableArray(availableSuppliersQuery.data),
     supplierSlaBreaches: useStableArray(supplierSlaBreachesQuery.data),
     lowStockItems: useStableArray(lowStockQuery.data),
+    stockItems: useStableArray(stockOverviewQuery.data),
     recentStockMovements: useStableArray(stockMovementsQuery.data),
     dashboardLowStockRows: useStableArray(dashboardLowStockQuery.data),
     dashboardOverdueShipments: useStableArray(dashboardOverdueShipmentsQuery.data),

@@ -16,7 +16,9 @@ export function InputField({
   onChange,
   type = 'text',
   required = false,
-  min
+  min,
+  max,
+  disabled = false
 }: {
   label: string;
   value: string;
@@ -24,6 +26,8 @@ export function InputField({
   type?: string;
   required?: boolean;
   min?: string;
+  max?: string;
+  disabled?: boolean;
 }) {
   return (
     <label style={styles.field}>
@@ -34,7 +38,9 @@ export function InputField({
         value={value}
         required={required}
         min={type === 'number' ? min : undefined}
+        max={type === 'number' ? max : undefined}
         step={type === 'number' ? '0.0001' : undefined}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
@@ -69,11 +75,11 @@ export function TextareaField({
   );
 }
 
-export function SelectField({ label, value, onChange, options, required = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; required?: boolean }) {
+export function SelectField({ label, value, onChange, options, required = false, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; required?: boolean; disabled?: boolean }) {
   return (
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
-      <select style={styles.input} value={value} required={required} onChange={(event) => onChange(event.target.value)}>
+      <select style={styles.input} value={value} required={required} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
         <option value="">{required ? 'Select…' : 'None'}</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>

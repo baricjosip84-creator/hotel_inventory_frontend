@@ -154,8 +154,10 @@ export function useEnterpriseInventoryStockMutations(
       ),
     onSuccess: mutationFeedback.invalidating("Stock transfer executed.", [
       "enterprise-stock-transfers",
+      "enterprise-stock-overview",
       "enterprise-low-stock",
       "enterprise-stock-movements",
+      "enterprise-products",
     ]),
     onError: mutationFeedback.error("Failed to execute stock transfer."),
   });
