@@ -21,6 +21,12 @@ type ExecutionMutation<TInput> = {
 
 type ExecutionAction = 'submit' | 'approve' | 'reject' | 'execute' | 'noop' | 'cancel';
 
+const hasTerminalExecutionStatus = (request: ExecutionRequest) => Boolean(request.execution_status);
+const canSubmitExecutionRequest = (request: ExecutionRequest) => request.status === 'draft' && !hasTerminalExecutionStatus(request);
+const canReviewExecutionRequest = (request: ExecutionRequest) => request.status === 'pending_review' && !hasTerminalExecutionStatus(request);
+const canRunExecutionRequest = (request: ExecutionRequest) => request.status === 'approved' && !hasTerminalExecutionStatus(request);
+const canCancelExecutionRequest = (request: ExecutionRequest) => ['draft', 'pending_review'].includes(request.status) && !hasTerminalExecutionStatus(request);
+
 type ExecutionTabProps = {
   systemStatusQuery: QueryState<SystemStatusResponse>;
   executionRequestsQuery: QueryState<ExecutionRequestsResponse>;
@@ -151,10 +157,10 @@ export function ExecutionTab({
           formatDateTime(request.updated_at || request.created_at),
           JSON.stringify(request.payload || {}).slice(0, 120),
           [
-            request.status === 'draft' ? 'Submit' : null,
-            request.status === 'pending_review' ? 'Approve / reject' : null,
-            request.status === 'approved' && !request.execution_status ? 'Execute / no-op' : null,
-            ['draft', 'pending_review', 'approved'].includes(request.status) ? 'Cancel' : null
+            canSubmitExecutionRequest(request) ? 'Submit' : null,
+            canReviewExecutionRequest(request) ? 'Approve / reject' : null,
+            canRunExecutionRequest(request) ? 'Execute / no-op' : null,
+            canCancelExecutionRequest(request) ? 'Cancel' : null
           ].filter(Boolean).join(', ') || '-'
         ])}
       />
@@ -167,12 +173,12 @@ export function ExecutionTab({
             <p>Status: <strong>{request.status}</strong></p>
             <p>Execution: <strong>{request.execution_status || 'not executed'}</strong></p>
             <div style={styles.actions}>
-              {request.status === 'draft' ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'submit')}>Submit</button> : null}
-              {request.status === 'pending_review' ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'approve')}>Approve</button> : null}
-              {request.status === 'pending_review' ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'reject')}>Reject</button> : null}
-              {request.status === 'approved' && !request.execution_status ? <button type="button" style={styles.primaryButton} onClick={() => handleExecutionAction(request, 'execute')}>Execute</button> : null}
-              {request.status === 'approved' && !request.execution_status ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'noop')}>No-op</button> : null}
-              {['draft', 'pending_review', 'approved'].includes(request.status) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'cancel')}>Cancel</button> : null}
+              {canSubmitExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'submit')}>Submit</button> : null}
+              {canReviewExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'approve')}>Approve</button> : null}
+              {canReviewExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'reject')}>Reject</button> : null}
+              {canRunExecutionRequest(request) ? <button type="button" style={styles.primaryButton} onClick={() => handleExecutionAction(request, 'execute')}>Execute</button> : null}
+              {canRunExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'noop')}>No-op</button> : null}
+              {canCancelExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'cancel')}>Cancel</button> : null}
             </div>
           </article>
         ))}
