@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DataTable, InputField, MetricCard, styles } from '../EnterpriseInventoryShared';
 import { emptyAuditFilters } from '../EnterpriseInventoryForms';
-import { formatDateTime, formatValue } from '../EnterpriseInventoryFormat';
+import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { AuditFilters, AuditLog } from '../EnterpriseInventoryTypes';
 
 type AuditTrailTabProps = {
@@ -11,7 +11,32 @@ type AuditTrailTabProps = {
   onAuditFiltersChange: (updater: (current: AuditFilters) => AuditFilters) => void;
 };
 
-const metadataPriority = ['po_number', 'next_status', 'status', 'previous_status', 'method', 'path', 'ip', 'actor_type', 'scope', 'reason'];
+const entitySingularLabels: Record<string, string> = {
+  Alerts: 'Alert',
+  'Auth Sessions': 'Auth Session',
+  Products: 'Product',
+  'Purchase Order': 'Purchase Order',
+  'Purchase Orders': 'Purchase Order',
+  'Reorder Insights': 'Reorder Insight',
+  Shipments: 'Shipment',
+  'Shipment Items': 'Shipment Item',
+  'Stock Transfers': 'Stock Transfer',
+  'Storage Locations': 'Storage Location',
+  Suppliers: 'Supplier',
+  'Tenant Subscription Access': 'Tenant Subscription Access',
+  Tenants: 'Tenant',
+  Users: 'User'
+};
+
+const actionResultLabels: Record<string, string> = {
+  create: 'Created',
+  update: 'Updated',
+  delete: 'Deleted',
+  replace: 'Replaced',
+  revoke: 'Revoked',
+  revoke_all: 'Revoked All',
+  subscription_access_denied: 'Access Denied'
+};
 
 function formatAuditLabel(value: string | null | undefined): string {
   if (!value) return '-';
@@ -36,51 +61,93 @@ function formatEntityId(value: string | null | undefined): string {
   return `${value.slice(0, 8)}…${value.slice(-6)}`;
 }
 
-function formatMetadataKey(key: string): string {
-  return formatAuditLabel(key);
-}
-
-function formatMetadataValue(key: string, value: unknown): string {
-  const formatted = formatValue(value);
-  if (['next_status', 'status', 'previous_status', 'actor_type', 'scope', 'reason'].includes(key)) {
-    return formatAuditLabel(formatted);
-  }
-  return formatted;
-}
-
-function formatMetadataItem(key: string, value: unknown): string | null {
+function readMetadataText(metadata: Record<string, unknown> | null | undefined, key: string): string | null {
+  const value = metadata?.[key];
   if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'object') {
-    if (Array.isArray(value)) return value.length ? `${formatMetadataKey(key)}: ${value.length} items` : null;
-    return `${formatMetadataKey(key)}: details recorded`;
-  }
-  return `${formatMetadataKey(key)}: ${formatMetadataValue(key, value)}`;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return null;
 }
 
-function formatMetadataSummary(metadata: Record<string, unknown> | null | undefined): string {
-  if (!metadata) return '-';
+function singularEntityLabel(entityType: string | null | undefined): string {
+  const entityLabel = formatAuditLabel(entityType);
+  return entitySingularLabels[entityLabel] || entityLabel;
+}
 
-  const entries = Object.entries(metadata).filter(([, value]) => value !== null && value !== undefined && value !== '');
-  if (!entries.length) return '-';
+function auditOperationFromPath(path: string, method: string | null): string | null {
+  const normalizedPath = path.toLowerCase();
+  const normalizedMethod = method?.toUpperCase() || '';
 
-  const sorted = [...entries].sort(([left], [right]) => {
-    const leftIndex = metadataPriority.indexOf(left);
-    const rightIndex = metadataPriority.indexOf(right);
-    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
-    if (leftIndex === -1) return 1;
-    if (rightIndex === -1) return -1;
-    return leftIndex - rightIndex;
-  });
+  if (normalizedPath.includes('/alerts/')) {
+    if (normalizedPath.endsWith('/acknowledge')) return 'Alert Acknowledged';
+    if (normalizedPath.endsWith('/escalate')) return 'Alert Escalated';
+    if (normalizedPath.endsWith('/resolve')) return 'Alert Resolved';
+    if (normalizedPath.endsWith('/reopen')) return 'Alert Reopened';
+  }
 
-  const visibleItems = sorted
-    .slice(0, 3)
-    .map(([key, value]) => formatMetadataItem(key, value))
-    .filter((item): item is string => Boolean(item));
+  const routeOperations: Array<{ match: string; label: string }> = [
+    { match: '/storage-locations', label: 'Storage Location' },
+    { match: '/suppliers', label: 'Supplier' },
+    { match: '/products', label: 'Product' },
+    { match: '/stock-transfers', label: 'Stock Transfer' },
+    { match: '/shipments', label: 'Shipment' },
+    { match: '/purchase-orders', label: 'Purchase Order' },
+    { match: '/users', label: 'User' },
+    { match: '/tenants', label: 'Tenant' },
+    { match: '/alerts', label: 'Alert' }
+  ];
 
-  if (!visibleItems.length) return '-';
+  const route = routeOperations.find((item) => normalizedPath.includes(item.match));
+  if (!route) return null;
 
-  const remaining = Math.max(0, sorted.length - visibleItems.length);
-  return remaining ? `${visibleItems.join(' · ')} · ${remaining} more detail${remaining === 1 ? '' : 's'}` : visibleItems.join(' · ');
+  if (normalizedMethod === 'POST') return `${route.label} Created`;
+  if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return `${route.label} Updated`;
+  if (normalizedMethod === 'DELETE') return `${route.label} Deleted`;
+  return null;
+}
+
+function formatAuditOperation(item: AuditLog): string {
+  const path = readMetadataText(item.metadata, 'path');
+  const method = readMetadataText(item.metadata, 'method');
+  const pathOperation = path ? auditOperationFromPath(path, method) : null;
+  if (pathOperation) return pathOperation;
+
+  if (item.action?.includes('.') && !['create', 'update', 'delete', 'replace'].includes(item.action)) {
+    return formatAuditLabel(item.action);
+  }
+
+  const actionResult = actionResultLabels[item.action] || formatAuditLabel(item.action);
+  const entityLabel = singularEntityLabel(item.entity_type);
+  if (!entityLabel || entityLabel === '-') return actionResult;
+  return `${entityLabel} ${actionResult}`;
+}
+
+function formatAuditDetails(item: AuditLog, operation: string): string {
+  const metadata = item.metadata;
+  if (!metadata) return `${operation} recorded`;
+
+  const details: string[] = [];
+  const poNumber = readMetadataText(metadata, 'po_number');
+  const nextStatus = readMetadataText(metadata, 'next_status');
+  const status = readMetadataText(metadata, 'status');
+  const previousStatus = readMetadataText(metadata, 'previous_status');
+  const reason = readMetadataText(metadata, 'reason');
+  const scope = readMetadataText(metadata, 'scope');
+  const actorType = readMetadataText(metadata, 'actor_type');
+  const ip = readMetadataText(metadata, 'ip');
+
+  if (poNumber) details.push(`PO ${poNumber}`);
+  if (previousStatus) details.push(`Previous status ${formatAuditLabel(previousStatus)}`);
+  if (nextStatus) details.push(`New status ${formatAuditLabel(nextStatus)}`);
+  if (!nextStatus && status) details.push(`Status ${formatAuditLabel(status)}`);
+  if (reason) details.push(`Reason: ${reason}`);
+  if (scope) details.push(`Scope ${formatAuditLabel(scope)}`);
+  if (actorType === 'support_session') details.push('Support session action');
+
+  if (!details.length) details.push(`${operation} recorded`);
+  if (ip) details.push(`Source IP ${ip}`);
+
+  return details.slice(0, 3).join(' · ');
 }
 
 export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFiltersChange }: AuditTrailTabProps) {
@@ -116,14 +183,17 @@ export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFilte
           loading={isLoading}
           empty="No audit rows match these filters."
           headers={['Action', 'Entity', 'Record ID', 'Actor', 'Created', 'Details']}
-          rows={auditLogs.map((item) => [
-            formatAuditLabel(item.action),
-            formatAuditLabel(item.entity_type),
-            formatEntityId(item.entity_id),
-            item.user_name || item.user_email || item.user_id || 'System',
-            formatDateTime(item.created_at),
-            formatMetadataSummary(item.metadata)
-          ])}
+          rows={auditLogs.map((item) => {
+            const operation = formatAuditOperation(item);
+            return [
+              operation,
+              formatAuditLabel(item.entity_type),
+              formatEntityId(item.entity_id),
+              item.user_name || item.user_email || item.user_id || 'System',
+              formatDateTime(item.created_at),
+              formatAuditDetails(item, operation)
+            ];
+          })}
         />
       </section>
     </section>
