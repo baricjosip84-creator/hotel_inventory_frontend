@@ -132,6 +132,17 @@ function tenantMutationSuccessMessage(path: string, method: string): string {
     if (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT') return 'Transfer draft updated successfully.';
   }
 
+  if (normalizedPath.includes('/alerts/')) {
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/acknowledge')) return 'Alert acknowledged successfully.';
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/escalate')) return 'Alert escalated successfully.';
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/resolve')) return 'Alert resolved successfully.';
+    if (normalizedMethod === 'POST' && normalizedPath.endsWith('/reopen')) return 'Alert reopened successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPath.endsWith('/alerts')) {
+    return 'Manual alert created successfully.';
+  }
+
   const label = tenantMutationActionLabel(path, method);
 
   if (normalizedMethod === 'POST') return `${label} created successfully.`;

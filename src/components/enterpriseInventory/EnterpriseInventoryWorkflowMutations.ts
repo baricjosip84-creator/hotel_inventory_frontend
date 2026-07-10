@@ -193,7 +193,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildAlertPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Alert created successfully.",
+      "Manual alert created successfully.",
       ["enterprise-alerts"],
       resetAlertForm,
     ),
