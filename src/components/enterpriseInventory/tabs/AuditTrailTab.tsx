@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DataTable, InputField, MetricCard, styles } from '../EnterpriseInventoryShared';
 import { emptyAuditFilters } from '../EnterpriseInventoryForms';
-import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { formatDateTime, formatValue } from '../EnterpriseInventoryFormat';
 import type { AuditFilters, AuditLog } from '../EnterpriseInventoryTypes';
 
 type AuditTrailTabProps = {
@@ -10,6 +10,78 @@ type AuditTrailTabProps = {
   isLoading: boolean;
   onAuditFiltersChange: (updater: (current: AuditFilters) => AuditFilters) => void;
 };
+
+const metadataPriority = ['po_number', 'next_status', 'status', 'previous_status', 'method', 'path', 'ip', 'actor_type', 'scope', 'reason'];
+
+function formatAuditLabel(value: string | null | undefined): string {
+  if (!value) return '-';
+
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((part) => {
+      const upper = part.toUpperCase();
+      if (['ID', 'PO', 'SLA', 'API', 'IP'].includes(upper)) return upper;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function formatEntityId(value: string | null | undefined): string {
+  if (!value) return '-';
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 8)}…${value.slice(-6)}`;
+}
+
+function formatMetadataKey(key: string): string {
+  return formatAuditLabel(key);
+}
+
+function formatMetadataValue(key: string, value: unknown): string {
+  const formatted = formatValue(value);
+  if (['next_status', 'status', 'previous_status', 'actor_type', 'scope', 'reason'].includes(key)) {
+    return formatAuditLabel(formatted);
+  }
+  return formatted;
+}
+
+function formatMetadataItem(key: string, value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'object') {
+    if (Array.isArray(value)) return value.length ? `${formatMetadataKey(key)}: ${value.length} items` : null;
+    return `${formatMetadataKey(key)}: details recorded`;
+  }
+  return `${formatMetadataKey(key)}: ${formatMetadataValue(key, value)}`;
+}
+
+function formatMetadataSummary(metadata: Record<string, unknown> | null | undefined): string {
+  if (!metadata) return '-';
+
+  const entries = Object.entries(metadata).filter(([, value]) => value !== null && value !== undefined && value !== '');
+  if (!entries.length) return '-';
+
+  const sorted = [...entries].sort(([left], [right]) => {
+    const leftIndex = metadataPriority.indexOf(left);
+    const rightIndex = metadataPriority.indexOf(right);
+    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
+
+  const visibleItems = sorted
+    .slice(0, 3)
+    .map(([key, value]) => formatMetadataItem(key, value))
+    .filter((item): item is string => Boolean(item));
+
+  if (!visibleItems.length) return '-';
+
+  const remaining = Math.max(0, sorted.length - visibleItems.length);
+  return remaining ? `${visibleItems.join(' · ')} · ${remaining} more detail${remaining === 1 ? '' : 's'}` : visibleItems.join(' · ');
+}
 
 export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFiltersChange }: AuditTrailTabProps) {
   const auditSummary = useMemo(() => {
@@ -43,14 +115,14 @@ export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFilte
         <DataTable
           loading={isLoading}
           empty="No audit rows match these filters."
-          headers={['Action', 'Entity', 'Entity ID', 'Actor', 'Created', 'Metadata']}
+          headers={['Action', 'Entity', 'Record ID', 'Actor', 'Created', 'Details']}
           rows={auditLogs.map((item) => [
-            item.action,
-            item.entity_type || '-',
-            item.entity_id || '-',
+            formatAuditLabel(item.action),
+            formatAuditLabel(item.entity_type),
+            formatEntityId(item.entity_id),
             item.user_name || item.user_email || item.user_id || 'System',
             formatDateTime(item.created_at),
-            item.metadata ? JSON.stringify(item.metadata) : '-'
+            formatMetadataSummary(item.metadata)
           ])}
         />
       </section>
