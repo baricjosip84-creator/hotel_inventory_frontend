@@ -130,8 +130,8 @@ export function EnterpriseInventoryHero({
         <p style={styles.eyebrow}>Enterprise inventory operations</p>
         <h1 style={styles.title}>Traceability, controls, and operational workflows</h1>
         <p style={styles.subtitle}>
-          Use the backend enterprise inventory API added at /enterprise-inventory for par levels,
-          cycle counts, requisitions, approvals, invoices, notifications, and labels.
+          Manage par levels, cycle counts, requisitions, approvals, invoices, notifications, labels,
+          and other operational inventory controls from one workspace.
         </p>
       </div>
       <button

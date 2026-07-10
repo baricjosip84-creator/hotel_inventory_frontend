@@ -57,7 +57,7 @@ export function LocationsTab({
     <section style={styles.grid}>
       <form onSubmit={handleStorageLocationSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>{editingStorageLocationId ? 'Edit storage location' : 'Create storage location'}</h2>
-        <p style={styles.helper}>Uses the real POST/PATCH /storage-locations routes and the actual name + temperature_zone fields.</p>
+        <p style={styles.helper}>Create and maintain storage areas used for receiving, transfers, stock counts, and inventory control.</p>
         <InputField label="Name" value={storageLocationForm.name} onChange={(value) => setStorageLocationForm((current) => ({ ...current, name: value }))} required />
         <InputField label="Temperature zone" value={storageLocationForm.temperature_zone} onChange={(value) => setStorageLocationForm((current) => ({ ...current, temperature_zone: value }))} />
         <div style={styles.actions}>
@@ -69,7 +69,7 @@ export function LocationsTab({
       </form>
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>Storage locations</h2>
-        <p style={styles.helper}>Uses the real GET /storage-locations and DELETE /storage-locations/:id routes.</p>
+        <p style={styles.helper}>Review storage locations, update operational zones, and remove locations that are no longer used.</p>
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
