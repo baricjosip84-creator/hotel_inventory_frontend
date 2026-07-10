@@ -4,6 +4,28 @@ import { emptyAlertFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { AlertFilters, AlertForm, AlertItem, ProductOption } from '../EnterpriseInventoryTypes';
 
+const ALERT_CODE_LABELS: Record<string, string> = {
+  info: 'Info',
+  warning: 'Warning',
+  critical: 'Critical',
+  manual: 'Manual',
+  low_stock: 'Low stock'
+};
+
+const formatAlertCodeLabel = (value: string | null | undefined): string => {
+  if (!value) return '-';
+  const normalized = value.toLowerCase();
+  if (ALERT_CODE_LABELS[normalized]) return ALERT_CODE_LABELS[normalized];
+
+  const label = value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.toLowerCase())
+    .join(' ');
+
+  return label ? `${label.charAt(0).toUpperCase()}${label.slice(1)}` : '-';
+};
+
 type AlertsSummary = {
   unresolved: number;
   critical: number;
@@ -143,8 +165,8 @@ export function AlertsTab({
                 <tbody>
                   {alerts.map((alert) => (
                     <tr key={alert.id}>
-                      <td style={styles.td}>{alert.severity}</td>
-                      <td style={styles.td}>{alert.type}</td>
+                      <td style={styles.td}>{formatAlertCodeLabel(alert.severity)}</td>
+                      <td style={styles.td}>{formatAlertCodeLabel(alert.type)}</td>
                       <td style={styles.td}>{alert.product_name || '-'}</td>
                       <td style={styles.td}>{alert.message}</td>
                       <td style={styles.td}>{alert.resolved ? 'Resolved' : alert.acknowledged ? 'Acknowledged' : 'Open'}</td>
