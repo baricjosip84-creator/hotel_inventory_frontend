@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { DataTable, InputField, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
 import { emptyAuditFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { AuditFilters, AuditLog } from '../EnterpriseInventoryTypes';
@@ -150,28 +150,86 @@ function formatAuditDetails(item: AuditLog, operation: string): string {
   return details.slice(0, 3).join(' · ');
 }
 
+
+function operationFilterValue(operation: string): string {
+  return `operation:${operation}`;
+}
+
+function selectedOperationFilter(value: string): string | null {
+  return value.startsWith('operation:') ? value.slice('operation:'.length) : null;
+}
+
+function uniqueOptions(options: Array<{ value: string; label: string }>): Array<{ value: string; label: string }> {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    if (!option.value || seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
+}
+
 export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFiltersChange }: AuditTrailTabProps) {
+  const selectedOperation = selectedOperationFilter(auditFilters.action);
+
+  const visibleAuditLogs = useMemo(() => {
+    if (!selectedOperation) return auditLogs;
+    return auditLogs.filter((item) => formatAuditOperation(item) === selectedOperation);
+  }, [auditLogs, selectedOperation]);
+
+  const actionOptions = useMemo(() => {
+    const currentOperations = auditLogs
+      .map((item) => formatAuditOperation(item))
+      .filter((operation): operation is string => Boolean(operation && operation !== '-'))
+      .sort((first, second) => first.localeCompare(second));
+
+    if (selectedOperation) currentOperations.push(selectedOperation);
+
+    return uniqueOptions(currentOperations.map((operation) => ({ value: operationFilterValue(operation), label: operation })));
+  }, [auditLogs, selectedOperation]);
+
+  const entityOptions = useMemo(() => {
+    const currentEntities = auditLogs
+      .map((item) => item.entity_type)
+      .filter((entityType): entityType is string => Boolean(entityType))
+      .sort((first, second) => formatAuditLabel(first).localeCompare(formatAuditLabel(second)));
+
+    if (auditFilters.entity_type) currentEntities.push(auditFilters.entity_type);
+
+    return uniqueOptions(currentEntities.map((entityType) => ({ value: entityType, label: formatAuditLabel(entityType) })));
+  }, [auditLogs, auditFilters.entity_type]);
+
   const auditSummary = useMemo(() => {
-    const entityTypes = new Set(auditLogs.map((item) => item.entity_type).filter(Boolean));
-    const supportActions = auditLogs.filter((item) => item.metadata?.actor_type === 'support_session').length;
-    return { total: auditLogs.length, entityTypes: entityTypes.size, supportActions };
-  }, [auditLogs]);
+    const entityTypes = new Set(visibleAuditLogs.map((item) => item.entity_type).filter(Boolean));
+    const supportActions = visibleAuditLogs.filter((item) => item.metadata?.actor_type === 'support_session').length;
+    return { total: visibleAuditLogs.length, entityTypes: entityTypes.size, supportActions };
+  }, [visibleAuditLogs]);
 
   return (
     <section style={styles.grid}>
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>Audit filters</h2>
-        <InputField label="Action" value={auditFilters.action} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, action: value }))} />
-        <InputField label="Entity type" value={auditFilters.entity_type} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, entity_type: value }))} />
-        <InputField label="Entity ID" value={auditFilters.entity_id} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, entity_id: value }))} />
-        <InputField label="User ID" value={auditFilters.user_id} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, user_id: value }))} />
+        <SelectField
+          label="Action"
+          value={auditFilters.action}
+          options={actionOptions}
+          onChange={(value) => onAuditFiltersChange((current) => ({ ...current, action: value }))}
+        />
+        <SelectField
+          label="Entity type"
+          value={auditFilters.entity_type}
+          options={entityOptions}
+          onChange={(value) => onAuditFiltersChange((current) => ({ ...current, entity_type: value }))}
+        />
+        <p style={styles.helper}>Use the ID filters only when you have the full internal ID from an audit export or support case.</p>
+        <InputField label="Record ID (advanced)" value={auditFilters.entity_id} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, entity_id: value }))} />
+        <InputField label="User ID (advanced)" value={auditFilters.user_id} onChange={(value) => onAuditFiltersChange((current) => ({ ...current, user_id: value }))} />
         <label style={styles.checkboxRow}>
           <input type="checkbox" checked={auditFilters.support_only} onChange={(event) => onAuditFiltersChange((current) => ({ ...current, support_only: event.target.checked }))} />
           Support-session actions only
         </label>
         <button type="button" style={styles.secondaryButton} onClick={() => onAuditFiltersChange(() => emptyAuditFilters)}>Reset filters</button>
         <div style={styles.statGrid}>
-          <MetricCard label="Audit rows" value={auditSummary.total} />
+          <MetricCard label="Visible rows" value={auditSummary.total} />
           <MetricCard label="Entity types" value={auditSummary.entityTypes} />
           <MetricCard label="Support actions" value={auditSummary.supportActions} />
         </div>
@@ -183,7 +241,7 @@ export function AuditTrailTab({ auditFilters, auditLogs, isLoading, onAuditFilte
           loading={isLoading}
           empty="No audit rows match these filters."
           headers={['Action', 'Entity', 'Record ID', 'Actor', 'Created', 'Details']}
-          rows={auditLogs.map((item) => {
+          rows={visibleAuditLogs.map((item) => {
             const operation = formatAuditOperation(item);
             return [
               operation,

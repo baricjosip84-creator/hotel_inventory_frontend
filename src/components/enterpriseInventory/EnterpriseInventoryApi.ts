@@ -108,7 +108,7 @@ export async function fetchAlerts(filters: AlertFilters): Promise<AlertItem[]> {
 
 export async function fetchAuditLogs(filters: AuditFilters): Promise<AuditLog[]> {
   const params = new URLSearchParams({ limit: '100' });
-  if (filters.action.trim()) params.set('action', filters.action.trim());
+  if (filters.action.trim() && !filters.action.trim().startsWith('operation:')) params.set('action', filters.action.trim());
   if (filters.entity_type.trim()) params.set('entity_type', filters.entity_type.trim());
   if (filters.entity_id.trim()) params.set('entity_id', filters.entity_id.trim());
   if (filters.user_id.trim()) params.set('user_id', filters.user_id.trim());
