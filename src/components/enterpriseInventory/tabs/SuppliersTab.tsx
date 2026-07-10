@@ -80,7 +80,7 @@ export function SuppliersTab({
       <div style={styles.stack}>
         <form style={styles.card} onSubmit={handleSupplierSubmit}>
           <h2 style={styles.sectionTitle}>{editingSupplierId ? 'Edit supplier' : 'Create supplier'}</h2>
-          <p style={styles.helper}>Uses the real POST/PATCH/DELETE /suppliers routes for supplier master data.</p>
+          <p style={styles.helper}>Create and maintain supplier contact records used by purchasing, receiving, and performance tracking.</p>
           <InputField label="Name" value={supplierForm.name} required onChange={(value) => setSupplierForm((current) => ({ ...current, name: value }))} />
           <InputField label="Email" value={supplierForm.email} type="email" onChange={(value) => setSupplierForm((current) => ({ ...current, email: value }))} />
           <InputField label="Contact info" value={supplierForm.contact_info} onChange={(value) => setSupplierForm((current) => ({ ...current, contact_info: value }))} />
@@ -94,7 +94,7 @@ export function SuppliersTab({
 
         <section style={styles.card}>
           <h2 style={styles.sectionTitle}>Supplier SLA breaches</h2>
-          <p style={styles.helper}>Uses the real GET /suppliers/sla-breaches route for overdue pending/partial shipment exposure by supplier.</p>
+          <p style={styles.helper}>Shows suppliers with overdue pending or partially received shipments that may need follow-up.</p>
           <DataTable
             loading={supplierSlaBreachesQuery.isLoading}
             empty="No supplier SLA breaches found."
@@ -149,7 +149,7 @@ export function SuppliersTab({
 
         <section style={styles.card}>
           <h2 style={styles.sectionTitle}>Supplier performance drilldown</h2>
-          <p style={styles.helper}>Uses the real GET /suppliers/:id/performance route. Available supplier options are loaded from GET /suppliers/available.</p>
+          <p style={styles.helper}>Review shipment history and delivery status for the selected supplier.</p>
           <SelectField
             label="Supplier"
             value={selectedSupplierPerformanceId}
