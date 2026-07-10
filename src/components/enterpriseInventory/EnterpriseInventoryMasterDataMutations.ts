@@ -225,6 +225,7 @@ export function useEnterpriseInventoryMasterDataMutations(
       patchEnterpriseInventoryRequest<ProductPackage>(
         `/products/${input.product_id}/packages/${packageId}`,
         buildProductPackagePayload(input),
+        input.version ?? undefined,
       ),
     onSuccess: mutationFeedback.resetting(
       "Product package barcode updated.",
@@ -236,9 +237,14 @@ export function useEnterpriseInventoryMasterDataMutations(
 
   const deleteProductPackageMutation = useMutation({
     mutationFn: (item: ProductPackage) =>
-      deleteEnterpriseInventoryRequest<{ message: string }>(
-        `/products/${item.product_id}/packages/${item.id}`,
-      ),
+      item.version !== undefined && item.version !== null
+        ? deleteEnterpriseInventoryVersionedRequest<{ message: string }>(
+            `/products/${item.product_id}/packages/${item.id}`,
+            item.version,
+          )
+        : deleteEnterpriseInventoryRequest<{ message: string }>(
+            `/products/${item.product_id}/packages/${item.id}`,
+          ),
     onSuccess: mutationFeedback.invalidating(
       "Product package barcode deleted.",
       ["enterprise-product-packages", "enterprise-products"],

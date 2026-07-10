@@ -22,6 +22,7 @@ export function createEnterpriseInventoryProductPackageEditingHandlers(
         barcode: item.barcode,
         units_per_package: String(item.units_per_package),
         is_default: Boolean(item.is_default),
+        version: item.version ?? null,
       });
       setEditingProductPackageId(item.id);
     },

@@ -122,7 +122,7 @@ function tenantMutationSuccessMessage(path: string, method: string): string {
   if (isProductPackageMutationPath(normalizedPath)) {
     if (normalizedMethod === 'POST') return 'Package barcode created successfully.';
     if (normalizedMethod === 'DELETE') return 'Package barcode deleted successfully.';
-    return 'Package barcode saved successfully.';
+    return 'Package barcode updated successfully.';
   }
 
   if (normalizedPath.includes('/stock-transfers')) {

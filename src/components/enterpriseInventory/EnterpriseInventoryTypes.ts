@@ -1197,6 +1197,7 @@ export type ProductPackageForm = {
   barcode: string;
   units_per_package: string;
   is_default: boolean;
+  version?: number | string | null;
 };
 
 export type BarcodeLabelForm = {
