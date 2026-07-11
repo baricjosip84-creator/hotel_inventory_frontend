@@ -153,7 +153,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildBarcodeLabelPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Barcode label created.",
+      "Barcode label created successfully.",
       ["enterprise-barcode-labels"],
       resetBarcodeLabelForm,
     ),
