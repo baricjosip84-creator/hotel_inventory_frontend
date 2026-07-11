@@ -130,16 +130,28 @@ export function buildApprovalQueue(
 ) {
   const requisitionRows = requisitions
     .filter((item) => ['draft', 'submitted', 'pending_approval'].includes(item.status))
-    .map((item) => ({
-      entity_type: 'department_requisition',
-      entity_id: item.id,
-      label: `${item.department} requisition`,
-      status: item.status,
-      created_at: item.created_at
-    }));
+    .map((item) => {
+      const items = item.items ?? [];
+      const requestedTotal = items.reduce((total, requisitionItem) => total + toNumber(requisitionItem.requested_quantity), 0);
+      const firstProductName = items[0]?.product_name;
+      const detail = firstProductName
+        ? `${firstProductName}${items.length > 1 ? ` + ${items.length - 1} more` : ''} · Requested ${requestedTotal.toLocaleString()}`
+        : requestedTotal > 0
+          ? `Requested ${requestedTotal.toLocaleString()}`
+          : undefined;
+
+      return {
+        entity_type: 'department_requisition',
+        entity_id: item.id,
+        label: `${item.department} requisition`,
+        detail,
+        status: item.status,
+        created_at: item.created_at
+      };
+    });
 
   const cycleCountRows = cycleCounts
-    .filter((item) => ['draft', 'submitted', 'approved'].includes(item.status))
+    .filter((item) => ['draft', 'submitted', 'pending_approval'].includes(item.status))
     .map((item) => ({
       entity_type: 'cycle_count',
       entity_id: item.id,

@@ -105,9 +105,12 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildApprovalExecutionPayload(input),
       ),
     onSuccess: mutationFeedback.variable<ApprovalExecutionInput>(
-      (input) => `Approval ${input.action}.`,
+      (input) => input.action === "approved"
+        ? "Item approved successfully."
+        : "Item rejected successfully.",
       [
         "enterprise-requisitions",
+        "enterprise-cycle-counts",
         "enterprise-invoices",
         "enterprise-notifications",
       ],

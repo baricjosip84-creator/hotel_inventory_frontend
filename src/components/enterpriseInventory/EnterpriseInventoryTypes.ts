@@ -48,6 +48,7 @@ export type ApprovalRule = {
   id: string;
   entity_type: string;
   department?: string | null;
+  storage_location_id?: string | null;
   min_amount: number | string;
   max_amount?: number | string | null;
   required_role: string;
