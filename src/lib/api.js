@@ -64,16 +64,28 @@ function isProductPackageMutationPath(path) {
     const normalizedPath = path.toLowerCase();
     return normalizedPath.includes('/products/') && normalizedPath.includes('/packages');
 }
-function readMutationAction(body) {
+function readMutationStringField(body, field) {
     if (typeof body !== 'string')
         return null;
     try {
         const parsed = JSON.parse(body);
-        return typeof parsed.action === 'string' ? parsed.action.toLowerCase() : null;
+        const value = parsed[field];
+        return typeof value === 'string' ? value : null;
     }
     catch {
         return null;
     }
+}
+function readMutationAction(body) {
+    return readMutationStringField(body, 'action')?.toLowerCase() ?? null;
+}
+function barcodeLabelCreatedMessage(body) {
+    const barcodeType = readMutationStringField(body, 'barcode_type')?.toUpperCase();
+    if (barcodeType === 'QR')
+        return 'QR code label created successfully.';
+    if (barcodeType === 'EAN13')
+        return 'EAN-13 label created successfully.';
+    return 'Code 128 label created successfully.';
 }
 function tenantMutationActionLabel(path, method) {
     const normalizedPath = path.toLowerCase();
@@ -139,8 +151,14 @@ function tenantMutationSuccessMessage(path, method, body) {
     if (normalizedPath.endsWith('/enterprise-inventory/supplier-invoices') && normalizedMethod === 'POST') {
         return 'Supplier invoice created successfully.';
     }
-    if (normalizedPath.includes('/enterprise-inventory/barcode-labels') && normalizedMethod === 'POST') {
-        return 'Barcode label created successfully.';
+    if (normalizedPath.endsWith('/enterprise-inventory/barcode-labels/print-events') && normalizedMethod === 'POST') {
+        return 'Barcode label print dialog opened.';
+    }
+    if (normalizedPath.endsWith('/enterprise-inventory/barcode-labels') && normalizedMethod === 'POST') {
+        return barcodeLabelCreatedMessage(body);
+    }
+    if (normalizedPath.includes('/enterprise-inventory/barcode-labels/') && normalizedMethod === 'DELETE') {
+        return 'Barcode label retired successfully.';
     }
     if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
         if (normalizedMethod === 'POST')

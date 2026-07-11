@@ -49,6 +49,16 @@ function formatBarcodeType(value: string): string {
   return value;
 }
 
+function barcodeValueHelp(type: BarcodeSymbology): string {
+  if (type === 'EAN13') {
+    return 'Leave this empty to generate a valid EAN-13 value. You may also enter 12 digits and the check digit will be added automatically, or enter a complete valid 13-digit value.';
+  }
+  if (type === 'QR') {
+    return 'Leave this empty to generate an internal QR value, or enter the exact text you want the QR code to contain.';
+  }
+  return 'Leave this empty to generate an internal Code 128 value, or enter your own printable barcode value.';
+}
+
 function sanitizeFilename(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'barcode-label';
 }
@@ -230,13 +240,16 @@ export function LabelsTab({
               type="button"
               style={canWriteBarcodeLabels && barcodeLabelForm.product_id ? styles.secondarySmallButton : styles.disabledButton}
               disabled={!canWriteBarcodeLabels || !barcodeLabelForm.product_id}
-              onClick={() => setGeneratedValue(generateBarcodeValue(barcodeType))}
+              onClick={() => {
+                setBarcodeLabelForm((current) => ({ ...current, barcode_value: '' }));
+                setGeneratedValue(generateBarcodeValue(barcodeType));
+              }}
             >
               Generate another value
             </button>
           </div>
           <p style={{ ...styles.helper, marginBottom: 12 }}>
-            Leave the field empty to use the generated value shown in the preview. EAN-13 accepts 12 digits and adds the check digit automatically.
+            {barcodeValueHelp(barcodeType)}
           </p>
           <SelectField
             label="Label template"
@@ -281,7 +294,7 @@ export function LabelsTab({
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
             <h2 style={{ ...styles.cardTitle, marginBottom: 4 }}>Saved barcode labels</h2>
-            <p style={styles.helper}>Print, reprint, download, or retire operational labels.</p>
+            <p style={styles.helper}>Open browser print dialogs, download SVG files, or retire labels. Print requests count dialog openings; browsers cannot confirm physical printing.</p>
           </div>
           <button
             type="button"
@@ -313,7 +326,7 @@ export function LabelsTab({
                   <th style={styles.th}>Barcode</th>
                   <th style={styles.th}>Type</th>
                   <th style={styles.th}>Traceability</th>
-                  <th style={styles.th}>Prints</th>
+                  <th style={styles.th}>Print requests</th>
                   <th style={styles.th}>Created</th>
                   <th style={styles.th}>Actions</th>
                 </tr>
@@ -339,7 +352,7 @@ export function LabelsTab({
                     <td style={{ ...styles.td, minWidth: 190 }}>{labelTraceability(label)}</td>
                     <td style={styles.td}>
                       {Number(label.print_count || 0)}
-                      {label.last_printed_at ? <div style={styles.muted}>Last {formatDateTime(label.last_printed_at)}</div> : null}
+                      {label.last_printed_at ? <div style={styles.muted}>Last opened {formatDateTime(label.last_printed_at)}</div> : null}
                     </td>
                     <td style={styles.td}>{formatDateTime(label.created_at)}</td>
                     <td style={styles.td}>
@@ -370,12 +383,12 @@ export function LabelsTab({
                           style={!canWriteBarcodeLabels || deleteBarcodeLabelMutation.isPending ? styles.disabledButton : styles.dangerButton}
                           disabled={!canWriteBarcodeLabels || deleteBarcodeLabelMutation.isPending}
                           onClick={() => {
-                            if (window.confirm(`Delete barcode label ${label.barcode_value}? The retired code will stop resolving in scanners.`)) {
+                            if (window.confirm(`Retire barcode label ${label.barcode_value}? The retired code will stop resolving in scanners.`)) {
                               deleteBarcodeLabelMutation.mutate(label.id);
                             }
                           }}
                         >
-                          Delete
+                          Retire
                         </button>
                       </div>
                     </td>

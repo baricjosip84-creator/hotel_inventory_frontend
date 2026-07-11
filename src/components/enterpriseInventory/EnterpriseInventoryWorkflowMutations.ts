@@ -152,27 +152,33 @@ export function useEnterpriseInventoryWorkflowMutations({
         "/enterprise-inventory/barcode-labels",
         buildBarcodeLabelPayload(input),
       ),
-    onSuccess: mutationFeedback.resetting(
-      "Barcode label created successfully.",
-      ["enterprise-barcode-labels"],
-      resetBarcodeLabelForm,
-    ),
+    onSuccess: async (result, input) => {
+      await resetBarcodeLabelForm();
+      await mutationFeedback.variable<BarcodeLabelForm>(
+        (variables) => {
+          if (variables.barcode_type === "QR") return "QR code label created successfully.";
+          if (variables.barcode_type === "EAN13") return "EAN-13 label created successfully.";
+          return "Code 128 label created successfully.";
+        },
+        ["enterprise-barcode-labels"],
+      )(result, input);
+    },
     onError: mutationFeedback.error("Failed to create barcode label."),
   });
 
 
   const recordBarcodeLabelPrintsMutation = useMutation({
     mutationFn: (labelIds: string[]) =>
-      postEnterpriseInventoryRequest<{ printed_count: number; labels: BarcodeLabel[] }>(
+      postEnterpriseInventoryRequest<{ print_request_count: number; labels: BarcodeLabel[] }>(
         "/enterprise-inventory/barcode-labels/print-events",
         { label_ids: labelIds },
       ),
     onSuccess: mutationFeedback.result(
-      (result: { printed_count: number }) =>
-        `${result.printed_count} barcode label${result.printed_count === 1 ? "" : "s"} sent to print.`,
+      (result: { print_request_count: number }) =>
+        `Print dialog opened for ${result.print_request_count} barcode label${result.print_request_count === 1 ? "" : "s"}.`,
       ["enterprise-barcode-labels", "enterprise-audit"],
     ),
-    onError: mutationFeedback.error("Failed to record barcode label printing."),
+    onError: mutationFeedback.error("Failed to record the barcode label print request."),
   });
 
   const deleteBarcodeLabelMutation = useMutation({
@@ -181,10 +187,10 @@ export function useEnterpriseInventoryWorkflowMutations({
         `/enterprise-inventory/barcode-labels/${encodeURIComponent(labelId)}`,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Barcode label deleted successfully.",
+      "Barcode label retired successfully.",
       ["enterprise-barcode-labels", "enterprise-audit"],
     ),
-    onError: mutationFeedback.error("Failed to delete barcode label."),
+    onError: mutationFeedback.error("Failed to retire barcode label."),
   });
 
   const queueNotificationDeliveryMutation = useMutation({
