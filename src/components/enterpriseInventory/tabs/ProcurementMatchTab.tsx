@@ -113,6 +113,14 @@ export function ProcurementMatchTab({
   setPurchaseOrderShipmentForm,
   shipmentsQuery
 }: ProcurementMatchTabProps) {
+  const approvedPurchaseOrders = purchaseOrders.filter((purchaseOrder) => purchaseOrder.status === 'approved');
+  const approvedPurchaseOrdersLoading = purchaseOrdersQuery.isLoading;
+  const hasApprovedPurchaseOrders = approvedPurchaseOrders.length > 0;
+  const canCreateLinkedShipment = hasApprovedPurchaseOrders && Boolean(purchaseOrderShipmentForm.purchase_order_id) && !createShipmentFromPurchaseOrderMutation.isPending;
+  const linkedShipmentButtonStyle = canCreateLinkedShipment
+    ? styles.primaryButton
+    : { ...styles.primaryButton, background: '#9ca3af', cursor: 'not-allowed' };
+
   return (
     <section style={styles.grid}>
       <div style={styles.stack}>
@@ -134,13 +142,23 @@ export function ProcurementMatchTab({
             label="Approved purchase order"
             value={purchaseOrderShipmentForm.purchase_order_id}
             onChange={(value) => setPurchaseOrderShipmentForm((current) => ({ ...current, purchase_order_id: value }))}
-            options={purchaseOrders
-              .filter((purchaseOrder) => purchaseOrder.status === 'approved')
-              .map((purchaseOrder) => ({ value: purchaseOrder.id, label: purchaseOrderOptionLabel(purchaseOrder) }))}
+            options={approvedPurchaseOrders.map((purchaseOrder) => ({ value: purchaseOrder.id, label: purchaseOrderOptionLabel(purchaseOrder) }))}
             required
+            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders}
           />
-          <InputField label="Delivery date" type="date" value={purchaseOrderShipmentForm.delivery_date} onChange={(value) => setPurchaseOrderShipmentForm((current) => ({ ...current, delivery_date: value }))} />
-          <button type="submit" disabled={createShipmentFromPurchaseOrderMutation.isPending} style={styles.primaryButton}>Create linked shipment</button>
+          {approvedPurchaseOrdersLoading ? (
+            <p style={styles.helper}>Loading approved purchase orders…</p>
+          ) : hasApprovedPurchaseOrders ? null : (
+            <p style={styles.helper}>No approved purchase orders are available. Approve a purchase order before creating a linked shipment.</p>
+          )}
+          <InputField
+            label="Delivery date"
+            type="date"
+            value={purchaseOrderShipmentForm.delivery_date}
+            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders}
+            onChange={(value) => setPurchaseOrderShipmentForm((current) => ({ ...current, delivery_date: value }))}
+          />
+          <button type="submit" disabled={!canCreateLinkedShipment} style={linkedShipmentButtonStyle}>Create linked shipment</button>
         </form>
       </div>
 
