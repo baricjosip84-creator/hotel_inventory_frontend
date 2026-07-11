@@ -1382,10 +1382,26 @@ export default function ShipmentsPage() {
     });
   };
 
+  const canSubmitCreateShipment =
+    canManageShipments &&
+    Boolean(shipmentForm.supplier_id) &&
+    Boolean(shipmentForm.delivery_date) &&
+    !createShipmentMutation.isPending;
+
   const handleCreateShipment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPageError(null);
     setPageMessage(null);
+
+    if (!canManageShipments) {
+      setPageError('Your current role cannot create shipments.');
+      return;
+    }
+
+    if (!shipmentForm.supplier_id || !shipmentForm.delivery_date) {
+      setPageError('Select a supplier and delivery date before creating a shipment.');
+      return;
+    }
 
     createShipmentMutation.mutate(shipmentForm);
   };
@@ -1731,12 +1747,26 @@ export default function ShipmentsPage() {
           <div style={styles.formActionRow}>
             <button
               type="submit"
-              style={styles.primaryButton}
-              disabled={createShipmentMutation.isPending || !canManageShipments}
-              title={!canManageShipments ? 'Manager or admin role required' : undefined}
+              style={{
+                ...styles.primaryButton,
+                ...(!canSubmitCreateShipment ? styles.primaryButtonDisabled : {})
+              }}
+              disabled={!canSubmitCreateShipment}
+              title={
+                !canManageShipments
+                  ? 'Manager or admin role required'
+                  : !shipmentForm.supplier_id || !shipmentForm.delivery_date
+                    ? 'Select a supplier and delivery date first'
+                    : undefined
+              }
             >
               {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
             </button>
+            {!shipmentForm.supplier_id || !shipmentForm.delivery_date ? (
+              <p style={styles.fieldHint}>
+                Select a supplier and delivery date before creating a shipment.
+              </p>
+            ) : null}
           </div>
         </form>
       </section>
@@ -2705,6 +2735,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer',
     width: '100%'
+  },
+  primaryButtonDisabled: {
+    background: '#9ca3af',
+    cursor: 'not-allowed'
   },
   secondaryButton: {
     border: '1px solid #d1d5db',
