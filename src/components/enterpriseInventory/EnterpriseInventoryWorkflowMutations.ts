@@ -125,7 +125,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildSupplierCatalogPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Supplier catalog item saved.",
+      "Supplier catalog item saved successfully.",
       ["enterprise-supplier-catalog"],
       resetSupplierCatalogForm,
     ),
@@ -139,7 +139,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildSupplierInvoicePayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Supplier invoice created.",
+      "Supplier invoice created successfully.",
       ["enterprise-invoices", "enterprise-notifications"],
       resetSupplierInvoiceForm,
     ),

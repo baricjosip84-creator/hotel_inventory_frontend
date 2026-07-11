@@ -131,6 +131,12 @@ function tenantMutationSuccessMessage(path, method, body) {
             return 'Item rejected successfully.';
         return 'Approval action completed successfully.';
     }
+    if (normalizedPath.endsWith('/enterprise-inventory/supplier-catalog') && normalizedMethod === 'POST') {
+        return 'Supplier catalog item saved successfully.';
+    }
+    if (normalizedPath.endsWith('/enterprise-inventory/supplier-invoices') && normalizedMethod === 'POST') {
+        return 'Supplier invoice created successfully.';
+    }
     if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
         if (normalizedMethod === 'POST')
             return 'Requisition created successfully.';

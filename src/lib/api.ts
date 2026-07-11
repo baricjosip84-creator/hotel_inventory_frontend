@@ -137,6 +137,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Approval action completed successfully.';
   }
 
+  if (normalizedPath.endsWith('/enterprise-inventory/supplier-catalog') && normalizedMethod === 'POST') {
+    return 'Supplier catalog item saved successfully.';
+  }
+
+  if (normalizedPath.endsWith('/enterprise-inventory/supplier-invoices') && normalizedMethod === 'POST') {
+    return 'Supplier invoice created successfully.';
+  }
+
   if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
     if (normalizedMethod === 'POST') return 'Requisition created successfully.';
     if (normalizedMethod === 'DELETE') return 'Requisition deleted successfully.';

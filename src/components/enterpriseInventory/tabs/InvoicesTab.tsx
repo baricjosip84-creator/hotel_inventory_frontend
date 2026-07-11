@@ -88,7 +88,11 @@ function validRequiredNonNegativeNumber(value: string): boolean {
   return Number.isFinite(parsed) && parsed >= 0;
 }
 
-function formatAmount(value: number | string | null | undefined, currency = 'EUR'): string {
+function formatAmount(
+  value: number | string | null | undefined,
+  currency = 'EUR',
+  maximumFractionDigits = 4
+): string {
   if (value === null || value === undefined || value === '') return '-';
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
@@ -97,7 +101,7 @@ function formatAmount(value: number | string | null | undefined, currency = 'EUR
     return parsed.toLocaleString(undefined, {
       style: 'currency',
       currency: currency || 'EUR',
-      maximumFractionDigits: 4
+      maximumFractionDigits
     });
   } catch {
     return `${formatNumber(parsed)} ${currency || 'EUR'}`;
@@ -266,7 +270,7 @@ export function InvoicesTab({
             })(),
             formatBusinessLabel(item.status),
             formatBusinessLabel(item.variance_status),
-            formatAmount(item.total_amount, item.currency || 'EUR'),
+            formatAmount(item.total_amount, item.currency || 'EUR', 2),
             formatDate(item.invoice_date),
             formatDateTime(item.created_at)
           ])}
