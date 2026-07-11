@@ -67,7 +67,7 @@ export function LabelsTab({
         <InputField label="Batch number" value={barcodeLabelForm.batch_number} onChange={(value) => setBarcodeLabelForm((current) => ({ ...current, batch_number: value }))} />
         <InputField label="Expiry date" type="date" value={barcodeLabelForm.expiry_date} onChange={(value) => setBarcodeLabelForm((current) => ({ ...current, expiry_date: value }))} />
         {!barcodeLabelForm.product_id ? <p style={styles.helper}>Select a product before creating a label.</p> : null}
-        <button type="submit" disabled={!canCreateLabel} style={styles.primaryButton}>Create label</button>
+        <button type="submit" disabled={!canCreateLabel} style={canCreateLabel ? styles.primaryButton : styles.disabledButton}>Create label</button>
       </form>
 
       <section style={styles.card}>
