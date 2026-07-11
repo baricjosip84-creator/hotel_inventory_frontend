@@ -1,6 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
-import { formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
+import { formatDate, formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
 import type {
   Shipment,
   ShipmentBarcodeLookup,
@@ -28,6 +28,30 @@ type ReceivingSummary = {
   discrepancyRows: number;
   remainingUnits: number;
 };
+
+
+function formatReceivingStatus(status: string | null | undefined): string {
+  if (!status) return '-';
+  return status
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function shortenReceivingIdentifier(value: string | null | undefined, visibleStart = 10, visibleEnd = 6): string {
+  if (!value) return '-';
+  if (value.length <= visibleStart + visibleEnd + 3) return value;
+  return `${value.slice(0, visibleStart)}...${value.slice(-visibleEnd)}`;
+}
+
+function getShipmentReference(shipment: Shipment): string {
+  return shipment.po_number || shipment.linked_purchase_order_number || shipment.id;
+}
+
+function formatShipmentOptionLabel(shipment: Shipment): string {
+  return `${shortenReceivingIdentifier(getShipmentReference(shipment), 14, 6)} · ${shipment.supplier_name || shipment.supplier_id} · ${formatReceivingStatus(shipment.status)} · v${shipment.version}`;
+}
 
 type ReceivingTabProps = {
   barcodeLookupMutation: PendingMutation;
@@ -82,13 +106,17 @@ export function ReceivingTab({
     : receiveShipmentMutation.isPending
       ? 'Receipt posting is already running.'
       : '';
+  const activeShipmentOptions = shipments
+    .filter((shipment) => !['received', 'cancelled'].includes(shipment.status))
+    .map((shipment) => ({ value: shipment.id, label: formatShipmentOptionLabel(shipment) }));
+  const noActiveShipments = !shipmentsQuery.isLoading && activeShipmentOptions.length === 0;
 
   return (
     <section style={styles.grid}>
       <div style={styles.stack}>
         <section style={styles.card}>
           <h2 style={styles.cardTitle}>Shipment receiving controls</h2>
-          <p style={styles.helper}>Uses the real GET /shipment-items/:shipmentId, GET /shipments/:shipmentId/barcode/:barcode, POST /shipments/:id/receive, and POST /shipments/:id/finalize routes with the selected shipment version.</p>
+          <p style={styles.helper}>Monitor open receiving work, partial receipts, discrepancies, and remaining units for active shipments.</p>
           <div style={styles.statGrid}>
             <MetricCard label="Active shipments" value={receivingSummary.activeShipments} />
             <MetricCard label="Partial receipts" value={receivingSummary.partiallyReceived} />
@@ -99,9 +127,9 @@ export function ReceivingTab({
 
         <form onSubmit={handleShipmentBarcodeLookupSubmit} style={styles.card}>
           <h2 style={styles.cardTitle}>Barcode receiving scanner</h2>
-          <p style={styles.helper}>Uses the real GET /shipments/:shipmentId/barcode/:barcode route to resolve package barcodes against the selected shipment before posting receipt.</p>
-          <InputField label="Package / product barcode" value={shipmentBarcodeScanForm.barcode} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, barcode: value }))} required />
-          <InputField label="Packages scanned" type="number" min="1" value={shipmentBarcodeScanForm.package_count} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, package_count: value }))} required />
+          <p style={styles.helper}>Resolve package or product barcodes against the selected active shipment before posting a receipt.</p>
+          <InputField label="Package / product barcode" value={shipmentBarcodeScanForm.barcode} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, barcode: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
+          <InputField label="Packages scanned" type="number" min="1" value={shipmentBarcodeScanForm.package_count} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, package_count: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
           <button type="submit" disabled={barcodeLookupMutation.isPending || !selectedReceivingShipment} title={barcodeLookupDisabledReason || undefined} style={barcodeLookupDisabledReason ? styles.disabledButton : styles.secondaryButton}>Resolve barcode</button>
           {barcodeLookupDisabledReason ? <p style={styles.helper}>{barcodeLookupDisabledReason}</p> : null}
           {lastBarcodeLookup ? (
@@ -130,11 +158,11 @@ export function ReceivingTab({
               setLastBarcodeLookup(null);
               setShipmentBarcodeScanForm(emptyShipmentBarcodeScanForm);
             }}
-            options={shipments
-              .filter((shipment) => !['received', 'cancelled'].includes(shipment.status))
-              .map((shipment) => ({ value: shipment.id, label: `${shipment.po_number || shipment.linked_purchase_order_number || shipment.id} · ${shipment.supplier_name || shipment.supplier_id} · ${shipment.status} · v${shipment.version}` }))}
+            options={activeShipmentOptions}
             required
+            disabled={noActiveShipments}
           />
+          {noActiveShipments ? <p style={styles.helper}>No active shipments are available for receiving.</p> : null}
           <SelectField
             label="Shipment item"
             value={shipmentReceivingForm.product_id}
@@ -151,11 +179,12 @@ export function ReceivingTab({
               label: `${item.product_name || item.product_id} · ordered ${formatNumber(item.quantity)} · received ${formatNumber(item.received_quantity)}`
             }))}
             required
+            disabled={!selectedReceivingShipment || shipmentItemsQuery.isLoading}
           />
-          <SelectField label="Receive into location" value={shipmentReceivingForm.storage_location_id} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
-          <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required />
-          <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} />
-          <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} />
+          <SelectField label="Receive into location" value={shipmentReceivingForm.storage_location_id} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!selectedReceivingShipment} />
+          <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
           <button type="submit" disabled={receiveShipmentMutation.isPending || !selectedReceivingShipment} title={receiptDisabledReason || undefined} style={receiptDisabledReason ? styles.disabledButton : styles.primaryButton}>Post receipt</button>
           {receiptDisabledReason ? <p style={styles.helper}>{receiptDisabledReason}</p> : null}
         </form>
@@ -194,14 +223,14 @@ export function ReceivingTab({
             empty="No shipments found."
             headers={['Shipment', 'Supplier', 'Status', 'PO', 'Lines', 'Ordered', 'Received', 'Delivery', 'Version']}
             rows={shipments.map((shipment) => [
-              shipment.id,
+              shortenReceivingIdentifier(shipment.id),
               shipment.supplier_name || shipment.supplier_id,
-              shipment.status,
-              shipment.po_number || shipment.linked_purchase_order_number || '-',
+              formatReceivingStatus(shipment.status),
+              shortenReceivingIdentifier(shipment.po_number || shipment.linked_purchase_order_number, 14, 6),
               formatNumber(shipment.line_count),
               formatNumber(shipment.total_ordered_quantity),
               formatNumber(shipment.total_received_quantity),
-              shipment.delivery_date || '-',
+              formatDate(shipment.delivery_date),
               String(shipment.version)
             ])}
           />
