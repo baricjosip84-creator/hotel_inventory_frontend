@@ -30,6 +30,28 @@ type ReceivingSummary = {
 };
 
 
+
+function formatInventoryLabelTraceability(label: ShipmentBarcodeLookup['label']): string {
+  if (!label) return 'Product identification only';
+  const details = [
+    label.lot_number ? `Lot ${label.lot_number}` : '',
+    label.batch_number ? `Batch ${label.batch_number}` : '',
+    label.expiry_date ? `Expires ${formatDate(label.expiry_date)}` : ''
+  ].filter(Boolean);
+  return details.length ? details.join(' · ') : 'Product identification only';
+}
+
+function formatBarcodeMatchDetails(lookup: ShipmentBarcodeLookup): string {
+  const remaining = formatNumber(lookup.calculated?.remaining_quantity ?? lookup.remaining_quantity);
+  if (lookup.match_source === 'label' || lookup.label) {
+    return `Inventory label · ${formatInventoryLabelTraceability(lookup.label)} · 1 base unit per scan · remaining ${remaining}`;
+  }
+  if (lookup.package) {
+    return `Package ${lookup.package.package_name} · ${formatNumber(lookup.package.units_per_package)} units/package · remaining ${remaining}`;
+  }
+  return `Product barcode · 1 base unit per scan · remaining ${remaining}`;
+}
+
 function formatReceivingStatus(status: string | null | undefined): string {
   if (!status) return '-';
   return status
@@ -127,16 +149,17 @@ export function ReceivingTab({
 
         <form onSubmit={handleShipmentBarcodeLookupSubmit} style={styles.card}>
           <h2 style={styles.cardTitle}>Barcode receiving scanner</h2>
-          <p style={styles.helper}>Resolve package or product barcodes against the selected active shipment before posting a receipt.</p>
-          <InputField label="Package / product barcode" value={shipmentBarcodeScanForm.barcode} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, barcode: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
-          <InputField label="Packages scanned" type="number" min="1" value={shipmentBarcodeScanForm.package_count} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, package_count: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
+          <p style={styles.helper}>Resolve product, package, or inventory-label barcodes against the selected active shipment before posting a receipt.</p>
+          <InputField label="Product, package, or inventory-label barcode" value={shipmentBarcodeScanForm.barcode} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, barcode: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
+          <InputField label="Scan quantity" type="number" min="1" value={shipmentBarcodeScanForm.package_count} onChange={(value) => setShipmentBarcodeScanForm((current) => ({ ...current, package_count: value }))} required disabled={!selectedReceivingShipment || barcodeLookupMutation.isPending} />
+          <p style={styles.helper}>For a package barcode, enter the number of packages. For a product or inventory-label barcode, enter the number of base units.</p>
           <button type="submit" disabled={barcodeLookupMutation.isPending || !selectedReceivingShipment} title={barcodeLookupDisabledReason || undefined} style={barcodeLookupDisabledReason ? styles.disabledButton : styles.secondaryButton}>Resolve barcode</button>
           {barcodeLookupDisabledReason ? <p style={styles.helper}>{barcodeLookupDisabledReason}</p> : null}
           {lastBarcodeLookup ? (
             <div style={styles.metricCard}>
               <span style={styles.metricLabel}>Last barcode match</span>
               <strong style={styles.metricValue}>{lastBarcodeLookup.product_name || lastBarcodeLookup.product?.name || lastBarcodeLookup.product_id}</strong>
-              <span style={styles.metricHelper}>Package: {lastBarcodeLookup.package?.package_name || '-'} · units/package {formatNumber(lastBarcodeLookup.package?.units_per_package)} · remaining {formatNumber(lastBarcodeLookup.calculated?.remaining_quantity ?? lastBarcodeLookup.remaining_quantity)}</span>
+              <span style={styles.metricHelper}>{formatBarcodeMatchDetails(lastBarcodeLookup)}</span>
             </div>
           ) : null}
         </form>

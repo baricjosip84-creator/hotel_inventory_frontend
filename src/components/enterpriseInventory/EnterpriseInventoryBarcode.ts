@@ -15,9 +15,9 @@ export function createShipmentBarcodeLookupSuccessHandler(
   setStatusMessage: SetStatusMessage
 ) {
   return (result: ShipmentBarcodeLookup) => {
-    const scannedPackages = Math.max(toNumber(shipmentBarcodeScanForm.package_count), 1);
+    const scannedQuantity = Math.max(toNumber(shipmentBarcodeScanForm.package_count), 1);
     const unitsPerPackage = Math.max(toNumber(result.package?.units_per_package), 1);
-    const receivedUnits = result.package ? scannedPackages * unitsPerPackage : scannedPackages;
+    const receivedUnits = result.package ? scannedQuantity * unitsPerPackage : scannedQuantity;
 
     setLastBarcodeLookup(result);
     setShipmentReceivingForm((current) => ({
@@ -27,6 +27,11 @@ export function createShipmentBarcodeLookupSuccessHandler(
       quantity_received: String(receivedUnits),
       discrepancy_reason: result.discrepancy_reason || current.discrepancy_reason
     }));
-    setStatusMessage(`Barcode resolved to ${result.product_name || result.product?.name || result.product_id}; ${formatNumber(receivedUnits)} unit(s) staged for receipt.`);
+    const matchType = result.match_source === 'label' || result.label
+      ? 'Inventory label'
+      : result.package
+        ? 'Package barcode'
+        : 'Product barcode';
+    setStatusMessage(`${matchType} resolved to ${result.product_name || result.product?.name || result.product_id}; ${formatNumber(receivedUnits)} unit(s) staged for receipt.`);
   };
 }
