@@ -1,6 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField, styles } from '../EnterpriseInventoryShared';
-import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import type { DepartmentRequisition, ProductOption, RequisitionForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type RequisitionCreateMutation = {
@@ -21,6 +21,37 @@ type RequisitionsTabProps = {
   setRequisitionForm: Dispatch<SetStateAction<RequisitionForm>>;
   storageLocations: StorageLocationOption[];
 };
+
+function formatRequisitionLabel(value: string | null | undefined): string {
+  if (!value) return '-';
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatRequisitionProducts(item: DepartmentRequisition): string {
+  const productNames = (item.items ?? [])
+    .map((line) => line.product_name?.trim())
+    .filter((productName): productName is string => Boolean(productName));
+
+  if (productNames.length) return productNames.join(', ');
+  return '-';
+}
+
+function formatRequisitionQuantity(item: DepartmentRequisition): string {
+  if (item.requested_quantity !== null && item.requested_quantity !== undefined && item.requested_quantity !== '') {
+    return formatNumber(item.requested_quantity);
+  }
+
+  const total = (item.items ?? []).reduce((sum, line) => {
+    const parsed = Number(line.requested_quantity ?? 0);
+    return Number.isFinite(parsed) ? sum + parsed : sum;
+  }, 0);
+
+  return total > 0 ? formatNumber(total) : '-';
+}
 
 export function RequisitionsTab({
   createRequisitionMutation,
@@ -50,7 +81,19 @@ export function RequisitionsTab({
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Department requisitions</h2>
-        <DataTable loading={requisitionsQuery.isLoading} empty="No requisitions yet." headers={['Department', 'Status', 'Priority', 'Created']} rows={(requisitionsQuery.data ?? []).map((item) => [item.department, item.status, item.priority, formatDateTime(item.created_at)])} />
+        <DataTable
+          loading={requisitionsQuery.isLoading}
+          empty="No requisitions yet."
+          headers={['Department', 'Product', 'Quantity', 'Status', 'Priority', 'Created']}
+          rows={(requisitionsQuery.data ?? []).map((item) => [
+            item.department,
+            formatRequisitionProducts(item),
+            formatRequisitionQuantity(item),
+            formatRequisitionLabel(item.status),
+            formatRequisitionLabel(item.priority),
+            formatDateTime(item.created_at)
+          ])}
+        />
       </div>
     </section>
   );

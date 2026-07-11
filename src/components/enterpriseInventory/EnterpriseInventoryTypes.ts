@@ -22,11 +22,24 @@ export type CycleCount = {
   updated_at?: string | null;
 };
 
+export type DepartmentRequisitionItem = {
+  id?: string;
+  product_id?: string | null;
+  product_name?: string | null;
+  requested_quantity?: number | string | null;
+  approved_quantity?: number | string | null;
+  fulfilled_quantity?: number | string | null;
+};
+
 export type DepartmentRequisition = {
   id: string;
   department: string;
   status: string;
   priority: string;
+  storage_location_id?: string | null;
+  storage_location_name?: string | null;
+  requested_quantity?: number | string | null;
+  items?: DepartmentRequisitionItem[] | null;
   notes?: string | null;
   created_at: string;
 };
