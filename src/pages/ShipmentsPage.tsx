@@ -391,6 +391,14 @@ function formatDate(dateString: string | null | undefined): string {
   return date.toLocaleDateString();
 }
 
+function formatShipmentStatus(status: string | null | undefined): string {
+  if (!status) return '-';
+
+  return status
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function statusBadgeStyle(status: string): CSSProperties {
   if (status === 'received') {
     return {
@@ -513,7 +521,7 @@ export default function ShipmentsPage() {
       setSelectedScannerLocationId('');
       autoReceiveAttemptKeyRef.current = '';
       setPageError(null);
-      setPageMessage('Shipment created successfully.');
+      setPageMessage(null);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
@@ -1656,7 +1664,11 @@ export default function ShipmentsPage() {
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Shipment</h3>
 
-        <form onSubmit={handleCreateShipment} style={styles.formGrid}>
+        <form
+          onSubmit={handleCreateShipment}
+          style={styles.formGrid}
+          data-skip-global-action-feedback="true"
+        >
           <div>
             <label style={styles.label}>Supplier</label>
             <select
@@ -1948,7 +1960,7 @@ export default function ShipmentsPage() {
                   </div>
                   <div>
                     <strong>Status</strong>
-                    <div>{selectedShipment.status}</div>
+                    <div>{formatShipmentStatus(selectedShipment.status)}</div>
                   </div>
                   <div>
                     <strong>Supplier</strong>
