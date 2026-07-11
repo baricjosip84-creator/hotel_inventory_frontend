@@ -103,13 +103,21 @@ type ProductBarcodeLookupResponse = {
     name: string;
     barcode?: string | null;
   };
+  match_source?: 'label' | 'package' | 'product';
   package?: {
     id: string;
     package_name: string;
     barcode: string;
     units_per_package: number | string;
     is_default: boolean;
-  };
+  } | null;
+  label?: {
+    id: string;
+    barcode_value: string;
+    lot_number?: string | null;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+  } | null;
   calculated?: {
     remaining_quantity: number | string;
     remaining_packages_estimate: number | string;
@@ -125,7 +133,7 @@ function modeLabel(mode: ScannerMode): string {
 
 function modeDescription(mode: ScannerMode): string {
   return mode === 'product'
-    ? 'Scan a product barcode for the currently selected shipment.'
+    ? 'Scan a product, package, or inventory label barcode for the currently selected shipment.'
     : 'Scan a shipment QR code to open that shipment directly.';
 }
 
@@ -193,6 +201,7 @@ export default function ScannerPage() {
   const [resolvedProductName, setResolvedProductName] = useState<string | null>(null);
   const [resolvedPackageName, setResolvedPackageName] = useState<string | null>(null);
   const [resolvedUnitsPerPackage, setResolvedUnitsPerPackage] = useState<string | null>(null);
+  const [resolvedLabel, setResolvedLabel] = useState<ProductBarcodeLookupResponse['label']>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -246,11 +255,24 @@ export default function ScannerPage() {
         ? String(match.package.units_per_package)
         : null
     );
+    setResolvedLabel(match.label || null);
 
     const params = new URLSearchParams();
     params.set('shipmentId', match.shipment_id);
     params.set('itemId', match.shipment_item_id);
     params.set('scannedBarcode', decodedText);
+
+    if (match.match_source) {
+      params.set('matchSource', match.match_source);
+    }
+
+    if (match.label?.id) {
+      params.set('barcodeLabelId', match.label.id);
+      params.set('labelBarcode', match.label.barcode_value);
+      if (match.label.lot_number) params.set('labelLot', match.label.lot_number);
+      if (match.label.batch_number) params.set('labelBatch', match.label.batch_number);
+      if (match.label.expiry_date) params.set('labelExpiry', match.label.expiry_date);
+    }
 
     if (match.package?.id) {
       params.set('packageId', match.package.id);
@@ -286,6 +308,7 @@ export default function ScannerPage() {
     setResolvedProductName(null);
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
+    setResolvedLabel(null);
     setError(null);
     setIsResolving(true);
 
@@ -343,6 +366,7 @@ export default function ScannerPage() {
     setResolvedProductName(null);
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
+    setResolvedLabel(null);
 
     try {
       await stopScanner();
@@ -715,7 +739,7 @@ export default function ScannerPage() {
         />
       </section>
 
-      {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName || resolvedPackageName ? (
+      {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName || resolvedPackageName || resolvedLabel ? (
         <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.panelHeader}>
             <div style={styles.panelHeaderText}>
@@ -761,6 +785,18 @@ export default function ScannerPage() {
                 <div style={styles.resultValue}>
                   {resolvedPackageName}
                   {resolvedUnitsPerPackage ? ` · ${resolvedUnitsPerPackage} units/package` : ''}
+                </div>
+              </div>
+            ) : null}
+
+            {resolvedLabel ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>Matched inventory label</div>
+                <div style={styles.resultValue}>
+                  {resolvedLabel.barcode_value}
+                  {resolvedLabel.lot_number ? ` · Lot ${resolvedLabel.lot_number}` : ''}
+                  {resolvedLabel.batch_number ? ` · Batch ${resolvedLabel.batch_number}` : ''}
+                  {resolvedLabel.expiry_date ? ` · Expires ${new Date(resolvedLabel.expiry_date).toLocaleDateString()}` : ''}
                 </div>
               </div>
             ) : null}

@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { createEnterpriseInventoryFormSubmitHandler } from "./EnterpriseInventoryFormHandlers";
 import { createEnterpriseInventoryProductPackageEditingHandlers } from "./EnterpriseInventoryPackageEditing";
 import type {
@@ -145,11 +145,16 @@ export function createEnterpriseInventorySubmitHandlers({
       receiveShipmentMutation.mutate(shipmentReceivingForm);
     });
 
-  const handleBarcodeLabelSubmit = createEnterpriseInventoryFormSubmitHandler(
-    () => {
-      createBarcodeLabelMutation.mutate(barcodeLabelForm);
-    },
-  );
+  const handleBarcodeLabelSubmit = (
+    event: FormEvent<HTMLFormElement>,
+    generatedBarcodeValue?: string,
+  ) => {
+    event.preventDefault();
+    createBarcodeLabelMutation.mutate({
+      ...barcodeLabelForm,
+      barcode_value: generatedBarcodeValue || barcodeLabelForm.barcode_value.trim() || "",
+    });
+  };
 
   const handleProductPackageSubmit = createEnterpriseInventoryFormSubmitHandler(
     () => {

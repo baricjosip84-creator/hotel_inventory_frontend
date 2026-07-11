@@ -37,6 +37,8 @@ export function EnterpriseInventoryCatalogSupportPanels({
     cancelEditProductPackage,
     createAttachmentMutation,
     createBarcodeLabelMutation,
+    recordBarcodeLabelPrintsMutation,
+    deleteBarcodeLabelMutation,
     createProductPackageMutation,
     deleteProductPackageMutation,
     handleAttachmentSubmit,
@@ -52,6 +54,8 @@ export function EnterpriseInventoryCatalogSupportPanels({
           barcodeLabelForm={barcodeLabelForm}
           barcodeLabelsQuery={barcodeLabelsQuery}
           createBarcodeLabelMutation={createBarcodeLabelMutation}
+          recordBarcodeLabelPrintsMutation={recordBarcodeLabelPrintsMutation}
+          deleteBarcodeLabelMutation={deleteBarcodeLabelMutation}
           products={products}
           setBarcodeLabelForm={setBarcodeLabelForm}
           onBarcodeLabelSubmit={handleBarcodeLabelSubmit}

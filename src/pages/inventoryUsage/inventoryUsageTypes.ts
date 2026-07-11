@@ -330,6 +330,12 @@ export type InventoryUsageBarcodeResponse = {
     units_per_package?: number | string | null;
     package_count?: number | string | null;
     matched_package_barcode?: boolean;
+    matched_label_barcode?: boolean;
+    barcode_label_id?: string | null;
+    lot_number?: string | null;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+    match_source?: 'label' | 'package' | 'product' | string;
   };
 };
 

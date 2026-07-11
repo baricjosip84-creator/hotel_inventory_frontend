@@ -14,7 +14,7 @@ import {
   buildSupplierInvoicePayload,
 } from "./EnterpriseInventoryPayloads";
 import { refreshSystemContextQueries } from "./EnterpriseInventoryRefresh";
-import { postEnterpriseInventoryRequest } from "./EnterpriseInventoryRequests";
+import { deleteEnterpriseInventoryRequest, postEnterpriseInventoryRequest } from "./EnterpriseInventoryRequests";
 import type {
   AlertForm,
   AlertItem,
@@ -160,6 +160,33 @@ export function useEnterpriseInventoryWorkflowMutations({
     onError: mutationFeedback.error("Failed to create barcode label."),
   });
 
+
+  const recordBarcodeLabelPrintsMutation = useMutation({
+    mutationFn: (labelIds: string[]) =>
+      postEnterpriseInventoryRequest<{ printed_count: number; labels: BarcodeLabel[] }>(
+        "/enterprise-inventory/barcode-labels/print-events",
+        { label_ids: labelIds },
+      ),
+    onSuccess: mutationFeedback.result(
+      (result: { printed_count: number }) =>
+        `${result.printed_count} barcode label${result.printed_count === 1 ? "" : "s"} sent to print.`,
+      ["enterprise-barcode-labels", "enterprise-audit"],
+    ),
+    onError: mutationFeedback.error("Failed to record barcode label printing."),
+  });
+
+  const deleteBarcodeLabelMutation = useMutation({
+    mutationFn: (labelId: string) =>
+      deleteEnterpriseInventoryRequest<{ message: string }>(
+        `/enterprise-inventory/barcode-labels/${encodeURIComponent(labelId)}`,
+      ),
+    onSuccess: mutationFeedback.invalidating(
+      "Barcode label deleted successfully.",
+      ["enterprise-barcode-labels", "enterprise-audit"],
+    ),
+    onError: mutationFeedback.error("Failed to delete barcode label."),
+  });
+
   const queueNotificationDeliveryMutation = useMutation({
     mutationFn: (input: NotificationDeliveryForm) =>
       postEnterpriseInventoryRequest<NotificationDelivery>(
@@ -279,6 +306,8 @@ export function useEnterpriseInventoryWorkflowMutations({
     createSupplierCatalogMutation,
     createSupplierInvoiceMutation,
     createBarcodeLabelMutation,
+    recordBarcodeLabelPrintsMutation,
+    deleteBarcodeLabelMutation,
     queueNotificationDeliveryMutation,
     processNotificationDeliveriesMutation,
     createAlertMutation,

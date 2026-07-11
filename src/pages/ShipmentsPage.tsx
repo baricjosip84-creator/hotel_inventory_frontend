@@ -160,6 +160,12 @@ type PendingAutoReceive = {
   unitsPerPackage: number | null;
   remainingPackagesEstimate: number | null;
   canReceiveOneFullPackage: boolean | null;
+  matchSource: string | null;
+  barcodeLabelId: string | null;
+  labelBarcode: string | null;
+  labelLot: string | null;
+  labelBatch: string | null;
+  labelExpiry: string | null;
 };
 
 async function fetchShipments(): Promise<ShipmentSummary[]> {
@@ -930,6 +936,12 @@ export default function ShipmentsPage() {
     const unitsPerPackageFromQuery = searchParams.get('unitsPerPackage');
     const remainingPackagesEstimateFromQuery = searchParams.get('remainingPackagesEstimate');
     const canReceiveOneFullPackageFromQuery = searchParams.get('canReceiveOneFullPackage');
+    const matchSourceFromQuery = searchParams.get('matchSource');
+    const barcodeLabelIdFromQuery = searchParams.get('barcodeLabelId');
+    const labelBarcodeFromQuery = searchParams.get('labelBarcode');
+    const labelLotFromQuery = searchParams.get('labelLot');
+    const labelBatchFromQuery = searchParams.get('labelBatch');
+    const labelExpiryFromQuery = searchParams.get('labelExpiry');
     const parsedUnitsPerPackage = unitsPerPackageFromQuery ? Number(unitsPerPackageFromQuery) : null;
     const parsedRemainingPackagesEstimate = remainingPackagesEstimateFromQuery
       ? Number(remainingPackagesEstimateFromQuery)
@@ -947,9 +959,16 @@ export default function ShipmentsPage() {
 
       if (!locationIdFromQuery) {
         setPendingAutoReceive(null);
+        const labelTraceability = [
+          labelLotFromQuery ? `Lot ${labelLotFromQuery}` : '',
+          labelBatchFromQuery ? `Batch ${labelBatchFromQuery}` : '',
+          labelExpiryFromQuery ? `Expires ${new Date(labelExpiryFromQuery).toLocaleDateString()}` : ''
+        ].filter(Boolean).join(' · ');
         setPageMessage(
           scannedBarcode
-            ? `Product barcode ${scannedBarcode} matched inside selected shipment. Select a default scan location before receiving.`
+            ? barcodeLabelIdFromQuery
+              ? `Inventory label ${labelBarcodeFromQuery || scannedBarcode} matched${labelTraceability ? ` · ${labelTraceability}` : ''}. Select a default scan location before receiving.`
+              : `Product barcode ${scannedBarcode} matched inside selected shipment. Select a default scan location before receiving.`
             : 'Shipment item matched from scanner. Select a default scan location before receiving.'
         );
       } else {
@@ -966,14 +985,28 @@ export default function ShipmentsPage() {
           canReceiveOneFullPackage:
             canReceiveOneFullPackageFromQuery === null
               ? null
-              : canReceiveOneFullPackageFromQuery === 'true'
+              : canReceiveOneFullPackageFromQuery === 'true',
+          matchSource: matchSourceFromQuery,
+          barcodeLabelId: barcodeLabelIdFromQuery,
+          labelBarcode: labelBarcodeFromQuery,
+          labelLot: labelLotFromQuery,
+          labelBatch: labelBatchFromQuery,
+          labelExpiry: labelExpiryFromQuery
         });
+
+        const labelTraceability = [
+          labelLotFromQuery ? `Lot ${labelLotFromQuery}` : '',
+          labelBatchFromQuery ? `Batch ${labelBatchFromQuery}` : '',
+          labelExpiryFromQuery ? `Expires ${new Date(labelExpiryFromQuery).toLocaleDateString()}` : ''
+        ].filter(Boolean).join(' · ');
 
         setPageMessage(
           scannedBarcode
-            ? packageNameFromQuery && unitsPerPackageFromQuery
-              ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
-              : `Product barcode ${scannedBarcode} matched inside selected shipment.`
+            ? barcodeLabelIdFromQuery
+              ? `Inventory label ${labelBarcodeFromQuery || scannedBarcode} matched inside selected shipment${labelTraceability ? ` · ${labelTraceability}` : ''}.`
+              : packageNameFromQuery && unitsPerPackageFromQuery
+                ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
+                : `Product barcode ${scannedBarcode} matched inside selected shipment.`
             : 'Shipment item matched from scanner.'
         );
       }
@@ -995,6 +1028,12 @@ export default function ShipmentsPage() {
     nextParams.delete('unitsPerPackage');
     nextParams.delete('remainingPackagesEstimate');
     nextParams.delete('canReceiveOneFullPackage');
+    nextParams.delete('matchSource');
+    nextParams.delete('barcodeLabelId');
+    nextParams.delete('labelBarcode');
+    nextParams.delete('labelLot');
+    nextParams.delete('labelBatch');
+    nextParams.delete('labelExpiry');
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
@@ -1108,6 +1147,7 @@ export default function ShipmentsPage() {
       matchedItem.id,
       pendingAutoReceive.scannedBarcode || '',
       pendingAutoReceive.packageId || '',
+      pendingAutoReceive.barcodeLabelId || '',
       String(pendingAutoReceive.unitsPerPackage ?? '')
     ].join(':');
 
@@ -1172,9 +1212,11 @@ export default function ShipmentsPage() {
     setPageMessage(
       shouldReceiveByPackage
         ? `${pendingAutoReceive.packageName || 'Scanned package'} matched. Auto receiving 1 package (${formatQuantity(baseQuantityToReceive)} base units)...`
-        : pendingAutoReceive.scannedBarcode
-          ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
-          : `Scanner matched item. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+        : pendingAutoReceive.barcodeLabelId
+          ? `Inventory label ${pendingAutoReceive.labelBarcode || pendingAutoReceive.scannedBarcode || ''} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+          : pendingAutoReceive.scannedBarcode
+            ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+            : `Scanner matched item. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
     );
 
     receiveShipmentMutation.mutate({

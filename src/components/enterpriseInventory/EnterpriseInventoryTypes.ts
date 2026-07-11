@@ -182,13 +182,18 @@ export type BarcodeLabel = {
   id: string;
   product_id: string;
   product_name?: string | null;
+  product_unit?: string | null;
   barcode_value: string;
   barcode_type: string;
   label_template?: string | null;
   lot_number?: string | null;
   batch_number?: string | null;
   expiry_date?: string | null;
+  is_active?: boolean;
+  print_count?: number | string | null;
+  last_printed_at?: string | null;
   created_at: string;
+  version?: number | string | null;
 };
 
 export type ProductOption = {
@@ -1103,6 +1108,7 @@ export type ShipmentBarcodeLookup = {
   product_name?: string | null;
   barcode: string;
   remaining_quantity?: number | string | null;
+  match_source?: 'label' | 'package' | 'product' | string;
   product?: {
     id: string;
     name?: string | null;
@@ -1114,7 +1120,14 @@ export type ShipmentBarcodeLookup = {
     barcode: string;
     units_per_package: number | string;
     is_default: boolean;
-  };
+  } | null;
+  label?: {
+    id: string;
+    barcode_value: string;
+    lot_number?: string | null;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+  } | null;
   calculated?: {
     remaining_quantity?: number | string | null;
     remaining_packages_estimate?: number | string | null;

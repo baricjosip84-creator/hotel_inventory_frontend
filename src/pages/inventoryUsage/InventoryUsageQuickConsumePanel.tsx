@@ -73,6 +73,15 @@ const createClientScanId = () => {
   });
 };
 
+const formatBarcodeTraceability = (match?: InventoryUsageBarcodeResponse['barcode_match']): string => {
+  if (!match?.matched_label_barcode) return '';
+  return [
+    match.lot_number ? `Lot ${match.lot_number}` : '',
+    match.batch_number ? `Batch ${match.batch_number}` : '',
+    match.expiry_date ? `Expiry ${new Date(match.expiry_date).toLocaleDateString()}` : ''
+  ].filter(Boolean).join(' · ');
+};
+
 const formatPolicyReason = (reason: string) => {
   switch (reason) {
     case 'missing_stock_row':
@@ -756,8 +765,13 @@ export function InventoryUsageQuickConsumePanel({
         <div style={styles.importPanel}>
           <strong>{previewResult.barcode_match?.product_name || previewResult.barcode_match?.product_id}</strong>
           <p style={styles.sectionDescription}>
-            {previewResult.barcode_match?.package_name ? `${previewResult.barcode_match.package_name} · ` : ''}
-            {toNumber(previewResult.preview.package_count)} package(s) = {toNumber(previewResult.preview.quantity_to_consume)} {previewResult.barcode_match?.product_unit || 'units'}.
+            {previewResult.barcode_match?.matched_label_barcode
+              ? 'Inventory label · '
+              : previewResult.barcode_match?.package_name
+                ? `${previewResult.barcode_match.package_name} · `
+                : ''}
+            {toNumber(previewResult.preview.package_count)} {previewResult.barcode_match?.matched_label_barcode ? 'label(s)' : 'package(s)'} = {toNumber(previewResult.preview.quantity_to_consume)} {previewResult.barcode_match?.product_unit || 'units'}.
+            {formatBarcodeTraceability(previewResult.barcode_match) ? ` ${formatBarcodeTraceability(previewResult.barcode_match)}.` : ''}
             {previewResult.preview.storage_location_name ? ` Location: ${previewResult.preview.storage_location_name}.` : ''}
             Current stock {toNumber(previewResult.preview.current_quantity)} → projected {toNumber(previewResult.preview.resulting_quantity)}.
           </p>
@@ -902,7 +916,11 @@ export function InventoryUsageQuickConsumePanel({
       {result?.barcode_match ? (
         <p style={styles.successText}>
           {result.idempotent_replay ? 'Already recorded' : 'Recorded'} {result.stock?.previous_quantity} → {result.stock?.new_quantity} for {result.barcode_match.product_name || result.barcode_match.product_id}
-          {result.barcode_match.package_name ? ` (${result.barcode_match.package_name})` : ''}.
+          {result.barcode_match.matched_label_barcode
+            ? ` (inventory label${formatBarcodeTraceability(result.barcode_match) ? ` · ${formatBarcodeTraceability(result.barcode_match)}` : ''})`
+            : result.barcode_match.package_name
+              ? ` (${result.barcode_match.package_name})`
+              : ''}.
         </p>
       ) : null}
     </section>
