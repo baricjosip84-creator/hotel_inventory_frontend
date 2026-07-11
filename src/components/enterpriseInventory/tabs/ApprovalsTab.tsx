@@ -156,6 +156,7 @@ export function ApprovalsTab({
                         <div style={styles.actions}>
                           <button
                             type="button"
+                            data-skip-global-action-feedback="true"
                             style={styles.smallButton}
                             disabled={executeApprovalMutation.isPending}
                             onClick={() => handleApprovalAction(item, 'approved')}
@@ -164,6 +165,7 @@ export function ApprovalsTab({
                           </button>
                           <button
                             type="button"
+                            data-skip-global-action-feedback="true"
                             style={styles.dangerButton}
                             disabled={executeApprovalMutation.isPending}
                             onClick={() => handleApprovalAction(item, 'rejected')}

@@ -86,6 +86,17 @@ function isProductPackageMutationPath(path: string): boolean {
   return normalizedPath.includes('/products/') && normalizedPath.includes('/packages');
 }
 
+function readMutationAction(body: BodyInit | null | undefined): string | null {
+  if (typeof body !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(body) as { action?: unknown };
+    return typeof parsed.action === 'string' ? parsed.action.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 function tenantMutationActionLabel(path: string, method: string): string {
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
@@ -115,9 +126,16 @@ function tenantMutationActionLabel(path: string, method: string): string {
   return 'Request';
 }
 
-function tenantMutationSuccessMessage(path: string, method: string): string {
+function tenantMutationSuccessMessage(path: string, method: string, body?: BodyInit | null): string {
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
+
+  if (normalizedPath.endsWith('/enterprise-inventory/approvals/execute') && normalizedMethod === 'POST') {
+    const action = readMutationAction(body);
+    if (action === 'approved') return 'Item approved successfully.';
+    if (action === 'rejected') return 'Item rejected successfully.';
+    return 'Approval action completed successfully.';
+  }
 
   if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
     if (normalizedMethod === 'POST') return 'Requisition created successfully.';
@@ -706,7 +724,7 @@ export async function apiRequest<T>(
   try {
     const result = await parseResponse<T>(response);
     if (shouldShowMutationFeedback) {
-      dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method) });
+      dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body) });
     }
     return result;
   } catch (error) {

@@ -64,6 +64,17 @@ function isProductPackageMutationPath(path) {
     const normalizedPath = path.toLowerCase();
     return normalizedPath.includes('/products/') && normalizedPath.includes('/packages');
 }
+function readMutationAction(body) {
+    if (typeof body !== 'string')
+        return null;
+    try {
+        const parsed = JSON.parse(body);
+        return typeof parsed.action === 'string' ? parsed.action.toLowerCase() : null;
+    }
+    catch {
+        return null;
+    }
+}
 function tenantMutationActionLabel(path, method) {
     const normalizedPath = path.toLowerCase();
     const normalizedMethod = method.toUpperCase();
@@ -109,9 +120,17 @@ function tenantMutationActionLabel(path, method) {
         return 'Item';
     return 'Request';
 }
-function tenantMutationSuccessMessage(path, method) {
+function tenantMutationSuccessMessage(path, method, body) {
     const normalizedPath = path.toLowerCase();
     const normalizedMethod = method.toUpperCase();
+    if (normalizedPath.endsWith('/enterprise-inventory/approvals/execute') && normalizedMethod === 'POST') {
+        const action = readMutationAction(body);
+        if (action === 'approved')
+            return 'Item approved successfully.';
+        if (action === 'rejected')
+            return 'Item rejected successfully.';
+        return 'Approval action completed successfully.';
+    }
     if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
         if (normalizedMethod === 'POST')
             return 'Requisition created successfully.';
@@ -578,7 +597,7 @@ export async function apiRequest(path, options = {}) {
     try {
         const result = await parseResponse(response);
         if (shouldShowMutationFeedback) {
-            dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method) });
+            dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body) });
         }
         return result;
     }
