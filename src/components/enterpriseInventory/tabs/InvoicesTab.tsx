@@ -158,8 +158,8 @@ export function InvoicesTab({
   };
 
   return (
-    <section style={styles.grid}>
-      <div style={styles.stack}>
+    <section style={styles.stack}>
+      <div style={styles.grid}>
         <form
           onSubmit={handleSupplierCatalogSubmit}
           style={styles.card}
@@ -190,28 +190,6 @@ export function InvoicesTab({
           </button>
         </form>
 
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Supplier catalog</h2>
-          <DataTable
-            loading={supplierCatalogQuery.isLoading}
-            empty="No supplier catalog items yet."
-            headers={['Supplier', 'Product', 'SKU', 'Cost', 'Lead time', 'MOQ', 'Preferred']}
-            rows={(supplierCatalogQuery.data ?? []).map((item) => [
-              item.supplier_name || item.supplier_id,
-              item.product_name || item.product_id,
-              item.supplier_sku || '-',
-              item.latest_unit_cost === null || item.latest_unit_cost === undefined
-                ? '-'
-                : formatAmount(item.latest_unit_cost, item.latest_currency || 'EUR'),
-              `${formatNumber(item.lead_time_days)} days`,
-              formatNumber(item.min_order_quantity),
-              item.preferred ? 'Yes' : 'No'
-            ])}
-          />
-        </section>
-      </div>
-
-      <div style={styles.stack}>
         <form
           onSubmit={handleSupplierInvoiceSubmit}
           style={styles.card}
@@ -244,36 +222,56 @@ export function InvoicesTab({
             {createSupplierInvoiceMutation.isPending ? 'Creating…' : 'Create invoice'}
           </button>
         </form>
-
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Supplier invoices</h2>
-          <p style={styles.helper}>Track supplier invoices, linked purchase orders and shipments, and quantity or unit-cost variances.</p>
-          <DataTable
-            loading={invoicesQuery.isLoading}
-            empty="No supplier invoices yet."
-            headers={['Invoice', 'Supplier', 'PO', 'Shipment', 'Status', 'Variance', 'Total', 'Invoice date', 'Created']}
-            rows={(invoicesQuery.data ?? []).map((item) => [
-              item.invoice_number,
-              suppliers.find((supplier) => supplier.id === item.supplier_id)?.name || `Supplier ${shortId(item.supplier_id)}`,
-              purchaseOrders.find((purchaseOrder) => purchaseOrder.id === item.purchase_order_id)?.po_number
-                || (item.purchase_order_id ? `Purchase order ${shortId(item.purchase_order_id)}` : '-'),
-              (() => {
-                const shipment = shipments.find((candidate) => candidate.id === item.shipment_id);
-                if (shipment) {
-                  const reference = shipment.linked_purchase_order_number || shipment.po_number;
-                  return reference ? `Shipment for ${reference}` : `Shipment ${shortId(shipment.id)}`;
-                }
-                return item.shipment_id ? `Shipment ${shortId(item.shipment_id)}` : '-';
-              })(),
-              formatBusinessLabel(item.status),
-              formatBusinessLabel(item.variance_status),
-              formatAmount(item.total_amount, item.currency || 'EUR'),
-              formatDate(item.invoice_date),
-              formatDateTime(item.created_at)
-            ])}
-          />
-        </section>
       </div>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Supplier catalog</h2>
+        <DataTable
+          loading={supplierCatalogQuery.isLoading}
+          empty="No supplier catalog items yet."
+          headers={['Supplier', 'Product', 'Supplier SKU', 'Unit cost', 'Lead time', 'Minimum order', 'Preferred']}
+          rows={(supplierCatalogQuery.data ?? []).map((item) => [
+            item.supplier_name || item.supplier_id,
+            item.product_name || item.product_id,
+            item.supplier_sku || '-',
+            item.latest_unit_cost === null || item.latest_unit_cost === undefined
+              ? '-'
+              : formatAmount(item.latest_unit_cost, item.latest_currency || 'EUR'),
+            `${formatNumber(item.lead_time_days)} days`,
+            formatNumber(item.min_order_quantity),
+            item.preferred ? 'Yes' : 'No'
+          ])}
+        />
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={styles.cardTitle}>Supplier invoices</h2>
+        <p style={styles.helper}>Track supplier invoices, linked purchase orders and shipments, and quantity or unit-cost variances.</p>
+        <DataTable
+          loading={invoicesQuery.isLoading}
+          empty="No supplier invoices yet."
+          headers={['Invoice', 'Supplier', 'PO', 'Shipment', 'Status', 'Variance', 'Total', 'Invoice date', 'Created']}
+          rows={(invoicesQuery.data ?? []).map((item) => [
+            item.invoice_number,
+            suppliers.find((supplier) => supplier.id === item.supplier_id)?.name || `Supplier ${shortId(item.supplier_id)}`,
+            purchaseOrders.find((purchaseOrder) => purchaseOrder.id === item.purchase_order_id)?.po_number
+              || (item.purchase_order_id ? `Purchase order ${shortId(item.purchase_order_id)}` : '-'),
+            (() => {
+              const shipment = shipments.find((candidate) => candidate.id === item.shipment_id);
+              if (shipment) {
+                const reference = shipment.linked_purchase_order_number || shipment.po_number;
+                return reference ? `Shipment for ${reference}` : `Shipment ${shortId(shipment.id)}`;
+              }
+              return item.shipment_id ? `Shipment ${shortId(item.shipment_id)}` : '-';
+            })(),
+            formatBusinessLabel(item.status),
+            formatBusinessLabel(item.variance_status),
+            formatAmount(item.total_amount, item.currency || 'EUR'),
+            formatDate(item.invoice_date),
+            formatDateTime(item.created_at)
+          ])}
+        />
+      </section>
     </section>
   );
 }
