@@ -145,22 +145,6 @@ export function InvoicesTab({
       && supplierInvoiceForm.product_id
   ) && invoiceNumbersValid && !createSupplierInvoiceMutation.isPending;
 
-  const supplierPurchaseOrders = purchaseOrders.filter(
-    (purchaseOrder) => purchaseOrder.supplier_id === supplierInvoiceForm.supplier_id
-  );
-  const supplierShipments = shipments.filter((shipment) => {
-    if (shipment.supplier_id !== supplierInvoiceForm.supplier_id) return false;
-    if (!supplierInvoiceForm.purchase_order_id) return true;
-    return shipment.purchase_order_id === supplierInvoiceForm.purchase_order_id;
-  });
-
-  const purchaseOrderNames = new Map(
-    purchaseOrders.map((purchaseOrder) => [
-      purchaseOrder.id,
-      purchaseOrder.po_number || `Purchase order ${shortId(purchaseOrder.id)}`
-    ])
-  );
-
   const handleSupplierCatalogSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSaveCatalogItem) return;
@@ -237,48 +221,10 @@ export function InvoicesTab({
           <SelectField
             label="Supplier"
             value={supplierInvoiceForm.supplier_id}
-            onChange={(value) => setSupplierInvoiceForm((current) => ({
-              ...current,
-              supplier_id: value,
-              purchase_order_id: '',
-              shipment_id: ''
-            }))}
+            onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, supplier_id: value }))}
             options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
             required
           />
-          <SelectField
-            label="Purchase order"
-            value={supplierInvoiceForm.purchase_order_id}
-            onChange={(value) => setSupplierInvoiceForm((current) => ({
-              ...current,
-              purchase_order_id: value,
-              shipment_id: ''
-            }))}
-            options={supplierPurchaseOrders.map((purchaseOrder) => ({
-              value: purchaseOrder.id,
-              label: `${purchaseOrder.po_number || `Purchase order ${shortId(purchaseOrder.id)}`} — ${formatBusinessLabel(purchaseOrder.status)}`
-            }))}
-            disabled={!supplierInvoiceForm.supplier_id}
-          />
-          <SelectField
-            label="Shipment"
-            value={supplierInvoiceForm.shipment_id}
-            onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, shipment_id: value }))}
-            options={supplierShipments.map((shipment) => {
-              const purchaseOrderReference = shipment.linked_purchase_order_number
-                || shipment.po_number
-                || (shipment.purchase_order_id ? purchaseOrderNames.get(shipment.purchase_order_id) : null);
-              const reference = purchaseOrderReference
-                ? `for ${purchaseOrderReference}`
-                : shortId(shipment.id);
-              return {
-                value: shipment.id,
-                label: `Shipment ${reference} — ${formatBusinessLabel(shipment.status)} — ${formatDate(shipment.delivery_date)}`
-              };
-            })}
-            disabled={!supplierInvoiceForm.supplier_id}
-          />
-          <p style={styles.helper}>Purchase order and shipment links are optional, but they keep the invoice, order, and receipt chain traceable.</p>
           <InputField label="Invoice number" value={supplierInvoiceForm.invoice_number} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_number: value }))} required />
           <InputField label="Invoice date" type="date" value={supplierInvoiceForm.invoice_date} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_date: value }))} required />
           <InputField label="Subtotal" type="number" min="0" value={supplierInvoiceForm.subtotal_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, subtotal_amount: value }))} />
