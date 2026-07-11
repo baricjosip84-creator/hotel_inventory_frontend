@@ -87,7 +87,7 @@ function tenantMutationActionLabel(path, method) {
         return 'Shipment';
     if (normalizedPath.includes('/inventory-usage'))
         return 'Usage record';
-    if (normalizedPath.includes('/requisitions'))
+    if (normalizedPath.includes('/department-requisitions') || normalizedPath.includes('/requisitions'))
         return 'Requisition';
     if (normalizedPath.includes('/purchase-orders'))
         return 'Purchase order';
@@ -112,6 +112,13 @@ function tenantMutationActionLabel(path, method) {
 function tenantMutationSuccessMessage(path, method) {
     const normalizedPath = path.toLowerCase();
     const normalizedMethod = method.toUpperCase();
+    if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
+        if (normalizedMethod === 'POST')
+            return 'Requisition created successfully.';
+        if (normalizedMethod === 'DELETE')
+            return 'Requisition deleted successfully.';
+        return 'Requisition saved successfully.';
+    }
     if (isProductPackageMutationPath(normalizedPath)) {
         if (normalizedMethod === 'POST')
             return 'Package barcode created successfully.';

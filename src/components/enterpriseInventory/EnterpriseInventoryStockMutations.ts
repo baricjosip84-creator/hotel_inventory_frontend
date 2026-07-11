@@ -76,7 +76,7 @@ export function useEnterpriseInventoryStockMutations(
         buildRequisitionPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Department requisition created.",
+      "Requisition created successfully.",
       ["enterprise-requisitions", "enterprise-notifications"],
       () => setRequisitionForm(emptyRequisitionForm),
     ),

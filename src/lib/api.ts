@@ -100,7 +100,7 @@ function tenantMutationActionLabel(path: string, method: string): string {
   if (normalizedPath.includes('/stock')) return 'Stock';
   if (normalizedPath.includes('/shipments')) return 'Shipment';
   if (normalizedPath.includes('/inventory-usage')) return 'Usage record';
-  if (normalizedPath.includes('/requisitions')) return 'Requisition';
+  if (normalizedPath.includes('/department-requisitions') || normalizedPath.includes('/requisitions')) return 'Requisition';
   if (normalizedPath.includes('/purchase-orders')) return 'Purchase order';
   if (normalizedPath.includes('/alerts')) return 'Alert';
   if (normalizedPath.includes('/automation-schedules')) return 'Automation schedule';
@@ -118,6 +118,12 @@ function tenantMutationActionLabel(path: string, method: string): string {
 function tenantMutationSuccessMessage(path: string, method: string): string {
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
+
+  if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
+    if (normalizedMethod === 'POST') return 'Requisition created successfully.';
+    if (normalizedMethod === 'DELETE') return 'Requisition deleted successfully.';
+    return 'Requisition saved successfully.';
+  }
 
   if (isProductPackageMutationPath(normalizedPath)) {
     if (normalizedMethod === 'POST') return 'Package barcode created successfully.';
