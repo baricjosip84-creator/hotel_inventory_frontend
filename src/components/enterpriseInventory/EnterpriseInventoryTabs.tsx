@@ -62,6 +62,7 @@ export function EnterpriseInventoryTabs({ activeTab, onChange }: EnterpriseInven
               disabled={!canOpenTab}
               aria-disabled={!canOpenTab}
               title={canOpenTab ? label : disabledTitle}
+              data-skip-global-action-feedback="true"
             >
               {label}
             </button>

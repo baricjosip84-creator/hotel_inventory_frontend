@@ -71,6 +71,7 @@ export type SupplierInvoice = {
   shipment_id?: string | null;
   invoice_number: string;
   invoice_date: string;
+  currency?: string | null;
   status: string;
   total_amount: number | string;
   variance_status: string;

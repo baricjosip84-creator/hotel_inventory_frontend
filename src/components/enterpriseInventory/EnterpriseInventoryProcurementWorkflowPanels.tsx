@@ -33,7 +33,7 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
   const { products, purchaseOrders, shipments, storageLocations, suppliers } =
     stableData;
 
-  const { approvalQueue, selectedSupplierName } = viewData;
+  const { approvalQueue } = viewData;
 
   const {
     createApprovalRuleMutation,
@@ -75,7 +75,6 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
           invoicesQuery={invoicesQuery}
           products={products}
           purchaseOrders={purchaseOrders}
-          selectedSupplierName={selectedSupplierName}
           setSupplierCatalogForm={setSupplierCatalogForm}
           setSupplierInvoiceForm={setSupplierInvoiceForm}
           shipments={shipments}
