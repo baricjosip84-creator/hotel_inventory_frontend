@@ -269,6 +269,7 @@ function shouldSuppressGenericFormSubmitFeedback(form: HTMLFormElement): boolean
   return (
     label === 'create product' ||
     label === 'edit product' ||
+    label === 'create barcode label' ||
     label.endsWith(' product')
   );
 }

@@ -40,7 +40,7 @@ export function LabelsTab({
 
   return (
     <section style={styles.grid}>
-      <form onSubmit={onBarcodeLabelSubmit} style={styles.card}>
+      <form onSubmit={onBarcodeLabelSubmit} style={styles.card} data-skip-global-action-feedback="true">
         <h2 style={styles.cardTitle}>Create barcode label</h2>
         <SelectField
           label="Product"

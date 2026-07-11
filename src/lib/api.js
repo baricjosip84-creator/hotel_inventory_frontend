@@ -80,6 +80,8 @@ function tenantMutationActionLabel(path, method) {
     const normalizedMethod = method.toUpperCase();
     if (isProductPackageMutationPath(normalizedPath))
         return 'Package barcode';
+    if (normalizedPath.includes('/enterprise-inventory/barcode-labels'))
+        return 'Barcode label';
     if (normalizedPath.includes('/suppliers'))
         return 'Supplier';
     if (normalizedPath.includes('/products'))
@@ -136,6 +138,9 @@ function tenantMutationSuccessMessage(path, method, body) {
     }
     if (normalizedPath.endsWith('/enterprise-inventory/supplier-invoices') && normalizedMethod === 'POST') {
         return 'Supplier invoice created successfully.';
+    }
+    if (normalizedPath.includes('/enterprise-inventory/barcode-labels') && normalizedMethod === 'POST') {
+        return 'Barcode label created successfully.';
     }
     if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
         if (normalizedMethod === 'POST')
