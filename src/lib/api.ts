@@ -328,6 +328,11 @@ type MutationSafetyOptions = {
    * Allows rare intentionally non-idempotent writes to opt out explicitly.
    */
   skipIdempotencyKey?: boolean;
+  /**
+   * Suppresses the shared success/error toast when the page owns a richer,
+   * operation-specific feedback message for this mutation.
+   */
+  skipMutationFeedback?: boolean;
 };
 
 export type SafeMutationRequestInit = RequestInit & MutationSafetyOptions;
@@ -352,6 +357,7 @@ function withMutationSafetyHeaders(path: string, options: SafeMutationRequestIni
     idempotencyKey,
     version,
     skipIdempotencyKey,
+    skipMutationFeedback: _skipMutationFeedback,
     headers: originalHeaders,
     ...requestOptions
   } = options;
@@ -688,7 +694,7 @@ export async function apiMutationRequest<T>(
 
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: SafeMutationRequestInit = {}
 ): Promise<T> {
   /*
     WHAT CHANGED
@@ -723,7 +729,11 @@ export async function apiRequest<T>(
   const isRefreshRequest = isAuthRefreshRequest(path);
   const requestOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
-  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest;
+  const shouldShowMutationFeedback =
+    isWriteRequest(requestOptions) &&
+    !(options as SafeMutationRequestInit).skipMutationFeedback &&
+    !isLoginRequest &&
+    !isRefreshRequest;
   const currentAccessToken = getAccessToken();
 
   /*

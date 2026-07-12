@@ -299,7 +299,8 @@ async function receiveShipmentLine(input: {
     },
     body: JSON.stringify({
       items: [input.item]
-    })
+    }),
+    skipMutationFeedback: true
   });
 }
 
@@ -312,7 +313,8 @@ async function finalizeShipment(input: {
     headers: {
       'If-Match-Version': String(input.version)
     },
-    body: JSON.stringify({})
+    body: JSON.stringify({}),
+    skipMutationFeedback: true
   });
 }
 

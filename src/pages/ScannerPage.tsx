@@ -636,6 +636,7 @@ export default function ScannerPage() {
 
           <button
             type="button"
+            data-skip-global-action-feedback="true"
             onClick={handleChooseImage}
             disabled={scannerInputDisabled}
             title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
@@ -711,6 +712,7 @@ export default function ScannerPage() {
           <div className="app-actions" style={styles.formActions}>
             <button
               type="button"
+              data-skip-global-action-feedback="true"
               onClick={() => void handleManualSubmit()}
               disabled={manualSubmitDisabled}
               title={
@@ -730,6 +732,7 @@ export default function ScannerPage() {
 
             <button
               type="button"
+              data-skip-global-action-feedback="true"
               onClick={handleChooseImage}
               disabled={scannerInputDisabled}
               title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}

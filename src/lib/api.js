@@ -290,7 +290,7 @@ function createIdempotencyKey() {
     return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 function withMutationSafetyHeaders(path, options = {}) {
-    const { idempotencyKey, version, skipIdempotencyKey, headers: originalHeaders, ...requestOptions } = options;
+    const { idempotencyKey, version, skipIdempotencyKey, skipMutationFeedback: _skipMutationFeedback, headers: originalHeaders, ...requestOptions } = options;
     const headers = new Headers(originalHeaders || {});
     if (version !== undefined && !headers.has('If-Match-Version')) {
         headers.set('If-Match-Version', String(version));
@@ -593,7 +593,7 @@ export async function apiRequest(path, options = {}) {
     const isRefreshRequest = isAuthRefreshRequest(path);
     const requestOptions = withMutationSafetyHeaders(path, options);
     const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
-    const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest;
+    const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !options.skipMutationFeedback && !isLoginRequest && !isRefreshRequest;
     const currentAccessToken = getAccessToken();
     /*
       If the access token is already expired before the request starts, try a
