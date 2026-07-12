@@ -222,6 +222,11 @@ export type InventoryUsageReversalResponse = {
     reversal_stock_movement_id?: string | null;
     reversal_reason?: string | null;
   };
+  product?: {
+    id: string;
+    name: string;
+    unit?: string | null;
+  };
 };
 
 

@@ -144,7 +144,23 @@ export default function InventoryUsagePage() {
     }) => {
       return reverseInventoryUsageLog(usageLogId, reversalReason);
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
+      const productName = data.product?.name || "Inventory item";
+      const restoredQuantity = data.stock ? Number(data.stock.restored_quantity) : null;
+      const previousQuantity = data.stock ? Number(data.stock.previous_quantity) : null;
+      const newQuantity = data.stock ? Number(data.stock.new_quantity) : null;
+      const unit = data.product?.unit?.trim() || "units";
+      const stockSummary = restoredQuantity !== null
+        && previousQuantity !== null
+        && newQuantity !== null
+        ? ` ${restoredQuantity} ${unit} restored; stock ${previousQuantity} → ${newQuantity}.`
+        : "";
+      const completionMessage = `${data.message || "Inventory usage reversed successfully"} for ${productName}.${stockSummary}`;
+
+      window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
+        detail: { type: "success", message: completionMessage },
+      }));
+
       queryClient.invalidateQueries({
         queryKey: ["inventory-usage-summary-page"],
       });
@@ -163,6 +179,14 @@ export default function InventoryUsagePage() {
       queryClient.invalidateQueries({
         queryKey: ["inventory-usage-log-detail-page", variables.usageLogId],
       });
+    },
+    onError: (mutationError) => {
+      const message = mutationError instanceof Error
+        ? mutationError.message
+        : "Unexpected error while reversing inventory usage.";
+      window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
+        detail: { type: "error", message: `Inventory usage reversal failed: ${message}` },
+      }));
     },
   });
 

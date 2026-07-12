@@ -47,7 +47,8 @@ export async function reverseInventoryUsageLog(
 ): Promise<InventoryUsageReversalResponse> {
   return apiMutationRequest<InventoryUsageReversalResponse>(`/stock/usage/${usageLogId}/reverse`, {
     method: 'POST',
-    body: JSON.stringify({ reversal_reason: reversalReason })
+    body: JSON.stringify({ reversal_reason: reversalReason }),
+    skipMutationFeedback: true
   });
 }
 
