@@ -231,6 +231,7 @@ export default function InventoryUsagePage() {
         evidence_storage_path: payload.evidence_storage_path,
       }),
     onSuccess: (data, variables) => {
+      barcodePreviewMutation.reset();
       queryClient.invalidateQueries({
         queryKey: ["inventory-usage-summary-page"],
       });
@@ -434,6 +435,9 @@ export default function InventoryUsagePage() {
   };
 
   const handlePreviewBarcodeUsage = (payload: InventoryUsageBarcodeRequest) => {
+    barcodeUsageMutation.reset();
+    barcodeEvidenceAttachmentMutation.reset();
+    barcodePreviewMutation.reset();
     barcodePreviewMutation.mutate({
       barcode: payload.barcode.trim(),
       storage_location_id: payload.storage_location_id.trim(),
@@ -458,6 +462,8 @@ export default function InventoryUsagePage() {
   };
 
   const handleRecordBarcodeUsage = (payload: InventoryUsageBarcodeRequest) => {
+    barcodeUsageMutation.reset();
+    barcodeEvidenceAttachmentMutation.reset();
     barcodeUsageMutation.mutate({
       barcode: payload.barcode.trim(),
       storage_location_id: payload.storage_location_id.trim(),
