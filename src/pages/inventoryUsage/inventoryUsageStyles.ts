@@ -68,6 +68,14 @@ export const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: 'pointer'
   },
+  disabledButton: {
+    background: '#e2e8f0',
+    borderColor: '#cbd5e1',
+    color: '#64748b',
+    cursor: 'not-allowed',
+    opacity: 1,
+    boxShadow: 'none'
+  },
   filterCard: {
     padding: '1rem',
     border: '1px solid #dbe4ef',

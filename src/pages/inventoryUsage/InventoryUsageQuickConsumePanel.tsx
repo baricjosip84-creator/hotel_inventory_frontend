@@ -397,6 +397,62 @@ export function InventoryUsageQuickConsumePanel({
     && (!requiresMissingEvidenceAcknowledgement || missingEvidenceAcknowledged)
     && (!previewRequiresEvidenceAcknowledgement || missingEvidenceAcknowledged);
 
+  const missingPreviewRequirements = [
+    draft.barcode.trim().length === 0 ? 'scan, paste, or enter a barcode' : '',
+    draft.storage_location_id.trim().length === 0 ? 'select a stock location' : '',
+    packageCount <= 0 ? 'enter a scan quantity greater than zero' : ''
+  ].filter(Boolean);
+
+  const actionGuidance = (() => {
+    if (!canRecord) {
+      return 'Recording permission is required before previewing or consuming stock.';
+    }
+
+    if (missingPreviewRequirements.length > 0) {
+      return `Required before preview: ${missingPreviewRequirements.join(', ')}.`;
+    }
+
+    if (previewing) {
+      return 'Stock-impact preview is running. Wait for it to finish.';
+    }
+
+    if (recording) {
+      return 'Quick consume is being recorded. Wait for it to finish.';
+    }
+
+    if (requiresFreshPreview && !previewMatchesDraft) {
+      return hasStalePreview
+        ? 'The draft changed after the last preview. Preview stock impact again before quick consume.'
+        : 'Preview stock impact first. Quick consume remains disabled until this exact draft passes preview.';
+    }
+
+    if (criticalAlertBlocksSubmit) {
+      return 'Quick consume is blocked by an unresolved critical alert.';
+    }
+
+    if (closedPeriodBlocksSubmit) {
+      return 'Quick consume is blocked because the selected usage time is inside a closed period.';
+    }
+
+    if (missingStockRowBlocksSubmit) {
+      return 'Quick consume is blocked because no stock row exists at the selected location.';
+    }
+
+    if (insufficientStockBlocksSubmit) {
+      return 'Quick consume is blocked because the requested quantity exceeds available stock.';
+    }
+
+    if ((activePreviewRisk && !riskAcknowledged) || (previewRequiresEvidenceAcknowledgement && !missingEvidenceAcknowledged) || (requiresMissingEvidenceAcknowledgement && !missingEvidenceAcknowledged)) {
+      return 'Complete the required acknowledgement before quick consume.';
+    }
+
+    if (canSubmit) {
+      return 'Preview is current. Quick consume is ready.';
+    }
+
+    return 'Complete the required fields and preview this draft before quick consume.';
+  })();
+
   const updateDraft = (patch: Partial<InventoryUsageBarcodeRequest>) => {
     setDraft((current) => ({ ...current, ...patch }));
     setRiskAcknowledged(false);
@@ -714,21 +770,32 @@ export function InventoryUsageQuickConsumePanel({
           ) : draftConsumedAt === '' && previewMatchesDraft ? (
             <p style={styles.sectionDescription}>Preview checked the current server-side usage timestamp because no manual consumed-at value is set.</p>
           ) : null}
+          <p style={canSubmit ? styles.successText : styles.warningText}>{actionGuidance}</p>
           {onPreviewBarcodeUsage ? (
             <button
               type="button"
-              style={styles.secondaryButton}
+              style={{
+                ...styles.secondaryButton,
+                ...(!canPreview ? styles.disabledButton : {})
+              }}
               onClick={handlePreview}
               disabled={!canPreview}
+              aria-disabled={!canPreview}
+              title={!canPreview ? actionGuidance : 'Preview stock impact for this draft'}
             >
               {previewing ? 'Previewing...' : 'Preview stock impact'}
             </button>
           ) : null}
           <button
             type="button"
-            style={styles.primaryButton}
+            style={{
+              ...styles.primaryButton,
+              ...(!canSubmit ? styles.disabledButton : {})
+            }}
             onClick={handleSubmit}
             disabled={!canSubmit}
+            aria-disabled={!canSubmit}
+            title={!canSubmit ? actionGuidance : 'Record this barcode quick consume'}
           >
             {recording ? 'Recording...' : 'Quick consume'}
           </button>

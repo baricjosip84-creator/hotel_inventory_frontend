@@ -67,14 +67,16 @@ export async function reviewInventoryUsageLog(
 export async function previewInventoryUsageByBarcode(payload: InventoryUsageBarcodeRequest): Promise<InventoryUsageBarcodePreviewResponse> {
   return apiMutationRequest<InventoryUsageBarcodePreviewResponse>('/stock/consume/barcode/preview', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    skipMutationFeedback: true
   });
 }
 
 export async function recordInventoryUsageByBarcode(payload: InventoryUsageBarcodeRequest): Promise<InventoryUsageBarcodeResponse> {
   return apiMutationRequest<InventoryUsageBarcodeResponse>('/stock/consume/barcode', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    skipMutationFeedback: true
   });
 }
 
