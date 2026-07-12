@@ -202,9 +202,9 @@ function getLocalActionFeedbackMessage(label: string): string | null {
   if (normalized.startsWith('export ')) return 'Export started.';
   if (normalized.startsWith('generate ')) return 'Generation started.';
   if (normalized.startsWith('preview ')) return 'Preview started.';
-  if (normalized.startsWith('scan') || normalized.includes(' scan')) return 'Scan started.';
   if (normalized.startsWith('start scanner')) return 'Scanner starting.';
   if (normalized.startsWith('stop scanner')) return 'Scanner stopping.';
+  if (normalized.startsWith('scan') || normalized.includes(' scan')) return 'Scan started.';
   if (normalized.startsWith('upload ')) return 'Upload action started.';
   if (normalized.startsWith('add ')) return 'Add action started.';
   if (normalized.startsWith('append ') || normalized.startsWith('replace ')) return 'Bulk edit applied.';

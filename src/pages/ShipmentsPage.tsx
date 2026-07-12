@@ -876,7 +876,7 @@ export default function ShipmentsPage() {
       label: '3. Receive Items',
       detail: hasShipmentItems
         ? hasRemainingQuantity
-          ? 'Receive lines manually or through the product barcode scanner.'
+          ? 'Receive lines manually or through the receiving barcode scanner.'
           : 'All current shipment lines are fully received.'
         : 'Add shipment items before receiving inventory.',
       complete: hasShipmentItems && !hasRemainingQuantity
@@ -1654,9 +1654,14 @@ export default function ShipmentsPage() {
       return;
     }
 
-    navigate(
-      `/scanner?mode=product&shipmentId=${encodeURIComponent(selectedShipmentId)}&locationId=${encodeURIComponent(selectedScannerLocationId)}`
-    );
+    const scannerParams = new URLSearchParams();
+    scannerParams.set('mode', 'product');
+    scannerParams.set('shipmentId', selectedShipmentId);
+    scannerParams.set('locationId', selectedScannerLocationId);
+    scannerParams.set('shipmentLabel', selectedShipment?.po_number || selectedShipmentId);
+    scannerParams.set('locationName', selectedScannerLocationName || selectedScannerLocationId);
+
+    navigate(`/scanner?${scannerParams.toString()}`);
   };
 
   return (
@@ -2384,14 +2389,15 @@ export default function ShipmentsPage() {
                       ...(selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
                     }}
                     onClick={openProductScanner}
+                    data-skip-global-action-feedback="true"
                     disabled={!selectedScannerLocationId}
                     title={
                       selectedScannerLocationId
-                        ? 'Open product barcode scanner'
+                        ? 'Open receiving barcode scanner'
                         : 'Select a default scan location first'
                     }
                   >
-                    Scan Product Barcode
+                    Scan Barcode
                   </button>
 
                   <div

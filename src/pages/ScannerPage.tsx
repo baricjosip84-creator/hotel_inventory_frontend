@@ -128,7 +128,7 @@ type ProductBarcodeLookupResponse = {
 type ScannerMode = 'shipment' | 'product';
 
 function modeLabel(mode: ScannerMode): string {
-  return mode === 'product' ? 'Product Barcode Scanner' : 'Shipment QR Scanner';
+  return mode === 'product' ? 'Receiving Barcode Scanner' : 'Shipment QR Scanner';
 }
 
 function modeDescription(mode: ScannerMode): string {
@@ -192,6 +192,8 @@ export default function ScannerPage() {
   const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
   const shipmentId = searchParams.get('shipmentId') || '';
   const locationId = searchParams.get('locationId') || '';
+  const shipmentLabel = searchParams.get('shipmentLabel') || '';
+  const locationName = searchParams.get('locationName') || '';
   const isProductContextMissing = mode === 'product' && !shipmentId;
 
   const [isRunning, setIsRunning] = useState(false);
@@ -207,6 +209,7 @@ export default function ScannerPage() {
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing;
+  const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
   const stopScanner = async () => {
     if (scannerRef.current) {
@@ -239,7 +242,7 @@ export default function ScannerPage() {
 
   const resolveProductBarcode = async (decodedText: string) => {
     if (!shipmentId) {
-      throw new Error('No shipment selected for product scanning.');
+      throw new Error('No shipment selected for barcode receiving.');
     }
 
     const match = await apiRequest<ProductBarcodeLookupResponse>(
@@ -357,7 +360,7 @@ export default function ScannerPage() {
     setError(null);
 
     if (isProductContextMissing) {
-      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before scanning a barcode.');
+      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before scanning a barcode.');
       return;
     }
     setResult(null);
@@ -455,7 +458,7 @@ export default function ScannerPage() {
     const trimmed = manualCode.trim();
 
     if (isProductContextMissing) {
-      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before entering a barcode.');
+      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before entering a barcode.');
       return;
     }
 
@@ -475,7 +478,7 @@ export default function ScannerPage() {
 
   const handleChooseImage = () => {
     if (isProductContextMissing) {
-      setError('Product scanning requires a selected shipment. Open the product scanner from a shipment before uploading a barcode image.');
+      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before uploading a barcode image.');
       return;
     }
 
@@ -544,7 +547,7 @@ export default function ScannerPage() {
           </div>
 
           <span style={mode === 'product' ? styles.modeBadgeWarn : styles.modeBadgeInfo}>
-            {mode === 'product' ? 'PRODUCT MODE' : 'SHIPMENT MODE'}
+            {mode === 'product' ? 'RECEIVING MODE' : 'SHIPMENT MODE'}
           </span>
         </div>
 
@@ -553,12 +556,18 @@ export default function ScannerPage() {
             <div style={styles.contextGrid}>
               <div style={shipmentId ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>Selected shipment</div>
-                <div style={styles.contextValue}>{shipmentId || 'Missing shipment ID'}</div>
+                <div style={styles.contextValue}>{shipmentLabel || shipmentId || 'Missing shipment ID'}</div>
+                {shipmentLabel && shipmentId ? (
+                  <div style={styles.contextMeta}>Shipment ID: {shipmentId}</div>
+                ) : null}
               </div>
 
               <div style={locationId ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>Default scan location</div>
-                <div style={styles.contextValue}>{locationId || 'Missing default location'}</div>
+                <div style={styles.contextValue}>{locationName || locationId || 'Missing default location'}</div>
+                {locationName && locationId ? (
+                  <div style={styles.contextMeta}>Location ID: {locationId}</div>
+                ) : null}
               </div>
 
               <div style={styles.contextCard}>
@@ -577,7 +586,7 @@ export default function ScannerPage() {
 
         {isProductContextMissing ? (
           <div className="app-warning-state" style={styles.infoBanner}>
-            Product scanning is disabled until a shipmentId is present. Open the scanner from a selected shipment to preserve receiving context.
+            Barcode receiving is disabled until a shipment is selected. Open the scanner from a selected shipment to preserve receiving context.
           </div>
         ) : null}
 
@@ -605,7 +614,7 @@ export default function ScannerPage() {
           <button
             onClick={() => void startScanner()}
             disabled={isRunning || scannerInputDisabled}
-            title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+            title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
             style={{
               ...styles.primaryButton,
               ...(isRunning || scannerInputDisabled ? styles.disabledButton : {})
@@ -629,7 +638,7 @@ export default function ScannerPage() {
             type="button"
             onClick={handleChooseImage}
             disabled={scannerInputDisabled}
-            title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+            title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
             style={{
               ...styles.secondaryButton,
               ...(scannerInputDisabled ? styles.disabledButton : {})
@@ -648,7 +657,7 @@ export default function ScannerPage() {
         {isResolving ? (
           <div className="app-warning-state" style={styles.infoBanner}>
             {mode === 'product'
-              ? 'Resolving product barcode in selected shipment...'
+              ? 'Resolving barcode in selected shipment...'
               : 'Resolving shipment from scanned QR code...'}
           </div>
         ) : null}
@@ -689,9 +698,9 @@ export default function ScannerPage() {
               type="text"
               value={manualCode}
               onChange={(event) => setManualCode(event.target.value)}
-              placeholder={mode === 'product' ? 'Enter product barcode' : 'Enter shipment QR text'}
+              placeholder={mode === 'product' ? 'Enter product, package, or inventory-label barcode' : 'Enter shipment QR text'}
               disabled={isProductContextMissing}
-              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
               style={{
                 ...styles.input,
                 ...(isProductContextMissing ? styles.disabledInput : {})
@@ -703,11 +712,17 @@ export default function ScannerPage() {
             <button
               type="button"
               onClick={() => void handleManualSubmit()}
-              disabled={scannerInputDisabled}
-              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              disabled={manualSubmitDisabled}
+              title={
+                isProductContextMissing
+                  ? 'Open receiving scanner from a selected shipment first'
+                  : !manualCode.trim()
+                    ? 'Enter a barcode first'
+                    : undefined
+              }
               style={{
                 ...styles.primaryButton,
-                ...(scannerInputDisabled ? styles.disabledButton : {})
+                ...(manualSubmitDisabled ? styles.disabledButton : {})
               }}
             >
               Submit Manual Code
@@ -717,7 +732,7 @@ export default function ScannerPage() {
               type="button"
               onClick={handleChooseImage}
               disabled={scannerInputDisabled}
-              title={isProductContextMissing ? 'Open product scanner from a selected shipment first' : undefined}
+              title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
               style={{
                 ...styles.secondaryButton,
                 ...(scannerInputDisabled ? styles.disabledButton : {})
@@ -899,6 +914,14 @@ const styles: Record<string, CSSProperties> = {
   contextValue: {
     color: '#1e3a8a',
     lineHeight: 1.5,
+    fontWeight: 700,
+    wordBreak: 'break-word'
+  },
+  contextMeta: {
+    marginTop: '6px',
+    color: '#475569',
+    fontSize: '12px',
+    lineHeight: 1.45,
     wordBreak: 'break-all'
   },
   tipBannerInfo: {
