@@ -40,13 +40,6 @@ type RecentBarcodeUsageScan = {
   last_recorded_at: string;
 };
 
-type SubmittedQuickConsumeDraft = {
-  baselineResultId: string | null;
-  fingerprint: string;
-  barcode: string;
-  storageLocationId: string;
-};
-
 const RECENT_BARCODE_SCANS_STORAGE_KEY = 'inventoryUsage.recentBarcodeScans';
 const QUICK_CONSUME_DEFAULTS_STORAGE_KEY = 'inventoryUsage.quickConsumeDefaults';
 const RECENT_BARCODE_SCANS_LIMIT = 8;
@@ -80,33 +73,6 @@ const createClientScanId = () => {
     return value.toString(16);
   });
 };
-
-const normalizeQuickConsumeNumber = (value: number | string | undefined) => {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const createQuickConsumeDraftFingerprint = (draft: InventoryUsageBarcodeRequest) => JSON.stringify({
-  barcode: draft.barcode.trim().toLowerCase(),
-  storage_location_id: draft.storage_location_id.trim(),
-  package_count: normalizeQuickConsumeNumber(draft.package_count),
-  quantity: draft.quantity === undefined || draft.quantity === '' ? null : normalizeQuickConsumeNumber(draft.quantity),
-  consumption_reason: draft.consumption_reason || 'internal_use',
-  department: draft.department?.trim() || '',
-  event_name: draft.event_name?.trim() || '',
-  notes: draft.notes?.trim() || '',
-  consumed_at: draft.consumed_at || '',
-  client_scan_id: draft.client_scan_id || '',
-  stock_risk_acknowledged: Boolean(draft.stock_risk_acknowledged),
-  missing_evidence_acknowledged: Boolean(draft.missing_evidence_acknowledged),
-  evidence_original_filename: draft.evidence_original_filename?.trim() || '',
-  evidence_stored_filename: draft.evidence_stored_filename?.trim() || '',
-  evidence_mime_type: draft.evidence_mime_type?.trim() || '',
-  evidence_file_size_bytes: draft.evidence_file_size_bytes === undefined || draft.evidence_file_size_bytes === ''
-    ? null
-    : normalizeQuickConsumeNumber(draft.evidence_file_size_bytes),
-  evidence_storage_path: draft.evidence_storage_path?.trim() || ''
-});
 
 const formatBarcodeTraceability = (match?: InventoryUsageBarcodeResponse['barcode_match']): string => {
   if (!match?.matched_label_barcode) return '';
@@ -229,7 +195,7 @@ type InventoryUsageQuickConsumePanelProps = {
   storageLocationsLoading: boolean;
   storageLocationsError?: Error | null;
   onPreviewBarcodeUsage?: (payload: InventoryUsageBarcodeRequest) => void;
-  onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => void;
+  onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;
 };
 
 const defaultDraft: InventoryUsageBarcodeRequest = {
@@ -283,8 +249,8 @@ export function InventoryUsageQuickConsumePanel({
 }: InventoryUsageQuickConsumePanelProps) {
   const [draft, setDraft] = useState<InventoryUsageBarcodeRequest>(buildInitialDraft);
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
-  const lastCompletedUsageIdRef = useRef<string | null>(result?.usage?.id || null);
-  const submittedDraftRef = useRef<SubmittedQuickConsumeDraft | null>(null);
+  const draftRevisionRef = useRef(0);
+  const [successMessage, setSuccessMessage] = useState('');
   const [recentScans, setRecentScans] = useState<RecentBarcodeUsageScan[]>(readRecentBarcodeScans);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [missingEvidenceAcknowledged, setMissingEvidenceAcknowledged] = useState(false);
@@ -467,9 +433,23 @@ export function InventoryUsageQuickConsumePanel({
   })();
 
   const updateDraft = (patch: Partial<InventoryUsageBarcodeRequest>) => {
+    draftRevisionRef.current += 1;
+    setSuccessMessage('');
     setDraft((current) => ({ ...current, ...patch }));
     setRiskAcknowledged(false);
     setMissingEvidenceAcknowledged(false);
+  };
+
+  const updateRiskAcknowledgement = (checked: boolean) => {
+    draftRevisionRef.current += 1;
+    setSuccessMessage('');
+    setRiskAcknowledged(checked);
+  };
+
+  const updateMissingEvidenceAcknowledgement = (checked: boolean) => {
+    draftRevisionRef.current += 1;
+    setSuccessMessage('');
+    setMissingEvidenceAcknowledged(checked);
   };
 
   const buildPayload = (): InventoryUsageBarcodeRequest => ({
@@ -491,67 +471,6 @@ export function InventoryUsageQuickConsumePanel({
     evidence_storage_path: draft.evidence_storage_path?.trim() || undefined
   });
 
-  useEffect(() => {
-    const completedUsageId = result?.usage?.id;
-    const submittedDraft = submittedDraftRef.current;
-
-    if (!completedUsageId || !submittedDraft || lastCompletedUsageIdRef.current === completedUsageId) {
-      return;
-    }
-
-    if (submittedDraft.baselineResultId === completedUsageId) {
-      return;
-    }
-
-    const resultBarcode = result.barcode_match?.barcode?.trim().toLowerCase() || '';
-    const resultStorageLocationId = result.stock?.storage_location_id || '';
-
-    if (
-      resultBarcode !== submittedDraft.barcode
-      || resultStorageLocationId !== submittedDraft.storageLocationId
-    ) {
-      return;
-    }
-
-    const currentDraftFingerprint = createQuickConsumeDraftFingerprint({
-      ...draft,
-      client_scan_id: clientScanId,
-      stock_risk_acknowledged: activePreviewRisk && riskAcknowledged ? true : undefined,
-      missing_evidence_acknowledged: (requiresMissingEvidenceAcknowledgement || previewRequiresEvidenceAcknowledgement) && missingEvidenceAcknowledged ? true : undefined
-    });
-
-    lastCompletedUsageIdRef.current = completedUsageId;
-    submittedDraftRef.current = null;
-
-    if (currentDraftFingerprint !== submittedDraft.fingerprint) {
-      return;
-    }
-
-    setRiskAcknowledged(false);
-    setMissingEvidenceAcknowledged(false);
-    setClientScanId(createClientScanId());
-    setDraft((current) => ({
-      ...current,
-      barcode: '',
-      package_count: 1,
-      notes: '',
-      evidence_original_filename: '',
-      evidence_stored_filename: '',
-      evidence_mime_type: '',
-      evidence_file_size_bytes: '',
-      evidence_storage_path: ''
-    }));
-    requestAnimationFrame(() => barcodeInputRef.current?.focus());
-  }, [
-    activePreviewRisk,
-    clientScanId,
-    draft,
-    missingEvidenceAcknowledged,
-    previewRequiresEvidenceAcknowledgement,
-    requiresMissingEvidenceAcknowledgement,
-    result,
-    riskAcknowledged
-  ]);
   const handlePreview = () => {
     if (!canPreview || !onPreviewBarcodeUsage) {
       return;
@@ -560,21 +479,53 @@ export function InventoryUsageQuickConsumePanel({
     onPreviewBarcodeUsage(buildPayload());
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) {
       return;
     }
 
     const payload = buildPayload();
+    const submittedDraftRevision = draftRevisionRef.current;
+    const submittedLocation = activeLocations.find((location) => location.id === payload.storage_location_id);
+    setSuccessMessage('');
 
-    submittedDraftRef.current = {
-      baselineResultId: result?.usage?.id || null,
-      fingerprint: createQuickConsumeDraftFingerprint(payload),
-      barcode: payload.barcode.trim().toLowerCase(),
-      storageLocationId: payload.storage_location_id.trim()
-    };
+    try {
+      const response = await onRecordBarcodeUsage(payload);
+      const productLabel = response.barcode_match?.product_name || response.barcode_match?.product_id || payload.barcode;
+      const stockChange = response.stock
+        ? ` Stock ${toNumber(response.stock.previous_quantity)} → ${toNumber(response.stock.new_quantity)}${submittedLocation?.name ? ` at ${submittedLocation.name}` : ''}.`
+        : '';
+      const completionLabel = response.idempotent_replay
+        ? 'Quick consume was already recorded'
+        : 'Quick consume recorded successfully';
 
-    onRecordBarcodeUsage(payload);
+      const submittedDraftIsStillCurrent = draftRevisionRef.current === submittedDraftRevision;
+      const completionNextStep = submittedDraftIsStillCurrent
+        ? 'Barcode cleared and ready for the next scan.'
+        : 'A newer draft was entered while recording and has been preserved.';
+
+      setSuccessMessage(`${completionLabel} for ${productLabel}.${stockChange} ${completionNextStep}`);
+
+      if (submittedDraftIsStillCurrent) {
+        setRiskAcknowledged(false);
+        setMissingEvidenceAcknowledged(false);
+        setClientScanId(createClientScanId());
+        setDraft((current) => ({
+          ...current,
+          barcode: '',
+          package_count: 1,
+          notes: '',
+          evidence_original_filename: '',
+          evidence_stored_filename: '',
+          evidence_mime_type: '',
+          evidence_file_size_bytes: '',
+          evidence_storage_path: ''
+        }));
+        requestAnimationFrame(() => barcodeInputRef.current?.focus());
+      }
+    } catch {
+      // The parent mutation exposes the backend error through the existing error panel.
+    }
   };
 
   const handleScannerEnter = () => {
@@ -836,7 +787,7 @@ export function InventoryUsageQuickConsumePanel({
             <input
               type="checkbox"
               checked={missingEvidenceAcknowledged}
-              onChange={(event) => setMissingEvidenceAcknowledged(event.target.checked)}
+              onChange={(event) => updateMissingEvidenceAcknowledgement(event.target.checked)}
             />
             Record this damage/waste scan without evidence attachment metadata.
           </label>
@@ -883,6 +834,16 @@ export function InventoryUsageQuickConsumePanel({
             {recording ? 'Recording...' : 'Quick consume'}
           </button>
         </div>
+        {successMessage ? (
+          <div role="status" aria-live="polite" style={styles.successBanner}>
+            {successMessage}
+          </div>
+        ) : null}
+        {error ? (
+          <div role="alert" style={styles.errorText}>
+            Quick consume failed: {error.message}
+          </div>
+        ) : null}
       </div>
 
 
@@ -1002,7 +963,7 @@ export function InventoryUsageQuickConsumePanel({
               <input
                 type="checkbox"
                 checked={riskAcknowledged}
-                onChange={(event) => setRiskAcknowledged(event.target.checked)}
+                onChange={(event) => updateRiskAcknowledgement(event.target.checked)}
               />
               I reviewed this stock-impact warning and still want to record the quick consume.
             </label>
@@ -1013,7 +974,6 @@ export function InventoryUsageQuickConsumePanel({
       {!storageLocationsLoading && activeLocations.length === 0 ? (
         <p style={styles.warningText}>Create an active storage location before using barcode quick consume.</p>
       ) : null}
-      {error ? <p style={styles.errorText}>Barcode usage failed: {error.message}</p> : null}
       {barcodePolicyErrorDetails ? (
         <div style={styles.importPanel}>
           <h3 style={styles.subsectionTitle}>Backend policy response</h3>
@@ -1069,16 +1029,6 @@ export function InventoryUsageQuickConsumePanel({
       {evidenceError ? <p style={styles.errorText}>Usage was recorded, but evidence linking failed: {evidenceError.message}</p> : null}
       {evidenceLinking ? <p style={styles.sectionDescription}>Linking evidence attachment...</p> : null}
       {evidenceResult?.id ? <p style={styles.successText}>Evidence linked: {evidenceResult.original_filename || evidenceResult.id}</p> : null}
-      {result?.barcode_match ? (
-        <p style={styles.successText}>
-          {result.idempotent_replay ? 'Already recorded' : 'Recorded'} {result.stock?.previous_quantity} → {result.stock?.new_quantity} for {result.barcode_match.product_name || result.barcode_match.product_id}
-          {result.barcode_match.matched_label_barcode
-            ? ` (inventory label${formatBarcodeTraceability(result.barcode_match) ? ` · ${formatBarcodeTraceability(result.barcode_match)}` : ''})`
-            : result.barcode_match.package_name
-              ? ` (${result.barcode_match.package_name})`
-              : ''}.
-        </p>
-      ) : null}
     </section>
   );
 }

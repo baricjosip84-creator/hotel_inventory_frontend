@@ -4,37 +4,47 @@ import process from 'node:process';
 
 const root = process.cwd();
 const panelPath = path.join(root, 'src/pages/inventoryUsage/InventoryUsageQuickConsumePanel.tsx');
+const dashboardPath = path.join(root, 'src/pages/inventoryUsage/InventoryUsageDashboard.tsx');
 const pagePath = path.join(root, 'src/pages/InventoryUsagePage.tsx');
 const panel = fs.readFileSync(panelPath, 'utf8');
+const dashboard = fs.readFileSync(dashboardPath, 'utf8');
 const page = fs.readFileSync(pagePath, 'utf8');
 
 const requiredPanelContracts = [
-  ['ignore stale mutation data on mount', "useRef<string | null>(result?.usage?.id || null)"],
-  ['track the exact submitted draft', 'submittedDraftRef.current = {'],
-  ['guard against the pre-submit result', 'submittedDraft.baselineResultId === completedUsageId'],
-  ['match the completed result to the submitted barcode', 'resultBarcode !== submittedDraft.barcode'],
-  ['match the completed result to the submitted location', 'resultStorageLocationId !== submittedDraft.storageLocationId'],
-  ['preserve a draft changed while recording', 'currentDraftFingerprint !== submittedDraft.fingerprint'],
+  ['await the exact quick-consume request', 'const response = await onRecordBarcodeUsage(payload);'],
+  ['clear only after the request resolves successfully', "barcode: '',\n          package_count: 1"],
+  ['preserve a draft edited while the request is pending', 'draftRevisionRef.current === submittedDraftRevision'],
+  ['show a visible success status beside the action controls', 'role="status" aria-live="polite" style={styles.successBanner}'],
+  ['show an explicit completion message', 'Quick consume recorded successfully'],
+  ['confirm the form is ready for another scan', 'Barcode cleared and ready for the next scan.'],
   ['disable preview while recording', '&& !recording;'],
   ['disable camera scanning while recording', 'disabled={!canRecord || recording}']
 ];
 
-const requiredPageContracts = [
-  ['clear stale record/evidence state before preview', 'barcodeUsageMutation.reset();\n    barcodeEvidenceAttachmentMutation.reset();\n    barcodePreviewMutation.reset();'],
-  ['clear stale record/evidence state before recording', 'const handleRecordBarcodeUsage = (payload: InventoryUsageBarcodeRequest) => {\n    barcodeUsageMutation.reset();\n    barcodeEvidenceAttachmentMutation.reset();'],
-  ['clear the completed preview only after recording succeeds', 'onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();']
+const requiredAsyncContracts = [
+  ['dashboard forwards a response promise', 'onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;'],
+  ['page returns the mutation promise', 'return barcodeUsageMutation.mutateAsync({'],
+  ['preview is cleared only after successful recording', 'onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();']
 ];
 
 for (const [label, contract] of requiredPanelContracts) {
   if (!panel.includes(contract)) {
-    throw new Error(`Quick-consume draft-preservation contract missing: ${label}`);
+    throw new Error(`Quick-consume completion contract missing: ${label}`);
   }
 }
 
-for (const [label, contract] of requiredPageContracts) {
+if (panel.includes('lastCompletedUsageIdRef') || panel.includes('submittedDraftRef')) {
+  throw new Error('Quick-consume completion must not depend on stale mutation-result effects.');
+}
+
+if (!dashboard.includes(requiredAsyncContracts[0][1])) {
+  throw new Error(`Quick-consume async contract missing: ${requiredAsyncContracts[0][0]}`);
+}
+
+for (const [label, contract] of requiredAsyncContracts.slice(1)) {
   if (!page.includes(contract)) {
-    throw new Error(`Quick-consume mutation-state contract missing: ${label}`);
+    throw new Error(`Quick-consume async contract missing: ${label}`);
   }
 }
 
-console.log('Inventory usage quick-consume draft-preservation contract passed.');
+console.log('Inventory usage quick-consume completion and draft-preservation contract passed.');

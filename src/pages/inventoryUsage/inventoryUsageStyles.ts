@@ -436,6 +436,14 @@ export const styles: Record<string, CSSProperties> = {
   mutedText: {
     color: '#64748b'
   },
+  successBanner: {
+    color: '#166534',
+    background: '#f0fdf4',
+    border: '1px solid #86efac',
+    borderRadius: '0.75rem',
+    padding: '0.85rem',
+    fontWeight: 800
+  },
   successText: {
     color: '#166534',
     fontWeight: 700,

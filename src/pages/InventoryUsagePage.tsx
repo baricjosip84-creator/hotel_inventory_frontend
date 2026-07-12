@@ -461,10 +461,10 @@ export default function InventoryUsagePage() {
     });
   };
 
-  const handleRecordBarcodeUsage = (payload: InventoryUsageBarcodeRequest) => {
+  const handleRecordBarcodeUsage = async (payload: InventoryUsageBarcodeRequest) => {
     barcodeUsageMutation.reset();
     barcodeEvidenceAttachmentMutation.reset();
-    barcodeUsageMutation.mutate({
+    return barcodeUsageMutation.mutateAsync({
       barcode: payload.barcode.trim(),
       storage_location_id: payload.storage_location_id.trim(),
       package_count: Number(payload.package_count || 1),

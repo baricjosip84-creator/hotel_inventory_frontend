@@ -115,7 +115,7 @@ type InventoryUsageDashboardProps = {
   storageLocationsLoading: boolean;
   storageLocationsError?: Error | null;
   onPreviewBarcodeUsage?: (payload: InventoryUsageBarcodeRequest) => void;
-  onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => void;
+  onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;
   bulkPreviewing?: boolean;
   bulkPreviewError?: Error | null;
   bulkPreviewResult?: InventoryUsageBulkReadinessResponse | null;
