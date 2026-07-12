@@ -541,7 +541,7 @@ export default function ShipmentsPage() {
     onSuccess: async () => {
       setItemForm(emptyItemForm());
       setPageError(null);
-      setPageMessage('Shipment item added successfully.');
+      setPageMessage(null);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
@@ -2247,7 +2247,11 @@ export default function ShipmentsPage() {
               <div style={styles.sectionDivider} />
 
               <h4 style={styles.sectionTitle}>Add Shipment Item</h4>
-              <form onSubmit={handleAddShipmentItem} style={styles.formGrid}>
+              <form
+                onSubmit={handleAddShipmentItem}
+                style={styles.formGrid}
+                data-skip-global-action-feedback="true"
+              >
                 <div>
                   <label style={styles.label}>Product</label>
                   <select
@@ -2467,6 +2471,34 @@ export default function ShipmentsPage() {
                     const draft = getReceiveDraft(item);
                     const isHighlighted = item.id === highlightedItemId;
                     const hasSavedShortageReason = Boolean(item.discrepancy_reason?.trim());
+                    const effectiveReceiveLocationId =
+                      draft.storage_location_id ||
+                      selectedScannerLocationId ||
+                      item.storage_location_id ||
+                      (storageLocations.length === 1 ? storageLocations[0].id : '');
+                    const parsedReceiveQuantity = Number(draft.quantity_received);
+                    const receiveQuantityIsValid =
+                      Number.isFinite(parsedReceiveQuantity) &&
+                      parsedReceiveQuantity > 0 &&
+                      parsedReceiveQuantity <= remaining;
+                    const canSubmitReceiveLine =
+                      canReceiveShipments &&
+                      remaining > 0 &&
+                      selectedShipment.status !== 'received' &&
+                      Boolean(effectiveReceiveLocationId) &&
+                      receiveQuantityIsValid &&
+                      !receiveShipmentMutation.isPending;
+                    const receiveLineDisabledReason = !canReceiveShipments
+                      ? 'Shipments receive permission required.'
+                      : remaining <= 0
+                        ? 'This line is already fully received.'
+                        : selectedShipment.status === 'received'
+                          ? 'This shipment is already received.'
+                          : !effectiveReceiveLocationId
+                            ? 'Select a storage location before receiving this line.'
+                            : !receiveQuantityIsValid
+                              ? `Receive quantity must be greater than zero and no more than ${formatQuantity(remaining)}.`
+                              : null;
 
                     return (
                       <div
@@ -2638,31 +2670,20 @@ export default function ShipmentsPage() {
                             <div style={styles.receiveLineActionBlock}>
                               <button
                                 type="button"
+                                data-skip-global-action-feedback="true"
                                 style={{
                                   ...styles.mobileReceiveButton,
-                                  ...(!canReceiveShipments || remaining <= 0 || selectedShipment.status === 'received' || receiveShipmentMutation.isPending
-                                    ? styles.mobileReceiveButtonDisabled
-                                    : {})
+                                  ...(!canSubmitReceiveLine ? styles.mobileReceiveButtonDisabled : {})
                                 }}
                                 onClick={() => handleReceiveLine(item)}
-                                disabled={
-                                  !canReceiveShipments ||
-                                  remaining <= 0 ||
-                                  selectedShipment.status === 'received' ||
-                                  receiveShipmentMutation.isPending
-                                }
-                                title={
-                                  !canReceiveShipments
-                                    ? 'Shipments receive permission required'
-                                    : remaining <= 0
-                                      ? 'This line is already fully received.'
-                                      : selectedShipment.status === 'received'
-                                        ? 'This shipment is already received.'
-                                        : 'Receive this shipment line into stock.'
-                                }
+                                disabled={!canSubmitReceiveLine}
+                                title={receiveLineDisabledReason || 'Receive this shipment line into stock.'}
                               >
                                 {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
                               </button>
+                              {receiveLineDisabledReason ? (
+                                <div style={styles.inlineHint}>{receiveLineDisabledReason}</div>
+                              ) : null}
                             </div>
                           </div>
                         </div>

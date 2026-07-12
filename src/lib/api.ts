@@ -158,6 +158,18 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Supplier invoice created successfully.';
   }
 
+  if (normalizedPath === '/shipment-items' && normalizedMethod === 'POST') {
+    return 'Shipment item added successfully.';
+  }
+
+  if (normalizedPath.startsWith('/shipment-items/') && (normalizedMethod === 'PATCH' || normalizedMethod === 'PUT')) {
+    return 'Shipment item updated successfully.';
+  }
+
+  if (normalizedPath.startsWith('/shipment-items/') && normalizedMethod === 'DELETE') {
+    return 'Shipment item deleted successfully.';
+  }
+
   if (normalizedPath.endsWith('/enterprise-inventory/barcode-labels/print-events') && normalizedMethod === 'POST') {
     return 'Barcode label print dialog opened.';
   }
