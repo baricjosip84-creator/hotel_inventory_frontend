@@ -12,19 +12,15 @@ const page = fs.readFileSync(pagePath, 'utf8');
 
 const requiredPanelContracts = [
   ['await the exact quick-consume request', 'const response = await onRecordBarcodeUsage(payload);'],
-  ['clear only after the request resolves successfully', "barcode: '',\n          package_count: 1"],
-  ['preserve a draft edited while the request is pending', 'draftRevisionRef.current === submittedDraftRevision'],
-  ['show a visible success status beside the action controls', 'role="status" aria-live="polite" style={styles.successBanner}'],
+  ['clear the barcode after the request resolves', "barcode: '',\n        package_count: 1"],
+  ['do not depend on optional response fields to clear', 'const productLabel = response?.barcode_match?.product_name'],
+  ['show a visible success status beside the action controls', 'ref={completionStatusRef} role="status" aria-live="polite" style={styles.successBanner}'],
   ['show an explicit completion message', 'Quick consume recorded successfully'],
   ['confirm the form is ready for another scan', 'Barcode cleared and ready for the next scan.'],
-  ['disable preview while recording', '&& !recording;'],
-  ['disable camera scanning while recording', 'disabled={!canRecord || recording}']
-];
-
-const requiredAsyncContracts = [
-  ['dashboard forwards a response promise', 'onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;'],
-  ['page returns the mutation promise', 'return barcodeUsageMutation.mutateAsync({'],
-  ['preview is cleared only after successful recording', 'onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();']
+  ['surface local post-submit failures instead of swallowing them', 'setCompletionError(`Quick consume failed: ${message}`);'],
+  ['disable barcode editing while recording', 'autoComplete="off"\n            disabled={recording}'],
+  ['disable camera scanning while recording', 'disabled={!canRecord || recording}'],
+  ['return focus to the barcode field', 'barcodeInputRef.current?.focus();']
 ];
 
 for (const [label, contract] of requiredPanelContracts) {
@@ -33,18 +29,30 @@ for (const [label, contract] of requiredPanelContracts) {
   }
 }
 
-if (panel.includes('lastCompletedUsageIdRef') || panel.includes('submittedDraftRef')) {
-  throw new Error('Quick-consume completion must not depend on stale mutation-result effects.');
+if (panel.includes('draftRevisionRef') || panel.includes('submittedDraftRevision')) {
+  throw new Error('Quick-consume completion must not be blocked by draft-revision comparisons after a successful response.');
 }
 
-if (!dashboard.includes(requiredAsyncContracts[0][1])) {
-  throw new Error(`Quick-consume async contract missing: ${requiredAsyncContracts[0][0]}`);
+if (panel.includes('catch {\n      // The parent mutation exposes')) {
+  throw new Error('Quick-consume completion must not silently swallow post-submit errors.');
 }
 
-for (const [label, contract] of requiredAsyncContracts.slice(1)) {
-  if (!page.includes(contract)) {
-    throw new Error(`Quick-consume async contract missing: ${label}`);
-  }
+const resetIndex = panel.indexOf("barcode: '',\n        package_count: 1");
+const responseFormattingIndex = panel.indexOf('const productLabel = response?.barcode_match?.product_name');
+if (resetIndex < 0 || responseFormattingIndex < 0 || resetIndex > responseFormattingIndex) {
+  throw new Error('The successful quick-consume reset must happen before optional response formatting.');
 }
 
-console.log('Inventory usage quick-consume completion and draft-preservation contract passed.');
+if (!dashboard.includes('onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;')) {
+  throw new Error('Quick-consume async contract missing: dashboard response promise.');
+}
+
+if (!page.includes('return barcodeUsageMutation.mutateAsync({')) {
+  throw new Error('Quick-consume async contract missing: page returns the mutation promise.');
+}
+
+if (!page.includes('onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();')) {
+  throw new Error('Quick-consume async contract missing: preview resets only after successful recording.');
+}
+
+console.log('Inventory usage quick-consume completion contract passed.');

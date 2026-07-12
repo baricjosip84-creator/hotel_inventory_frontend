@@ -249,8 +249,9 @@ export function InventoryUsageQuickConsumePanel({
 }: InventoryUsageQuickConsumePanelProps) {
   const [draft, setDraft] = useState<InventoryUsageBarcodeRequest>(buildInitialDraft);
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
-  const draftRevisionRef = useRef(0);
   const [successMessage, setSuccessMessage] = useState('');
+  const [completionError, setCompletionError] = useState('');
+  const completionStatusRef = useRef<HTMLDivElement | null>(null);
   const [recentScans, setRecentScans] = useState<RecentBarcodeUsageScan[]>(readRecentBarcodeScans);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [missingEvidenceAcknowledged, setMissingEvidenceAcknowledged] = useState(false);
@@ -433,22 +434,22 @@ export function InventoryUsageQuickConsumePanel({
   })();
 
   const updateDraft = (patch: Partial<InventoryUsageBarcodeRequest>) => {
-    draftRevisionRef.current += 1;
     setSuccessMessage('');
+    setCompletionError('');
     setDraft((current) => ({ ...current, ...patch }));
     setRiskAcknowledged(false);
     setMissingEvidenceAcknowledged(false);
   };
 
   const updateRiskAcknowledgement = (checked: boolean) => {
-    draftRevisionRef.current += 1;
     setSuccessMessage('');
+    setCompletionError('');
     setRiskAcknowledged(checked);
   };
 
   const updateMissingEvidenceAcknowledgement = (checked: boolean) => {
-    draftRevisionRef.current += 1;
     setSuccessMessage('');
+    setCompletionError('');
     setMissingEvidenceAcknowledged(checked);
   };
 
@@ -485,46 +486,52 @@ export function InventoryUsageQuickConsumePanel({
     }
 
     const payload = buildPayload();
-    const submittedDraftRevision = draftRevisionRef.current;
     const submittedLocation = activeLocations.find((location) => location.id === payload.storage_location_id);
     setSuccessMessage('');
+    setCompletionError('');
 
     try {
       const response = await onRecordBarcodeUsage(payload);
-      const productLabel = response.barcode_match?.product_name || response.barcode_match?.product_id || payload.barcode;
-      const stockChange = response.stock
+
+      // Once the request resolves successfully, reset the scan immediately.
+      // Do not make the reset depend on optional response fields, preview state,
+      // a delayed effect, or a draft-revision comparison.
+      setRiskAcknowledged(false);
+      setMissingEvidenceAcknowledged(false);
+      setClientScanId(createClientScanId());
+      setDraft((current) => ({
+        ...current,
+        barcode: '',
+        package_count: 1,
+        notes: '',
+        evidence_original_filename: '',
+        evidence_stored_filename: '',
+        evidence_mime_type: '',
+        evidence_file_size_bytes: '',
+        evidence_storage_path: ''
+      }));
+
+      const productLabel = response?.barcode_match?.product_name
+        || response?.barcode_match?.product_id
+        || payload.barcode;
+      const stockChange = response?.stock
         ? ` Stock ${toNumber(response.stock.previous_quantity)} → ${toNumber(response.stock.new_quantity)}${submittedLocation?.name ? ` at ${submittedLocation.name}` : ''}.`
         : '';
-      const completionLabel = response.idempotent_replay
+      const completionLabel = response?.idempotent_replay
         ? 'Quick consume was already recorded'
         : 'Quick consume recorded successfully';
 
-      const submittedDraftIsStillCurrent = draftRevisionRef.current === submittedDraftRevision;
-      const completionNextStep = submittedDraftIsStillCurrent
-        ? 'Barcode cleared and ready for the next scan.'
-        : 'A newer draft was entered while recording and has been preserved.';
+      setSuccessMessage(`${completionLabel} for ${productLabel}.${stockChange} Barcode cleared and ready for the next scan.`);
 
-      setSuccessMessage(`${completionLabel} for ${productLabel}.${stockChange} ${completionNextStep}`);
-
-      if (submittedDraftIsStillCurrent) {
-        setRiskAcknowledged(false);
-        setMissingEvidenceAcknowledged(false);
-        setClientScanId(createClientScanId());
-        setDraft((current) => ({
-          ...current,
-          barcode: '',
-          package_count: 1,
-          notes: '',
-          evidence_original_filename: '',
-          evidence_stored_filename: '',
-          evidence_mime_type: '',
-          evidence_file_size_bytes: '',
-          evidence_storage_path: ''
-        }));
-        requestAnimationFrame(() => barcodeInputRef.current?.focus());
-      }
-    } catch {
-      // The parent mutation exposes the backend error through the existing error panel.
+      requestAnimationFrame(() => {
+        barcodeInputRef.current?.focus();
+        completionStatusRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    } catch (caughtError) {
+      const message = caughtError instanceof Error
+        ? caughtError.message
+        : 'Unexpected error while recording quick consume.';
+      setCompletionError(`Quick consume failed: ${message}`);
     }
   };
 
@@ -593,6 +600,7 @@ export function InventoryUsageQuickConsumePanel({
             }}
             placeholder="Paste or enter barcode value"
             autoComplete="off"
+            disabled={recording}
           />
         </label>
 
@@ -607,7 +615,7 @@ export function InventoryUsageQuickConsumePanel({
             style={styles.input}
             value={draft.storage_location_id}
             onChange={(event) => updateDraft({ storage_location_id: event.target.value })}
-            disabled={storageLocationsLoading || activeLocations.length === 0}
+            disabled={recording || storageLocationsLoading || activeLocations.length === 0}
           >
             <option value="">{storageLocationsLoading ? 'Loading locations...' : 'Select location'}</option>
             {activeLocations.map((location) => (
@@ -627,6 +635,7 @@ export function InventoryUsageQuickConsumePanel({
             style={styles.input}
             value={draft.package_count ?? 1}
             onChange={(event) => updateDraft({ package_count: event.target.value })}
+            disabled={recording}
           />
         </label>
 
@@ -636,6 +645,7 @@ export function InventoryUsageQuickConsumePanel({
             style={styles.input}
             value={draft.consumption_reason || 'internal_use'}
             onChange={(event) => updateDraft({ consumption_reason: event.target.value })}
+            disabled={recording}
           >
             {USAGE_REASON_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -650,6 +660,7 @@ export function InventoryUsageQuickConsumePanel({
             value={draft.department || ''}
             onChange={(event) => updateDraft({ department: event.target.value })}
             placeholder="Housekeeping, kitchen, maintenance..."
+            disabled={recording}
           />
         </label>
 
@@ -660,6 +671,7 @@ export function InventoryUsageQuickConsumePanel({
             value={draft.event_name || ''}
             onChange={(event) => updateDraft({ event_name: event.target.value })}
             placeholder="Optional event or work order"
+            disabled={recording}
           />
         </label>
 
@@ -670,6 +682,7 @@ export function InventoryUsageQuickConsumePanel({
             style={styles.input}
             value={draft.consumed_at || ''}
             onChange={(event) => updateDraft({ consumed_at: event.target.value })}
+            disabled={recording}
           />
         </label>
       </div>
@@ -726,6 +739,7 @@ export function InventoryUsageQuickConsumePanel({
               value={draft.evidence_original_filename || ''}
               onChange={(event) => updateDraft({ evidence_original_filename: event.target.value })}
               placeholder="damage-photo.jpg"
+              disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
@@ -735,6 +749,7 @@ export function InventoryUsageQuickConsumePanel({
               value={draft.evidence_stored_filename || ''}
               onChange={(event) => updateDraft({ evidence_stored_filename: event.target.value })}
               placeholder="tenant/uploads/damage-photo.jpg"
+              disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
@@ -744,6 +759,7 @@ export function InventoryUsageQuickConsumePanel({
               value={draft.evidence_mime_type || ''}
               onChange={(event) => updateDraft({ evidence_mime_type: event.target.value })}
               placeholder="image/jpeg"
+              disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
@@ -756,6 +772,7 @@ export function InventoryUsageQuickConsumePanel({
               value={draft.evidence_file_size_bytes || ''}
               onChange={(event) => updateDraft({ evidence_file_size_bytes: event.target.value })}
               placeholder="Optional"
+              disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
@@ -765,6 +782,7 @@ export function InventoryUsageQuickConsumePanel({
               value={draft.evidence_storage_path || ''}
               onChange={(event) => updateDraft({ evidence_storage_path: event.target.value })}
               placeholder="Optional object storage path or URL"
+              disabled={recording}
             />
           </label>
         </div>
@@ -779,6 +797,7 @@ export function InventoryUsageQuickConsumePanel({
             value={draft.notes || ''}
             onChange={(event) => updateDraft({ notes: event.target.value })}
             placeholder="Optional notes for governance, damage/waste detail, or shift context"
+            disabled={recording}
           />
         </label>
 
@@ -788,6 +807,7 @@ export function InventoryUsageQuickConsumePanel({
               type="checkbox"
               checked={missingEvidenceAcknowledged}
               onChange={(event) => updateMissingEvidenceAcknowledgement(event.target.checked)}
+              disabled={recording}
             />
             Record this damage/waste scan without evidence attachment metadata.
           </label>
@@ -805,6 +825,11 @@ export function InventoryUsageQuickConsumePanel({
             <p style={styles.sectionDescription}>Preview checked the current server-side usage timestamp because no manual consumed-at value is set.</p>
           ) : null}
           <p style={canSubmit ? styles.successText : styles.warningText}>{actionGuidance}</p>
+          {successMessage ? (
+            <div ref={completionStatusRef} role="status" aria-live="polite" style={styles.successBanner}>
+              {successMessage}
+            </div>
+          ) : null}
           {onPreviewBarcodeUsage ? (
             <button
               type="button"
@@ -834,12 +859,11 @@ export function InventoryUsageQuickConsumePanel({
             {recording ? 'Recording...' : 'Quick consume'}
           </button>
         </div>
-        {successMessage ? (
-          <div role="status" aria-live="polite" style={styles.successBanner}>
-            {successMessage}
+        {completionError ? (
+          <div role="alert" style={styles.errorText}>
+            {completionError}
           </div>
-        ) : null}
-        {error ? (
+        ) : error ? (
           <div role="alert" style={styles.errorText}>
             Quick consume failed: {error.message}
           </div>
