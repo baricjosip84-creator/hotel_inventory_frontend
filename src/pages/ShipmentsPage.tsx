@@ -2360,7 +2360,9 @@ export default function ShipmentsPage() {
                     <strong>Default Scan Location:</strong>{' '}
                     {selectedScannerLocationId ? selectedScannerLocationName : 'Not selected'}
                     <div style={styles.inlineHint}>
-                      Barcode scanning stays disabled until a scan destination is chosen above.
+                      {selectedScannerLocationId
+                        ? 'Scanner is ready and will receive matched items into this location.'
+                        : 'Barcode scanning stays disabled until a scan destination is chosen above.'}
                     </div>
                   </div>
                 </div>
