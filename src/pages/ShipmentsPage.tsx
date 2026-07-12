@@ -1396,6 +1396,19 @@ export default function ShipmentsPage() {
     Boolean(shipmentForm.delivery_date) &&
     !createShipmentMutation.isPending;
 
+  const parsedShipmentItemQuantity = Number(itemForm.quantity);
+  const parsedShipmentItemUnitCost =
+    itemForm.unit_cost.trim() === '' ? null : Number(itemForm.unit_cost);
+  const canSubmitShipmentItem =
+    canManageShipmentItems &&
+    Boolean(selectedShipmentId) &&
+    Boolean(itemForm.product_id) &&
+    Number.isFinite(parsedShipmentItemQuantity) &&
+    parsedShipmentItemQuantity > 0 &&
+    (parsedShipmentItemUnitCost === null ||
+      (Number.isFinite(parsedShipmentItemUnitCost) && parsedShipmentItemUnitCost >= 0)) &&
+    !addShipmentItemMutation.isPending;
+
   const handleCreateShipment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPageError(null);
@@ -1429,9 +1442,25 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (!itemForm.product_id) {
+      setPageError('Select a product before adding a shipment item.');
+      return;
+    }
+
+    const quantity = Number(itemForm.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setPageError('Shipment item quantity must be greater than zero.');
+      return;
+    }
+
     const selectedProduct = (productsQuery.data ?? []).find(
       (product) => product.id === itemForm.product_id
     );
+
+    if (!selectedProduct) {
+      setPageError('The selected product is no longer available. Refresh the page and choose it again.');
+      return;
+    }
 
     if (
       selectedProduct?.supplier_id &&
@@ -1453,7 +1482,7 @@ export default function ShipmentsPage() {
     addShipmentItemMutation.mutate({
       shipment_id: selectedShipmentId,
       product_id: itemForm.product_id,
-      quantity: Number(itemForm.quantity),
+      quantity,
       unit_cost: parsedUnitCost
     });
   };
@@ -2290,12 +2319,24 @@ export default function ShipmentsPage() {
                 <div style={styles.formActionRow}>
                   <button
                     type="submit"
-                    style={styles.primaryButton}
-                    disabled={addShipmentItemMutation.isPending || !canManageShipmentItems}
-                    title={!canManageShipmentItems ? 'Shipment item write permission required' : undefined}
+                    style={{
+                      ...styles.primaryButton,
+                      ...(!canSubmitShipmentItem ? styles.primaryButtonDisabled : {})
+                    }}
+                    disabled={!canSubmitShipmentItem}
+                    title={
+                      !canManageShipmentItems
+                        ? 'Shipment item write permission required'
+                        : !itemForm.product_id
+                          ? 'Select a product before adding the shipment item'
+                          : undefined
+                    }
                   >
                     {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
                   </button>
+                  {!itemForm.product_id ? (
+                    <div style={styles.inlineHint}>Select a product before adding a shipment item.</div>
+                  ) : null}
                 </div>
               </form>
 
