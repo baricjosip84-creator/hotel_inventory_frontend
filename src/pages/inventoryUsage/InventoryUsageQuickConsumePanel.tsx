@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
+import { InventoryUsageCameraScanner } from './InventoryUsageCameraScanner';
 import type { InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 
 
@@ -477,8 +478,8 @@ export function InventoryUsageQuickConsumePanel({
         <div>
           <h2 style={styles.sectionTitle}>Barcode quick consume</h2>
           <p style={styles.sectionDescription}>
-            Scan or paste a product/package barcode, choose the stock location, and immediately record operational usage.
-            Package barcodes automatically convert package count into unit quantity.
+            Scan a product, package, or inventory-label barcode with this device camera, or paste/type its value.
+            Package barcode quantity means packages; product and inventory-label quantity means base units.
           </p>
         </div>
         <span style={canRecord ? styles.successPill : styles.warningPill}>
@@ -500,10 +501,15 @@ export function InventoryUsageQuickConsumePanel({
                 handleScannerEnter();
               }
             }}
-            placeholder="Scan or paste barcode"
+            placeholder="Paste or enter barcode value"
             autoComplete="off"
           />
         </label>
+
+        <InventoryUsageCameraScanner
+          disabled={!canRecord}
+          onDecoded={(barcode) => updateDraft({ barcode })}
+        />
 
         <label style={styles.fieldLabel}>
           Stock location
@@ -523,7 +529,7 @@ export function InventoryUsageQuickConsumePanel({
         </label>
 
         <label style={styles.fieldLabel}>
-          Package count
+          Scan quantity
           <input
             type="number"
             min="0.0001"
@@ -701,7 +707,7 @@ export function InventoryUsageQuickConsumePanel({
 
         <div style={styles.bulkFooter}>
           <p style={styles.sectionDescription}>
-            The backend resolves product_packages first, falls back to products.barcode, validates location stock, records a normal usage log, links the stock movement, stores operator acknowledgements in notes, and uses the same device-generated scan id for retries until a scan is confirmed. Pressing Enter from a scanner previews first when policy checks are required, then records after the preview is current and any acknowledgements are complete.
+            The backend resolves active inventory labels first, then package and product barcodes, validates location stock, records a normal usage log, links the stock movement, stores operator acknowledgements in notes, and uses the same device-generated scan id for retries until a scan is confirmed. Camera scanning fills the barcode field; preview the stock impact before recording.
           </p>
           {requiresFreshPreview && !previewMatchesDraft ? (
             <p style={styles.warningText}>Preview the current scan before recording so stock, alert, period, reason, and evidence controls are checked against this exact draft.</p>
