@@ -1390,6 +1390,7 @@ export function InventoryUsageDashboard({
                           <button
                             type="button"
                             style={styles.dangerButton}
+                            data-skip-global-action-feedback="true"
                             onClick={() => onReverseUsage(usage.id)}
                             disabled={
                               Boolean(usage.reversed_at) ||

@@ -6,10 +6,12 @@ const root = process.cwd();
 const apiPath = path.join(root, 'src/pages/inventoryUsage/inventoryUsageApi.ts');
 const pagePath = path.join(root, 'src/pages/InventoryUsagePage.tsx');
 const typesPath = path.join(root, 'src/pages/inventoryUsage/inventoryUsageTypes.ts');
+const dashboardPath = path.join(root, 'src/pages/inventoryUsage/InventoryUsageDashboard.tsx');
 
 const api = fs.readFileSync(apiPath, 'utf8');
 const page = fs.readFileSync(pagePath, 'utf8');
 const types = fs.readFileSync(typesPath, 'utf8');
+const dashboard = fs.readFileSync(dashboardPath, 'utf8');
 
 const requiredApiContracts = [
   ['reversal route', '`/stock/usage/${usageLogId}/reverse`'],
@@ -43,6 +45,10 @@ if (!types.includes('product?: {') || !types.includes('name: string;')) {
 
 if (page.includes('Stock created successfully.')) {
   throw new Error('Inventory usage reversal page still contains the incorrect stock-creation message.');
+}
+
+if (!/data-skip-global-action-feedback="true"[\s\S]{0,300}onClick=\{\(\) => onReverseUsage\(usage\.id\)\}/.test(dashboard)) {
+  throw new Error('Inventory usage Reverse action still allows the generic global Action started notification.');
 }
 
 console.log('Inventory usage reversal feedback contract passed.');
