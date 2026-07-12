@@ -108,6 +108,8 @@ type InventoryUsageDashboardProps = {
   barcodeRecording: boolean;
   barcodeError?: Error | null;
   barcodeResult?: InventoryUsageBarcodeResponse | null;
+  barcodeCompletionKey?: number;
+  barcodeCompletionMessage?: string;
   barcodeEvidenceLinking?: boolean;
   barcodeEvidenceError?: Error | null;
   barcodeEvidenceResult?: InventoryUsageAttachmentResponse | null;
@@ -221,6 +223,8 @@ export function InventoryUsageDashboard({
   barcodeRecording,
   barcodeError,
   barcodeResult,
+  barcodeCompletionKey = 0,
+  barcodeCompletionMessage = "",
   barcodeEvidenceLinking,
   barcodeEvidenceError,
   barcodeEvidenceResult,
@@ -549,6 +553,8 @@ export function InventoryUsageDashboard({
 
       {permissions.canRecord ? (
         <InventoryUsageQuickConsumePanel
+          key={barcodeCompletionKey}
+          completionMessage={barcodeCompletionMessage}
           canRecord={permissions.canRecord}
           previewing={Boolean(barcodePreviewing)}
           previewError={barcodePreviewError}

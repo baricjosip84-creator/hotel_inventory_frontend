@@ -31,6 +31,7 @@ import {
 } from "./inventoryUsage/inventoryUsageApi";
 import { DEFAULT_USAGE_FILTERS } from "./inventoryUsage/inventoryUsageConfig";
 import { getRoleCapabilities } from "../lib/permissions";
+import { TENANT_MUTATION_FEEDBACK_EVENT } from "../lib/actionFeedback";
 import type {
   InventoryUsageBarcodeRequest,
   InventoryUsageBulkLine,
@@ -49,6 +50,7 @@ export default function InventoryUsagePage() {
   const permissions = getRoleCapabilities();
   const [filters, setFilters] = useState(DEFAULT_USAGE_FILTERS);
   const [selectedUsageLogId, setSelectedUsageLogId] = useState<string>("");
+  const [barcodeCompletion, setBarcodeCompletion] = useState({ key: 0, message: "" });
 
   const summaryQuery = useQuery({
     queryKey: ["inventory-usage-summary-page", filters],
@@ -232,6 +234,29 @@ export default function InventoryUsagePage() {
       }),
     onSuccess: (data, variables) => {
       barcodePreviewMutation.reset();
+
+      const locationName = storageLocationsQuery.data?.find(
+        (location) => location.id === variables.storage_location_id,
+      )?.name;
+      const productLabel = data?.barcode_match?.product_name
+        || data?.barcode_match?.product_id
+        || variables.barcode;
+      const stockChange = data?.stock
+        ? ` Stock ${Number(data.stock.previous_quantity)} → ${Number(data.stock.new_quantity)}${locationName ? ` at ${locationName}` : ""}.`
+        : "";
+      const completionLabel = data?.idempotent_replay
+        ? "Quick consume was already recorded"
+        : "Quick consume recorded successfully";
+      const completionMessage = `${completionLabel} for ${productLabel}.${stockChange} The scan form was cleared and is ready for the next barcode.`;
+
+      setBarcodeCompletion((current) => ({
+        key: current.key + 1,
+        message: completionMessage,
+      }));
+      window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
+        detail: { type: "success", message: completionMessage },
+      }));
+
       queryClient.invalidateQueries({
         queryKey: ["inventory-usage-summary-page"],
       });
@@ -263,6 +288,14 @@ export default function InventoryUsagePage() {
           storage_path: variables.evidence_storage_path?.trim() || undefined,
         });
       }
+    },
+    onError: (mutationError) => {
+      const message = mutationError instanceof Error
+        ? mutationError.message
+        : "Unexpected error while recording quick consume.";
+      window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
+        detail: { type: "error", message: `Quick consume failed: ${message}` },
+      }));
     },
   });
 
@@ -916,6 +949,8 @@ export default function InventoryUsagePage() {
           : null
       }
       barcodeResult={barcodeUsageMutation.data || null}
+      barcodeCompletionKey={barcodeCompletion.key}
+      barcodeCompletionMessage={barcodeCompletion.message}
       barcodeEvidenceLinking={barcodeEvidenceAttachmentMutation.isPending}
       barcodeEvidenceError={
         barcodeEvidenceAttachmentMutation.isError

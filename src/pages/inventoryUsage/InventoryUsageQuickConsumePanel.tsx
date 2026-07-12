@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
@@ -188,6 +188,7 @@ type InventoryUsageQuickConsumePanelProps = {
   recording: boolean;
   error?: Error | null;
   result?: InventoryUsageBarcodeResponse | null;
+  completionMessage?: string;
   evidenceLinking?: boolean;
   evidenceError?: Error | null;
   evidenceResult?: { id?: string; original_filename?: string } | null;
@@ -238,6 +239,7 @@ export function InventoryUsageQuickConsumePanel({
   recording,
   error,
   result,
+  completionMessage = '',
   evidenceLinking = false,
   evidenceError,
   evidenceResult,
@@ -248,10 +250,8 @@ export function InventoryUsageQuickConsumePanel({
   onRecordBarcodeUsage
 }: InventoryUsageQuickConsumePanelProps) {
   const [draft, setDraft] = useState<InventoryUsageBarcodeRequest>(buildInitialDraft);
-  const barcodeInputRef = useRef<HTMLInputElement | null>(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState(completionMessage);
   const [completionError, setCompletionError] = useState('');
-  const completionStatusRef = useRef<HTMLDivElement | null>(null);
   const [recentScans, setRecentScans] = useState<RecentBarcodeUsageScan[]>(readRecentBarcodeScans);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [missingEvidenceAcknowledged, setMissingEvidenceAcknowledged] = useState(false);
@@ -486,47 +486,15 @@ export function InventoryUsageQuickConsumePanel({
     }
 
     const payload = buildPayload();
-    const submittedLocation = activeLocations.find((location) => location.id === payload.storage_location_id);
     setSuccessMessage('');
     setCompletionError('');
 
     try {
-      const response = await onRecordBarcodeUsage(payload);
-
-      // Once the request resolves successfully, reset the scan immediately.
-      // Do not make the reset depend on optional response fields, preview state,
-      // a delayed effect, or a draft-revision comparison.
-      setRiskAcknowledged(false);
-      setMissingEvidenceAcknowledged(false);
-      setClientScanId(createClientScanId());
-      setDraft((current) => ({
-        ...current,
-        barcode: '',
-        package_count: 1,
-        notes: '',
-        evidence_original_filename: '',
-        evidence_stored_filename: '',
-        evidence_mime_type: '',
-        evidence_file_size_bytes: '',
-        evidence_storage_path: ''
-      }));
-
-      const productLabel = response?.barcode_match?.product_name
-        || response?.barcode_match?.product_id
-        || payload.barcode;
-      const stockChange = response?.stock
-        ? ` Stock ${toNumber(response.stock.previous_quantity)} → ${toNumber(response.stock.new_quantity)}${submittedLocation?.name ? ` at ${submittedLocation.name}` : ''}.`
-        : '';
-      const completionLabel = response?.idempotent_replay
-        ? 'Quick consume was already recorded'
-        : 'Quick consume recorded successfully';
-
-      setSuccessMessage(`${completionLabel} for ${productLabel}.${stockChange} Barcode cleared and ready for the next scan.`);
-
-      requestAnimationFrame(() => {
-        barcodeInputRef.current?.focus();
-        completionStatusRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      });
+      // The parent owns confirmed completion. On success it increments the panel
+      // key, which remounts this entire workflow and guarantees that the barcode,
+      // camera state, quantity, notes, evidence metadata, preview, and scan id are
+      // reset together. This avoids child-state races after a committed mutation.
+      await onRecordBarcodeUsage(payload);
     } catch (caughtError) {
       const message = caughtError instanceof Error
         ? caughtError.message
@@ -589,7 +557,6 @@ export function InventoryUsageQuickConsumePanel({
           Barcode
           <input
             style={styles.input}
-            ref={barcodeInputRef}
             value={draft.barcode}
             onChange={(event) => updateDraft({ barcode: event.target.value })}
             onKeyDown={(event) => {
@@ -826,13 +793,14 @@ export function InventoryUsageQuickConsumePanel({
           ) : null}
           <p style={canSubmit ? styles.successText : styles.warningText}>{actionGuidance}</p>
           {successMessage ? (
-            <div ref={completionStatusRef} role="status" aria-live="polite" style={styles.successBanner}>
+            <div role="status" aria-live="polite" style={styles.successBanner}>
               {successMessage}
             </div>
           ) : null}
           {onPreviewBarcodeUsage ? (
             <button
               type="button"
+              data-skip-global-action-feedback="true"
               style={{
                 ...styles.secondaryButton,
                 ...(!canPreview ? styles.disabledButton : {})
@@ -847,6 +815,7 @@ export function InventoryUsageQuickConsumePanel({
           ) : null}
           <button
             type="button"
+            data-skip-global-action-feedback="true"
             style={{
               ...styles.primaryButton,
               ...(!canSubmit ? styles.disabledButton : {})

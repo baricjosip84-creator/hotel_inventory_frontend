@@ -10,49 +10,64 @@ const panel = fs.readFileSync(panelPath, 'utf8');
 const dashboard = fs.readFileSync(dashboardPath, 'utf8');
 const page = fs.readFileSync(pagePath, 'utf8');
 
+const requiredPageContracts = [
+  ['confirmed completion state', 'const [barcodeCompletion, setBarcodeCompletion] = useState({ key: 0, message: "" });'],
+  ['preview reset after confirmed recording', 'onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();'],
+  ['parent-owned completion key increment', 'key: current.key + 1'],
+  ['specific successful completion message', 'Quick consume recorded successfully'],
+  ['global success feedback', 'detail: { type: "success", message: completionMessage }'],
+  ['global failure feedback', 'detail: { type: "error", message: `Quick consume failed: ${message}` }'],
+  ['mutation promise returned to the panel', 'return barcodeUsageMutation.mutateAsync({']
+];
+
+for (const [label, contract] of requiredPageContracts) {
+  if (!page.includes(contract)) {
+    throw new Error(`Quick-consume page completion contract missing: ${label}`);
+  }
+}
+
+const requiredDashboardContracts = [
+  ['completion key prop', 'barcodeCompletionKey?: number;'],
+  ['completion message prop', 'barcodeCompletionMessage?: string;'],
+  ['panel remount on each confirmed success', 'key={barcodeCompletionKey}'],
+  ['completion message passed into remounted panel', 'completionMessage={barcodeCompletionMessage}'],
+  ['async record contract', 'onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;']
+];
+
+for (const [label, contract] of requiredDashboardContracts) {
+  if (!dashboard.includes(contract)) {
+    throw new Error(`Quick-consume dashboard completion contract missing: ${label}`);
+  }
+}
+
 const requiredPanelContracts = [
-  ['await the exact quick-consume request', 'const response = await onRecordBarcodeUsage(payload);'],
-  ['clear the barcode after the request resolves', "barcode: '',\n        package_count: 1"],
-  ['do not depend on optional response fields to clear', 'const productLabel = response?.barcode_match?.product_name'],
-  ['show a visible success status beside the action controls', 'ref={completionStatusRef} role="status" aria-live="polite" style={styles.successBanner}'],
-  ['show an explicit completion message', 'Quick consume recorded successfully'],
-  ['confirm the form is ready for another scan', 'Barcode cleared and ready for the next scan.'],
-  ['surface local post-submit failures instead of swallowing them', 'setCompletionError(`Quick consume failed: ${message}`);'],
-  ['disable barcode editing while recording', 'autoComplete="off"\n            disabled={recording}'],
-  ['disable camera scanning while recording', 'disabled={!canRecord || recording}'],
-  ['return focus to the barcode field', 'barcodeInputRef.current?.focus();']
+  ['completion message initializes on remount', 'const [successMessage, setSuccessMessage] = useState(completionMessage);'],
+  ['exact request is awaited', 'await onRecordBarcodeUsage(payload);'],
+  ['success message is visible beside controls', '<div role="status" aria-live="polite" style={styles.successBanner}>'],
+  ['failure message is visible beside controls', '<div role="alert" style={styles.errorText}>'],
+  ['barcode is locked during recording', 'autoComplete="off"\n            disabled={recording}'],
+  ['camera is locked during recording', 'disabled={!canRecord || recording}'],
+  ['generic action feedback is suppressed for preview', 'data-skip-global-action-feedback="true"'],
+  ['draft edits clear stale completion feedback', "setSuccessMessage('');\n    setCompletionError('');"]
 ];
 
 for (const [label, contract] of requiredPanelContracts) {
   if (!panel.includes(contract)) {
-    throw new Error(`Quick-consume completion contract missing: ${label}`);
+    throw new Error(`Quick-consume panel completion contract missing: ${label}`);
   }
 }
 
-if (panel.includes('draftRevisionRef') || panel.includes('submittedDraftRevision')) {
-  throw new Error('Quick-consume completion must not be blocked by draft-revision comparisons after a successful response.');
+const forbiddenPanelPatterns = [
+  ['result-watching reset effect', 'lastCompletedUsageIdRef'],
+  ['draft-revision completion gate', 'draftRevisionRef'],
+  ['child-owned barcode clearing after mutation', "barcode: '',\n        package_count: 1"],
+  ['silent completion failure', 'catch {\n      //']
+];
+
+for (const [label, pattern] of forbiddenPanelPatterns) {
+  if (panel.includes(pattern)) {
+    throw new Error(`Quick-consume completion still contains forbidden race-prone behavior: ${label}`);
+  }
 }
 
-if (panel.includes('catch {\n      // The parent mutation exposes')) {
-  throw new Error('Quick-consume completion must not silently swallow post-submit errors.');
-}
-
-const resetIndex = panel.indexOf("barcode: '',\n        package_count: 1");
-const responseFormattingIndex = panel.indexOf('const productLabel = response?.barcode_match?.product_name');
-if (resetIndex < 0 || responseFormattingIndex < 0 || resetIndex > responseFormattingIndex) {
-  throw new Error('The successful quick-consume reset must happen before optional response formatting.');
-}
-
-if (!dashboard.includes('onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;')) {
-  throw new Error('Quick-consume async contract missing: dashboard response promise.');
-}
-
-if (!page.includes('return barcodeUsageMutation.mutateAsync({')) {
-  throw new Error('Quick-consume async contract missing: page returns the mutation promise.');
-}
-
-if (!page.includes('onSuccess: (data, variables) => {\n      barcodePreviewMutation.reset();')) {
-  throw new Error('Quick-consume async contract missing: preview resets only after successful recording.');
-}
-
-console.log('Inventory usage quick-consume completion contract passed.');
+console.log('Inventory usage quick-consume confirmed-completion contract passed.');
