@@ -86,13 +86,13 @@ function openPrintWindow(labels: BarcodeLabel[]): boolean {
   }
 
   const labelMarkup = labels.map((label) => (
-    `<article class="label">${createBarcodeLabelSvgMarkup(label)}</article>`
+    `<article class="label label-${String(label.barcode_type || 'CODE128').toLowerCase()}">${createBarcodeLabelSvgMarkup(label)}</article>`
   )).join('');
 
   popup.document.open();
   popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Inventory barcode labels</title><style>
-    *{box-sizing:border-box}body{margin:0;padding:18px;font-family:Arial,sans-serif;background:#fff}.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}.label{break-inside:avoid;page-break-inside:avoid;display:flex;justify-content:center}.label svg{width:100%;height:auto;max-height:290px}@media print{body{padding:0}.sheet{gap:6mm}.label{page-break-inside:avoid}@page{margin:8mm}}
-  </style></head><body><main class="sheet">${labelMarkup}</main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));<\/script></body></html>`);
+    *{box-sizing:border-box}body{margin:0;padding:18px;font-family:Arial,sans-serif;background:#fff}.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}.label{break-inside:avoid;page-break-inside:avoid;display:flex;justify-content:center}.label svg{width:auto;height:auto;max-width:100%;max-height:330px}.label-code128{grid-column:1/-1}.label-code128 svg{width:min(100%,760px)}@media print{body{padding:0}.sheet{gap:6mm}.label{page-break-inside:avoid}.label-code128{grid-column:1/-1}.label-code128 svg{width:105mm;max-height:none}.label-ean13 svg{width:75mm;max-height:none}.label-qr svg{width:60mm;max-height:none}@page{margin:8mm}}
+  </style></head><body><main class="sheet">${labelMarkup}</main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));</script></body></html>`);
   popup.document.close();
   return true;
 }

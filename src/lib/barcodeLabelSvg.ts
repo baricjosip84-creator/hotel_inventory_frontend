@@ -170,10 +170,50 @@ export function svgMarkupToDataUri(markup: string): string {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`;
 }
 
-function labelTemplateDimensions(template: string | null | undefined) {
+function code128NaturalWidth(value: string): number {
+  const quietZoneModules = 20;
+  const encodedModules = (value.length + 2) * 11 + 13;
+  return (quietZoneModules + encodedModules) * 2;
+}
+
+function labelTemplateDimensions(
+  template: string | null | undefined,
+  type: BarcodeSymbology,
+  value: string
+) {
+  if (type === 'CODE128') {
+    const naturalGraphicWidth = code128NaturalWidth(value);
+
+    if (template === 'compact') {
+      const width = Math.max(560, naturalGraphicWidth + 44);
+      return { width, height: 220, graphicX: 22, graphicY: 56, graphicWidth: width - 44, graphicHeight: 112, fontSize: 20 };
+    }
+
+    if (template === 'shelf') {
+      const width = Math.max(720, naturalGraphicWidth + 230);
+      return { width, height: 260, graphicX: 205, graphicY: 46, graphicWidth: width - 225, graphicHeight: 150, fontSize: 26 };
+    }
+
+    const width = Math.max(620, naturalGraphicWidth + 48);
+    return { width, height: 280, graphicX: 24, graphicY: 68, graphicWidth: width - 48, graphicHeight: 150, fontSize: 24 };
+  }
+
   if (template === 'compact') return { width: 340, height: 190, graphicX: 18, graphicY: 54, graphicWidth: 304, graphicHeight: 90, fontSize: 18 };
   if (template === 'shelf') return { width: 520, height: 230, graphicX: 175, graphicY: 42, graphicWidth: 325, graphicHeight: 132, fontSize: 24 };
   return { width: 420, height: 250, graphicX: 24, graphicY: 70, graphicWidth: 372, graphicHeight: 120, fontSize: 22 };
+}
+
+function embedBarcodeGraphicSvg(
+  markup: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): string {
+  return markup.replace(
+    '<svg ',
+    `<svg x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" `
+  );
 }
 
 function formatExpiry(value?: string | null): string {
@@ -185,9 +225,15 @@ function formatExpiry(value?: string | null): string {
 export function createBarcodeLabelSvgMarkup(label: PrintableBarcodeLabel): string {
   const type = (label.barcode_type || 'CODE128') as BarcodeSymbology;
   const template = label.label_template || 'default';
-  const dimensions = labelTemplateDimensions(template);
+  const dimensions = labelTemplateDimensions(template, type, label.barcode_value);
   const graphic = createBarcodeGraphicSvgMarkup(label.barcode_value, type);
-  const graphicUri = svgMarkupToDataUri(graphic);
+  const embeddedGraphic = embedBarcodeGraphicSvg(
+    graphic,
+    dimensions.graphicX,
+    dimensions.graphicY,
+    dimensions.graphicWidth,
+    dimensions.graphicHeight
+  );
   const metadata = [
     label.lot_number ? `Lot: ${label.lot_number}` : '',
     label.batch_number ? `Batch: ${label.batch_number}` : '',
@@ -195,9 +241,9 @@ export function createBarcodeLabelSvgMarkup(label: PrintableBarcodeLabel): strin
   ].filter(Boolean);
 
   if (template === 'shelf') {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="22" y="42" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="22" y="72" font-family="Arial, sans-serif" font-size="15" fill="#333">${escapeXml(label.product_unit || '')}</text><text x="22" y="112" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[0] || '')}</text><text x="22" y="137" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[1] || '')}</text><text x="22" y="162" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[2] || '')}</text><text x="22" y="205" font-family="Arial, sans-serif" font-size="12" fill="#555">${escapeXml(label.barcode_value)}</text><image href="${escapeXml(graphicUri)}" x="${dimensions.graphicX}" y="${dimensions.graphicY}" width="${dimensions.graphicWidth}" height="${dimensions.graphicHeight}" preserveAspectRatio="xMidYMid meet"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="22" y="42" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="22" y="72" font-family="Arial, sans-serif" font-size="15" fill="#333">${escapeXml(label.product_unit || '')}</text><text x="22" y="112" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[0] || '')}</text><text x="22" y="137" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[1] || '')}</text><text x="22" y="162" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[2] || '')}</text><text x="22" y="205" font-family="Arial, sans-serif" font-size="12" fill="#555">${escapeXml(label.barcode_value)}</text>${embeddedGraphic}</svg>`;
   }
 
   const metadataText = metadata.join(' · ');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="${dimensions.width / 2}" y="32" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" text-anchor="middle" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="${dimensions.width / 2}" y="52" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#444">${escapeXml(metadataText)}</text><image href="${escapeXml(graphicUri)}" x="${dimensions.graphicX}" y="${dimensions.graphicY}" width="${dimensions.graphicWidth}" height="${dimensions.graphicHeight}" preserveAspectRatio="xMidYMid meet"/><text x="${dimensions.width / 2}" y="${dimensions.height - 16}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#555">${escapeXml(label.barcode_value)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="${dimensions.width / 2}" y="32" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" text-anchor="middle" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="${dimensions.width / 2}" y="52" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#444">${escapeXml(metadataText)}</text>${embeddedGraphic}<text x="${dimensions.width / 2}" y="${dimensions.height - 16}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#555">${escapeXml(label.barcode_value)}</text></svg>`;
 }

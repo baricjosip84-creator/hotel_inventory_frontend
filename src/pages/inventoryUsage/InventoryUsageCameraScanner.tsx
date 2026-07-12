@@ -15,6 +15,15 @@ const SUPPORTED_FORMATS: Html5QrcodeSupportedFormats[] = [
   Html5QrcodeSupportedFormats.QR_CODE
 ];
 
+const REQUIRED_MATCHING_DECODE_COUNT = 2;
+const DECODE_CONFIRMATION_WINDOW_MS = 1800;
+
+type DecodeCandidate = {
+  value: string;
+  count: number;
+  lastSeenAt: number;
+};
+
 type InventoryUsageCameraScannerProps = {
   disabled?: boolean;
   onDecoded: (barcode: string) => void;
@@ -57,11 +66,14 @@ export function InventoryUsageCameraScanner({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const startingRef = useRef(false);
   const decodeLockedRef = useRef(false);
+  const decodeCandidateRef = useRef<DecodeCandidate>({ value: '', count: 0, lastSeenAt: 0 });
   const [isOpen, setIsOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [decodedValue, setDecodedValue] = useState('');
+  const [candidateValue, setCandidateValue] = useState('');
+  const [confirmationCount, setConfirmationCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const stopScanner = async () => {
@@ -87,7 +99,13 @@ export function InventoryUsageCameraScanner({
     startingRef.current = false;
   };
 
-  const handleDecodedValue = async (rawValue: string) => {
+  const resetDecodeCandidate = () => {
+    decodeCandidateRef.current = { value: '', count: 0, lastSeenAt: 0 };
+    setCandidateValue('');
+    setConfirmationCount(0);
+  };
+
+  const confirmDecodedValue = async (rawValue: string) => {
     const value = rawValue.trim();
 
     if (!value || decodeLockedRef.current) {
@@ -98,8 +116,33 @@ export function InventoryUsageCameraScanner({
     playScanFeedback();
     await stopScanner();
     setDecodedValue(value);
+    setCandidateValue('');
+    setConfirmationCount(0);
     setError(null);
     onDecoded(value);
+  };
+
+  const handleCameraDecode = (rawValue: string) => {
+    const value = rawValue.trim();
+
+    if (!value || decodeLockedRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    const previous = decodeCandidateRef.current;
+    const isRepeatedCandidate = previous.value === value
+      && now - previous.lastSeenAt <= DECODE_CONFIRMATION_WINDOW_MS;
+    const count = isRepeatedCandidate ? previous.count + 1 : 1;
+
+    decodeCandidateRef.current = { value, count, lastSeenAt: now };
+    setCandidateValue(value);
+    setConfirmationCount(count);
+    setError(null);
+
+    if (count >= REQUIRED_MATCHING_DECODE_COUNT) {
+      void confirmDecodedValue(value);
+    }
   };
 
   const startScanner = async () => {
@@ -109,19 +152,24 @@ export function InventoryUsageCameraScanner({
 
     startingRef.current = true;
     decodeLockedRef.current = false;
+    resetDecodeCandidate();
     setDecodedValue('');
     setError(null);
     setIsStarting(true);
 
     const createScanner = () => new Html5Qrcode(scannerContainerId, {
       formatsToSupport: SUPPORTED_FORMATS,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       verbose: false
     });
 
     const scannerConfig = {
-      fps: 15,
+      fps: 20,
       aspectRatio: 1.7777778,
-      qrbox: { width: 360, height: 160 },
+      qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
+        width: Math.min(viewfinderWidth, Math.max(180, Math.floor(viewfinderWidth * 0.92))),
+        height: Math.min(viewfinderHeight, Math.max(100, Math.floor(viewfinderHeight * 0.42)))
+      }),
       disableFlip: false
     };
 
@@ -137,7 +185,7 @@ export function InventoryUsageCameraScanner({
         await scanner.start(
           { facingMode: { exact: 'environment' } },
           scannerConfig,
-          (value) => void handleDecodedValue(value),
+          handleCameraDecode,
           () => {}
         );
       } catch {
@@ -150,7 +198,7 @@ export function InventoryUsageCameraScanner({
         await fallbackScanner.start(
           { facingMode: 'environment' },
           scannerConfig,
-          (value) => void handleDecodedValue(value),
+          handleCameraDecode,
           () => {}
         );
       }
@@ -180,6 +228,7 @@ export function InventoryUsageCameraScanner({
     setIsOpen(false);
     setError(null);
     setDecodedValue('');
+    resetDecodeCandidate();
     decodeLockedRef.current = false;
   };
 
@@ -192,6 +241,7 @@ export function InventoryUsageCameraScanner({
 
     setError(null);
     setDecodedValue('');
+    resetDecodeCandidate();
     setIsDecodingImage(true);
     decodeLockedRef.current = false;
 
@@ -203,7 +253,7 @@ export function InventoryUsageCameraScanner({
       });
       scannerRef.current = imageScanner;
       const value = await imageScanner.scanFile(file, true);
-      await handleDecodedValue(value);
+      await confirmDecodedValue(value);
     } catch (imageError) {
       await stopScanner();
       setError(imageError instanceof Error && imageError.message
@@ -311,13 +361,19 @@ export function InventoryUsageCameraScanner({
           />
 
           {error ? <p style={cameraStyles.errorText}>{error}</p> : null}
+          {!decodedValue && candidateValue ? (
+            <p style={cameraStyles.confirmationText}>
+              Detected <strong>{candidateValue}</strong>. Hold the camera still while the same value is confirmed
+              {' '}({Math.min(confirmationCount, REQUIRED_MATCHING_DECODE_COUNT)}/{REQUIRED_MATCHING_DECODE_COUNT}).
+            </p>
+          ) : null}
           {decodedValue ? (
             <p style={cameraStyles.successText}>
               Barcode captured: <strong>{decodedValue}</strong>. It has been placed in the Barcode field; preview stock impact before recording.
             </p>
           ) : (
             <p style={cameraStyles.helpText}>
-              Hold a Code 128, EAN, UPC, QR, or other supported inventory barcode inside the scan area. Camera access requires HTTPS or localhost and browser permission.
+              Fill most of the wide scan area with one Code 128, EAN, UPC, QR, or other supported inventory barcode and hold it still. The scanner accepts a camera result only after the same value is decoded twice. Camera access requires HTTPS or localhost and browser permission.
             </p>
           )}
         </div>
@@ -414,6 +470,13 @@ const cameraStyles: Record<string, CSSProperties> = {
     margin: '0.75rem 0 0',
     color: '#475569',
     lineHeight: 1.5
+  },
+  confirmationText: {
+    margin: '0.75rem 0 0',
+    color: '#92400e',
+    fontWeight: 700,
+    lineHeight: 1.5,
+    overflowWrap: 'anywhere'
   },
   successText: {
     margin: '0.75rem 0 0',
