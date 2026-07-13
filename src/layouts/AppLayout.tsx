@@ -14,7 +14,7 @@ import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/mainten
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
-import { hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { getTenantPermissionSnapshot, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
@@ -51,6 +51,15 @@ function getCurrentUserRole(): UserRole {
   return null;
 }
 
+function getCurrentAccessRoleLabel(): string | null {
+  const payload = decodeJwtPayload(getAccessToken());
+  if (typeof payload?.custom_role_name === 'string' && payload.custom_role_name.trim()) {
+    return payload.custom_role_name.trim();
+  }
+  const role = payload?.role;
+  return typeof role === 'string' && role ? role : null;
+}
+
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
@@ -69,6 +78,8 @@ export default function AppLayout() {
   const isMobile = useIsMobile();
   const role = useMemo(() => getCurrentUserRole(), []);
   const [permissionRevision, setPermissionRevision] = useState(0);
+  const permissionSnapshot = getTenantPermissionSnapshot();
+  const accessRoleLabel = permissionSnapshot?.access_role_label || permissionSnapshot?.custom_role_name || getCurrentAccessRoleLabel();
   const tenantAccess = useMemo(() => getTenantAccessSnapshot(), [location.pathname, permissionRevision]);
   const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
 
@@ -384,7 +395,7 @@ export default function AppLayout() {
         <div style={styles.brandBlock}>
           <div style={styles.brandTitle}>Inventory Platform</div>
           <div style={styles.brandSubtitle}>Multi-tenant control center</div>
-          {role ? <div style={styles.rolePill}>ROLE: {role.toUpperCase()}</div> : null}
+          {accessRoleLabel ? <div style={styles.rolePill}>ROLE: {accessRoleLabel.toUpperCase()}</div> : null}
 
         {supportSession.isSupportSession ? (
             <div style={styles.supportPill}>SUPPORT MODE</div>

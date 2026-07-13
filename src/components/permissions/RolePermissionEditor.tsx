@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { PermissionCatalogItem, RolePermissionPolicy } from '../../lib/permissionPolicies';
 
 export type RolePermissionEditorProps<Role extends string, Permission extends string> = {
@@ -19,6 +19,7 @@ export type RolePermissionEditorProps<Role extends string, Permission extends st
   errorMessage?: string | null;
   scopeLabel: string;
   reservedLabel?: string;
+  headerAddon?: ReactNode;
 };
 
 function roleLabel(role: string): string {
@@ -51,10 +52,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   successMessage,
   errorMessage,
   scopeLabel,
-  reservedLabel = 'Admin only'
+  reservedLabel = 'Admin only',
+  headerAddon
 }: RolePermissionEditorProps<Role, Permission>) {
   const [search, setSearch] = useState('');
   const activeRole = roles.find((role) => role.role === selectedRole) || roles[0];
+  const builtInRoles = roles.filter((role) => role.role_kind !== 'custom');
+  const customRoles = roles.filter((role) => role.role_kind === 'custom');
   const draftSet = useMemo(() => new Set(draftPermissions), [draftPermissions]);
   const defaultSet = useMemo(() => new Set(activeRole?.default_permissions || []), [activeRole]);
   const lockedSet = useMemo(() => new Set(activeRole?.locked_permissions || []), [activeRole]);
@@ -139,30 +143,57 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
       {successMessage ? <div style={styles.success}>{successMessage}</div> : null}
       {errorMessage ? <div style={styles.error}>{errorMessage}</div> : null}
+      {headerAddon}
 
-      <div style={styles.roleTabs}>
-        {roles.map((role) => (
-          <button
-            key={role.role}
-            type="button"
-            onClick={() => requestRoleChange(role.role)}
-            style={{ ...styles.roleTab, ...(role.role === activeRole?.role ? styles.roleTabActive : {}) }}
-          >
-            <strong>{roleLabel(role.role)}</strong>
-            <span>{role.effective_permissions.length} enabled</span>
-            <small>{role.editable ? (role.is_default ? 'Default' : `${role.override_count} overrides`) : 'Protected'}</small>
-          </button>
-        ))}
+      <div style={styles.roleCollections}>
+        <div style={styles.roleCollection}>
+          <div style={styles.roleCollectionHeader}><strong>{scopeLabel} roles</strong><span>Protected role baselines</span></div>
+          <div style={styles.roleTabs}>
+            {builtInRoles.map((role) => (
+              <button
+                key={role.role}
+                type="button"
+                onClick={() => requestRoleChange(role.role)}
+                style={{ ...styles.roleTab, ...(role.role === activeRole?.role ? styles.roleTabActive : {}) }}
+              >
+                <strong>{role.display_name || roleLabel(role.role)}</strong>
+                <span>{role.effective_permissions.length} enabled</span>
+                <small>{role.editable ? (role.is_default ? 'Default' : `${role.override_count} overrides`) : 'Protected'}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        {customRoles.length ? (
+          <div style={styles.roleCollection}>
+            <div style={styles.roleCollectionHeader}><strong>Custom roles</strong><span>Tenant-specific operational roles</span></div>
+            <div style={styles.roleTabs}>
+              {customRoles.map((role) => (
+                <button
+                  key={role.role}
+                  type="button"
+                  onClick={() => requestRoleChange(role.role)}
+                  style={{ ...styles.roleTab, ...(role.role === activeRole?.role ? styles.roleTabActive : {}), ...(role.is_active === false ? styles.roleTabInactive : {}) }}
+                >
+                  <strong>{role.display_name || roleLabel(role.role)}</strong>
+                  <span>{role.effective_permissions.length} enabled · {role.user_count || 0} users</span>
+                  <small>{role.is_active === false ? 'Inactive' : role.is_default ? `Template: ${role.source_template_name || 'Blank'}` : `${role.override_count} changes`}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {activeRole ? (
         <>
           <div style={styles.toolbar}>
             <div>
-              <h2 style={styles.roleTitle}>{roleLabel(activeRole.role)}</h2>
+              <h2 style={styles.roleTitle}>{activeRole.display_name || roleLabel(activeRole.role)}</h2>
               <p style={styles.roleHelp}>
                 {activeRole.editable
-                  ? 'Changes apply to every active user assigned to this role.'
+                  ? activeRole.role_kind === 'custom'
+                    ? `Changes apply to every user assigned to this tenant custom role${activeRole.description ? ` — ${activeRole.description}` : ''}.`
+                    : 'Changes apply to every active user assigned to this role.'
                   : 'This role is protected and cannot be edited.'}
               </p>
             </div>
@@ -250,7 +281,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
           <footer style={styles.actionBar}>
             <div>
               <strong>{dirty ? 'Unsaved permission changes' : activeRole.is_default ? 'Using hardcoded defaults' : 'Saved custom policy active'}</strong>
-              <span style={styles.actionHelp}>Hardcoded defaults remain available through Reset to defaults.</span>
+              <span style={styles.actionHelp}>{activeRole.role_kind === 'custom' ? 'The starting template remains available through Reset to starting template.' : 'Hardcoded defaults remain available through Reset to defaults.'}</span>
             </div>
             <div style={styles.actionButtons}>
               <button
@@ -262,7 +293,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                 onClick={() => void onReset()}
               >
-                {resetting ? 'Resetting…' : 'Reset to defaults'}
+                {resetting ? 'Resetting…' : activeRole.role_kind === 'custom' ? 'Reset to starting template' : 'Reset to defaults'}
               </button>
               <button
                 type="button"
@@ -293,8 +324,12 @@ const styles: Record<string, CSSProperties> = {
   metric: { background: '#eef4ff', color: '#174ea6', borderRadius: 999, padding: '8px 12px', fontWeight: 700, whiteSpace: 'nowrap' },
   success: { background: '#ecfdf3', border: '1px solid #86efac', color: '#166534', borderRadius: 12, padding: '12px 14px', fontWeight: 700 },
   error: { background: '#fff1f2', border: '1px solid #fda4af', color: '#9f1239', borderRadius: 12, padding: '12px 14px', fontWeight: 700 },
+  roleCollections: { display: 'grid', gap: 14 },
+  roleCollection: { display: 'grid', gap: 8 },
+  roleCollectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, color: '#475569', padding: '0 2px', flexWrap: 'wrap' },
   roleTabs: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
   roleTab: { display: 'grid', textAlign: 'left', gap: 4, padding: 14, borderRadius: 14, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' },
+  roleTabInactive: { opacity: 0.66, background: '#f8fafc' },
   roleTabActive: { borderColor: '#2563eb', boxShadow: '0 0 0 2px rgba(37,99,235,0.12)', background: '#f8fbff' },
   toolbar: { display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'end', background: '#fff', border: '1px solid #dbe3ef', borderRadius: 16, padding: 18 },
   roleTitle: { margin: 0, fontSize: 22 },

@@ -140,6 +140,8 @@ type JwtPayload = {
   role?: string;
   tenant_id?: string;
   id?: string;
+  custom_role_id?: string;
+  custom_role_name?: string;
   exp?: number;
 };
 
@@ -579,18 +581,23 @@ export type TenantPermissionSnapshot = {
   tenant_id: string;
   user_id?: string | null;
   role: UserRole;
+  custom_role_id?: string | null;
+  custom_role_name?: string | null;
+  access_role?: string | null;
+  access_role_label?: string | null;
   permissions: TenantPermission[];
   loaded_at: string;
 };
 
-function currentTenantIdentity(): { tenantId: string | null; userId: string | null; role: UserRole } {
+function currentTenantIdentity(): { tenantId: string | null; userId: string | null; role: UserRole; customRoleId: string | null } {
   const payload = decodeJwtPayload(getAccessToken());
   const role: UserRole = isKnownUserRole(payload?.role) ? payload.role : 'unknown';
 
   return {
     tenantId: typeof payload?.tenant_id === 'string' ? payload.tenant_id : null,
     userId: typeof payload?.id === 'string' ? payload.id : null,
-    role
+    role,
+    customRoleId: typeof payload?.custom_role_id === 'string' ? payload.custom_role_id : null
   };
 }
 
@@ -612,6 +619,10 @@ export function getTenantPermissionSnapshot(): TenantPermissionSnapshot | null {
       tenant_id: parsed.tenant_id,
       user_id: typeof parsed.user_id === 'string' || parsed.user_id === null ? parsed.user_id : null,
       role: parsed.role,
+      custom_role_id: typeof parsed.custom_role_id === 'string' || parsed.custom_role_id === null ? parsed.custom_role_id : null,
+      custom_role_name: typeof parsed.custom_role_name === 'string' || parsed.custom_role_name === null ? parsed.custom_role_name : null,
+      access_role: typeof parsed.access_role === 'string' || parsed.access_role === null ? parsed.access_role : null,
+      access_role_label: typeof parsed.access_role_label === 'string' || parsed.access_role_label === null ? parsed.access_role_label : null,
       permissions: [...new Set(parsed.permissions.filter((permission): permission is TenantPermission => validPermissions.has(String(permission))))],
       loaded_at: typeof parsed.loaded_at === 'string' ? parsed.loaded_at : new Date(0).toISOString()
     };
@@ -642,6 +653,7 @@ function cachedPermissionsForCurrentRole(role: UserRole): readonly TenantPermiss
   const snapshot = getTenantPermissionSnapshot();
   if (!snapshot || role === 'unknown') return null;
   if (identity.role !== role || identity.tenantId !== snapshot.tenant_id || snapshot.role !== role) return null;
+  if ((snapshot.custom_role_id || null) !== identity.customRoleId) return null;
   if (identity.userId && snapshot.user_id && identity.userId !== snapshot.user_id) return null;
   return snapshot.permissions;
 }
@@ -656,7 +668,10 @@ export function getCurrentUserRole(): UserRole {
 export function permissionsForRole(role: UserRole = getCurrentUserRole()): readonly TenantPermission[] {
   if (isKnownUserRole(role)) {
     const cached = cachedPermissionsForCurrentRole(role);
-    return cached || [...new Set(ROLE_PERMISSIONS[role])];
+    if (cached) return cached;
+    const identity = currentTenantIdentity();
+    if (identity.customRoleId) return [];
+    return [...new Set(ROLE_PERMISSIONS[role])];
   }
 
   return [];

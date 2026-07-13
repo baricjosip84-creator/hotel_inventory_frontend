@@ -7,20 +7,41 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 
 type UserRole = 'admin' | 'manager' | 'staff';
+type RoleSelection = UserRole | `custom:${string}`;
 
 type UserItem = {
   id: string;
   tenant_id: string;
   name: string;
   role: UserRole;
+  custom_role_id?: string | null;
+  custom_role_name?: string | null;
+  access_role?: string;
+  access_role_label?: string;
   email: string;
   created_at: string;
+};
+
+type AssignableRole = {
+  key: string;
+  role: UserRole;
+  custom_role_id?: string;
+  label: string;
+  description?: string | null;
+  kind: 'built_in' | 'custom';
+  permission_count?: number;
+  user_count?: number;
+};
+
+type RoleOptionsResponse = {
+  built_in_roles: AssignableRole[];
+  custom_roles: AssignableRole[];
 };
 
 type UserFormState = {
   name: string;
   email: string;
-  role: UserRole;
+  roleSelection: RoleSelection;
   password: string;
 };
 
@@ -28,13 +49,24 @@ function emptyForm(): UserFormState {
   return {
     name: '',
     email: '',
-    role: 'staff',
+    roleSelection: 'staff',
     password: ''
   };
 }
 
+function rolePayload(selection: RoleSelection): { role: UserRole; custom_role_id: string | null } {
+  if (selection.startsWith('custom:')) {
+    return { role: 'staff', custom_role_id: selection.slice('custom:'.length) };
+  }
+  return { role: selection as UserRole, custom_role_id: null };
+}
+
 async function fetchUsers(): Promise<UserItem[]> {
   return apiRequest<UserItem[]>('/users');
+}
+
+async function fetchRoleOptions(): Promise<RoleOptionsResponse> {
+  return apiRequest<RoleOptionsResponse>('/users/role-options');
 }
 
 async function createUser(input: UserFormState): Promise<UserItem> {
@@ -43,19 +75,19 @@ async function createUser(input: UserFormState): Promise<UserItem> {
     body: JSON.stringify({
       name: input.name.trim(),
       email: input.email.trim().toLowerCase(),
-      role: input.role,
+      ...rolePayload(input.roleSelection),
       password: input.password
     })
   });
 }
 
-async function updateUser(input: { id: string; values: UserFormState }): Promise<UserItem> {
+async function updateUser(input: { id: string; values: UserFormState; preserveRole?: boolean }): Promise<UserItem> {
   return apiRequest<UserItem>(`/users/${input.id}`, {
     method: 'PUT',
     body: JSON.stringify({
       name: input.values.name.trim(),
       email: input.values.email.trim().toLowerCase(),
-      role: input.values.role,
+      ...(input.preserveRole ? {} : rolePayload(input.values.roleSelection)),
       password: input.values.password.trim() ? input.values.password : undefined
     })
   });
@@ -155,6 +187,12 @@ export default function UsersPage() {
     queryFn: fetchUsers
   });
 
+  const roleOptionsQuery = useQuery({
+    queryKey: ['tenant-user-role-options'],
+    queryFn: fetchRoleOptions,
+    enabled: canWrite
+  });
+
   const createMutation = useMutation({
     mutationFn: createUser,
     onSuccess: async () => {
@@ -173,7 +211,10 @@ export default function UsersPage() {
       setEditingUser(null);
       setPageError(null);
       setPageMessage('User created successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
+      ]);
     },
     onError: (error) => {
       setPageMessage(null);
@@ -188,7 +229,10 @@ export default function UsersPage() {
       setEditingUser(null);
       setPageError(null);
       setPageMessage('User updated successfully.');
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
+      ]);
     },
     onError: (error) => {
       setPageMessage(null);
@@ -205,7 +249,10 @@ export default function UsersPage() {
         setEditingUser(null);
         setForm(emptyForm());
       }
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
+      ]);
     },
     onError: (error) => {
       setPageMessage(null);
@@ -223,7 +270,7 @@ export default function UsersPage() {
     }
 
     return users.filter((user) =>
-      [user.name, user.email, user.role].some((value) => value.toLowerCase().includes(needle))
+      [user.name, user.email, user.access_role_label || user.custom_role_name || user.role].some((value) => value.toLowerCase().includes(needle))
     );
   }, [search, users]);
 
@@ -232,7 +279,8 @@ export default function UsersPage() {
       total: users.length,
       admins: users.filter((user) => user.role === 'admin').length,
       managers: users.filter((user) => user.role === 'manager').length,
-      staff: users.filter((user) => user.role === 'staff').length
+      staff: users.filter((user) => user.role === 'staff' && !user.custom_role_id).length,
+      custom: users.filter((user) => Boolean(user.custom_role_id)).length
     };
   }, [users]);
 
@@ -267,7 +315,8 @@ export default function UsersPage() {
     if (editingUser) {
       updateMutation.mutate({
         id: editingUser.id,
-        values: form
+        values: form,
+        preserveRole: Boolean(currentUserId && editingUser.id === currentUserId)
       });
       return;
     }
@@ -286,7 +335,7 @@ export default function UsersPage() {
     setForm({
       name: user.name,
       email: user.email,
-      role: user.role,
+      roleSelection: (user.custom_role_id ? `custom:${user.custom_role_id}` : user.role) as RoleSelection,
       password: ''
     });
     scrollToFormSection('tenant-user-form-panel');
@@ -335,7 +384,8 @@ export default function UsersPage() {
         <StatCard title="Users" value={summary.total} subtitle="Tenant user accounts" />
         <StatCard title="Admins" value={summary.admins} subtitle="Full platform control" tone="warn" />
         <StatCard title="Managers" value={summary.managers} subtitle="Operational supervisors" />
-        <StatCard title="Staff" value={summary.staff} subtitle="Daily execution users" tone="good" />
+        <StatCard title="Staff" value={summary.staff} subtitle="Built-in daily execution users" tone="good" />
+        <StatCard title="Custom roles" value={summary.custom} subtitle="Specialized tenant assignments" />
       </div>
 
       <div
@@ -413,16 +463,31 @@ export default function UsersPage() {
               <select
                 id="user-role"
                 style={styles.select}
-                value={form.role}
+                value={form.roleSelection}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, role: event.target.value as UserRole }))
+                  setForm((current) => ({ ...current, roleSelection: event.target.value as RoleSelection }))
                 }
-                disabled={!canWrite}
+                disabled={!canWrite || roleOptionsQuery.isLoading || Boolean(editingUser && currentUserId && editingUser.id === currentUserId)}
               >
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                <optgroup label="Built-in roles">
+                  {(roleOptionsQuery.data?.built_in_roles || [
+                    { key: 'staff', role: 'staff', label: 'Staff', kind: 'built_in' as const },
+                    { key: 'manager', role: 'manager', label: 'Manager', kind: 'built_in' as const },
+                    { key: 'admin', role: 'admin', label: 'Admin', kind: 'built_in' as const }
+                  ]).map((option) => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </optgroup>
+                {roleOptionsQuery.data?.custom_roles.length ? (
+                  <optgroup label="Custom roles">
+                    {roleOptionsQuery.data.custom_roles.map((option) => (
+                      <option key={option.key} value={option.key}>{option.label} · {option.permission_count || 0} permissions</option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </select>
+              {editingUser && currentUserId && editingUser.id === currentUserId ? <small style={styles.fieldHelp}>Your own role assignment cannot be changed from this form.</small> : null}
+              {roleOptionsQuery.isError ? <small style={styles.fieldHelp}>Custom roles could not be loaded. Built-in roles remain available.</small> : null}
             </div>
 
             <div style={styles.formField}>
@@ -522,7 +587,7 @@ export default function UsersPage() {
                             : styles.roleBadgeStaff)
                       }}
                     >
-                      {user.role.toUpperCase()}
+                      {(user.access_role_label || user.custom_role_name || user.role).toUpperCase()}
                     </span>
                   </div>
 
@@ -530,6 +595,11 @@ export default function UsersPage() {
                     <div style={styles.metaItem}>
                       <div style={styles.metaLabel}>Created</div>
                       <div style={styles.metaValue}>{formatDateTime(user.created_at)}</div>
+                    </div>
+
+                    <div style={styles.metaItem}>
+                      <div style={styles.metaLabel}>Access model</div>
+                      <div style={styles.metaValue}>{user.custom_role_id ? 'Tenant custom role' : 'Built-in role'}</div>
                     </div>
 
                     <div style={styles.metaItem}>
@@ -672,6 +742,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '8px',
     minWidth: 0
   },
+  fieldHelp: { color: '#64748b', fontWeight: 500, lineHeight: 1.4 },
   label: {
     fontWeight: 700,
     color: '#334155'

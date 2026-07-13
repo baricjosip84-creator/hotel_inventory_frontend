@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getAccessToken } from '../lib/auth';
+import { getTenantPermissionSnapshot } from '../lib/permissions';
 
-type TenantUserRole = 'admin' | 'manager' | 'staff';
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
 type ActionDomain = 'all' | 'alerts' | 'execution' | 'control_tower' | 'decision_intelligence' | 'ai_governance' | 'multi_domain';
 
@@ -145,8 +145,15 @@ function decodeJwtPayload(token: string | null): Record<string, unknown> | null 
   }
 }
 
-function getCurrentRole(): TenantUserRole | 'unknown' {
-  const role = decodeJwtPayload(getAccessToken())?.role;
+function getCurrentAccessRoleLabel(): string {
+  const snapshot = getTenantPermissionSnapshot();
+  if (snapshot?.access_role_label?.trim()) return snapshot.access_role_label.trim();
+  const payload = decodeJwtPayload(getAccessToken());
+  const customRoleName = payload?.custom_role_name;
+  if (typeof customRoleName === 'string' && customRoleName.trim()) {
+    return customRoleName.trim();
+  }
+  const role = payload?.role;
   return role === 'admin' || role === 'manager' || role === 'staff' ? role : 'unknown';
 }
 
@@ -207,7 +214,7 @@ async function fetchWorkspace(domain: ActionDomain, urgency: 'all' | ActionUrgen
 export default function RoleAwareWorkspacePage() {
   const [domain, setDomain] = useState<ActionDomain>('all');
   const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
-  const currentRole = useMemo(() => getCurrentRole(), []);
+  const accessRoleLabel = useMemo(() => getCurrentAccessRoleLabel(), []);
 
   const workspaceQuery = useQuery({
     queryKey: ['role-aware-workspace', domain, urgency],
@@ -226,7 +233,7 @@ export default function RoleAwareWorkspacePage() {
         <div className="card">
           <div className="card__label">Workspace</div>
           <div className="card__value" style={{ fontSize: 20 }}>{workspace.workspace_name || 'Role workspace'}</div>
-          <div className="card__subtext">Role detected from the active tenant session: {currentRole}.</div>
+          <div className="card__subtext">Access role detected from the active tenant session: {accessRoleLabel}.</div>
         </div>
         <div className="card">
           <div className="card__label">Visible actions</div>
