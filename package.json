@@ -38,7 +38,8 @@
     "check:inventory-usage-quick-consume-draft-preservation": "node scripts/check-inventory-usage-quick-consume-draft-preservation.mjs",
     "check:inventory-usage-reversal-feedback": "node scripts/check-inventory-usage-reversal-feedback.mjs",
     "check:role-permission-management": "node scripts/check-role-permission-management.mjs",
-    "check:tenant-custom-role-management": "node scripts/check-tenant-custom-role-management.mjs"
+    "check:tenant-custom-role-management": "node scripts/check-tenant-custom-role-management.mjs",
+    "check:shipment-mailtrap-sandbox-ui": "node scripts/check-shipment-mailtrap-sandbox-ui.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

@@ -145,9 +145,11 @@ type SendShipmentToSupplierResponse = {
   recipient_email?: string | null;
   pdf_filename?: string;
   qr_filename?: string;
+  delivery_method?: string;
+  sandbox_capture?: boolean;
   attachments?: Array<{
-    filename?: string;
-    content_type?: string;
+    filename?: string | null;
+    content_type?: string | null;
   }>;
 };
 
@@ -724,12 +726,12 @@ export default function ShipmentsPage() {
       const attachmentLabel = attachmentNames.length > 0
         ? ` Attachments: ${attachmentNames.join(', ')}.`
         : ' QR information was included by the backend when available.';
+      const fallbackMessage = data.sandbox_capture
+        ? `✔ Shipment test email${poLabel} captured in Mailtrap Sandbox for ${recipientEmail}.${attachmentLabel}`
+        : `✔ Shipment${poLabel} emailed to ${recipientEmail}.${attachmentLabel}`;
 
       setPageError(null);
-      setPageMessage(
-        data.message ||
-          `✔ Shipment${poLabel} emailed to ${recipientEmail}.${attachmentLabel}`
-      );
+      setPageMessage(data.message || fallbackMessage);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
     },
@@ -2436,7 +2438,7 @@ export default function ShipmentsPage() {
                           ? 'Shipments send permission required'
                           : shipmentItems.length === 0
                             ? 'Add at least one shipment item before emailing the supplier'
-                            : 'Email shipment details and QR information to the supplier. This does not receive stock or finalize the shipment.'
+                            : 'Send through the configured backend email provider. Mailtrap Sandbox captures the test message without delivering it to the supplier.'
                       }
                     >
                       {sendShipmentToSupplierMutation.isPending
@@ -2445,7 +2447,7 @@ export default function ShipmentsPage() {
                     </button>
 
                     <div style={styles.emailSupplierHint}>
-                      Sends shipment details and QR information only. It does not receive stock or finalize.
+                      Sends through the configured backend provider. Mailtrap Sandbox captures test messages without opening Gmail or delivering to the supplier.
                     </div>
                   </div>
 
