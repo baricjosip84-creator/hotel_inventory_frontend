@@ -7,6 +7,8 @@ import {
   deleteTenantCustomRole,
   duplicateTenantCustomRole,
   fetchTenantPermissionPolicyMatrix,
+  isReservedTenantCustomRoleName,
+  RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE,
   resetTenantCustomRolePermissions,
   resetTenantRolePermissionPolicy,
   saveTenantCustomRolePermissions,
@@ -136,6 +138,11 @@ export default function TenantPermissionsPage() {
   const createCustomRole = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (creating || !createName.trim()) return;
+    if (isReservedTenantCustomRoleName(createName)) {
+      setSuccessMessage(null);
+      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      return;
+    }
     setCreating(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -161,6 +168,11 @@ export default function TenantPermissionsPage() {
   const updateMetadata = async () => {
     const id = customRoleId(activeRole);
     if (!id || !activeRole || managing || !metadataName.trim()) return;
+    if (isReservedTenantCustomRoleName(metadataName)) {
+      setSuccessMessage(null);
+      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      return;
+    }
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -213,6 +225,11 @@ export default function TenantPermissionsPage() {
     if (!id || !activeRole || managing) return;
     const name = window.prompt('Name for the copied custom role:', `${roleName(activeRole)} Copy`);
     if (!name?.trim()) return;
+    if (isReservedTenantCustomRoleName(name)) {
+      setSuccessMessage(null);
+      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      return;
+    }
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -301,7 +318,7 @@ export default function TenantPermissionsPage() {
             {creating ? 'Creating…' : 'Create custom role'}
           </button>
         </div>
-        <p style={styles.safetyNote}>Custom roles cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when operational actions depend on them.</p>
+        <p style={styles.safetyNote}>Custom roles cannot be named Admin, Manager, or Staff and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when operational actions depend on them.</p>
       </form>
 
       {activeRole?.role_kind === 'custom' ? (

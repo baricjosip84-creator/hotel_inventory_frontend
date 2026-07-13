@@ -46,6 +46,13 @@ export type RolePermissionPolicy<Role extends string, Permission extends string>
   updated_at?: string | null;
 };
 
+export const RESERVED_TENANT_CUSTOM_ROLE_NAMES = Object.freeze(['admin', 'manager', 'staff'] as const);
+export const RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE = 'Custom role name cannot use a protected built-in role name: Admin, Manager, or Staff';
+
+export function isReservedTenantCustomRoleName(value: string): boolean {
+  return RESERVED_TENANT_CUSTOM_ROLE_NAMES.includes(value.trim().toLowerCase() as (typeof RESERVED_TENANT_CUSTOM_ROLE_NAMES)[number]);
+}
+
 export type BuiltInTenantRole = Extract<UserRole, 'admin' | 'manager' | 'staff'>;
 export type TenantRolePolicyKey = BuiltInTenantRole | `custom:${string}`;
 export type TenantRolePermissionPolicy = RolePermissionPolicy<TenantRolePolicyKey, TenantPermission>;

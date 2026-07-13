@@ -54,6 +54,7 @@ if (receivingClerk.permissions.includes(tenantPermissions.TENANT_PERMISSIONS.SHI
 
 const migration = read('db/migrations/487_tenant_custom_roles.sql', backendRoot);
 const receivingClerkLeastPrivilegeMigration = read('db/migrations/488_receiving_clerk_least_privilege.sql', backendRoot);
+const reservedNameMigration = read('db/migrations/489_tenant_custom_role_reserved_names.sql', backendRoot);
 const customRoleService = read('src/services/tenantCustomRoleService.js', backendRoot);
 const policyService = read('src/services/permissionPolicyService.js', backendRoot);
 const permissionRoutes = read('src/routes/permissions.js', backendRoot);
@@ -82,6 +83,13 @@ assertIncludes(receivingClerkLeastPrivilegeMigration, [
   "template_permissions - 'shipment_items.write'",
   'custom_role.permissions.security_correction'
 ], 'migration 488');
+assertIncludes(reservedNameMigration, [
+  "LOWER(TRIM(role_row.name)) IN ('admin', 'manager', 'staff')",
+  'tenant_custom_roles_reserved_name_check',
+  'custom_role.name.security_correction',
+  'retired_unassigned_role',
+  'renamed_assigned_role'
+], 'migration 489');
 assertIncludes(customRoleService, [
   'normalizePermissions',
   'createCustomRole',
@@ -91,7 +99,10 @@ assertIncludes(customRoleService, [
   'deleteCustomRole',
   'TENANT_CUSTOM_ROLE_ASSIGNED_USERS',
   'TENANT_CUSTOM_ROLE_VERSION_CONFLICT',
-  'custom_role.permissions.update'
+  'custom_role.permissions.update',
+  'TENANT_CUSTOM_ROLE_NAME_RESERVED',
+  'isReservedCustomRoleName',
+  'RESERVED_CUSTOM_ROLE_NAMES'
 ], 'custom role service');
 assertIncludes(policyService, [
   'customRoleId',
@@ -152,7 +163,9 @@ assertIncludes(policyClient, [
   'saveTenantCustomRolePermissions',
   'resetTenantCustomRolePermissions',
   'duplicateTenantCustomRole',
-  'deleteTenantCustomRole'
+  'deleteTenantCustomRole',
+  'RESERVED_TENANT_CUSTOM_ROLE_NAMES',
+  'isReservedTenantCustomRoleName'
 ], 'frontend custom role API');
 assertIncludes(tenantPage, [
   'Create custom role',
@@ -161,7 +174,9 @@ assertIncludes(tenantPage, [
   "setErrorMessage('Reassign all users before deactivating this custom role.')",
   "setErrorMessage('Reassign all users before deleting this custom role.')",
   'Reassign all users before deleting this role',
-  'Required Read permissions are added automatically'
+  'Required Read permissions are added automatically',
+  'Custom roles cannot be named Admin, Manager, or Staff',
+  'RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE'
 ], 'tenant permissions custom role UI');
 assertNotIncludes(tenantPage, [
   'disabled={managing || (activeRole.is_active !== false && !activeRole.can_deactivate)}',
