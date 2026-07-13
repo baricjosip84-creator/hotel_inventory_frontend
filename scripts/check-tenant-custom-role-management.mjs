@@ -158,9 +158,15 @@ assertIncludes(tenantPage, [
   'Create custom role',
   'Starting template',
   'Manage selected custom role',
+  "setErrorMessage('Reassign all users before deactivating this custom role.')",
+  "setErrorMessage('Reassign all users before deleting this custom role.')",
   'Reassign all users before deleting this role',
   'Required Read permissions are added automatically'
 ], 'tenant permissions custom role UI');
+assertNotIncludes(tenantPage, [
+  'disabled={managing || (activeRole.is_active !== false && !activeRole.can_deactivate)}',
+  'disabled={managing || !activeRole.can_delete}'
+], 'tenant custom-role lifecycle feedback');
 assertIncludes(usersPage, [
   "'/users/role-options'",
   'roleSelection',

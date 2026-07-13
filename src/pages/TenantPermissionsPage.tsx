@@ -185,6 +185,14 @@ export default function TenantPermissionsPage() {
     if (!id || !activeRole || managing) return;
     const nextActive = activeRole.is_active === false;
     const action = nextActive ? 'activate' : 'deactivate';
+    const assignedUsers = Number(activeRole.user_count || 0);
+
+    if (!nextActive && assignedUsers > 0) {
+      setSuccessMessage(null);
+      setErrorMessage('Reassign all users before deactivating this custom role.');
+      return;
+    }
+
     if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${roleName(activeRole)}?`)) return;
     setManaging(true);
     setSuccessMessage(null);
@@ -223,6 +231,13 @@ export default function TenantPermissionsPage() {
   const removeCustomRole = async () => {
     const id = customRoleId(activeRole);
     if (!id || !activeRole || managing) return;
+
+    if (Number(activeRole.user_count || 0) > 0) {
+      setSuccessMessage(null);
+      setErrorMessage('Reassign all users before deleting this custom role.');
+      return;
+    }
+
     if (!window.confirm(`Delete ${roleName(activeRole)}? This is allowed only after every assigned user is reassigned.`)) return;
     setManaging(true);
     setSuccessMessage(null);
@@ -307,7 +322,7 @@ export default function TenantPermissionsPage() {
             <button
               type="button"
               style={styles.secondaryButton}
-              disabled={managing || (activeRole.is_active !== false && !activeRole.can_deactivate)}
+              disabled={managing}
               onClick={() => void toggleCustomRoleActive()}
               title={activeRole.user_count ? 'Reassign all users before deactivating this role.' : undefined}
             >
@@ -316,7 +331,7 @@ export default function TenantPermissionsPage() {
             <button
               type="button"
               style={styles.dangerButton}
-              disabled={managing || !activeRole.can_delete}
+              disabled={managing}
               onClick={() => void removeCustomRole()}
               title={activeRole.user_count ? 'Reassign all users before deleting this role.' : undefined}
             >
