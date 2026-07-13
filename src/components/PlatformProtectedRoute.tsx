@@ -13,7 +13,8 @@ import {
 } from '../lib/platformAuth';
 import type { PlatformIdentity, PlatformRole } from '../lib/platformAuth';
 import type { PlatformPermission } from '../lib/platformPermissions';
-import { hasAllPlatformPermissions } from '../lib/platformPermissions';
+import { hasAllPlatformPermissions, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
+import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
 
 type PlatformProtectedRouteProps = PropsWithChildren<{
   allowedRoles?: PlatformRole[];
@@ -22,6 +23,7 @@ type PlatformProtectedRouteProps = PropsWithChildren<{
 
 export function PlatformProtectedRoute({ children, allowedRoles, requiredPermissions }: PlatformProtectedRouteProps) {
   const location = useLocation();
+  const [, setPermissionRevision] = useState(0);
   const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>(() => {
     return isPlatformAuthenticated() ? 'checking' : 'denied';
   });
@@ -37,6 +39,7 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
         try {
           const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
 
+          await refreshPlatformPermissionSnapshot();
           if (isMounted) {
             setStatus(identity?.id ? 'allowed' : 'denied');
           }
@@ -62,6 +65,7 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
         });
         savePlatformAuthTokens(tokens);
         const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
+        await refreshPlatformPermissionSnapshot();
 
         if (isMounted) {
           setStatus(identity?.id ? 'allowed' : 'denied');
@@ -78,6 +82,12 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
+    window.addEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+    return () => window.removeEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
   }, []);
 
   if (status === 'checking') {

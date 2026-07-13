@@ -35,6 +35,7 @@ export function getPlatformRefreshToken(): string | null {
 export function clearPlatformAuthTokens(): void {
   localStorage.removeItem(PLATFORM_ACCESS_TOKEN_KEY);
   localStorage.removeItem(PLATFORM_REFRESH_TOKEN_KEY);
+  localStorage.removeItem('inventory_platform_effective_permissions');
 }
 
 function decodeJwtPayload(token: string | null): PlatformJwtPayload | null {

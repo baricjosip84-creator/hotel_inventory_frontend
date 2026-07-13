@@ -1,13 +1,20 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { logoutPlatformSession } from '../lib/platformAuth';
-import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const mainRef = useRef<HTMLElement | null>(null);
+  const [, setPermissionRevision] = useState(0);
+
+  useEffect(() => {
+    const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
+    window.addEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+    return () => window.removeEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+  }, []);
 
   const forcePageScrollTop = () => {
     const scrollTargets = new Set<HTMLElement>();
@@ -434,6 +441,11 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ) ? (
             <NavLink to="/platform/users" style={getPlatformLinkStyle}>
               Platform Users
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ROLE_PERMISSIONS_READ) ? (
+            <NavLink to="/platform/permissions" style={getPlatformLinkStyle}>
+              Platform Permissions
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ) ? (

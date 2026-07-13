@@ -39,6 +39,7 @@ import ScannerPage from '../pages/ScannerPage';
 import SessionsPage from '../pages/SessionsPage';
 import ReportsPage from '../pages/ReportsPage';
 import UsersPage from '../pages/UsersPage';
+import TenantPermissionsPage from '../pages/TenantPermissionsPage';
 import AdminSystemPage from '../pages/AdminSystemPage';
 import InsightsPage from '../pages/InsightsPage';
 import OperationalActionCenterPage from '../pages/OperationalActionCenterPage';
@@ -73,6 +74,7 @@ import PlatformAuditPage from '../pages/PlatformAuditPage';
 import PlatformAuditRetentionPage from '../pages/PlatformAuditRetentionPage';
 import PlatformSupportSessionsPage from '../pages/PlatformSupportSessionsPage';
 import PlatformUsersPage from '../pages/PlatformUsersPage';
+import PlatformPermissionsPage from '../pages/PlatformPermissionsPage';
 import PlatformSessionsPage from '../pages/PlatformSessionsPage';
 import PlatformNotificationsPage from '../pages/PlatformNotificationsPage';
 import PlatformSecurityPage from '../pages/PlatformSecurityPage';
@@ -814,6 +816,14 @@ const router = createBrowserRouter([
         )
       },
       {
+        path: 'permissions',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_ROLE_PERMISSIONS_READ]}>
+            <PlatformPermissionsPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
         path: 'sessions',
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ]}>
@@ -1144,6 +1154,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.USERS_READ]}>
             <UsersPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'permissions',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.ROLE_PERMISSIONS_READ]}>
+            <TenantPermissionsPage />
           </ProtectedRoute>
         )
       },

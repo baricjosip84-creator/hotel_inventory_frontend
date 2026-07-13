@@ -32,6 +32,7 @@ const REFRESH_TOKEN_KEY = 'inventory_refresh_token';
 export function saveSupportSessionAccessToken(accessToken: string): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('inventory_tenant_effective_permissions');
 }
 
 /*
@@ -67,6 +68,7 @@ export function getRefreshToken(): string | null {
 export function clearAuthTokens(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('inventory_tenant_effective_permissions');
 }
 
 /*

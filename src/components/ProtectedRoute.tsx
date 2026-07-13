@@ -9,7 +9,8 @@ import {
 } from '../lib/auth';
 import type { AuthTokens } from '../types/auth';
 import type { TenantPermission, UserRole } from '../lib/permissions';
-import { hasAllPermissions, hasAnyRole } from '../lib/permissions';
+import { hasAllPermissions, hasAnyRole, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { apiRequest } from '../lib/api';
 
 type ProtectedRouteProps = PropsWithChildren<{
@@ -57,6 +58,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: 
     - allowed: render protected content
     - denied: redirect to login
   */
+  const [, setPermissionRevision] = useState(0);
   const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>(() => {
     return isAuthenticated() ? 'checking' : 'denied';
   });
@@ -73,6 +75,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: 
         The API layer will refresh it transparently when needed.
       */
       if (accessToken) {
+        await refreshTenantPermissionSnapshot();
         if (isMounted) {
           setStatus('allowed');
         }
@@ -107,6 +110,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: 
           still has no fresh access token.
         */
         saveAuthTokens(tokens);
+        await refreshTenantPermissionSnapshot();
 
         if (isMounted) {
           setStatus('allowed');
@@ -123,6 +127,12 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: 
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
+    window.addEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+    return () => window.removeEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
   }, []);
 
   if (status === 'checking') {

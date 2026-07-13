@@ -319,6 +319,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         permission: TENANT_PERMISSIONS.USERS_READ
       },
       {
+        to: '/permissions',
+        label: 'Permissions',
+        description: 'Manage tenant role defaults and tenant-specific permission overrides.',
+        section: 'Administration',
+        permission: TENANT_PERMISSIONS.ROLE_PERMISSIONS_READ
+      },
+      {
         to: '/audit',
         label: 'Audit',
         description: 'Review tenant-scoped write history and audited support-session activity.',

@@ -38,6 +38,8 @@ type PlatformMutationSafetyOptions = {
    * Allows rare intentionally non-idempotent writes to opt out explicitly.
    */
   skipIdempotencyKey?: boolean;
+  /** Suppress the shared generic mutation toast when a page owns specific feedback. */
+  skipMutationFeedback?: boolean;
 };
 
 export type SafePlatformMutationRequestInit = RequestInit & PlatformMutationSafetyOptions;
@@ -140,6 +142,7 @@ function withPlatformMutationSafetyHeaders(
     idempotencyKey,
     version,
     skipIdempotencyKey,
+    skipMutationFeedback: _skipMutationFeedback,
     headers: originalHeaders,
     ...requestOptions
   } = options;
@@ -289,7 +292,7 @@ export async function platformApiRequest<T>(
   const isRefreshRequest = isPlatformRefreshRequest(path);
   const requestOptions = withPlatformMutationSafetyHeaders(path, options);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
-  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest;
+  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest && !options.skipMutationFeedback;
 
   if (
     !isLoginRequest &&

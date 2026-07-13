@@ -14,7 +14,7 @@ import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/mainten
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
-import { hasPermission } from '../lib/permissions';
+import { hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
@@ -68,7 +68,8 @@ export default function AppLayout() {
   const location = useLocation();
   const isMobile = useIsMobile();
   const role = useMemo(() => getCurrentUserRole(), []);
-  const tenantAccess = useMemo(() => getTenantAccessSnapshot(), [location.pathname]);
+  const [permissionRevision, setPermissionRevision] = useState(0);
+  const tenantAccess = useMemo(() => getTenantAccessSnapshot(), [location.pathname, permissionRevision]);
   const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
 
   const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
@@ -113,6 +114,12 @@ export default function AppLayout() {
     return item.roles.includes(role);
   };
 
+  useEffect(() => {
+    const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
+    window.addEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+    return () => window.removeEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+  }, []);
+
   const visibleNavSections = useMemo(() => {
     return tenantNavigationSections
       .map((section) => ({
@@ -120,7 +127,7 @@ export default function AppLayout() {
         items: section.items.filter(isVisibleNavigationItem)
       }))
       .filter((section) => section.items.length > 0);
-  }, [role, tenantSubscriptionAccess]);
+  }, [role, tenantSubscriptionAccess, permissionRevision]);
 
   useEffect(() => {
     setMobileNavOpen(false);
