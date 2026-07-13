@@ -43,8 +43,17 @@ for (const template of templates.CUSTOM_ROLE_TEMPLATES) {
     if (template.permissions.includes(permission)) fail(`${template.key} contains reserved permission ${permission}`);
   }
 }
+const receivingClerk = templates.CUSTOM_ROLE_TEMPLATES.find((template) => template.key === 'receiving_clerk');
+if (!receivingClerk) fail('Receiving Clerk template is missing');
+if (!receivingClerk.permissions.includes(tenantPermissions.TENANT_PERMISSIONS.SHIPMENTS_RECEIVE)) {
+  fail('Receiving Clerk template must retain shipments.receive');
+}
+if (receivingClerk.permissions.includes(tenantPermissions.TENANT_PERMISSIONS.SHIPMENT_ITEMS_WRITE)) {
+  fail('Receiving Clerk template must not include shipment_items.write');
+}
 
 const migration = read('db/migrations/487_tenant_custom_roles.sql', backendRoot);
+const receivingClerkLeastPrivilegeMigration = read('db/migrations/488_receiving_clerk_least_privilege.sql', backendRoot);
 const customRoleService = read('src/services/tenantCustomRoleService.js', backendRoot);
 const policyService = read('src/services/permissionPolicyService.js', backendRoot);
 const permissionRoutes = read('src/routes/permissions.js', backendRoot);
@@ -67,6 +76,12 @@ assertIncludes(migration, [
   'users_custom_role_staff_base_check',
   'ON DELETE RESTRICT'
 ], 'migration 487');
+assertIncludes(receivingClerkLeastPrivilegeMigration, [
+  "source_template_key = 'receiving_clerk'",
+  "permission_row.permission = 'shipment_items.write'",
+  "template_permissions - 'shipment_items.write'",
+  'custom_role.permissions.security_correction'
+], 'migration 488');
 assertIncludes(customRoleService, [
   'normalizePermissions',
   'createCustomRole',
@@ -171,5 +186,12 @@ for (const [label, source, permission] of customRolePermissionSurfaces) {
     'restricted to manager and admin roles'
   ], `${label} custom role feedback`);
 }
+
+const shipmentsPage = customRolePermissionSurfaces.find(([label]) => label === 'Shipments')?.[1] || '';
+assertIncludes(shipmentsPage, [
+  'Ordered shipment-line changes require shipment_items.write.',
+  'Receiving remains available through shipments.receive.',
+  'canManageShipmentItems ? ('
+], 'Shipments least-privilege action gating');
 
 console.log(`Tenant custom role contract passed (${templates.CUSTOM_ROLE_TEMPLATES.length} templates, tenant isolation, reserved-right protection, backend enforcement, user assignment, and frontend integration verified).`);

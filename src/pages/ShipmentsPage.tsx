@@ -1691,9 +1691,17 @@ export default function ShipmentsPage() {
       {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
       {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
 
-      {!canManageShipments ? (
+      {!canManageShipments || !canManageShipmentItems || !canFinalizeShipments ? (
         <div style={styles.warningBox}>
-          Current access role: {accessRoleLabel}. Shipment creation, shipment item changes, and finalization are unavailable because this role does not have the corresponding permissions. Receiving remains available when shipments.receive is enabled.
+          Current access role: {accessRoleLabel}.{' '}
+          {[
+            !canManageShipments ? 'Shipment creation and header changes require shipments.write.' : null,
+            !canManageShipmentItems ? 'Ordered shipment-line changes require shipment_items.write.' : null,
+            !canFinalizeShipments ? 'Finalization requires shipments.finalize.' : null,
+            canReceiveShipments
+              ? 'Receiving remains available through shipments.receive.'
+              : 'Receiving requires shipments.receive.'
+          ].filter(Boolean).join(' ')}
         </div>
       ) : null}
 
