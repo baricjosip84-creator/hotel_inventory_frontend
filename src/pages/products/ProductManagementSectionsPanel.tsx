@@ -1,3 +1,4 @@
+import { getCurrentAccessRoleLabel } from '../../lib/permissions';
 import { styles } from './productStyles';
 import { ProductFormPanel } from './ProductFormPanel';
 import { ProductPackagesPanel } from './ProductPackagesPanel';
@@ -133,7 +134,7 @@ export function ProductManagementSectionsPanel({
     <>
       {!canManageProducts ? (
         <div style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Products are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete products.
+          Current access role: {getCurrentAccessRoleLabel() || role}. Products are read-only because this role does not have products.write permission.
         </div>
       ) : null}
 

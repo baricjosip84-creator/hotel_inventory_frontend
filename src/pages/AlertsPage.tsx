@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 
 type AlertSeverity = 'info' | 'warning' | 'critical';
 
@@ -180,7 +180,8 @@ export default function AlertsPage() {
     design foundation instead of relying only on page-local styles.
   */
   const queryClient = useQueryClient();
-  const { role, canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
+  const { canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [filters, setFilters] = useState<AlertFilters>({
     search: '',
@@ -355,9 +356,7 @@ export default function AlertsPage() {
 
       {!canManageAlerts ? (
         <div className="app-warning-state" style={styles.messageBox}>
-          Current role: {role.toUpperCase()}. Alerts can still be reviewed, but
-          acknowledge / resolve / reopen / escalate actions are restricted to manager and
-          admin roles.
+          Current access role: {accessRoleLabel}. Alerts can still be reviewed, but acknowledge / resolve / reopen / escalate actions require alerts.write permission.
         </div>
       ) : null}
 

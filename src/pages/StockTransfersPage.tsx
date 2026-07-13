@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem } from '../types/inventory';
 
@@ -261,12 +261,12 @@ function StatCard(props: { title: string; value: number | string; subtitle: stri
 export default function StockTransfersPage() {
   const queryClient = useQueryClient();
   const {
-    role,
     canCreateStockTransfers,
     canUpdateStockTransfers,
     canExecuteStockTransfers,
     canCancelStockTransfers
   } = getRoleCapabilities();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [statusFilter, setStatusFilter] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
@@ -805,7 +805,7 @@ export default function StockTransfersPage() {
 
       {!canCreateStockTransfers ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Stock transfer creation is restricted by your tenant permissions.
+          Current access role: {accessRoleLabel}. Stock transfer creation is unavailable because this role does not have stock_transfers.create permission.
         </div>
       ) : null}
 

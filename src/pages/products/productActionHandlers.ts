@@ -65,7 +65,7 @@ export function buildProductActionHandlers({
 
     if (!canManageProducts) {
       setFormError(
-        'Your current role is read-only for product master data. Product writes are restricted to manager and admin roles by the existing backend.'
+        'Your current role is read-only for product master data because it does not have products.write permission.'
       );
       return;
     }

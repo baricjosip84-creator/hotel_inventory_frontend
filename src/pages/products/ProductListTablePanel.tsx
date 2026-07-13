@@ -129,7 +129,7 @@ export function ProductListTablePanel({
                       style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
                       onClick={() => onStartEdit(product)}
                       disabled={!canManageProducts}
-                      title={!canManageProducts ? 'Manager or admin role required' : undefined}
+                      title={!canManageProducts ? 'Products write permission required' : undefined}
                     >
                       Edit
                     </button>
@@ -139,7 +139,7 @@ export function ProductListTablePanel({
                       style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
                       onClick={() => onDelete(product)}
                       disabled={deleteProductPending || !canManageProducts}
-                      title={!canManageProducts ? 'Manager or admin role required' : undefined}
+                      title={!canManageProducts ? 'Products write permission required' : undefined}
                     >
                       Delete
                     </button>

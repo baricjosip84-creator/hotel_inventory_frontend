@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 
 type SupplierFormState = {
@@ -220,7 +220,8 @@ function KeyValue({ label, value }: { label: string; value: unknown }) {
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
 
-  const { role, canManageSuppliers } = getRoleCapabilities();
+  const { canManageSuppliers } = getRoleCapabilities();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [search, setSearch] = useState('');
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
@@ -350,7 +351,7 @@ export default function SuppliersPage() {
 
     if (!canManageSuppliers) {
       setFormError(
-        'Your current role is read-only for supplier master data. Supplier writes are restricted to manager and admin roles by the existing backend.'
+        'Your current role is read-only for supplier master data because it does not have suppliers.write permission.'
       );
       return;
     }
@@ -450,7 +451,7 @@ export default function SuppliersPage() {
 
       {!canManageSuppliers ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Suppliers are read-only in the frontend because your backend only allows manager and admin users to create, edit, or delete suppliers.
+          Current access role: {accessRoleLabel}. Suppliers are read-only because this role does not have suppliers.write permission.
         </div>
       ) : null}
 
@@ -659,7 +660,7 @@ export default function SuppliersPage() {
                             style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
                             onClick={() => handleStartEdit(supplier)}
                             disabled={!canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
+                            title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
                           >
                             Edit
                           </button>
@@ -669,7 +670,7 @@ export default function SuppliersPage() {
                             style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
                             onClick={() => handleDelete(supplier)}
                             disabled={deleteMutation.isPending || !canManageSuppliers}
-                            title={!canManageSuppliers ? 'Manager or admin role required' : undefined}
+                            title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
                           >
                             Delete
                           </button>

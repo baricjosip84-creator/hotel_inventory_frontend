@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 
 /**
  * ============================================================================
@@ -441,7 +441,6 @@ export default function ShipmentsPage() {
   const queryClient = useQueryClient();
 
   const {
-    role,
     canManageShipments,
     canManageShipmentItems,
     canSendShipments,
@@ -450,6 +449,7 @@ export default function ShipmentsPage() {
     canAutoReorderShipments,
     canViewPurchaseOrders
   } = getRoleCapabilities();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -1565,7 +1565,7 @@ export default function ShipmentsPage() {
 
   const handleFinalizeShipment = () => {
     if (!canFinalizeShipments) {
-      setPageError('Your current role cannot finalize shipments. Shipment finalization is restricted to manager and admin roles by the existing backend.');
+      setPageError('Your current role does not have the shipments.finalize permission required to finalize shipments.');
       return;
     }
 
@@ -1612,7 +1612,7 @@ export default function ShipmentsPage() {
 
   const handleSendShipmentToSupplier = () => {
     if (!canSendShipments) {
-      setPageError('Your current role cannot email shipments to suppliers. Supplier email actions are restricted to manager and admin roles.');
+      setPageError('Your current role does not have the shipments.send permission required to email shipments to suppliers.');
       return;
     }
 
@@ -1693,7 +1693,7 @@ export default function ShipmentsPage() {
 
       {!canManageShipments ? (
         <div style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Shipment creation, shipment item changes, and finalization are blocked in the frontend because your backend only allows manager and admin users to perform those writes. Receiving remains available according to the existing backend access model.
+          Current access role: {accessRoleLabel}. Shipment creation, shipment item changes, and finalization are unavailable because this role does not have the corresponding permissions. Receiving remains available when shipments.receive is enabled.
         </div>
       ) : null}
 
@@ -1802,7 +1802,7 @@ export default function ShipmentsPage() {
               disabled={!canSubmitCreateShipment}
               title={
                 !canManageShipments
-                  ? 'Manager or admin role required'
+                  ? 'Shipments write permission required'
                   : !shipmentForm.supplier_id || !shipmentForm.delivery_date
                     ? 'Select a supplier and delivery date first'
                     : undefined

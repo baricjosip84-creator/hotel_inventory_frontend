@@ -22,6 +22,12 @@ function assertIncludes(source, values, label) {
   }
 }
 
+function assertNotIncludes(source, values, label) {
+  for (const value of values) {
+    if (source.includes(value)) fail(`${label} still contains legacy copy ${value}`);
+  }
+}
+
 const requireFromBackend = createRequire(path.join(backendRoot, 'package.json'));
 const templates = requireFromBackend(path.join(backendRoot, 'src/permissions/tenantCustomRoleTemplates.js'));
 const tenantPermissions = requireFromBackend(path.join(backendRoot, 'src/permissions/tenantPermissions.js'));
@@ -116,6 +122,14 @@ const permissionSnapshot = read('src/lib/permissions.ts');
 const editor = read('src/components/permissions/RolePermissionEditor.tsx');
 const appLayout = read('src/layouts/AppLayout.tsx');
 const roleAwareWorkspace = read('src/pages/RoleAwareWorkspacePage.tsx');
+const customRolePermissionSurfaces = [
+  ['Shipments', read('src/pages/ShipmentsPage.tsx'), 'shipments.receive'],
+  ['Alerts', read('src/pages/AlertsPage.tsx'), 'alerts.write'],
+  ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'stock_transfers.create'],
+  ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'storage_locations.write'],
+  ['Suppliers', read('src/pages/SuppliersPage.tsx'), 'suppliers.write'],
+  ['Products', read('src/pages/products/ProductManagementSectionsPanel.tsx'), 'products.write']
+];
 
 assertIncludes(policyClient, [
   'createTenantCustomRole',
@@ -142,10 +156,20 @@ assertIncludes(usersPage, [
 assertIncludes(permissionSnapshot, [
   'custom_role_id?: string | null',
   'access_role_label?: string | null',
-  'if (identity.customRoleId) return []'
+  'if (identity.customRoleId) return []',
+  'export function getCurrentAccessRoleLabel()'
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');
 assertIncludes(appLayout, ['getCurrentAccessRoleLabel', 'accessRoleLabel.toUpperCase()'], 'custom role shell label');
 assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleLabel', 'getTenantPermissionSnapshot', 'custom_role_name', 'Access role detected from the active tenant session'], 'custom role workspace label');
+for (const [label, source, permission] of customRolePermissionSurfaces) {
+  assertIncludes(source, ['Current access role:', permission], `${label} custom role feedback`);
+  assertNotIncludes(source, [
+    'Current role: {role.toUpperCase()}',
+    'Manager or admin role required',
+    'backend only allows manager and admin',
+    'restricted to manager and admin roles'
+  ], `${label} custom role feedback`);
+}
 
 console.log(`Tenant custom role contract passed (${templates.CUSTOM_ROLE_TEMPLATES.length} templates, tenant isolation, reserved-right protection, backend enforcement, user assignment, and frontend integration verified).`);

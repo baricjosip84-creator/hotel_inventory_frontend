@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 
 type StorageLocationItem = {
@@ -99,7 +99,8 @@ function StatCard(props: {
 
 export default function StorageLocationsPage() {
   const queryClient = useQueryClient();
-  const { role, canManageStorageLocations } = getRoleCapabilities();
+  const { canManageStorageLocations } = getRoleCapabilities();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [search, setSearch] = useState('');
   const [createForm, setCreateForm] = useState<StorageLocationFormState>(emptyForm());
@@ -186,7 +187,7 @@ export default function StorageLocationsPage() {
 
     if (!canManageStorageLocations) {
       setFormError(
-        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
+        'Your current role is read-only for storage locations because it does not have storage_locations.write permission.'
       );
       return;
     }
@@ -214,7 +215,7 @@ export default function StorageLocationsPage() {
 
     if (!canManageStorageLocations) {
       setFormError(
-        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
+        'Your current role is read-only for storage locations because it does not have storage_locations.write permission.'
       );
       return;
     }
@@ -232,7 +233,7 @@ export default function StorageLocationsPage() {
 
     if (!canManageStorageLocations) {
       setFormError(
-        'Your current role is read-only for storage locations. Storage location writes are restricted to manager and admin roles by the backend.'
+        'Your current role is read-only for storage locations because it does not have storage_locations.write permission.'
       );
       return;
     }
@@ -273,7 +274,7 @@ export default function StorageLocationsPage() {
 
       {!canManageStorageLocations ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          Current role: {role.toUpperCase()}. Storage locations are read-only in the frontend because your backend only allows manager and admin users to write storage locations.
+          Current access role: {accessRoleLabel}. Storage locations are read-only because this role does not have storage_locations.write permission.
         </div>
       ) : null}
 
@@ -317,7 +318,7 @@ export default function StorageLocationsPage() {
               type="submit"
               style={styles.primaryButton}
               disabled={writeBusy || !canManageStorageLocations}
-              title={!canManageStorageLocations ? 'Manager or admin role required' : undefined}
+              title={!canManageStorageLocations ? 'Storage locations write permission required' : undefined}
             >
               {createMutation.isPending ? 'Creating...' : 'Create Storage Location'}
             </button>

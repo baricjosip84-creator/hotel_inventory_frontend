@@ -665,6 +665,26 @@ export function getCurrentUserRole(): UserRole {
   return isKnownUserRole(role) ? role : 'unknown';
 }
 
+export function getCurrentAccessRoleLabel(): string {
+  const snapshot = getTenantPermissionSnapshot();
+
+  if (snapshot?.access_role_label?.trim()) {
+    return snapshot.access_role_label.trim();
+  }
+
+  if (snapshot?.custom_role_name?.trim()) {
+    return snapshot.custom_role_name.trim();
+  }
+
+  const payload = decodeJwtPayload(getAccessToken());
+
+  if (payload?.custom_role_name?.trim()) {
+    return payload.custom_role_name.trim();
+  }
+
+  return isKnownUserRole(payload?.role) ? payload.role : 'unknown';
+}
+
 export function permissionsForRole(role: UserRole = getCurrentUserRole()): readonly TenantPermission[] {
   if (isKnownUserRole(role)) {
     const cached = cachedPermissionsForCurrentRole(role);
