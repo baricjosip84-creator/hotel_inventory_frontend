@@ -48,6 +48,7 @@ import MobileExecutionPage from '../pages/MobileExecutionPage';
 import RealTimeOperationsFeedPage from '../pages/RealTimeOperationsFeedPage';
 import WorkflowAutomationComposerPage from '../pages/WorkflowAutomationComposerPage';
 import HumanInLoopAIReviewPage from '../pages/HumanInLoopAIReviewPage';
+import AIOperationsCopilotPage from '../pages/AIOperationsCopilotPage';
 import DecisionLearningFeedbackPage from '../pages/DecisionLearningFeedbackPage';
 import CrossDomainOptimizationPage from '../pages/CrossDomainOptimizationPage';
 import AdaptivePolicyEnginePage from '../pages/AdaptivePolicyEnginePage';
@@ -989,6 +990,14 @@ const router = createBrowserRouter([
             TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
           ]}>
             <HumanInLoopAIReviewPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'ai-copilot',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+            <AIOperationsCopilotPage />
           </ProtectedRoute>
         )
       },

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
@@ -3847,7 +3847,8 @@ function sourceReviewToAppPath(review: HumanAIReview): string | null {
     '/reports',
     '/cross-domain-optimization',
     '/probabilistic-forecasting',
-    '/decision-learning-feedback'
+    '/decision-learning-feedback',
+    '/ai-copilot'
   ]);
 
   if (!tenantRoutes.has(sourceSurface)) {
@@ -3963,11 +3964,13 @@ async function fetchHumanAIReviewSummary(
 export default function HumanInLoopAIReviewPage() {
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
+  const [searchParams] = useSearchParams();
+  const requestedSourceActionId = searchParams.get('source_action_id');
   const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
   const [reviewState, setReviewState] = useState<'all' | ReviewState>('all');
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
   const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('reorder_recommendations');
-  const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(null);
+  const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
   const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
   const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
 
@@ -3999,7 +4002,7 @@ export default function HumanInLoopAIReviewPage() {
   const executionRequestDraftMutation = useMutation({
     mutationFn: (sourceActionId: string) => createAIReviewExecutionRequestDraft(sourceActionId),
     onSuccess: async (result) => {
-      setReviewActionMessage('Draft system-recommendation Execution Request created. No operational action was executed.');
+      setReviewActionMessage('Draft Execution Request created from the approved AI review. No operational action was executed.');
       const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
       if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
       await Promise.all([

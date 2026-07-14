@@ -91,6 +91,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         ]
       },
       {
+        to: '/ai-copilot',
+        label: 'AI Copilot',
+        description: 'Governed tenant-scoped inventory analysis and structured proposal preparation with no autonomous execution.',
+        section: 'Command',
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+      },
+      {
         to: '/decision-learning-feedback',
         label: 'Learning Feedback',
         description: 'Governed decision-intelligence feedback capture for outcomes, forecast accuracy, policy effectiveness, and optimization evidence.',
