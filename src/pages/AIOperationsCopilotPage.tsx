@@ -11,7 +11,8 @@ type CopilotIntent =
   | 'operational_priority_summary'
   | 'product_risk_explanation'
   | 'supplier_performance_summary'
-  | 'prepare_min_stock_proposal';
+  | 'prepare_min_stock_proposal'
+  | 'prepare_standard_cost_proposal';
 
 type CopilotIntentCapability = {
   intent: CopilotIntent;
@@ -39,6 +40,13 @@ type CopilotCapabilities = {
     response_storage_at_provider_disabled: boolean;
     external_processing_confirmation_required: boolean;
   };
+  run_limits?: {
+    window_minutes: number;
+    user_limit: number;
+    tenant_limit: number;
+    user_runs_used: number;
+    tenant_runs_used: number;
+  };
   safety_contract: Record<string, boolean>;
 };
 
@@ -58,6 +66,8 @@ type CopilotProposal = {
     product_name?: string;
     min_stock?: number;
     previous_min_stock?: number;
+    standard_unit_cost?: number;
+    previous_standard_unit_cost?: number | null;
     reason?: string | null;
     source?: string;
   };
@@ -118,6 +128,7 @@ type CreateRunInput = {
   prompt: string;
   product_id?: string;
   proposed_min_stock?: number;
+  proposed_standard_unit_cost?: number;
   external_processing_confirmed?: boolean;
 };
 
@@ -137,6 +148,10 @@ const intentFallbacks: Record<CopilotIntent, { label: string; description: strin
   prepare_min_stock_proposal: {
     label: 'Prepare minimum-stock proposal',
     description: 'Prepare a server-controlled minimum-stock proposal for AI Review. No product is changed.'
+  },
+  prepare_standard_cost_proposal: {
+    label: 'Prepare standard-cost proposal',
+    description: 'Prepare a server-controlled standard unit cost proposal for AI Review. No product is changed.'
   }
 };
 
@@ -219,6 +234,7 @@ export default function AIOperationsCopilotPage() {
   const [prompt, setPrompt] = useState('Summarize the most important operational evidence I should review now.');
   const [productId, setProductId] = useState('');
   const [proposedMinStock, setProposedMinStock] = useState('');
+  const [proposedStandardUnitCost, setProposedStandardUnitCost] = useState('');
   const [externalProcessingConfirmed, setExternalProcessingConfirmed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(requestedRunId);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -245,7 +261,7 @@ export default function AIOperationsCopilotPage() {
     () => capabilitiesQuery.data?.intents.find((item) => item.intent === intent),
     [capabilitiesQuery.data?.intents, intent]
   );
-  const needsProduct = intent === 'product_risk_explanation' || intent === 'prepare_min_stock_proposal';
+  const needsProduct = ['product_risk_explanation', 'prepare_min_stock_proposal', 'prepare_standard_cost_proposal'].includes(intent);
 
   const productsQuery = useQuery({
     queryKey: ['ai-operations-copilot', 'products'],
@@ -264,6 +280,7 @@ export default function AIOperationsCopilotPage() {
       showTenantActionSuccess(run.proposal_snapshot ? 'AI Copilot proposal created for human review.' : 'AI Copilot analysis completed.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'runs'] }),
+        queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'capabilities'] }),
         queryClient.invalidateQueries({ queryKey: ['human-in-loop-ai-review'] })
       ]);
     },
@@ -282,13 +299,16 @@ export default function AIOperationsCopilotPage() {
 
 
   const provider = capabilitiesQuery.data?.provider;
+  const minStockValue = Number(proposedMinStock);
+  const standardCostValue = Number(proposedStandardUnitCost);
   const canSubmit = Boolean(
     capabilities.canGovernDecisionIntelligence
     && capabilitiesQuery.data?.can_run
     && selectedIntentCapability?.available
     && prompt.trim().length >= 3
     && (!needsProduct || productId)
-    && (intent !== 'prepare_min_stock_proposal' || proposedMinStock !== '')
+    && (intent !== 'prepare_min_stock_proposal' || (proposedMinStock !== '' && Number.isFinite(minStockValue) && minStockValue >= 0))
+    && (intent !== 'prepare_standard_cost_proposal' || (proposedStandardUnitCost !== '' && Number.isFinite(standardCostValue) && standardCostValue >= 0))
     && (!provider?.external_processing_confirmation_required || externalProcessingConfirmed)
     && !createMutation.isPending
   );
@@ -302,8 +322,10 @@ export default function AIOperationsCopilotPage() {
       setPrompt('Explain the operational risk for this product using only the tenant evidence available to me.');
     } else if (nextIntent === 'supplier_performance_summary') {
       setPrompt('Summarize which suppliers require operational review and explain the evidence.');
-    } else {
+    } else if (nextIntent === 'prepare_min_stock_proposal') {
       setPrompt('Prepare a governed minimum-stock proposal and explain the evidence. Do not change the product.');
+    } else {
+      setPrompt('Prepare a governed standard-cost proposal and explain the received-cost evidence. Do not change the product.');
     }
   };
 
@@ -312,7 +334,8 @@ export default function AIOperationsCopilotPage() {
     if (!canSubmit) return;
     const input: CreateRunInput = { intent, prompt: prompt.trim() };
     if (needsProduct) input.product_id = productId;
-    if (intent === 'prepare_min_stock_proposal') input.proposed_min_stock = Number(proposedMinStock);
+    if (intent === 'prepare_min_stock_proposal') input.proposed_min_stock = minStockValue;
+    if (intent === 'prepare_standard_cost_proposal') input.proposed_standard_unit_cost = standardCostValue;
     input.external_processing_confirmed = provider?.external_processing_confirmation_required
       ? externalProcessingConfirmed
       : false;
@@ -325,6 +348,19 @@ export default function AIOperationsCopilotPage() {
   };
 
   const proposal = selectedRun?.proposal_snapshot || null;
+  const isMinStockProposal = proposal?.request_type === 'product_min_stock_update';
+  const isStandardCostProposal = proposal?.request_type === 'cost_standard_update';
+  const proposalCurrentValue = isMinStockProposal
+    ? proposal?.payload?.previous_min_stock
+    : isStandardCostProposal
+      ? proposal?.payload?.previous_standard_unit_cost
+      : undefined;
+  const proposalTargetValue = isMinStockProposal
+    ? proposal?.payload?.min_stock
+    : isStandardCostProposal
+      ? proposal?.payload?.standard_unit_cost
+      : undefined;
+  const proposalValueLabel = isMinStockProposal ? 'minimum stock' : isStandardCostProposal ? 'standard unit cost' : 'value';
   const response = selectedRun?.response_snapshot || {};
   const reviewLink = selectedRun?.source_action_id
     ? `/ai-review?source_action_id=${encodeURIComponent(selectedRun.source_action_id)}`
@@ -337,7 +373,7 @@ export default function AIOperationsCopilotPage() {
           <div style={styles.eyebrow}>Governed tenant intelligence</div>
           <h1 style={styles.title}>AI Operations Copilot</h1>
           <p style={styles.subtitle}>
-            Ask narrowly scoped inventory questions or prepare a minimum-stock proposal. The server controls every tenant read, validates structured output, and performs no operational write.
+            Ask narrowly scoped inventory questions or prepare controlled product proposals. The server controls every tenant read, validates structured output, and performs no operational write.
           </p>
         </div>
         <div style={styles.heroBadges}>
@@ -365,6 +401,11 @@ export default function AIOperationsCopilotPage() {
           <div style={styles.summaryLabel}>Operational authority</div>
           <div style={styles.summaryValue}>None</div>
           <div style={styles.summaryHelp}>The Copilot cannot submit, approve, or execute an Execution Request.</div>
+        </div>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Hourly usage guardrail</div>
+          <div style={styles.summaryValue}>{capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}</div>
+          <div style={styles.summaryHelp}>User runs used. Tenant usage: {capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}.</div>
         </div>
       </div>
 
@@ -398,7 +439,7 @@ export default function AIOperationsCopilotPage() {
                   <option value="">Select a product</option>
                   {(productsQuery.data || []).map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} — min {displayUnknown(product.min_stock)} {product.unit}
+                      {product.name} — min {displayUnknown(product.min_stock)} {product.unit} · standard cost {displayUnknown(product.standard_unit_cost)}
                     </option>
                   ))}
                 </select>
@@ -423,6 +464,22 @@ export default function AIOperationsCopilotPage() {
               </label>
             ) : null}
 
+            {intent === 'prepare_standard_cost_proposal' ? (
+              <label style={styles.field}>
+                <span style={styles.label}>Proposed standard unit cost</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="1000000000"
+                  step="0.0001"
+                  value={proposedStandardUnitCost}
+                  onChange={(event) => setProposedStandardUnitCost(event.target.value)}
+                  style={styles.input}
+                />
+                <span style={styles.help}>The server records the current standard cost and recent cost-bearing movement evidence. This does not update the product.</span>
+              </label>
+            ) : null}
+
             <label style={styles.field}>
               <span style={styles.label}>Question or rationale</span>
               <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={6} maxLength={2000} style={styles.textarea} />
@@ -443,7 +500,7 @@ export default function AIOperationsCopilotPage() {
             ) : null}
 
             <button type="submit" className="primary-button" style={styles.primaryButton} disabled={!canSubmit}>
-              {createMutation.isPending ? 'Running governed analysis…' : intent === 'prepare_min_stock_proposal' ? 'Prepare proposal for AI Review' : 'Run read-only analysis'}
+              {createMutation.isPending ? 'Running governed analysis…' : selectedIntentCapability?.proposal_supported ? 'Prepare proposal for AI Review' : 'Run read-only analysis'}
             </button>
             {!capabilities.canGovernDecisionIntelligence ? (
               <div style={styles.notice}>Your role can view Copilot history but cannot create Copilot runs.</div>
@@ -503,8 +560,8 @@ export default function AIOperationsCopilotPage() {
                   <div style={styles.keyValueGrid}>
                     <div><span style={styles.keyLabel}>Request type</span><strong>{formatLabel(proposal.request_type)}</strong></div>
                     <div><span style={styles.keyLabel}>Product</span><strong>{proposal.payload?.product_name || proposal.payload?.product_id || 'Not reported'}</strong></div>
-                    <div><span style={styles.keyLabel}>Current minimum</span><strong>{displayUnknown(proposal.payload?.previous_min_stock)}</strong></div>
-                    <div><span style={styles.keyLabel}>Proposed minimum</span><strong>{displayUnknown(proposal.payload?.min_stock)}</strong></div>
+                    <div><span style={styles.keyLabel}>Current {proposalValueLabel}</span><strong>{displayUnknown(proposalCurrentValue)}</strong></div>
+                    <div><span style={styles.keyLabel}>Proposed {proposalValueLabel}</span><strong>{displayUnknown(proposalTargetValue)}</strong></div>
                   </div>
                   <p style={styles.help}>No product field has changed. A permitted reviewer must approve this proposal in AI Review before a draft Execution Request can be created.</p>
                   <div style={styles.actionRow}>
