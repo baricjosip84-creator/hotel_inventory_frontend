@@ -984,7 +984,10 @@ const router = createBrowserRouter([
       {
         path: 'ai-review',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+          <ProtectedRoute requiredPermissions={[
+            TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+            TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+          ]}>
             <HumanInLoopAIReviewPage />
           </ProtectedRoute>
         )

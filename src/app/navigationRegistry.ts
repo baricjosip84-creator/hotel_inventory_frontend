@@ -8,6 +8,7 @@ export type TenantNavigationItem = {
   description: string;
   section: string;
   permission?: TenantPermission;
+  requiredPermissions?: TenantPermission[];
   roles?: TenantUserRole[];
 };
 
@@ -81,9 +82,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/ai-review',
         label: 'AI Review',
-        description: 'Human-in-the-loop AI recommendation review queue with confidence, explainability, override, and approval guidance.',
+        description: 'Human-in-the-loop intelligence review queue with source confidence, structured evidence previews, explainability, override, and approval guidance.',
         section: 'Command',
-        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
+        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+        requiredPermissions: [
+          TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+          TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+        ]
       },
       {
         to: '/decision-learning-feedback',

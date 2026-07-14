@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { getRoleCapabilities } from '../lib/permissions';
 
 
 const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
@@ -57,9 +58,9 @@ const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
 ] as const;
 
 type AIOperationDomain = 'decision_intelligence' | 'ai_governance' | 'remediation' | 'simulation' | 'optimization' | 'multi_domain';
-type ReviewState = 'pending_review' | 'approval_required' | 'escalated' | 'ready_for_human_decision';
+type ReviewState = 'pending_review' | 'approval_required' | 'escalated' | 'ready_for_human_decision' | 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'execution_request_drafted';
+type ReviewDecision = 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'escalated' | 'reopened';
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
-
 
 type IntelligenceProductionBacklogItem = {
   feature_key?: string;
@@ -3555,25 +3556,38 @@ type IntelligenceProductionEnablementManifestResponse = {
 type HumanAIReview = {
   review_id: string;
   source_action_id?: string;
+  source_action_domain?: string;
+  source_reference?: {
+    source_type?: string | null;
+    source_id?: string | null;
+    frontend_route?: string | null;
+    frontend_route_query?: string | null;
+    api_surface?: string | null;
+  };
   ai_operation_domain?: string;
   review_state?: string;
   urgency?: string;
   title?: string;
   summary?: string | null;
   confidence_visualization?: {
-    confidence_score?: number;
+    confidence_score?: number | null;
     confidence_band?: string;
     visualization_type?: string;
+    score_source?: string;
     advisory_only?: boolean;
   };
   explainability_review?: {
     primary_factors?: string[];
     source_surface?: string;
+    source_api_surface?: string | null;
     reasoning_visible_to_human?: boolean;
     human_action_only?: boolean;
   };
   simulation_preview?: {
     preview_available?: boolean;
+    preview_kind?: string;
+    preview_summary?: string;
+    preview_metrics?: Record<string, number | string | null>;
     preview_execution_mode?: string;
     mutation_allowed_from_preview?: boolean;
   };
@@ -3587,9 +3601,64 @@ type HumanAIReview = {
     approval_route?: string;
     endpoint_executes_approval?: boolean;
   };
+  lifecycle?: {
+    lifecycle_id?: string;
+    persisted?: boolean;
+    current_status?: string;
+    decision?: string | null;
+    reason_category?: string | null;
+    reviewer_notes?: string | null;
+    override_reason?: string | null;
+    reviewer_user_id?: string | null;
+    reviewer_role?: string | null;
+    execution_request_id?: string | null;
+    first_reviewed_at?: string | null;
+    last_reviewed_at?: string | null;
+    version?: number | null;
+    allowed_decisions?: ReviewDecision[];
+    updated_at?: string | null;
+  };
   safety_contract?: Record<string, boolean>;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+type AIReviewHistoryResponse = {
+  source?: {
+    source_action_id?: string;
+    source_type?: string;
+    source_id?: string;
+    ai_operation_domain?: string;
+    source_status?: string;
+    title?: string;
+    summary?: string | null;
+    confidence_score?: number | null;
+    approval_required?: boolean;
+    updated_at?: string | null;
+  };
+  lifecycle?: HumanAIReview['lifecycle'];
+  events?: Array<{
+    id?: string;
+    event_type?: string;
+    from_status?: string | null;
+    to_status?: string;
+    decision?: string | null;
+    reason_category?: string | null;
+    reviewer_notes?: string | null;
+    override_reason?: string | null;
+    actor_user_id?: string | null;
+    actor_role?: string | null;
+    execution_request_id?: string | null;
+    created_at?: string | null;
+  }>;
+  execution_request?: { id?: string; status?: string; request_type?: string };
+};
+
+type ReviewDecisionDraft = {
+  decision: ReviewDecision;
+  reason_category: string;
+  reviewer_notes: string;
+  override_reason: string;
 };
 
 type HumanAIReviewResponse = {
@@ -3648,8 +3717,43 @@ const REVIEW_STATE_FILTERS: Array<{ value: 'all' | ReviewState; label: string }>
   { value: 'pending_review', label: 'Pending review' },
   { value: 'approval_required', label: 'Approval required' },
   { value: 'escalated', label: 'Escalated' },
-  { value: 'ready_for_human_decision', label: 'Ready for human decision' }
+  { value: 'ready_for_human_decision', label: 'Ready for human decision' },
+  { value: 'acknowledged', label: 'Acknowledged' },
+  { value: 'approved_for_manual_action', label: 'Approved for manual action' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'suppressed', label: 'Suppressed' },
+  { value: 'execution_request_drafted', label: 'Execution request drafted' }
 ];
+
+const REVIEW_DECISION_OPTIONS: Array<{ value: ReviewDecision; label: string }> = [
+  { value: 'acknowledged', label: 'Acknowledge' },
+  { value: 'approved_for_manual_action', label: 'Approve for manual action' },
+  { value: 'rejected', label: 'Reject' },
+  { value: 'suppressed', label: 'Suppress' },
+  { value: 'escalated', label: 'Escalate' },
+  { value: 'reopened', label: 'Reopen review' }
+];
+
+const REVIEW_REASON_OPTIONS = [
+  'risk_context_changed',
+  'confidence_too_low',
+  'insufficient_evidence',
+  'business_policy_exception',
+  'manual_execution_preferred',
+  'policy_violation',
+  'duplicate_or_stale',
+  'other'
+] as const;
+
+const defaultReviewDecisionDraft: ReviewDecisionDraft = {
+  decision: 'acknowledged',
+  reason_category: '',
+  reviewer_notes: '',
+  override_reason: ''
+};
+
+const HUMAN_AI_REVIEW_QUERY_KEY = 'human-in-loop-ai-review';
+const HUMAN_AI_REVIEW_HISTORY_QUERY_KEY = 'human-in-loop-ai-review-history';
 
 const URGENCY_FILTERS: Array<{ value: 'all' | Urgency; label: string }> = [
   { value: 'all', label: 'All urgency' },
@@ -3705,7 +3809,7 @@ function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
 }
 
-function formatPercent(value?: number): string {
+function formatPercent(value?: number | null): string {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return 'Not scored';
   }
@@ -3722,7 +3826,11 @@ function formatDateTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
+function sourceReviewToAppPath(review: HumanAIReview): string | null {
+  const sourceSurface = review.source_reference?.frontend_route
+    || review.explainability_review?.source_surface
+    || review.governance_approval_guidance?.approval_route;
+
   if (!sourceSurface || !sourceSurface.startsWith('/')) {
     return null;
   }
@@ -3736,10 +3844,28 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
     '/procurement-recommendations',
     '/execution-tasks',
     '/automation-schedules',
-    '/reports'
+    '/reports',
+    '/cross-domain-optimization',
+    '/probabilistic-forecasting',
+    '/decision-learning-feedback'
   ]);
 
-  return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+  if (!tenantRoutes.has(sourceSurface)) {
+    return null;
+  }
+
+  const params = new URLSearchParams(review.source_reference?.frontend_route_query || '');
+  if (sourceSurface === '/action-center') {
+    if (review.source_action_id && !params.has('source_action_id')) {
+      params.set('source_action_id', review.source_action_id);
+    }
+    if (review.source_action_domain && !params.has('domain')) {
+      params.set('domain', review.source_action_domain);
+    }
+  }
+
+  const query = params.toString();
+  return query ? `${sourceSurface}?${query}` : sourceSurface;
 }
 
 
@@ -3794,6 +3920,24 @@ async function fetchIntelligenceFeatureDetail(featureKey: string): Promise<Intel
   return apiRequest<IntelligenceProductionFeatureDetailResponse>(`/intelligence-readiness/production-readiness-summary/${encodeURIComponent(featureKey)}`);
 }
 
+async function fetchAIReviewHistory(sourceActionId: string): Promise<AIReviewHistoryResponse> {
+  return apiRequest<AIReviewHistoryResponse>(`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/history`);
+}
+
+async function recordAIReviewDecision(sourceActionId: string, body: Record<string, unknown>): Promise<AIReviewHistoryResponse> {
+  return apiRequest<AIReviewHistoryResponse>(`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/decision`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+}
+
+async function createAIReviewExecutionRequestDraft(sourceActionId: string): Promise<AIReviewHistoryResponse> {
+  return apiRequest<AIReviewHistoryResponse>(`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/execution-request-draft`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
 async function fetchHumanAIReviewSummary(
   aiOperationDomain: 'all' | AIOperationDomain,
   reviewState: 'all' | ReviewState,
@@ -3817,14 +3961,54 @@ async function fetchHumanAIReviewSummary(
 }
 
 export default function HumanInLoopAIReviewPage() {
+  const queryClient = useQueryClient();
+  const capabilities = getRoleCapabilities();
   const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
   const [reviewState, setReviewState] = useState<'all' | ReviewState>('all');
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
   const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('reorder_recommendations');
+  const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(null);
+  const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
+  const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
 
   const reviewQuery = useQuery({
     queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency],
     queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency)
+  });
+
+  const reviewHistoryQuery = useQuery({
+    queryKey: ['human-in-loop-ai-review-history', selectedHistorySourceActionId],
+    queryFn: () => fetchAIReviewHistory(selectedHistorySourceActionId || ''),
+    enabled: Boolean(selectedHistorySourceActionId)
+  });
+
+  const reviewDecisionMutation = useMutation({
+    mutationFn: ({ sourceActionId, body }: { sourceActionId: string; body: Record<string, unknown> }) => recordAIReviewDecision(sourceActionId, body),
+    onSuccess: async (result) => {
+      setReviewActionMessage('AI review decision recorded and audit history updated.');
+      const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
+      if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] })
+      ]);
+    },
+    onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : 'Unable to record AI review decision.')
+  });
+
+  const executionRequestDraftMutation = useMutation({
+    mutationFn: (sourceActionId: string) => createAIReviewExecutionRequestDraft(sourceActionId),
+    onSuccess: async (result) => {
+      setReviewActionMessage('Draft system-recommendation Execution Request created. No operational action was executed.');
+      const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
+      if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ['execution-requests'] })
+      ]);
+    },
+    onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : 'Unable to create the Execution Request draft.')
   });
 
   const readinessQuery = useQuery({
@@ -3915,6 +4099,7 @@ export default function HumanInLoopAIReviewPage() {
   const refreshAllAIReviewData = () => {
     void Promise.all(allReviewAndReadinessQueries.map((query) => query.refetch()));
   };
+
 
   const response = reviewQuery.data;
   const summary = response?.summary || {};
@@ -4127,6 +4312,37 @@ export default function HumanInLoopAIReviewPage() {
   const selectedFeature = featureDetail?.feature;
   const selectedFeatureTables = selectedFeature?.evidence?.tables || [];
   const selectedHardeningItems = featureDetail?.hardening_items || [];
+
+  const updateReviewDecisionDraft = (sourceActionId: string, patch: Partial<ReviewDecisionDraft>) => {
+    setReviewDecisionDrafts((current) => ({
+      ...current,
+      [sourceActionId]: {
+        ...(current[sourceActionId] || defaultReviewDecisionDraft),
+        ...patch
+      }
+    }));
+  };
+
+  const submitReviewDecision = (review: HumanAIReview) => {
+    const sourceActionId = review.source_action_id;
+    if (!sourceActionId) return;
+    const draft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
+    const allowed = review.lifecycle?.allowed_decisions || [];
+    const decision = allowed.includes(draft.decision) ? draft.decision : allowed[0];
+    if (!decision) return;
+
+    setReviewActionMessage(null);
+    reviewDecisionMutation.mutate({
+      sourceActionId,
+      body: {
+        decision,
+        reason_category: draft.reason_category || null,
+        reviewer_notes: draft.reviewer_notes || null,
+        override_reason: draft.override_reason || null,
+        expected_version: review.lifecycle?.version || undefined
+      }
+    });
+  };
 
   return (
     <div>
@@ -7643,6 +7859,7 @@ export default function HumanInLoopAIReviewPage() {
 
       <section className="section">
         <div className="section__title">Human-in-the-loop AI controls</div>
+        {reviewActionMessage ? <div className="card" style={{ marginBottom: 12 }}><p className="card__subtext">{reviewActionMessage}</p></div> : null}
         <div className="card">
           <div style={toolbarStyle}>
             <select style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
@@ -7677,7 +7894,7 @@ export default function HumanInLoopAIReviewPage() {
             </p>
           ) : (
             <p className="card__subtext">
-              {guidance.review_queue_guidance || 'Review recommendations, confidence, explainability, simulation context, and approval requirements before acting elsewhere.'}
+              {guidance.review_queue_guidance || 'Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.'}
             </p>
           )}
         </div>
@@ -7690,8 +7907,15 @@ export default function HumanInLoopAIReviewPage() {
         ) : (
           <div style={reviewListStyle}>
             {reviews.map((review) => {
-              const sourcePath = sourceSurfaceToAppPath(review.explainability_review?.source_surface || review.governance_approval_guidance?.approval_route);
+              const sourcePath = sourceReviewToAppPath(review);
               const confidence = review.confidence_visualization;
+              const evidencePreview = review.simulation_preview;
+              const lifecycle = review.lifecycle;
+              const sourceActionId = review.source_action_id || '';
+              const decisionDraft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
+              const allowedDecisions = lifecycle?.allowed_decisions || [];
+              const visibleDecisionOptions = REVIEW_DECISION_OPTIONS.filter((option) => allowedDecisions.includes(option.value));
+              const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               return (
                 <article className="card" key={review.review_id}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -7704,20 +7928,34 @@ export default function HumanInLoopAIReviewPage() {
                   <p className="card__subtext">{review.summary || 'No review summary was provided.'}</p>
                   <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginTop: 12 }}>
                     <div>
-                      <div className="card__label">Confidence</div>
+                      <div className="card__label">Source confidence</div>
                       <strong>{formatPercent(confidence?.confidence_score)}</strong>
-                      <div className="card__subtext">{formatLabel(confidence?.confidence_band)} · advisory only</div>
+                      <div className="card__subtext">{formatLabel(confidence?.confidence_band)} · {formatLabel(confidence?.score_source)} · advisory only</div>
                     </div>
                     <div>
-                      <div className="card__label">Simulation</div>
-                      <strong>{review.simulation_preview?.preview_available ? 'Available' : 'Not available'}</strong>
-                      <div className="card__subtext">{formatLabel(review.simulation_preview?.preview_execution_mode)}</div>
+                      <div className="card__label">Evidence preview</div>
+                      <strong>{evidencePreview?.preview_available ? 'Structured evidence available' : 'Metadata only'}</strong>
+                      <div className="card__subtext">{formatLabel(evidencePreview?.preview_kind)}</div>
                     </div>
                     <div>
                       <div className="card__label">Updated</div>
                       <strong>{formatDateTime(review.updated_at || review.created_at)}</strong>
                     </div>
                   </div>
+
+                  {evidencePreview?.preview_summary ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div className="card__label">Evidence summary</div>
+                      <p className="card__subtext">{evidencePreview.preview_summary}</p>
+                    </div>
+                  ) : null}
+
+                  {review.source_reference?.source_id ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div className="card__label">Source record</div>
+                      <p className="card__subtext">{formatLabel(review.source_reference.source_type)} · {review.source_reference.source_id}</p>
+                    </div>
+                  ) : null}
 
                   {review.explainability_review?.primary_factors?.length ? (
                     <div style={{ marginTop: 12 }}>
@@ -7736,9 +7974,124 @@ export default function HumanInLoopAIReviewPage() {
                     </div>
                   ) : null}
 
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-color, #d9dde5)' }}>
+                    <div className="card__label">Persisted review lifecycle</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span style={badgeStyle}>Status: {formatLabel(lifecycle?.current_status || review.review_state)}</span>
+                      <span style={badgeStyle}>{lifecycle?.persisted ? `Version ${lifecycle.version || 1}` : 'Not yet reviewed'}</span>
+                      {lifecycle?.reviewer_role ? <span style={badgeStyle}>Reviewer: {formatLabel(lifecycle.reviewer_role)}</span> : null}
+                    </div>
+                    {lifecycle?.reviewer_notes ? <p className="card__subtext" style={{ marginTop: 8 }}>Latest notes: {lifecycle.reviewer_notes}</p> : null}
+                    {lifecycle?.override_reason ? <p className="card__subtext">Override reason: {lifecycle.override_reason}</p> : null}
+                    {lifecycle?.execution_request_id ? (
+                      <p className="card__subtext">Execution Request draft: {lifecycle.execution_request_id}</p>
+                    ) : null}
+                  </div>
+
+                  {capabilities.canGovernDecisionIntelligence && sourceActionId && visibleDecisionOptions.length ? (
+                    <div style={{ marginTop: 14, padding: 12, border: '1px solid var(--border-color, #d9dde5)', borderRadius: 8 }}>
+                      <div className="card__label">Record human decision</div>
+                      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>
+                        <label>
+                          <span className="card__subtext">Decision</span>
+                          <select
+                            style={{ ...selectStyle, width: '100%', marginTop: 4 }}
+                            value={visibleDecisionOptions.some((option) => option.value === decisionDraft.decision) ? decisionDraft.decision : visibleDecisionOptions[0]?.value}
+                            onChange={(event) => updateReviewDecisionDraft(sourceActionId, { decision: event.target.value as ReviewDecision })}
+                          >
+                            {visibleDecisionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          <span className="card__subtext">Reason category</span>
+                          <select
+                            style={{ ...selectStyle, width: '100%', marginTop: 4 }}
+                            value={decisionDraft.reason_category}
+                            onChange={(event) => updateReviewDecisionDraft(sourceActionId, { reason_category: event.target.value })}
+                          >
+                            <option value="">Select when required</option>
+                            {REVIEW_REASON_OPTIONS.map((reason) => <option key={reason} value={reason}>{formatLabel(reason)}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      <label style={{ display: 'block', marginTop: 10 }}>
+                        <span className="card__subtext">Reviewer notes</span>
+                        <textarea
+                          style={{ width: '100%', minHeight: 74, marginTop: 4, padding: 8 }}
+                          value={decisionDraft.reviewer_notes}
+                          maxLength={2000}
+                          onChange={(event) => updateReviewDecisionDraft(sourceActionId, { reviewer_notes: event.target.value })}
+                          placeholder="Record the evidence considered and why this decision is appropriate."
+                        />
+                      </label>
+                      {decisionDraft.reason_category === 'business_policy_exception' ? (
+                        <label style={{ display: 'block', marginTop: 10 }}>
+                          <span className="card__subtext">Override reason</span>
+                          <textarea
+                            style={{ width: '100%', minHeight: 64, marginTop: 4, padding: 8 }}
+                            value={decisionDraft.override_reason}
+                            maxLength={2000}
+                            onChange={(event) => updateReviewDecisionDraft(sourceActionId, { override_reason: event.target.value })}
+                            placeholder="Required for a business policy exception."
+                          />
+                        </label>
+                      ) : null}
+                      <button
+                        className="button button--primary"
+                        type="button"
+                        style={{ marginTop: 10 }}
+                        disabled={reviewDecisionMutation.isPending}
+                        onClick={() => submitReviewDecision(review)}
+                      >
+                        {reviewDecisionMutation.isPending ? 'Recording…' : 'Record review decision'}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {historyIsSelected ? (
+                    <div style={{ marginTop: 14, padding: 12, border: '1px solid var(--border-color, #d9dde5)', borderRadius: 8 }}>
+                      <div className="card__label">Review history</div>
+                      {reviewHistoryQuery.isLoading ? <p className="card__subtext">Loading review history…</p> : null}
+                      {reviewHistoryQuery.error ? <p className="form-error">{reviewHistoryQuery.error instanceof Error ? reviewHistoryQuery.error.message : 'Unable to load review history.'}</p> : null}
+                      {!reviewHistoryQuery.isLoading && !(reviewHistoryQuery.data?.events?.length) ? <p className="card__subtext">No persisted review events yet.</p> : null}
+                      {(reviewHistoryQuery.data?.events || []).map((event) => (
+                        <div key={event.id || `${event.event_type}-${event.created_at}`} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-color, #d9dde5)' }}>
+                          <strong>{formatLabel(event.event_type)}</strong>
+                          <div className="card__subtext">{formatLabel(event.from_status)} → {formatLabel(event.to_status)} · {formatDateTime(event.created_at)}</div>
+                          {event.reason_category ? <div className="card__subtext">Reason: {formatLabel(event.reason_category)}</div> : null}
+                          {event.reviewer_notes ? <div className="card__subtext">Notes: {event.reviewer_notes}</div> : null}
+                          {event.execution_request_id ? <div className="card__subtext">Execution Request: {event.execution_request_id}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
                     {sourcePath ? <Link className="button button--secondary" to={sourcePath}>Open source surface</Link> : null}
                     <Link className="button button--secondary" to="/action-center">Open action center</Link>
+                    {sourceActionId ? (
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        onClick={() => setSelectedHistorySourceActionId(historyIsSelected ? null : sourceActionId)}
+                      >
+                        {historyIsSelected ? 'Hide review history' : 'View review history'}
+                      </button>
+                    ) : null}
+                    {capabilities.canGovernDecisionIntelligence
+                      && capabilities.canCreateExecutionRequests
+                      && lifecycle?.current_status === 'approved_for_manual_action'
+                      && sourceActionId ? (
+                        <button
+                          className="button button--primary"
+                          type="button"
+                          disabled={executionRequestDraftMutation.isPending}
+                          onClick={() => executionRequestDraftMutation.mutate(sourceActionId)}
+                        >
+                          {executionRequestDraftMutation.isPending ? 'Creating draft…' : 'Create Execution Request draft'}
+                        </button>
+                      ) : null}
+                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to="/execution-requests">Open Execution Requests</Link> : null}
                   </div>
                 </article>
               );

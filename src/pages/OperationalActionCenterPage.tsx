@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
@@ -312,8 +312,8 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
 }
 
-async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUrgency): Promise<ActionCenterResponse> {
-  const params = new URLSearchParams({ limit: '50' });
+async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUrgency, sourceActionId?: string | null): Promise<ActionCenterResponse> {
+  const params = new URLSearchParams({ limit: sourceActionId ? '100' : '50' });
 
   if (domain !== 'all') {
     params.set('action_domain', domain);
@@ -327,6 +327,8 @@ async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUr
 }
 
 export default function OperationalActionCenterPage() {
+  const [searchParams] = useSearchParams();
+  const sourceActionId = searchParams.get('source_action_id');
   const [domain, setDomain] = useRouteQueryState<ActionDomain>({
     paramName: 'domain',
     defaultValue: 'all',
@@ -339,12 +341,13 @@ export default function OperationalActionCenterPage() {
   });
 
   const actionCenterQuery = useQuery({
-    queryKey: ['operational-action-center', domain, urgency],
-    queryFn: () => fetchActionCenter(domain, urgency)
+    queryKey: ['operational-action-center', domain, urgency, sourceActionId],
+    queryFn: () => fetchActionCenter(domain, urgency, sourceActionId)
   });
 
   const response = actionCenterQuery.data;
   const actions = response?.actions || [];
+  const selectedSourceAction = sourceActionId ? actions.find((action) => action.action_id === sourceActionId) : null;
   const summary = response?.summary || {};
   const traceability = response?.control_tower_orchestration_traceability || {};
   const remediationFeedback = response?.control_tower_remediation_feedback_loop || {};
@@ -359,6 +362,12 @@ export default function OperationalActionCenterPage() {
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
+
+  useEffect(() => {
+    if (!selectedSourceAction) return;
+    const element = document.getElementById(`action-${selectedSourceAction.action_id}`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [selectedSourceAction]);
 
   return (
     <div>
@@ -404,6 +413,14 @@ export default function OperationalActionCenterPage() {
             </button>
           </div>
 
+          {sourceActionId && !actionCenterQuery.isLoading && !actionCenterQuery.error ? (
+            <p className={selectedSourceAction ? 'card__subtext' : 'form-error'}>
+              {selectedSourceAction
+                ? `Opened source action ${sourceActionId}.`
+                : `Source action ${sourceActionId} was not returned by the current tenant filters or is no longer pending.`}
+            </p>
+          ) : null}
+
           {actionCenterQuery.isLoading ? (
             <p className="card__subtext">Loading action-center summary…</p>
           ) : actionCenterQuery.error ? (
@@ -420,7 +437,16 @@ export default function OperationalActionCenterPage() {
                 const sourcePath = sourceSurfaceToAppPath(action.explainability?.source_surface);
 
                 return (
-                  <article key={action.action_id} className="card" style={{ background: 'var(--color-surface-soft)' }}>
+                  <article
+                    id={`action-${action.action_id}`}
+                    key={action.action_id}
+                    className="card"
+                    style={{
+                      background: 'var(--color-surface-soft)',
+                      outline: sourceActionId === action.action_id ? '3px solid var(--color-primary)' : undefined,
+                      outlineOffset: sourceActionId === action.action_id ? 2 : undefined
+                    }}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ fontWeight: 800 }}>{action.title}</div>
@@ -438,6 +464,9 @@ export default function OperationalActionCenterPage() {
                     </div>
                     <div className="card__subtext">
                       Priority score: {numberValue(action.priority_score)} · Updated: {formatDateTime(action.updated_at || action.created_at)}
+                    </div>
+                    <div className="card__subtext">
+                      Action: {action.action_id}{action.source_id ? ` · Source: ${action.source_id}` : ''}
                     </div>
                     {action.explainability?.primary_factors?.length ? (
                       <div className="card__subtext">
