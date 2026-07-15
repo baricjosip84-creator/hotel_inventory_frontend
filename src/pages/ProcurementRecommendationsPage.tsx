@@ -1640,6 +1640,9 @@ export default function ProcurementRecommendationsPage() {
               ? new Date(data.generated_at).toLocaleString()
               : "-"}
           </div>
+          <button type="button" style={styles.secondaryButton} onClick={() => navigate('/replenishment-planning')}>
+            Open transfer-before-buy planning
+          </button>
         </div>
       </header>
 

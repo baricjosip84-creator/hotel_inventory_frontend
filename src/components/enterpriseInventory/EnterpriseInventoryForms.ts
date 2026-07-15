@@ -30,7 +30,12 @@ export const emptyParLevelForm: ParLevelForm = {
   department: '',
   min_quantity: '',
   par_quantity: '',
-  reorder_quantity: ''
+  max_quantity: '',
+  reorder_quantity: '',
+  replenishment_priority: 'normal',
+  effective_from: '',
+  effective_to: '',
+  override_reason: ''
 };
 
 export const emptyRequisitionForm: RequisitionForm = {

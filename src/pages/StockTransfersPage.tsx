@@ -273,7 +273,7 @@ export default function StockTransfersPage() {
   const [fromLocationFilter, setFromLocationFilter] = useState('');
   const [toLocationFilter, setToLocationFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
+  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('transfer_id'));
   const [form, setForm] = useState<TransferFormState>(emptyTransferForm());
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');

@@ -8,7 +8,12 @@ export type ParLevel = {
   department?: string | null;
   min_quantity: number | string;
   par_quantity: number | string;
+  max_quantity?: number | string | null;
   reorder_quantity: number | string;
+  replenishment_priority?: string | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  override_reason?: string | null;
   active: boolean;
 };
 
@@ -1160,7 +1165,12 @@ export type ParLevelForm = {
   department: string;
   min_quantity: string;
   par_quantity: string;
+  max_quantity: string;
   reorder_quantity: string;
+  replenishment_priority: string;
+  effective_from: string;
+  effective_to: string;
+  override_reason: string;
 };
 
 export type RequisitionForm = {

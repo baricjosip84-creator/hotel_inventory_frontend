@@ -291,6 +291,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         permission: TENANT_PERMISSIONS.INSIGHTS_READ
       },
       {
+        to: '/replenishment-planning',
+        label: 'Replenishment Planning',
+        description: 'Plan location transfers before supplier purchases and create governed drafts.',
+        section: 'Procurement',
+        permission: TENANT_PERMISSIONS.INSIGHTS_READ
+      },
+      {
         to: '/shipments',
         label: 'Shipments',
         description: 'Manage inbound shipment creation, receiving, and finalization.',

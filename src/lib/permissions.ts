@@ -800,6 +800,7 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canDisableAutomationSchedules: can(TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_DISABLE),
     canViewSessions: role === 'admin' || role === 'manager' || role === 'staff',
     canViewTenantDiagnostics: can(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ),
+    canCreateInventoryOptimization: can(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE),
     canGovernInventoryOptimization: can(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_GOVERN),
     canViewAudit: can(TENANT_PERMISSIONS.AUDIT_READ)
   };

@@ -44,7 +44,12 @@ export function buildParLevelPayload(input: ParLevelForm): Record<string, unknow
     department: input.department.trim() || null,
     min_quantity: Number(input.min_quantity),
     par_quantity: Number(input.par_quantity),
+    max_quantity: input.max_quantity === '' ? null : Number(input.max_quantity),
     reorder_quantity: Number(input.reorder_quantity),
+    replenishment_priority: input.replenishment_priority,
+    effective_from: input.effective_from || null,
+    effective_to: input.effective_to || null,
+    override_reason: input.override_reason.trim() || null,
     active: true
   };
 }
