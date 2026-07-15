@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
@@ -89,6 +90,10 @@ function JsonBlock({ value }: { value: unknown }) {
 
 export default function ExecutionRequestsPage() {
   const capabilities = getRoleCapabilities();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedRequestId = searchParams.get('request_id');
+  const registrySectionRef = useRef<HTMLDivElement | null>(null);
+  const openedRequestedRequestIdRef = useRef<string | null>(null);
   const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
   const canSubmitExecutionRequests = capabilities.canSubmitExecutionRequests;
   const canCancelExecutionRequests = capabilities.canCancelExecutionRequests;
@@ -152,8 +157,44 @@ export default function ExecutionRequestsPage() {
   }, [query]);
 
   useEffect(() => {
-    void loadRequests();
+    const frame = window.requestAnimationFrame(() => {
+      void loadRequests();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [loadRequests]);
+
+  useEffect(() => {
+    if (!requestedRequestId || openedRequestedRequestIdRef.current === requestedRequestId) {
+      return;
+    }
+
+    let cancelled = false;
+    const openLinkedRequest = async () => {
+      setSaving(true);
+      setError(null);
+      try {
+        const detail = await apiRequest<ExecutionRequest>(`/execution-requests/${requestedRequestId}`);
+        if (cancelled) return;
+        setSelected(detail);
+        setAuditPack(null);
+        setSecurityAudit(null);
+        setExecutionReview(null);
+        openedRequestedRequestIdRef.current = requestedRequestId;
+        window.requestAnimationFrame(() => registrySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : 'Failed to open the linked Execution Request');
+        }
+      } finally {
+        if (!cancelled) setSaving(false);
+      }
+    };
+
+    void openLinkedRequest();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedRequestId]);
 
 
   const loadOptionalExecutionContextSnapshots = useCallback(async () => {
@@ -443,6 +484,9 @@ export default function ExecutionRequestsPage() {
       setAuditPack(null);
       setSecurityAudit(null);
       setExecutionReview(null);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('request_id', detail.id);
+      setSearchParams(nextParams, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load execution request detail');
     } finally {
@@ -608,7 +652,7 @@ export default function ExecutionRequestsPage() {
         </label>
         <label style={styles.fieldWide}>
           <span>Search</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search payload, status, or type" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search request ID, payload, status, or type" />
         </label>
       </section>
 
@@ -641,7 +685,7 @@ export default function ExecutionRequestsPage() {
         {adapterRegistry?.notes?.map((note) => <div key={note} style={styles.note}>{note}</div>)}
       </section>
 
-      <div style={styles.layout}>
+      <div style={styles.layout} ref={registrySectionRef}>
         <section style={styles.card}>
           <div style={styles.cardHeader}>
             <h2 style={styles.cardTitle}>Registry</h2>
@@ -652,6 +696,7 @@ export default function ExecutionRequestsPage() {
               <thead>
                 <tr>
                   <th>Status</th>
+                  <th>Request ID</th>
                   <th>Type</th>
                   <th>Requested By</th>
                   <th>Created</th>
@@ -664,6 +709,7 @@ export default function ExecutionRequestsPage() {
                 {(data?.rows || []).map((request) => (
                   <tr key={request.id}>
                     <td><span style={{ ...styles.badge, ...statusTone(request.status) }}>{label(request.status)}</span></td>
+                    <td><code style={styles.requestId} title={request.id}>{request.id.slice(0, 8)}…</code></td>
                     <td>{label(request.request_type)}</td>
                     <td>{request.requested_by_name || request.requested_by || '-'}</td>
                     <td>{formatDateTime(request.created_at)}</td>
@@ -671,7 +717,7 @@ export default function ExecutionRequestsPage() {
                     <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{label(request.execution_status)}</span> : '-'}</td>
                     <td>
                       <div style={styles.actions}>
-                        <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(request)}>View Detail</button>
+                        <button type="button" className="btn btn-secondary" disabled={saving} data-skip-global-action-feedback="true" onClick={() => loadRequestDetail(request)}>View Detail</button>
                         {canSubmitExecutionRequests && request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>Submit</button> : null}
                         {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
                         {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
@@ -684,7 +730,7 @@ export default function ExecutionRequestsPage() {
                   </tr>
                 ))}
                 {!loading && !(data?.rows || []).length ? (
-                  <tr><td colSpan={7} style={styles.empty}>No execution requests found.</td></tr>
+                  <tr><td colSpan={8} style={styles.empty}>No execution requests found.</td></tr>
                 ) : null}
               </tbody>
             </table>
@@ -698,7 +744,7 @@ export default function ExecutionRequestsPage() {
             <div style={styles.headerActions}>
               <span style={styles.meta}>{selected ? selected.id : 'Select a request'}</span>
               {selected ? (
-                <button type="button" className="btn btn-secondary" onClick={copySelectedId}>
+                <button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>
                   Copy ID
                 </button>
               ) : null}
@@ -709,7 +755,7 @@ export default function ExecutionRequestsPage() {
               <div style={styles.summaryGrid}>
                 <div style={styles.summaryTile}>
                   <span style={styles.summaryLabel}>Origin</span>
-                  <strong>{selected.payload?.source === 'system_context_page' ? 'System Context' : 'Manual / API'}</strong>
+                  <strong>{selected.payload?.source === 'system_context_page' ? 'System Context' : selected.payload?.source === 'ai_operations_copilot' ? 'AI Copilot' : 'Manual / API'}</strong>
                 </div>
                 <div style={styles.summaryTile}>
                   <span style={styles.summaryLabel}>Review</span>
@@ -1064,6 +1110,8 @@ const styles: Record<string, CSSProperties> = {
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
+  summaryTile: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 },
+  summaryLabel: { color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' },
   badgeRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' },
   badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize', fontSize: '0.75rem', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
   filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
@@ -1093,6 +1141,7 @@ const styles: Record<string, CSSProperties> = {
   meta: { color: '#64748b', fontSize: '0.85rem' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
+  requestId: { fontSize: '0.78rem', color: '#334155', whiteSpace: 'nowrap' },
   empty: { textAlign: 'center', padding: '1rem', color: '#64748b' },
   note: { marginTop: '0.75rem', color: '#64748b', fontSize: '0.85rem' },
   detail: { display: 'flex', flexDirection: 'column', gap: '0.7rem' },

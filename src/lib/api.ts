@@ -208,6 +208,25 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     if (normalizedMethod === 'POST' && normalizedPath.endsWith('/reopen')) return 'Alert reopened successfully.';
   }
 
+  if (normalizedMethod === 'POST' && normalizedPath === '/ai-operations-copilot/runs') {
+    return 'AI Copilot run completed successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPath.includes('/operational-action-center/human-in-loop-ai-reviews/')) {
+    if (normalizedPath.endsWith('/decision')) return 'AI review decision recorded successfully.';
+    if (normalizedPath.endsWith('/execution-request-draft')) return 'Execution Request draft created successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPath.includes('/execution-requests/')) {
+    if (normalizedPath.endsWith('/submit')) return 'Execution Request submitted successfully.';
+    if (normalizedPath.endsWith('/approve')) return 'Execution Request approved successfully.';
+    if (normalizedPath.endsWith('/reject')) return 'Execution Request rejected successfully.';
+    if (normalizedPath.endsWith('/execute-noop')) return 'Execution Request no-op completed successfully.';
+    if (normalizedPath.endsWith('/execute')) return 'Execution Request executed successfully.';
+    if (normalizedPath.endsWith('/prepare-retry')) return 'Execution Request retry prepared successfully.';
+    if (normalizedPath.endsWith('/cancel')) return 'Execution Request cancelled successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPath.endsWith('/alerts')) {
     return 'Manual alert created successfully.';
   }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -3973,6 +3973,7 @@ export default function HumanInLoopAIReviewPage() {
   const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
   const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
   const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
+  const lastAutoScrolledSourceActionId = useRef<string | null>(null);
 
   const reviewQuery = useQuery({
     queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency],
@@ -4107,7 +4108,27 @@ export default function HumanInLoopAIReviewPage() {
   const response = reviewQuery.data;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
-  const reviews = response?.reviews || [];
+  const reviews = useMemo(() => response?.reviews || [], [response?.reviews]);
+
+  useEffect(() => {
+    if (!requestedSourceActionId || reviewQuery.isLoading || lastAutoScrolledSourceActionId.current === requestedSourceActionId) {
+      return;
+    }
+
+    const requestedReviewExists = reviews.some((review) => review.source_action_id === requestedSourceActionId);
+    if (!requestedReviewExists) {
+      return;
+    }
+
+    lastAutoScrolledSourceActionId.current = requestedSourceActionId;
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(`ai-review-${requestedSourceActionId}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedSourceActionId, reviewQuery.isLoading, reviews]);
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
@@ -4351,6 +4372,7 @@ export default function HumanInLoopAIReviewPage() {
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={toolbarStyle}>
+          <a className="button button--primary" href="#ai-review-queue" data-skip-global-action-feedback="true">Go to review queue</a>
           <button
             className="button button--secondary"
             type="button"
@@ -7903,7 +7925,7 @@ export default function HumanInLoopAIReviewPage() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section" id="ai-review-queue" style={{ scrollMarginTop: 16 }}>
         <div className="section__title">Review queue</div>
         {reviews.length === 0 && !reviewQuery.isLoading ? (
           <div className="empty-state">No AI review items match the selected filters.</div>
@@ -7920,7 +7942,7 @@ export default function HumanInLoopAIReviewPage() {
               const visibleDecisionOptions = REVIEW_DECISION_OPTIONS.filter((option) => allowedDecisions.includes(option.value));
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               return (
-                <article className="card" key={review.review_id}>
+                <article className="card" key={review.review_id} id={sourceActionId ? `ai-review-${sourceActionId}` : undefined} tabIndex={-1} style={{ scrollMarginTop: 16 }}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                     <span style={badgeStyle}>{formatLabel(review.urgency)}</span>
                     <span style={badgeStyle}>{formatLabel(review.review_state)}</span>
@@ -8044,6 +8066,7 @@ export default function HumanInLoopAIReviewPage() {
                         type="button"
                         style={{ marginTop: 10 }}
                         disabled={reviewDecisionMutation.isPending}
+                        data-skip-global-action-feedback="true"
                         onClick={() => submitReviewDecision(review)}
                       >
                         {reviewDecisionMutation.isPending ? 'Recording…' : 'Record review decision'}
@@ -8089,12 +8112,13 @@ export default function HumanInLoopAIReviewPage() {
                           className="button button--primary"
                           type="button"
                           disabled={executionRequestDraftMutation.isPending}
+                          data-skip-global-action-feedback="true"
                           onClick={() => executionRequestDraftMutation.mutate(sourceActionId)}
                         >
                           {executionRequestDraftMutation.isPending ? 'Creating draft…' : 'Create Execution Request draft'}
                         </button>
                       ) : null}
-                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to="/execution-requests">Open Execution Requests</Link> : null}
+                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true">Open linked Execution Request</Link> : null}
                   </div>
                 </article>
               );

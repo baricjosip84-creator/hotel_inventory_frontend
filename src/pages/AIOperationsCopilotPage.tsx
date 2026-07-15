@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
-import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
+import { showTenantActionError } from '../lib/actionFeedback';
 import type { ProductItem } from '../types/inventory';
 
 type CopilotIntent =
@@ -277,7 +277,6 @@ export default function AIOperationsCopilotPage() {
         : 'Copilot analysis completed. No operational data was changed.');
       setSelectedRunId(run.id);
       setSearchParams({ run_id: run.id });
-      showTenantActionSuccess(run.proposal_snapshot ? 'AI Copilot proposal created for human review.' : 'AI Copilot analysis completed.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'runs'] }),
         queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'capabilities'] }),
@@ -365,6 +364,9 @@ export default function AIOperationsCopilotPage() {
   const reviewLink = selectedRun?.source_action_id
     ? `/ai-review?source_action_id=${encodeURIComponent(selectedRun.source_action_id)}`
     : '/ai-review';
+  const executionRequestLink = selectedRun?.execution_request_id
+    ? `/execution-requests?request_id=${encodeURIComponent(selectedRun.execution_request_id)}`
+    : '/execution-requests';
 
   return (
     <div style={styles.page}>
@@ -411,7 +413,7 @@ export default function AIOperationsCopilotPage() {
 
       <div style={styles.mainGrid}>
         <Panel title="Create a governed Copilot run" subtitle="Only intents supported by your effective tenant permissions are available.">
-          <form onSubmit={handleSubmit} style={styles.form}>
+          <form onSubmit={handleSubmit} style={styles.form} data-skip-global-action-feedback="true">
             <label style={styles.field}>
               <span style={styles.label}>Intent</span>
               <select value={intent} onChange={(event) => handleIntentChange(event.target.value as CopilotIntent)} style={styles.input}>
@@ -565,8 +567,8 @@ export default function AIOperationsCopilotPage() {
                   </div>
                   <p style={styles.help}>No product field has changed. A permitted reviewer must approve this proposal in AI Review before a draft Execution Request can be created.</p>
                   <div style={styles.actionRow}>
-                    <Link to={reviewLink} style={styles.linkButton}>Open in AI Review</Link>
-                    {selectedRun.execution_request_id ? <Link to="/execution-requests" style={styles.secondaryLink}>Open linked Execution Request</Link> : null}
+                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true">Open in AI Review</Link>
+                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true">Open linked Execution Request</Link> : null}
                   </div>
                 </div>
               ) : null}
