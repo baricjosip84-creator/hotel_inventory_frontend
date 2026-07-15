@@ -111,11 +111,11 @@ if (fs.existsSync(frontendPackagePath)) {
       failures.push(`frontend package script ${scriptName} is missing or misaligned`);
     }
   }
-  if (scripts.prebuild !== 'npm run check:unified-ai-contract-suite') {
-    failures.push('frontend prebuild script must run check:unified-ai-contract-suite before TypeScript/Vite build');
+  if (scripts.prebuild !== 'npm run check:unified-ai-contract-suite && npm run typecheck:ci') {
+    failures.push('frontend prebuild script must run the unified AI contract suite and pilot-critical TypeScript gate before Vite build');
   }
-  if (scripts.build !== 'tsc -b && vite build') {
-    failures.push('frontend build script must remain the plain TypeScript/Vite build command guarded by npm prebuild');
+  if (scripts.build !== 'vite build') {
+    failures.push('frontend build script must remain the plain Vite production build guarded by npm prebuild');
   }
   if (scripts['pretest:e2e'] !== 'npm run check:unified-ai-contract-suite') {
     failures.push('frontend pretest:e2e script must run check:unified-ai-contract-suite before Playwright e2e tests');

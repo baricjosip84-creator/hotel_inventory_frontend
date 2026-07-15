@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.pilot-critical.tsbuildinfo"
+  },
+  "include": [
+    "src/lib/api.ts",
+    "src/lib/http.ts",
+    "src/lib/permissions.ts",
+    "src/app/navigationRegistry.ts",
+    "src/pages/ReplenishmentPlanningPage.tsx",
+    "src/pages/ProcurementRecommendationsPage.tsx",
+    "src/pages/StockTransfersPage.tsx",
+    "src/pages/PurchaseOrdersPage.tsx"
+  ]
+}

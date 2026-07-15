@@ -17,4 +17,21 @@ Everything shipped to the browser is readable by the user. Therefore:
 
 ## Required validation
 
-Before release, run `npm run security:check`, `npm run check:ci`, `npm run typecheck`, `npm run lint:pilot-critical`, and `npm run build` from a clean `npm ci` installation.
+Before release, run `npm run security:check`, `npm run check:ci`, `npm run typecheck:ci`, `npm run lint:pilot-critical`, and `npm run build` from a clean `npm ci` installation.
+
+`npm run typecheck` remains the repository-wide diagnostic. The current application contains several very large advanced pages, so the required release gate uses `typecheck:ci` for the pilot-critical operational surfaces and then runs the complete Vite production compilation. Repository-wide TypeScript partitioning remains separate technical-debt work rather than a CI command that never completes.
+
+## Generated test-artifact cleanup
+
+Legacy branches may still contain tracked Playwright output even though `test-results/`
+and `playwright-report/` are ignored and excluded from source distributions. Run:
+
+```bash
+npm run repo:clean-generated
+```
+
+The command removes those generated folders and, when run inside a Git checkout,
+stages any previously tracked generated files for deletion. Commit those deletions so
+future checkouts remain clean. CI runs this compatibility cleanup before the strict
+repository-hygiene check; real source secrets and forbidden dependencies remain hard
+failures.

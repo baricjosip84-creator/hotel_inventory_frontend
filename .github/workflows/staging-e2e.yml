@@ -26,6 +26,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Remove legacy generated artifacts
+        run: npm run repo:clean-generated
       - run: npm ci --no-audit --no-fund
       - run: npm run security:check
       - run: npx playwright install --with-deps chromium

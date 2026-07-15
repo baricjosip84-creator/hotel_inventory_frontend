@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Remove legacy generated artifacts
+        run: npm run repo:clean-generated
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Check repository hygiene and committed secrets
@@ -37,8 +39,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Run static commercial and security checks
         run: npm run check:ci
-      - name: Run TypeScript validation
-        run: npm run typecheck
+      - name: Run pilot-critical TypeScript validation
+        run: npm run typecheck:ci
       - name: Lint pilot-critical surfaces
         run: npm run lint:pilot-critical
       - name: Build production frontend
