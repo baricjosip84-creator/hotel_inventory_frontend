@@ -66,6 +66,10 @@ type CopilotProposal = {
     product_name?: string;
     min_stock?: number;
     previous_min_stock?: number;
+    system_recommended_min_stock?: number;
+    recommendation_formula_version?: string;
+    user_override_applied?: boolean;
+    override_reason?: string | null;
     standard_unit_cost?: number;
     previous_standard_unit_cost?: number | null;
     reason?: string | null;
@@ -128,8 +132,67 @@ type CreateRunInput = {
   prompt: string;
   product_id?: string;
   proposed_min_stock?: number;
+  min_stock_override_reason?: string;
   proposed_standard_unit_cost?: number;
   external_processing_confirmed?: boolean;
+};
+
+type MinimumStockRecommendation = {
+  product_id: string;
+  product_name: string;
+  unit?: string | null;
+  method: string;
+  formula_version: string;
+  formula: string;
+  recommendation_status: 'calculated' | 'limited_history' | 'no_outbound_history';
+  current_min_stock: number;
+  recommended_min_stock: number;
+  raw_recommended_min_stock: number;
+  direction: 'increase' | 'decrease' | 'keep_current';
+  would_change: boolean;
+  confidence_score: number;
+  confidence_meaning: string;
+  inputs: {
+    lookback_days: number;
+    recent_window_days: number;
+    total_outbound_90d: number;
+    total_outbound_30d: number;
+    observed_days_90d: number;
+    observed_days_30d: number;
+    average_daily_usage_90d: number;
+    average_daily_usage_30d: number;
+    selected_daily_demand: number;
+    daily_demand_stddev_90d: number;
+    outbound_events_90d: number;
+    active_usage_days_90d: number;
+    outbound_history_days: number;
+    first_outbound_at?: string | null;
+    last_outbound_at?: string | null;
+    configured_lead_time_days?: number | null;
+    lead_time_configured: boolean;
+    lead_time_buffer_days: number;
+    supplier_delay_sample_count: number;
+    average_supplier_delay_days: number;
+    supplier_delay_buffer_days: number;
+    effective_coverage_days: number;
+    service_factor: number;
+    default_package_name?: string | null;
+    units_per_package: number;
+    package_rounding_applied: boolean;
+  };
+  calculation: {
+    expected_lead_time_demand: number;
+    safety_stock: number;
+    before_package_rounding: number;
+    after_package_rounding: number;
+  };
+  operational_context: {
+    current_stock: number;
+    visible_open_inbound_quantity: number;
+    unresolved_alert_count: number;
+  };
+  assumptions: string[];
+  warnings: string[];
 };
 
 const intentFallbacks: Record<CopilotIntent, { label: string; description: string }> = {
@@ -147,7 +210,7 @@ const intentFallbacks: Record<CopilotIntent, { label: string; description: strin
   },
   prepare_min_stock_proposal: {
     label: 'Prepare minimum-stock proposal',
-    description: 'Prepare a server-controlled minimum-stock proposal for AI Review. No product is changed.'
+    description: 'Calculate a transparent minimum-stock recommendation from demand and replenishment evidence, then prepare the recommended or explicitly overridden value for AI Review. No product is changed.'
   },
   prepare_standard_cost_proposal: {
     label: 'Prepare standard-cost proposal',
@@ -194,6 +257,10 @@ async function fetchRun(runId: string): Promise<CopilotRun> {
   return apiRequest<CopilotRun>(`/ai-operations-copilot/runs/${runId}`);
 }
 
+async function fetchMinimumStockRecommendation(productId: string): Promise<MinimumStockRecommendation> {
+  return apiRequest<MinimumStockRecommendation>(`/ai-operations-copilot/minimum-stock-recommendation/${productId}`);
+}
+
 async function createRun(input: CreateRunInput): Promise<CopilotRun> {
   return apiRequest<CopilotRun>('/ai-operations-copilot/runs', {
     method: 'POST',
@@ -234,6 +301,8 @@ export default function AIOperationsCopilotPage() {
   const [prompt, setPrompt] = useState('Summarize the most important operational evidence I should review now.');
   const [productId, setProductId] = useState('');
   const [proposedMinStock, setProposedMinStock] = useState('');
+  const [minStockOverrideReason, setMinStockOverrideReason] = useState('');
+  const [minStockValueTouched, setMinStockValueTouched] = useState(false);
   const [proposedStandardUnitCost, setProposedStandardUnitCost] = useState('');
   const [externalProcessingConfirmed, setExternalProcessingConfirmed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(requestedRunId);
@@ -269,6 +338,19 @@ export default function AIOperationsCopilotPage() {
     enabled: needsProduct && Boolean(selectedIntentCapability?.available)
   });
 
+  const minimumStockRecommendationQuery = useQuery({
+    queryKey: ['ai-operations-copilot', 'minimum-stock-recommendation', productId],
+    queryFn: () => fetchMinimumStockRecommendation(productId),
+    enabled: intent === 'prepare_min_stock_proposal' && Boolean(productId) && Boolean(selectedIntentCapability?.available)
+  });
+
+  const minimumStockRecommendation = minimumStockRecommendationQuery.data;
+  const effectiveProposedMinStock = intent === 'prepare_min_stock_proposal'
+    && minimumStockRecommendation
+    && !minStockValueTouched
+    ? String(minimumStockRecommendation.recommended_min_stock)
+    : proposedMinStock;
+
   const createMutation = useMutation({
     mutationFn: createRun,
     onSuccess: async (run) => {
@@ -298,15 +380,35 @@ export default function AIOperationsCopilotPage() {
 
 
   const provider = capabilitiesQuery.data?.provider;
-  const minStockValue = Number(proposedMinStock);
+  const minStockValue = Number(effectiveProposedMinStock);
   const standardCostValue = Number(proposedStandardUnitCost);
+  const minStockOverrideApplied = Boolean(
+    minimumStockRecommendation
+    && effectiveProposedMinStock !== ''
+    && Number.isFinite(minStockValue)
+    && Math.abs(minStockValue - minimumStockRecommendation.recommended_min_stock) > 0.0001
+  );
+  const minStockNoChange = Boolean(
+    minimumStockRecommendation
+    && effectiveProposedMinStock !== ''
+    && Number.isFinite(minStockValue)
+    && Math.abs(minStockValue - minimumStockRecommendation.current_min_stock) <= 0.0001
+  );
   const canSubmit = Boolean(
     capabilities.canGovernDecisionIntelligence
     && capabilitiesQuery.data?.can_run
     && selectedIntentCapability?.available
     && prompt.trim().length >= 3
     && (!needsProduct || productId)
-    && (intent !== 'prepare_min_stock_proposal' || (proposedMinStock !== '' && Number.isFinite(minStockValue) && minStockValue >= 0))
+    && (intent !== 'prepare_min_stock_proposal' || (
+      Boolean(minimumStockRecommendation)
+      && !minimumStockRecommendationQuery.isFetching
+      && effectiveProposedMinStock !== ''
+      && Number.isFinite(minStockValue)
+      && minStockValue >= 0
+      && !minStockNoChange
+      && (!minStockOverrideApplied || minStockOverrideReason.trim().length >= 3)
+    ))
     && (intent !== 'prepare_standard_cost_proposal' || (proposedStandardUnitCost !== '' && Number.isFinite(standardCostValue) && standardCostValue >= 0))
     && (!provider?.external_processing_confirmation_required || externalProcessingConfirmed)
     && !createMutation.isPending
@@ -315,6 +417,9 @@ export default function AIOperationsCopilotPage() {
   const handleIntentChange = (nextIntent: CopilotIntent) => {
     setIntent(nextIntent);
     setActionMessage(null);
+    setMinStockOverrideReason('');
+    setMinStockValueTouched(false);
+    if (nextIntent !== 'prepare_min_stock_proposal') setProposedMinStock('');
     if (nextIntent === 'operational_priority_summary') {
       setPrompt('Summarize the most important operational evidence I should review now.');
     } else if (nextIntent === 'product_risk_explanation') {
@@ -322,7 +427,7 @@ export default function AIOperationsCopilotPage() {
     } else if (nextIntent === 'supplier_performance_summary') {
       setPrompt('Summarize which suppliers require operational review and explain the evidence.');
     } else if (nextIntent === 'prepare_min_stock_proposal') {
-      setPrompt('Prepare a governed minimum-stock proposal and explain the evidence. Do not change the product.');
+      setPrompt('Calculate a transparent minimum-stock recommendation, prepare the recommended value for governed review, and explain every input. Do not change the product.');
     } else {
       setPrompt('Prepare a governed standard-cost proposal and explain the received-cost evidence. Do not change the product.');
     }
@@ -333,7 +438,10 @@ export default function AIOperationsCopilotPage() {
     if (!canSubmit) return;
     const input: CreateRunInput = { intent, prompt: prompt.trim() };
     if (needsProduct) input.product_id = productId;
-    if (intent === 'prepare_min_stock_proposal') input.proposed_min_stock = minStockValue;
+    if (intent === 'prepare_min_stock_proposal') {
+      input.proposed_min_stock = minStockValue;
+      if (minStockOverrideApplied) input.min_stock_override_reason = minStockOverrideReason.trim();
+    }
     if (intent === 'prepare_standard_cost_proposal') input.proposed_standard_unit_cost = standardCostValue;
     input.external_processing_confirmed = provider?.external_processing_confirmation_required
       ? externalProcessingConfirmed
@@ -437,7 +545,12 @@ export default function AIOperationsCopilotPage() {
             {needsProduct ? (
               <label style={styles.field}>
                 <span style={styles.label}>Product</span>
-                <select value={productId} onChange={(event) => setProductId(event.target.value)} style={styles.input}>
+                <select value={productId} onChange={(event) => {
+                  setProductId(event.target.value);
+                  setProposedMinStock('');
+                  setMinStockOverrideReason('');
+                  setMinStockValueTouched(false);
+                }} style={styles.input}>
                   <option value="">Select a product</option>
                   {(productsQuery.data || []).map((product) => (
                     <option key={product.id} value={product.id}>
@@ -451,19 +564,87 @@ export default function AIOperationsCopilotPage() {
             ) : null}
 
             {intent === 'prepare_min_stock_proposal' ? (
-              <label style={styles.field}>
-                <span style={styles.label}>Proposed minimum stock</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000000000"
-                  step="0.01"
-                  value={proposedMinStock}
-                  onChange={(event) => setProposedMinStock(event.target.value)}
-                  style={styles.input}
-                />
-                <span style={styles.help}>This value becomes a server-controlled proposal. It does not update the product.</span>
-              </label>
+              <div style={styles.recommendationStack}>
+                {minimumStockRecommendationQuery.isLoading || minimumStockRecommendationQuery.isFetching ? (
+                  <div style={styles.notice}>Calculating the minimum-stock recommendation from tenant evidence…</div>
+                ) : minimumStockRecommendationQuery.isError ? (
+                  <div style={styles.error}>{readableError(minimumStockRecommendationQuery.error)}</div>
+                ) : minimumStockRecommendation ? (
+                  <div style={styles.recommendationBox}>
+                    <div style={styles.proposalHeader}>
+                      <div>
+                        <div style={styles.eyebrow}>Deterministic recommendation</div>
+                        <h3 style={styles.proposalTitle}>System recommendation: {minimumStockRecommendation.recommended_min_stock} {minimumStockRecommendation.unit || ''}</h3>
+                      </div>
+                      <Badge tone={minimumStockRecommendation.recommendation_status === 'calculated' ? 'good' : 'warn'}>
+                        {formatLabel(minimumStockRecommendation.recommendation_status)}
+                      </Badge>
+                    </div>
+                    <div style={styles.keyValueGrid}>
+                      <div><span style={styles.keyLabel}>Current minimum</span><strong>{minimumStockRecommendation.current_min_stock}</strong></div>
+                      <div><span style={styles.keyLabel}>System recommendation</span><strong>{minimumStockRecommendation.recommended_min_stock}</strong></div>
+                      <div><span style={styles.keyLabel}>Evidence quality</span><strong>{formatConfidence(minimumStockRecommendation.confidence_score)}</strong></div>
+                      <div><span style={styles.keyLabel}>Direction</span><strong>{formatLabel(minimumStockRecommendation.direction)}</strong></div>
+                    </div>
+                    <p style={styles.help}>{minimumStockRecommendation.formula}</p>
+                    <div style={styles.calculationGrid}>
+                      <div><span style={styles.keyLabel}>Demand used/day</span><strong>{minimumStockRecommendation.inputs.selected_daily_demand}</strong></div>
+                      <div><span style={styles.keyLabel}>Configured lead time</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${minimumStockRecommendation.inputs.configured_lead_time_days} days` : 'Not configured'}</strong></div>
+                      <div><span style={styles.keyLabel}>Effective coverage</span><strong>{minimumStockRecommendation.inputs.effective_coverage_days} days</strong></div>
+                      <div><span style={styles.keyLabel}>Lead-time demand</span><strong>{minimumStockRecommendation.calculation.expected_lead_time_demand}</strong></div>
+                      <div><span style={styles.keyLabel}>Safety stock</span><strong>{minimumStockRecommendation.calculation.safety_stock}</strong></div>
+                      <div><span style={styles.keyLabel}>Package size</span><strong>{minimumStockRecommendation.inputs.units_per_package}</strong></div>
+                      <div><span style={styles.keyLabel}>Supplier delay buffer</span><strong>{minimumStockRecommendation.inputs.supplier_delay_buffer_days} days</strong></div>
+                      <div><span style={styles.keyLabel}>30d / 90d usage</span><strong>{minimumStockRecommendation.inputs.total_outbound_30d} / {minimumStockRecommendation.inputs.total_outbound_90d}</strong></div>
+                      <div><span style={styles.keyLabel}>Last outbound evidence</span><strong>{formatDateTime(minimumStockRecommendation.inputs.last_outbound_at)}</strong></div>
+                    </div>
+                    <details>
+                      <summary style={styles.detailsSummary}>Show calculation assumptions and warnings</summary>
+                      <ul style={styles.list}>
+                        {minimumStockRecommendation.assumptions.map((item) => <li key={item}>{item}</li>)}
+                        {minimumStockRecommendation.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
+                      </ul>
+                    </details>
+                    <div style={styles.help}>{minimumStockRecommendation.confidence_meaning}</div>
+                  </div>
+                ) : productId ? null : (
+                  <div style={styles.notice}>Select a product to calculate its recommendation.</div>
+                )}
+
+                <label style={styles.field}>
+                  <span style={styles.label}>Final proposed minimum stock</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000000000"
+                    step="0.01"
+                    value={effectiveProposedMinStock}
+                    onChange={(event) => {
+                      setProposedMinStock(event.target.value);
+                      setMinStockValueTouched(true);
+                    }}
+                    style={styles.input}
+                  />
+                  <span style={styles.help}>The system recommendation is filled automatically. You may change it, but an explanation is required. This field does not update the product.</span>
+                  {minStockNoChange ? <span style={styles.fieldError}>The final value matches the current product minimum, so there is no change to propose.</span> : null}
+                </label>
+
+                {minStockOverrideApplied ? (
+                  <label style={styles.field}>
+                    <span style={styles.label}>Why are you overriding the system recommendation?</span>
+                    <textarea
+                      value={minStockOverrideReason}
+                      onChange={(event) => setMinStockOverrideReason(event.target.value)}
+                      rows={3}
+                      maxLength={1000}
+                      style={styles.textarea}
+                      placeholder="Explain the business evidence or policy reason for using a different value."
+                    />
+                    <span style={styles.help}>{minStockOverrideReason.length}/1000 characters</span>
+                    {minStockOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>An override explanation is required.</span> : null}
+                  </label>
+                ) : null}
+              </div>
             ) : null}
 
             {intent === 'prepare_standard_cost_proposal' ? (
@@ -563,8 +744,11 @@ export default function AIOperationsCopilotPage() {
                     <div><span style={styles.keyLabel}>Request type</span><strong>{formatLabel(proposal.request_type)}</strong></div>
                     <div><span style={styles.keyLabel}>Product</span><strong>{proposal.payload?.product_name || proposal.payload?.product_id || 'Not reported'}</strong></div>
                     <div><span style={styles.keyLabel}>Current {proposalValueLabel}</span><strong>{displayUnknown(proposalCurrentValue)}</strong></div>
-                    <div><span style={styles.keyLabel}>Proposed {proposalValueLabel}</span><strong>{displayUnknown(proposalTargetValue)}</strong></div>
+                    {isMinStockProposal ? <div><span style={styles.keyLabel}>System recommendation</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock)}</strong></div> : null}
+                    <div><span style={styles.keyLabel}>Final proposed {proposalValueLabel}</span><strong>{displayUnknown(proposalTargetValue)}</strong></div>
+                    {isMinStockProposal ? <div><span style={styles.keyLabel}>Human override</span><strong>{proposal.payload?.user_override_applied ? 'Yes' : 'No'}</strong></div> : null}
                   </div>
+                  {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>Override reason: {proposal.payload.override_reason}</p> : null}
                   <p style={styles.help}>No product field has changed. A permitted reviewer must approve this proposal in AI Review before a draft Execution Request can be created.</p>
                   <div style={styles.actionRow}>
                     <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true">Open in AI Review</Link>
@@ -645,6 +829,10 @@ const styles: Record<string, CSSProperties> = {
   panelTitle: { margin: 0, fontSize: 19 },
   panelSubtitle: { margin: '5px 0 0', color: 'var(--muted-text, #64748b)', lineHeight: 1.45 },
   form: { display: 'grid', gap: 15 },
+  recommendationStack: { display: 'grid', gap: 12 },
+  recommendationBox: { display: 'grid', gap: 12, padding: 14, borderRadius: 12, border: '1px solid rgba(37, 99, 235, 0.28)', background: 'rgba(37, 99, 235, 0.06)' },
+  calculationGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 9, padding: 10, borderRadius: 8, background: 'rgba(100, 116, 139, 0.07)' },
+  detailsSummary: { cursor: 'pointer', fontWeight: 800, fontSize: 13 },
   field: { display: 'grid', gap: 7 },
   label: { fontSize: 13, fontWeight: 800 },
   input: { width: '100%', boxSizing: 'border-box', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: 8, padding: '10px 11px', background: 'var(--input-background, #fff)', color: 'inherit' },
