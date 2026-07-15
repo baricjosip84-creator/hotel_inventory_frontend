@@ -17,12 +17,22 @@ type PlanningRunListItem = {
   generated_by_user_name?: string | null;
   created_at: string;
   materialized_at?: string | null;
+  version?: number | string;
+  materialization_guard?: {
+    pending_decision_count: number;
+    all_lines_reviewed: boolean;
+    max_age_hours: number;
+    run_age_hours: number | string;
+    age_expired: boolean;
+    can_materialize: boolean;
+  };
   item_count?: number | string;
   transfer_count?: number | string;
 };
 
 type PlanItem = {
   id: string;
+  version: number | string;
   product_id: string;
   product_name: string;
   product_unit?: string | null;
@@ -57,6 +67,7 @@ type PlanItem = {
 
 type PlanTransfer = {
   id: string;
+  version: number | string;
   product_name: string;
   product_unit?: string | null;
   source_storage_location_name: string;
@@ -75,7 +86,7 @@ type PlanTransfer = {
 };
 
 type PlanningRunDetail = {
-  run: PlanningRunListItem & { version?: number | string };
+  run: PlanningRunListItem;
   items: PlanItem[];
   transfers: PlanTransfer[];
 };
@@ -133,11 +144,46 @@ async function getRun(id: string): Promise<PlanningRunDetail> {
 async function createRun(input: { target_coverage_days: number }): Promise<PlanningRunDetail> {
   return apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input) });
 }
-async function saveDecisions(input: { runId: string; decisions: Array<{ kind: 'purchase' | 'transfer'; id: string; decision: Decision; quantity?: number; reason?: string | null }> }): Promise<PlanningRunDetail> {
-  return apiRequest<PlanningRunDetail>(`/replenishment-planning/${input.runId}/decisions`, { method: 'POST', body: JSON.stringify({ decisions: input.decisions }) });
+type DecisionMutationInput = {
+  runId: string;
+  expectedRunVersion: number;
+  decisions: Array<{
+    kind: 'purchase' | 'transfer';
+    id: string;
+    expected_version: number;
+    decision: Decision;
+    quantity?: number;
+    reason?: string | null;
+  }>;
+};
+
+type MaterializationResponse = {
+  run: PlanningRunDetail;
+  created_stock_transfers: unknown[];
+  created_purchase_orders: unknown[];
+  idempotent_replay?: boolean;
+  validation?: {
+    validated_at: string;
+    run_age_hours: number | string;
+    checked_scope_count: number;
+    checked_transfer_count: number;
+    checked_purchase_count: number;
+  };
+};
+
+async function saveDecisions(input: DecisionMutationInput): Promise<PlanningRunDetail> {
+  return apiRequest<PlanningRunDetail>(`/replenishment-planning/${input.runId}/decisions`, {
+    method: 'POST',
+    body: JSON.stringify({ expected_run_version: input.expectedRunVersion, decisions: input.decisions }),
+    skipMutationFeedback: true
+  });
 }
-async function materializeRun(runId: string): Promise<{ run: PlanningRunDetail; created_stock_transfers: unknown[]; created_purchase_orders: unknown[] }> {
-  return apiRequest(`/replenishment-planning/${runId}/materialize`, { method: 'POST', body: JSON.stringify({}) });
+async function materializeRun(input: { runId: string; expectedRunVersion: number }): Promise<MaterializationResponse> {
+  return apiRequest<MaterializationResponse>(`/replenishment-planning/${input.runId}/materialize`, {
+    method: 'POST',
+    body: JSON.stringify({ expected_run_version: input.expectedRunVersion }),
+    skipMutationFeedback: true
+  });
 }
 async function getOutcomes(runId: string): Promise<OutcomeResponse> {
   return apiRequest<OutcomeResponse>(`/replenishment-planning/${runId}/outcomes`);
@@ -165,9 +211,9 @@ export default function ReplenishmentPlanningPage() {
     enabled: Boolean(effectiveRunId)
   });
   const outcomesQuery = useQuery({
-    queryKey: ['location-replenishment-outcomes', selectedRunId],
-    queryFn: () => getOutcomes(selectedRunId),
-    enabled: Boolean(selectedRunId && detailQuery.data?.run.status === 'materialized')
+    queryKey: ['location-replenishment-outcomes', effectiveRunId],
+    queryFn: () => getOutcomes(effectiveRunId),
+    enabled: Boolean(effectiveRunId && detailQuery.data?.run.status === 'materialized')
   });
 
   const createMutation = useMutation({
@@ -186,23 +232,33 @@ export default function ReplenishmentPlanningPage() {
     onSuccess: async (data) => {
       setMessage('Planning decisions saved. No transfer or purchase order was created.');
       setError('');
+      setDrafts({});
       queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-runs'] });
     },
-    onError: (e) => setError(errorMessage(e))
+    onError: async (e) => {
+      setError(errorMessage(e));
+      if (effectiveRunId) await queryClient.invalidateQueries({ queryKey: ['location-replenishment-run', effectiveRunId] });
+    }
   });
   const materializeMutation = useMutation({
     mutationFn: materializeRun,
     onSuccess: async (data) => {
       const transferCount = data.created_stock_transfers.length;
       const poCount = data.created_purchase_orders.length;
-      setMessage(`Created ${transferCount} draft Stock Transfer(s) and ${poCount} draft Purchase Order(s). Nothing was executed or approved.`);
+      setMessage(data.idempotent_replay
+        ? `This run was already materialized. Found ${transferCount} linked draft Stock Transfer(s) and ${poCount} linked draft Purchase Order(s).`
+        : `Live evidence was revalidated. Created ${transferCount} draft Stock Transfer(s) and ${poCount} draft Purchase Order(s). Nothing was executed or approved.`);
       setError('');
+      setDrafts({});
       queryClient.setQueryData(['location-replenishment-run', data.run.run.id], data.run);
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-runs'] });
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-outcomes', data.run.run.id] });
     },
-    onError: (e) => setError(errorMessage(e))
+    onError: async (e) => {
+      setError(errorMessage(e));
+      if (effectiveRunId) await queryClient.invalidateQueries({ queryKey: ['location-replenishment-run', effectiveRunId] });
+    }
   });
 
   const detail = detailQuery.data;
@@ -215,11 +271,22 @@ export default function ReplenishmentPlanningPage() {
   const acceptedPurchaseDraftsRequired = Boolean(detail?.items.some((row) => ['accepted', 'overridden'].includes(row.decision_status) && num(row.final_purchase_quantity) > 0 && !row.linked_purchase_order_id));
   const missingMaterializationPermission = (acceptedTransferDraftsRequired && !canCreateTransfers) || (acceptedPurchaseDraftsRequired && !canCreatePurchaseOrders);
 
+  const runLocked = detail?.run.status === 'materialized' || detail?.run.status === 'cancelled';
+  const pendingDecisionCount = detail?.run.materialization_guard?.pending_decision_count
+    ?? ((detail?.items.filter((row) => row.decision_status === 'pending').length ?? 0)
+      + (detail?.transfers.filter((row) => row.decision_status === 'pending').length ?? 0));
+  const runAgeExpired = Boolean(detail?.run.materialization_guard?.age_expired);
+  const allLinesReviewed = pendingDecisionCount === 0;
+
   const setAll = (kind: 'purchase' | 'transfer', decision: Decision) => {
     const rows = kind === 'purchase' ? detail?.items ?? [] : detail?.transfers ?? [];
     setDrafts((current) => {
       const next = { ...current };
       for (const row of rows) {
+        const linked = kind === 'purchase'
+          ? Boolean((row as PlanItem).linked_purchase_order_id)
+          : Boolean((row as PlanTransfer).linked_stock_transfer_id);
+        if (linked || runLocked) continue;
         const quantity = kind === 'purchase' ? (row as PlanItem).recommended_purchase_quantity : (row as PlanTransfer).recommended_quantity;
         next[`${kind}:${row.id}`] = { decision, quantity: String(quantity), reason: '' };
       }
@@ -229,7 +296,7 @@ export default function ReplenishmentPlanningPage() {
 
   const changedDecisions = useMemo(() => {
     if (!detail) return [];
-    const result: Array<{ kind: 'purchase' | 'transfer'; id: string; decision: Decision; quantity?: number; reason?: string | null }> = [];
+    const result: DecisionMutationInput['decisions'] = [];
     for (const item of detail.items) {
       const draft = drafts[`purchase:${item.id}`];
       if (!draft || draft.decision === 'pending') continue;
@@ -238,7 +305,7 @@ export default function ReplenishmentPlanningPage() {
         && draft.reason.trim() === (item.decision_reason ?? '').trim()
         && (draft.decision !== 'overridden' || num(draft.quantity) === num(baseQuantity));
       if (unchanged) continue;
-      result.push({ kind: 'purchase', id: item.id, decision: draft.decision, quantity: draft.decision === 'overridden' ? num(draft.quantity) : undefined, reason: draft.reason.trim() || null });
+      result.push({ kind: 'purchase', id: item.id, expected_version: num(item.version), decision: draft.decision, quantity: draft.decision === 'overridden' ? num(draft.quantity) : undefined, reason: draft.reason.trim() || null });
     }
     for (const transfer of detail.transfers) {
       const draft = drafts[`transfer:${transfer.id}`];
@@ -248,7 +315,7 @@ export default function ReplenishmentPlanningPage() {
         && draft.reason.trim() === (transfer.decision_reason ?? '').trim()
         && (draft.decision !== 'overridden' || num(draft.quantity) === num(baseQuantity));
       if (unchanged) continue;
-      result.push({ kind: 'transfer', id: transfer.id, decision: draft.decision, quantity: draft.decision === 'overridden' ? num(draft.quantity) : undefined, reason: draft.reason.trim() || null });
+      result.push({ kind: 'transfer', id: transfer.id, expected_version: num(transfer.version), decision: draft.decision, quantity: draft.decision === 'overridden' ? num(draft.quantity) : undefined, reason: draft.reason.trim() || null });
     }
     return result;
   }, [detail, drafts]);
@@ -278,27 +345,45 @@ export default function ReplenishmentPlanningPage() {
           <Stat label="Location lines" value={String(summary.location_line_count ?? detail.items.length)} hint={`${summary.product_count ?? 0} products`} />
           <Stat label="Internal transfers" value={String(summary.transfer_recommendation_count ?? detail.transfers.length)} hint={`${fmt(summary.transfer_recommended_quantity)} units`} />
           <Stat label="Supplier purchases" value={String(summary.purchase_recommendation_count ?? 0)} hint={`${fmt(summary.purchase_recommended_quantity)} units`} />
+          <Stat label="Review readiness" value={allLinesReviewed ? 'Complete' : `${pendingDecisionCount} pending`} hint={`Run age ${fmt(detail.run.materialization_guard?.run_age_hours ?? 0)}h · version ${detail.run.version ?? '-'}`} />
         </div>
 
         <section style={styles.panel}>
-          <div style={styles.sectionHeader}><div><h2 style={styles.sectionTitle}>Transfer before buy</h2><p style={styles.muted}>A source location is never planned below its protected target. Accepted lines create draft Stock Transfers only.</p></div><div style={styles.actions}><button style={styles.secondaryButton} onClick={() => setAll('transfer', 'accepted')}>Accept all transfers</button><button style={styles.secondaryButton} onClick={() => setAll('transfer', 'deferred')}>Defer all</button></div></div>
+          <div style={styles.sectionHeader}><div><h2 style={styles.sectionTitle}>Transfer before buy</h2><p style={styles.muted}>A source location is never planned below its protected target. Accepted lines create draft Stock Transfers only.</p></div><div style={styles.actions}><button style={styles.secondaryButton} disabled={runLocked} onClick={() => setAll('transfer', 'accepted')}>Accept all transfers</button><button style={styles.secondaryButton} disabled={runLocked} onClick={() => setAll('transfer', 'deferred')}>Defer all</button></div></div>
           {detail.transfers.length === 0 ? <p style={styles.empty}>No protected internal surplus can cover another location’s shortage.</p> : <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th>Product</th><th>From → To</th><th>Recommended</th><th>Protected evidence</th><th>Decision</th><th>Final qty</th><th>Reason</th><th>Draft transfer</th></tr></thead><tbody>{detail.transfers.map((row) => {
             const key = `transfer:${row.id}`; const draft = drafts[key] ?? { decision: row.decision_status, quantity: String(row.final_quantity), reason: row.decision_reason ?? '' };
-            return <tr key={row.id}><td><strong>{row.product_name}</strong><br/><span style={styles.muted}>{row.product_unit}</span></td><td>{row.source_storage_location_name}<br/>→ {row.destination_storage_location_name}</td><td>{fmt(row.recommended_quantity)}</td><td>Surplus {fmt(row.source_surplus_before)}<br/>Shortage {fmt(row.destination_shortage_before)}</td><td><select style={styles.compactInput} value={draft.decision} disabled={!canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, decision: e.target.value as Decision } }))}>{DECISIONS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></td><td><input style={styles.qtyInput} type="number" min={0} value={draft.quantity} disabled={draft.decision !== 'overridden' || !canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, quantity: e.target.value } }))}/></td><td><input style={styles.compactInput} value={draft.reason} disabled={!canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, reason: e.target.value } }))}/></td><td>{row.linked_stock_transfer_id ? <a href={`/stock-transfers?transfer_id=${row.linked_stock_transfer_id}`}>{String(row.linked_stock_transfer_id).slice(0,8)} · {row.linked_stock_transfer_status}</a> : '-'}</td></tr>;
+            return <tr key={row.id}><td><strong>{row.product_name}</strong><br/><span style={styles.muted}>{row.product_unit}</span></td><td>{row.source_storage_location_name}<br/>→ {row.destination_storage_location_name}</td><td>{fmt(row.recommended_quantity)}</td><td>Surplus {fmt(row.source_surplus_before)}<br/>Shortage {fmt(row.destination_shortage_before)}</td><td><select style={styles.compactInput} value={draft.decision} disabled={!canGovern || runLocked || Boolean(row.linked_stock_transfer_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, decision: e.target.value as Decision } }))}>{DECISIONS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></td><td><input style={styles.qtyInput} type="number" min={0} value={draft.quantity} disabled={draft.decision !== 'overridden' || !canGovern || runLocked || Boolean(row.linked_stock_transfer_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, quantity: e.target.value } }))}/></td><td><input style={styles.compactInput} value={draft.reason} disabled={!canGovern || runLocked || Boolean(row.linked_stock_transfer_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, reason: e.target.value } }))}/></td><td>{row.linked_stock_transfer_id ? <a href={`/stock-transfers?transfer_id=${row.linked_stock_transfer_id}`}>{String(row.linked_stock_transfer_id).slice(0,8)} · {row.linked_stock_transfer_status}</a> : '-'}</td></tr>;
           })}</tbody></table></div>}
         </section>
 
         <section style={styles.panel}>
-          <div style={styles.sectionHeader}><div><h2 style={styles.sectionTitle}>Remaining supplier purchases</h2><p style={styles.muted}>Purchase quantity is calculated after accepted internal transfer coverage, then rounded to supplier MOQ and package rules.</p></div><div style={styles.actions}><button style={styles.secondaryButton} onClick={() => setAll('purchase', 'accepted')}>Accept all purchases</button><button style={styles.secondaryButton} onClick={() => setAll('purchase', 'deferred')}>Defer all</button></div></div>
+          <div style={styles.sectionHeader}><div><h2 style={styles.sectionTitle}>Remaining supplier purchases</h2><p style={styles.muted}>Purchase quantity is calculated after accepted internal transfer coverage, then rounded to supplier MOQ and package rules.</p></div><div style={styles.actions}><button style={styles.secondaryButton} disabled={runLocked} onClick={() => setAll('purchase', 'accepted')}>Accept all purchases</button><button style={styles.secondaryButton} disabled={runLocked} onClick={() => setAll('purchase', 'deferred')}>Defer all</button></div></div>
           <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th>Product / location</th><th>Position</th><th>Target</th><th>Transfer cover</th><th>Remaining gap</th><th>Recommended order</th><th>Supplier</th><th>Decision</th><th>Final qty</th><th>Reason</th><th>Draft PO</th></tr></thead><tbody>{detail.items.filter((row) => num(row.shortage_before_transfer) > 0 || num(row.recommended_purchase_quantity) > 0).map((row) => {
             const key = `purchase:${row.id}`; const draft = drafts[key] ?? { decision: row.decision_status, quantity: String(row.final_purchase_quantity), reason: row.decision_reason ?? '' };
-            return <tr key={row.id}><td><strong>{row.product_name}</strong><br/><span style={styles.muted}>{row.storage_location_name}</span></td><td>{fmt(row.usable_inventory_position)}<br/><span style={styles.muted}>stock {fmt(row.current_stock)} · reserved {fmt(row.reserved_quantity)}</span></td><td>{fmt(row.configured_target_quantity)}<br/><span style={styles.muted}>governed min {fmt(row.governed_min_quantity)}</span></td><td>{fmt(row.transfer_covered_quantity)}</td><td>{fmt(row.remaining_purchase_requirement)}</td><td><strong>{fmt(row.recommended_purchase_quantity)}</strong><br/><span style={styles.muted}>cost {row.estimated_purchase_cost == null ? '-' : fmt(row.estimated_purchase_cost)}</span></td><td>{row.supplier_name ?? 'Missing supplier'}</td><td><select style={styles.compactInput} value={draft.decision} disabled={!canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, decision: e.target.value as Decision } }))}>{DECISIONS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></td><td><input style={styles.qtyInput} type="number" min={0} value={draft.quantity} disabled={draft.decision !== 'overridden' || !canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, quantity: e.target.value } }))}/></td><td><input style={styles.compactInput} value={draft.reason} disabled={!canGovern || detail.run.status === 'materialized'} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, reason: e.target.value } }))}/></td><td>{row.linked_purchase_order_id ? <a href={`/purchase-orders?purchase_order_id=${row.linked_purchase_order_id}`}>{row.linked_purchase_order_number ?? String(row.linked_purchase_order_id).slice(0,8)} · {row.linked_purchase_order_status}</a> : '-'}</td></tr>;
+            return <tr key={row.id}><td><strong>{row.product_name}</strong><br/><span style={styles.muted}>{row.storage_location_name}</span></td><td>{fmt(row.usable_inventory_position)}<br/><span style={styles.muted}>stock {fmt(row.current_stock)} · reserved {fmt(row.reserved_quantity)}</span></td><td>{fmt(row.configured_target_quantity)}<br/><span style={styles.muted}>governed min {fmt(row.governed_min_quantity)}</span></td><td>{fmt(row.transfer_covered_quantity)}</td><td>{fmt(row.remaining_purchase_requirement)}</td><td><strong>{fmt(row.recommended_purchase_quantity)}</strong><br/><span style={styles.muted}>cost {row.estimated_purchase_cost == null ? '-' : fmt(row.estimated_purchase_cost)}</span></td><td>{row.supplier_name ?? 'Missing supplier'}</td><td><select style={styles.compactInput} value={draft.decision} disabled={!canGovern || runLocked || Boolean(row.linked_purchase_order_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, decision: e.target.value as Decision } }))}>{DECISIONS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></td><td><input style={styles.qtyInput} type="number" min={0} value={draft.quantity} disabled={draft.decision !== 'overridden' || !canGovern || runLocked || Boolean(row.linked_purchase_order_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, quantity: e.target.value } }))}/></td><td><input style={styles.compactInput} value={draft.reason} disabled={!canGovern || runLocked || Boolean(row.linked_purchase_order_id)} onChange={(e) => setDrafts((d) => ({ ...d, [key]: { ...draft, reason: e.target.value } }))}/></td><td>{row.linked_purchase_order_id ? <a href={`/purchase-orders?purchase_order_id=${row.linked_purchase_order_id}`}>{row.linked_purchase_order_number ?? String(row.linked_purchase_order_id).slice(0,8)} · {row.linked_purchase_order_status}</a> : '-'}</td></tr>;
           })}</tbody></table></div>
         </section>
 
         <section style={styles.panel}>
-          <div style={styles.actions}><button style={styles.primaryButton} disabled={!canGovern || changedDecisions.length === 0 || decisionMutation.isPending || detail.run.status === 'materialized'} onClick={() => decisionMutation.mutate({ runId: detail.run.id, decisions: changedDecisions })}>{decisionMutation.isPending ? 'Saving…' : `Save ${changedDecisions.length} decision(s)`}</button><button style={styles.dangerButton} disabled={!canGovern || missingMaterializationPermission || materializeMutation.isPending || detail.run.status === 'materialized'} onClick={() => materializeMutation.mutate(detail.run.id)}>{materializeMutation.isPending ? 'Creating drafts…' : 'Create accepted draft transfers and purchase orders'}</button></div>
-          <p style={styles.muted}>Materialization creates only draft records. Stock Transfer execution and Purchase Order submission/approval remain in their existing controlled pages.</p>
+          <div style={styles.actions}>
+            <button
+              style={styles.primaryButton}
+              disabled={!canGovern || changedDecisions.length === 0 || decisionMutation.isPending || runLocked}
+              onClick={() => decisionMutation.mutate({ runId: detail.run.id, expectedRunVersion: num(detail.run.version), decisions: changedDecisions })}
+            >
+              {decisionMutation.isPending ? 'Saving…' : `Save ${changedDecisions.length} decision(s)`}
+            </button>
+            <button
+              style={styles.dangerButton}
+              disabled={!canGovern || missingMaterializationPermission || materializeMutation.isPending || runLocked || !allLinesReviewed || runAgeExpired}
+              onClick={() => materializeMutation.mutate({ runId: detail.run.id, expectedRunVersion: num(detail.run.version) })}
+            >
+              {materializeMutation.isPending ? 'Revalidating and creating drafts…' : 'Revalidate live evidence and create accepted drafts'}
+            </button>
+          </div>
+          <p style={styles.muted}>Every visible action line must be reviewed first. Immediately before draft creation, the backend reloads stock, reservations, transfers, inbound supply, supplier rules, product versions, and location settings. Any change blocks materialization and requires a new planning run.</p>
+          {!allLinesReviewed ? <p style={styles.warning}>{pendingDecisionCount} planning line(s) still need a decision. Partial materialization is intentionally blocked.</p> : null}
+          {runAgeExpired ? <p style={styles.error}>This run is older than {detail.run.materialization_guard?.max_age_hours ?? 24} hours. Generate a fresh run before creating drafts.</p> : null}
           {missingMaterializationPermission ? <p style={styles.error}>Your role lacks permission to create one or more accepted draft records. Stock Transfer creation is required for accepted transfers, and Purchase Order creation is required for accepted purchases.</p> : null}
         </section>
 
@@ -318,7 +403,7 @@ const styles: Record<string, CSSProperties> = {
   page: { padding: '24px', display: 'grid', gap: 16 }, eyebrow: { fontSize: 12, fontWeight: 800, letterSpacing: 1.1, color: '#58708f' }, title: { margin: '4px 0 6px', fontSize: 32 }, subtitle: { margin: 0, maxWidth: 950, color: '#5f7189', lineHeight: 1.55 },
   panel: { background: '#fff', border: '1px solid #dbe3ef', borderRadius: 16, padding: 16 }, toolbar: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end' }, field: { display: 'grid', gap: 6, fontWeight: 700, fontSize: 13 }, input: { minWidth: 150, padding: '10px 12px', border: '1px solid #b8c4d5', borderRadius: 8, background: '#fff' }, compactInput: { width: '100%', minWidth: 125, padding: '7px 8px', border: '1px solid #b8c4d5', borderRadius: 6 }, qtyInput: { width: 82, padding: '7px 8px', border: '1px solid #b8c4d5', borderRadius: 6 },
   primaryButton: { padding: '11px 16px', border: 0, borderRadius: 8, background: '#2563eb', color: '#fff', fontWeight: 800, cursor: 'pointer' }, secondaryButton: { padding: '9px 12px', border: '1px solid #b8c4d5', borderRadius: 8, background: '#f7f9fc', fontWeight: 700, cursor: 'pointer' }, dangerButton: { padding: '11px 16px', border: 0, borderRadius: 8, background: '#8b3a17', color: '#fff', fontWeight: 800, cursor: 'pointer' },
-  success: { padding: 12, borderRadius: 8, background: '#e9f8ef', border: '1px solid #9bd8b1', color: '#176b3a' }, error: { padding: 12, borderRadius: 8, background: '#fff0f0', border: '1px solid #efaaaa', color: '#9b1c1c' },
+  success: { padding: 12, borderRadius: 8, background: '#e9f8ef', border: '1px solid #9bd8b1', color: '#176b3a' }, error: { padding: 12, borderRadius: 8, background: '#fff0f0', border: '1px solid #efaaaa', color: '#9b1c1c' }, warning: { padding: 12, borderRadius: 8, background: '#fff8e6', border: '1px solid #e6c66a', color: '#795500' },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }, stat: { padding: 14, border: '1px solid #dbe3ef', borderRadius: 12, background: '#fff', display: 'grid', gap: 5 }, statValue: { fontSize: 22 }, muted: { color: '#66788f', fontSize: 12 },
   sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', marginBottom: 12 }, sectionTitle: { margin: 0, fontSize: 21 }, actions: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, tableWrap: { overflowX: 'auto' }, table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 }, empty: { textAlign: 'center', color: '#66788f', padding: 24 }
 };
