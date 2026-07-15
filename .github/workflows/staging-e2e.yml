@@ -1,0 +1,46 @@
+name: Staging End-to-End Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      VERCEL: '1'
+      PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_FRONTEND_URL }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_MANAGER_EMAIL: ${{ secrets.E2E_MANAGER_EMAIL }}
+      E2E_MANAGER_PASSWORD: ${{ secrets.E2E_MANAGER_PASSWORD }}
+      E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
+      E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run security:check
+      - run: npx playwright install --with-deps chromium
+      - name: Require staging URL and non-production test credentials
+        run: |
+          test -n "$PLAYWRIGHT_BASE_URL" || (echo "STAGING_FRONTEND_URL repository variable is required" && exit 1)
+          test -n "$E2E_EMAIL" || (echo "E2E_EMAIL secret is required" && exit 1)
+          test -n "$E2E_PASSWORD" || (echo "E2E_PASSWORD secret is required" && exit 1)
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-artifacts
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

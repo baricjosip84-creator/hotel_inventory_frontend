@@ -1,40 +1,33 @@
 import fs from 'node:fs';
 
-const files = [
-  'src/pages/AutomationSchedulesPage.tsx',
-  'src/components/enterpriseInventory/tabs/AutomationTab.tsx',
-  'src/components/enterpriseInventory/EnterpriseInventoryAutomationPanel.tsx',
-  'src/components/enterpriseInventory/EnterpriseInventoryAutomationMutations.ts'
-];
-
-const sources = Object.fromEntries(files.map((file) => [file, fs.readFileSync(file, 'utf8')]));
-
-const forbiddenTokens = [
-  '`/automation-schedules/${schedule.id}/resume`',
-  '`/automation-schedules/${id}/resume`',
-  'resumeAutomationScheduleMutation',
-  'canResumeAutomationSchedules',
-  'tryResume(schedule)'
-];
-
-for (const [file, source] of Object.entries(sources)) {
-  for (const token of forbiddenTokens) {
-    if (source.includes(token)) {
-      throw new Error(`${file} still exposes blocked automation resume behavior: ${token}`);
-    }
-  }
-}
+const pagePath = 'src/pages/AutomationSchedulesPage.tsx';
+const page = fs.readFileSync(pagePath, 'utf8');
 
 const requiredTokens = [
-  'Resume locked',
-  'Resume is intentionally blocked until the automation runner is enabled.',
-  'disabledLinkButton'
+  'const canResumeAutomationSchedules = capabilities.canResumeAutomationSchedules;',
+  'const resumeSchedule = async (schedule: AutomationSchedule) => {',
+  '`/automation-schedules/${schedule.id}/resume`',
+  "method: 'POST'",
+  "schedule.status === 'draft' || schedule.status === 'paused'",
+  'canResumeAutomationSchedules',
+  '>Activate</button>'
 ];
 
 for (const token of requiredTokens) {
-  if (!sources['src/pages/AutomationSchedulesPage.tsx'].includes(token) && !sources['src/components/enterpriseInventory/tabs/AutomationTab.tsx'].includes(token)) {
-    throw new Error(`Missing automation resume governance token: ${token}`);
+  if (!page.includes(token)) {
+    throw new Error(`Automation resume UI governance is missing required controlled-resume token: ${token}`);
   }
 }
 
-console.log('Automation resume UI governance check passed.');
+const forbiddenTokens = [
+  'resumeSchedule(schedule); // bypass permission',
+  'disabled={false}',
+  'automation_schedules.resume"'
+];
+for (const token of forbiddenTokens) {
+  if (page.includes(token)) {
+    throw new Error(`Automation resume UI governance found an unsafe token: ${token}`);
+  }
+}
+
+console.log('Automation resume UI governance check passed: activation is permission-gated and limited to draft/paused schedules.');

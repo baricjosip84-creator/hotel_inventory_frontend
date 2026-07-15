@@ -1,0 +1,100 @@
+name: Frontend Validation
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      VERCEL: '1'
+      VITE_API_BASE_URL: /api
+    steps:
+      - name: Check out frontend source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check repository hygiene and committed secrets
+        run: npm run security:check
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Run static commercial and security checks
+        run: npm run check:ci
+      - name: Run TypeScript validation
+        run: npm run typecheck
+      - name: Lint pilot-critical surfaces
+        run: npm run lint:pilot-critical
+      - name: Build production frontend
+        run: npm run build
+      - name: Stage a clean source distribution
+        run: npm run package:stage -- --output ../frontend-source-stage
+
+  cross-repository-contracts:
+    if: ${{ vars.BACKEND_REPOSITORY != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      BACKEND_ROOT: ${{ github.workspace }}/backend
+    steps:
+      - name: Check out frontend source
+        uses: actions/checkout@v4
+        with:
+          path: frontend
+      - name: Check out backend source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.BACKEND_REPOSITORY }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          path: backend
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+      - name: Validate backend/frontend permission and AI contracts
+        working-directory: frontend
+        run: npm run check:cross-repo
+
+  full-lint-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    env:
+      CI: 'true'
+      VERCEL: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Report existing repository-wide lint debt without blocking the pilot gate
+        run: npm run lint

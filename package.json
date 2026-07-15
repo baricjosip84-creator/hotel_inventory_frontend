@@ -39,7 +39,15 @@
     "check:inventory-usage-reversal-feedback": "node scripts/check-inventory-usage-reversal-feedback.mjs",
     "check:role-permission-management": "node scripts/check-role-permission-management.mjs",
     "check:tenant-custom-role-management": "node scripts/check-tenant-custom-role-management.mjs",
-    "check:shipment-mailtrap-sandbox-ui": "node scripts/check-shipment-mailtrap-sandbox-ui.mjs"
+    "check:shipment-mailtrap-sandbox-ui": "node scripts/check-shipment-mailtrap-sandbox-ui.mjs",
+    "typecheck": "tsc -b",
+    "security:scan": "node scripts/check-committed-secrets.mjs",
+    "repo:hygiene": "node scripts/check-repository-hygiene.mjs",
+    "security:check": "npm run repo:hygiene && npm run security:scan",
+    "lint:pilot-critical": "eslint src/app/router.tsx src/app/navigationRegistry.ts src/lib/api.ts src/lib/http.ts src/pages/ReplenishmentPlanningPage.tsx src/pages/ProcurementRecommendationsPage.tsx src/pages/StockTransfersPage.tsx src/pages/PurchaseOrdersPage.tsx",
+    "package:stage": "node scripts/prepare-source-distribution.mjs",
+    "check:ci": "npm run security:check && npm run check:commercial-shell && npm run check:phase15-closure && npm run check:phase18-commercial-readiness-surfaces && npm run check:vercel-install-hardening && npm run check:platform-security-route-permission && npm run check:platform-api-mutation-safety && npm run check:production-env-governance && npm run check:automation-resume-ui-governance && npm run check:tenant-session-route-auth-governance && npm run check:shipment-mailtrap-sandbox-ui",
+    "check:cross-repo": "npm run check:unified-ai-contract-suite && npm run check:role-permission-management && npm run check:tenant-custom-role-management"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

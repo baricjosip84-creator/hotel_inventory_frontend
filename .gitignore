@@ -1,8 +1,37 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build, test and coverage output
+dist/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+
+# Environment files and local secrets
 .env
-.env.local
-.env.development.local
-.env.production.local
-.vscode
+.env.*
+!.env.example
+!.env.*.example
+!.env.production
+
+# Logs and runtime output
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+tmp/
+temp/
+
+# Local tooling and operating-system files
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
+
+# Generated source distributions
+release/
+artifacts/
+*.zip
+*.tgz

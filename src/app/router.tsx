@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- the router is intentionally exported for contract and navigation tests. */
 /*
   src/app/router.tsx
 

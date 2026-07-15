@@ -381,6 +381,8 @@ function withMutationSafetyHeaders(path: string, options: SafeMutationRequestIni
     ...requestOptions
   } = options;
 
+  void _skipMutationFeedback;
+
   const headers = new Headers(originalHeaders || {});
 
   if (version !== undefined && !headers.has('If-Match-Version')) {
@@ -603,7 +605,12 @@ function readDownloadMetadata(response: Response): ApiDownloadMetadata {
 function sanitizeDownloadFilename(filename: string): string {
   const normalizedFilename = String(filename || '')
     .replace(/[\\/]/g, '-')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .split('')
+    .filter((character) => {
+      const codePoint = character.charCodeAt(0);
+      return codePoint >= 32 && codePoint !== 127;
+    })
+    .join('')
     .replace(/\.{2,}/g, '.')
     .replace(/[^a-zA-Z0-9._ -]+/g, '-')
     .replace(/\s+/g, ' ')
@@ -630,9 +637,10 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
 
   try {
     ({ response } = await performRequest(path, { method: 'GET' }));
-  } catch (error: any) {
-    dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while downloading file' });
-    throw new ApiError(error?.message || 'Network error while downloading file', 0);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Network error while downloading file';
+    dispatchTenantMutationFeedback({ type: 'error', message });
+    throw new ApiError(message, 0);
   }
 
   if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
@@ -641,9 +649,10 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
     if (recoveredAccessToken) {
       try {
         ({ response } = await performRequest(path, { method: 'GET' }));
-      } catch (error: any) {
-        dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while downloading file' });
-        throw new ApiError(error?.message || 'Network error while downloading file', 0);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Network error while downloading file';
+        dispatchTenantMutationFeedback({ type: 'error', message });
+        throw new ApiError(message, 0);
       }
     }
   }
@@ -768,11 +777,12 @@ export async function apiRequest<T>(
 
   try {
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Network error while contacting backend';
     if (shouldShowMutationFeedback) {
-      dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+      dispatchTenantMutationFeedback({ type: 'error', message });
     }
-    throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+    throw new ApiError(message, 0);
   }
 
   /*
@@ -786,11 +796,12 @@ export async function apiRequest<T>(
     if (recoveredAccessToken) {
       try {
         ({ response } = await performRequest(path, requestOptions));
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Network error while contacting backend';
         if (shouldShowMutationFeedback) {
-          dispatchTenantMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+          dispatchTenantMutationFeedback({ type: 'error', message });
         }
-        throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+        throw new ApiError(message, 0);
       }
     }
   }

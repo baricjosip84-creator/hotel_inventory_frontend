@@ -149,7 +149,7 @@ function escapeHtml(value: unknown): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
+    .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
 
@@ -567,6 +567,8 @@ export default function StockTransfersPage() {
 
     const selectedStillVisible = transfers.some((transfer) => transfer.id === selectedTransferId);
     if (!selectedStillVisible) {
+      // The list is the source of truth; clear a selection that filters removed.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedTransferId(null);
       setEditingTransferId(null);
     }
