@@ -88,12 +88,44 @@ type ReplenishmentRecommendation = {
   unit?: string | null;
   current_quantity: number | string;
   min_stock: number | string;
+  product_min_stock?: number | string | null;
+  calculated_min_stock?: number | string | null;
+  system_recommended_min_stock?: number | string | null;
+  governed_min_stock?: number | string | null;
+  min_stock_recommendation_status?: string | null;
+  min_stock_confidence_score?: number | string | null;
+  min_stock_direction?: string | null;
+  min_stock_formula_version?: string | null;
   average_daily_usage: number | string;
   estimated_days_of_coverage: number | string | null;
   projected_depletion_date?: string | null;
+  target_coverage_days?: number | string | null;
+  target_stock_quantity?: number | string | null;
+  gross_open_inbound_quantity?: number | string | null;
+  reliable_open_inbound_quantity?: number | string | null;
+  at_risk_open_inbound_quantity?: number | string | null;
+  current_inventory_position?: number | string | null;
   base_reorder_quantity?: number | string | null;
   moq_adjusted_reorder_quantity?: number | string | null;
   recommended_reorder_quantity: number | string;
+  replenishment_plan?: {
+    formula_version?: string | null;
+    formula?: string | null;
+    target_coverage_days?: number | string | null;
+    target_stock_quantity?: number | string | null;
+    gross_open_inbound_quantity?: number | string | null;
+    reliable_open_inbound_quantity?: number | string | null;
+    at_risk_open_inbound_quantity?: number | string | null;
+    inventory_position?: number | string | null;
+    pre_moq_reorder_quantity?: number | string | null;
+    min_order_quantity?: number | string | null;
+    moq_adjusted_reorder_quantity?: number | string | null;
+    units_per_order_package?: number | string | null;
+    recommended_order_package_count?: number | string | null;
+    recommended_reorder_quantity?: number | string | null;
+    warnings?: string[];
+    assumptions?: string[];
+  };
   order_package_id?: string | null;
   order_package_name?: string | null;
   units_per_order_package?: number | string | null;
@@ -467,6 +499,51 @@ type ProcurementExecutionHistoryResponse = {
   timeline: Array<Record<string, unknown> & { event_type?: string; occurred_at?: string | null }>;
 };
 
+type ProcurementRecommendationOutcomesResponse = {
+  generated_at: string;
+  tenant_id: string;
+  pagination: RecommendationPagination;
+  summary: {
+    total: number | string;
+    threshold_met_count: number | string;
+    received_complete_count: number | string;
+    rows_with_post_decision_alerts: number | string;
+    by_status: Record<string, number | string>;
+  };
+  rows: Array<{
+    decision_id: string;
+    recommendation_key?: string | null;
+    product_id?: string | null;
+    product_name?: string | null;
+    unit?: string | null;
+    decision_status: string;
+    decision_note?: string | null;
+    decided_at?: string | null;
+    recommended_reorder_quantity?: number | string | null;
+    governed_min_stock_at_decision?: number | string | null;
+    current_min_stock?: number | string | null;
+    current_quantity?: number | string | null;
+    threshold_met: boolean;
+    converted_purchase_order_id?: string | null;
+    converted_at?: string | null;
+    po_number?: string | null;
+    purchase_order_status?: string | null;
+    expected_delivery_date?: string | null;
+    ordered_quantity?: number | string | null;
+    received_quantity?: number | string | null;
+    fulfillment_ratio?: number | string | null;
+    last_received_at?: string | null;
+    post_decision_alert_count: number | string;
+    outcome_status: string;
+  }>;
+  safety_contract: {
+    read_only: boolean;
+    creates_purchase_orders: boolean;
+    mutates_inventory: boolean;
+    evaluates_recorded_outcomes_only: boolean;
+  };
+};
+
 type ReplenishmentRecommendationBulkReadinessResponse = {
   generated_at: string;
   tenant_id: string;
@@ -710,6 +787,12 @@ async function fetchProcurementExecutionHistory(): Promise<ProcurementExecutionH
   );
 }
 
+async function fetchProcurementRecommendationOutcomes(): Promise<ProcurementRecommendationOutcomesResponse> {
+  return apiRequest<ProcurementRecommendationOutcomesResponse>(
+    "/reorder-insights/recommendations/outcomes?limit=50&offset=0",
+  );
+}
+
 
 async function fetchProcurementExceptionQueue(
   filters: RecommendationFilters,
@@ -926,13 +1009,23 @@ function exportRecommendationRowsCsv({
     "category",
     "unit",
     "current_quantity",
-    "min_stock",
+    "product_min_stock",
+    "calculated_min_stock",
+    "system_recommended_min_stock",
+    "governed_min_stock",
+    "min_stock_recommendation_status",
+    "min_stock_confidence_score",
     "average_daily_usage",
     "estimated_days_of_coverage",
     "projected_depletion_date",
     "source_signal",
     "urgency",
     "recommendation_status",
+    "target_stock_quantity",
+    "gross_open_inbound_quantity",
+    "reliable_open_inbound_quantity",
+    "at_risk_open_inbound_quantity",
+    "current_inventory_position",
     "base_reorder_quantity",
     "moq_adjusted_reorder_quantity",
     "recommended_reorder_quantity",
@@ -991,13 +1084,23 @@ function exportRecommendationRowsCsv({
     row.category || "",
     row.unit || "",
     row.current_quantity,
-    row.min_stock,
+    row.product_min_stock ?? row.min_stock,
+    row.calculated_min_stock ?? "",
+    row.system_recommended_min_stock ?? "",
+    row.governed_min_stock ?? row.min_stock,
+    row.min_stock_recommendation_status || "",
+    row.min_stock_confidence_score ?? "",
     row.average_daily_usage,
     row.estimated_days_of_coverage ?? "",
     row.projected_depletion_date || "",
     row.source_signal || "",
     row.urgency,
     row.recommendation_status || "",
+    row.target_stock_quantity ?? "",
+    row.gross_open_inbound_quantity ?? "",
+    row.reliable_open_inbound_quantity ?? "",
+    row.at_risk_open_inbound_quantity ?? "",
+    row.current_inventory_position ?? "",
     row.base_reorder_quantity ?? "",
     row.moq_adjusted_reorder_quantity ?? "",
     row.recommended_reorder_quantity,
@@ -1235,6 +1338,7 @@ export default function ProcurementRecommendationsPage() {
         queryKey: ["procurement-execution-dashboard"],
       });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-outcomes"] });
     },
   });
 
@@ -1261,6 +1365,7 @@ export default function ProcurementRecommendationsPage() {
         queryKey: ["procurement-execution-dashboard"],
       });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-outcomes"] });
     },
   });
 
@@ -1293,6 +1398,7 @@ export default function ProcurementRecommendationsPage() {
         queryKey: ["procurement-execution-dashboard"],
       });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-outcomes"] });
     },
   });
 
@@ -1333,6 +1439,11 @@ export default function ProcurementRecommendationsPage() {
     queryFn: fetchProcurementExecutionHistory,
   });
 
+  const recommendationOutcomesQuery = useQuery({
+    queryKey: ["procurement-recommendation-outcomes"],
+    queryFn: fetchProcurementRecommendationOutcomes,
+  });
+
 
   const exceptionQueueQuery = useQuery({
     queryKey: [
@@ -1367,6 +1478,7 @@ export default function ProcurementRecommendationsPage() {
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-po-draft-review"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-outcomes"] });
     },
   });
 
@@ -1386,6 +1498,7 @@ export default function ProcurementRecommendationsPage() {
       void queryClient.invalidateQueries({ queryKey: ["procurement-exception-queue"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-po-draft-review"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-outcomes"] });
     },
   });
 
@@ -1403,8 +1516,10 @@ export default function ProcurementRecommendationsPage() {
   });
 
   const data = recommendationsQuery.data;
-  const allRows = data?.rows ?? [];
-  const rows = useMemo(() => allRows.filter(isActiveRecommendation), [allRows]);
+  const rows = useMemo(
+    () => (data?.rows ?? []).filter(isActiveRecommendation),
+    [data?.rows],
+  );
   const activeSummary = useMemo(() => buildActiveRecommendationSummary(rows), [rows]);
   const summary: RecommendationSummary = {
     ...(data?.summary ?? {}),
@@ -1515,8 +1630,7 @@ export default function ProcurementRecommendationsPage() {
           </p>
           <h1 style={styles.title}>Procurement recommendations</h1>
           <p style={styles.subtitle}>
-            Action queue for turning stock, usage velocity, supplier lead time,
-            and MOQ evidence into procurement-ready replenishment decisions.
+            All-products workbench that keeps minimum-stock thresholds separate from order quantities, counts only reliable inbound supply, and routes approved replenishment into purchase order drafts.
           </p>
         </div>
         <div style={styles.generatedBox}>
@@ -2027,6 +2141,99 @@ export default function ProcurementRecommendationsPage() {
                     <tr>
                       <td style={styles.emptyCell} colSpan={6}>No procurement execution history yet.</td>
                     </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Recommendation outcomes</h2>
+            <p style={styles.panelSubtitle}>
+              Read-only follow-up showing whether approved recommendations reached a purchase order, were received, restored the governed threshold, or still produced alerts.
+            </p>
+          </div>
+          <button
+            style={styles.secondaryButton}
+            type="button"
+            onClick={() => void recommendationOutcomesQuery.refetch()}
+          >
+            Refresh outcomes
+          </button>
+        </div>
+        {recommendationOutcomesQuery.isLoading ? (
+          <div style={styles.infoBox}>Loading recorded recommendation outcomes...</div>
+        ) : null}
+        {recommendationOutcomesQuery.isError ? (
+          <div style={styles.errorBox}>{getErrorMessage(recommendationOutcomesQuery.error)}</div>
+        ) : null}
+        {recommendationOutcomesQuery.data ? (
+          <>
+            <div style={styles.bulkGrid}>
+              <StatCard label="Loaded outcomes" value={formatNumber(recommendationOutcomesQuery.data.summary.total, 0)} />
+              <StatCard label="Threshold restored" value={formatNumber(recommendationOutcomesQuery.data.summary.threshold_met_count, 0)} tone="good" />
+              <StatCard label="Fully received" value={formatNumber(recommendationOutcomesQuery.data.summary.received_complete_count, 0)} tone="good" />
+              <StatCard
+                label="Post-decision alerts"
+                value={formatNumber(recommendationOutcomesQuery.data.summary.rows_with_post_decision_alerts, 0)}
+                tone={toNumber(recommendationOutcomesQuery.data.summary.rows_with_post_decision_alerts) > 0 ? "warn" : "good"}
+              />
+            </div>
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Product</th>
+                    <th style={styles.th}>Decision</th>
+                    <th style={styles.th}>Outcome</th>
+                    <th style={styles.th}>Recommended / ordered</th>
+                    <th style={styles.th}>Received</th>
+                    <th style={styles.th}>Current stock / threshold</th>
+                    <th style={styles.th}>PO</th>
+                    <th style={styles.th}>Alerts after decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recommendationOutcomesQuery.data.rows.map((row) => (
+                    <tr key={row.decision_id} style={styles.tr}>
+                      <td style={styles.td}>
+                        <div style={styles.primaryText}>{row.product_name || row.product_id || "Unknown product"}</div>
+                        <div style={styles.mutedText}>{row.decided_at ? new Date(row.decided_at).toLocaleString() : "-"}</div>
+                      </td>
+                      <td style={styles.td}>{titleCase(row.decision_status)}</td>
+                      <td style={styles.td}>
+                        <Badge tone={row.outcome_status === "received_complete" ? "good" : row.outcome_status === "po_cancelled" || row.outcome_status === "not_approved" ? "bad" : "warn"}>
+                          {titleCase(row.outcome_status)}
+                        </Badge>
+                      </td>
+                      <td style={styles.td}>
+                        {formatNumber(row.recommended_reorder_quantity)} / {formatNumber(row.ordered_quantity)} {row.unit || ""}
+                      </td>
+                      <td style={styles.td}>
+                        {formatNumber(row.received_quantity)} {row.unit || ""}
+                        {row.fulfillment_ratio !== null && row.fulfillment_ratio !== undefined ? (
+                          <div style={styles.mutedText}>{formatNumber(toNumber(row.fulfillment_ratio) * 100, 0)}% fulfilled</div>
+                        ) : null}
+                      </td>
+                      <td style={styles.td}>
+                        {formatNumber(row.current_quantity)} / {formatNumber(row.governed_min_stock_at_decision)} {row.unit || ""}
+                        <div style={row.threshold_met ? styles.mutedText : styles.warningText}>
+                          {row.threshold_met ? "Threshold met" : "Below governed threshold"}
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        {row.po_number || row.converted_purchase_order_id || "Not created"}
+                        {row.purchase_order_status ? <div style={styles.mutedText}>{titleCase(row.purchase_order_status)}</div> : null}
+                      </td>
+                      <td style={styles.td}>{formatNumber(row.post_decision_alert_count, 0)}</td>
+                    </tr>
+                  ))}
+                  {recommendationOutcomesQuery.data.rows.length === 0 ? (
+                    <tr><td style={styles.emptyCell} colSpan={8}>No recommendation outcomes have been recorded yet.</td></tr>
                   ) : null}
                 </tbody>
               </table>
@@ -2710,6 +2917,8 @@ export default function ProcurementRecommendationsPage() {
                 <th style={styles.th}>Product</th>
                 <th style={styles.th}>Urgency</th>
                 <th style={styles.th}>Coverage</th>
+                <th style={styles.th}>Threshold</th>
+                <th style={styles.th}>Supply position</th>
                 <th style={styles.th}>Reorder qty</th>
                 <th style={styles.th}>Supplier</th>
                 <th style={styles.th}>Supplier signal</th>
@@ -2777,12 +2986,31 @@ export default function ProcurementRecommendationsPage() {
                   </td>
                   <td style={styles.td}>
                     <div style={styles.primaryText}>
+                      Current {formatNumber(row.product_min_stock ?? row.min_stock)} → governed {formatNumber(row.governed_min_stock ?? row.min_stock)}
+                    </div>
+                    <div style={styles.mutedText}>
+                      Calculated {formatNumber(row.system_recommended_min_stock ?? row.calculated_min_stock)} · {formatNumber(toNumber(row.min_stock_confidence_score) * 100, 0)}% evidence
+                    </div>
+                    <div style={styles.mutedText}>{titleCase(row.min_stock_recommendation_status || row.min_stock_direction)}</div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.primaryText}>
+                      Position {formatNumber(row.current_inventory_position ?? row.current_quantity)} {row.unit || ""}
+                    </div>
+                    <div style={styles.mutedText}>
+                      Stock {formatNumber(row.current_quantity)} + reliable inbound {formatNumber(row.reliable_open_inbound_quantity)}
+                    </div>
+                    {toNumber(row.at_risk_open_inbound_quantity) > 0 ? (
+                      <div style={styles.warningText}>{formatNumber(row.at_risk_open_inbound_quantity)} inbound excluded as at risk</div>
+                    ) : null}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.primaryText}>
                       {formatNumber(row.recommended_reorder_quantity)}{" "}
                       {row.unit || ""}
                     </div>
                     <div style={styles.mutedText}>
-                      Current {formatNumber(row.current_quantity)} · Min{" "}
-                      {formatNumber(row.min_stock)}
+                      Target {formatNumber(row.target_stock_quantity)} · before MOQ {formatNumber(row.base_reorder_quantity)}
                     </div>
                   </td>
                   <td style={styles.td}>
@@ -2934,7 +3162,7 @@ export default function ProcurementRecommendationsPage() {
               ))}
               {!recommendationsQuery.isLoading && rows.length === 0 ? (
                 <tr>
-                  <td style={styles.emptyCell} colSpan={14}>
+                  <td style={styles.emptyCell} colSpan={16}>
                     No procurement recommendations match the current filters.
                   </td>
                 </tr>
@@ -3275,31 +3503,26 @@ export default function ProcurementRecommendationsPage() {
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Stock snapshot</div>
-              <div style={styles.metricLine}>
-                <strong>Current:</strong>{" "}
-                {formatNumber(selectedDetail.current_quantity)}{" "}
-                {selectedDetail.unit || ""}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Minimum:</strong>{" "}
-                {formatNumber(selectedDetail.min_stock)}{" "}
-                {selectedDetail.unit || ""}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Target coverage:</strong>{" "}
-                {formatNumber(detailQuery.data?.target_coverage_days, 0)} days
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Recommended reorder:</strong>{" "}
-                {formatNumber(selectedDetail.recommended_reorder_quantity)}{" "}
-                {selectedDetail.unit || ""}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>MOQ-adjusted need:</strong>{" "}
-                {formatNumber(selectedDetail.moq_adjusted_reorder_quantity)}{" "}
-                {selectedDetail.unit || ""}
-              </div>
+              <div style={styles.statLabel}>Threshold and supply position</div>
+              <div style={styles.metricLine}><strong>Current stock:</strong> {formatNumber(selectedDetail.current_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Current product minimum:</strong> {formatNumber(selectedDetail.product_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Calculated threshold:</strong> {formatNumber(selectedDetail.system_recommended_min_stock ?? selectedDetail.calculated_min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Governed threshold:</strong> {formatNumber(selectedDetail.governed_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Threshold evidence:</strong> {formatNumber(toNumber(selectedDetail.min_stock_confidence_score) * 100, 0)}% · {titleCase(selectedDetail.min_stock_recommendation_status)}</div>
+              <div style={styles.metricLine}><strong>Gross open inbound:</strong> {formatNumber(selectedDetail.gross_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Reliable inbound counted:</strong> {formatNumber(selectedDetail.reliable_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>At-risk inbound excluded:</strong> {formatNumber(selectedDetail.at_risk_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Inventory position:</strong> {formatNumber(selectedDetail.current_inventory_position)} {selectedDetail.unit || ""}</div>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Separate reorder plan</div>
+              <div style={styles.metricLine}><strong>Target coverage:</strong> {formatNumber(selectedDetail.target_coverage_days ?? detailQuery.data?.target_coverage_days, 0)} days</div>
+              <div style={styles.metricLine}><strong>Target stock:</strong> {formatNumber(selectedDetail.target_stock_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Need before MOQ:</strong> {formatNumber(selectedDetail.base_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>MOQ-adjusted need:</strong> {formatNumber(selectedDetail.moq_adjusted_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Recommended order:</strong> {formatNumber(selectedDetail.recommended_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <p style={styles.riskText}>Package size and MOQ affect this order quantity only; they do not inflate the minimum-stock threshold.</p>
             </div>
 
             <div style={styles.detailCard}>

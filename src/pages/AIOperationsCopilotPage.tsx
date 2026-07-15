@@ -10,6 +10,7 @@ import type { ProductItem } from '../types/inventory';
 type CopilotIntent =
   | 'operational_priority_summary'
   | 'product_risk_explanation'
+  | 'product_replenishment_plan'
   | 'supplier_performance_summary'
   | 'prepare_min_stock_proposal'
   | 'prepare_standard_cost_proposal';
@@ -137,6 +138,31 @@ type CreateRunInput = {
   external_processing_confirmed?: boolean;
 };
 
+type ReplenishmentPlan = {
+  formula_version: string;
+  formula: string;
+  target_coverage_days: number;
+  current_stock: number;
+  governed_min_stock: number;
+  target_stock_quantity: number;
+  inventory_position: number;
+  gross_open_inbound_quantity: number;
+  reliable_open_inbound_quantity: number;
+  at_risk_open_inbound_quantity: number;
+  inbound_data_available?: boolean;
+  pre_moq_reorder_quantity: number;
+  min_order_quantity: number;
+  moq_adjusted_reorder_quantity: number;
+  units_per_order_package: number;
+  recommended_order_package_count: number;
+  recommended_reorder_quantity: number;
+  package_rounding_applied: boolean;
+  package_rounding_added_quantity: number;
+  recommendation_status: string;
+  warnings: string[];
+  assumptions: string[];
+};
+
 type MinimumStockRecommendation = {
   product_id: string;
   product_name: string;
@@ -179,12 +205,16 @@ type MinimumStockRecommendation = {
     default_package_name?: string | null;
     units_per_package: number;
     package_rounding_applied: boolean;
+    package_size_excluded_from_threshold?: boolean;
+    base_unit_increment?: number;
   };
   calculation: {
     expected_lead_time_demand: number;
     safety_stock: number;
     before_package_rounding: number;
     after_package_rounding: number;
+    before_base_unit_rounding?: number;
+    after_base_unit_rounding?: number;
   };
   operational_context: {
     current_stock: number;
@@ -193,6 +223,7 @@ type MinimumStockRecommendation = {
   };
   assumptions: string[];
   warnings: string[];
+  replenishment_plan?: ReplenishmentPlan;
 };
 
 const intentFallbacks: Record<CopilotIntent, { label: string; description: string }> = {
@@ -203,6 +234,10 @@ const intentFallbacks: Record<CopilotIntent, { label: string; description: strin
   product_risk_explanation: {
     label: 'Product risk explanation',
     description: 'Explain one product’s stock, recent outbound movement, unresolved alerts, and visible inbound supply.'
+  },
+  product_replenishment_plan: {
+    label: 'Product replenishment plan',
+    description: 'Show the minimum-stock threshold separately from the quantity to order, including reliable inbound, MOQ, and package rounding.'
   },
   supplier_performance_summary: {
     label: 'Supplier performance summary',
@@ -330,7 +365,7 @@ export default function AIOperationsCopilotPage() {
     () => capabilitiesQuery.data?.intents.find((item) => item.intent === intent),
     [capabilitiesQuery.data?.intents, intent]
   );
-  const needsProduct = ['product_risk_explanation', 'prepare_min_stock_proposal', 'prepare_standard_cost_proposal'].includes(intent);
+  const needsProduct = ['product_risk_explanation', 'product_replenishment_plan', 'prepare_min_stock_proposal', 'prepare_standard_cost_proposal'].includes(intent);
 
   const productsQuery = useQuery({
     queryKey: ['ai-operations-copilot', 'products'],
@@ -341,7 +376,7 @@ export default function AIOperationsCopilotPage() {
   const minimumStockRecommendationQuery = useQuery({
     queryKey: ['ai-operations-copilot', 'minimum-stock-recommendation', productId],
     queryFn: () => fetchMinimumStockRecommendation(productId),
-    enabled: intent === 'prepare_min_stock_proposal' && Boolean(productId) && Boolean(selectedIntentCapability?.available)
+    enabled: ['prepare_min_stock_proposal', 'product_replenishment_plan'].includes(intent) && Boolean(productId) && Boolean(selectedIntentCapability?.available)
   });
 
   const minimumStockRecommendation = minimumStockRecommendationQuery.data;
@@ -424,6 +459,8 @@ export default function AIOperationsCopilotPage() {
       setPrompt('Summarize the most important operational evidence I should review now.');
     } else if (nextIntent === 'product_risk_explanation') {
       setPrompt('Explain the operational risk for this product using only the tenant evidence available to me.');
+    } else if (nextIntent === 'product_replenishment_plan') {
+      setPrompt('Explain the minimum-stock threshold and the separate reorder quantity using reliable inbound, MOQ, and package evidence. Do not create a purchase order.');
     } else if (nextIntent === 'supplier_performance_summary') {
       setPrompt('Summarize which suppliers require operational review and explain the evidence.');
     } else if (nextIntent === 'prepare_min_stock_proposal') {
@@ -563,86 +600,136 @@ export default function AIOperationsCopilotPage() {
               </label>
             ) : null}
 
-            {intent === 'prepare_min_stock_proposal' ? (
+            {['prepare_min_stock_proposal', 'product_replenishment_plan'].includes(intent) ? (
               <div style={styles.recommendationStack}>
                 {minimumStockRecommendationQuery.isLoading || minimumStockRecommendationQuery.isFetching ? (
-                  <div style={styles.notice}>Calculating the minimum-stock recommendation from tenant evidence…</div>
+                  <div style={styles.notice}>Calculating the minimum-stock threshold and replenishment plan from tenant evidence…</div>
                 ) : minimumStockRecommendationQuery.isError ? (
                   <div style={styles.error}>{readableError(minimumStockRecommendationQuery.error)}</div>
                 ) : minimumStockRecommendation ? (
-                  <div style={styles.recommendationBox}>
-                    <div style={styles.proposalHeader}>
-                      <div>
-                        <div style={styles.eyebrow}>Deterministic recommendation</div>
-                        <h3 style={styles.proposalTitle}>System recommendation: {minimumStockRecommendation.recommended_min_stock} {minimumStockRecommendation.unit || ''}</h3>
+                  <>
+                    <div style={styles.recommendationBox}>
+                      <div style={styles.proposalHeader}>
+                        <div>
+                          <div style={styles.eyebrow}>Deterministic threshold recommendation</div>
+                          <h3 style={styles.proposalTitle}>Recommended minimum stock: {minimumStockRecommendation.recommended_min_stock} {minimumStockRecommendation.unit || ''}</h3>
+                        </div>
+                        <Badge tone={minimumStockRecommendation.recommendation_status === 'calculated' ? 'good' : 'warn'}>
+                          {formatLabel(minimumStockRecommendation.recommendation_status)}
+                        </Badge>
                       </div>
-                      <Badge tone={minimumStockRecommendation.recommendation_status === 'calculated' ? 'good' : 'warn'}>
-                        {formatLabel(minimumStockRecommendation.recommendation_status)}
-                      </Badge>
+                      <div style={styles.keyValueGrid}>
+                        <div><span style={styles.keyLabel}>Current minimum</span><strong>{minimumStockRecommendation.current_min_stock}</strong></div>
+                        <div><span style={styles.keyLabel}>Recommended minimum</span><strong>{minimumStockRecommendation.recommended_min_stock}</strong></div>
+                        <div><span style={styles.keyLabel}>Raw requirement</span><strong>{minimumStockRecommendation.raw_recommended_min_stock}</strong></div>
+                        <div><span style={styles.keyLabel}>Evidence quality</span><strong>{formatConfidence(minimumStockRecommendation.confidence_score)}</strong></div>
+                        <div><span style={styles.keyLabel}>Direction</span><strong>{formatLabel(minimumStockRecommendation.direction)}</strong></div>
+                        <div><span style={styles.keyLabel}>Base-unit increment</span><strong>{minimumStockRecommendation.inputs.base_unit_increment ?? 1}</strong></div>
+                      </div>
+                      <p style={styles.help}>{minimumStockRecommendation.formula}</p>
+                      <div style={styles.calculationGrid}>
+                        <div><span style={styles.keyLabel}>Demand used/day</span><strong>{minimumStockRecommendation.inputs.selected_daily_demand}</strong></div>
+                        <div><span style={styles.keyLabel}>Configured lead time</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${minimumStockRecommendation.inputs.configured_lead_time_days} days` : 'Not configured'}</strong></div>
+                        <div><span style={styles.keyLabel}>Effective coverage</span><strong>{minimumStockRecommendation.inputs.effective_coverage_days} days</strong></div>
+                        <div><span style={styles.keyLabel}>Lead-time demand</span><strong>{minimumStockRecommendation.calculation.expected_lead_time_demand}</strong></div>
+                        <div><span style={styles.keyLabel}>Safety stock</span><strong>{minimumStockRecommendation.calculation.safety_stock}</strong></div>
+                        <div><span style={styles.keyLabel}>Before base rounding</span><strong>{minimumStockRecommendation.calculation.before_base_unit_rounding ?? minimumStockRecommendation.calculation.before_package_rounding}</strong></div>
+                        <div><span style={styles.keyLabel}>After base rounding</span><strong>{minimumStockRecommendation.calculation.after_base_unit_rounding ?? minimumStockRecommendation.calculation.after_package_rounding}</strong></div>
+                        <div><span style={styles.keyLabel}>Supplier delay buffer</span><strong>{minimumStockRecommendation.inputs.supplier_delay_buffer_days} days</strong></div>
+                        <div><span style={styles.keyLabel}>30d / 90d usage</span><strong>{minimumStockRecommendation.inputs.total_outbound_30d} / {minimumStockRecommendation.inputs.total_outbound_90d}</strong></div>
+                        <div><span style={styles.keyLabel}>Last outbound evidence</span><strong>{formatDateTime(minimumStockRecommendation.inputs.last_outbound_at)}</strong></div>
+                      </div>
+                      <div style={styles.notice}>Package size and minimum-order rules are intentionally excluded from the minimum-stock threshold. They are applied only to the separate reorder quantity below.</div>
+                      <details>
+                        <summary style={styles.detailsSummary}>Show threshold assumptions and warnings</summary>
+                        <ul style={styles.list}>
+                          {minimumStockRecommendation.assumptions.map((item) => <li key={item}>{item}</li>)}
+                          {minimumStockRecommendation.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
+                        </ul>
+                      </details>
+                      <div style={styles.help}>{minimumStockRecommendation.confidence_meaning}</div>
                     </div>
-                    <div style={styles.keyValueGrid}>
-                      <div><span style={styles.keyLabel}>Current minimum</span><strong>{minimumStockRecommendation.current_min_stock}</strong></div>
-                      <div><span style={styles.keyLabel}>System recommendation</span><strong>{minimumStockRecommendation.recommended_min_stock}</strong></div>
-                      <div><span style={styles.keyLabel}>Evidence quality</span><strong>{formatConfidence(minimumStockRecommendation.confidence_score)}</strong></div>
-                      <div><span style={styles.keyLabel}>Direction</span><strong>{formatLabel(minimumStockRecommendation.direction)}</strong></div>
-                    </div>
-                    <p style={styles.help}>{minimumStockRecommendation.formula}</p>
-                    <div style={styles.calculationGrid}>
-                      <div><span style={styles.keyLabel}>Demand used/day</span><strong>{minimumStockRecommendation.inputs.selected_daily_demand}</strong></div>
-                      <div><span style={styles.keyLabel}>Configured lead time</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${minimumStockRecommendation.inputs.configured_lead_time_days} days` : 'Not configured'}</strong></div>
-                      <div><span style={styles.keyLabel}>Effective coverage</span><strong>{minimumStockRecommendation.inputs.effective_coverage_days} days</strong></div>
-                      <div><span style={styles.keyLabel}>Lead-time demand</span><strong>{minimumStockRecommendation.calculation.expected_lead_time_demand}</strong></div>
-                      <div><span style={styles.keyLabel}>Safety stock</span><strong>{minimumStockRecommendation.calculation.safety_stock}</strong></div>
-                      <div><span style={styles.keyLabel}>Package size</span><strong>{minimumStockRecommendation.inputs.units_per_package}</strong></div>
-                      <div><span style={styles.keyLabel}>Supplier delay buffer</span><strong>{minimumStockRecommendation.inputs.supplier_delay_buffer_days} days</strong></div>
-                      <div><span style={styles.keyLabel}>30d / 90d usage</span><strong>{minimumStockRecommendation.inputs.total_outbound_30d} / {minimumStockRecommendation.inputs.total_outbound_90d}</strong></div>
-                      <div><span style={styles.keyLabel}>Last outbound evidence</span><strong>{formatDateTime(minimumStockRecommendation.inputs.last_outbound_at)}</strong></div>
-                    </div>
-                    <details>
-                      <summary style={styles.detailsSummary}>Show calculation assumptions and warnings</summary>
-                      <ul style={styles.list}>
-                        {minimumStockRecommendation.assumptions.map((item) => <li key={item}>{item}</li>)}
-                        {minimumStockRecommendation.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
-                      </ul>
-                    </details>
-                    <div style={styles.help}>{minimumStockRecommendation.confidence_meaning}</div>
-                  </div>
+
+                    {minimumStockRecommendation.replenishment_plan ? (
+                      <div style={styles.proposalBox}>
+                        <div style={styles.proposalHeader}>
+                          <div>
+                            <div style={styles.eyebrow}>Separate replenishment plan</div>
+                            <h3 style={styles.proposalTitle}>Recommended order quantity: {minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity} {minimumStockRecommendation.unit || ''}</h3>
+                          </div>
+                          <Badge tone={minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity > 0 ? 'warn' : 'good'}>
+                            {minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity > 0 ? 'Order suggested' : 'No order suggested'}
+                          </Badge>
+                        </div>
+                        <div style={styles.keyValueGrid}>
+                          <div><span style={styles.keyLabel}>Current stock</span><strong>{minimumStockRecommendation.replenishment_plan.current_stock}</strong></div>
+                          <div><span style={styles.keyLabel}>Reliable inbound</span><strong>{minimumStockRecommendation.replenishment_plan.reliable_open_inbound_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>At-risk inbound</span><strong>{minimumStockRecommendation.replenishment_plan.at_risk_open_inbound_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>Inbound evidence</span><strong>{minimumStockRecommendation.replenishment_plan.inbound_data_available === false ? 'Unavailable for this role' : 'Available'}</strong></div>
+                          <div><span style={styles.keyLabel}>Inventory position</span><strong>{minimumStockRecommendation.replenishment_plan.inventory_position}</strong></div>
+                          <div><span style={styles.keyLabel}>Target stock</span><strong>{minimumStockRecommendation.replenishment_plan.target_stock_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>Before MOQ</span><strong>{minimumStockRecommendation.replenishment_plan.pre_moq_reorder_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>Minimum order quantity</span><strong>{minimumStockRecommendation.replenishment_plan.min_order_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>Package size</span><strong>{minimumStockRecommendation.replenishment_plan.units_per_order_package}</strong></div>
+                          <div><span style={styles.keyLabel}>Packages to order</span><strong>{minimumStockRecommendation.replenishment_plan.recommended_order_package_count}</strong></div>
+                          <div><span style={styles.keyLabel}>Final order quantity</span><strong>{minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity}</strong></div>
+                        </div>
+                        <p style={styles.help}>{minimumStockRecommendation.replenishment_plan.formula}</p>
+                        <details>
+                          <summary style={styles.detailsSummary}>Show replenishment assumptions and warnings</summary>
+                          <ul style={styles.list}>
+                            {minimumStockRecommendation.replenishment_plan.assumptions.map((item) => <li key={item}>{item}</li>)}
+                            {minimumStockRecommendation.replenishment_plan.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
+                          </ul>
+                        </details>
+                        <div style={styles.actionRow}>
+                          <Link to="/procurement-recommendations" style={styles.linkButton} data-skip-global-action-feedback="true">
+                            Open all-products replenishment workbench
+                          </Link>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : productId ? null : (
-                  <div style={styles.notice}>Select a product to calculate its recommendation.</div>
+                  <div style={styles.notice}>Select a product to calculate its threshold and replenishment plan.</div>
                 )}
 
-                <label style={styles.field}>
-                  <span style={styles.label}>Final proposed minimum stock</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="1000000000"
-                    step="0.01"
-                    value={effectiveProposedMinStock}
-                    onChange={(event) => {
-                      setProposedMinStock(event.target.value);
-                      setMinStockValueTouched(true);
-                    }}
-                    style={styles.input}
-                  />
-                  <span style={styles.help}>The system recommendation is filled automatically. You may change it, but an explanation is required. This field does not update the product.</span>
-                  {minStockNoChange ? <span style={styles.fieldError}>The final value matches the current product minimum, so there is no change to propose.</span> : null}
-                </label>
+                {intent === 'prepare_min_stock_proposal' ? (
+                  <>
+                    <label style={styles.field}>
+                      <span style={styles.label}>Final proposed minimum stock</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000000000"
+                        step="0.01"
+                        value={effectiveProposedMinStock}
+                        onChange={(event) => {
+                          setProposedMinStock(event.target.value);
+                          setMinStockValueTouched(true);
+                        }}
+                        style={styles.input}
+                      />
+                      <span style={styles.help}>The threshold recommendation is filled automatically. You may change it, but an explanation is required. The separate reorder quantity is advisory and does not change the product or create a purchase order.</span>
+                      {minStockNoChange ? <span style={styles.fieldError}>The final value matches the current product minimum, so there is no change to propose.</span> : null}
+                    </label>
 
-                {minStockOverrideApplied ? (
-                  <label style={styles.field}>
-                    <span style={styles.label}>Why are you overriding the system recommendation?</span>
-                    <textarea
-                      value={minStockOverrideReason}
-                      onChange={(event) => setMinStockOverrideReason(event.target.value)}
-                      rows={3}
-                      maxLength={1000}
-                      style={styles.textarea}
-                      placeholder="Explain the business evidence or policy reason for using a different value."
-                    />
-                    <span style={styles.help}>{minStockOverrideReason.length}/1000 characters</span>
-                    {minStockOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>An override explanation is required.</span> : null}
-                  </label>
+                    {minStockOverrideApplied ? (
+                      <label style={styles.field}>
+                        <span style={styles.label}>Why are you overriding the threshold recommendation?</span>
+                        <textarea
+                          value={minStockOverrideReason}
+                          onChange={(event) => setMinStockOverrideReason(event.target.value)}
+                          rows={3}
+                          maxLength={1000}
+                          style={styles.textarea}
+                          placeholder="Explain the business evidence or policy reason for using a different threshold."
+                        />
+                        <span style={styles.help}>{minStockOverrideReason.length}/1000 characters</span>
+                        {minStockOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>An override explanation is required.</span> : null}
+                      </label>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             ) : null}
