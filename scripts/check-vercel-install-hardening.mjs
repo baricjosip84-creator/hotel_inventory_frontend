@@ -21,8 +21,12 @@ if (vercelJson.buildCommand !== 'npm run build') {
   failures.push('vercel.json must explicitly use npm run build');
 }
 
-if (packageJson.engines?.node !== '20.x') failures.push('frontend package.json must pin engines.node to 20.x');
-if (packageJson.engines?.npm !== '10.x') failures.push('frontend package.json must pin engines.npm to 10.x');
+if (packageJson.engines?.node !== '24.x') failures.push('frontend package.json must pin engines.node to 24.x');
+if (packageJson.engines?.npm !== '>=10 <12') failures.push('frontend package.json must allow supported npm 10 and 11 releases');
+
+const packageLockJson = JSON.parse(packageLock);
+if (packageLockJson.packages?.['']?.engines?.node !== '24.x') failures.push('frontend package-lock.json must pin root engines.node to 24.x');
+if (packageLockJson.packages?.['']?.engines?.npm !== '>=10 <12') failures.push('frontend package-lock.json must match the supported npm engine range');
 
 if (packageJson.dependencies?.bcrypt) failures.push('frontend package.json must not depend on native bcrypt');
 if (packageLock.includes('"node_modules/bcrypt"')) failures.push('frontend package-lock.json must not install native bcrypt');

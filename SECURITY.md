@@ -35,3 +35,7 @@ stages any previously tracked generated files for deletion. Commit those deletio
 future checkouts remain clean. CI runs this compatibility cleanup before the strict
 repository-hygiene check; real source secrets and forbidden dependencies remain hard
 failures.
+
+## Dependency major-version policy
+
+Dependabot version-update groups are limited to minor and patch releases. Major upgrades must be reviewed separately and merged only after `npm ci`, TypeScript, lint, production build, and staging checks pass. In particular, TypeScript and `typescript-eslint` must be upgraded as a compatible toolchain rather than independently.
