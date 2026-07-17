@@ -1,10 +1,13 @@
 import {
   clearAuthTokens,
   getAccessToken,
-  getRefreshToken,
+  getCsrfToken,
   isAccessTokenExpired,
-  saveAuthTokens
+  isSupportSessionAccess,
+  saveAuthTokens,
+  saveCsrfToken
 } from './auth';
+import type { AuthTokens } from '../types/auth';
 import { TENANT_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
 
 /**
@@ -15,8 +18,10 @@ import { TENANT_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
  * - Vite proxy forwards /api -> local backend
  *
  * Production:
- * - .env.production points to Render backend:
- *   https://hotel-inventory-backend.onrender.com/api
+ * - .env.production keeps a safe /api fallback.
+ * - deployment configuration may instead provide the reviewed HTTPS API URL.
+ * - credentials mode remains enabled for either same-origin or cross-origin
+ *   refresh-cookie deployments.
  */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -325,6 +330,10 @@ function isAuthRefreshRequest(path: string): boolean {
   return path === '/auth/refresh' || path === 'auth/refresh';
 }
 
+function isAuthCsrfRequest(path: string): boolean {
+  return path === '/auth/csrf' || path === 'auth/csrf';
+}
+
 function isAuthLoginRequest(path: string): boolean {
   return path === '/auth/login' || path === 'auth/login';
 }
@@ -479,31 +488,91 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return rawText as T;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
+type BrowserLockManager = {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+};
 
-  if (!refreshToken) {
+function browserLockManager(): BrowserLockManager | null {
+  if (typeof navigator === 'undefined') return null;
+  return (navigator as Navigator & { locks?: BrowserLockManager }).locks || null;
+}
+
+async function fetchTenantCsrfToken(): Promise<string | null> {
+  const response = await fetch(buildUrl('/auth/csrf'), {
+    method: 'GET',
+    credentials: 'include'
+  });
+
+  const payload = await parseResponse<{ csrfToken: string }>(response);
+  if (!payload.csrfToken) return null;
+  saveCsrfToken(payload.csrfToken);
+  return payload.csrfToken;
+}
+
+async function performTenantRefresh(expectedAccessToken: string | null): Promise<string | null> {
+  if (isSupportSessionAccess()) {
     clearAuthTokens();
     return null;
   }
 
+  const currentAccessToken = getAccessToken();
+  if (
+    currentAccessToken &&
+    !isAccessTokenExpired(currentAccessToken) &&
+    currentAccessToken !== expectedAccessToken
+  ) {
+    return currentAccessToken;
+  }
+
+  let csrfToken = getCsrfToken();
+  if (!csrfToken) {
+    csrfToken = await fetchTenantCsrfToken();
+  }
+
+  if (!csrfToken) {
+    clearAuthTokens();
+    return null;
+  }
+
+  const sendRefresh = (token: string) => fetch(buildUrl('/auth/refresh'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'X-CSRF-Token': token
+    }
+  });
+
+  let response = await sendRefresh(csrfToken);
+
+  if (response.status === 403) {
+    localStorage.removeItem('inventory_csrf_token');
+    const bootstrappedToken = await fetchTenantCsrfToken();
+    if (bootstrappedToken) {
+      response = await sendRefresh(bootstrappedToken);
+    }
+  }
+
+  const tokens = await parseResponse<AuthTokens>(response);
+  saveAuthTokens(tokens);
+  return tokens.accessToken;
+}
+
+async function refreshAccessToken(expectedAccessToken: string | null = getAccessToken()): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const response = await fetch(buildUrl('/auth/refresh'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ refreshToken })
-        });
-
-        const tokens = await parseResponse<{ accessToken: string; refreshToken: string }>(response);
-
-        saveAuthTokens(tokens);
-        return tokens.accessToken;
-      } catch {
-        clearAuthTokens();
+        const locks = browserLockManager();
+        if (locks) {
+          return await locks.request(
+            'inventory-tenant-refresh',
+            () => performTenantRefresh(expectedAccessToken)
+          );
+        }
+        return await performTenantRefresh(expectedAccessToken);
+      } catch (error) {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          clearAuthTokens();
+        }
         return null;
       } finally {
         refreshPromise = null;
@@ -512,6 +581,39 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   return refreshPromise;
+}
+
+export async function restoreTenantSession(): Promise<string | null> {
+  const accessToken = getAccessToken();
+  if (accessToken && !isAccessTokenExpired(accessToken)) {
+    return accessToken;
+  }
+  return refreshAccessToken(accessToken);
+}
+
+export async function logoutTenantSession(): Promise<void> {
+  try {
+    let csrfToken = getCsrfToken();
+    if (!csrfToken) {
+      try {
+        csrfToken = await fetchTenantCsrfToken();
+      } catch {
+        csrfToken = null;
+      }
+    }
+
+    if (csrfToken) {
+      await fetch(buildUrl('/auth/logout'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken
+        }
+      });
+    }
+  } finally {
+    clearAuthTokens();
+  }
 }
 
 async function performRequest(path: string, options: RequestInit = {}): Promise<ApiFetchResult> {
@@ -533,6 +635,7 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
 
   const response = await withApiRequestSlot(() => fetch(buildUrl(path), {
     ...safeOptions,
+    credentials: 'include',
     headers
   }));
 
@@ -543,7 +646,7 @@ async function performRequest(path: string, options: RequestInit = {}): Promise<
 }
 
 async function recoverFromUnauthorized(path: string, accessTokenUsed: string | null): Promise<string | null> {
-  if (isAuthLoginRequest(path) || isAuthRefreshRequest(path)) {
+  if (isAuthLoginRequest(path) || isAuthRefreshRequest(path) || isAuthCsrfRequest(path)) {
     return null;
   }
 
@@ -558,7 +661,7 @@ async function recoverFromUnauthorized(path: string, accessTokenUsed: string | n
     return currentAccessToken;
   }
 
-  return refreshAccessToken();
+  return refreshAccessToken(accessTokenUsed);
 }
 
 
@@ -627,24 +730,26 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
 
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
+  const isCsrfRequest = isAuthCsrfRequest(path);
   const currentAccessToken = getAccessToken();
 
-  if (!isLoginRequest && !isRefreshRequest && isAccessTokenExpired(currentAccessToken)) {
-    await refreshAccessToken();
+  if (!isLoginRequest && !isRefreshRequest && !isCsrfRequest && isAccessTokenExpired(currentAccessToken)) {
+    await refreshAccessToken(currentAccessToken);
   }
 
   let response: Response;
+  let accessTokenUsed: string | null = null;
 
   try {
-    ({ response } = await performRequest(path, { method: 'GET' }));
+    ({ response, accessTokenUsed } = await performRequest(path, { method: 'GET' }));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Network error while downloading file';
     dispatchTenantMutationFeedback({ type: 'error', message });
     throw new ApiError(message, 0);
   }
 
-  if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
-    const recoveredAccessToken = await recoverFromUnauthorized(path, null);
+  if (response.status === 401 && !isLoginRequest && !isRefreshRequest && !isCsrfRequest) {
+    const recoveredAccessToken = await recoverFromUnauthorized(path, accessTokenUsed);
 
     if (recoveredAccessToken) {
       try {
@@ -665,7 +770,8 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
         error instanceof ApiError &&
         error.status === 401 &&
         !isLoginRequest &&
-        !isRefreshRequest
+        !isRefreshRequest &&
+        !isCsrfRequest
       ) {
         clearAuthTokens();
         redirectToLoginAfterExpiredSession();
@@ -738,9 +844,9 @@ export async function apiRequest<T>(
     - same one-time retry after 401
     - same 403 behavior: throw ApiError and let the page decide UI
 
-    Only added:
-    - after a final unrecoverable 401 on protected API requests, clear auth and
-      redirect to /login.
+    Authentication hardening in this release additionally keeps refresh tokens
+    cookie-only, coordinates rotation across tabs, and forces a real refresh
+    after a request fails with the exact access token it used.
 
     WHY IT CHANGED
     --------------
@@ -755,21 +861,23 @@ export async function apiRequest<T>(
   */
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
+  const isCsrfRequest = isAuthCsrfRequest(path);
   const requestOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
   const shouldShowMutationFeedback =
     isWriteRequest(requestOptions) &&
     !(options as SafeMutationRequestInit).skipMutationFeedback &&
     !isLoginRequest &&
-    !isRefreshRequest;
+    !isRefreshRequest &&
+    !isCsrfRequest;
   const currentAccessToken = getAccessToken();
 
   /*
     If the access token is already expired before the request starts, try a
     silent refresh first for authenticated routes. This reduces avoidable 401s.
   */
-  if (!isLoginRequest && !isRefreshRequest && isAccessTokenExpired(currentAccessToken)) {
-    await refreshAccessToken();
+  if (!isLoginRequest && !isRefreshRequest && !isCsrfRequest && isAccessTokenExpired(currentAccessToken)) {
+    await refreshAccessToken(currentAccessToken);
   }
 
   let response: Response;
@@ -790,7 +898,7 @@ export async function apiRequest<T>(
     endpoint. Skip this behavior for login/refresh requests themselves to avoid
     loops.
   */
-  if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
+  if (response.status === 401 && !isLoginRequest && !isRefreshRequest && !isCsrfRequest) {
     const recoveredAccessToken = await recoverFromUnauthorized(path, accessTokenUsed);
 
     if (recoveredAccessToken) {

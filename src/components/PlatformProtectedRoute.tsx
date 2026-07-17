@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import type { AuthTokens } from '../types/auth';
-import { platformApiRequest } from '../lib/platformApi';
-import {
-  getPlatformAccessToken,
-  getPlatformRefreshToken,
-  hasAnyPlatformRole,
-  isPlatformAccessTokenExpired,
-  isPlatformAuthenticated,
-  savePlatformAuthTokens
-} from '../lib/platformAuth';
+import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
+import { hasAnyPlatformRole } from '../lib/platformAuth';
 import type { PlatformIdentity, PlatformRole } from '../lib/platformAuth';
 import type { PlatformPermission } from '../lib/platformPermissions';
 import { hasAllPlatformPermissions, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
@@ -24,61 +16,28 @@ type PlatformProtectedRouteProps = PropsWithChildren<{
 export function PlatformProtectedRoute({ children, allowedRoles, requiredPermissions }: PlatformProtectedRouteProps) {
   const location = useLocation();
   const [, setPermissionRevision] = useState(0);
-  const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>(() => {
-    return isPlatformAuthenticated() ? 'checking' : 'denied';
-  });
+  const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>('checking');
 
   useEffect(() => {
     let isMounted = true;
 
     const verifySession = async () => {
-      const accessToken = getPlatformAccessToken();
-      const refreshToken = getPlatformRefreshToken();
-
-      if (accessToken && !isPlatformAccessTokenExpired(accessToken)) {
-        try {
-          const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
-
-          await refreshPlatformPermissionSnapshot();
-          if (isMounted) {
-            setStatus(identity?.id ? 'allowed' : 'denied');
-          }
-        } catch {
-          if (isMounted) {
-            setStatus('denied');
-          }
-        }
-        return;
-      }
-
-      if (!refreshToken) {
-        if (isMounted) {
-          setStatus('denied');
-        }
+      const accessToken = await restorePlatformSession();
+      if (!accessToken) {
+        if (isMounted) setStatus('denied');
         return;
       }
 
       try {
-        const tokens = await platformApiRequest<AuthTokens>('/platform/auth/refresh', {
-          method: 'POST',
-          body: JSON.stringify({ refreshToken })
-        });
-        savePlatformAuthTokens(tokens);
         const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
         await refreshPlatformPermissionSnapshot();
-
-        if (isMounted) {
-          setStatus(identity?.id ? 'allowed' : 'denied');
-        }
+        if (isMounted) setStatus(identity?.id ? 'allowed' : 'denied');
       } catch {
-        if (isMounted) {
-          setStatus('denied');
-        }
+        if (isMounted) setStatus('denied');
       }
     };
 
     void verifySession();
-
     return () => {
       isMounted = false;
     };

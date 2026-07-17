@@ -1,163 +1,110 @@
 /**
- * src/lib/auth.ts
+ * Tenant authentication storage.
  *
- * PURPOSE
- * -------
- * Central token storage and basic token inspection helpers for the frontend.
- *
- * IMPORTANT
- * ---------
- * This file intentionally exports MULTIPLE helper names so it stays compatible
- * with the rest of your existing frontend code, including pages/components that
- * may already import:
- * - saveAuthTokens
- * - getAccessToken
- * - getRefreshToken
- * - clearAuthTokens
- * - clearAuth
- * - isAuthenticated
+ * Refresh tokens are intentionally absent from JavaScript storage. They are
+ * issued by the API as scoped HttpOnly cookies. The browser stores only the
+ * short-lived access token and the signed refresh-CSRF token.
  */
 
 import type { AuthTokens } from '../types/auth';
 
 const ACCESS_TOKEN_KEY = 'inventory_access_token';
-const REFRESH_TOKEN_KEY = 'inventory_refresh_token';
+const CSRF_TOKEN_KEY = 'inventory_csrf_token';
+const LEGACY_REFRESH_TOKEN_KEY = 'inventory_refresh_token';
 
-/*
-  Save support-session access token.
+function removeLegacyRefreshToken(): void {
+  localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
+}
 
-  Support access is access-token-only. A refresh token from a normal tenant
-  session must not remain active beside it.
-*/
 export function saveSupportSessionAccessToken(accessToken: string): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CSRF_TOKEN_KEY);
+  removeLegacyRefreshToken();
   localStorage.removeItem('inventory_tenant_effective_permissions');
 }
 
-/*
-  Save both tokens after login / refresh.
-*/
 export function saveAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
   }
 
-  if (tokens.refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+  if (tokens.csrfToken) {
+    localStorage.setItem(CSRF_TOKEN_KEY, tokens.csrfToken);
   }
+
+  removeLegacyRefreshToken();
 }
 
-/*
-  Read current access token.
-*/
+export function saveCsrfToken(csrfToken: string): void {
+  if (csrfToken) {
+    localStorage.setItem(CSRF_TOKEN_KEY, csrfToken);
+  }
+  removeLegacyRefreshToken();
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-/*
-  Read current refresh token.
-*/
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+export function getCsrfToken(): string | null {
+  removeLegacyRefreshToken();
+  return localStorage.getItem(CSRF_TOKEN_KEY);
 }
 
-/*
-  Clear all auth tokens.
-*/
+/**
+ * Backward-compatible cleanup helper. Refresh tokens are no longer readable by
+ * JavaScript, so this always removes any legacy value and returns null.
+ */
+export function getRefreshToken(): null {
+  removeLegacyRefreshToken();
+  return null;
+}
+
 export function clearAuthTokens(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CSRF_TOKEN_KEY);
+  removeLegacyRefreshToken();
   localStorage.removeItem('inventory_tenant_effective_permissions');
 }
 
-/*
-  Backward-compatible alias.
-*/
 export function clearAuth(): void {
   clearAuthTokens();
 }
 
-/*
-  Decode a JWT payload safely without depending on an extra package.
-  This is used only for client-side expiry checks and UX decisions.
-*/
 function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   try {
     const parts = token.split('.');
-
-    if (parts.length !== 3) {
-      return null;
-    }
+    if (parts.length !== 3) return null;
 
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    const decoded = atob(padded);
-
-    return JSON.parse(decoded) as Record<string, unknown>;
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
-/*
-  Check whether a JWT is expired.
-  A small safety buffer helps avoid edge cases where the token expires while a
-  request is in flight.
-*/
 export function isAccessTokenExpired(token: string | null, bufferSeconds = 15): boolean {
-  if (!token) {
-    return true;
-  }
+  if (!token) return true;
 
-  const payload = decodeJwtPayload(token);
-  const exp = payload?.exp;
+  const exp = decodeJwtPayload(token)?.exp;
+  if (typeof exp !== 'number') return true;
 
-  if (typeof exp !== 'number') {
-    return true;
-  }
-
-  const nowInSeconds = Math.floor(Date.now() / 1000);
-  return exp <= nowInSeconds + bufferSeconds;
+  return exp <= Math.floor(Date.now() / 1000) + bufferSeconds;
 }
 
-/*
-  Basic auth presence check.
-
-  We consider the user authenticated when either:
-  - a non-expired access token exists, or
-  - a refresh token exists and the app can attempt silent session recovery
-
-  This prevents immediate hard redirects when only the access token has expired
-  but the refresh session is still valid on the backend.
-*/
 export function isAuthenticated(): boolean {
   const accessToken = getAccessToken();
-  const refreshToken = getRefreshToken();
-
-  if (accessToken && !isAccessTokenExpired(accessToken)) {
-    return true;
-  }
-
-  return Boolean(refreshToken);
+  return Boolean(accessToken && !isAccessTokenExpired(accessToken));
 }
-
 
 export function getCurrentTenantUserId(): string | null {
   const payload = decodeJwtPayload(getAccessToken());
 
-  if (typeof payload?.id === 'string') {
-    return payload.id;
-  }
-
-  if (typeof payload?.user_id === 'string') {
-    return payload.user_id;
-  }
-
+  if (typeof payload?.id === 'string') return payload.id;
+  if (typeof payload?.user_id === 'string') return payload.user_id;
   return null;
 }
 
@@ -193,5 +140,6 @@ export function isSupportSessionAccess(): boolean {
 
 export function clearSupportSessionAccessToken(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CSRF_TOKEN_KEY);
+  removeLegacyRefreshToken();
 }

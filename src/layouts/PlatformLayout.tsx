@@ -74,7 +74,10 @@ export default function PlatformLayout() {
 
   const logout = async () => {
     await logoutPlatformSession();
-    navigate('/platform/login', { replace: true });
+    navigate('/platform/login', {
+      replace: true,
+      state: { skipSessionRecovery: true }
+    });
   };
 
   const getPlatformLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({

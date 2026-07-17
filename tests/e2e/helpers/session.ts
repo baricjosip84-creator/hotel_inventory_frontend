@@ -26,7 +26,7 @@ type Role = 'default' | 'manager' | 'staff';
 
 type AuthTokens = {
   accessToken: string;
-  refreshToken?: string;
+  csrfToken?: string;
 };
 
 type Credentials = {
@@ -35,7 +35,8 @@ type Credentials = {
 };
 
 const ACCESS_TOKEN_KEY = 'inventory_access_token';
-const REFRESH_TOKEN_KEY = 'inventory_refresh_token';
+const CSRF_TOKEN_KEY = 'inventory_csrf_token';
+const LEGACY_REFRESH_TOKEN_KEY = 'inventory_refresh_token';
 
 /*
   In-memory token cache for the duration of the Playwright run.
@@ -87,18 +88,20 @@ async function writeTokensToStorage(page: Page, tokens: AuthTokens): Promise<voi
   await page.goto('/login');
 
   await page.evaluate(
-    ({ accessToken, refreshToken, accessKey, refreshKey }) => {
+    ({ accessToken, csrfToken, accessKey, csrfKey, legacyRefreshKey }) => {
       window.localStorage.setItem(accessKey, accessToken);
 
-      if (refreshToken) {
-        window.localStorage.setItem(refreshKey, refreshToken);
+      if (csrfToken) {
+        window.localStorage.setItem(csrfKey, csrfToken);
       }
+      window.localStorage.removeItem(legacyRefreshKey);
     },
     {
       accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken ?? '',
+      csrfToken: tokens.csrfToken ?? '',
       accessKey: ACCESS_TOKEN_KEY,
-      refreshKey: REFRESH_TOKEN_KEY
+      csrfKey: CSRF_TOKEN_KEY,
+      legacyRefreshKey: LEGACY_REFRESH_TOKEN_KEY
     }
   );
 }
@@ -131,7 +134,7 @@ async function loginThroughApi(
 
   const tokens: AuthTokens = {
     accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken
+    csrfToken: payload.csrfToken
   };
 
   tokenCache[role] = tokens;
@@ -165,13 +168,15 @@ export async function clearSession(page: Page): Promise<void> {
   await page.goto('/login');
 
   await page.evaluate(
-    ({ accessKey, refreshKey }) => {
+    ({ accessKey, csrfKey, legacyRefreshKey }) => {
       window.localStorage.removeItem(accessKey);
-      window.localStorage.removeItem(refreshKey);
+      window.localStorage.removeItem(csrfKey);
+      window.localStorage.removeItem(legacyRefreshKey);
     },
     {
       accessKey: ACCESS_TOKEN_KEY,
-      refreshKey: REFRESH_TOKEN_KEY
+      csrfKey: CSRF_TOKEN_KEY,
+      legacyRefreshKey: LEGACY_REFRESH_TOKEN_KEY
     }
   );
 }

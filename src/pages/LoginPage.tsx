@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiRequest, ApiError } from '../lib/api';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { apiRequest, ApiError, restoreTenantSession } from '../lib/api';
 import { saveAuthTokens } from '../lib/auth';
 import type { AuthTokens } from '../types/auth';
 
@@ -48,7 +48,34 @@ export function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const isCompact = useIsCompactLayout();
+  const skipSessionRecovery = Boolean(
+    (location.state as { skipSessionRecovery?: boolean } | null)?.skipSessionRecovery
+  );
+
+  useEffect(() => {
+    if (skipSessionRecovery) {
+      return undefined;
+    }
+
+    let active = true;
+
+    const recoverExistingSession = async () => {
+      const accessToken = await restoreTenantSession();
+      if (active && accessToken) {
+        navigate('/dashboard', { replace: true });
+      }
+    };
+
+    void recoverExistingSession().catch(() => {
+      // Stay on the login page when no recoverable tenant session exists.
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate, skipSessionRecovery]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     // 🔴 THIS IS THE CRITICAL FIX

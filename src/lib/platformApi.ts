@@ -4,13 +4,19 @@ import { ApiError } from './api';
 import {
   clearPlatformAuthTokens,
   getPlatformAccessToken,
-  getPlatformRefreshToken,
+  getPlatformCsrfToken,
   isPlatformAccessTokenExpired,
-  savePlatformAuthTokens
+  savePlatformAuthTokens,
+  savePlatformCsrfToken
 } from './platformAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 let refreshPromise: Promise<string | null> | null = null;
+
+type PlatformApiFetchResult = {
+  response: Response;
+  accessTokenUsed: string | null;
+};
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -51,6 +57,10 @@ function buildUrl(path: string): string {
 
 function isPlatformRefreshRequest(path: string): boolean {
   return path === '/platform/auth/refresh' || path === 'platform/auth/refresh';
+}
+
+function isPlatformCsrfRequest(path: string): boolean {
+  return path === '/platform/auth/csrf' || path === 'platform/auth/csrf';
 }
 
 function isPlatformLoginRequest(path: string): boolean {
@@ -134,6 +144,10 @@ function dispatchPlatformMutationFeedback(detail: { type: 'success' | 'error'; m
   window.dispatchEvent(new CustomEvent(PLATFORM_MUTATION_FEEDBACK_EVENT, { detail }));
 }
 
+function platformNetworkErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function withPlatformMutationSafetyHeaders(
   path: string,
   options: SafePlatformMutationRequestInit = {}
@@ -146,6 +160,8 @@ function withPlatformMutationSafetyHeaders(
     headers: originalHeaders,
     ...requestOptions
   } = options;
+
+  void _skipMutationFeedback;
 
   const headers = new Headers(originalHeaders || {});
 
@@ -213,30 +229,88 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return rawText as T;
 }
 
-async function refreshPlatformAccessToken(): Promise<string | null> {
-  const refreshToken = getPlatformRefreshToken();
+type BrowserLockManager = {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+};
 
-  if (!refreshToken) {
+function browserLockManager(): BrowserLockManager | null {
+  if (typeof navigator === 'undefined') return null;
+  return (navigator as Navigator & { locks?: BrowserLockManager }).locks || null;
+}
+
+async function fetchPlatformCsrfToken(): Promise<string | null> {
+  const response = await fetch(buildUrl('/platform/auth/csrf'), {
+    method: 'GET',
+    credentials: 'include'
+  });
+
+  const payload = await parseResponse<{ csrfToken: string }>(response);
+  if (!payload.csrfToken) return null;
+  savePlatformCsrfToken(payload.csrfToken);
+  return payload.csrfToken;
+}
+
+async function performPlatformRefresh(expectedAccessToken: string | null): Promise<string | null> {
+  const currentAccessToken = getPlatformAccessToken();
+  if (
+    currentAccessToken &&
+    !isPlatformAccessTokenExpired(currentAccessToken) &&
+    currentAccessToken !== expectedAccessToken
+  ) {
+    return currentAccessToken;
+  }
+
+  let csrfToken = getPlatformCsrfToken();
+  if (!csrfToken) {
+    csrfToken = await fetchPlatformCsrfToken();
+  }
+
+  if (!csrfToken) {
     clearPlatformAuthTokens();
     return null;
   }
 
+  const sendRefresh = (token: string) => fetch(buildUrl('/platform/auth/refresh'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'X-CSRF-Token': token
+    }
+  });
+
+  let response = await sendRefresh(csrfToken);
+
+  if (response.status === 403) {
+    localStorage.removeItem('inventory_platform_csrf_token');
+    const bootstrappedToken = await fetchPlatformCsrfToken();
+    if (bootstrappedToken) {
+      response = await sendRefresh(bootstrappedToken);
+    }
+  }
+
+  const tokens = await parseResponse<AuthTokens>(response);
+  savePlatformAuthTokens(tokens);
+  return tokens.accessToken;
+}
+
+async function refreshPlatformAccessToken(
+  expectedAccessToken: string | null = getPlatformAccessToken()
+): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const response = await fetch(buildUrl('/platform/auth/refresh'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ refreshToken })
-        });
-
-        const tokens = await parseResponse<AuthTokens>(response);
-        savePlatformAuthTokens(tokens);
-        return tokens.accessToken;
-      } catch {
-        clearPlatformAuthTokens();
+        const locks = browserLockManager();
+        if (locks) {
+          return await locks.request(
+            'inventory-platform-refresh',
+            () => performPlatformRefresh(expectedAccessToken)
+          );
+        }
+        return await performPlatformRefresh(expectedAccessToken);
+      } catch (error) {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          clearPlatformAuthTokens();
+        }
         return null;
       } finally {
         refreshPromise = null;
@@ -247,10 +321,18 @@ async function refreshPlatformAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
+export async function restorePlatformSession(): Promise<string | null> {
+  const accessToken = getPlatformAccessToken();
+  if (accessToken && !isPlatformAccessTokenExpired(accessToken)) {
+    return accessToken;
+  }
+  return refreshPlatformAccessToken(accessToken);
+}
+
 async function performRequest(
   path: string,
   options: SafePlatformMutationRequestInit = {}
-): Promise<Response> {
+): Promise<PlatformApiFetchResult> {
   const safeOptions = withPlatformMutationSafetyHeaders(path, options);
   const headers = new Headers(safeOptions.headers || {});
 
@@ -263,10 +345,26 @@ async function performRequest(
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
-  return fetch(buildUrl(path), {
+  const response = await fetch(buildUrl(path), {
     ...safeOptions,
+    credentials: 'include',
     headers
   });
+
+  return {
+    response,
+    accessTokenUsed: accessToken || null
+  };
+}
+
+async function recoverPlatformFromUnauthorized(accessTokenUsed: string | null): Promise<string | null> {
+  const currentAccessToken = getPlatformAccessToken();
+
+  if (currentAccessToken && currentAccessToken !== accessTokenUsed) {
+    return currentAccessToken;
+  }
+
+  return refreshPlatformAccessToken(accessTokenUsed);
 }
 
 export async function platformApiMutationRequest<T>(
@@ -290,40 +388,47 @@ export async function platformApiRequest<T>(
 ): Promise<T> {
   const isLoginRequest = isPlatformLoginRequest(path);
   const isRefreshRequest = isPlatformRefreshRequest(path);
+  const isCsrfRequest = isPlatformCsrfRequest(path);
   const requestOptions = withPlatformMutationSafetyHeaders(path, options);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
-  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest && !options.skipMutationFeedback;
+  const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest && !isCsrfRequest && !options.skipMutationFeedback;
+
+  const currentAccessToken = getPlatformAccessToken();
 
   if (
     !isLoginRequest &&
     !isRefreshRequest &&
-    isPlatformAccessTokenExpired(getPlatformAccessToken())
+    !isCsrfRequest &&
+    isPlatformAccessTokenExpired(currentAccessToken)
   ) {
-    await refreshPlatformAccessToken();
+    await refreshPlatformAccessToken(currentAccessToken);
   }
 
   let response: Response;
+  let accessTokenUsed: string | null = null;
 
   try {
-    response = await performRequest(path, requestOptions);
-  } catch (error: any) {
+    ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
+  } catch (error: unknown) {
+    const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
     if (shouldShowMutationFeedback) {
-      dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+      dispatchPlatformMutationFeedback({ type: 'error', message });
     }
-    throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+    throw new ApiError(message, 0);
   }
 
-  if (response.status === 401 && !isLoginRequest && !isRefreshRequest) {
-    const refreshedAccessToken = await refreshPlatformAccessToken();
+  if (response.status === 401 && !isLoginRequest && !isRefreshRequest && !isCsrfRequest) {
+    const refreshedAccessToken = await recoverPlatformFromUnauthorized(accessTokenUsed);
 
     if (refreshedAccessToken) {
       try {
-        response = await performRequest(path, requestOptions);
-      } catch (error: any) {
+        ({ response } = await performRequest(path, requestOptions));
+      } catch (error: unknown) {
+        const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
         if (shouldShowMutationFeedback) {
-          dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
+          dispatchPlatformMutationFeedback({ type: 'error', message });
         }
-        throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+        throw new ApiError(message, 0);
       }
     }
   }
@@ -339,7 +444,8 @@ export async function platformApiRequest<T>(
       error instanceof ApiError &&
       error.status === 401 &&
       !isLoginRequest &&
-      !isRefreshRequest
+      !isRefreshRequest &&
+      !isCsrfRequest
     ) {
       clearPlatformAuthTokens();
       redirectToPlatformLoginAfterExpiredSession();
@@ -358,26 +464,30 @@ export async function platformApiRequest<T>(
 }
 
 export async function platformDownload(path: string, fallbackFilename: string): Promise<void> {
-  if (isPlatformAccessTokenExpired(getPlatformAccessToken())) {
-    await refreshPlatformAccessToken();
+  const currentAccessToken = getPlatformAccessToken();
+  if (isPlatformAccessTokenExpired(currentAccessToken)) {
+    await refreshPlatformAccessToken(currentAccessToken);
   }
 
   let response: Response;
+  let accessTokenUsed: string | null = null;
   try {
-    response = await performRequest(path);
-  } catch (error: any) {
-    dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
-    throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+    ({ response, accessTokenUsed } = await performRequest(path));
+  } catch (error: unknown) {
+    const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
+    dispatchPlatformMutationFeedback({ type: 'error', message });
+    throw new ApiError(message, 0);
   }
 
   if (response.status === 401) {
-    const refreshedAccessToken = await refreshPlatformAccessToken();
+    const refreshedAccessToken = await recoverPlatformFromUnauthorized(accessTokenUsed);
     if (refreshedAccessToken) {
       try {
-        response = await performRequest(path);
-      } catch (error: any) {
-        dispatchPlatformMutationFeedback({ type: 'error', message: error?.message || 'Network error while contacting backend' });
-        throw new ApiError(error?.message || 'Network error while contacting backend', 0);
+        ({ response } = await performRequest(path));
+      } catch (error: unknown) {
+        const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
+        dispatchPlatformMutationFeedback({ type: 'error', message });
+        throw new ApiError(message, 0);
       }
     }
   }

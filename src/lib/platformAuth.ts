@@ -1,7 +1,8 @@
 import type { AuthTokens } from '../types/auth';
 
 const PLATFORM_ACCESS_TOKEN_KEY = 'inventory_platform_access_token';
-const PLATFORM_REFRESH_TOKEN_KEY = 'inventory_platform_refresh_token';
+const PLATFORM_CSRF_TOKEN_KEY = 'inventory_platform_csrf_token';
+const LEGACY_PLATFORM_REFRESH_TOKEN_KEY = 'inventory_platform_refresh_token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export type PlatformRole = 'superadmin' | 'support' | 'platform_viewer' | 'support_l1' | 'support_l2' | 'security' | 'billing' | 'ops' | 'tenant_success' | 'readonly_audit' | 'unknown';
@@ -14,40 +15,56 @@ type PlatformJwtPayload = {
   sid?: string;
 };
 
+function removeLegacyRefreshToken(): void {
+  localStorage.removeItem(LEGACY_PLATFORM_REFRESH_TOKEN_KEY);
+}
+
 export function savePlatformAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(PLATFORM_ACCESS_TOKEN_KEY, tokens.accessToken);
   }
 
-  if (tokens.refreshToken) {
-    localStorage.setItem(PLATFORM_REFRESH_TOKEN_KEY, tokens.refreshToken);
+  if (tokens.csrfToken) {
+    localStorage.setItem(PLATFORM_CSRF_TOKEN_KEY, tokens.csrfToken);
   }
+
+  removeLegacyRefreshToken();
+}
+
+export function savePlatformCsrfToken(csrfToken: string): void {
+  if (csrfToken) {
+    localStorage.setItem(PLATFORM_CSRF_TOKEN_KEY, csrfToken);
+  }
+  removeLegacyRefreshToken();
 }
 
 export function getPlatformAccessToken(): string | null {
   return localStorage.getItem(PLATFORM_ACCESS_TOKEN_KEY);
 }
 
-export function getPlatformRefreshToken(): string | null {
-  return localStorage.getItem(PLATFORM_REFRESH_TOKEN_KEY);
+export function getPlatformCsrfToken(): string | null {
+  removeLegacyRefreshToken();
+  return localStorage.getItem(PLATFORM_CSRF_TOKEN_KEY);
+}
+
+export function getPlatformRefreshToken(): null {
+  removeLegacyRefreshToken();
+  return null;
 }
 
 export function clearPlatformAuthTokens(): void {
   localStorage.removeItem(PLATFORM_ACCESS_TOKEN_KEY);
-  localStorage.removeItem(PLATFORM_REFRESH_TOKEN_KEY);
+  localStorage.removeItem(PLATFORM_CSRF_TOKEN_KEY);
+  removeLegacyRefreshToken();
   localStorage.removeItem('inventory_platform_effective_permissions');
 }
 
 function decodeJwtPayload(token: string | null): PlatformJwtPayload | null {
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
+    if (parts.length !== 3) return null;
 
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
@@ -58,16 +75,10 @@ function decodeJwtPayload(token: string | null): PlatformJwtPayload | null {
 }
 
 export function isPlatformAccessTokenExpired(token: string | null, bufferSeconds = 15): boolean {
-  if (!token) {
-    return true;
-  }
+  if (!token) return true;
 
-  const payload = decodeJwtPayload(token);
-  const exp = payload?.exp;
-
-  if (typeof exp !== 'number') {
-    return true;
-  }
+  const exp = decodeJwtPayload(token)?.exp;
+  if (typeof exp !== 'number') return true;
 
   return exp <= Math.floor(Date.now() / 1000) + bufferSeconds;
 }
@@ -75,9 +86,7 @@ export function isPlatformAccessTokenExpired(token: string | null, bufferSeconds
 export function getCurrentPlatformRole(): PlatformRole {
   const payload = decodeJwtPayload(getPlatformAccessToken());
 
-  if (payload?.typ !== 'platform') {
-    return 'unknown';
-  }
+  if (payload?.typ !== 'platform') return 'unknown';
 
   if (
     payload.role === 'superadmin' ||
@@ -99,19 +108,12 @@ export function getCurrentPlatformRole(): PlatformRole {
 
 export function isPlatformAuthenticated(): boolean {
   const accessToken = getPlatformAccessToken();
-  const refreshToken = getPlatformRefreshToken();
-
-  if (accessToken && !isPlatformAccessTokenExpired(accessToken)) {
-    return true;
-  }
-
-  return Boolean(refreshToken);
+  return Boolean(accessToken && !isPlatformAccessTokenExpired(accessToken));
 }
 
 export function hasAnyPlatformRole(allowedRoles: PlatformRole[]): boolean {
   return allowedRoles.includes(getCurrentPlatformRole());
 }
-
 
 export type PlatformIdentity = {
   id: string;
@@ -157,14 +159,11 @@ function parsePlatformIdentity(payload: unknown): PlatformIdentity {
 export async function fetchCurrentPlatformIdentity(): Promise<PlatformIdentity | null> {
   const accessToken = getPlatformAccessToken();
 
-  if (!accessToken || isPlatformAccessTokenExpired(accessToken)) {
-    return null;
-  }
+  if (!accessToken || isPlatformAccessTokenExpired(accessToken)) return null;
 
   const response = await fetch(buildPlatformUrl('/platform/auth/me'), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
+    credentials: 'include',
+    headers: { Authorization: `Bearer ${accessToken}` }
   });
 
   if (response.status === 401) {
@@ -179,26 +178,33 @@ export async function fetchCurrentPlatformIdentity(): Promise<PlatformIdentity |
   return parsePlatformIdentity(await response.json());
 }
 
+async function bootstrapPlatformCsrfToken(): Promise<string | null> {
+  const response = await fetch(buildPlatformUrl('/platform/auth/csrf'), {
+    method: 'GET',
+    credentials: 'include'
+  });
+
+  if (!response.ok) return null;
+  const payload = await response.json() as { csrfToken?: string };
+  if (!payload.csrfToken) return null;
+  savePlatformCsrfToken(payload.csrfToken);
+  return payload.csrfToken;
+}
+
 export async function logoutPlatformSession(): Promise<void> {
-  const refreshToken = getPlatformRefreshToken();
-  const accessToken = getPlatformAccessToken();
-
   try {
-    if (refreshToken) {
-      const headers = new Headers({
-        'Content-Type': 'application/json'
-      });
+    const csrfToken = getPlatformCsrfToken() || await bootstrapPlatformCsrfToken();
+    if (!csrfToken) return;
 
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      }
+    const headers = new Headers({ 'X-CSRF-Token': csrfToken });
+    const accessToken = getPlatformAccessToken();
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
-      await fetch(buildPlatformUrl('/platform/auth/logout'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ refreshToken })
-      });
-    }
+    await fetch(buildPlatformUrl('/platform/auth/logout'), {
+      method: 'POST',
+      credentials: 'include',
+      headers
+    });
   } finally {
     clearPlatformAuthTokens();
   }

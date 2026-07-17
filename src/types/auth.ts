@@ -1,12 +1,11 @@
 export type AuthTokens = {
   accessToken: string;
-  refreshToken: string;
+  csrfToken: string;
+  sessionId?: string;
+  sessionExpiresAt?: string;
 };
 
-export type AuthenticatedSession = {
-  accessToken: string;
-  refreshToken: string;
-};
+export type AuthenticatedSession = AuthTokens;
 
 export type PlatformSessionIdentity = {
   id?: string;

@@ -2,13 +2,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { CSSProperties, MouseEvent } from 'react';
 import {
-  clearAuthTokens,
   clearSupportSessionAccessToken,
   getAccessToken,
-  getRefreshToken,
   getSupportSessionInfo
 } from '../lib/auth';
-import { apiRequest } from '../lib/api';
+import { logoutTenantSession } from '../lib/api';
 import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/supportContext';
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
@@ -352,7 +350,6 @@ export default function AppLayout() {
 
     setIsLoggingOut(true);
 
-    const refreshToken = getRefreshToken();
     const supportSessionInfo = getSupportSessionInfo();
 
     if (supportSessionInfo.isSupportSession) {
@@ -363,17 +360,14 @@ export default function AppLayout() {
     }
 
     try {
-      if (refreshToken) {
-        await apiRequest('/auth/logout', {
-          method: 'POST',
-          body: JSON.stringify({ refreshToken })
-        });
-      }
+      await logoutTenantSession();
     } catch {
-      // Clear local auth state even when backend logout is unavailable.
+      // logoutTenantSession always clears local auth state in its finally block.
     } finally {
-      clearAuthTokens();
-      navigate('/login', { replace: true });
+      navigate('/login', {
+        replace: true,
+        state: { skipSessionRecovery: true }
+      });
       setIsLoggingOut(false);
     }
   };

@@ -1,42 +1,47 @@
 
-import {
-  fetchCurrentPlatformIdentity,
-  logoutPlatformSession
-} from '../lib/platformAuth';
+import { fetchCurrentPlatformIdentity } from '../lib/platformAuth';
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AuthTokens } from '../types/auth';
-import { platformApiRequest } from '../lib/platformApi';
+import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
 import { savePlatformAuthTokens } from '../lib/platformAuth';
 
 export default function PlatformLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const skipSessionRecovery = Boolean(
+    (location.state as { from?: string; skipSessionRecovery?: boolean } | null)?.skipSessionRecovery
+  );
 
   useEffect(() => {
-    void logoutPlatformSession();
+    if (skipSessionRecovery) {
+      return undefined;
+    }
+
     let active = true;
 
-    fetchCurrentPlatformIdentity()
-      .then((identity) => {
-        if (!active || !identity) {
-          return;
-        }
+    const recoverExistingSession = async () => {
+      const accessToken = await restorePlatformSession();
+      if (!accessToken || !active) return;
 
-        navigate('/platform');
-      })
-      .catch(() => {
-        // noop
-      });
+      const identity = await fetchCurrentPlatformIdentity();
+      if (active && identity) {
+        navigate('/platform', { replace: true });
+      }
+    };
+
+    void recoverExistingSession().catch(() => {
+      // Stay on the login page when no recoverable platform session exists.
+    });
 
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [navigate, skipSessionRecovery]);
 
 
-  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

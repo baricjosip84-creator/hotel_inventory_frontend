@@ -39,3 +39,13 @@ failures.
 ## Dependency major-version policy
 
 Dependabot version-update groups are limited to minor and patch releases. Major upgrades must be reviewed separately and merged only after `npm ci`, TypeScript, lint, production build, and staging checks pass. In particular, TypeScript and `typescript-eslint` must be upgraded as a compatible toolchain rather than independently.
+
+## Browser session handling
+
+- The frontend stores only short-lived access tokens and signed CSRF tokens. Refresh tokens are cookie-only and cannot be read by JavaScript.
+- Every API call uses `credentials: include` so scoped refresh cookies can participate in session recovery.
+- Tenant and platform refreshes are coordinated with an in-flight promise and the Web Locks API when available, reducing concurrent rotation races across tabs.
+- A protected-request `401` records the exact access token used. The retry path performs a real cookie refresh unless another tab has already installed a newer access token.
+- Tenant and platform login pages recover a valid cookie-backed session instead of destroying it or forcing an unnecessary sign-in.
+- Legacy `inventory_refresh_token` and `inventory_platform_refresh_token` local-storage entries are removed whenever auth state is read or saved.
+- Vercel applies global CSP, HSTS, framing, referrer, permissions, MIME-sniffing, opener, and resource-policy headers. Review CSP changes whenever adding a new external browser resource or connection endpoint.
