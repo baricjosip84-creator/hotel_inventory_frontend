@@ -14,7 +14,7 @@ const requiredSnippets = [
   'export async function platformApiMutationRequest',
   "'platformApiMutationRequest requires POST, PUT, PATCH, or DELETE.'",
   'const requestOptions = withPlatformMutationSafetyHeaders(path, options);',
-  'response = await performRequest(path, requestOptions);'
+  '({ response, accessTokenUsed } = await performRequest(path, requestOptions));'
 ];
 
 const missing = requiredSnippets.filter((snippet) => !source.includes(snippet));
