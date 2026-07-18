@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import './decisionIntelligencePages.css';
 
 type FeedbackMode = 'learning-outcomes' | 'forecast-accuracy' | 'policy-effectiveness' | 'optimization-results';
 
@@ -4385,7 +4386,7 @@ export default function DecisionLearningFeedbackPage() {
   };
 
   return (
-    <div className="page-shell">
+    <div className="decision-intelligence-page">
       <div className="page-header">
         <div>
           <p className="eyebrow">Decision Intelligence</p>

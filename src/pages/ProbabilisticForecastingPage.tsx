@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import './decisionIntelligencePages.css';
 
 
 const FORECAST_DOMAIN_OPTIONS = [
@@ -487,7 +488,7 @@ export default function ProbabilisticForecastingPage() {
   const totalForecastRecords = (data?.models?.length || 0) + (data?.intervals?.length || 0) + (data?.risk_probabilities?.length || 0) + (data?.calibration?.length || 0);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="decision-intelligence-page">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decision Intelligence</p>

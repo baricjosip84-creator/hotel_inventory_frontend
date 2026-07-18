@@ -46,12 +46,13 @@
     "security:check": "npm run repo:hygiene && npm run security:scan",
     "lint:pilot-critical": "eslint src/app/router.tsx src/app/navigationRegistry.ts src/lib/api.ts src/lib/auth.ts src/lib/platformApi.ts src/lib/platformAuth.ts src/components/ProtectedRoute.tsx src/components/PlatformProtectedRoute.tsx src/pages/ReplenishmentPlanningPage.tsx src/pages/ProcurementRecommendationsPage.tsx src/pages/StockTransfersPage.tsx src/pages/PurchaseOrdersPage.tsx src/pages/LoginPage.tsx src/pages/PlatformLoginPage.tsx",
     "package:stage": "node scripts/prepare-source-distribution.mjs",
-    "check:ci": "npm run security:check && npm run check:dependency-update-governance && npm run check:commercial-shell && npm run check:phase15-closure && npm run check:phase18-commercial-readiness-surfaces && npm run check:vercel-install-hardening && npm run check:platform-security-route-permission && npm run check:platform-api-mutation-safety && npm run check:production-env-governance && npm run check:automation-resume-ui-governance && npm run check:tenant-session-route-auth-governance && npm run check:auth-browser-security-hardening && npm run check:shipment-mailtrap-sandbox-ui",
+    "check:ci": "npm run security:check && npm run check:dependency-update-governance && npm run check:commercial-shell && npm run check:phase15-closure && npm run check:phase18-commercial-readiness-surfaces && npm run check:vercel-install-hardening && npm run check:platform-security-route-permission && npm run check:platform-api-mutation-safety && npm run check:production-env-governance && npm run check:automation-resume-ui-governance && npm run check:tenant-session-route-auth-governance && npm run check:auth-browser-security-hardening && npm run check:shipment-mailtrap-sandbox-ui && npm run check:decision-intelligence-layout",
     "check:cross-repo": "npm run check:unified-ai-contract-suite && npm run check:role-permission-management && npm run check:tenant-custom-role-management",
     "repo:clean-generated": "node scripts/clean-generated-artifacts.mjs",
     "typecheck:ci": "tsc -p tsconfig.pilot-critical.json --noEmit",
     "check:dependency-update-governance": "node scripts/check-dependency-update-governance.mjs",
-    "check:auth-browser-security-hardening": "node scripts/check-auth-browser-security-hardening.mjs"
+    "check:auth-browser-security-hardening": "node scripts/check-auth-browser-security-hardening.mjs",
+    "check:decision-intelligence-layout": "node scripts/check-decision-intelligence-layout.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

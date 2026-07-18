@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import './decisionIntelligencePages.css';
 
 const OPTIMIZATION_DOMAIN_OPTIONS = [
   'inventory',
@@ -326,7 +327,7 @@ export default function CrossDomainOptimizationPage() {
   const totalOptimizationRecords = (summary?.optimization_runs?.length || 0) + (summary?.objectives?.length || 0) + (summary?.options?.length || 0) + (summary?.tradeoffs?.length || 0);
 
   return (
-    <div className="page-shell">
+    <div className="decision-intelligence-page">
       <div className="page-header">
         <div>
           <p className="eyebrow">Decision Intelligence</p>
