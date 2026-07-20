@@ -7,6 +7,7 @@
  */
 
 import type { AuthTokens } from '../types/auth';
+import { clearRuntimeIdentity, setRuntimeIdentity } from '../observability/runtimeErrorMonitoring';
 
 const ACCESS_TOKEN_KEY = 'inventory_access_token';
 const CSRF_TOKEN_KEY = 'inventory_csrf_token';
@@ -26,6 +27,7 @@ export function saveSupportSessionAccessToken(accessToken: string): void {
 export function saveAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    syncTenantRuntimeIdentity(tokens.accessToken);
   }
 
   if (tokens.csrfToken) {
@@ -65,6 +67,7 @@ export function clearAuthTokens(): void {
   localStorage.removeItem(CSRF_TOKEN_KEY);
   removeLegacyRefreshToken();
   localStorage.removeItem('inventory_tenant_effective_permissions');
+  clearRuntimeIdentity('tenant');
 }
 
 export function clearAuth(): void {
@@ -108,6 +111,27 @@ export function getCurrentTenantUserId(): string | null {
   return null;
 }
 
+export function getTenantObservabilityIdentity(token: string | null): { area: 'tenant'; userId?: string; tenantId?: string; role?: string; supportSession?: boolean } | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+
+  const userId = typeof payload.id === 'string' ? payload.id : typeof payload.user_id === 'string' ? payload.user_id : undefined;
+  const tenantId = typeof payload.tenant_id === 'string' ? payload.tenant_id : undefined;
+  const role = typeof payload.role === 'string' ? payload.role : undefined;
+  return {
+    area: 'tenant',
+    userId,
+    tenantId,
+    role,
+    supportSession: payload.typ === 'support_session'
+  };
+}
+
+function syncTenantRuntimeIdentity(accessToken: string | null): void {
+  const identity = getTenantObservabilityIdentity(accessToken);
+  if (identity) setRuntimeIdentity(identity);
+}
+
 export type SupportSessionInfo = {
   isSupportSession: boolean;
   supportSessionId?: string;
@@ -142,4 +166,5 @@ export function clearSupportSessionAccessToken(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(CSRF_TOKEN_KEY);
   removeLegacyRefreshToken();
+  clearRuntimeIdentity('tenant');
 }

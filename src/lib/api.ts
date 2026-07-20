@@ -9,6 +9,7 @@ import {
 } from './auth';
 import type { AuthTokens } from '../types/auth';
 import { TENANT_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
+import { captureApiFailure } from '../observability/runtimeErrorMonitoring';
 
 /**
  * IMPORTANT
@@ -887,6 +888,7 @@ export async function apiRequest<T>(
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Network error while contacting backend';
+    captureApiFailure({ area: 'tenant', path, method, status: 0, error });
     if (shouldShowMutationFeedback) {
       dispatchTenantMutationFeedback({ type: 'error', message });
     }
@@ -921,6 +923,16 @@ export async function apiRequest<T>(
     }
     return result;
   } catch (error) {
+    captureApiFailure({
+      area: 'tenant',
+      path,
+      method,
+      status: error instanceof ApiError ? error.status : response.status,
+      code: error instanceof ApiError ? error.code : undefined,
+      requestId: error instanceof ApiError ? error.requestId : undefined,
+      error
+    });
+
     if (
       error instanceof ApiError &&
       error.status === 401 &&

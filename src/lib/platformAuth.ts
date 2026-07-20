@@ -1,4 +1,5 @@
 import type { AuthTokens } from '../types/auth';
+import { clearRuntimeIdentity, setRuntimeIdentity } from '../observability/runtimeErrorMonitoring';
 
 const PLATFORM_ACCESS_TOKEN_KEY = 'inventory_platform_access_token';
 const PLATFORM_CSRF_TOKEN_KEY = 'inventory_platform_csrf_token';
@@ -22,6 +23,7 @@ function removeLegacyRefreshToken(): void {
 export function savePlatformAuthTokens(tokens: AuthTokens): void {
   if (tokens.accessToken) {
     localStorage.setItem(PLATFORM_ACCESS_TOKEN_KEY, tokens.accessToken);
+    syncPlatformRuntimeIdentity(tokens.accessToken);
   }
 
   if (tokens.csrfToken) {
@@ -57,6 +59,7 @@ export function clearPlatformAuthTokens(): void {
   localStorage.removeItem(PLATFORM_CSRF_TOKEN_KEY);
   removeLegacyRefreshToken();
   localStorage.removeItem('inventory_platform_effective_permissions');
+  clearRuntimeIdentity('platform');
 }
 
 function decodeJwtPayload(token: string | null): PlatformJwtPayload | null {
@@ -81,6 +84,21 @@ export function isPlatformAccessTokenExpired(token: string | null, bufferSeconds
   if (typeof exp !== 'number') return true;
 
   return exp <= Math.floor(Date.now() / 1000) + bufferSeconds;
+}
+
+export function getPlatformObservabilityIdentity(token: string | null): { area: 'platform'; userId?: string; role?: string } | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload || payload.typ !== 'platform') return null;
+  return {
+    area: 'platform',
+    userId: typeof payload.id === 'string' ? payload.id : undefined,
+    role: typeof payload.role === 'string' ? payload.role : undefined
+  };
+}
+
+function syncPlatformRuntimeIdentity(accessToken: string | null): void {
+  const identity = getPlatformObservabilityIdentity(accessToken);
+  if (identity) setRuntimeIdentity(identity);
 }
 
 export function getCurrentPlatformRole(): PlatformRole {

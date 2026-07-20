@@ -1,5 +1,6 @@
 import type { AuthTokens } from '../types/auth';
 import { PLATFORM_MUTATION_FEEDBACK_EVENT } from './actionFeedback';
+import { captureApiFailure } from '../observability/runtimeErrorMonitoring';
 import { ApiError } from './api';
 import {
   clearPlatformAuthTokens,
@@ -411,6 +412,7 @@ export async function platformApiRequest<T>(
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: unknown) {
     const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
+    captureApiFailure({ area: 'platform', path, method, status: 0, error });
     if (shouldShowMutationFeedback) {
       dispatchPlatformMutationFeedback({ type: 'error', message });
     }
@@ -440,6 +442,16 @@ export async function platformApiRequest<T>(
     }
     return result;
   } catch (error) {
+    captureApiFailure({
+      area: 'platform',
+      path,
+      method,
+      status: error instanceof ApiError ? error.status : response.status,
+      code: error instanceof ApiError ? error.code : undefined,
+      requestId: error instanceof ApiError ? error.requestId : undefined,
+      error
+    });
+
     if (
       error instanceof ApiError &&
       error.status === 401 &&

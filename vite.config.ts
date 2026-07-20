@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 const firstNonEmpty = (...values: Array<string | undefined>): string | null => {
   for (const value of values) {
@@ -8,6 +9,20 @@ const firstNonEmpty = (...values: Array<string | undefined>): string | null => {
   }
   return null;
 };
+
+
+const appRelease = firstNonEmpty(
+  process.env.SENTRY_RELEASE,
+  process.env.VERCEL_GIT_COMMIT_SHA,
+  process.env.GITHUB_SHA,
+  process.env.SOURCE_VERSION
+);
+
+const sentrySourceMapUploadEnabled = Boolean(
+  process.env.SENTRY_AUTH_TOKEN?.trim() &&
+  process.env.SENTRY_ORG?.trim() &&
+  process.env.SENTRY_PROJECT?.trim()
+);
 
 function deploymentVersionPlugin(): Plugin {
   return {
@@ -51,12 +66,26 @@ function deploymentVersionPlugin(): Plugin {
  * predictable production bundles before deeper route-level lazy loading work.
  */
 export default defineConfig({
-  plugins: [react(), deploymentVersionPlugin()],
+  define: {
+    __APP_RELEASE__: JSON.stringify(appRelease)
+  },
+  plugins: [
+    react(),
+    deploymentVersionPlugin(),
+    ...(sentrySourceMapUploadEnabled ? [sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      release: { name: appRelease || undefined },
+      sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] }
+    })] : [])
+  ],
   build: {
     chunkSizeWarningLimit: 750,
     cssCodeSplit: true,
     reportCompressedSize: true,
-    sourcemap: false,
+    sourcemap: sentrySourceMapUploadEnabled ? 'hidden' : false,
     rollupOptions: {
       output: {
         manualChunks(id) {

@@ -37,8 +37,10 @@ jobs:
         run: npm run security:check
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-      - name: Run static commercial and security checks
-        run: npm run check:ci
+      - name: Run static commercial, security and runtime-monitoring checks
+        run: |
+          npm run check:ci
+          npm run check:runtime-error-monitoring
       - name: Run pilot-critical TypeScript validation
         run: npm run typecheck:ci
       - name: Lint complete frontend repository
