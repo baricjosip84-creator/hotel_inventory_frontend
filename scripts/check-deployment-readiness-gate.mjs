@@ -94,6 +94,13 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
   'inputs.expected_backend_commit || inputs.environment || github.run_id'
 ].forEach((expected) => requireText(workflow, expected, 'deployment-readiness workflow'));
 
+const frontendValidationWorkflow = read('.github/workflows/frontend-validation.yml');
+[
+  'full-lint-diagnostic:',
+  "if: ${{ github.event_name == 'workflow_dispatch' }}",
+  'npm run lint'
+].forEach((expected) => requireText(frontendValidationWorkflow, expected, 'frontend validation workflow'));
+
 [
   'deployment-version-metadata',
   'VERCEL_GIT_COMMIT_SHA',

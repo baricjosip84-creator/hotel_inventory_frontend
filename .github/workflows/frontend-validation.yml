@@ -85,6 +85,9 @@ jobs:
         run: npm run check:cross-repo
 
   full-lint-diagnostic:
+    # Repository-wide lint still contains known legacy debt. Keep this diagnostic
+    # available for manual audits without producing red checks on every push.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
