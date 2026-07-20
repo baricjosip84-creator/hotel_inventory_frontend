@@ -55,7 +55,8 @@
     "check:decision-intelligence-layout": "node scripts/check-decision-intelligence-layout.mjs",
     "test:deployment-readiness": "playwright test --config=playwright.deployment.config.ts",
     "check:deployment-readiness-gate": "node scripts/check-deployment-readiness-gate.mjs",
-    "typecheck:deployment-readiness": "tsc -p tsconfig.deployment.json --noEmit"
+    "typecheck:deployment-readiness": "tsc -p tsconfig.deployment.json --noEmit",
+    "wait:production-deployment": "node scripts/wait-for-production-deployment.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

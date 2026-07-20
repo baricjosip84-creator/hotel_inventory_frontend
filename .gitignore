@@ -37,3 +37,6 @@ artifacts/
 *.tgz
 
 playwright-deployment-report/
+
+# Build-generated deployment identity
+public/deployment-version.json

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const generatedPaths = ['test-results', 'playwright-report', 'playwright-deployment-report', 'coverage', 'dist'];
+const generatedPaths = ['test-results', 'playwright-report', 'playwright-deployment-report', 'coverage', 'dist', 'public/deployment-version.json'];
 
 function removeTrackedGeneratedPaths() {
   const gitDir = path.join(root, '.git');

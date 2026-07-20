@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 /*
-  Browser/API configuration for the manually triggered deployment readiness gate.
+  Browser/API configuration for the automatic and manually triggered deployment readiness gate.
 
   This configuration never starts a local Vite server. It only targets the
   deployed URLs supplied by the selected GitHub Environment or the local shell.

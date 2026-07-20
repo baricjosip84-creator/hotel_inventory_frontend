@@ -7,25 +7,42 @@ on:
         description: GitHub Environment containing the deployed URLs and smoke-account credentials
         required: true
         type: environment
+      expected_backend_commit:
+        description: Automation-only backend commit SHA; leave blank for a manual run
+        required: false
+        type: string
+  workflow_run:
+    workflows:
+      - Frontend Validation
+    types:
+      - completed
 
 permissions:
   contents: read
 
 concurrency:
-  group: deployment-readiness-${{ inputs.environment }}
-  cancel-in-progress: false
+  # Keep frontend-commit and backend-commit verification runs separate. A paired
+  # backend/frontend release must not cancel one side of the exact-commit proof.
+  group: deployment-readiness-${{ github.event_name }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.expected_backend_commit || inputs.environment || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   deployment-readiness:
-    environment: ${{ inputs.environment }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
       CI: 'true'
+      READINESS_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
       DEPLOYMENT_FRONTEND_URL: ${{ vars.DEPLOYMENT_FRONTEND_URL }}
       DEPLOYMENT_BACKEND_URL: ${{ vars.DEPLOYMENT_BACKEND_URL }}
       DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE: ${{ vars.DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE || 'true' }}
       DEPLOYMENT_REQUIRE_PLATFORM_AUTH: ${{ vars.DEPLOYMENT_REQUIRE_PLATFORM_AUTH || 'false' }}
+      EXPECTED_FRONTEND_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+      EXPECTED_BACKEND_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_backend_commit || '' }}
       E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_PLATFORM_EMAIL: ${{ secrets.E2E_PLATFORM_EMAIL }}
@@ -34,6 +51,8 @@ jobs:
     steps:
       - name: Check out frontend source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,6 +71,9 @@ jobs:
             test -n "$E2E_PLATFORM_EMAIL" || (echo "E2E_PLATFORM_EMAIL is required when platform auth smoke testing is enabled" && exit 1)
             test -n "$E2E_PLATFORM_PASSWORD" || (echo "E2E_PLATFORM_PASSWORD is required when platform auth smoke testing is enabled" && exit 1)
           fi
+
+      - name: Wait for the exact production deployment
+        run: npm run wait:production-deployment
 
       - name: Remove legacy generated artifacts
         run: npm run repo:clean-generated
@@ -75,7 +97,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: deployment-readiness-${{ inputs.environment }}-${{ github.run_id }}
+          name: deployment-readiness-${{ env.READINESS_ENVIRONMENT }}-${{ github.run_id }}
           path: |
             playwright-deployment-report
             test-results/deployment-readiness.json

@@ -24,6 +24,7 @@ function copyDirectory(source, destination) {
     if (shouldExclude(entry.name, entry.isDirectory())) continue;
     const sourcePath = path.join(source, entry.name);
     const destinationPath = path.join(destination, entry.name);
+    if (sourcePath === path.join(root, 'public', 'deployment-version.json')) continue;
     if (entry.isDirectory()) copyDirectory(sourcePath, destinationPath);
     else if (entry.isFile()) fs.copyFileSync(sourcePath, destinationPath);
   }

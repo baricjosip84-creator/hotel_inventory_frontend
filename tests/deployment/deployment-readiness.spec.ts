@@ -29,6 +29,15 @@ function booleanSetting(name: string, fallback: boolean): boolean {
   throw new Error(`${name} must be true or false`);
 }
 
+
+function optionalCommit(name: 'EXPECTED_FRONTEND_COMMIT' | 'EXPECTED_BACKEND_COMMIT'): string {
+  const value = process.env[name]?.trim().toLowerCase() || '';
+  if (value && !/^[0-9a-f]{40}$/.test(value)) {
+    throw new Error(`${name} must be a full 40-character Git commit SHA when provided.`);
+  }
+  return value;
+}
+
 function deploymentUrl(name: 'DEPLOYMENT_FRONTEND_URL' | 'DEPLOYMENT_BACKEND_URL'): string {
   const raw = requiredValue(name);
   const parsed = new URL(raw);
@@ -116,6 +125,19 @@ test.describe('deployed service readiness', () => {
       expect(await frontendResponse.text()).toContain('id="root"');
       expectSecurityHeaders(frontendResponse, 'Frontend');
 
+      const frontendVersionResponse = await api.get(`${frontendUrl}/deployment-version.json`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      const frontendVersion = await readJson<{
+        service?: string;
+        git_commit?: string | null;
+      }>(frontendVersionResponse, 'Frontend deployment version');
+      expect(frontendVersion.service).toBe('hotel-inventory-frontend');
+      const expectedFrontendCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT');
+      if (expectedFrontendCommit) {
+        expect(frontendVersion.git_commit?.toLowerCase(), 'Frontend production deployment must match the triggering commit').toBe(expectedFrontendCommit);
+      }
+
       const livenessResponse = await api.get(`${backendUrl}/health/live`);
       const liveness = await readJson<{
         status?: string;
@@ -130,12 +152,17 @@ test.describe('deployed service readiness', () => {
         status?: string;
         probe?: string;
         checks?: { process?: string; database?: string };
+        deployment?: { git_commit?: string | null };
       }>(readinessResponse, 'Backend readiness probe');
       expect(readiness).toMatchObject({
         status: 'ready',
         probe: 'readiness',
         checks: { process: 'ok', database: 'ok' }
       });
+      const expectedBackendCommit = optionalCommit('EXPECTED_BACKEND_COMMIT');
+      if (expectedBackendCommit) {
+        expect(readiness.deployment?.git_commit?.toLowerCase(), 'Backend production deployment must match the triggering commit').toBe(expectedBackendCommit);
+      }
 
       const corsResponse = await api.fetch(`${backendUrl}/api/auth/login`, {
         method: 'OPTIONS',
