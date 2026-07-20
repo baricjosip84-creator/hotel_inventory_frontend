@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload deployment-readiness evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deployment-readiness-${{ env.READINESS_ENVIRONMENT }}-${{ github.run_id }}
           path: |
