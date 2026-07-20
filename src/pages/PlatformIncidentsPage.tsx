@@ -152,7 +152,7 @@ export default function PlatformIncidentsPage() {
     }
   });
 
-  const rows = incidents.data || [];
+  const rows = useMemo(() => incidents.data ?? [], [incidents.data]);
   const openIncidents = useMemo(() => rows.filter((incident) => !['resolved', 'cancelled'].includes(incident.status)), [rows]);
   const trimmedTitle = form.title.trim();
   const tenantIncidentNeedsTenant = form.scope === 'tenant' && !form.tenant_id;

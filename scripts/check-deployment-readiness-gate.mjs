@@ -96,10 +96,13 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
 
 const frontendValidationWorkflow = read('.github/workflows/frontend-validation.yml');
 [
-  'full-lint-diagnostic:',
-  "if: ${{ github.event_name == 'workflow_dispatch' }}",
-  'npm run lint'
+  'Lint complete frontend repository',
+  'run: npm run lint'
 ].forEach((expected) => requireText(frontendValidationWorkflow, expected, 'frontend validation workflow'));
+
+if (frontendValidationWorkflow.includes('full-lint-diagnostic:')) {
+  errors.push('Frontend validation must not keep the legacy manual-only full-lint diagnostic after repository-wide lint is clean.');
+}
 
 [
   'deployment-version-metadata',

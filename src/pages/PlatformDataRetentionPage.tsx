@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties, ReactNode } from 'react';
 import { ApiError } from '../lib/api';
@@ -109,7 +109,7 @@ export default function PlatformDataRetentionPage() {
     writeLocked: rows.filter((r) => r.write_locked).length
   }), [rows]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -126,9 +126,9 @@ export default function PlatformDataRetentionPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dueOnly, legalHold, tenantId]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const startEdit = (row: RetentionRow) => {
     setEditing(row);

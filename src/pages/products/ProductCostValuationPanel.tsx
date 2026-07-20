@@ -7,7 +7,13 @@ import {
   toNumber
 } from './productFormatting';
 import type { CostValuationDetailFilterState } from './productCostAssessmentApi';
-import type { ProductCostHistoryItem, ProductCostRiskItem } from '../../types/inventory';
+import type {
+  ProductCostRiskItem,
+  ProductCostValuationDetailsResponse,
+  ProductCostValuationItem,
+  ProductCostValuationSummaryResponse,
+  ProductItem
+} from '../../types/inventory';
 
 type ProductCostValuationPanelProps = {
   costValuationQuery: {
@@ -15,15 +21,15 @@ type ProductCostValuationPanelProps = {
     isError: boolean;
     refetch: () => void;
   };
-  costValuationSummary: any;
+  costValuationSummary?: ProductCostValuationSummaryResponse;
   costValuationDetailsQuery: {
     isLoading: boolean;
     isError: boolean;
   };
-  costValuationDetails: any;
+  costValuationDetails?: ProductCostValuationDetailsResponse;
   costValuationDetailFilters: CostValuationDetailFilterState;
   setCostValuationDetailFilters: Dispatch<SetStateAction<CostValuationDetailFilterState>>;
-  onOpenCostHistory: (product: ProductCostHistoryItem | ProductCostRiskItem | any) => void;
+  onOpenCostHistory: (product: ProductItem | ProductCostRiskItem) => void;
   onExportCostValuationDetailsCsv: () => void;
   onViewCategory: (category: string) => void;
 };
@@ -101,7 +107,7 @@ export function ProductCostValuationPanel({
                 <div style={styles.rowSubtle}>No stocked product valuation basis found.</div>
               ) : (
                 <div style={styles.riskList}>
-                  {(costValuationSummary?.basis_breakdown ?? []).map((row: any) => (
+                  {(costValuationSummary?.basis_breakdown ?? []).map((row) => (
                     <div key={row.valuation_basis} style={styles.riskListItem}>
                       <div>
                         <div style={styles.rowTitle}>{formatValuationBasis(row.valuation_basis)}</div>
@@ -135,7 +141,7 @@ export function ProductCostValuationPanel({
                     <td style={styles.emptyCell} colSpan={6}>No stocked category valuation found.</td>
                   </tr>
                 ) : (
-                  (costValuationSummary?.category_breakdown ?? []).map((row: any) => (
+                  (costValuationSummary?.category_breakdown ?? []).map((row) => (
                     <tr key={row.category}>
                       <td style={styles.td}>{row.category}</td>
                       <td style={styles.td}>{toNumber(row.stocked_products)}</td>
@@ -249,7 +255,7 @@ export function ProductCostValuationPanel({
                       <td style={styles.emptyCell} colSpan={6}>No valuation detail rows match the current filters.</td>
                     </tr>
                   ) : (
-                    (costValuationDetails?.rows ?? []).map((row: any) => (
+                    (costValuationDetails?.rows ?? []).map((row: ProductCostValuationItem) => (
                       <tr key={row.id}>
                         <td style={styles.td}>
                           <strong>{row.name}</strong>

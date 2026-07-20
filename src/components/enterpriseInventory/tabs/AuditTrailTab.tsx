@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { DataTable, InputField, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { emptyAuditFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { AuditFilters, AuditLog } from '../EnterpriseInventoryTypes';

@@ -89,7 +89,7 @@ export default function PlatformMaintenancePage() {
     }
   });
 
-  const windows = maintenance.data || [];
+  const windows = useMemo(() => maintenance.data ?? [], [maintenance.data]);
   const activeOrUpcoming = useMemo(() => windows.filter((w) => w.status !== 'completed' && w.status !== 'cancelled'), [windows]);
   const trimmedTitle = form.title.trim();
   const startsAtTime = form.starts_at ? new Date(form.starts_at).getTime() : Number.NaN;
@@ -227,7 +227,7 @@ export default function PlatformMaintenancePage() {
           </label>
           <button
             style={{ ...styles.dangerButton, ...(cancel.isPending || !cancelReasonById[window.id]?.trim() ? styles.disabledDangerButton : {}) }}
-            onClick={() => { const reason = cancelReasonById[window.id]?.trim() || ''; if (globalThis.confirm(`Cancel maintenance window \"${window.title}\"?`)) cancel.mutate({ id: window.id, reason }); }}
+            onClick={() => { const reason = cancelReasonById[window.id]?.trim() || ''; if (globalThis.confirm(`Cancel maintenance window "${window.title}"?`)) cancel.mutate({ id: window.id, reason }); }}
             disabled={cancel.isPending || !cancelReasonById[window.id]?.trim()}
           >Cancel</button>
         </div> : null}

@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { InputField, styles } from '../EnterpriseInventoryShared';
+import { InputField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { StorageLocationForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 

@@ -1,4 +1,5 @@
-import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatNumber } from '../EnterpriseInventoryFormat';
 import type {
   DepletionRiskRow,

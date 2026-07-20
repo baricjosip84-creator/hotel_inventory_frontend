@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import {
   EnterpriseInventoryHero,
   StatusMessages,
-  styles,
 } from "./EnterpriseInventoryShared";
+import { styles } from "./EnterpriseInventoryStyles";
 import { EnterpriseInventoryTabs } from "./EnterpriseInventoryTabs";
 
 type EnterpriseInventoryPageLayoutProps = {

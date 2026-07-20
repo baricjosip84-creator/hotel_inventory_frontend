@@ -1,98 +1,8 @@
-import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatCurrency, formatDateTime, formatNumber, formatRecordValue } from '../EnterpriseInventoryFormat';
 
-type CostControlTabProps = {
-  highVarianceCostRows: any;
-  inconsistentCostRows: any;
-  missingCostRows: any;
-  productCostActionAgeBands: any;
-  productCostActionAgeSummaryQuery: any;
-  productCostActionCategories: any;
-  productCostActionCategorySummaryQuery: any;
-  productCostActionCoverageRows: any;
-  productCostActionCoverageSummaryQuery: any;
-  productCostActionImpactSummaryQuery: any;
-  productCostActionPlanSummaryQuery: any;
-  productCostActionRows: any;
-  productCostActionSourceSummaryQuery: any;
-  productCostActionSources: any;
-  productCostActionSummaryQuery: any;
-  productCostActionSupplierSummaryQuery: any;
-  productCostActionSuppliers: any;
-  productCostAlertGroups: any;
-  productCostAlertSummaryQuery: any;
-  productCostBasisRows: any;
-  productCostCategoryRows: any;
-  productCostCoverageGaps: any;
-  productCostDashboardCategories: any;
-  productCostDashboardPriorityProducts: any;
-  productCostDashboardSummaryQuery: any;
-  productCostGovernanceAuditPackQuery: any;
-  productCostGovernanceAuditRows: any;
-  productCostGovernanceBlockers: any;
-  productCostGovernanceChecklist: any;
-  productCostGovernanceClosureChecklist: any;
-  productCostGovernanceClosureSummaryQuery: any;
-  productCostGovernanceDetailsQuery: any;
-  productCostGovernanceFailedChecklist: any;
-  productCostGovernanceHandoffChecklist: any;
-  productCostGovernanceHandoffSummaryQuery: any;
-  productCostGovernanceOwnerSummary: any;
-  productCostGovernancePriorityProducts: any;
-  productCostGovernanceQueueItems: any;
-  productCostGovernanceRemediationPlan: any;
-  productCostGovernanceReviewExportRows: any;
-  productCostGovernanceReviewPackQuery: any;
-  productCostGovernanceReviewQueueQuery: any;
-  productCostGovernanceSignoffChecklist: any;
-  productCostGovernanceSignoffSummaryQuery: any;
-  productCostGovernanceSummaryQuery: any;
-  productCostGovernanceWarnings: any;
-  productCostGovernanceWatchChecklist: any;
-  productCostHardeningFailedChecklist: any;
-  productCostHardeningSummaryQuery: any;
-  productCostImpactRows: any;
-  productCostNextActions: any;
-  productCostOperationsControlChecks: any;
-  productCostOperationsControlSummaryQuery: any;
-  productCostOperationsEscalationRules: any;
-  productCostOperationsEvidenceSections: any;
-  productCostOperationsEvidenceSummaryQuery: any;
-  productCostOperationsReadinessChecklist: any;
-  productCostOperationsReadinessSummaryQuery: any;
-  productCostOperationsRhythm: any;
-  productCostOperationsRunbookSummaryQuery: any;
-  productCostPriorityBands: any;
-  productCostRecommendationGroups: any;
-  productCostRecommendationSummaryQuery: any;
-  productCostReportSummaryQuery: any;
-  productCostRiskSummary: any;
-  productCostRiskSummaryQuery: any;
-  productCostTopAlerts: any;
-  productCostTopImpactProducts: any;
-  productCostTopRecommendations: any;
-  productCostTopValueRows: any;
-  productCostValuationDetailRows: any;
-  productCostValuationDetailsQuery: any;
-  productCostValuationSummary: any;
-  productCostValuationSummaryQuery: any;
-  carryingCostProductionReview: any;
-  carryingCostProductionReviewRows: any;
-  carryingCostProductionControls: any;
-  carryingCostProductionReviewQuery: any;
-  deadStockProductionReview: any;
-  deadStockProductionReviewRows: any;
-  deadStockProductionControls: any;
-  deadStockProductionReviewQuery: any;
-  marginAwareProductionReview: any;
-  marginAwareProductionReviewRows: any;
-  marginAwareProductionControls: any;
-  marginAwareProductionReviewQuery: any;
-  procurementSpendProductionReview: any;
-  procurementSpendProductionReviewRows: any;
-  procurementSpendProductionControls: any;
-  procurementSpendProductionReviewQuery: any;
-};
+import type { CostControlTabProps, DynamicApiValue } from '../EnterpriseInventoryCostControlTypes';
 
 const formatCodeLabel = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '-';
@@ -194,9 +104,9 @@ const formatCostTableValue = (key: unknown, value: unknown): string => {
   return formatRecordValue({ value }, 'value');
 };
 
-const toHardeningReviewRows = (queryData: any, fallbackRows: any[]): string[][] => {
+const toHardeningReviewRows = (queryData: DynamicApiValue, fallbackRows: DynamicApiValue[]): string[][] => {
   if (Array.isArray(fallbackRows) && fallbackRows.length) {
-    return fallbackRows.map((item: any) => [
+    return fallbackRows.map((item: DynamicApiValue) => [
       formatRecordValue(item, 'label'),
       formatCodeLabel(item.status),
       formatCostDetailValue(item.detail)
@@ -204,7 +114,7 @@ const toHardeningReviewRows = (queryData: any, fallbackRows: any[]): string[][] 
   }
 
   const actions = Array.isArray(queryData?.hardening_actions) ? queryData.hardening_actions : [];
-  return actions.map((action: string) => ['Hardening action', 'Review', action]);
+  return actions.map((action: DynamicApiValue) => ['Hardening action', 'Review', String(action)]);
 };
 
 export function CostControlTab({
@@ -321,9 +231,9 @@ export function CostControlTab({
   const costActionableValue = costActionTotals.actionable_estimated_inventory_value;
 
   const governanceCheckpointRows = [
-    ...productCostGovernanceSignoffChecklist.map((item: any) => ({ ...item, area: 'Sign-off' })),
-    ...productCostGovernanceClosureChecklist.map((item: any) => ({ ...item, area: 'Closure' })),
-    ...productCostGovernanceHandoffChecklist.map((item: any) => ({ ...item, area: 'Handoff' }))
+    ...productCostGovernanceSignoffChecklist.map((item: DynamicApiValue) => ({ ...item, area: 'Sign-off' })),
+    ...productCostGovernanceClosureChecklist.map((item: DynamicApiValue) => ({ ...item, area: 'Closure' })),
+    ...productCostGovernanceHandoffChecklist.map((item: DynamicApiValue) => ({ ...item, area: 'Handoff' }))
   ];
 
   return (
@@ -345,13 +255,13 @@ export function CostControlTab({
           loading={carryingCostProductionReviewQuery.isLoading}
           empty="No carrying-cost production review rows returned."
           headers={['Product', 'Location', 'Readiness', 'Score', 'Monthly cost', 'Factors']}
-          rows={carryingCostProductionReviewRows.map((item: any) => [
+          rows={carryingCostProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
             formatCodeLabel(item.readiness_state),
             formatNumber(item.carrying_cost_score),
             formatCurrency(item.monthly_carrying_cost),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: DynamicApiValue) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {carryingCostProductionControls.length ? (
@@ -376,13 +286,13 @@ export function CostControlTab({
           loading={deadStockProductionReviewQuery.isLoading}
           empty="No dead-stock production review rows returned."
           headers={['Product', 'Location', 'Readiness', 'Score', 'Capital', 'Factors']}
-          rows={deadStockProductionReviewRows.map((item: any) => [
+          rows={deadStockProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
             formatCodeLabel(item.readiness_state),
             formatNumber(item.dead_stock_score),
             formatCurrency(item.capital_locked_value),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: DynamicApiValue) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {deadStockProductionControls.length ? (
@@ -410,13 +320,13 @@ export function CostControlTab({
           loading={procurementSpendProductionReviewQuery.isLoading}
           empty="No procurement spend production review rows returned."
           headers={['Category', 'Readiness', 'Pressure', 'Committed', 'Open', 'Factors']}
-          rows={procurementSpendProductionReviewRows.map((item: any) => [
+          rows={procurementSpendProductionReviewRows.map((item: DynamicApiValue) => [
             item.category || '-',
             formatCodeLabel(item.readiness_state),
             formatCodeLabel(item.spend_pressure_tier || item.risk_level),
             formatCurrency(item.committed_spend_value),
             formatCurrency(item.open_spend_value),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: DynamicApiValue) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {procurementSpendProductionControls.length ? (
@@ -441,13 +351,13 @@ export function CostControlTab({
           loading={marginAwareProductionReviewQuery.isLoading}
           empty="No margin-aware production review rows returned."
           headers={['Product', 'Location', 'Readiness', 'Decision', 'Spend', 'Factors']}
-          rows={marginAwareProductionReviewRows.map((item: any) => [
+          rows={marginAwareProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',
             item.storage_location_name || item.storage_location_id || '-',
             formatCodeLabel(item.readiness_state),
             formatCodeLabel(item.commercial_decision),
             formatCurrency(item.estimated_replenishment_cost),
-            Array.isArray(item.factors) ? item.factors.map((factor: any) => factor.label || factor.code).join(', ') : '-'
+            Array.isArray(item.factors) ? item.factors.map((factor: DynamicApiValue) => factor.label || factor.code).join(', ') : '-'
           ])}
         />
         {marginAwareProductionControls.length ? (
@@ -487,7 +397,7 @@ export function CostControlTab({
           loading={productCostValuationSummaryQuery.isLoading}
           empty="No valuation basis breakdown returned."
           headers={['Basis', 'Stocked products', 'Quantity', 'Estimated value']}
-          rows={productCostBasisRows.map((item: any) => [
+          rows={productCostBasisRows.map((item: DynamicApiValue) => [
             formatCodeLabel(item.valuation_basis),
             formatRecordValue(item, 'stocked_products'),
             formatRecordValue(item, 'stock_quantity'),
@@ -502,7 +412,7 @@ export function CostControlTab({
           loading={productCostValuationSummaryQuery.isLoading}
           empty="No cost category breakdown returned."
           headers={['Category', 'Stocked products', 'Quantity', 'Estimated value', 'Unvalued products']}
-          rows={productCostCategoryRows.map((item: any) => [
+          rows={productCostCategoryRows.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'stocked_products'),
             formatRecordValue(item, 'stock_quantity'),
@@ -518,7 +428,7 @@ export function CostControlTab({
           loading={productCostValuationSummaryQuery.isLoading}
           empty="No top value products returned."
           headers={['Product', 'Category', 'Stock', 'Basis', 'Effective cost', 'Estimated value']}
-          rows={productCostTopValueRows.map((item: any) => [
+          rows={productCostTopValueRows.map((item: DynamicApiValue) => [
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
@@ -535,7 +445,7 @@ export function CostControlTab({
           loading={productCostValuationDetailsQuery.isLoading}
           empty="No valuation detail rows returned."
           headers={['Product', 'Category', 'Stock', 'Latest cost', 'Standard cost', 'Basis', 'Value']}
-          rows={productCostValuationDetailRows.map((item: any) => [
+          rows={productCostValuationDetailRows.map((item: DynamicApiValue) => [
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
@@ -560,7 +470,7 @@ export function CostControlTab({
           loading={productCostActionSummaryQuery.isLoading}
           empty="No cost action summary rows returned."
           headers={['Action', 'Products', 'Stock quantity', 'Estimated value', 'Recommended action']}
-          rows={costActionBreakdownRows.map((item: any) => [
+          rows={costActionBreakdownRows.map((item: DynamicApiValue) => [
             formatCodeLabel(item.action_type),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'stock_quantity'),
@@ -585,7 +495,7 @@ export function CostControlTab({
           loading={productCostActionPlanSummaryQuery.isLoading}
           empty="No cost action priority bands returned."
           headers={['Priority band', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
-          rows={productCostPriorityBands.map((item: any) => [
+          rows={productCostPriorityBands.map((item: DynamicApiValue) => [
             formatCodeLabel(item.priority_band),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'stock_quantity'),
@@ -601,7 +511,7 @@ export function CostControlTab({
           loading={productCostActionPlanSummaryQuery.isLoading}
           empty="No next cost actions returned."
           headers={['Product', 'Category', 'Action', 'Priority', 'Score', 'Recommended action']}
-          rows={productCostNextActions.map((item: any) => [
+          rows={productCostNextActions.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatCodeLabel(item.action_type),
@@ -619,7 +529,7 @@ export function CostControlTab({
           loading={productCostActionCategorySummaryQuery.isLoading}
           empty="No cost action categories returned."
           headers={['Category', 'Products', 'Critical', 'High', 'Estimated value', 'Recommended focus']}
-          rows={productCostActionCategories.map((item: any) => [
+          rows={productCostActionCategories.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'critical_products'),
@@ -643,7 +553,7 @@ export function CostControlTab({
           loading={productCostActionImpactSummaryQuery.isLoading}
           empty="No cost impact rows returned."
           headers={['Impact type', 'Products', 'Stock quantity', 'Estimated value', 'Max score']}
-          rows={productCostImpactRows.map((item: any) => [
+          rows={productCostImpactRows.map((item: DynamicApiValue) => [
             formatCodeLabel(item.impact_type),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'stock_quantity'),
@@ -659,7 +569,7 @@ export function CostControlTab({
           loading={productCostActionImpactSummaryQuery.isLoading}
           empty="No top impact products returned."
           headers={['Product', 'Impact type', 'Action', 'Stock', 'Value', 'Score']}
-          rows={productCostTopImpactProducts.map((item: any) => [
+          rows={productCostTopImpactProducts.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatCodeLabel(item.impact_type),
             formatCodeLabel(item.action_type),
@@ -677,7 +587,7 @@ export function CostControlTab({
           loading={productCostActionSupplierSummaryQuery.isLoading}
           empty="No supplier action rows returned."
           headers={['Supplier', 'Products', 'Critical', 'High', 'Estimated value', 'Recommended action']}
-          rows={productCostActionSuppliers.map((item: any) => [
+          rows={productCostActionSuppliers.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'supplier_name'),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'critical_products'),
@@ -690,7 +600,7 @@ export function CostControlTab({
           loading={productCostActionSourceSummaryQuery.isLoading}
           empty="No cost source rows returned."
           headers={['Cost source', 'Products', 'Missing source', 'Estimated value', 'Recommended source action']}
-          rows={productCostActionSources.map((item: any) => [
+          rows={productCostActionSources.map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'cost_source'),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_source_products'),
@@ -713,7 +623,7 @@ export function CostControlTab({
           loading={productCostActionAgeSummaryQuery.isLoading}
           empty="No cost age bands returned."
           headers={['Age band', 'Products', 'Missing cost', 'Estimated value', 'Recommended age action']}
-          rows={productCostActionAgeBands.map((item: any) => [
+          rows={productCostActionAgeBands.map((item: DynamicApiValue) => [
             formatCodeLabel(item.cost_age_band),
             formatRecordValue(item, 'product_count'),
             formatRecordValue(item, 'missing_cost_products'),
@@ -725,7 +635,7 @@ export function CostControlTab({
           loading={productCostActionCoverageSummaryQuery.isLoading}
           empty="No category coverage rows returned."
           headers={['Category', 'Stocked products', 'With cost basis', 'Uncosted', 'Coverage %', 'Actionable value']}
-          rows={productCostActionCoverageRows.map((item: any) => [
+          rows={productCostActionCoverageRows.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'stocked_products'),
             formatRecordValue(item, 'stocked_products_with_cost_basis'),
@@ -742,7 +652,7 @@ export function CostControlTab({
           loading={productCostActionCoverageSummaryQuery.isLoading}
           empty="No cost coverage action review rows returned."
           headers={['Product', 'Category', 'Stock', 'Cost source', 'Review action', 'Score']}
-          rows={productCostCoverageGaps.map((item: any) => [
+          rows={productCostCoverageGaps.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'current_stock_quantity'),
@@ -767,7 +677,7 @@ export function CostControlTab({
           loading={productCostAlertSummaryQuery.isLoading}
           empty="No alert groups returned."
           headers={['Type', 'Severity', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
-          rows={productCostAlertGroups.map((item: any) => [
+          rows={productCostAlertGroups.map((item: DynamicApiValue) => [
             formatCodeLabel(item.alert_type),
             formatCodeLabel(item.alert_severity),
             formatRecordValue(item, 'alert_count'),
@@ -780,7 +690,7 @@ export function CostControlTab({
           loading={productCostAlertSummaryQuery.isLoading}
           empty="No top alert products returned."
           headers={['Product', 'Alert', 'Severity', 'Value', 'Variance %', 'Score']}
-          rows={productCostTopAlerts.map((item: any) => [
+          rows={productCostTopAlerts.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatCodeLabel(item.alert_type),
             formatCodeLabel(item.alert_severity),
@@ -804,7 +714,7 @@ export function CostControlTab({
           loading={productCostRecommendationSummaryQuery.isLoading}
           empty="No recommendation groups returned."
           headers={['Type', 'Priority', 'Count', 'Stock quantity', 'Value', 'Recommended action']}
-          rows={productCostRecommendationGroups.map((item: any) => [
+          rows={productCostRecommendationGroups.map((item: DynamicApiValue) => [
             formatCodeLabel(item.recommendation_type),
             formatCodeLabel(item.recommendation_priority),
             formatRecordValue(item, 'recommendation_count'),
@@ -817,7 +727,7 @@ export function CostControlTab({
           loading={productCostRecommendationSummaryQuery.isLoading}
           empty="No top recommendation products returned."
           headers={['Product', 'Recommendation', 'Priority', 'Value', 'Score']}
-          rows={productCostTopRecommendations.map((item: any) => [
+          rows={productCostTopRecommendations.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatCodeLabel(item.recommendation_type),
             formatCodeLabel(item.recommendation_priority),
@@ -840,7 +750,7 @@ export function CostControlTab({
           loading={productCostDashboardSummaryQuery.isLoading}
           empty="No dashboard review categories returned."
           headers={['Category', 'Products', 'Review value', 'Critical', 'High']}
-          rows={productCostDashboardCategories.map((item: any) => [
+          rows={productCostDashboardCategories.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'category'),
             formatRecordValue(item, 'product_count'),
             formatCurrency(item.review_estimated_value as number | string | null | undefined),
@@ -852,7 +762,7 @@ export function CostControlTab({
           loading={productCostDashboardSummaryQuery.isLoading}
           empty="No dashboard priority products returned."
           headers={['Product', 'Recommendation', 'Priority', 'Value', 'Dashboard score']}
-          rows={productCostDashboardPriorityProducts.map((item: any) => [
+          rows={productCostDashboardPriorityProducts.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatCodeLabel(item.recommendation_type),
             formatCodeLabel(item.recommendation_priority),
@@ -864,7 +774,7 @@ export function CostControlTab({
           loading={productCostGovernanceSummaryQuery.isLoading}
           empty="No governance checklist returned."
           headers={['Check', 'Status', 'Detail']}
-          rows={productCostGovernanceChecklist.map((item: any) => [
+          rows={productCostGovernanceChecklist.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
             formatCostDetailValue(item.detail)
@@ -874,7 +784,7 @@ export function CostControlTab({
           loading={productCostReportSummaryQuery.isLoading}
           empty="No report export rows returned."
           headers={['Section', 'Metric', 'Value']}
-          rows={(productCostReportSummaryQuery.data?.export_rows ?? []).map((item: any) => [
+          rows={(productCostReportSummaryQuery.data?.export_rows ?? []).map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'section'),
             formatCodeRecordValue(item, 'metric'),
             formatCostTableValue(item.metric, item.value)
@@ -896,7 +806,7 @@ export function CostControlTab({
             loading={productCostGovernanceDetailsQuery.isLoading}
             empty="No failed governance detail checklist rows returned."
             headers={['Failed check', 'Status', 'Detail']}
-            rows={productCostGovernanceFailedChecklist.map((item: any) => [
+            rows={productCostGovernanceFailedChecklist.map((item: DynamicApiValue) => [
               formatRecordValue(item, 'label'),
               formatCodeLabel(item.status),
               formatCostDetailValue(item.detail)
@@ -907,7 +817,7 @@ export function CostControlTab({
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No watch governance checklist rows returned."
           headers={['Watch check', 'Status', 'Detail']}
-          rows={productCostGovernanceWatchChecklist.map((item: any) => [
+          rows={productCostGovernanceWatchChecklist.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
             formatCostDetailValue(item.detail)
@@ -917,7 +827,7 @@ export function CostControlTab({
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No remediation plan rows returned."
           headers={['Item', 'Priority', 'Action', 'Evidence']}
-          rows={productCostGovernanceRemediationPlan.map((item: any) => [
+          rows={productCostGovernanceRemediationPlan.map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'key'),
             formatCodeRecordValue(item, 'priority'),
             formatCostDetailValue(item.action),
@@ -928,7 +838,7 @@ export function CostControlTab({
           loading={productCostGovernanceDetailsQuery.isLoading}
           empty="No priority products returned."
           headers={['Product', 'Category', 'Value', 'Recommendation']}
-          rows={productCostGovernancePriorityProducts.map((item: any) => [
+          rows={productCostGovernancePriorityProducts.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'name'),
             formatRecordValue(item, 'category'),
             formatCurrency(item.estimated_inventory_value as number | string | null | undefined),
@@ -945,7 +855,7 @@ export function CostControlTab({
           loading={productCostGovernanceSignoffSummaryQuery.isLoading || productCostGovernanceClosureSummaryQuery.isLoading || productCostGovernanceHandoffSummaryQuery.isLoading}
           empty="No sign-off, closure, or handoff checks returned."
           headers={['Area', 'Check', 'Status', 'Detail']}
-          rows={governanceCheckpointRows.map((item: any) => [
+          rows={governanceCheckpointRows.map((item: DynamicApiValue) => [
             item.area,
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
@@ -956,7 +866,7 @@ export function CostControlTab({
           loading={productCostGovernanceHandoffSummaryQuery.isLoading}
           empty="No owner handoff rows returned."
           headers={['Owner', 'Responsibility', 'Status']}
-          rows={productCostGovernanceOwnerSummary.map((item: any) => [
+          rows={productCostGovernanceOwnerSummary.map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'owner'),
             formatRecordValue(item, 'responsibility'),
             formatCodeLabel(item.status)
@@ -982,7 +892,7 @@ export function CostControlTab({
           loading={productCostOperationsRunbookSummaryQuery.isLoading}
           empty="No operating rhythm rows returned."
           headers={['Cadence', 'Owner', 'Status', 'Action']}
-          rows={productCostOperationsRhythm.map((item: any) => [
+          rows={productCostOperationsRhythm.map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'cadence'),
             formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
@@ -993,7 +903,7 @@ export function CostControlTab({
           loading={productCostOperationsRunbookSummaryQuery.isLoading}
           empty="No escalation rules returned."
           headers={['Key', 'Current value', 'Condition', 'Escalation']}
-          rows={productCostOperationsEscalationRules.map((item: any) => [
+          rows={productCostOperationsEscalationRules.map((item: DynamicApiValue) => [
             formatCodeRecordValue(item, 'key'),
             formatCostTableValue(item.key, item.current_value),
             formatCostDetailValue(item.condition),
@@ -1004,7 +914,7 @@ export function CostControlTab({
           loading={productCostOperationsControlSummaryQuery.isLoading}
           empty="No control checks returned."
           headers={['Check', 'Owner', 'Status', 'Value', 'Detail']}
-          rows={productCostOperationsControlChecks.map((item: any) => [
+          rows={productCostOperationsControlChecks.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'label'),
             formatCodeRecordValue(item, 'owner'),
             formatCodeLabel(item.status),
@@ -1016,7 +926,7 @@ export function CostControlTab({
           loading={productCostOperationsEvidenceSummaryQuery.isLoading}
           empty="No evidence sections returned."
           headers={['Evidence', 'Source', 'Rows', 'Status', 'Purpose']}
-          rows={productCostOperationsEvidenceSections.map((item: any) => [
+          rows={productCostOperationsEvidenceSections.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'label'),
             formatCodeRecordValue(item, 'source'),
             formatRecordValue(item, 'rows'),
@@ -1028,7 +938,7 @@ export function CostControlTab({
           loading={productCostOperationsReadinessSummaryQuery.isLoading}
           empty="No readiness checklist rows returned."
           headers={['Check', 'Status', 'Value', 'Detail']}
-          rows={productCostOperationsReadinessChecklist.map((item: any) => [
+          rows={productCostOperationsReadinessChecklist.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'label'),
             formatCodeLabel(item.status),
             formatCostTableValue(item.label, item.value),
@@ -1043,7 +953,7 @@ export function CostControlTab({
           loading={productCostRiskSummaryQuery.isLoading}
           empty="No high variance products returned."
           headers={['Product', 'Category', 'Stock', 'Standard cost', 'Latest cost', 'Variance %', 'Inventory value']}
-          rows={highVarianceCostRows.map((item: any) => [
+          rows={highVarianceCostRows.map((item: DynamicApiValue) => [
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
@@ -1061,7 +971,7 @@ export function CostControlTab({
           loading={productCostRiskSummaryQuery.isLoading}
           empty="No stocked products are missing cost."
           headers={['Product', 'Category', 'Stock', 'Effective cost', 'Cost source', 'Variance status']}
-          rows={missingCostRows.map((item: any) => [
+          rows={missingCostRows.map((item: DynamicApiValue) => [
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
@@ -1078,7 +988,7 @@ export function CostControlTab({
           loading={productCostRiskSummaryQuery.isLoading}
           empty="No inconsistent cost history rows returned."
           headers={['Product', 'Category', 'Stock', 'Latest cost', 'History spread %', 'Inventory value']}
-          rows={inconsistentCostRows.map((item: any) => [
+          rows={inconsistentCostRows.map((item: DynamicApiValue) => [
             item.name || item.product_name || item.product_id || item.id || '-',
             item.category || '-',
             `${formatNumber(item.current_stock_quantity)} ${item.unit || ''}`.trim(),
@@ -1095,7 +1005,7 @@ export function CostControlTab({
           loading={productCostRiskSummaryQuery.isLoading}
           empty="No recommended cost actions returned."
           headers={['Action']}
-          rows={(productCostRiskSummary?.recommended_actions ?? []).map((action: any) => [action])}
+          rows={(productCostRiskSummary?.recommended_actions ?? []).map((action: DynamicApiValue) => [action])}
         />
       </section>
     </section>

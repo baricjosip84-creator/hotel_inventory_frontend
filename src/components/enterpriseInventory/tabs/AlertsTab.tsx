@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
-import { InputField, MetricCard, SelectField, TextareaField, styles } from '../EnterpriseInventoryShared';
+import { InputField, MetricCard, SelectField, TextareaField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { emptyAlertFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { AlertFilters, AlertForm, AlertItem, ProductOption } from '../EnterpriseInventoryTypes';

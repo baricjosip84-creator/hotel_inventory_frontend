@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { DataTable, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { emptyExecutionFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import type { ExecutionAdapter, ExecutionFilters, ExecutionHardeningSummary, ExecutionRequest, ExecutionRequestsResponse } from '../EnterpriseInventoryTypes';

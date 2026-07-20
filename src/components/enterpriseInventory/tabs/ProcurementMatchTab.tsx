@@ -1,5 +1,6 @@
 import type { CSSProperties, Dispatch, FormEvent, SetStateAction } from 'react';
-import { InputField, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
+import { InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatCurrency, formatDate, formatNumber } from '../EnterpriseInventoryFormat';
 import type { PurchaseOrder, PurchaseOrderShipmentForm } from '../EnterpriseInventoryTypes';
 

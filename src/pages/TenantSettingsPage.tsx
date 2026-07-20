@@ -151,7 +151,7 @@ export default function TenantSettingsPage() {
     setFormState(createFormState(selectedTenant));
     setFormError(null);
     setSuccessMessage(null);
-  }, [selectedTenant?.id]);
+  }, [selectedTenant]);
 
   const parsedMetadata = useMemo(() => {
     try {

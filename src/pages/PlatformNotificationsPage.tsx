@@ -226,7 +226,7 @@ export default function PlatformNotificationsPage() {
     }
   });
 
-  const notifications = q.data || [];
+  const notifications = useMemo(() => q.data ?? [], [q.data]);
   const allVisibleSelected = notifications.length > 0 && notifications.every((n) => selectedIds.includes(n.id));
   const selectedIntegrationNotifications = notifications.filter((n) => selectedIds.includes(n.id) && n.source === 'integration_monitoring.scan' && ['open', 'acknowledged'].includes(n.status));
   const availableSources = useMemo(() => Array.from(new Set(notifications.map((n) => n.source).filter(Boolean))).sort(), [notifications]);

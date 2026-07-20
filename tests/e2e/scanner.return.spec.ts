@@ -137,7 +137,7 @@ test.describe('scanner return and auto-receive integration', () => {
 
     await page.goto('/shipments');
 
-    const main = await getMain(page);
+    await getMain(page);
 
     await selectFirstOperationalShipment(main);
 
@@ -204,7 +204,7 @@ test.describe('scanner return and auto-receive integration', () => {
     */
     await page.goto('/shipments?shipmentId=00000000-0000-0000-0000-000000000000&scannedBarcode=E2E-UNSAFE-RETURN');
 
-    const main = await getMain(page);
+    await getMain(page);
 
     /*
       The page must remain usable even if the scanner return cannot be resolved into a safe receive.

@@ -1,8 +1,6 @@
-import type { ComponentProps } from "react";
-import type { CostControlTab } from "./tabs/CostControlTab";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
+import type { CostControlTabProps } from "./EnterpriseInventoryCostControlTypes";
 
-type CostControlTabProps = ComponentProps<typeof CostControlTab>;
 
 type EnterpriseInventoryCostControlPageData = EnterpriseInventoryPanelBaseProps["pageData"];
 

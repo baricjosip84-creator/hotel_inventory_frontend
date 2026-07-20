@@ -1,42 +1,44 @@
 import { useMemo } from 'react';
 
 import { useStableActionsOrRows, useStableRows } from './EnterpriseInventoryQueryData';
+import type { useEnterpriseInventoryQueries } from './EnterpriseInventoryQueries';
 
-type QueryLike<T = any> = { data?: T | null };
+type EnterpriseInventoryQueries = ReturnType<typeof useEnterpriseInventoryQueries>;
 
-type ProductCostDerivedDataInput = {
-  productCostRiskSummaryQuery: QueryLike;
-  productCostValuationSummaryQuery: QueryLike;
-  productCostValuationDetailsQuery: QueryLike;
-  productCostActionSummaryQuery: QueryLike;
-  productCostActionPlanSummaryQuery: QueryLike;
-  productCostActionCategorySummaryQuery: QueryLike;
-  productCostActionImpactSummaryQuery: QueryLike;
-  productCostActionSupplierSummaryQuery: QueryLike;
-  productCostActionSourceSummaryQuery: QueryLike;
-  productCostActionAgeSummaryQuery: QueryLike;
-  productCostActionCoverageSummaryQuery: QueryLike;
-  productCostAlertSummaryQuery: QueryLike;
-  productCostRecommendationSummaryQuery: QueryLike;
-  productCostDashboardSummaryQuery: QueryLike;
-  productCostGovernanceSummaryQuery: QueryLike;
-  productCostGovernanceDetailsQuery: QueryLike;
-  productCostGovernanceAuditPackQuery: QueryLike;
-  productCostGovernanceSignoffSummaryQuery: QueryLike;
-  productCostGovernanceReviewQueueQuery: QueryLike;
-  productCostGovernanceReviewPackQuery: QueryLike;
-  productCostGovernanceClosureSummaryQuery: QueryLike;
-  productCostGovernanceHandoffSummaryQuery: QueryLike;
-  productCostHardeningSummaryQuery: QueryLike;
-  productCostOperationsRunbookSummaryQuery: QueryLike;
-  productCostOperationsControlSummaryQuery: QueryLike;
-  productCostOperationsEvidenceSummaryQuery: QueryLike;
-  productCostOperationsReadinessSummaryQuery: QueryLike;
-  carryingCostProductionReviewQuery: QueryLike;
-  deadStockProductionReviewQuery: QueryLike;
-  marginAwareProductionReviewQuery: QueryLike;
-  procurementSpendProductionReviewQuery: QueryLike;
-};
+type ProductCostDerivedDataInput = Pick<
+  EnterpriseInventoryQueries,
+  'productCostRiskSummaryQuery'
+  | 'productCostValuationSummaryQuery'
+  | 'productCostValuationDetailsQuery'
+  | 'productCostActionSummaryQuery'
+  | 'productCostActionPlanSummaryQuery'
+  | 'productCostActionCategorySummaryQuery'
+  | 'productCostActionImpactSummaryQuery'
+  | 'productCostActionSupplierSummaryQuery'
+  | 'productCostActionSourceSummaryQuery'
+  | 'productCostActionAgeSummaryQuery'
+  | 'productCostActionCoverageSummaryQuery'
+  | 'productCostAlertSummaryQuery'
+  | 'productCostRecommendationSummaryQuery'
+  | 'productCostDashboardSummaryQuery'
+  | 'productCostGovernanceSummaryQuery'
+  | 'productCostGovernanceDetailsQuery'
+  | 'productCostGovernanceAuditPackQuery'
+  | 'productCostGovernanceSignoffSummaryQuery'
+  | 'productCostGovernanceReviewQueueQuery'
+  | 'productCostGovernanceReviewPackQuery'
+  | 'productCostGovernanceClosureSummaryQuery'
+  | 'productCostGovernanceHandoffSummaryQuery'
+  | 'productCostHardeningSummaryQuery'
+  | 'productCostOperationsRunbookSummaryQuery'
+  | 'productCostOperationsControlSummaryQuery'
+  | 'productCostOperationsEvidenceSummaryQuery'
+  | 'productCostOperationsReadinessSummaryQuery'
+  | 'carryingCostProductionReviewQuery'
+  | 'deadStockProductionReviewQuery'
+  | 'marginAwareProductionReviewQuery'
+  | 'procurementSpendProductionReviewQuery'
+>;
 
 export function useProductCostDerivedData({
   productCostRiskSummaryQuery,

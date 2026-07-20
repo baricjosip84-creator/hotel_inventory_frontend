@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { DataTable, MetricCard, SectionCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard, SectionCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
 import type {
   InventoryValuationReport,

@@ -11,7 +11,7 @@ The production gate now runs automatically in both release paths:
 
 The manual **Run workflow** option remains available as a fallback. Normal production pushes no longer require a manual click.
 
-The repository-wide full-lint diagnostic is manual-only because the repository still has known legacy lint debt outside the pilot-critical release surfaces. Normal pushes run the blocking pilot-critical lint check and no longer show a red diagnostic job for that known debt.
+Repository-wide lint is now clean and runs as a blocking step inside **Frontend Validation** on every push and pull request. A lint failure prevents deployment readiness from starting until the source issue is corrected.
 
 ## Canonical files
 

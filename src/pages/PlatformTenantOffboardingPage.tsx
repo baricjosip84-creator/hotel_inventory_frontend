@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
@@ -167,7 +167,7 @@ export default function PlatformTenantOffboardingPage() {
     onSuccess: async () => { setStatusMessage('Offboarding workflow cancelled.'); await invalidate(); }
   });
 
-  const buildFormFromWorkflow = (row: OffboardingRow): typeof blankForm => ({
+  const buildFormFromWorkflow = useCallback((row: OffboardingRow): typeof blankForm => ({
     tenant_id: row.tenant_id,
     status: row.status,
     reason: row.reason || '',
@@ -175,14 +175,14 @@ export default function PlatformTenantOffboardingPage() {
     owner_platform_user_id: row.owner_platform_user_id || '',
     notes: row.notes || '',
     checklist: { ...emptyChecklist, ...(row.checklist || {}) }
-  });
+  }), []);
 
-  const loadWorkflowIntoForm = (row: OffboardingRow) => {
+  const loadWorkflowIntoForm = useCallback((row: OffboardingRow) => {
     const nextForm = buildFormFromWorkflow(row);
     setForm(nextForm);
     setOriginalForm(nextForm);
     setLoadedWorkflowId(row.id);
-  };
+  }, [buildFormFromWorkflow]);
 
   const resetFormForTenant = (nextTenantId: string) => {
     setTenantId(nextTenantId);
@@ -219,7 +219,7 @@ export default function PlatformTenantOffboardingPage() {
       setOriginalForm(null);
       setLoadedWorkflowId(null);
     }
-  }, [tenantId, detail.data?.offboarding?.id, detail.isFetching]);
+  }, [detail.data?.offboarding, detail.isFetching, form.tenant_id, loadWorkflowIntoForm, loadedWorkflowId, tenantId]);
 
   const isFormDirty = isUpdateWorkflow && originalForm ? normalizeForm(form) !== normalizeForm(originalForm) : false;
   const hasCreateRequiredFields = Boolean(selectedTenantId && form.reason.trim());

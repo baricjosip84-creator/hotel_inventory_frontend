@@ -179,7 +179,7 @@ export default function PlatformTenantTimelinePage() {
   });
 
   const counts = timeline.data?.counts || {};
-  const events = timeline.data?.events || [];
+  const events = useMemo(() => timeline.data?.events ?? [], [timeline.data?.events]);
   const selectedTenant = (tenants.data || []).find((tenant) => tenant.id === tenantId);
   const selectedSourceLabel = sourceOptions.find((option) => option.value === source)?.label || 'All sources';
   const backendFilterText = [

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -781,7 +781,7 @@ export default function ShipmentsPage() {
       purchase_order_id: selectedShipment.purchase_order_id || ''
     });
     setEditingShipment(false);
-  }, [selectedShipment?.id, selectedShipment?.version]);
+  }, [selectedShipment]);
 
   useEffect(() => {
     setItemEditDrafts(
@@ -1110,7 +1110,7 @@ export default function ShipmentsPage() {
     });
   }, [selectedScannerLocationId, shipmentItems]);
 
-  const getReceiveDraft = (item: ShipmentItem): ReceiveDraft => {
+  const getReceiveDraft = useCallback((item: ShipmentItem): ReceiveDraft => {
     const draft = receiveDrafts[item.id] ?? makeDefaultReceiveDraft(item);
 
     if (!draft.storage_location_id && selectedScannerLocationId) {
@@ -1121,7 +1121,7 @@ export default function ShipmentsPage() {
     }
 
     return draft;
-  };
+  }, [receiveDrafts, selectedScannerLocationId]);
 
   useEffect(() => {
     if (!pendingAutoReceive) {
@@ -1258,7 +1258,8 @@ export default function ShipmentsPage() {
     storageLocations,
     selectedScannerLocationId,
     receiveShipmentMutation,
-    receiveDrafts
+    receiveDrafts,
+    getReceiveDraft
   ]);
 
   const updateReceiveDraft = (

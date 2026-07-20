@@ -1,3 +1,4 @@
+import type { useProductPageViewModel } from './useProductPageViewModel';
 import { ProductCostValuationPanel } from './ProductCostValuationPanel';
 import { ProductCostingReadinessPanel } from './ProductCostingReadinessPanel';
 import { ProductCostActionSummaryPanel } from './ProductCostActionSummaryPanel';
@@ -17,7 +18,7 @@ import { ProductCostAlertSummaryPanel } from './ProductCostAlertSummaryPanel';
 import { ProductCostReportSummaryPanel } from './ProductCostReportSummaryPanel';
 import { ProductCostActionDetailsPanel } from './ProductCostActionDetailsPanel';
 
-type ProductCostAnalyticsSectionsPanelProps = Record<string, any>;
+type ProductCostAnalyticsSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
 export function ProductCostAnalyticsSectionsPanel({
   costingReadiness,

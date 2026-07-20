@@ -199,7 +199,7 @@ export default function AlertsPage() {
     queryFn: () => fetchAlerts(filters)
   });
 
-  const makeMutation = (mutationFn: (id: string) => Promise<AlertRow>) =>
+  const useAlertMutation = (mutationFn: (id: string) => Promise<AlertRow>) =>
     useMutation({
       mutationFn,
       onSuccess: async () => {
@@ -231,10 +231,10 @@ export default function AlertsPage() {
     }
   });
 
-  const acknowledgeMutation = makeMutation(acknowledgeAlert);
-  const resolveMutation = makeMutation(resolveAlert);
-  const reopenMutation = makeMutation(reopenAlert);
-  const escalateMutation = makeMutation(escalateAlert);
+  const acknowledgeMutation = useAlertMutation(acknowledgeAlert);
+  const resolveMutation = useAlertMutation(resolveAlert);
+  const reopenMutation = useAlertMutation(reopenAlert);
+  const escalateMutation = useAlertMutation(escalateAlert);
 
   const overrideMutation = useMutation({
     mutationFn: overrideBlockingAlert,

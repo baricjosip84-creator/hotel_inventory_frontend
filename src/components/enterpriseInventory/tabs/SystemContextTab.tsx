@@ -1,4 +1,5 @@
-import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatRecordValue, formatValue } from '../EnterpriseInventoryFormat';
 import type { SystemContextResponse, SystemContextSnapshot, SystemExecutionGateResponse, TenantPublicContext } from '../EnterpriseInventoryTypes';
 

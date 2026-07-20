@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatNumber, toNumber } from '../EnterpriseInventoryFormat';
 import type { DemandForecastRow, ForecastAccuracyBacktestResponse, ForecastCalibrationReviewResponse, ForecastDataQualityReviewResponse, ForecastReliabilityMatrixResponse } from '../EnterpriseInventoryTypes';
 

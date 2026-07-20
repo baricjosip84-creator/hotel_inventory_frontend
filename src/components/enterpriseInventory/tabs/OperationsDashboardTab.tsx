@@ -1,4 +1,5 @@
-import { DataTable, MetricCard, SectionCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard, SectionCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDate, formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import type {
   AlertItem,

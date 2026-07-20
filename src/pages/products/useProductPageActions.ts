@@ -1,11 +1,14 @@
+import type { QueryClient } from '@tanstack/react-query';
+import type { useProductPageData } from './useProductPageData';
+import type { useProductPageState } from './useProductPageState';
 import { buildProductActionHandlers } from './productActionHandlers';
 import { buildProductCostHistoryHandlers } from './productCostHistoryHandlers';
 import { useProductMutations } from './productMutations';
 
 type UseProductPageActionsParams = {
-  queryClient: any;
-  productPageState: any;
-  productPageData: any;
+  queryClient: QueryClient;
+  productPageState: ReturnType<typeof useProductPageState>;
+  productPageData: ReturnType<typeof useProductPageData>;
   canManageProducts: boolean;
   canManageProductPackages: boolean;
 };

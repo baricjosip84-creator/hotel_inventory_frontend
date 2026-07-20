@@ -568,7 +568,6 @@ export default function StockTransfersPage() {
     const selectedStillVisible = transfers.some((transfer) => transfer.id === selectedTransferId);
     if (!selectedStillVisible) {
       // The list is the source of truth; clear a selection that filters removed.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedTransferId(null);
       setEditingTransferId(null);
     }

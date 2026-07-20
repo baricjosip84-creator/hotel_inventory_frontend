@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { InputField, SelectField, styles } from '../EnterpriseInventoryShared';
+import { InputField, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import type { ProductOption, ProductPackage, ProductPackageForm } from '../EnterpriseInventoryTypes';
 

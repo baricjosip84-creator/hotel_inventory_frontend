@@ -124,7 +124,7 @@ export default function PlatformAnnouncementsPage() {
   });
 
   const canCreateAnnouncement = canWrite && !createBlockedReason && !create.isPending;
-  const rows = announcements.data || [];
+  const rows = useMemo(() => announcements.data ?? [], [announcements.data]);
   const currentCount = useMemo(() => rows.filter((row) => row.is_current).length, [rows]);
   const refreshAll = async () => {
     setStatusMessage('');
@@ -261,7 +261,7 @@ export default function PlatformAnnouncementsPage() {
           <label style={styles.field}>Cancellation reason
             <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[row.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [row.id]: e.target.value })} />
           </label>
-          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => { const reason = (cancelReasonById[row.id] || '').trim(); if (globalThis.confirm(`Cancel announcement \"${row.title}\"?`)) cancel.mutate({ id: row.id, reason }); }} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
+          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => { const reason = (cancelReasonById[row.id] || '').trim(); if (globalThis.confirm(`Cancel announcement "${row.title}"?`)) cancel.mutate({ id: row.id, reason }); }} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
         </div> : null}
       </article>)}
       {!announcements.isLoading && rows.length === 0 ? <div style={styles.empty}>No announcements match the current filters.</div> : null}

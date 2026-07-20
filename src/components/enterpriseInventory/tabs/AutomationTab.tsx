@@ -1,49 +1,7 @@
-import type { Dispatch, SetStateAction } from 'react';
-import { DataTable, InputField, MetricCard, SectionCard, SelectField, TextareaField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, MetricCard, SectionCard, SelectField, TextareaField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatRecordValue } from '../EnterpriseInventoryFormat';
-import type { AutomationSchedule, AutomationScheduleForm } from '../EnterpriseInventoryTypes';
-
-type QueryLike<T = any> = {
-  data?: T;
-  isLoading: boolean;
-};
-
-type MutationLike<TVariables = any> = {
-  isPending?: boolean;
-  mutate: (variables: TVariables) => void;
-};
-
-type AutomationTabProps = {
-  automationSchedules: AutomationSchedule[];
-  automationRunEvents: any[];
-  automationScheduleForm: AutomationScheduleForm;
-  setAutomationScheduleForm: Dispatch<SetStateAction<AutomationScheduleForm>>;
-  automationDisableReasons: Record<string, string>;
-  setAutomationDisableReasons: Dispatch<SetStateAction<Record<string, string>>>;
-  automationTypesQuery: QueryLike;
-  automationSchedulesQuery: QueryLike;
-  automationRunnerReadinessQuery: QueryLike;
-  automationRunnerStatusQuery: QueryLike;
-  automationRunEventsQuery: QueryLike;
-  automationRunnerSafetyReportQuery: QueryLike;
-  automationRunnerGovernancePackQuery: QueryLike;
-  automationRunnerOperationsReviewQuery: QueryLike;
-  automationRunnerAccountabilityDigestQuery: QueryLike;
-  automationRunnerPolicyMatrixQuery: QueryLike;
-  automationRunnerSafetyChecks: any[];
-  automationRunnerGovernanceChecks: any[];
-  automationRunnerOperationsChecks: any[];
-  automationRunnerPolicyRows: any[];
-  automationRunnerActorBreakdown: any[];
-  automationRunnerRequestBreakdown: any[];
-  automationRunnerDueSchedules: any[];
-  automationRunnerLinkedRequests: any[];
-  createAutomationScheduleMutation: MutationLike<AutomationScheduleForm>;
-  dryRunAutomationScheduleMutation: MutationLike<string>;
-  runAutomationScheduleMutation: MutationLike<string>;
-  pauseAutomationScheduleMutation: MutationLike<string>;
-  disableAutomationScheduleMutation: MutationLike<{ id: string; reason: string }>;
-};
+import type { AutomationTabProps } from '../EnterpriseInventoryAutomationTabProps';
 
 export function AutomationTab({
   automationSchedules,
@@ -104,7 +62,7 @@ export function AutomationTab({
               value={automationScheduleForm.automation_type}
               required
               onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, automation_type: value }))}
-              options={(automationTypesQuery.data?.automation_types ?? []).map((item: any) => ({ value: item.automation_type, label: item.label || item.automation_type }))}
+              options={(automationTypesQuery.data?.automation_types ?? []).map((item) => ({ value: item.automation_type, label: item.label || item.automation_type }))}
             />
             <SelectField
               label="Schedule kind"
@@ -147,7 +105,7 @@ export function AutomationTab({
           loading={automationRunnerReadinessQuery.isLoading || automationRunnerStatusQuery.isLoading}
           empty="No automation readiness checks returned."
           headers={['Check', 'Status', 'Detail']}
-          rows={[...(automationRunnerReadinessQuery.data?.checks ?? []), ...(automationRunnerStatusQuery.data?.checks ?? [])].slice(0, 12).map((item: any) => [item.label || item.key || '-', item.status || '-', item.detail || '-'])}
+          rows={[...(automationRunnerReadinessQuery.data?.checks ?? []), ...(automationRunnerStatusQuery.data?.checks ?? [])].slice(0, 12).map((item) => [item.label || item.key || '-', item.status || '-', item.detail || '-'])}
         />
       </section>
 

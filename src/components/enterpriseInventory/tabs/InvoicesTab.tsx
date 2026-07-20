@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { DataTable, InputField, SelectField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDate, formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import type {
   ProductOption,

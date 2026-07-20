@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
-import { DataTable, InputField, SelectField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { NotificationDeliveryForm, NotificationEvent } from '../EnterpriseInventoryTypes';
 

@@ -276,9 +276,10 @@ export default function PlatformBillingPage() {
   };
 
   const selectedPlan = (planCatalogQuery.data?.plans || []).find((plan) => plan.plan_code === billingForm.plan_code) || null;
+  const selectedBillingTenant = detailsQuery.data?.tenant;
   useEffect(() => {
-    if (!detailsQuery.data?.tenant) return;
-    const tenant = detailsQuery.data.tenant;
+    if (!selectedBillingTenant) return;
+    const tenant = selectedBillingTenant;
     const currentPeriod = isoDateInput(tenant.current_period_ends_at);
     setBillingForm({
       billing_status: tenant.billing_status || 'not_configured',
@@ -298,7 +299,7 @@ export default function PlatformBillingPage() {
       trial_ends_at: current.trial_ends_at || isoDateInput(tenant.trial_ends_at),
       billing_customer_reference: current.billing_customer_reference || tenant.billing_customer_reference || ''
     }));
-  }, [detailsQuery.data?.tenant?.id]);
+  }, [selectedBillingTenant]);
 
   const saveBilling = useMutation({
     mutationFn: () => platformApiRequest(`/platform/billing/${selectedTenantId}`, {

@@ -970,14 +970,12 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     // Keep URL-backed pagination aligned when filter criteria change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
   }, [filters, sortKey, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
       // Clamp a stale page after the result count shrinks.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
@@ -994,7 +992,6 @@ export default function PurchaseOrdersPage() {
     }
 
     // A direct link intentionally synchronizes the selected record from the URL.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedId(purchaseOrderIdFromQuery);
     setEditingId(null);
     setFormError(null);

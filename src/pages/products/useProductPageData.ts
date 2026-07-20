@@ -1,46 +1,8 @@
 import { useMemo } from 'react';
 import { buildCategoryOptions, buildCostingReadiness, buildProductSummary } from './productDerivedState';
+import type { useProductPageQueries } from './productQueries';
 
-type ProductPageDataQueries = {
-  productsQuery: any;
-  suppliersQuery: any;
-  packagesQuery: any;
-  costHistoryQuery: any;
-  standardCostHistoryQuery: any;
-  costActionQuery: any;
-  costActionPlanQuery: any;
-  costActionCategoryQuery: any;
-  costActionImpactQuery: any;
-  costActionSupplierQuery: any;
-  costActionSourceQuery: any;
-  costActionAgeQuery: any;
-  costActionCoverageQuery: any;
-  costAlertQuery: any;
-  costRecommendationQuery: any;
-  costDashboardQuery: any;
-  costReportQuery: any;
-  costGovernanceQuery: any;
-  costGovernanceDetailsQuery: any;
-  costGovernanceAuditQuery: any;
-  costGovernanceSignoffQuery: any;
-  costGovernanceReviewQueueQuery: any;
-  costGovernanceReviewPackQuery: any;
-  costGovernanceClosureQuery: any;
-  costGovernanceHandoffQuery: any;
-  costOperationsRunbookQuery: any;
-  costOperationsControlQuery: any;
-  costOperationsEvidenceQuery: any;
-  costOperationsReadinessQuery: any;
-  costGovernanceFinalQuery: any;
-  costPerformanceQuery: any;
-  costSecurityAuditQuery: any;
-  costHardeningQuery: any;
-  costActionDetailsQuery: any;
-  costRiskQuery: any;
-  costRiskDetailsQuery: any;
-  costValuationQuery: any;
-  costValuationDetailsQuery: any;
-};
+type ProductPageDataQueries = ReturnType<typeof useProductPageQueries>;
 
 export function useProductPageData(queries: ProductPageDataQueries) {
   const products = useMemo(() => queries.productsQuery.data ?? [], [queries.productsQuery.data]);

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
-import { InputField, SelectField, styles } from '../EnterpriseInventoryShared';
+import { InputField, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
 import type { CycleCount, CycleCountForm, ProductOption, StockAdjustmentForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 

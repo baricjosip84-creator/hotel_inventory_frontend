@@ -1,4 +1,5 @@
-import { DataTable, MetricCard, styles } from '../EnterpriseInventoryShared';
+import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
 import type { StockItem, StockMovement } from '../EnterpriseInventoryTypes';
 

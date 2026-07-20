@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { DataTable, InputField, MetricCard, SelectField, styles } from '../EnterpriseInventoryShared';
+import { DataTable, InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatNumber } from '../EnterpriseInventoryFormat';
 import type { SupplierForm, SupplierOption, SupplierPerformance, SupplierSlaBreach } from '../EnterpriseInventoryTypes';
 

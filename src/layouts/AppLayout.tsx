@@ -75,11 +75,11 @@ export default function AppLayout() {
   const location = useLocation();
   const isMobile = useIsMobile();
   const role = useMemo(() => getCurrentUserRole(), []);
-  const [permissionRevision, setPermissionRevision] = useState(0);
+  const [, setPermissionRevision] = useState(0);
   const permissionSnapshot = getTenantPermissionSnapshot();
   const accessRoleLabel = permissionSnapshot?.access_role_label || permissionSnapshot?.custom_role_name || getCurrentAccessRoleLabel();
-  const tenantAccess = useMemo(() => getTenantAccessSnapshot(), [location.pathname, permissionRevision]);
-  const supportSession = useMemo(() => getSupportSessionInfo(), [location.pathname]);
+  const tenantAccess = getTenantAccessSnapshot();
+  const supportSession = getSupportSessionInfo();
 
   const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
   const [maintenanceContext, setMaintenanceContext] = useState<MaintenanceContext | null>(null);
@@ -133,14 +133,12 @@ export default function AppLayout() {
     return () => window.removeEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
   }, []);
 
-  const visibleNavSections = useMemo(() => {
-    return tenantNavigationSections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter(isVisibleNavigationItem)
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [role, tenantSubscriptionAccess, permissionRevision]);
+  const visibleNavSections = tenantNavigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(isVisibleNavigationItem)
+    }))
+    .filter((section) => section.items.length > 0);
 
   useEffect(() => {
     setMobileNavOpen(false);

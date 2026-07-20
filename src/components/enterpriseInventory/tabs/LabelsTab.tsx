@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, Dispatch, FormEvent, SetStateAction } from 'react';
-import { InputField, SelectField, styles } from '../EnterpriseInventoryShared';
+import { InputField, SelectField } from '../EnterpriseInventoryShared';
+import { styles } from '../EnterpriseInventoryStyles';
 import { formatDate, formatDateTime } from '../EnterpriseInventoryFormat';
 import type { BarcodeLabel, BarcodeLabelForm, ProductOption } from '../EnterpriseInventoryTypes';
 import {

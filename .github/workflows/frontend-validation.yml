@@ -41,8 +41,8 @@ jobs:
         run: npm run check:ci
       - name: Run pilot-critical TypeScript validation
         run: npm run typecheck:ci
-      - name: Lint pilot-critical surfaces
-        run: npm run lint:pilot-critical
+      - name: Lint complete frontend repository
+        run: npm run lint
       - name: Build production frontend
         run: npm run build
       - name: Stage a clean source distribution
@@ -83,23 +83,3 @@ jobs:
       - name: Validate backend/frontend permission and AI contracts
         working-directory: frontend
         run: npm run check:cross-repo
-
-  full-lint-diagnostic:
-    # Repository-wide lint still contains known legacy debt. Keep this diagnostic
-    # available for manual audits without producing red checks on every push.
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    continue-on-error: true
-    env:
-      CI: 'true'
-      VERCEL: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - name: Report existing repository-wide lint debt without blocking the pilot gate
-        run: npm run lint

@@ -496,9 +496,9 @@ export default function ReportsPage() {
   });
 
   const inventoryValuationRows = inventoryValuationQuery.data?.rows ?? [];
-  const stockByLocationRows = stockByLocationQuery.data ?? [];
-  const productMovementRows = productMovementsQuery.data ?? [];
-  const forecastRows = forecastQuery.data ?? [];
+  const stockByLocationRows = useMemo(() => stockByLocationQuery.data ?? [], [stockByLocationQuery.data]);
+  const productMovementRows = useMemo(() => productMovementsQuery.data ?? [], [productMovementsQuery.data]);
+  const forecastRows = useMemo(() => forecastQuery.data ?? [], [forecastQuery.data]);
 
   const topLocation = useMemo(() => {
     if (stockByLocationRows.length === 0) {

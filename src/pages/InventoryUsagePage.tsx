@@ -749,7 +749,7 @@ export default function InventoryUsagePage() {
     });
   };
 
-  const usageLogs = logsQuery.data || [];
+  const usageLogs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
 
   const activeFilterCount = useMemo(() => {
     return Object.values(filters).filter((value) => value.trim()).length;

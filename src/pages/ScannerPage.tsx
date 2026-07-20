@@ -19,8 +19,10 @@ const playSuccessFeedback = () => {
       navigator.vibrate(120);
     }
 
-    const AudioContextClass =
-      window.AudioContext || (window as any).webkitAudioContext;
+    const audioWindow = window as Window & {
+      webkitAudioContext?: typeof AudioContext;
+    };
+    const AudioContextClass = window.AudioContext || audioWindow.webkitAudioContext;
 
     const audioCtx = new AudioContextClass();
     const oscillator = audioCtx.createOscillator();

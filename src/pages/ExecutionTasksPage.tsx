@@ -485,7 +485,7 @@ export default function ExecutionTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
+  }, [batchStatusFilter, batchTypeFilter, canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
 
   useEffect(() => {
     void loadTasks();
