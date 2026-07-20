@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const excludedNames = new Set(['.git', 'node_modules', 'dist', 'coverage', 'test-results', 'playwright-report', '.cache', 'tmp', 'temp']);
+const excludedNames = new Set(['.git', 'node_modules', 'dist', 'coverage', 'test-results', 'playwright-report', 'playwright-deployment-report', '.cache', 'tmp', 'temp']);
 function readOutput(argv) {
   const index = argv.indexOf('--output');
   const value = index >= 0 ? argv[index + 1] : argv[0];

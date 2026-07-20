@@ -1,0 +1,86 @@
+name: Deployment Readiness Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment containing the deployed URLs and smoke-account credentials
+        required: true
+        type: environment
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-readiness-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deployment-readiness:
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      DEPLOYMENT_FRONTEND_URL: ${{ vars.DEPLOYMENT_FRONTEND_URL }}
+      DEPLOYMENT_BACKEND_URL: ${{ vars.DEPLOYMENT_BACKEND_URL }}
+      DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE: ${{ vars.DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE || 'true' }}
+      DEPLOYMENT_REQUIRE_PLATFORM_AUTH: ${{ vars.DEPLOYMENT_REQUIRE_PLATFORM_AUTH || 'false' }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_PLATFORM_EMAIL: ${{ secrets.E2E_PLATFORM_EMAIL }}
+      E2E_PLATFORM_PASSWORD: ${{ secrets.E2E_PLATFORM_PASSWORD }}
+      E2E_PLATFORM_MFA_CODE: ${{ secrets.E2E_PLATFORM_MFA_CODE }}
+    steps:
+      - name: Check out frontend source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Require deployment URLs and tenant smoke credentials
+        shell: bash
+        run: |
+          test -n "$DEPLOYMENT_FRONTEND_URL" || (echo "DEPLOYMENT_FRONTEND_URL GitHub Environment variable is required" && exit 1)
+          test -n "$DEPLOYMENT_BACKEND_URL" || (echo "DEPLOYMENT_BACKEND_URL GitHub Environment variable is required" && exit 1)
+          test -n "$E2E_EMAIL" || (echo "E2E_EMAIL GitHub Environment secret is required" && exit 1)
+          test -n "$E2E_PASSWORD" || (echo "E2E_PASSWORD GitHub Environment secret is required" && exit 1)
+          if [ "$DEPLOYMENT_REQUIRE_PLATFORM_AUTH" = "true" ]; then
+            test -n "$E2E_PLATFORM_EMAIL" || (echo "E2E_PLATFORM_EMAIL is required when platform auth smoke testing is enabled" && exit 1)
+            test -n "$E2E_PLATFORM_PASSWORD" || (echo "E2E_PLATFORM_PASSWORD is required when platform auth smoke testing is enabled" && exit 1)
+          fi
+
+      - name: Remove legacy generated artifacts
+        run: npm run repo:clean-generated
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate repository and deployment-gate contracts
+        run: |
+          npm run security:check
+          npm run check:deployment-readiness-gate
+          npm run typecheck:deployment-readiness
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run deployed frontend and backend readiness gate
+        run: npm run test:deployment-readiness
+
+      - name: Upload deployment-readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-readiness-${{ inputs.environment }}-${{ github.run_id }}
+          path: |
+            playwright-deployment-report
+            test-results/deployment-readiness.json
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/*.zip
+          if-no-files-found: warn
+          retention-days: 30

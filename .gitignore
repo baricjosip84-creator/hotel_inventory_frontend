@@ -35,3 +35,5 @@ release/
 artifacts/
 *.zip
 *.tgz
+
+playwright-deployment-report/

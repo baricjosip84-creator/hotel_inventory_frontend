@@ -157,8 +157,8 @@ export async function loginThroughUi(page: Page, role: Role = 'default'): Promis
 
   await page.goto('/login');
 
-  await page.getByPlaceholder('Email').fill(email);
-  await page.getByPlaceholder('Password').fill(password);
+  await page.getByLabel(/^Email$/i).fill(email);
+  await page.getByLabel(/^Password$/i).fill(password);
   await page.getByRole('button', { name: /login/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);

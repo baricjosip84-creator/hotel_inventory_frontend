@@ -11,7 +11,7 @@ const requiredFiles = [
 const forbiddenTrackedPatterns = [
   /^\.env$/, /^\.env\.(?!example$|production$|[^/]+\.example$)/,
   /(^|\/)node_modules\//, /(^|\/)coverage\//, /(^|\/)dist\//,
-  /(^|\/)test-results\//, /(^|\/)playwright-report\//,
+  /(^|\/)test-results\//, /(^|\/)playwright-report\//, /(^|\/)playwright-deployment-report\//,
   /(^|\/)\.git\/workflows\//, /\.zip$/i, /(^|\/)npm-debug\.log/i
 ];
 
@@ -28,14 +28,15 @@ for (const file of tracked) {
   if (forbiddenTrackedPatterns.some((pattern) => pattern.test(file))) errors.push(`forbidden tracked artifact: ${file}`);
 }
 const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-['node_modules/', 'dist/', '.env', '.env.*', 'test-results/', 'playwright-report/', '*.zip'].forEach((token) => {
+['node_modules/', 'dist/', '.env', '.env.*', 'test-results/', 'playwright-report/', 'playwright-deployment-report/', '*.zip'].forEach((token) => {
   if (!gitignore.includes(token)) errors.push(`.gitignore must include: ${token}`);
 });
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 const workflowFiles = [
   '.github/workflows/frontend-validation.yml',
-  '.github/workflows/staging-e2e.yml'
+  '.github/workflows/staging-e2e.yml',
+  '.github/workflows/deployment-readiness.yml'
 ];
 for (const relative of workflowFiles) {
   const content = fs.readFileSync(path.join(root, relative), 'utf8');
