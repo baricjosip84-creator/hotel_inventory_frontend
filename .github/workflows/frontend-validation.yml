@@ -23,7 +23,7 @@ jobs:
       VITE_API_BASE_URL: /api
     steps:
       - name: Check out frontend source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -57,11 +57,11 @@ jobs:
       BACKEND_ROOT: ${{ github.workspace }}/backend
     steps:
       - name: Check out frontend source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: frontend
       - name: Check out backend source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ vars.BACKEND_REPOSITORY }}
           token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
