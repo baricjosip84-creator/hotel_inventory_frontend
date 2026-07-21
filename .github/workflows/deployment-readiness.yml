@@ -41,6 +41,7 @@ jobs:
       DEPLOYMENT_BACKEND_URL: ${{ vars.DEPLOYMENT_BACKEND_URL }}
       DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE: ${{ vars.DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE || 'true' }}
       DEPLOYMENT_REQUIRE_PLATFORM_AUTH: ${{ vars.DEPLOYMENT_REQUIRE_PLATFORM_AUTH || 'false' }}
+      DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS: ${{ vars.DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS || 'false' }}
       EXPECTED_FRONTEND_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
       EXPECTED_BACKEND_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_backend_commit || '' }}
       E2E_EMAIL: ${{ secrets.E2E_EMAIL }}

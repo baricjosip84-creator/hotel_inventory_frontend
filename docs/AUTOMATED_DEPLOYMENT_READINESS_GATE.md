@@ -32,6 +32,7 @@ Environment variables:
 - `DEPLOYMENT_BACKEND_URL` — deployed backend origin, without `/api`.
 - `DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE` — normally `true`.
 - `DEPLOYMENT_REQUIRE_PLATFORM_AUTH` — set `true` only after dedicated platform credentials exist.
+- `DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS` — set `true` after Vercel confirms Sentry source-map upload is configured.
 
 Environment secrets:
 
@@ -62,7 +63,7 @@ Render exposes `RENDER_GIT_COMMIT` at runtime. The backend includes it in `/heal
 
 The gate performs read-only operational checks plus authentication lifecycle cleanup:
 
-- frontend HTML, deployment identity, and security headers;
+- frontend HTML, deployment identity, security headers, and optional Sentry source-map upload marker;
 - backend liveness, database-backed readiness, and deployment identity;
 - exact frontend-origin CORS preflight;
 - rejection of unauthenticated protected API access;

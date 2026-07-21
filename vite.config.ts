@@ -18,11 +18,48 @@ const appRelease = firstNonEmpty(
   process.env.SOURCE_VERSION
 );
 
-const sentrySourceMapUploadEnabled = Boolean(
-  process.env.SENTRY_AUTH_TOKEN?.trim() &&
-  process.env.SENTRY_ORG?.trim() &&
-  process.env.SENTRY_PROJECT?.trim()
-);
+const booleanEnvironmentSetting = (name: string, fallback = false): boolean => {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (!value) return fallback;
+  if (['true', '1', 'yes', 'on'].includes(value)) return true;
+  if (['false', '0', 'no', 'off'].includes(value)) return false;
+  throw new Error(`${name} must be true or false.`);
+};
+
+const sentrySourceMapSettings = {
+  SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN?.trim() || '',
+  SENTRY_ORG: process.env.SENTRY_ORG?.trim() || '',
+  SENTRY_PROJECT: process.env.SENTRY_PROJECT?.trim() || ''
+};
+const configuredSentrySourceMapSettings = Object.entries(sentrySourceMapSettings)
+  .filter(([, value]) => Boolean(value));
+const missingSentrySourceMapSettings = Object.entries(sentrySourceMapSettings)
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+const sentrySourceMapsRequired = booleanEnvironmentSetting('SENTRY_SOURCE_MAPS_REQUIRED');
+const sentryAllowFailure = booleanEnvironmentSetting('SENTRY_ALLOW_FAILURE');
+
+if (configuredSentrySourceMapSettings.length > 0 && missingSentrySourceMapSettings.length > 0) {
+  throw new Error(
+    `Incomplete Sentry source-map configuration. Missing: ${missingSentrySourceMapSettings.join(', ')}.`
+  );
+}
+
+if (sentrySourceMapsRequired && missingSentrySourceMapSettings.length > 0) {
+  throw new Error(
+    `SENTRY_SOURCE_MAPS_REQUIRED is true, but these values are missing: ${missingSentrySourceMapSettings.join(', ')}.`
+  );
+}
+
+if (sentrySourceMapsRequired && !appRelease) {
+  throw new Error('Sentry source-map upload requires a deployment release identifier.');
+}
+
+if (sentrySourceMapsRequired && sentryAllowFailure) {
+  throw new Error('SENTRY_ALLOW_FAILURE must remain false when Sentry source maps are required.');
+}
+
+const sentrySourceMapUploadEnabled = missingSentrySourceMapSettings.length === 0;
 
 function deploymentVersionPlugin(): Plugin {
   return {
@@ -40,7 +77,9 @@ function deploymentVersionPlugin(): Plugin {
           process.env.VERCEL_GIT_COMMIT_REF,
           process.env.GITHUB_REF_NAME
         ),
-        built_at: new Date().toISOString()
+        built_at: new Date().toISOString(),
+        sentry_source_maps: sentrySourceMapUploadEnabled,
+        sentry_release: sentrySourceMapUploadEnabled ? appRelease : null
       };
 
       this.emitFile({
@@ -73,9 +112,9 @@ export default defineConfig({
     react(),
     deploymentVersionPlugin(),
     ...(sentrySourceMapUploadEnabled ? [sentryVitePlugin({
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: sentrySourceMapSettings.SENTRY_ORG,
+      project: sentrySourceMapSettings.SENTRY_PROJECT,
+      authToken: sentrySourceMapSettings.SENTRY_AUTH_TOKEN,
       telemetry: false,
       release: { name: appRelease || undefined },
       sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] }

@@ -40,9 +40,15 @@ requireText(api, "area: 'tenant'", 'tenant API monitoring');
 requireText(platformApi, "area: 'platform'", 'platform API monitoring');
 [
   '@sentry/vite-plugin', '__APP_RELEASE__', 'VERCEL_GIT_COMMIT_SHA', 'sentryVitePlugin',
-  "sourcemap: sentrySourceMapUploadEnabled ? 'hidden' : false", 'filesToDeleteAfterUpload'
+  "sourcemap: sentrySourceMapUploadEnabled ? 'hidden' : false", 'filesToDeleteAfterUpload',
+  'SENTRY_SOURCE_MAPS_REQUIRED',
+  'SENTRY_ALLOW_FAILURE', 'Incomplete Sentry source-map configuration',
+  'sentry_source_maps', 'sentry_release'
 ].forEach((expected) => requireText(vite, expected, 'Vite Sentry setup'));
-['VITE_SENTRY_DSN=', 'VITE_SENTRY_ENVIRONMENT=', 'VITE_SENTRY_TRACES_SAMPLE_RATE='].forEach((expected) => {
+[
+  'VITE_SENTRY_DSN=', 'VITE_SENTRY_ENVIRONMENT=', 'VITE_SENTRY_TRACES_SAMPLE_RATE=',
+  'SENTRY_ORG=', 'SENTRY_PROJECT=', 'SENTRY_SOURCE_MAPS_REQUIRED='
+].forEach((expected) => {
   requireText(envExample, expected, '.env.example');
 });
 ['# Runtime Error Monitoring', 'Captured', 'Privacy', 'Vercel variables'].forEach((expected) => {

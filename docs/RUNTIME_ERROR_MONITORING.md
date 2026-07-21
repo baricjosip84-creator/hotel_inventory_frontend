@@ -28,13 +28,24 @@ Runtime:
 
 Build-only source map upload:
 
-- `SENTRY_AUTH_TOKEN` (secret)
+- `SENTRY_AUTH_TOKEN` (protected secret)
 - `SENTRY_ORG`
 - `SENTRY_PROJECT`
+- `SENTRY_SOURCE_MAPS_REQUIRED=true`
 
-When all three build-only values exist, Vite generates hidden source maps,
-uploads them to the matching Sentry release, and deletes them from the deployed
-output. Vercel's commit SHA is used as the release identifier.
+All four belong in the Vercel **Production** environment. The token must never use
+a `VITE_` prefix because `VITE_*` values are bundled into browser code. When the
+three credentials exist, Vite generates hidden source maps, uploads them to the
+matching Sentry release, and deletes them from the deployed output. Vercel's
+commit SHA is used as the release identifier. A partial configuration or a
+required upload without credentials now fails the production build instead of
+silently deploying unreadable stack traces. `SENTRY_ALLOW_FAILURE` must remain unset/false so an upload failure blocks the production build.
+
+The public `/deployment-version.json` file exposes only a boolean upload marker
+and the non-secret release SHA. It never exposes the authentication token. The
+deployment gate can enforce this with
+`DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS=true` in the frontend GitHub `production`
+Environment.
 
 Sentry issue-alert rules are configured in Sentry itself, not in repository
 code. Create alerts for new production issues, regressions, and five events in

@@ -131,11 +131,21 @@ test.describe('deployed service readiness', () => {
       const frontendVersion = await readJson<{
         service?: string;
         git_commit?: string | null;
+        sentry_source_maps?: boolean;
+        sentry_release?: string | null;
       }>(frontendVersionResponse, 'Frontend deployment version');
       expect(frontendVersion.service).toBe('hotel-inventory-frontend');
       const expectedFrontendCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT');
       if (expectedFrontendCommit) {
         expect(frontendVersion.git_commit?.toLowerCase(), 'Frontend production deployment must match the triggering commit').toBe(expectedFrontendCommit);
+      }
+
+      if (booleanSetting('DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS', false)) {
+        expect(frontendVersion.sentry_source_maps, 'Production frontend must confirm Sentry source maps were uploaded').toBe(true);
+        expect(frontendVersion.sentry_release, 'Production frontend must expose the non-secret Sentry release identifier').toBeTruthy();
+        if (expectedFrontendCommit) {
+          expect(frontendVersion.sentry_release?.toLowerCase(), 'Sentry release must match the deployed frontend commit').toBe(expectedFrontendCommit);
+        }
       }
 
       const livenessResponse = await api.get(`${backendUrl}/health/live`);
