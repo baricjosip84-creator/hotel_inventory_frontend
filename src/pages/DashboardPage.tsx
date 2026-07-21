@@ -3,7 +3,8 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 
 /**
  * ============================================================================
@@ -339,6 +340,26 @@ function changeDisplay(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function healthTierLabel(tier: string): string {
+  if (tier === 'excellent') return 'Excellent';
+  if (tier === 'good') return 'Good';
+  if (tier === 'watch') return 'Needs attention';
+  return 'Critical';
+}
+
+function formatActivityReason(reason: string): string {
+  const formatPart = (value: string) =>
+    value
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
+  const [action, detail] = reason.split(':', 2);
+  const actionLabel = formatPart(action || reason);
+  return detail ? `${actionLabel} — ${formatPart(detail)}` : actionLabel;
+}
+
 function Section(props: {
   title: string;
   subtitle: string;
@@ -427,32 +448,31 @@ function StatCard(props: {
  */
 
 export default function DashboardPage() {
-  const { canViewReports, canViewInsights } = getRoleCapabilities();
+  const { canViewReports, canViewInsights, canManageProducts } = getRoleCapabilities();
+  const canViewStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
+  const canViewShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
+  const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
+  const canViewProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
+  const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
+  const canViewLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ);
 
   /*
     WHAT CHANGED
     ------------
     This file stays grounded in the DashboardPage you sent.
 
-    Existing real behavior is preserved:
-    - same dashboard queries
-    - same section structure
-    - same quick links
-    - same operational health, depletion, reorder, alerts, anomalies, activity,
-      and supplier performance rendering
-    - same helper logic and routing
+    Existing dashboard data and operational sections are preserved.
 
-    This pass applies the shared UI foundation carefully:
-    - dashboard sections now use app-panel/app-panel--padded
-    - KPI grids now use app-grid-stats
-    - empty/error states align with the shared foundation
-    - no business logic was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes the dashboard consume the same shared visual layer as the other pages
-    without simplifying or rewriting any of its operational content.
+    This pass also keeps navigation and display behavior aligned with the real
+    permission and subscription model, fixes dashboard links so they open the
+    intended record or filtered page, and removes avoidable desktop layout gaps.
   */
+  const subscriptionAccessQuery = useQuery({
+    queryKey: ['tenant-subscription-access'],
+    queryFn: fetchTenantSubscriptionAccess,
+    staleTime: 60_000
+  });
+
   const summaryQuery = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: fetchDashboardSummary
@@ -509,6 +529,8 @@ export default function DashboardPage() {
 
   const summary = summaryQuery.data;
   const health = operationalHealthQuery.data;
+  const canOpenReports =
+    canViewReports && isTenantFeatureAllowed(subscriptionAccessQuery.data, 'reports');
 
   const topDepletionRows = useMemo(() => {
     return (depletionRiskQuery.data?.rows ?? [])
@@ -535,8 +557,7 @@ export default function DashboardPage() {
   if (summaryQuery.isLoading) {
     return (
       <div style={styles.page}>
-        <h2 style={styles.title}>Dashboard</h2>
-        <p style={styles.description}>Loading production dashboard...</p>
+        <div className="app-panel app-panel--padded">Loading dashboard...</div>
       </div>
     );
   }
@@ -544,35 +565,25 @@ export default function DashboardPage() {
   if (summaryQuery.isError || !summary) {
     return (
       <div style={styles.page}>
-        <h2 style={styles.title}>Dashboard</h2>
-        <p style={styles.description}>
-          Failed to load dashboard summary:{' '}
-          {(summaryQuery.error as Error)?.message || 'Unknown error'}
-        </p>
+        <SectionError
+          message={`Failed to load dashboard summary: ${(summaryQuery.error as Error)?.message || 'Unknown error'}`}
+        />
       </div>
     );
   }
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <div style={styles.headerTextBlock}>
-          <h2 style={styles.title}>Dashboard</h2>
-          <p style={styles.description}>
-            Operational overview, intelligent inventory signals, and recent activity for
-            the current tenant.
-          </p>
-        </div>
-      </div>
-
       <div style={styles.quickActionRow}>
-        <ActionLink to="/stock" label="Open Stock" />
-        <ActionLink to="/shipments" label="Open Shipments" />
-        <ActionLink to="/alerts?resolved=false" label="Review Alerts" />
-        <ActionLink to="/products" label="Manage Products" />
-        <ActionLink to="/suppliers" label="Open Suppliers" />
-        <ActionLink to="/storage-locations" label="Open Locations" />
-        {canViewReports ? <ActionLink to="/reports" label="Open Reports" /> : null}
+        {canViewStock ? <ActionLink to="/stock" label="Open Stock" /> : null}
+        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" /> : null}
+        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" /> : null}
+        {canViewProducts ? (
+          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} />
+        ) : null}
+        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" /> : null}
+        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" /> : null}
+        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" /> : null}
         {canViewInsights ? <ActionLink to="/insights" label="Open Insights" /> : null}
       </div>
 
@@ -636,7 +647,7 @@ export default function DashboardPage() {
 
             {health ? (
               <span style={healthBadgeStyle(health.health_tier)}>
-                {health.health_tier}
+                {healthTierLabel(health.health_tier)}
               </span>
             ) : null}
           </div>
@@ -654,7 +665,10 @@ export default function DashboardPage() {
             />
           ) : (
             <>
-              <div style={styles.healthScore}>{toNumber(health.health_score)}</div>
+              <div style={styles.healthScore}>
+                <span>{toNumber(health.health_score)}</span>
+                <span style={styles.healthScoreScale}> / 100</span>
+              </div>
 
               <div style={styles.healthMetricsGrid}>
                 <div style={styles.healthMetric}>
@@ -918,13 +932,23 @@ export default function DashboardPage() {
                   ) : (
                     (overdueShipmentsQuery.data ?? []).map((row) => (
                       <tr key={row.id}>
-                        <td style={styles.td}>{row.po_number || '-'}</td>
+                        <td style={styles.td}>
+                          <div style={styles.rowTitle}>{row.po_number || '-'}</div>
+                          {canViewShipments ? (
+                            <ActionLink
+                              to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
+                              label="Open Shipment"
+                            />
+                          ) : null}
+                        </td>
                         <td style={styles.td}>
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          <ActionLink
-                            to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
-                            label="Open Supplier"
-                          />
+                          {canViewSuppliers ? (
+                            <ActionLink
+                              to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                              label="Open Supplier"
+                            />
+                          ) : null}
                         </td>
                         <td style={styles.td}>{formatDate(row.delivery_date)}</td>
                         <td style={styles.td}>
@@ -979,10 +1003,12 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.cardText}>{alert.message}</div>
-                    <ActionLink
-                      to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
-                      label="Open in Alerts"
-                    />
+                    {canViewAlerts ? (
+                      <ActionLink
+                        to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
+                        label="Open in Alerts"
+                      />
+                    ) : null}
 
                     <div style={styles.metricRow}>
                       <span>Escalation Level</span>
@@ -1107,8 +1133,10 @@ export default function DashboardPage() {
                           <td style={styles.td}>
                             <span style={changeBadgeStyle(amount)}>{changeDisplay(amount)}</span>
                           </td>
-                          <td style={styles.td}>{row.reason}</td>
-                          <td style={styles.td}>{row.user_name || row.user_id || '-'}</td>
+                          <td style={styles.td}>{formatActivityReason(row.reason)}</td>
+                          <td style={styles.td}>
+                            {row.user_name || (row.user_id ? 'User name unavailable' : 'System')}
+                          </td>
                         </tr>
                       );
                     })
@@ -1157,10 +1185,12 @@ export default function DashboardPage() {
                       <tr key={row.supplier_id}>
                         <td style={styles.td}>
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          <ActionLink
-                            to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
-                            label="Open Supplier"
-                          />
+                          {canViewSuppliers ? (
+                            <ActionLink
+                              to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                              label="Open Supplier"
+                            />
+                          ) : null}
                         </td>
                         <td style={styles.td}>{row.total_shipments}</td>
                         <td style={styles.td}>{row.pending_shipments}</td>
@@ -1290,6 +1320,11 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1,
     marginBottom: '16px'
   },
+  healthScoreScale: {
+    fontSize: '20px',
+    fontWeight: 700,
+    color: '#6b7280'
+  },
   healthMetricsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -1316,6 +1351,7 @@ const styles: Record<string, CSSProperties> = {
   twoColumnGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
+    alignItems: 'start',
     gap: '20px',
     marginBottom: '20px',
     width: '100%',
@@ -1421,7 +1457,7 @@ const styles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '720px'
+    minWidth: '600px'
   },
   th: {
     textAlign: 'left',

@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -233,6 +234,15 @@ const URGENCY_FILTERS: Array<{ value: 'all' | ActionUrgency; label: string }> = 
   { value: 'low', label: 'Low' }
 ];
 
+const USER_FACING_SAFETY_KEYS = new Set([
+  'read_only',
+  'tenant_isolated',
+  'permission_gated',
+  'human_action_only',
+  'approval_gated_when_required',
+  'no_inventory_mutation'
+]);
+
 const cardGridStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
 };
@@ -269,6 +279,33 @@ const badgeStyle: CSSProperties = {
   textTransform: 'capitalize'
 };
 
+const detailsStyle: CSSProperties = {
+  border: '1px solid var(--color-border)',
+  borderRadius: 14,
+  background: 'var(--color-surface)',
+  padding: '14px 16px'
+};
+
+const detailsSummaryStyle: CSSProperties = {
+  cursor: 'pointer',
+  fontWeight: 800,
+  fontSize: 16
+};
+
+const actionMetadataStyle: CSSProperties = {
+  marginTop: 10,
+  paddingTop: 10,
+  borderTop: '1px solid var(--color-border)',
+  overflowWrap: 'anywhere'
+};
+
+function urgencyBadgeStyle(urgency?: string | null): CSSProperties {
+  if (urgency === 'critical') return { ...badgeStyle, background: '#fee2e2', color: '#991b1b' };
+  if (urgency === 'high') return { ...badgeStyle, background: '#ffedd5', color: '#9a3412' };
+  if (urgency === 'medium') return { ...badgeStyle, background: '#fef3c7', color: '#92400e' };
+  return { ...badgeStyle, background: '#dcfce7', color: '#166534' };
+}
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -291,6 +328,21 @@ function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
 }
 
+function executionModeLabel(value?: string | null): string {
+  if (value === 'read_only_action_aggregation_human_operated') {
+    return 'Read-only, human-operated';
+  }
+  return formatLabel(value);
+}
+
+function actionTitleLabel(action: OperationalAction): string {
+  const title = formatLabel(action.title);
+  if (action.action_domain === 'alerts' && title === title.toUpperCase()) {
+    return title.toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+  }
+  return title;
+}
+
 function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) {
     return null;
@@ -310,6 +362,30 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   ]);
 
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+}
+
+type SourceActionLink = { to: string; label: string };
+
+function sourceActionLink(action: OperationalAction): SourceActionLink | null {
+  if (action.action_domain === 'alerts') {
+    const params = new URLSearchParams({ resolved: 'false' });
+    const search = String(action.summary || action.title || '').trim();
+    if (search) params.set('search', search);
+    return { to: `/alerts?${params.toString()}`, label: 'Open alert workflow' };
+  }
+
+  if (action.action_domain === 'execution' && action.source_id) {
+    const params = new URLSearchParams({ task_id: action.source_id });
+    return { to: `/execution-tasks?${params.toString()}`, label: 'Open execution task' };
+  }
+
+  if (['decision_intelligence', 'ai_governance'].includes(action.action_domain)) {
+    const params = new URLSearchParams({ source_action_id: action.action_id });
+    return { to: `/ai-review?${params.toString()}`, label: 'Open AI review' };
+  }
+
+  const sourcePath = sourceSurfaceToAppPath(action.explainability?.source_surface);
+  return sourcePath ? { to: sourcePath, label: 'Open source workflow' } : null;
 }
 
 async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUrgency, sourceActionId?: string | null): Promise<ActionCenterResponse> {
@@ -340,6 +416,31 @@ export default function OperationalActionCenterPage() {
     allowedValues: URGENCY_FILTER_VALUES
   });
 
+  const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
+  const canViewExecutionTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+  const canViewControlTower = hasPermission(TENANT_PERMISSIONS.CONTROL_TOWER_READ);
+  const canViewDecisionIntelligence = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
+  const canViewTenantDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const canViewGovernanceReadiness = canViewControlTower || canViewDecisionIntelligence;
+  const availableDomains = useMemo(() => {
+    const allowed = new Set<ActionDomain>(['all']);
+    if (canViewAlerts) allowed.add('alerts');
+    if (canViewExecutionTasks) allowed.add('execution');
+    if (canViewControlTower) allowed.add('control_tower');
+    if (canViewDecisionIntelligence) {
+      allowed.add('decision_intelligence');
+      allowed.add('ai_governance');
+      allowed.add('multi_domain');
+    }
+    return ACTION_DOMAINS.filter((option) => allowed.has(option.value));
+  }, [canViewAlerts, canViewControlTower, canViewDecisionIntelligence, canViewExecutionTasks]);
+
+  useEffect(() => {
+    if (!availableDomains.some((option) => option.value === domain)) {
+      setDomain('all');
+    }
+  }, [availableDomains, domain, setDomain]);
+
   const actionCenterQuery = useQuery({
     queryKey: ['operational-action-center', domain, urgency, sourceActionId],
     queryFn: () => fetchActionCenter(domain, urgency, sourceActionId)
@@ -369,18 +470,43 @@ export default function OperationalActionCenterPage() {
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [selectedSourceAction]);
 
+  if (actionCenterQuery.isLoading) {
+    return (
+      <div className="card">
+        <div style={{ fontWeight: 800 }}>Loading Action Center</div>
+        <p className="card__subtext">Collecting the actions that are visible to your role.</p>
+      </div>
+    );
+  }
+
+  if (actionCenterQuery.error) {
+    return (
+      <div className="card">
+        <div style={{ fontWeight: 800 }}>Action Center could not be loaded</div>
+        <p className="form-error">
+          {actionCenterQuery.error instanceof ApiError
+            ? actionCenterQuery.error.message
+            : 'Unable to load the action center.'}
+        </p>
+        <button className="button button--secondary" type="button" onClick={() => actionCenterQuery.refetch()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="card-grid" style={cardGridStyle}>
         <div className="card">
-          <div className="card__label">Open actions</div>
+          <div className="card__label">Open actions shown</div>
           <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
-          <div className="card__subtext">Prioritized across backend action domains.</div>
+          <div className="card__subtext">The highest-priority actions currently returned for your access.</div>
         </div>
         <div className="card">
           <div className="card__label">Highest urgency</div>
-          <div className="card__value" style={{ textTransform: 'capitalize' }}>{formatLabel(summary.highest_urgency)}</div>
-          <div className="card__subtext">Calculated by the action-center service.</div>
+          <div className="card__value" style={{ textTransform: 'capitalize' }}>{summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}</div>
+          <div className="card__subtext">The most urgent level among the actions shown.</div>
         </div>
         <div className="card">
           <div className="card__label">Approval gated</div>
@@ -389,21 +515,28 @@ export default function OperationalActionCenterPage() {
         </div>
         <div className="card">
           <div className="card__label">Execution mode</div>
-          <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(response?.definition?.execution_mode)}</div>
-          <div className="card__subtext">Read-only commercial command surface.</div>
+          <div className="card__value" style={{ fontSize: 18 }}>{executionModeLabel(response?.definition?.execution_mode)}</div>
+          <div className="card__subtext">This page guides people to source workflows but does not change records itself.</div>
         </div>
       </div>
 
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ fontWeight: 800 }}>How this page works</div>
+        <p className="card__subtext" style={{ marginBottom: 0 }}>
+          The Action Center combines work from several parts of the tenant account. It is advisory and read-only: use the source-workflow button on an item to review or complete the real work.
+        </p>
+      </div>
+
       <section className="section">
-        <div className="section__title">Commercial action inbox</div>
+        <div className="section__title">Action inbox</div>
         <div className="card">
           <div style={toolbarStyle}>
-            <select style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
-              {ACTION_DOMAINS.map((option) => (
+            <select aria-label="Filter by action domain" style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
+              {availableDomains.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <select style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
+            <select aria-label="Filter by urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
               {URGENCY_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -416,25 +549,17 @@ export default function OperationalActionCenterPage() {
           {sourceActionId && !actionCenterQuery.isLoading && !actionCenterQuery.error ? (
             <p className={selectedSourceAction ? 'card__subtext' : 'form-error'}>
               {selectedSourceAction
-                ? `Opened source action ${sourceActionId}.`
-                : `Source action ${sourceActionId} was not returned by the current tenant filters or is no longer pending.`}
+                ? 'The requested action is highlighted below.'
+                : 'The requested action was not returned by the current filters or is no longer pending.'}
             </p>
           ) : null}
 
-          {actionCenterQuery.isLoading ? (
-            <p className="card__subtext">Loading action-center summary…</p>
-          ) : actionCenterQuery.error ? (
-            <p className="card__subtext">
-              {actionCenterQuery.error instanceof ApiError
-                ? actionCenterQuery.error.message
-                : 'Unable to load the action center.'}
-            </p>
-          ) : actions.length === 0 ? (
+          {actions.length === 0 ? (
             <p className="card__subtext">No action-center items matched the selected filters.</p>
           ) : (
             <div style={actionListStyle}>
               {actions.map((action) => {
-                const sourcePath = sourceSurfaceToAppPath(action.explainability?.source_surface);
+                const sourceLink = sourceActionLink(action);
 
                 return (
                   <article
@@ -449,11 +574,11 @@ export default function OperationalActionCenterPage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ fontWeight: 800 }}>{action.title}</div>
+                        <div style={{ fontWeight: 800 }}>{actionTitleLabel(action)}</div>
                         <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <span style={badgeStyle}>{formatLabel(action.urgency)}</span>
+                        <span style={urgencyBadgeStyle(action.urgency)}>{formatLabel(action.urgency)}</span>
                         <span style={badgeStyle}>{formatLabel(action.action_domain)}</span>
                         <span style={badgeStyle}>{formatLabel(action.action_status)}</span>
                       </div>
@@ -463,21 +588,25 @@ export default function OperationalActionCenterPage() {
                       Recommended next step: {action.recommended_next_step || 'Review source workflow before acting.'}
                     </div>
                     <div className="card__subtext">
-                      Priority score: {numberValue(action.priority_score)} · Updated: {formatDateTime(action.updated_at || action.created_at)}
+                      Updated: {formatDateTime(action.updated_at || action.created_at)}
                     </div>
-                    <div className="card__subtext">
-                      Action: {action.action_id}{action.source_id ? ` · Source: ${action.source_id}` : ''}
-                    </div>
-                    {action.explainability?.primary_factors?.length ? (
-                      <div className="card__subtext">
-                        Evidence: {action.explainability.primary_factors.join(' · ')}
-                      </div>
-                    ) : null}
-                    {sourcePath ? (
+                    {sourceLink ? (
                       <div style={{ marginTop: 10 }}>
-                        <Link className="button button--secondary" to={sourcePath}>Open source workflow</Link>
+                        <Link className="button button--secondary" to={sourceLink.to}>{sourceLink.label}</Link>
                       </div>
                     ) : null}
+                    <details style={actionMetadataStyle}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Technical details</summary>
+                      <div className="card__subtext">Priority score: {numberValue(action.priority_score)}</div>
+                      <div className="card__subtext">
+                        Action: {action.action_id}{action.source_id ? ` · Source: ${action.source_id}` : ''}
+                      </div>
+                      {action.explainability?.primary_factors?.length ? (
+                        <div className="card__subtext">
+                          Evidence: {action.explainability.primary_factors.map((factor) => formatLabel(factor)).join(' · ')}
+                        </div>
+                      ) : null}
+                    </details>
                   </article>
                 );
               })}
@@ -487,7 +616,14 @@ export default function OperationalActionCenterPage() {
       </section>
 
 
-      <section className="section">
+      {canViewGovernanceReadiness ? (
+      <details style={{ ...detailsStyle, marginTop: 16 }}>
+        <summary style={detailsSummaryStyle}>Governance readiness details</summary>
+        <p className="card__subtext">
+          Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe workflow readiness, not the tenant's overall operational health.
+        </p>
+
+        <section className="section" style={{ marginTop: 12 }}>
         <div className="section__title">Control Tower orchestration traceability</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
@@ -724,8 +860,17 @@ export default function OperationalActionCenterPage() {
           )}
         </div>
       </section>
+      </details>
+      ) : null}
 
-      <section className="section">
+      {canViewTenantDiagnostics ? (
+        <details style={{ ...detailsStyle, marginTop: 16 }}>
+          <summary style={detailsSummaryStyle}>Technical contract diagnostics</summary>
+          <p className="card__subtext">
+            Advanced checks shown only to users with tenant diagnostics access, confirming that the page and backend still agree about the information this screen requires.
+          </p>
+
+      <section className="section" style={{ marginTop: 12 }}>
         <div className="section__title">Control Tower remediation response contract audit</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
@@ -838,11 +983,13 @@ export default function OperationalActionCenterPage() {
           )}
         </div>
       </section>
+        </details>
+      ) : null}
 
       <section className="section">
-        <div className="section__title">Read-only safety contract</div>
+        <div className="section__title">Read-only safety guarantees</div>
         <div className="card-grid" style={cardGridStyle}>
-          {safetyEntries.slice(0, 8).map(([key]) => (
+          {safetyEntries.filter(([key]) => USER_FACING_SAFETY_KEYS.has(key)).map(([key]) => (
             <div className="card" key={key}>
               <div className="card__label">Guaranteed</div>
               <div style={{ fontWeight: 800 }}>{formatLabel(key)}</div>

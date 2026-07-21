@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
@@ -180,15 +180,16 @@ export default function AlertsPage() {
     design foundation instead of relying only on page-local styles.
   */
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
-  const [filters, setFilters] = useState<AlertFilters>({
-    search: '',
-    severity: '',
-    resolved: 'false',
-    acknowledged: ''
-  });
+  const [filters, setFilters] = useState<AlertFilters>(() => ({
+    search: searchParams.get('search')?.trim() || '',
+    severity: searchParams.get('severity')?.trim() || '',
+    resolved: searchParams.get('resolved')?.trim() || 'false',
+    acknowledged: searchParams.get('acknowledged')?.trim() || ''
+  }));
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});

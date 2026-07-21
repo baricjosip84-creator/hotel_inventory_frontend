@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
@@ -295,6 +296,8 @@ function isUuid(value: string): boolean {
 }
 
 export default function ExecutionTasksPage() {
+  const [searchParams] = useSearchParams();
+  const requestedTaskId = searchParams.get('task_id')?.trim() || '';
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canReadOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
   const canCreateOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE);
@@ -471,7 +474,23 @@ export default function ExecutionTasksPage() {
           ? apiRequest<MobileOptimizationVisibility>(`/optimization-plans/mobile-visibility?${mobileOptimizationParams.toString()}`)
           : Promise.resolve(null)
       ]);
-      setTasks(nextTasks);
+      let visibleTasks = nextTasks;
+      let linkedTaskError: string | null = null;
+
+      if (requestedTaskId) {
+        if (!isUuid(requestedTaskId)) {
+          linkedTaskError = 'The linked execution task ID is invalid.';
+        } else if (!nextTasks.some((task) => task.id === requestedTaskId)) {
+          try {
+            const linkedTask = await apiRequest<ExecutionTask>(`/execution-tasks/${requestedTaskId}`);
+            visibleTasks = [linkedTask, ...nextTasks];
+          } catch (linkedTaskRequestError) {
+            linkedTaskError = `The linked execution task could not be opened. ${errorMessage(linkedTaskRequestError)}`;
+          }
+        }
+      }
+
+      setTasks(visibleTasks);
       setBatches(nextBatches);
       setWorkload(nextWorkload);
       setSlaQueue(nextSlaQueue);
@@ -479,17 +498,30 @@ export default function ExecutionTasksPage() {
       setMobileQueue(nextMobileQueue);
       setOptimizationDashboard(nextOptimizationDashboard);
       setMobileOptimization(nextMobileOptimization);
-      setSelected((current) => nextTasks.find((task) => task.id === current?.id) || nextTasks[0] || null);
+      setSelected((current) => {
+        if (requestedTaskId) {
+          const requestedTask = visibleTasks.find((task) => task.id === requestedTaskId);
+          if (requestedTask) return requestedTask;
+        }
+        return visibleTasks.find((task) => task.id === current?.id) || visibleTasks[0] || null;
+      });
+      if (linkedTaskError) setError(linkedTaskError);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [batchStatusFilter, batchTypeFilter, canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
+  }, [batchStatusFilter, batchTypeFilter, canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, requestedTaskId, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
 
   useEffect(() => {
     void loadTasks();
   }, [loadTasks]);
+
+  useEffect(() => {
+    if (!requestedTaskId || selected?.id !== requestedTaskId) return;
+    const element = document.getElementById(`execution-task-${requestedTaskId}`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [requestedTaskId, selected?.id]);
 
   useEffect(() => {
     if (!canRead || !selected?.id) {
@@ -1118,7 +1150,7 @@ export default function ExecutionTasksPage() {
               </thead>
               <tbody>
                 {tasks.map((task) => (
-                  <tr key={task.id} style={selected?.id === task.id ? styles.selectedRow : undefined}>
+                  <tr id={`execution-task-${task.id}`} key={task.id} style={selected?.id === task.id ? styles.selectedRow : undefined}>
                     <td style={styles.td}>
                       <button type="button" style={styles.linkButton} onClick={() => setSelected(task)}>{task.task_code}</button>
                       <div style={styles.strong}>{task.title}</div>

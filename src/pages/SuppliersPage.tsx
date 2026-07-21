@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { apiRequest, ApiError } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
@@ -219,11 +220,12 @@ function KeyValue({ label, value }: { label: string; value: unknown }) {
 
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
 
   const { canManageSuppliers } = getRoleCapabilities();
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
   const [selectedPerformanceSupplier, setSelectedPerformanceSupplier] = useState<SupplierItem | null>(null);
   const [form, setForm] = useState<SupplierFormState>(emptyForm());
