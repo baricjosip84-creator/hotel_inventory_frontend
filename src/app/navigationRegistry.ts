@@ -79,7 +79,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/workflow-composer',
         label: 'Workflow Composer',
-        description: 'Read-only workflow automation blueprint composer with approval chains, trigger previews, and integration routing guidance.',
+        description: 'Shows suggested human workflow plans, approval steps, and source-page guidance without creating or running automation.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
