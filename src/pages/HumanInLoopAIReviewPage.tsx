@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import './HumanInLoopAIReviewPage.css';
 
 
 const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
@@ -3764,7 +3765,7 @@ const URGENCY_FILTERS: Array<{ value: 'all' | Urgency; label: string }> = [
 ];
 
 const gridStyle: CSSProperties = {
-  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))'
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(210px, 100%), 1fr))'
 };
 
 const toolbarStyle: CSSProperties = {
@@ -3785,7 +3786,7 @@ const selectStyle: CSSProperties = {
 
 const reviewListStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))',
   gap: 14
 };
 
@@ -3824,6 +3825,29 @@ function formatDateTime(value?: string | null): string {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function reviewDecisionValidationMessage(decision: ReviewDecision | undefined, draft: ReviewDecisionDraft): string | null {
+  if (!decision) {
+    return 'No review decision is currently available for this lifecycle state.';
+  }
+
+  const reasonRequired = !['acknowledged', 'reopened'].includes(decision);
+  if (reasonRequired && !draft.reason_category) {
+    return 'Select a reason category before recording this decision.';
+  }
+
+  if (draft.reason_category === 'other' && !draft.reviewer_notes.trim()) {
+    return 'Add reviewer notes when the reason category is Other.';
+  }
+
+  if (decision === 'approved_for_manual_action'
+    && draft.reason_category === 'business_policy_exception'
+    && !draft.override_reason.trim()) {
+    return 'Add an override reason for a business policy exception.';
+  }
+
+  return null;
 }
 
 function sourceReviewToAppPath(review: HumanAIReview): string | null {
@@ -4095,7 +4119,8 @@ export default function HumanInLoopAIReviewPage() {
     monitoringContractQuery,
     remediationWorkbenchQuery,
     evidenceMatrixQuery,
-    featureDetailQuery
+    featureDetailQuery,
+    ...(selectedHistorySourceActionId ? [reviewHistoryQuery] : [])
   ];
 
   const isRefreshingAnyAIReviewData = allReviewAndReadinessQueries.some((query) => query.isFetching);
@@ -4369,7 +4394,7 @@ export default function HumanInLoopAIReviewPage() {
   };
 
   return (
-    <div>
+    <div className="ai-review-page">
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={toolbarStyle}>
           <a className="button button--primary" href="#ai-review-queue" data-skip-global-action-feedback="true">Go to review queue</a>
@@ -7884,20 +7909,24 @@ export default function HumanInLoopAIReviewPage() {
 
       <section className="section">
         <div className="section__title">Human-in-the-loop AI controls</div>
-        {reviewActionMessage ? <div className="card" style={{ marginBottom: 12 }}><p className="card__subtext">{reviewActionMessage}</p></div> : null}
+        {reviewActionMessage ? (
+          <div className="card ai-review-page__feedback" style={{ marginBottom: 12 }} role="status" aria-live="polite">
+            <p className="card__subtext">{reviewActionMessage}</p>
+          </div>
+        ) : null}
         <div className="card">
           <div style={toolbarStyle}>
-            <select style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
+            <select aria-label="AI operation domain" style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
               {DOMAIN_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <select style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
+            <select aria-label="AI review state" style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
               {REVIEW_STATE_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <select style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
+            <select aria-label="AI review urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
               {URGENCY_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -7940,6 +7969,10 @@ export default function HumanInLoopAIReviewPage() {
               const decisionDraft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
               const allowedDecisions = lifecycle?.allowed_decisions || [];
               const visibleDecisionOptions = REVIEW_DECISION_OPTIONS.filter((option) => allowedDecisions.includes(option.value));
+              const selectedDecision = visibleDecisionOptions.some((option) => option.value === decisionDraft.decision)
+                ? decisionDraft.decision
+                : visibleDecisionOptions[0]?.value;
+              const decisionValidationMessage = reviewDecisionValidationMessage(selectedDecision, decisionDraft);
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               return (
                 <article className="card" key={review.review_id} id={sourceActionId ? `ai-review-${sourceActionId}` : undefined} tabIndex={-1} style={{ scrollMarginTop: 16 }}>
@@ -8021,7 +8054,7 @@ export default function HumanInLoopAIReviewPage() {
                           <span className="card__subtext">Decision</span>
                           <select
                             style={{ ...selectStyle, width: '100%', marginTop: 4 }}
-                            value={visibleDecisionOptions.some((option) => option.value === decisionDraft.decision) ? decisionDraft.decision : visibleDecisionOptions[0]?.value}
+                            value={selectedDecision}
                             onChange={(event) => updateReviewDecisionDraft(sourceActionId, { decision: event.target.value as ReviewDecision })}
                           >
                             {visibleDecisionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -8061,11 +8094,16 @@ export default function HumanInLoopAIReviewPage() {
                           />
                         </label>
                       ) : null}
+                      {decisionValidationMessage ? (
+                        <p className="card__subtext ai-review-page__decision-help" role="note">
+                          {decisionValidationMessage}
+                        </p>
+                      ) : null}
                       <button
                         className="button button--primary"
                         type="button"
                         style={{ marginTop: 10 }}
-                        disabled={reviewDecisionMutation.isPending}
+                        disabled={reviewDecisionMutation.isPending || Boolean(decisionValidationMessage)}
                         data-skip-global-action-feedback="true"
                         onClick={() => submitReviewDecision(review)}
                       >

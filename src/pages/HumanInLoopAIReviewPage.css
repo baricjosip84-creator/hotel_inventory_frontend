@@ -1,0 +1,65 @@
+.ai-review-page,
+.ai-review-page * {
+  box-sizing: border-box;
+}
+
+.ai-review-page {
+  min-width: 0;
+}
+
+.ai-review-page .card,
+.ai-review-page .card-grid,
+.ai-review-page .card-grid > *,
+.ai-review-page section,
+.ai-review-page article,
+.ai-review-page div,
+.ai-review-page p,
+.ai-review-page li,
+.ai-review-page h3,
+.ai-review-page strong,
+.ai-review-page span,
+.ai-review-page label {
+  min-width: 0;
+}
+
+.ai-review-page .card,
+.ai-review-page [data-ai-contract-panel],
+.ai-review-page .card__subtext,
+.ai-review-page li,
+.ai-review-page h3,
+.ai-review-page strong,
+.ai-review-page span,
+.ai-review-page label {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.ai-review-page textarea,
+.ai-review-page select,
+.ai-review-page input {
+  max-width: 100%;
+}
+
+.ai-review-page textarea {
+  resize: vertical;
+}
+
+.ai-review-page__feedback .card__subtext,
+.ai-review-page__decision-help {
+  margin-bottom: 0;
+}
+
+.ai-review-page__decision-help {
+  color: var(--color-text-soft);
+}
+
+@media (max-width: 720px) {
+  .ai-review-page .button,
+  .ai-review-page select {
+    width: 100%;
+  }
+
+  .ai-review-page .card {
+    padding: 14px;
+  }
+}
