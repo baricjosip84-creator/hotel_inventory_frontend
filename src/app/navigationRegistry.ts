@@ -63,12 +63,16 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         label: 'Mobile Execution',
         description: 'Touch-first mobile execution queue sourced from the backend read-only mobile execution platform foundation.',
         section: 'Command',
-        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
+        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+        requiredPermissions: [
+          TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+          TENANT_PERMISSIONS.EXECUTION_TASKS_READ
+        ]
       },
       {
         to: '/real-time-operations-feed',
         label: 'Operations Feed',
-        description: 'Real-time event coordination timeline for event-bus signals, action-center items, and disruption follow-up.',
+        description: 'Current operational coordination feed for open work, permitted integration events, and disruption follow-up.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
