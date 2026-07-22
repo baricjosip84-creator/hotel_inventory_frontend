@@ -22,7 +22,7 @@ const phase15CommandSurfaces = [
   ['/mobile-execution', 'mobile-execution', 'MobileExecutionPage.tsx', 'Mobile Execution'],
   ['/real-time-operations-feed', 'real-time-operations-feed', 'RealTimeOperationsFeedPage.tsx', 'Operations Feed'],
   ['/workflow-composer', 'workflow-composer', 'WorkflowAutomationComposerPage.tsx', 'Workflow Composer'],
-  ['/ai-review', 'ai-review', 'HumanInLoopAIReviewPage.tsx', 'AI Review'],
+  ['/intelligence-review', 'intelligence-review', 'HumanInLoopAIReviewPage.tsx', 'Intelligence Review'],
   ['/collaboration', 'collaboration', 'EnterpriseCollaborationPage.tsx', 'Collaboration'],
   ['/digital-twin', 'digital-twin', 'DigitalTwinVisualizationPage.tsx', 'Digital Twin'],
   ['/reliability-command', 'reliability-command', 'ReliabilityCommandPage.tsx', 'Reliability Command']

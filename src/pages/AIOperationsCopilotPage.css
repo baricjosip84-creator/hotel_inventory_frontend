@@ -1,0 +1,43 @@
+.ai-copilot-page,
+.ai-copilot-panel,
+.ai-copilot-result,
+.ai-copilot-panel * {
+  min-width: 0;
+}
+
+.ai-copilot-result,
+.ai-copilot-result p,
+.ai-copilot-result li,
+.ai-copilot-result strong,
+.ai-copilot-panel {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+@media (max-width: 980px) {
+  .ai-copilot-main-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .ai-copilot-page {
+    gap: 14px !important;
+  }
+
+  .ai-copilot-history-button {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .ai-copilot-history-prompt {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  .ai-copilot-panel {
+    border-radius: 10px !important;
+  }
+}

@@ -3588,7 +3588,7 @@ type HumanAIReview = {
     preview_available?: boolean;
     preview_kind?: string;
     preview_summary?: string;
-    preview_metrics?: Record<string, number | string | null>;
+    preview_metrics?: Record<string, number | string | boolean | null>;
     preview_execution_mode?: string;
     mutation_allowed_from_preview?: boolean;
   };
@@ -3704,13 +3704,13 @@ type HumanAIReviewResponse = {
 };
 
 const DOMAIN_FILTERS: Array<{ value: 'all' | AIOperationDomain; label: string }> = [
-  { value: 'all', label: 'All AI domains' },
+  { value: 'all', label: 'All review categories' },
   { value: 'decision_intelligence', label: 'Decision intelligence' },
-  { value: 'ai_governance', label: 'AI governance' },
-  { value: 'remediation', label: 'Remediation' },
-  { value: 'simulation', label: 'Simulation' },
-  { value: 'optimization', label: 'Optimization' },
-  { value: 'multi_domain', label: 'Multi-domain' }
+  { value: 'ai_governance', label: 'Governance findings' },
+  { value: 'remediation', label: 'Remediation findings' },
+  { value: 'simulation', label: 'Simulations' },
+  { value: 'optimization', label: 'Optimisation' },
+  { value: 'multi_domain', label: 'Cross-area reviews' }
 ];
 
 const REVIEW_STATE_FILTERS: Array<{ value: 'all' | ReviewState; label: string }> = [
@@ -3752,6 +3752,53 @@ const defaultReviewDecisionDraft: ReviewDecisionDraft = {
   reviewer_notes: '',
   override_reason: ''
 };
+
+type IntelligenceReviewView = 'recommendations' | 'readiness';
+
+type ReviewOriginDescription = {
+  label: string;
+  detail: string;
+};
+
+function describeReviewOrigin(review: HumanAIReview): ReviewOriginDescription {
+  const metrics = review.simulation_preview?.preview_metrics || {};
+  const provider = typeof metrics.provider === 'string' ? metrics.provider : null;
+  const model = typeof metrics.model === 'string' ? metrics.model : null;
+  const sharedExternally = metrics.data_shared_externally === true;
+
+  if (provider === 'openai_responses') {
+    return {
+      label: 'External AI-assisted explanation',
+      detail: `${model ? `Model: ${model}. ` : ''}${sharedExternally ? 'Selected tenant evidence was sent to the configured AI provider.' : 'No external data-sharing flag was reported.'} Business values remain controlled by the application.`
+    };
+  }
+
+  if (provider === 'local_rules_fallback') {
+    return {
+      label: 'Rule-based fallback',
+      detail: 'The external AI provider was unavailable or refused the request, so the application produced the explanation with fixed local rules.'
+    };
+  }
+
+  if (provider === 'local_rules') {
+    return {
+      label: 'Rule-based Copilot analysis',
+      detail: 'The application produced this result with fixed backend rules. No external AI model generated it.'
+    };
+  }
+
+  if (review.source_reference?.source_type === 'ai_copilot_run') {
+    return {
+      label: 'Copilot proposal',
+      detail: 'This item came from the governed Copilot. The provider information was not included in the returned review evidence.'
+    };
+  }
+
+  return {
+    label: 'Rule-based intelligence or stored analysis',
+    detail: 'No external AI model is reported for this item. It comes from calculations, thresholds, simulations, optimisation logic, or stored governance evidence.'
+  };
+}
 
 const HUMAN_AI_REVIEW_QUERY_KEY = 'human-in-loop-ai-review';
 const HUMAN_AI_REVIEW_HISTORY_QUERY_KEY = 'human-in-loop-ai-review-history';
@@ -3988,8 +4035,9 @@ async function fetchHumanAIReviewSummary(
 export default function HumanInLoopAIReviewPage() {
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedSourceActionId = searchParams.get('source_action_id');
+  const activeView: IntelligenceReviewView = searchParams.get('view') === 'readiness' ? 'readiness' : 'recommendations';
   const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
   const [reviewState, setReviewState] = useState<'all' | ReviewState>('all');
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
@@ -4001,19 +4049,20 @@ export default function HumanInLoopAIReviewPage() {
 
   const reviewQuery = useQuery({
     queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency],
-    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency)
+    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency),
+    enabled: activeView === 'recommendations'
   });
 
   const reviewHistoryQuery = useQuery({
     queryKey: ['human-in-loop-ai-review-history', selectedHistorySourceActionId],
     queryFn: () => fetchAIReviewHistory(selectedHistorySourceActionId || ''),
-    enabled: Boolean(selectedHistorySourceActionId)
+    enabled: activeView === 'recommendations' && Boolean(selectedHistorySourceActionId)
   });
 
   const reviewDecisionMutation = useMutation({
     mutationFn: ({ sourceActionId, body }: { sourceActionId: string; body: Record<string, unknown> }) => recordAIReviewDecision(sourceActionId, body),
     onSuccess: async (result) => {
-      setReviewActionMessage('AI review decision recorded and audit history updated.');
+      setReviewActionMessage('Intelligence review decision recorded and audit history updated.');
       const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
       if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
       await Promise.all([
@@ -4021,13 +4070,13 @@ export default function HumanInLoopAIReviewPage() {
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] })
       ]);
     },
-    onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : 'Unable to record AI review decision.')
+    onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : 'Unable to record the intelligence review decision.')
   });
 
   const executionRequestDraftMutation = useMutation({
     mutationFn: (sourceActionId: string) => createAIReviewExecutionRequestDraft(sourceActionId),
     onSuccess: async (result) => {
-      setReviewActionMessage('Draft Execution Request created from the approved AI review. No operational action was executed.');
+      setReviewActionMessage('Draft Execution Request created from the approved intelligence review. No operational action was executed.');
       const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
       if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
       await Promise.all([
@@ -4041,73 +4090,88 @@ export default function HumanInLoopAIReviewPage() {
 
   const readinessQuery = useQuery({
     queryKey: ['intelligence-production-readiness-summary'],
-    queryFn: fetchIntelligenceProductionReadiness
+    queryFn: fetchIntelligenceProductionReadiness,
+    enabled: activeView === 'readiness'
   });
 
   const readinessAuditPackQuery = useQuery({
     queryKey: ['intelligence-production-readiness-audit-pack'],
-    queryFn: fetchIntelligenceProductionReadinessAuditPack
+    queryFn: fetchIntelligenceProductionReadinessAuditPack,
+    enabled: activeView === 'readiness'
   });
 
   const hardeningPlanQuery = useQuery({
     queryKey: ['intelligence-production-hardening-plan'],
-    queryFn: fetchIntelligenceHardeningPlan
+    queryFn: fetchIntelligenceHardeningPlan,
+    enabled: activeView === 'readiness'
   });
 
   const signoffChecklistQuery = useQuery({
     queryKey: ['intelligence-production-signoff-checklist'],
-    queryFn: fetchIntelligenceSignoffChecklist
+    queryFn: fetchIntelligenceSignoffChecklist,
+    enabled: activeView === 'readiness'
   });
 
 
   const releaseDecisionBoardQuery = useQuery({
     queryKey: ['intelligence-production-release-decision-board'],
-    queryFn: fetchIntelligenceReleaseDecisionBoard
+    queryFn: fetchIntelligenceReleaseDecisionBoard,
+    enabled: activeView === 'readiness'
   });
 
   const operationalRunbookQuery = useQuery({
     queryKey: ['intelligence-production-operational-runbook'],
-    queryFn: fetchIntelligenceOperationalRunbook
+    queryFn: fetchIntelligenceOperationalRunbook,
+    enabled: activeView === 'readiness'
   });
 
 
   const validationSuiteQuery = useQuery({
     queryKey: ['intelligence-production-validation-suite'],
-    queryFn: fetchIntelligenceValidationSuite
+    queryFn: fetchIntelligenceValidationSuite,
+    enabled: activeView === 'readiness'
   });
 
 
   const enablementManifestQuery = useQuery({
     queryKey: ['intelligence-production-enablement-manifest'],
-    queryFn: fetchIntelligenceEnablementManifest
+    queryFn: fetchIntelligenceEnablementManifest,
+    enabled: activeView === 'readiness'
   });
 
 
   const monitoringContractQuery = useQuery({
     queryKey: ['intelligence-production-monitoring-contract'],
-    queryFn: fetchIntelligenceMonitoringContract
+    queryFn: fetchIntelligenceMonitoringContract,
+    enabled: activeView === 'readiness'
   });
 
   const remediationWorkbenchQuery = useQuery({
     queryKey: ['intelligence-production-remediation-workbench'],
-    queryFn: fetchIntelligenceRemediationWorkbench
+    queryFn: fetchIntelligenceRemediationWorkbench,
+    enabled: activeView === 'readiness'
   });
 
 
   const evidenceMatrixQuery = useQuery({
     queryKey: ['intelligence-production-evidence-matrix'],
-    queryFn: fetchIntelligenceEvidenceMatrix
+    queryFn: fetchIntelligenceEvidenceMatrix,
+    enabled: activeView === 'readiness'
   });
 
 
   const featureDetailQuery = useQuery({
     queryKey: ['intelligence-production-feature-detail', selectedReadinessFeatureKey],
     queryFn: () => fetchIntelligenceFeatureDetail(selectedReadinessFeatureKey),
-    enabled: Boolean(selectedReadinessFeatureKey)
+    enabled: activeView === 'readiness' && Boolean(selectedReadinessFeatureKey)
   });
 
-  const allReviewAndReadinessQueries = [
+  const recommendationQueries = [
     reviewQuery,
+    ...(selectedHistorySourceActionId ? [reviewHistoryQuery] : [])
+  ];
+
+  const readinessQueries = [
     readinessQuery,
     readinessAuditPackQuery,
     hardeningPlanQuery,
@@ -4119,14 +4183,24 @@ export default function HumanInLoopAIReviewPage() {
     monitoringContractQuery,
     remediationWorkbenchQuery,
     evidenceMatrixQuery,
-    featureDetailQuery,
-    ...(selectedHistorySourceActionId ? [reviewHistoryQuery] : [])
+    featureDetailQuery
   ];
 
-  const isRefreshingAnyAIReviewData = allReviewAndReadinessQueries.some((query) => query.isFetching);
+  const activeViewQueries = activeView === 'readiness' ? readinessQueries : recommendationQueries;
+  const isRefreshingActiveView = activeViewQueries.some((query) => query.isFetching);
 
-  const refreshAllAIReviewData = () => {
-    void Promise.all(allReviewAndReadinessQueries.map((query) => query.refetch()));
+  const refreshActiveView = () => {
+    void Promise.all(activeViewQueries.map((query) => query.refetch()));
+  };
+
+  const selectView = (view: IntelligenceReviewView) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (view === 'readiness') {
+      nextSearchParams.set('view', 'readiness');
+    } else {
+      nextSearchParams.delete('view');
+    }
+    setSearchParams(nextSearchParams, { replace: true });
   };
 
 
@@ -4136,7 +4210,7 @@ export default function HumanInLoopAIReviewPage() {
   const reviews = useMemo(() => response?.reviews || [], [response?.reviews]);
 
   useEffect(() => {
-    if (!requestedSourceActionId || reviewQuery.isLoading || lastAutoScrolledSourceActionId.current === requestedSourceActionId) {
+    if (activeView !== 'recommendations' || !requestedSourceActionId || reviewQuery.isLoading || lastAutoScrolledSourceActionId.current === requestedSourceActionId) {
       return;
     }
 
@@ -4153,7 +4227,7 @@ export default function HumanInLoopAIReviewPage() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [requestedSourceActionId, reviewQuery.isLoading, reviews]);
+  }, [activeView, requestedSourceActionId, reviewQuery.isLoading, reviews]);
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
@@ -4395,56 +4469,88 @@ export default function HumanInLoopAIReviewPage() {
 
   return (
     <div className="ai-review-page">
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card ai-review-page__intro" style={{ marginBottom: 16 }}>
+        <div className="card__label">Intelligence review</div>
+        <h2 className="ai-review-page__intro-title">Review recommendations and technical readiness separately</h2>
+        <p className="card__subtext">
+          Not every item on this page was produced by an AI model. Recommendation reviews can come from rule-based calculations, simulations, optimisation logic, governance findings, or an optional AI-assisted Copilot. Readiness checks are technical, read-only controls.
+        </p>
+        <div className="ai-review-page__view-switch" role="group" aria-label="Intelligence review view">
+          <button
+            className={`button ${activeView === 'recommendations' ? 'button--primary' : 'button--secondary'}`}
+            type="button"
+            aria-pressed={activeView === 'recommendations'}
+            onClick={() => selectView('recommendations')}
+          >
+            Recommendation reviews
+          </button>
+          <button
+            className={`button ${activeView === 'readiness' ? 'button--primary' : 'button--secondary'}`}
+            type="button"
+            aria-pressed={activeView === 'readiness'}
+            onClick={() => selectView('readiness')}
+          >
+            Readiness &amp; governance
+          </button>
+        </div>
         <div style={toolbarStyle}>
-          <a className="button button--primary" href="#ai-review-queue" data-skip-global-action-feedback="true">Go to review queue</a>
           <button
             className="button button--secondary"
             type="button"
-            onClick={refreshAllAIReviewData}
-            disabled={isRefreshingAnyAIReviewData}
+            onClick={refreshActiveView}
+            disabled={isRefreshingActiveView}
           >
-            {isRefreshingAnyAIReviewData ? 'Refreshing AI review…' : 'Refresh AI review'}
+            {isRefreshingActiveView
+              ? activeView === 'readiness' ? 'Refreshing readiness checks…' : 'Refreshing recommendation reviews…'
+              : activeView === 'readiness' ? 'Refresh readiness checks' : 'Refresh recommendation reviews'}
           </button>
           <Link className="button button--secondary" to="/action-center">Open action center</Link>
           <Link className="button button--secondary" to="/workflow-composer">Open workflow composer</Link>
         </div>
-        <p className="card__subtext" style={{ marginTop: 10 }}>
-          Refreshes the human review queue and all AI/intelligence readiness panels without executing recommendations, approvals, overrides, inventory mutations, model training, or external AI calls.
+        <p className="card__subtext ai-review-page__mode-explanation">
+          {activeView === 'readiness'
+            ? 'This view checks evidence, testing, monitoring, rollback, release, and audit controls. It does not prove that an external AI model was used and it cannot enable or release a feature.'
+            : 'This view is the actionable human queue. A review decision never performs the underlying inventory, pricing, configuration, or release action.'}
         </p>
       </div>
 
-      <div className="card-grid" style={gridStyle}>
-        <div className="card">
-          <div className="card__label">AI review queue</div>
-          <div className="card__value">{numberValue(summary.total_reviews ?? reviews.length)}</div>
-          <div className="card__subtext">Human-in-the-loop recommendation reviews from decision intelligence and AI governance surfaces.</div>
+      {activeView === 'recommendations' ? (
+        <div className="card-grid" style={gridStyle}>
+          <div className="card">
+            <div className="card__label">Recommendation reviews</div>
+            <div className="card__value">{numberValue(summary.total_reviews ?? reviews.length)}</div>
+            <div className="card__subtext">Rule-based and optional AI-assisted proposals waiting for human review.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Approval required</div>
+            <div className="card__value">{numberValue(summary.approval_required_reviews)}</div>
+            <div className="card__subtext">Items that must remain inside an existing governed approval workflow.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Escalated</div>
+            <div className="card__value">{numberValue(summary.escalated_reviews)}</div>
+            <div className="card__subtext">High-attention items requiring management or governance follow-up.</div>
+          </div>
+          <div className="card">
+            <div className="card__label">Safety rule</div>
+            <div className="card__value" style={{ fontSize: 18 }}>Human decision only</div>
+            <div className="card__subtext">This page records a review; it does not execute the recommendation.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Approval required</div>
-          <div className="card__value">{numberValue(summary.approval_required_reviews)}</div>
-          <div className="card__subtext">Reviews that must stay inside existing governed approval workflows.</div>
-        </div>
-        <div className="card">
-          <div className="card__label">Escalated</div>
-          <div className="card__value">{numberValue(summary.escalated_reviews)}</div>
-          <div className="card__subtext">High-attention review items requiring management or governance follow-up.</div>
-        </div>
-        <div className="card">
-          <div className="card__label">Execution mode</div>
-          <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(response?.definition?.execution_mode)}</div>
-          <div className="card__subtext">This page does not execute recommendations, approvals, overrides, or source-system actions.</div>
-        </div>
-      </div>
+      ) : null}
 
 
+      {activeView === 'readiness' ? (
       <section className="section">
-        <div className="section__title">AI / intelligence production readiness</div>
+        <div className="section__title">Intelligence feature readiness</div>
+        <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
+          <strong>What this means:</strong> these checks govern rule-based intelligence and optional AI-assisted capabilities. They measure evidence and operational safety, not whether every feature uses a machine-learning model.
+        </div>
         <div className="card-grid" style={gridStyle}>
           <div className="card">
             <div className="card__label">Tracked intelligence features</div>
             <div className="card__value">{numberValue(readinessSummary.total_features)}</div>
-            <div className="card__subtext">Existing AI/intelligence modules registered from the current backend surfaces.</div>
+            <div className="card__subtext">Existing intelligence and AI-assisted modules registered from the current backend surfaces.</div>
           </div>
           <div className="card">
             <div className="card__label">Production candidates</div>
@@ -4459,18 +4565,18 @@ export default function HumanInLoopAIReviewPage() {
           <div className="card">
             <div className="card__label">Average readiness score</div>
             <div className="card__value">{numberValue(readinessSummary.average_readiness_score)}%</div>
-            <div className="card__subtext">Current production-readiness score across tracked AI/intelligence features.</div>
+            <div className="card__subtext">Current production-readiness score across tracked intelligence and AI-assisted features.</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 16 }}>
           {readinessQuery.isLoading ? (
-            <p className="card__subtext">Loading AI/intelligence production readiness…</p>
+            <p className="card__subtext">Loading intelligence and AI-assisted production readiness…</p>
           ) : readinessQuery.error ? (
             <p className="form-error">
               {readinessQuery.error instanceof ApiError
                 ? readinessQuery.error.message
-                : 'Unable to load AI/intelligence production readiness.'}
+                : 'Unable to load intelligence and AI-assisted production readiness.'}
             </p>
           ) : (
             <>
@@ -4508,15 +4614,15 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="capability_inventory">
-                <div className="card__label">Unified AI capability inventory</div>
+                <div className="card__label">Intelligence capability inventory</div>
                 <p className="card__subtext">
-                  Platform-wide inventory of the implemented AI/intelligence capabilities registered by the backend readiness service. This is read-only and does not execute, train, or call external AI.
+                  Platform-wide inventory of the implemented intelligence and AI-assisted capabilities registered by the backend readiness service. This is read-only and does not execute, train, or call external AI.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
                     <div className="card__label">Tracked capabilities</div>
                     <div className="card__value">{numberValue(capabilityInventory?.total_capabilities)}</div>
-                    <div className="card__subtext">Implemented capabilities across registered AI/intelligence features.</div>
+                    <div className="card__subtext">Implemented capabilities across registered intelligence and AI-assisted features.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Commercial candidates</div>
@@ -4555,15 +4661,15 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="risk_scoring">
-                <div className="card__label">Unified AI risk scoring</div>
+                <div className="card__label">Intelligence risk scoring</div>
                 <p className="card__subtext">
-                  Cross-module risk scoring for registered AI/intelligence features using existing readiness, tenant evidence, priority, production status, and open hardening gaps. This is read-only and does not execute, train, or call external AI.
+                  Cross-module risk scoring for registered intelligence and AI-assisted features using existing readiness, tenant evidence, priority, production status, and open hardening gaps. This is read-only and does not execute, train, or call external AI.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
                     <div className="card__label">Average AI risk</div>
                     <div className="card__value">{numberValue(aiRiskScoring?.average_ai_risk_score)}</div>
-                    <div className="card__subtext">Average risk score across registered AI/intelligence features.</div>
+                    <div className="card__subtext">Average risk score across registered intelligence and AI-assisted features.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Highest AI risk</div>
@@ -4602,9 +4708,9 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="decision_lineage">
-                <div className="card__label">Unified AI decision lineage</div>
+                <div className="card__label">Intelligence decision lineage</div>
                 <p className="card__subtext">
-                  Cross-module lineage trace showing whether each registered AI/intelligence feature has a path from tenant evidence tables through backend endpoints, frontend operator surfaces, and governance review. This is read-only and does not execute, train, or call external AI.
+                  Cross-module lineage trace showing whether each registered intelligence and AI-assisted feature has a path from tenant evidence tables through backend endpoints, frontend operator surfaces, and governance review. This is read-only and does not execute, train, or call external AI.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
@@ -4654,15 +4760,15 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="rollback_orchestration">
-                <div className="card__label">Unified AI rollback orchestration</div>
+                <div className="card__label">Intelligence rollback orchestration</div>
                 <p className="card__subtext">
-                  Cross-module rollback planning for registered AI/intelligence features. It combines risk scoring and decision lineage to show whether each AI surface has a safe manual rollback path. This is read-only and does not perform rollback, mutate state, train models, or call external AI.
+                  Cross-module rollback planning for registered intelligence and AI-assisted features. It combines risk scoring and decision lineage to show whether each AI surface has a safe manual rollback path. This is read-only and does not perform rollback, mutate state, train models, or call external AI.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
                     <div className="card__label">Average rollback score</div>
                     <div className="card__value">{numberValue(aiRollbackOrchestration?.average_rollback_score)}%</div>
-                    <div className="card__subtext">Average readiness of rollback controls across registered AI/intelligence features.</div>
+                    <div className="card__subtext">Average readiness of rollback controls across registered intelligence and AI-assisted features.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Rollback ready</div>
@@ -4708,7 +4814,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="maturity_self_audit">
-                <div className="card__label">Unified AI maturity self-audit</div>
+                <div className="card__label">Intelligence maturity self-audit</div>
                 <p className="card__subtext">
                   Platform-wide commercial-grade AI readiness audit across the existing registered intelligence surfaces. It combines capability inventory, risk scoring, decision lineage, rollback orchestration, production signoff, monitoring, and release controls. This is read-only and does not train, execute, mutate, or call external AI.
                 </p>
@@ -4759,7 +4865,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="governance_dashboard">
-                <div className="card__label">Unified AI governance dashboard</div>
+                <div className="card__label">Intelligence governance dashboard</div>
                 <p className="card__subtext">
                   Final read-only governance rollup for commercial AI enablement. It consolidates maturity self-audit, risk scoring, decision lineage, rollback orchestration, monitoring, signoff, and release-board status without executing AI actions or certifying release automatically.
                 </p>
@@ -4767,7 +4873,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card">
                     <div className="card__label">Governance readiness</div>
                     <div className="card__value">{numberValue(aiGovernanceDashboard?.governance_readiness_score)}%</div>
-                    <div className="card__subtext">Weighted readiness score across the unified AI governance controls.</div>
+                    <div className="card__subtext">Weighted readiness score across the unified intelligence governance controls.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Governance state</div>
@@ -4802,12 +4908,12 @@ export default function HumanInLoopAIReviewPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="card__subtext" style={{ marginTop: 12 }}>No unified AI governance dashboard actions reported.</p>
+                  <p className="card__subtext" style={{ marginTop: 12 }}>No unified intelligence governance dashboard actions reported.</p>
                 )}
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="commercial_release_gate">
-                <div className="card__label">Unified AI commercial release gate</div>
+                <div className="card__label">Intelligence commercial release gate</div>
                 <p className="card__subtext">
                   Final read-only gate before any commercial AI enablement decision. It does not release, execute, train, or mutate anything; it consolidates governance, maturity, risk, release-board, monitoring, and signoff controls into an operator-controlled release decision.
                 </p>
@@ -4853,7 +4959,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="commercial_release_evidence_dossier">
-                <div className="card__label">Unified AI commercial release evidence dossier</div>
+                <div className="card__label">Intelligence commercial release evidence dossier</div>
                 <p className="card__subtext">
                   Read-only release evidence dossier that gathers the existing AI governance controls into one operator review packet. It does not perform release, mutate data, train models, or call external AI.
                 </p>
@@ -4900,7 +5006,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="route_exposure_audit">
-                <div className="card__label">Unified AI route exposure audit</div>
+                <div className="card__label">Intelligence route exposure audit</div>
                 <p className="card__subtext">
                   Read-only route/controller/frontend-query exposure audit for AI readiness governance endpoints. It verifies the operator surface is backed by registered backend routes, controller exports, frontend query keys, and permission expectations before more AI governance keys are added.
                 </p>
@@ -4962,9 +5068,9 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_coverage_audit">
-                <div className="card__label">Unified AI runtime coverage audit</div>
+                <div className="card__label">Intelligence runtime coverage audit</div>
                 <p className="card__subtext">
-                  Runtime coverage matrix for registered AI/intelligence features. It checks whether each feature has backend endpoints, frontend consumers, evidence schema, and tenant evidence rows before treating it as commercially proven.
+                  Runtime coverage matrix for registered intelligence and AI-assisted features. It checks whether each feature has backend endpoints, frontend consumers, evidence schema, and tenant evidence rows before treating it as commercially proven.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
@@ -5027,7 +5133,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_remediation_worklist">
-                <div className="card__label">Unified AI runtime remediation worklist</div>
+                <div className="card__label">Intelligence runtime remediation worklist</div>
                 <p className="card__subtext">
                   Prioritized remediation list generated from the runtime coverage audit. It turns endpoint, frontend consumer, schema, and tenant evidence gaps into owner/action rows before commercial signoff.
                 </p>
@@ -5080,7 +5186,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_validation_drill">
-                <div className="card__label">Unified AI runtime validation drill</div>
+                <div className="card__label">Intelligence runtime validation drill</div>
                 <p className="card__subtext">
                   Operator-executable validation drill generated from the runtime remediation worklist. It defines real tenant evidence, pass criteria, and abort rules before any unwaived commercial AI signoff.
                 </p>
@@ -5137,7 +5243,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_signoff_evidence_ledger">
-                <div className="card__label">Unified AI runtime signoff evidence ledger</div>
+                <div className="card__label">Intelligence runtime signoff evidence ledger</div>
                 <p className="card__subtext">
                   Read-only signoff ledger that converts runtime coverage and validation drill evidence into feature-level operator signoff readiness. It does not record approval or release anything automatically.
                 </p>
@@ -5213,7 +5319,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_waiver_review_register">
-                <div className="card__label">Unified AI runtime waiver review register</div>
+                <div className="card__label">Intelligence runtime waiver review register</div>
                 <p className="card__subtext">
                   Read-only register for manual runtime waiver review, expiration control, renewal rules, and closure evidence. It does not create, renew, close, or approve waivers.
                 </p>
@@ -5267,7 +5373,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_waiver_escalation_matrix">
-                <div className="card__label">Unified AI runtime waiver escalation matrix</div>
+                <div className="card__label">Intelligence runtime waiver escalation matrix</div>
                 <p className="card__subtext">
                   Read-only escalation matrix for runtime AI waiver reviews. It separates executive, product/operations, and owner follow-up escalation before commercial AI enablement.
                 </p>
@@ -5322,7 +5428,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_waiver_closure_board">
-                <div className="card__label">Unified AI runtime waiver closure board</div>
+                <div className="card__label">Intelligence runtime waiver closure board</div>
                 <p className="card__subtext">
                   Read-only closure board for runtime AI waiver escalations. It keeps closure blockers, owners, due policy, and release conditions visible before commercial AI enablement.
                 </p>
@@ -5380,7 +5486,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_closure_monitoring_plan">
-                <div className="card__label">Unified AI runtime post-closure monitoring plan</div>
+                <div className="card__label">Intelligence runtime post-closure monitoring plan</div>
                 <p className="card__subtext">
                   Read-only post-closure monitoring plan for runtime AI waivers. It keeps monitoring cadence, owner hints, evidence packets, and broad-release conditions visible after closure review.
                 </p>
@@ -5437,7 +5543,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_closure_evidence_acceptance_gate">
-                <div className="card__label">Unified AI runtime post-closure evidence acceptance gate</div>
+                <div className="card__label">Intelligence runtime post-closure evidence acceptance gate</div>
                 <p className="card__subtext">
                   Read-only acceptance gate for post-closure runtime AI monitoring evidence. It keeps manual evidence acceptance, owner hints, due policy, and broad-release conditions visible without approving release or recording signoff.
                 </p>
@@ -5491,7 +5597,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_broad_release_readiness_board">
-                <div className="card__label">Unified AI runtime broad release readiness board</div>
+                <div className="card__label">Intelligence runtime broad release readiness board</div>
                 <p className="card__subtext">
                   Read-only board that carries accepted post-closure runtime evidence into manual broad-release review conditions. It keeps release-owner approval, tenant validation sample, and rollback acknowledgement requirements visible without enabling any tenant feature flag or release mutation.
                 </p>
@@ -5546,7 +5652,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_tenant_enablement_control_queue">
-                <div className="card__label">Unified AI runtime tenant enablement control queue</div>
+                <div className="card__label">Intelligence runtime tenant enablement control queue</div>
                 <p className="card__subtext">
                   Read-only queue that converts broad-release readiness into manual tenant enablement controls. It keeps feature-flag rollout plan, support/customer-success acknowledgement, and post-enablement monitoring owner requirements visible without mutating tenant flags.
                 </p>
@@ -5603,7 +5709,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_health_watchlist">
-                <div className="card__label">Unified AI runtime post-enablement health watchlist</div>
+                <div className="card__label">Intelligence runtime post-enablement health watchlist</div>
                 <p className="card__subtext">
                   Read-only watchlist that converts tenant enablement controls into post-enablement runtime health monitoring requirements. It keeps health metrics, incident review, rollback reconfirmation, and customer-success feedback evidence visible without scheduling monitoring jobs or changing rollout scope.
                 </p>
@@ -5660,7 +5766,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_incident_response_queue">
-                <div className="card__label">Unified AI runtime post-enablement incident response queue</div>
+                <div className="card__label">Intelligence runtime post-enablement incident response queue</div>
                 <p className="card__subtext">
                   Read-only incident response queue that converts post-enablement health watch rows into manual incident triage, tenant-impact review, support escalation, rollback decision logging, and customer communication controls. It does not create tickets, notify customers, pause rollout, or trigger rollback automatically.
                 </p>
@@ -5718,7 +5824,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_incident_closure_board">
-                <div className="card__label">Unified AI runtime post-enablement incident closure board</div>
+                <div className="card__label">Intelligence runtime post-enablement incident closure board</div>
                 <p className="card__subtext">
                   Read-only incident closure board that converts post-enablement incident response rows into manual root-cause analysis, tenant-impact resolution, customer follow-up, prevention action, and rollout-resume conditions. It does not update tickets, notify customers, resume rollout, or trigger rollback automatically.
                 </p>
@@ -5776,7 +5882,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_prevention_verification_backlog">
-                <div className="card__label">Unified AI runtime post-enablement prevention verification backlog</div>
+                <div className="card__label">Intelligence runtime post-enablement prevention verification backlog</div>
                 <p className="card__subtext">
                   Read-only prevention verification backlog that converts incident-closure rows into manual prevention-action implementation, effectiveness review, rollout-resume authorization, customer-success follow-up, and monitoring re-entry conditions. It does not update tickets, notify customers, resume rollout, or schedule monitoring jobs automatically.
                 </p>
@@ -5834,7 +5940,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_resume_authorization_ledger">
-                <div className="card__label">Unified AI runtime post-enablement rollout resume authorization ledger</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout resume authorization ledger</div>
                 <p className="card__subtext">
                   Read-only rollout-resume authorization ledger that converts prevention-verification rows into manual rollout-resume authorization, limited tenant-scope planning, rollback reconfirmation, customer-success acknowledgement, and post-resume health-owner controls. It does not change feature flags, notify customers, resume rollout, or schedule monitoring jobs automatically.
                 </p>
@@ -5893,7 +5999,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_resume_observation_board">
-                <div className="card__label">Unified AI runtime post-enablement rollout resume observation board</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout resume observation board</div>
                 <p className="card__subtext">
                   Read-only post-resume observation board that converts rollout-resume authorization rows into limited-scope observation, runtime health metric review, customer-success feedback, rollback readiness, and manual rollout-scope expansion controls. It does not expand rollout scope, change feature flags, notify customers, or schedule monitoring jobs automatically.
                 </p>
@@ -5952,7 +6058,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_scope_expansion_authorization_board">
-                <div className="card__label">Unified AI runtime post-enablement rollout scope expansion authorization board</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout scope expansion authorization board</div>
                 <p className="card__subtext">
                   Read-only scope-expansion authorization board that converts post-resume observation rows into manual expanded tenant-scope controls, limited-scope health acceptance, customer-success acknowledgement, rollback reconfirmation, and expanded-scope monitoring ownership. It does not change feature flags, expand rollout scope, notify customers, or schedule monitoring jobs automatically.
                 </p>
@@ -6011,7 +6117,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_expanded_scope_health_board">
-                <div className="card__label">Unified AI runtime post-enablement expanded scope health board</div>
+                <div className="card__label">Intelligence runtime post-enablement expanded scope health board</div>
                 <p className="card__subtext">
                   Read-only expanded-scope health board that converts rollout scope-expansion authorization rows into manual tenant-sample, runtime metric, customer-success, incident, rollback, and further rollout-growth controls. It does not change feature flags, notify customers, create support tickets, trigger rollback, or schedule monitoring jobs automatically.
                 </p>
@@ -6071,7 +6177,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_growth_authorization_board">
-                <div className="card__label">Unified AI runtime post-enablement rollout growth authorization board</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout growth authorization board</div>
                 <p className="card__subtext">
                   Read-only rollout-growth authorization board that converts expanded-scope health rows into manual business justification, customer-success, support-capacity, rollback, and growth-scope monitoring controls. It does not grow tenant scope, change feature flags, notify customers, create support tickets, trigger rollback, or schedule monitoring jobs automatically.
                 </p>
@@ -6131,7 +6237,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_growth_observation_board">
-                <div className="card__label">Unified AI runtime post-enablement rollout growth observation board</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout growth observation board</div>
                 <p className="card__subtext">
                   Read-only rollout-growth observation board that converts manual growth authorization into growth-scope tenant sample, runtime health, incident review, customer-success, support-capacity, rollback-readiness, and next-growth-step controls. It does not grow tenant scope, change feature flags, notify customers, create support tickets, trigger rollback, or schedule monitoring jobs automatically.
                 </p>
@@ -6193,7 +6299,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_rollout_growth_next_step_gate">
-                <div className="card__label">Unified AI runtime post-enablement rollout growth next-step gate</div>
+                <div className="card__label">Intelligence runtime post-enablement rollout growth next-step gate</div>
                 <p className="card__subtext">
                   Read-only next-growth-step gate that converts rollout growth observation into manual next-wave scope authorization controls. It requires observation acceptance, business justification, tenant-scope limits, customer-success/support capacity, runtime monitoring ownership, and rollback reconfirmation before any further tenant growth.
                 </p>
@@ -6254,7 +6360,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_next_wave_observation_board">
-                <div className="card__label">Unified AI runtime post-enablement next-wave observation board</div>
+                <div className="card__label">Intelligence runtime post-enablement next-wave observation board</div>
                 <p className="card__subtext">
                   Read-only next-wave observation board that converts accepted next-growth-step gates into runtime observation controls for the newly enabled tenant wave. It requires tenant-scope evidence, runtime health metrics, incident review, customer-success/support feedback, rollback readiness, and observation ownership before any additional growth.
                 </p>
@@ -6316,7 +6422,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_additional_growth_authorization_board">
-                <div className="card__label">Unified AI runtime post-enablement additional growth authorization board</div>
+                <div className="card__label">Intelligence runtime post-enablement additional growth authorization board</div>
                 <p className="card__subtext">
                   Read-only authorization board that converts accepted next-wave runtime observation into controlled additional rollout growth. It requires business justification, limited tenant-scope planning, customer-success/support capacity, runtime monitoring ownership, and rollback reconfirmation before another growth wave.
                 </p>
@@ -6377,7 +6483,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_additional_growth_observation_board">
-                <div className="card__label">Unified AI runtime post-enablement additional growth observation board</div>
+                <div className="card__label">Intelligence runtime post-enablement additional growth observation board</div>
                 <p className="card__subtext">
                   Read-only observation board that converts accepted additional-growth authorization into controlled runtime observation before any further rollout growth. It requires tenant-scope evidence, runtime health metrics, incident review, customer-success/support feedback, rollback readiness, and observation ownership.
                 </p>
@@ -6440,7 +6546,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_further_growth_exit_criteria_board">
-                <div className="card__label">Unified AI runtime post-enablement further growth exit criteria board</div>
+                <div className="card__label">Intelligence runtime post-enablement further growth exit criteria board</div>
                 <p className="card__subtext">
                   Read-only exit-criteria board that converts accepted additional-growth observation into controlled further-growth exit review. It requires runtime health stability, incident-free or resolved-exception evidence, customer-success/support acceptance, rollback rehearsal, and explicit owner evidence before the next rollout growth cycle exits observation.
                 </p>
@@ -6501,7 +6607,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_certification_board">
-                <div className="card__label">Unified AI runtime post-enablement steady-state certification board</div>
+                <div className="card__label">Intelligence runtime post-enablement steady-state certification board</div>
                 <p className="card__subtext">
                   Read-only steady-state certification board that converts accepted further-growth exit criteria into controlled runtime AI steady-state certification. It requires runtime health baseline evidence, incident-review acceptance, customer-success/support readiness, rollback reconfirmation, and explicit owner evidence before the AI feature is treated as steady-state operational.
                 </p>
@@ -6562,9 +6668,9 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_monitoring_cadence_board">
-                <div className="card__label">Unified AI runtime post-enablement steady-state monitoring cadence board</div>
+                <div className="card__label">Intelligence runtime post-enablement steady-state monitoring cadence board</div>
                 <p className="card__subtext">
-                  Read-only steady-state monitoring cadence board that converts manual steady-state certification into recurring runtime AI review controls. It requires recurring runtime health review, incident review, customer-success feedback, support escalation capacity review, rollback reconfirmation, and explicit cadence-owner evidence.
+                  Read-only steady-state monitoring cadence board that converts manual steady-state certification into recurring runtime intelligence review controls. It requires recurring runtime health review, incident review, customer-success feedback, support escalation capacity review, rollback reconfirmation, and explicit cadence-owner evidence.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
@@ -6627,7 +6733,7 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_monitoring_exception_review_queue">
                 <div className="card__header">
                   <div>
-                    <h3>Unified AI runtime steady-state exception review queue</h3>
+                    <h3>Intelligence runtime steady-state exception review queue</h3>
                     <p className="card__subtext">Recurring exception-review controls after steady-state monitoring cadence acceptance.</p>
                   </div>
                   <span style={badgeStyle}>{formatLabel(aiRuntimePostEnablementSteadyStateMonitoringExceptionReviewQueue?.steady_state_exception_review_status || 'not_reported')}</span>
@@ -6678,7 +6784,7 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_exception_closure_board">
                 <div className="card__header">
                   <div>
-                    <h3>Unified AI runtime steady-state exception closure board</h3>
+                    <h3>Intelligence runtime steady-state exception closure board</h3>
                     <p className="card__subtext">Manual closure controls after steady-state exception review acceptance.</p>
                   </div>
                   <span style={badgeStyle}>{formatLabel(aiRuntimePostEnablementSteadyStateExceptionClosureBoard?.steady_state_exception_closure_status || 'not_reported')}</span>
@@ -6734,7 +6840,7 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_exception_recurrence_audit_board">
                 <div className="card__header">
                   <div>
-                    <h3>Unified AI runtime steady-state exception recurrence audit board</h3>
+                    <h3>Intelligence runtime steady-state exception recurrence audit board</h3>
                     <p className="card__subtext">Manual recurrence audit controls after steady-state exception closure acceptance.</p>
                   </div>
                   <span style={badgeStyle}>{formatLabel(aiRuntimePostEnablementSteadyStateExceptionRecurrenceAuditBoard?.steady_state_exception_recurrence_audit_status || 'not_reported')}</span>
@@ -6789,7 +6895,7 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_exception_recurrence_resolution_board">
                 <div className="card__header">
                   <div>
-                    <h3>Unified AI runtime steady-state exception recurrence resolution board</h3>
+                    <h3>Intelligence runtime steady-state exception recurrence resolution board</h3>
                     <p className="card__subtext">Manual repeat-exception resolution controls after recurrence audit acceptance.</p>
                   </div>
                   <span style={badgeStyle}>{formatLabel(aiRuntimePostEnablementSteadyStateExceptionRecurrenceResolutionBoard?.steady_state_exception_recurrence_resolution_status || 'not_reported')}</span>
@@ -6843,7 +6949,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_exception_resolution_verification_board">
-                <div className="card__label">Unified AI runtime steady-state exception resolution verification board</div>
+                <div className="card__label">Intelligence runtime steady-state exception resolution verification board</div>
                 <p className="card__subtext">
                   Read-only verification board that checks recurrence-resolution effectiveness, monitoring samples, customer-success confirmation, support confirmation, and manual recertification conditions after repeat steady-state AI exceptions are resolved.
                 </p>
@@ -6894,7 +7000,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_post_enablement_steady_state_certification_renewal_board">
-                <div className="card__label">Unified AI runtime steady-state certification renewal board</div>
+                <div className="card__label">Intelligence runtime steady-state certification renewal board</div>
                 <p className="card__subtext">
                   Read-only renewal board that forces steady-state AI certification to be refreshed with current monitoring history, exception-resolution verification, customer-success health, support health, and AI governance owner signoff.
                 </p>
@@ -6946,7 +7052,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="runtime_final_governance_audit_pack">
-                <div className="card__label">Unified AI runtime final governance audit pack</div>
+                <div className="card__label">Intelligence runtime final governance audit pack</div>
                 <p className="card__subtext">
                   Read-only final audit pack that verifies AI contract freeze, runtime evidence, rollout history, monitoring history, exception resolution, certification renewal, and governance owner signoff before the AI track is considered complete.
                 </p>
@@ -6999,7 +7105,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="final_completion_freeze_manifest">
-                <div className="card__label">Unified AI final completion freeze manifest</div>
+                <div className="card__label">Intelligence final completion freeze manifest</div>
                 <p className="card__subtext">
                   Read-only final completion freeze manifest that carries final governance audit evidence into manual AI-track completion acceptance without certifying commercial grade, enabling tenants, sending notices, or mutating runtime systems.
                 </p>
@@ -7052,7 +7158,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="commercial_completion_certificate">
-                <div className="card__label">Unified AI commercial completion certificate</div>
+                <div className="card__label">Intelligence commercial completion certificate</div>
                 <p className="card__subtext">
                   Final read-only AI governance code-track completion certificate. It closes the governance-board expansion track, lists the remaining external runtime proof requirements, and hands the platform to the commercial launch readiness track without making customer claims or mutating runtime systems.
                 </p>
@@ -7113,9 +7219,9 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="contract_freeze_manifest">
-                <div className="card__label">Unified AI contract freeze manifest</div>
+                <div className="card__label">Intelligence contract freeze manifest</div>
                 <p className="card__subtext">
-                  Frozen platform-wide AI response contract manifest. It records which unified AI backend keys and frontend panels must stay aligned before any new AI governance surface is added or renamed.
+                  Frozen platform-wide AI response contract manifest. It records which unified intelligence backend keys and frontend panels must stay aligned before any new AI governance surface is added or renamed.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
@@ -7126,7 +7232,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card">
                     <div className="card__label">Contract version</div>
                     <div className="card__value" style={{ fontSize: 18 }}>{aiContractFreezeManifest?.contract_version || '—'}</div>
-                    <div className="card__subtext">Version label for this frozen unified AI governance contract.</div>
+                    <div className="card__subtext">Version label for this frozen unified intelligence governance contract.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Registered key alignment</div>
@@ -7136,7 +7242,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card">
                     <div className="card__label">Frozen / returned keys</div>
                     <div className="card__value">{numberValue(aiContractFreezeManifest?.frozen_key_count)} / {numberValue(aiContractFreezeManifest?.returned_key_count)}</div>
-                    <div className="card__subtext">Frozen response keys compared with actual unified AI response keys.</div>
+                    <div className="card__subtext">Frozen response keys compared with actual unified intelligence response keys.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Placeholder panels allowed</div>
@@ -7177,20 +7283,20 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="response_contract_audit">
-                <div className="card__label">Unified AI response contract audit</div>
+                <div className="card__label">Intelligence response contract audit</div>
                 <p className="card__subtext">
-                  Contract-freeze audit for the unified AI summary response. It verifies that every platform-wide AI governance panel is backed by a real backend response key and that those keys preserve the read-only safety contract.
+                  Contract-freeze audit for the unified intelligence summary response. It verifies that every platform-wide AI governance panel is backed by a real backend response key and that those keys preserve the read-only safety contract.
                 </p>
                 <div className="card-grid" style={{ ...gridStyle, marginTop: 12 }}>
                   <div className="card">
                     <div className="card__label">Contract status</div>
                     <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(aiResponseContractAudit?.contract_status)}</div>
-                    <div className="card__subtext">Backend contract-audit result for unified AI response keys.</div>
+                    <div className="card__subtext">Backend contract-audit result for unified intelligence response keys.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Expected / returned keys</div>
                     <div className="card__value">{numberValue(aiResponseContractAudit?.expected_key_count)} / {numberValue(aiResponseContractAudit?.returned_key_count)}</div>
-                    <div className="card__subtext">Expected unified AI summary keys compared with actual returned keys.</div>
+                    <div className="card__subtext">Expected unified intelligence summary keys compared with actual returned keys.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Missing / unexpected</div>
@@ -7200,12 +7306,12 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card">
                     <div className="card__label">Safety-contract gaps</div>
                     <div className="card__value">{numberValue(aiResponseContractAudit?.missing_or_unsafe_safety_contract_keys?.length)}</div>
-                    <div className="card__subtext">Unified AI response objects missing a safe read-only contract.</div>
+                    <div className="card__subtext">Intelligence response objects missing a safe read-only contract.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Safety coverage</div>
                     <div className="card__value">{numberValue(aiResponseContractAudit?.safety_contract_coverage_percent)}%</div>
-                    <div className="card__subtext">Expected unified AI objects covered by read-only safety contracts, including the audit object itself.</div>
+                    <div className="card__subtext">Expected unified intelligence objects covered by read-only safety contracts, including the audit object itself.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Self-audit included</div>
@@ -7250,7 +7356,7 @@ export default function HumanInLoopAIReviewPage() {
                 ) : null}
                 {aiResponseContractAudit?.missing_response_keys?.length ? (
                   <p className="form-error" style={{ marginTop: 12 }}>
-                    Missing unified AI response keys: {aiResponseContractAudit.missing_response_keys.map(formatLabel).join(', ')}
+                    Missing unified intelligence response keys: {aiResponseContractAudit.missing_response_keys.map(formatLabel).join(', ')}
                   </p>
                 ) : null}
               </div>
@@ -7269,7 +7375,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card">
                     <div className="card__label">Evidence-table coverage</div>
                     <div className="card__value">{numberValue(auditPack?.coverage?.evidence_table_coverage_percent)}%</div>
-                    <div className="card__subtext">Registered AI/intelligence evidence tables that exist in the current database schema.</div>
+                    <div className="card__subtext">Registered intelligence and AI-assisted evidence tables that exist in the current database schema.</div>
                   </div>
                   <div className="card">
                     <div className="card__label">Tenant-scope coverage</div>
@@ -7309,12 +7415,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production hardening plan</div>
                 {hardeningPlanQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production hardening plan…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production hardening plan…</p>
                 ) : hardeningPlanQuery.error ? (
                   <p className="form-error">
                     {hardeningPlanQuery.error instanceof ApiError
                       ? hardeningPlanQuery.error.message
-                      : 'Unable to load AI/intelligence production hardening plan.'}
+                      : 'Unable to load intelligence and AI-assisted production hardening plan.'}
                   </p>
                 ) : (
                   <>
@@ -7370,12 +7476,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production evidence matrix</div>
                 {evidenceMatrixQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence evidence matrix…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted evidence matrix…</p>
                 ) : evidenceMatrixQuery.error ? (
                   <p className="form-error">
                     {evidenceMatrixQuery.error instanceof ApiError
                       ? evidenceMatrixQuery.error.message
-                      : 'Unable to load AI/intelligence production evidence matrix.'}
+                      : 'Unable to load intelligence and AI-assisted production evidence matrix.'}
                   </p>
                 ) : (
                   <>
@@ -7418,12 +7524,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production release decision board</div>
                 {releaseDecisionBoardQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production release decision board…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production release decision board…</p>
                 ) : releaseDecisionBoardQuery.error ? (
                   <p className="form-error">
                     {releaseDecisionBoardQuery.error instanceof ApiError
                       ? releaseDecisionBoardQuery.error.message
-                      : 'Unable to load AI/intelligence production release decision board.'}
+                      : 'Unable to load intelligence and AI-assisted production release decision board.'}
                   </p>
                 ) : (
                   <>
@@ -7471,12 +7577,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production operational runbook</div>
                 {operationalRunbookQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production operational runbook…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production operational runbook…</p>
                 ) : operationalRunbookQuery.error ? (
                   <p className="form-error">
                     {operationalRunbookQuery.error instanceof ApiError
                       ? operationalRunbookQuery.error.message
-                      : 'Unable to load AI/intelligence production operational runbook.'}
+                      : 'Unable to load intelligence and AI-assisted production operational runbook.'}
                   </p>
                 ) : (
                   <>
@@ -7486,7 +7592,7 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>Next actions: {numberValue(nextOperatorActions.length)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {operationalRunbook?.operator_warning || 'Runbook guidance is read-only and does not execute AI/intelligence actions.'}
+                      {operationalRunbook?.operator_warning || 'Runbook guidance is read-only and does not execute intelligence and AI-assisted actions.'}
                     </p>
                     {dailyOperatorSequence.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -7537,12 +7643,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production validation suite</div>
                 {validationSuiteQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production validation suite…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production validation suite…</p>
                 ) : validationSuiteQuery.error ? (
                   <p className="form-error">
                     {validationSuiteQuery.error instanceof ApiError
                       ? validationSuiteQuery.error.message
-                      : 'Unable to load AI/intelligence production validation suite.'}
+                      : 'Unable to load intelligence and AI-assisted production validation suite.'}
                   </p>
                 ) : (
                   <>
@@ -7554,7 +7660,7 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>Tenant review: {numberValue(validationSuite?.totals?.tenant_isolation_review_case_count)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {validationSuite?.safety_rule || 'Validation proves readiness only; it does not execute AI/intelligence actions.'}
+                      {validationSuite?.safety_rule || 'Validation proves readiness only; it does not execute intelligence and AI-assisted actions.'}
                     </p>
                     {validationBlockedCases.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -7571,7 +7677,7 @@ export default function HumanInLoopAIReviewPage() {
                         </ol>
                       </div>
                     ) : (
-                      <p className="card__subtext" style={{ marginTop: 14 }}>No blocked AI/intelligence validation cases reported.</p>
+                      <p className="card__subtext" style={{ marginTop: 14 }}>No blocked intelligence and AI-assisted validation cases reported.</p>
                     )}
                     {validationReviewCases.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -7615,12 +7721,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production signoff checklist</div>
                 {signoffChecklistQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production signoff checklist…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production signoff checklist…</p>
                 ) : signoffChecklistQuery.error ? (
                   <p className="form-error">
                     {signoffChecklistQuery.error instanceof ApiError
                       ? signoffChecklistQuery.error.message
-                      : 'Unable to load AI/intelligence production signoff checklist.'}
+                      : 'Unable to load intelligence and AI-assisted production signoff checklist.'}
                   </p>
                 ) : (
                   <>
@@ -7633,7 +7739,7 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>Blocked features: {numberValue(signoffChecklist?.totals?.blocked_feature_count)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {signoffChecklist?.release_rule || 'Production signoff requires passing or governance-accepting every AI/intelligence checklist item.'}
+                      {signoffChecklist?.release_rule || 'Production signoff requires passing or governance-accepting every intelligence and AI-assisted checklist item.'}
                     </p>
                     {blockedSignoffFeatures.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -7650,7 +7756,7 @@ export default function HumanInLoopAIReviewPage() {
                         </ol>
                       </div>
                     ) : (
-                      <p className="card__subtext" style={{ marginTop: 14 }}>No blocked AI/intelligence signoff features reported.</p>
+                      <p className="card__subtext" style={{ marginTop: 14 }}>No blocked intelligence and AI-assisted signoff features reported.</p>
                     )}
                     {watchSignoffFeatures.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -7673,7 +7779,7 @@ export default function HumanInLoopAIReviewPage() {
 
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="card__label">Selected AI/intelligence feature drilldown</div>
+                <div className="card__label">Selected intelligence and AI-assisted feature drilldown</div>
                 <div style={{ ...toolbarStyle, marginTop: 10 }}>
                   <select
                     style={selectStyle}
@@ -7694,12 +7800,12 @@ export default function HumanInLoopAIReviewPage() {
                   </button>
                 </div>
                 {featureDetailQuery.isLoading ? (
-                  <p className="card__subtext">Loading selected AI/intelligence feature detail…</p>
+                  <p className="card__subtext">Loading selected intelligence and AI-assisted feature detail…</p>
                 ) : featureDetailQuery.error ? (
                   <p className="form-error">
                     {featureDetailQuery.error instanceof ApiError
                       ? featureDetailQuery.error.message
-                      : 'Unable to load selected AI/intelligence feature detail.'}
+                      : 'Unable to load selected intelligence and AI-assisted feature detail.'}
                   </p>
                 ) : (
                   <>
@@ -7791,7 +7897,7 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="card__label">Full AI/intelligence feature breakdown</div>
+                <div className="card__label">Full intelligence and AI-assisted feature breakdown</div>
                 <div style={{ overflowX: 'auto', marginTop: 10 }}>
                   <table className="table">
                     <thead>
@@ -7829,12 +7935,12 @@ export default function HumanInLoopAIReviewPage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">Production remediation workbench</div>
                 {remediationWorkbenchQuery.isLoading ? (
-                  <p className="card__subtext">Loading AI/intelligence production remediation workbench…</p>
+                  <p className="card__subtext">Loading intelligence and AI-assisted production remediation workbench…</p>
                 ) : remediationWorkbenchQuery.error ? (
                   <p className="form-error">
                     {remediationWorkbenchQuery.error instanceof ApiError
                       ? remediationWorkbenchQuery.error.message
-                      : 'Unable to load AI/intelligence production remediation workbench.'}
+                      : 'Unable to load intelligence and AI-assisted production remediation workbench.'}
                   </p>
                 ) : (
                   <>
@@ -7879,14 +7985,14 @@ export default function HumanInLoopAIReviewPage() {
                       <p className="card__subtext" style={{ marginTop: 14 }}>No remediation actions reported.</p>
                     )}
                     <p className="card__subtext" style={{ marginTop: 14 }}>
-                      This workbench is still read-only. It turns the existing AI/intelligence gaps into actionable production tasks, but it does not execute recommendations or mutate inventory, procurement, financial, approval, or external AI state.
+                      This workbench is still read-only. It turns the existing intelligence and AI-assisted gaps into actionable production tasks, but it does not execute recommendations or mutate inventory, procurement, financial, approval, or external AI state.
                     </p>
                   </>
                 )}
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="card__label">Production backlog from existing AI/intelligence features</div>
+                <div className="card__label">Production backlog from existing intelligence and AI-assisted features</div>
                 {productionBacklog.length ? (
                   <ol style={{ marginBottom: 0 }}>
                     {productionBacklog.slice(0, 12).map((item) => (
@@ -7906,9 +8012,12 @@ export default function HumanInLoopAIReviewPage() {
           )}
         </div>
       </section>
+      ) : null}
 
+      {activeView === 'recommendations' ? (
+        <>
       <section className="section">
-        <div className="section__title">Human-in-the-loop AI controls</div>
+        <div className="section__title">Recommendation review controls</div>
         {reviewActionMessage ? (
           <div className="card ai-review-page__feedback" style={{ marginBottom: 12 }} role="status" aria-live="polite">
             <p className="card__subtext">{reviewActionMessage}</p>
@@ -7916,17 +8025,17 @@ export default function HumanInLoopAIReviewPage() {
         ) : null}
         <div className="card">
           <div style={toolbarStyle}>
-            <select aria-label="AI operation domain" style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
+            <select aria-label="Review category" style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
               {DOMAIN_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <select aria-label="AI review state" style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
+            <select aria-label="Review state" style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
               {REVIEW_STATE_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <select aria-label="AI review urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
+            <select aria-label="Review urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
               {URGENCY_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -7939,12 +8048,12 @@ export default function HumanInLoopAIReviewPage() {
           </div>
 
           {reviewQuery.isLoading ? (
-            <p className="card__subtext">Loading human-in-the-loop AI review queue…</p>
+            <p className="card__subtext">Loading recommendation review queue…</p>
           ) : reviewQuery.error ? (
             <p className="form-error">
               {reviewQuery.error instanceof ApiError
                 ? reviewQuery.error.message
-                : 'Unable to load human-in-the-loop AI review queue.'}
+                : 'Unable to load the recommendation review queue.'}
             </p>
           ) : (
             <p className="card__subtext">
@@ -7957,13 +8066,14 @@ export default function HumanInLoopAIReviewPage() {
       <section className="section" id="ai-review-queue" style={{ scrollMarginTop: 16 }}>
         <div className="section__title">Review queue</div>
         {reviews.length === 0 && !reviewQuery.isLoading ? (
-          <div className="empty-state">No AI review items match the selected filters.</div>
+          <div className="empty-state">No recommendation review items match the selected filters.</div>
         ) : (
           <div style={reviewListStyle}>
             {reviews.map((review) => {
               const sourcePath = sourceReviewToAppPath(review);
               const confidence = review.confidence_visualization;
               const evidencePreview = review.simulation_preview;
+              const reviewOrigin = describeReviewOrigin(review);
               const lifecycle = review.lifecycle;
               const sourceActionId = review.source_action_id || '';
               const decisionDraft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
@@ -7994,6 +8104,11 @@ export default function HumanInLoopAIReviewPage() {
                       <div className="card__label">Evidence preview</div>
                       <strong>{evidencePreview?.preview_available ? 'Structured evidence available' : 'Metadata only'}</strong>
                       <div className="card__subtext">{formatLabel(evidencePreview?.preview_kind)}</div>
+                    </div>
+                    <div>
+                      <div className="card__label">How this result was produced</div>
+                      <strong>{reviewOrigin.label}</strong>
+                      <div className="card__subtext">{reviewOrigin.detail}</div>
                     </div>
                     <div>
                       <div className="card__label">Updated</div>
@@ -8164,18 +8279,21 @@ export default function HumanInLoopAIReviewPage() {
           </div>
         )}
       </section>
+        </>
+      ) : null}
 
-
+      {activeView === 'readiness' ? (
+        <>
       <section className="section">
         <div className="section__title">Production enablement manifest</div>
         <div className="card">
           {enablementManifestQuery.isLoading ? (
-            <p className="card__subtext">Loading AI/intelligence production enablement manifest…</p>
+            <p className="card__subtext">Loading intelligence and AI-assisted production enablement manifest…</p>
           ) : enablementManifestQuery.error ? (
             <p className="form-error">
               {enablementManifestQuery.error instanceof ApiError
                 ? enablementManifestQuery.error.message
-                : 'Unable to load AI/intelligence production enablement manifest.'}
+                : 'Unable to load intelligence and AI-assisted production enablement manifest.'}
             </p>
           ) : (
             <>
@@ -8233,12 +8351,12 @@ export default function HumanInLoopAIReviewPage() {
         <div className="section__title">Production monitoring contract</div>
         <div className="card">
           {monitoringContractQuery.isLoading ? (
-            <p className="card__subtext">Loading AI/intelligence production monitoring contract…</p>
+            <p className="card__subtext">Loading intelligence and AI-assisted production monitoring contract…</p>
           ) : monitoringContractQuery.error ? (
             <p className="form-error">
               {monitoringContractQuery.error instanceof ApiError
                 ? monitoringContractQuery.error.message
-                : 'Unable to load AI/intelligence production monitoring contract.'}
+                : 'Unable to load intelligence and AI-assisted production monitoring contract.'}
             </p>
           ) : (
             <>
@@ -8249,7 +8367,7 @@ export default function HumanInLoopAIReviewPage() {
                 <span style={badgeStyle}>Controlled: {numberValue(monitoringContract?.totals?.monitor_after_controlled_enablement)}</span>
               </div>
               <p className="card__subtext" style={{ marginTop: 12 }}>
-                {monitoringContract?.safety_rule || 'Monitoring is read-only and does not execute AI/intelligence actions.'}
+                {monitoringContract?.safety_rule || 'Monitoring is read-only and does not execute intelligence and AI-assisted actions.'}
               </p>
               {monitoringChecks.length ? (
                 <div style={{ marginTop: 14 }}>
@@ -8327,6 +8445,8 @@ export default function HumanInLoopAIReviewPage() {
           </div>
         </div>
       </section>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@ const read = (path) => readFileSync(join(root, path), 'utf8');
 const registry = read('src/app/navigationRegistry.ts');
 const router = read('src/app/router.tsx');
 const layout = read('src/layouts/AppLayout.tsx');
+const intelligenceReviewPage = read('src/pages/HumanInLoopAIReviewPage.tsx');
 
 const commercialRoutes = [
   {
@@ -41,10 +42,10 @@ const commercialRoutes = [
     label: 'Workflow Composer'
   },
   {
-    route: '/ai-review',
-    routerPath: 'ai-review',
+    route: '/intelligence-review',
+    routerPath: 'intelligence-review',
     page: 'src/pages/HumanInLoopAIReviewPage.tsx',
-    label: 'AI Review'
+    label: 'Intelligence Review'
   },
   {
     route: '/collaboration',
@@ -111,6 +112,24 @@ for (const item of commercialRoutes) {
 
   if (!existsSync(join(root, item.page))) {
     failures.push(`commercial page file is missing: ${item.page}`);
+  }
+}
+
+
+if (!router.includes("path: 'ai-review'") || !router.includes('LegacyAIReviewRedirect')) {
+  failures.push('router.tsx must keep the legacy /ai-review redirect for old bookmarks and deep links.');
+}
+
+for (const signal of [
+  'Recommendation reviews',
+  'Readiness &amp; governance',
+  'Not every item on this page was produced by an AI model',
+  'How this result was produced',
+  "activeView === 'recommendations'",
+  "activeView === 'readiness'"
+]) {
+  if (!intelligenceReviewPage.includes(signal)) {
+    failures.push(`Intelligence Review page is missing clarity/split-view signal: ${signal}`);
   }
 }
 

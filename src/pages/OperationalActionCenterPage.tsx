@@ -381,7 +381,7 @@ function sourceActionLink(action: OperationalAction): SourceActionLink | null {
 
   if (['decision_intelligence', 'ai_governance'].includes(action.action_domain)) {
     const params = new URLSearchParams({ source_action_id: action.action_id });
-    return { to: `/ai-review?${params.toString()}`, label: 'Open AI review' };
+    return { to: `/intelligence-review?${params.toString()}`, label: 'Open intelligence review' };
   }
 
   const sourcePath = sourceSurfaceToAppPath(action.explainability?.source_surface);

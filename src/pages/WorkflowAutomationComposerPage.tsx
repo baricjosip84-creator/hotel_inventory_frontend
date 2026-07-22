@@ -274,7 +274,7 @@ function blueprintSourceLink(blueprint: WorkflowBlueprint): BlueprintLink | null
 
   if (['decision_intelligence', 'ai_governance'].includes(String(sourceDomain)) && blueprint.source_action_id) {
     return {
-      to: `/ai-review?${new URLSearchParams({ source_action_id: blueprint.source_action_id }).toString()}`,
+      to: `/intelligence-review?${new URLSearchParams({ source_action_id: blueprint.source_action_id }).toString()}`,
       label: 'Open review'
     };
   }

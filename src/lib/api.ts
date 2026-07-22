@@ -219,7 +219,7 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   }
 
   if (normalizedMethod === 'POST' && normalizedPath.includes('/operational-action-center/human-in-loop-ai-reviews/')) {
-    if (normalizedPath.endsWith('/decision')) return 'AI review decision recorded successfully.';
+    if (normalizedPath.endsWith('/decision')) return 'Intelligence review decision recorded successfully.';
     if (normalizedPath.endsWith('/execution-request-draft')) return 'Execution Request draft created successfully.';
   }
 

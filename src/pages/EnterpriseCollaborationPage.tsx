@@ -226,7 +226,7 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
     '/mobile-execution',
     '/real-time-operations-feed',
     '/workflow-composer',
-    '/ai-review',
+    '/intelligence-review',
     '/execution-tasks',
     '/execution-requests',
     '/alerts',
@@ -330,7 +330,7 @@ export default function EnterpriseCollaborationPage() {
               {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh threads'}
             </button>
             <Link className="button button--secondary" to="/real-time-operations-feed">Open operations feed</Link>
-            <Link className="button button--secondary" to="/ai-review">Open AI review</Link>
+            <Link className="button button--secondary" to="/intelligence-review">Open intelligence review</Link>
           </div>
 
           {collaborationQuery.isLoading ? (

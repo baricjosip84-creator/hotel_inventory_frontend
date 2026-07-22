@@ -19,7 +19,7 @@
   system/admin visibility, and management insights.
 */
 
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
 import DashboardPage from '../pages/DashboardPage';
@@ -160,6 +160,12 @@ import PlatformCommercialLaunchRetentionRenewalFinalSealPage from '../pages/Plat
 import PlatformCommercialLaunchRetentionRenewalArchiveSealPage from '../pages/PlatformCommercialLaunchRetentionRenewalArchiveSealPage';
 import PlatformCommercialLaunchRetentionRenewalCycleResetPage from '../pages/PlatformCommercialLaunchRetentionRenewalCycleResetPage';
 import { PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+
+
+function LegacyAIReviewRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/intelligence-review${location.search}${location.hash}`} replace />;
+}
 
 const router = createBrowserRouter([
   {
@@ -963,7 +969,12 @@ const router = createBrowserRouter([
       {
         path: 'mobile-execution',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+          <ProtectedRoute
+            requiredPermissions={[
+              TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+              TENANT_PERMISSIONS.EXECUTION_TASKS_READ
+            ]}
+          >
             <MobileExecutionPage />
           </ProtectedRoute>
         )
@@ -985,7 +996,7 @@ const router = createBrowserRouter([
         )
       },
       {
-        path: 'ai-review',
+        path: 'intelligence-review',
         element: (
           <ProtectedRoute requiredPermissions={[
             TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
@@ -994,6 +1005,10 @@ const router = createBrowserRouter([
             <HumanInLoopAIReviewPage />
           </ProtectedRoute>
         )
+      },
+      {
+        path: 'ai-review',
+        element: <LegacyAIReviewRedirect />
       },
       {
         path: 'ai-copilot',

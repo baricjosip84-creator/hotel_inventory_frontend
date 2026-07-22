@@ -9,7 +9,7 @@ The phase preserves existing backend contracts and existing tenant routes while 
 - unified tenant application shell metadata
 - centralized navigation and module registry
 - commercial command/action surfaces
-- role-aware workspace, mobile execution, real-time operations, workflow composer, AI review, collaboration, digital twin, and reliability command UI foundations
+- role-aware workspace, mobile execution, real-time operations, workflow composer, Intelligence Review, collaboration, digital twin, and reliability command UI foundations
 - route-query state normalization for command filters
 - tenant/permission visibility signals in the shell
 - regression and closure scripts that protect route, registry, page, permission, and shell drift

@@ -32,7 +32,7 @@ export const commercialFrontendClosureGuardrails: CommercialFrontendClosureGuard
   {
     id: 'command-surfaces',
     label: 'Commercial command surfaces',
-    description: 'Action center, workspace, mobile execution, operations feed, workflow composer, AI review, collaboration, digital twin, and reliability command routes are present and shell-registered.',
+    description: 'Action center, workspace, mobile execution, operations feed, workflow composer, intelligence review, collaboration, digital twin, and reliability command routes are present and shell-registered.',
     evidence: ['src/app/router.tsx', 'src/pages/*Command*.tsx', 'src/pages/*Workspace*.tsx']
   },
   {

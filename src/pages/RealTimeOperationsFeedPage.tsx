@@ -239,7 +239,7 @@ function sourceItemLink(item: TimelineItem): FeedLink | null {
 
     if (['decision_intelligence', 'ai_governance'].includes(String(item.timeline_domain)) && item.correlation_id) {
       return {
-        to: `/ai-review?${new URLSearchParams({ source_action_id: item.correlation_id }).toString()}`,
+        to: `/intelligence-review?${new URLSearchParams({ source_action_id: item.correlation_id }).toString()}`,
         label: 'Open review'
       };
     }

@@ -84,9 +84,9 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
       {
-        to: '/ai-review',
-        label: 'AI Review',
-        description: 'Human-in-the-loop intelligence review queue with source confidence, structured evidence previews, explainability, override, and approval guidance.',
+        to: '/intelligence-review',
+        label: 'Intelligence Review',
+        description: 'Separates actionable recommendation reviews from read-only readiness and governance checks, with clear disclosure of rule-based versus AI-assisted results.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
         requiredPermissions: [
@@ -97,7 +97,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/ai-copilot',
         label: 'AI Copilot',
-        description: 'Governed tenant-scoped inventory analysis and structured proposal preparation with no autonomous execution.',
+        description: 'Explains inventory risks, summarizes priorities, and prepares proposals for human review without changing business data.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },

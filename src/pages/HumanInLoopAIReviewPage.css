@@ -63,3 +63,34 @@
     padding: 14px;
   }
 }
+
+
+.ai-review-page__intro-title {
+  margin: 6px 0 8px;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  line-height: 1.2;
+}
+
+.ai-review-page__view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-soft, #f7f9fc);
+}
+
+.ai-review-page__view-switch .button {
+  flex: 1 1 240px;
+}
+
+.ai-review-page__mode-explanation {
+  margin: 0;
+  padding-top: 2px;
+}
+
+.ai-review-page__readiness-note {
+  line-height: 1.5;
+}
