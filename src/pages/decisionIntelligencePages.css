@@ -418,3 +418,79 @@
     text-align: left;
   }
 }
+
+/* Learning Feedback keeps everyday evidence review separate from technical readiness controls. */
+.decision-intelligence-page .learning-feedback-view-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .learning-feedback-view-switch__button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.decision-intelligence-page .learning-feedback-view-switch__button:hover,
+.decision-intelligence-page .learning-feedback-view-switch__button:focus-visible {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.decision-intelligence-page .learning-feedback-view-switch__button.is-active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.14);
+}
+
+.decision-intelligence-page .learning-feedback-advanced {
+  margin-top: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .learning-feedback-advanced > summary {
+  padding: 14px 16px;
+  color: #334155;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.decision-intelligence-page .learning-feedback-advanced[open] > summary {
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.decision-intelligence-page .learning-feedback-advanced__body {
+  padding: 16px;
+}
+
+.decision-intelligence-page .learning-feedback-read-only {
+  border-left: 4px solid #64748b;
+}
+
+@media (max-width: 767px) {
+  .decision-intelligence-page .learning-feedback-view-switch {
+    display: grid;
+    width: 100%;
+  }
+
+  .decision-intelligence-page .learning-feedback-view-switch__button {
+    width: 100%;
+  }
+
+  .decision-intelligence-page .learning-feedback-advanced__body {
+    padding: 12px;
+  }
+}

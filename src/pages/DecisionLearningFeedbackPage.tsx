@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import './decisionIntelligencePages.css';
 
 type FeedbackMode = 'learning-outcomes' | 'forecast-accuracy' | 'policy-effectiveness' | 'optimization-results';
+type LearningFeedbackView = 'feedback' | 'readiness';
 
 type ContinuousLearningSummary = {
   tenant_id?: string;
@@ -1330,12 +1332,12 @@ type FeedbackFormState = {
   executionReference: string;
   lifecycleEvidence: string;
   outcomeClassification: string;
-  outcomeReviewRequired: boolean;
+  outcomeReviewRequired: string;
   outcomeReviewReason: string;
   financialImpactAmount: string;
   financialImpactCurrency: string;
-  stockoutPrevented: boolean;
-  overstockPrevented: boolean;
+  stockoutPrevented: string;
+  overstockPrevented: string;
   wasteReducedQuantity: string;
   serviceLevelDeltaPercent: string;
   businessImpactEvidence: string;
@@ -1403,7 +1405,7 @@ const statusOptions: Record<FeedbackMode, string[]> = {
 const defaultForm: FeedbackFormState = {
   domain: 'multi_domain',
   status: 'observed',
-  score: '0',
+  score: '',
   reference: '',
   expected: '',
   observed: '',
@@ -1414,7 +1416,7 @@ const defaultForm: FeedbackFormState = {
   wasteImpactScore: '',
   serviceLevelImpactScore: '',
   outcomeConfidenceScore: '',
-  lifecycleStatus: 'measured',
+  lifecycleStatus: '',
   generatedAt: '',
   approvedAt: '',
   executedAt: '',
@@ -1422,25 +1424,25 @@ const defaultForm: FeedbackFormState = {
   scoredAt: '',
   executionReference: '',
   lifecycleEvidence: '',
-  outcomeClassification: 'unclassified',
-  outcomeReviewRequired: false,
+  outcomeClassification: '',
+  outcomeReviewRequired: '',
   outcomeReviewReason: '',
   financialImpactAmount: '',
-  financialImpactCurrency: 'EUR',
-  stockoutPrevented: false,
-  overstockPrevented: false,
+  financialImpactCurrency: '',
+  stockoutPrevented: '',
+  overstockPrevented: '',
   wasteReducedQuantity: '',
   serviceLevelDeltaPercent: '',
   businessImpactEvidence: '',
   baselineMetricValue: '',
   targetMetricValue: '',
   actualMetricValue: '',
-  metricUnit: 'units',
-  targetDirection: 'increase',
+  metricUnit: '',
+  targetDirection: '',
   targetTolerancePercent: '',
   targetMet: '',
   targetEvidence: '',
-  attributionMethod: 'before_after',
+  attributionMethod: '',
   attributionConfidenceScore: '',
   counterfactualReference: '',
   attributionEvidence: '',
@@ -1450,29 +1452,29 @@ const defaultForm: FeedbackFormState = {
   measurementSampleSize: '',
   measurementDataQualityScore: '',
   measurementQualityEvidence: '',
-  reviewStatus: 'not_required',
+  reviewStatus: '',
   reviewOwner: '',
   reviewedAt: '',
   reviewResolution: '',
   reviewEvidence: '',
   evaluationDueAt: '',
-  evaluationStatus: 'not_scheduled',
+  evaluationStatus: '',
   evaluationOwner: '',
   evaluationEvidence: '',
-  acceptanceStatus: 'pending',
+  acceptanceStatus: '',
   acceptanceOwner: '',
   acceptedAt: '',
   acceptanceEvidence: '',
-  correctiveActionStatus: 'not_required',
+  correctiveActionStatus: '',
   correctiveActionOwner: '',
   correctiveActionDueAt: '',
   correctiveActionResolvedAt: '',
   correctiveActionEvidence: '',
-  learningSignal: 'unclassified',
+  learningSignal: '',
   learningSignalReason: '',
   learningSignalNextAction: '',
   learningSignalEvidence: '',
-  learningActionStatus: 'assigned',
+  learningActionStatus: '',
   learningActionOwner: '',
   learningActionDueAt: '',
   learningActionCompletedAt: '',
@@ -1495,7 +1497,7 @@ function scoreOrNull(value: string): number | null {
   if (value.trim() === '') return null;
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
-  return Math.max(-1, Math.min(1, numeric));
+  return numeric;
 }
 
 function numberOrNull(value: string): number | null {
@@ -1509,7 +1511,7 @@ function formatLabel(value: unknown): string {
   return String(value).replace(/_/g, ' ');
 }
 
-function formatTimestamp(value: number | string | null | undefined): string {
+function formatTimestamp(value: unknown): string {
   if (!value) return 'not refreshed yet';
   const timestamp = typeof value === 'number' ? value : Date.parse(String(value));
   if (!Number.isFinite(timestamp)) return 'unknown';
@@ -1578,7 +1580,7 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
     waste_impact_score: scoreOrNull(form.wasteImpactScore),
     service_level_impact_score: scoreOrNull(form.serviceLevelImpactScore),
     outcome_confidence_score: scoreOrNull(form.outcomeConfidenceScore),
-    recommendation_lifecycle_status: form.lifecycleStatus || 'measured',
+    recommendation_lifecycle_status: form.lifecycleStatus || undefined,
     recommendation_generated_at: form.generatedAt || undefined,
     recommendation_approved_at: form.approvedAt || undefined,
     recommendation_executed_at: form.executedAt || undefined,
@@ -1586,13 +1588,13 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
     recommendation_scored_at: form.scoredAt || undefined,
     execution_reference: safeJsonObject(form.executionReference),
     lifecycle_evidence: safeJsonObject(form.lifecycleEvidence),
-    recommendation_outcome_classification: form.outcomeClassification || 'unclassified',
-    recommendation_outcome_review_required: form.outcomeReviewRequired,
+    recommendation_outcome_classification: form.outcomeClassification || undefined,
+    recommendation_outcome_review_required: form.outcomeReviewRequired === '' ? undefined : form.outcomeReviewRequired === 'true',
     recommendation_outcome_review_reason: safeJsonObject(form.outcomeReviewReason),
     financial_impact_amount: numberOrNull(form.financialImpactAmount),
     financial_impact_currency: form.financialImpactCurrency.trim().toUpperCase() || undefined,
-    stockout_prevented: form.stockoutPrevented,
-    overstock_prevented: form.overstockPrevented,
+    stockout_prevented: form.stockoutPrevented === '' ? undefined : form.stockoutPrevented === 'true',
+    overstock_prevented: form.overstockPrevented === '' ? undefined : form.overstockPrevented === 'true',
     waste_reduced_quantity: numberOrNull(form.wasteReducedQuantity),
     service_level_delta_percent: numberOrNull(form.serviceLevelDeltaPercent),
     recommendation_business_impact_evidence: safeJsonObject(form.businessImpactEvidence),
@@ -1605,14 +1607,14 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
     target_met: form.targetMet === '' ? undefined : form.targetMet === 'true',
     recommendation_target_evidence: safeJsonObject(form.targetEvidence),
     recommendation_attribution_method: form.attributionMethod || undefined,
-    recommendation_attribution_confidence_score: scoreOrNull(form.attributionConfidenceScore) === null ? null : Math.max(0, Math.min(1, Number(form.attributionConfidenceScore))),
+    recommendation_attribution_confidence_score: numberOrNull(form.attributionConfidenceScore),
     recommendation_counterfactual_reference: safeJsonObject(form.counterfactualReference),
     recommendation_attribution_evidence: safeJsonObject(form.attributionEvidence),
     recommendation_measurement_method: form.measurementMethod.trim() || undefined,
     recommendation_measurement_source: form.measurementSource.trim() || undefined,
     recommendation_measurement_owner: form.measurementOwner.trim() || undefined,
     recommendation_measurement_sample_size: numberOrNull(form.measurementSampleSize),
-    recommendation_measurement_data_quality_score: scoreOrNull(form.measurementDataQualityScore) === null ? null : Math.max(0, Math.min(1, Number(form.measurementDataQualityScore))),
+    recommendation_measurement_data_quality_score: numberOrNull(form.measurementDataQualityScore),
     recommendation_measurement_quality_evidence: safeJsonObject(form.measurementQualityEvidence),
     recommendation_outcome_review_status: form.reviewStatus || undefined,
     recommendation_outcome_review_owner: form.reviewOwner.trim() || undefined,
@@ -1623,25 +1625,81 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
     recommendation_outcome_evaluation_status: form.evaluationStatus || undefined,
     recommendation_outcome_evaluation_owner: form.evaluationOwner.trim() || undefined,
     recommendation_outcome_evaluation_evidence: safeJsonObject(form.evaluationEvidence),
-    recommendation_outcome_acceptance_status: form.acceptanceStatus || 'pending',
+    recommendation_outcome_acceptance_status: form.acceptanceStatus || undefined,
     recommendation_outcome_acceptance_owner: form.acceptanceOwner.trim() || undefined,
     recommendation_outcome_accepted_at: form.acceptedAt || undefined,
     recommendation_outcome_acceptance_evidence: safeJsonObject(form.acceptanceEvidence),
-    recommendation_outcome_corrective_action_status: form.correctiveActionStatus || 'not_required',
+    recommendation_outcome_corrective_action_status: form.correctiveActionStatus || undefined,
     recommendation_outcome_corrective_action_owner: form.correctiveActionOwner.trim() || undefined,
     recommendation_outcome_corrective_action_due_at: form.correctiveActionDueAt || undefined,
     recommendation_outcome_corrective_action_resolved_at: form.correctiveActionResolvedAt || undefined,
     recommendation_outcome_corrective_action_evidence: safeJsonObject(form.correctiveActionEvidence),
-    recommendation_outcome_learning_signal: form.learningSignal || 'unclassified',
+    recommendation_outcome_learning_signal: form.learningSignal || undefined,
     recommendation_outcome_learning_signal_reason: form.learningSignalReason.trim() || undefined,
     recommendation_outcome_recommended_next_action: form.learningSignalNextAction.trim() || undefined,
     recommendation_outcome_learning_signal_evidence: safeJsonObject(form.learningSignalEvidence),
-    recommendation_outcome_learning_action_status: form.learningActionStatus || 'assigned',
+    recommendation_outcome_learning_action_status: form.learningActionStatus || undefined,
     recommendation_outcome_learning_action_owner: form.learningActionOwner.trim() || undefined,
     recommendation_outcome_learning_action_due_at: form.learningActionDueAt || undefined,
     recommendation_outcome_learning_action_completed_at: form.learningActionCompletedAt || undefined,
     recommendation_outcome_learning_action_evidence: safeJsonObject(form.learningActionEvidence)
   };
+}
+
+
+function validateNumberRange(value: string, label: string, min: number, max: number): string | null {
+  if (!value.trim()) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return `${label} must be a number.`;
+  if (numeric < min || numeric > max) return `${label} must be between ${min} and ${max}.`;
+  return null;
+}
+
+function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState): string | null {
+  const scoreFields: Array<[string, string, number, number]> = [
+    [form.score, 'Score', -1, 1],
+    [form.businessValueScore, 'Business value', -1, 1],
+    [form.stockImpactScore, 'Stock impact', -1, 1],
+    [form.financialImpactScore, 'Financial impact', -1, 1],
+    [form.wasteImpactScore, 'Waste impact', -1, 1],
+    [form.serviceLevelImpactScore, 'Service impact', -1, 1],
+    [form.outcomeConfidenceScore, 'Outcome confidence', 0, 1],
+    [form.attributionConfidenceScore, 'Attribution confidence', 0, 1],
+    [form.measurementDataQualityScore, 'Data quality score', 0, 1]
+  ];
+
+  for (const [value, label, min, max] of scoreFields) {
+    const error = validateNumberRange(value, label, min, max);
+    if (error) return error;
+  }
+
+  if (form.financialImpactCurrency.trim() && !/^[A-Za-z]{3}$/.test(form.financialImpactCurrency.trim())) {
+    return 'Currency must use a three-letter code such as EUR.';
+  }
+
+  if (mode === 'forecast-accuracy') {
+    if (!form.expected.trim() || !form.observed.trim()) {
+      return 'Enter both the predicted value and the observed value.';
+    }
+    if (!Number.isFinite(Number(form.expected)) || !Number.isFinite(Number(form.observed))) {
+      return 'Predicted and observed values must be numbers.';
+    }
+    return null;
+  }
+
+  if (mode === 'learning-outcomes') {
+    if (!form.recommendationKey.trim() && !form.reference.trim()) {
+      return 'Add a recommendation key or a reference so this outcome can be traced.';
+    }
+  } else if (!form.reference.trim()) {
+    return 'Add a reference for the policy or optimization result being reviewed.';
+  }
+
+  if (!form.observed.trim()) {
+    return 'Describe the observed result before recording feedback.';
+  }
+
+  return null;
 }
 
 function StatCard({ label, value }: { label: string; value: unknown }) {
@@ -1663,7 +1721,7 @@ function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedbac
         <div>
           <h2>Feedback action plan</h2>
           <p className="card__subtext">
-            Backend-generated manual review plan from observed learning evidence. It does not train models, update policies, execute recommendations, or mutate operational state.
+            Suggested follow-up work based on the feedback records already captured. People still decide whether to take any action, who owns it, and when it is complete.
           </p>
         </div>
       </div>
@@ -1718,7 +1776,7 @@ function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearni
         <div>
           <h2>Learning impact assessment</h2>
           <p className="card__subtext">
-            Backend-generated impact view that compares positive evidence, drift pressure, and open review pressure. It is read-only visibility; it does not train models or update policies.
+            A read-only comparison of positive results, signs that results are changing, and evidence that still needs human review.
           </p>
         </div>
       </div>
@@ -3567,7 +3625,7 @@ function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feed
         <div>
           <h2>Feedback review board</h2>
           <p className="card__subtext">
-            Backend-generated governance queue for learning evidence that needs human resolution. This is visibility and review guidance only; it does not execute recommendations or update models.
+            Feedback records that still need a person to check, accept, correct, or close. This page only helps organize the review; it does not carry out recommendations.
           </p>
         </div>
       </div>
@@ -4296,33 +4354,39 @@ function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<stri
       <div className="card__header">
         <div>
           <h2>{title}</h2>
-          <p className="card__subtext">Latest governed learning evidence from the backend continuous-learning summary.</p>
+          <p className="card__subtext">
+            The latest saved records in this category. {rows.length > previewRows.length ? `Showing ${previewRows.length} of ${rows.length}.` : `${rows.length} record${rows.length === 1 ? '' : 's'} shown.`}
+          </p>
         </div>
       </div>
       {!previewRows.length ? (
-        <p className="card__subtext">No evidence captured yet.</p>
+        <p className="card__subtext">No feedback evidence has been recorded in this category yet.</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Key</th>
-                <th>Domain</th>
+                <th>Record</th>
+                <th>Area</th>
                 <th>Status</th>
                 <th>Score / Error</th>
                 <th>Observed</th>
               </tr>
             </thead>
             <tbody>
-              {previewRows.map((row, index) => (
-                <tr key={String(row.id || row.outcome_key || row.accuracy_key || row.effectiveness_key || row.result_key || index)}>
-                  <td>{formatLabel(row.outcome_key || row.accuracy_key || row.effectiveness_key || row.result_key || row.id)}</td>
-                  <td>{formatLabel(row.learning_domain || row.forecast_domain || row.policy_domain || row.result_domain)}</td>
-                  <td>{formatLabel(row.outcome_status || row.calibration_status || row.effectiveness_status || row.result_status)}</td>
-                  <td>{formatLabel(row.outcome_score || row.absolute_error || row.effectiveness_score || row.realized_value_score)}</td>
-                  <td>{formatLabel(row.observed_at)}</td>
-                </tr>
-              ))}
+              {previewRows.map((row, index) => {
+                const businessKey = row.outcome_key ?? row.accuracy_key ?? row.effectiveness_key ?? row.result_key;
+                const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
+                return (
+                  <tr key={String(row.id ?? businessKey ?? index)}>
+                    <td>{businessKey ? formatLabel(businessKey) : `Recorded item ${index + 1}`}</td>
+                    <td>{formatLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain)}</td>
+                    <td>{formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status)}</td>
+                    <td>{formatLabel(score)}</td>
+                    <td>{formatTimestamp(row.observed_at)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -4333,6 +4397,9 @@ function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<stri
 
 export default function DecisionLearningFeedbackPage() {
   const queryClient = useQueryClient();
+  const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
   const [form, setForm] = useState<FeedbackFormState>(defaultForm);
   const [message, setMessage] = useState<string | null>(null);
@@ -4345,7 +4412,8 @@ export default function DecisionLearningFeedbackPage() {
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/${mode}`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      skipMutationFeedback: true
     }),
     onSuccess: async () => {
       setMessage(`${modeLabels[mode]} recorded. The backend stores this as learning evidence only.`);
@@ -4360,13 +4428,13 @@ export default function DecisionLearningFeedbackPage() {
   const governance = summaryQuery.data?.governance;
   const activeStatusOptions = useMemo(() => statusOptions[mode], [mode]);
 
-  const updateForm = (field: keyof FeedbackFormState, value: string | boolean) => {
+  const updateForm = (field: keyof FeedbackFormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
   const handleModeChange = (nextMode: FeedbackMode) => {
     setMode(nextMode);
-    setForm((current) => ({ ...current, status: statusOptions[nextMode][0] || 'observed' }));
+    setForm({ ...defaultForm, status: statusOptions[nextMode][0] || 'observed' });
     setMessage(null);
   };
 
@@ -4374,14 +4442,23 @@ export default function DecisionLearningFeedbackPage() {
     setMessage(null);
     const result = await summaryQuery.refetch();
     if (result.error) {
-      setMessage(result.error instanceof Error ? result.error.message : 'Unable to refresh continuous-learning summary.');
+      setMessage(result.error instanceof Error ? result.error.message : 'Unable to refresh the learning feedback summary.');
       return;
     }
-    setMessage('Continuous-learning summary refreshed.');
+    setMessage('Learning feedback summary refreshed.');
   };
 
   const submitFeedback = () => {
     setMessage(null);
+    if (!canGovern) {
+      setMessage('You have read-only access. Decision Intelligence governance permission is required to record feedback.');
+      return;
+    }
+    const validationError = validateFeedbackForm(mode, form);
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
     mutation.mutate(buildPayload(mode, form));
   };
 
@@ -4390,9 +4467,9 @@ export default function DecisionLearningFeedbackPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">Decision Intelligence</p>
-          <h1>Continuous Learning Feedback</h1>
+          <h1>Learning Feedback</h1>
           <p className="page-subtitle">
-            Capture observed outcomes, forecast accuracy, policy effectiveness, and optimization results without training models, auto-updating policies, or mutating operational state.
+            Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -4405,9 +4482,9 @@ export default function DecisionLearningFeedbackPage() {
 
       {summaryQuery.isError ? (
         <section className="card card--danger">
-          <h2>Continuous-learning summary unavailable</h2>
+          <h2>Learning feedback summary unavailable</h2>
           <p className="card__subtext">
-            {summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load continuous-learning summary.'}
+            {summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load the learning feedback summary.'}
           </p>
           <button className="button" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
             {summaryQuery.isFetching ? 'Retrying…' : 'Retry'}
@@ -4423,12 +4500,36 @@ export default function DecisionLearningFeedbackPage() {
         <StatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} />
       </div>
 
+      <div className="learning-feedback-view-switch" role="tablist" aria-label="Learning Feedback view">
+        <button
+          className={`learning-feedback-view-switch__button${view === 'feedback' ? ' is-active' : ''}`}
+          type="button"
+          role="tab"
+          aria-selected={view === 'feedback'}
+          onClick={() => setView('feedback')}
+        >
+          Feedback records
+        </button>
+        {canViewDiagnostics ? (
+          <button
+            className={`learning-feedback-view-switch__button${view === 'readiness' ? ' is-active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={view === 'readiness'}
+            onClick={() => setView('readiness')}
+          >
+            Readiness checks
+          </button>
+        ) : null}
+      </div>
+
+      {view === 'feedback' ? (canGovern ? (
       <section className="card">
         <div className="card__header">
           <div>
-            <h2>Record governed feedback</h2>
-            <p className="card__subtext">This writes audit-backed evidence to the new feedback endpoints and then refreshes the existing continuous-learning summary.</p>
-            <p className="card__subtext">Fields marked JSON accept JSON objects. Fields marked JSON or note also accept plain text, which is stored as a note. Submission remains evidence-only and never trains models, executes recommendations, or mutates operational state.</p>
+            <h2>Record feedback evidence</h2>
+            <p className="card__subtext">Choose what was reviewed, identify the source, and describe the expected and actual result. The saved record is added to the audit trail and the summary is refreshed.</p>
+            <p className="card__subtext">Advanced fields are optional. Leave a field blank when the answer is not known; the system will not turn a blank field into a measured result, decision, or assigned action.</p>
           </div>
         </div>
 
@@ -4462,7 +4563,9 @@ export default function DecisionLearningFeedbackPage() {
         </div>
 
         {mode === 'learning-outcomes' ? (
-          <>
+          <details className="learning-feedback-advanced">
+            <summary>Additional recommendation outcome details</summary>
+            <div className="learning-feedback-advanced__body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
               <span className="form-label">Business value</span>
@@ -4491,12 +4594,14 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Outcome classification</span>
               <select className="input" value={form.outcomeClassification} onChange={(event) => updateForm('outcomeClassification', event.target.value)}>
+                <option value="">Decide from status and scores</option>
                 {['successful', 'partially_successful', 'neutral', 'failed', 'inconclusive', 'unclassified'].map((classification) => <option key={classification} value={classification}>{formatLabel(classification)}</option>)}
               </select>
             </label>
             <label>
               <span className="form-label">Review required</span>
-              <select className="input" value={String(form.outcomeReviewRequired)} onChange={(event) => updateForm('outcomeReviewRequired', event.target.value === 'true')}>
+              <select className="input" value={form.outcomeReviewRequired} onChange={(event) => updateForm('outcomeReviewRequired', event.target.value)}>
+                <option value="">Decide from the evidence</option>
                 <option value="false">No</option>
                 <option value="true">Yes</option>
               </select>
@@ -4522,14 +4627,16 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">Stockout prevented</span>
-              <select className="input" value={String(form.stockoutPrevented)} onChange={(event) => updateForm('stockoutPrevented', event.target.value === 'true')}>
+              <select className="input" value={form.stockoutPrevented} onChange={(event) => updateForm('stockoutPrevented', event.target.value)}>
+                <option value="">Not known</option>
                 <option value="false">No</option>
                 <option value="true">Yes</option>
               </select>
             </label>
             <label>
               <span className="form-label">Overstock prevented</span>
-              <select className="input" value={String(form.overstockPrevented)} onChange={(event) => updateForm('overstockPrevented', event.target.value === 'true')}>
+              <select className="input" value={form.overstockPrevented} onChange={(event) => updateForm('overstockPrevented', event.target.value)}>
+                <option value="">Not known</option>
                 <option value="false">No</option>
                 <option value="true">Yes</option>
               </select>
@@ -4572,6 +4679,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Target direction</span>
               <select className="input" value={form.targetDirection} onChange={(event) => updateForm('targetDirection', event.target.value)}>
+                <option value="">Not specified</option>
                 <option value="increase">Increase</option>
                 <option value="decrease">Decrease</option>
                 <option value="maintain">Maintain</option>
@@ -4602,6 +4710,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Attribution method</span>
               <select className="input" value={form.attributionMethod} onChange={(event) => updateForm('attributionMethod', event.target.value)}>
+                <option value="">Not specified</option>
                 {['direct_measurement', 'before_after', 'control_group', 'counterfactual', 'manual_assessment', 'inferred'].map((method) => <option key={method} value={method}>{formatLabel(method)}</option>)}
               </select>
             </label>
@@ -4656,6 +4765,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Review status</span>
               <select className="input" value={form.reviewStatus} onChange={(event) => updateForm('reviewStatus', event.target.value)}>
+                <option value="">Decide from the evidence</option>
                 {['not_required', 'open', 'in_review', 'resolved', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4691,6 +4801,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Evaluation status</span>
               <select className="input" value={form.evaluationStatus} onChange={(event) => updateForm('evaluationStatus', event.target.value)}>
+                <option value="">Decide from due date</option>
                 {['not_scheduled', 'scheduled', 'due', 'overdue', 'completed', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4711,6 +4822,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Outcome acceptance status</span>
               <select className="input" value={form.acceptanceStatus} onChange={(event) => updateForm('acceptanceStatus', event.target.value)}>
+                <option value="">Not decided</option>
                 {['pending', 'accepted', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4735,6 +4847,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Corrective action status</span>
               <select className="input" value={form.correctiveActionStatus} onChange={(event) => updateForm('correctiveActionStatus', event.target.value)}>
+                <option value="">Decide from the outcome</option>
                 {['not_required', 'open', 'in_progress', 'resolved', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4763,6 +4876,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Learning signal</span>
               <select className="input" value={form.learningSignal} onChange={(event) => updateForm('learningSignal', event.target.value)}>
+                <option value="">Decide from the evidence</option>
                 {['reinforce', 'tune', 'suppress', 'review', 'unclassified'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4787,6 +4901,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Learning action status</span>
               <select className="input" value={form.learningActionStatus} onChange={(event) => updateForm('learningActionStatus', event.target.value)}>
+                <option value="">Decide from the learning signal</option>
                 {['pending', 'assigned', 'completed', 'blocked', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4815,6 +4930,7 @@ export default function DecisionLearningFeedbackPage() {
             <label>
               <span className="form-label">Lifecycle status</span>
               <select className="input" value={form.lifecycleStatus} onChange={(event) => updateForm('lifecycleStatus', event.target.value)}>
+                <option value="">Decide from timestamps and status</option>
                 {['generated', 'approved', 'executed', 'measured', 'scored', 'validated', 'needs_review', 'dismissed'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
               </select>
             </label>
@@ -4849,7 +4965,8 @@ export default function DecisionLearningFeedbackPage() {
               <textarea className="input" rows={3} value={form.lifecycleEvidence} onChange={(event) => updateForm('lifecycleEvidence', event.target.value)} placeholder='{"reviewer":"manager","evidence":"approved and executed"}' />
             </label>
           </div>
-          </>
+            </div>
+          </details>
         ) : null}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
@@ -4867,67 +4984,88 @@ export default function DecisionLearningFeedbackPage() {
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           <button className="button" type="button" disabled={mutation.isPending} onClick={submitFeedback}>
             {mutation.isPending ? 'Recording…' : 'Record feedback evidence'}
           </button>
-          {message ? <span className="card__subtext">{message}</span> : null}
+          {message ? <span className="card__subtext" role="status">{message}</span> : null}
         </div>
       </section>
+      ) : (
+        <section className="card learning-feedback-read-only">
+          <h2>Feedback records are read-only for your role</h2>
+          <p className="card__subtext">You can review the summary and recorded evidence, but recording new feedback requires the Decision Intelligence governance permission.</p>
+        </section>
+      )) : null}
 
-      <RecommendationOutcomeFoundation foundation={summaryQuery.data?.recommendation_outcome_foundation} />
-      <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
-      <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
-      <LearningCoverageMatrix matrix={summaryQuery.data?.learning_coverage_matrix} />
-      <LearningMaturityRoadmap roadmap={summaryQuery.data?.learning_maturity_roadmap} />
-      <ClosedLoopGovernanceGate gate={summaryQuery.data?.closed_loop_governance_gate} />
-      <ClosedLoopSignoffPacket packet={summaryQuery.data?.closed_loop_signoff_packet} />
-      <ClosedLoopReleaseReadinessSnapshot snapshot={summaryQuery.data?.closed_loop_release_readiness_snapshot} />
-      <ClosedLoopOperationalHandoff handoff={summaryQuery.data?.closed_loop_operational_handoff} />
-      <ClosedLoopOperationalAcceptance acceptance={summaryQuery.data?.closed_loop_operational_acceptance} />
-      <ClosedLoopMonitoringReadiness readiness={summaryQuery.data?.closed_loop_monitoring_readiness} />
-      <ClosedLoopProductionSurveillance surveillance={summaryQuery.data?.closed_loop_production_surveillance} />
-      <ClosedLoopExceptionRegister register={summaryQuery.data?.closed_loop_exception_register} />
-      <ClosedLoopResolutionPlan plan={summaryQuery.data?.closed_loop_resolution_plan} />
-      <ClosedLoopClosureReport report={summaryQuery.data?.closed_loop_closure_report} />
-      <ClosedLoopCertificationDossier dossier={summaryQuery.data?.closed_loop_certification_dossier} />
-      <ClosedLoopAuditLedger ledger={summaryQuery.data?.closed_loop_audit_ledger} />
-      <ClosedLoopComplianceAttestation attestation={summaryQuery.data?.closed_loop_compliance_attestation} />
-      <ClosedLoopCommercialReadinessPacket packet={summaryQuery.data?.closed_loop_commercial_readiness_packet} />
-      <ClosedLoopCustomerPilotReadiness pilot={summaryQuery.data?.closed_loop_customer_pilot_readiness} />
-      <ClosedLoopCustomerPilotLaunchControl launch={summaryQuery.data?.closed_loop_customer_pilot_launch_control} />
-      <ClosedLoopCustomerPilotSuccessCriteria success={summaryQuery.data?.closed_loop_customer_pilot_success_criteria} />
-      <ClosedLoopCustomerPilotOutcomeReview review={summaryQuery.data?.closed_loop_customer_pilot_outcome_review} />
-      <ClosedLoopCustomerPilotExpansionReadiness expansion={summaryQuery.data?.closed_loop_customer_pilot_expansion_readiness} />
-      <ClosedLoopEnterpriseRolloutReadiness rollout={summaryQuery.data?.closed_loop_enterprise_rollout_readiness} />
-      <ClosedLoopEnterpriseRolloutGovernance governance={summaryQuery.data?.closed_loop_enterprise_rollout_governance} />
-      <ClosedLoopMultiTenantRolloutControls controls={summaryQuery.data?.closed_loop_multi_tenant_rollout_controls} />
-      <ClosedLoopEnterpriseAdoptionReadiness readiness={summaryQuery.data?.closed_loop_enterprise_adoption_readiness} />
-      <ClosedLoopEnterpriseActivationPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_plan} />
-      <ClosedLoopEnterpriseActivationRunbook runbook={summaryQuery.data?.closed_loop_enterprise_activation_runbook} />
-      <ClosedLoopEnterpriseActivationRollbackPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_rollback_plan} />
-      <ClosedLoopEnterpriseActivationCutoverReadiness readiness={summaryQuery.data?.closed_loop_enterprise_activation_cutover_readiness} />
-      <ClosedLoopEnterpriseActivationStabilizationPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_stabilization_plan} />
-      <ClosedLoopEnterpriseActivationSupportReadiness readiness={summaryQuery.data?.closed_loop_enterprise_activation_support_readiness} />
-      <ClosedLoopEnterpriseActivationValueAssurance assurance={summaryQuery.data?.closed_loop_enterprise_activation_value_assurance} />
-      <ClosedLoopEnterpriseActivationValueRealizationReview review={summaryQuery.data?.closed_loop_enterprise_activation_value_realization_review} />
-      <ClosedLoopEnterpriseValueExpansionDecision decision={summaryQuery.data?.closed_loop_enterprise_value_expansion_decision} />
-      <ClosedLoopEnterpriseValueExpansionOperatingModel model={summaryQuery.data?.closed_loop_enterprise_value_expansion_operating_model} />
-      <ClosedLoopEnterpriseExpansionGovernanceCadence cadence={summaryQuery.data?.closed_loop_enterprise_expansion_governance_cadence} />
-      <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} />
+      {view === 'feedback' ? (
+        <>
+          <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
+          <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
+          <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} />
 
-      <section className="card">
-        <h2>Safety contract</h2>
-        <p className="card__subtext">
-          External model training: {governance?.external_model_training ? 'yes' : 'no'} · Autonomous model update: {governance?.autonomous_model_update ? 'yes' : 'no'} · Autonomous policy update: {governance?.autonomous_policy_update ? 'yes' : 'no'} · Operational mutation: {governance?.operational_state_mutation ? 'yes' : 'no'}
-        </p>
-        <p className="card__subtext">Observed domains: {(governance?.observed_domains || []).join(', ') || 'none yet'}</p>
-      </section>
+          <section className="card">
+            <h2>What this page can change</h2>
+            <p className="card__subtext">
+              It can save feedback evidence for later review. It cannot train an external model, change an AI model or policy by itself, execute a recommendation, or change stock and other operational records.
+            </p>
+            <p className="card__subtext">
+              Business areas represented in the current records: {(governance?.observed_domains || []).map(formatLabel).join(', ') || 'none yet'}.
+            </p>
+          </section>
 
-      <EvidenceTable title="Learning outcomes" rows={summaryQuery.data?.outcomes || []} />
-      <EvidenceTable title="Forecast accuracy" rows={summaryQuery.data?.forecast_accuracy || []} />
-      <EvidenceTable title="Policy effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} />
-      <EvidenceTable title="Optimization results" rows={summaryQuery.data?.optimization_results || []} />
+          <EvidenceTable title="Learning outcomes" rows={summaryQuery.data?.outcomes || []} />
+          <EvidenceTable title="Forecast accuracy" rows={summaryQuery.data?.forecast_accuracy || []} />
+          <EvidenceTable title="Policy effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} />
+          <EvidenceTable title="Optimization results" rows={summaryQuery.data?.optimization_results || []} />
+        </>
+      ) : canViewDiagnostics ? (
+        <>
+          <section className="card">
+            <h2>Readiness checks</h2>
+            <p className="card__subtext">
+              These technical checks support internal release, monitoring, audit, and rollout reviews. They do not prove that an AI model was used and they do not carry out operational work.
+            </p>
+          </section>
+          <RecommendationOutcomeFoundation foundation={summaryQuery.data?.recommendation_outcome_foundation} />
+          <LearningCoverageMatrix matrix={summaryQuery.data?.learning_coverage_matrix} />
+          <LearningMaturityRoadmap roadmap={summaryQuery.data?.learning_maturity_roadmap} />
+          <ClosedLoopGovernanceGate gate={summaryQuery.data?.closed_loop_governance_gate} />
+          <ClosedLoopSignoffPacket packet={summaryQuery.data?.closed_loop_signoff_packet} />
+          <ClosedLoopReleaseReadinessSnapshot snapshot={summaryQuery.data?.closed_loop_release_readiness_snapshot} />
+          <ClosedLoopOperationalHandoff handoff={summaryQuery.data?.closed_loop_operational_handoff} />
+          <ClosedLoopOperationalAcceptance acceptance={summaryQuery.data?.closed_loop_operational_acceptance} />
+          <ClosedLoopMonitoringReadiness readiness={summaryQuery.data?.closed_loop_monitoring_readiness} />
+          <ClosedLoopProductionSurveillance surveillance={summaryQuery.data?.closed_loop_production_surveillance} />
+          <ClosedLoopExceptionRegister register={summaryQuery.data?.closed_loop_exception_register} />
+          <ClosedLoopResolutionPlan plan={summaryQuery.data?.closed_loop_resolution_plan} />
+          <ClosedLoopClosureReport report={summaryQuery.data?.closed_loop_closure_report} />
+          <ClosedLoopCertificationDossier dossier={summaryQuery.data?.closed_loop_certification_dossier} />
+          <ClosedLoopAuditLedger ledger={summaryQuery.data?.closed_loop_audit_ledger} />
+          <ClosedLoopComplianceAttestation attestation={summaryQuery.data?.closed_loop_compliance_attestation} />
+          <ClosedLoopCommercialReadinessPacket packet={summaryQuery.data?.closed_loop_commercial_readiness_packet} />
+          <ClosedLoopCustomerPilotReadiness pilot={summaryQuery.data?.closed_loop_customer_pilot_readiness} />
+          <ClosedLoopCustomerPilotLaunchControl launch={summaryQuery.data?.closed_loop_customer_pilot_launch_control} />
+          <ClosedLoopCustomerPilotSuccessCriteria success={summaryQuery.data?.closed_loop_customer_pilot_success_criteria} />
+          <ClosedLoopCustomerPilotOutcomeReview review={summaryQuery.data?.closed_loop_customer_pilot_outcome_review} />
+          <ClosedLoopCustomerPilotExpansionReadiness expansion={summaryQuery.data?.closed_loop_customer_pilot_expansion_readiness} />
+          <ClosedLoopEnterpriseRolloutReadiness rollout={summaryQuery.data?.closed_loop_enterprise_rollout_readiness} />
+          <ClosedLoopEnterpriseRolloutGovernance governance={summaryQuery.data?.closed_loop_enterprise_rollout_governance} />
+          <ClosedLoopMultiTenantRolloutControls controls={summaryQuery.data?.closed_loop_multi_tenant_rollout_controls} />
+          <ClosedLoopEnterpriseAdoptionReadiness readiness={summaryQuery.data?.closed_loop_enterprise_adoption_readiness} />
+          <ClosedLoopEnterpriseActivationPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_plan} />
+          <ClosedLoopEnterpriseActivationRunbook runbook={summaryQuery.data?.closed_loop_enterprise_activation_runbook} />
+          <ClosedLoopEnterpriseActivationRollbackPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_rollback_plan} />
+          <ClosedLoopEnterpriseActivationCutoverReadiness readiness={summaryQuery.data?.closed_loop_enterprise_activation_cutover_readiness} />
+          <ClosedLoopEnterpriseActivationStabilizationPlan plan={summaryQuery.data?.closed_loop_enterprise_activation_stabilization_plan} />
+          <ClosedLoopEnterpriseActivationSupportReadiness readiness={summaryQuery.data?.closed_loop_enterprise_activation_support_readiness} />
+          <ClosedLoopEnterpriseActivationValueAssurance assurance={summaryQuery.data?.closed_loop_enterprise_activation_value_assurance} />
+          <ClosedLoopEnterpriseActivationValueRealizationReview review={summaryQuery.data?.closed_loop_enterprise_activation_value_realization_review} />
+          <ClosedLoopEnterpriseValueExpansionDecision decision={summaryQuery.data?.closed_loop_enterprise_value_expansion_decision} />
+          <ClosedLoopEnterpriseValueExpansionOperatingModel model={summaryQuery.data?.closed_loop_enterprise_value_expansion_operating_model} />
+          <ClosedLoopEnterpriseExpansionGovernanceCadence cadence={summaryQuery.data?.closed_loop_enterprise_expansion_governance_cadence} />
+        </>
+      ) : null}
     </div>
   );
 }

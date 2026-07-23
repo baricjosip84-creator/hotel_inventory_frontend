@@ -14,6 +14,8 @@ const allowedClasses = new Set([
   'button', 'button--secondary',
   'card', 'card--danger', 'card__header', 'card__label', 'card__subtext', 'card__value',
   'data-table', 'eyebrow', 'form-label', 'input', 'page-header', 'page-subtitle',
+  'learning-feedback-advanced', 'learning-feedback-advanced__body', 'learning-feedback-read-only',
+  'learning-feedback-view-switch', 'learning-feedback-view-switch__button',
   'stat-card', 'stat-card__label', 'stat-card__value', 'table', 'table-wrap',
   'bg-amber-50', 'bg-red-50', 'bg-red-700', 'bg-slate-100', 'bg-slate-200', 'bg-slate-50', 'bg-slate-900', 'bg-white',
   'border', 'border-amber-200', 'border-red-200', 'border-slate-100', 'border-slate-200', 'border-slate-300',

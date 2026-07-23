@@ -104,7 +104,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/decision-learning-feedback',
         label: 'Learning Feedback',
-        description: 'Governed decision-intelligence feedback capture for outcomes, forecast accuracy, policy effectiveness, and optimization evidence.',
+        description: 'Records what happened after recommendations, forecasts, policies, and optimization results so people can review whether they helped.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },
