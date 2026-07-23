@@ -132,7 +132,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/collaboration',
         label: 'Collaboration',
-        description: 'Enterprise collaboration thread guidance for incidents, escalations, task coordination, and governed source-workflow comments.',
+        description: 'Read-only coordination recommendations for permitted alerts, tasks, governance reviews, and operational events. It does not send messages or create threads.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },

@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import './EnterpriseCollaborationPage.css';
+
+type CollaborationView = 'recommendations' | 'limits' | 'diagnostics';
 
 type CollaborationDomain =
   | 'alerts'
@@ -23,11 +26,11 @@ type CollaborationThreadType =
   | 'governance_review_thread';
 
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
+type ResultLimit = '25' | '50' | '75' | '100';
 
 type CollaborationThread = {
-  thread_id: string;
-  source_action_id?: string;
-  source_timeline_item_id?: string;
+  thread_key?: string;
+  thread_id?: string;
   collaboration_domain?: string;
   thread_type?: string;
   urgency?: string;
@@ -35,40 +38,31 @@ type CollaborationThread = {
   summary?: string | null;
   participants_hint?: {
     suggested_roles?: string[];
-    external_participants_allowed_from_endpoint?: boolean;
-    endpoint_sends_messages?: boolean;
   };
   coordination_context?: {
     source_surface?: string | null;
     recommended_next_step?: string | null;
     escalation_recommended?: boolean;
-    correlation_id?: string | null;
-    source_reference?: Record<string, unknown>;
   };
   comment_guidance?: {
     comment_capture_surface?: string | null;
-    endpoint_records_comment?: boolean;
     recommended_comment_topics?: string[];
   };
   war_room_guidance?: {
     war_room_candidate?: boolean;
-    suggested_cadence?: string;
-    endpoint_creates_room?: boolean;
+    suggested_cadence?: string | null;
   };
-  safety_contract?: Record<string, boolean>;
   created_at?: string | null;
   updated_at?: string | null;
 };
 
 type CollaborationResponse = {
   definition?: {
-    foundation_type?: string;
     execution_mode?: string;
-    source_foundations?: string[];
-    supported_collaboration_domains?: string[];
-    supported_thread_types?: string[];
-    collaboration_capabilities?: string[];
-    safety_contract?: Record<string, boolean>;
+    [key: string]: unknown;
+  };
+  access?: {
+    can_view_diagnostics?: boolean;
   };
   filters?: {
     collaboration_domain?: string | null;
@@ -85,104 +79,118 @@ type CollaborationResponse = {
     by_urgency?: Record<string, number>;
   };
   guidance?: {
-    next_thread_id?: string | null;
-    next_thread_type?: string | null;
-    next_thread_urgency?: string | null;
     collaboration_guidance?: string;
     escalation_thread_guidance?: string;
     incident_war_room_guidance?: string;
     supplier_coordination_guidance?: string;
-    safety_contract?: Record<string, boolean>;
+    [key: string]: unknown;
   };
   threads?: CollaborationThread[];
-  source_workspace_summary?: Record<string, unknown>;
-  source_event_coordination_summary?: Record<string, unknown>;
   non_mutation_guarantee?: boolean;
   generated_at?: string;
+  [key: string]: unknown;
 };
 
 const DOMAIN_FILTERS: Array<{ value: 'all' | CollaborationDomain; label: string }> = [
-  { value: 'all', label: 'All collaboration domains' },
+  { value: 'all', label: 'All coordination areas' },
   { value: 'alerts', label: 'Alerts' },
-  { value: 'execution', label: 'Execution' },
+  { value: 'execution', label: 'Execution tasks' },
   { value: 'control_tower', label: 'Control tower' },
   { value: 'decision_intelligence', label: 'Decision intelligence' },
   { value: 'ai_governance', label: 'AI governance' },
-  { value: 'workflow', label: 'Workflow' },
-  { value: 'event_coordination', label: 'Event coordination' },
-  { value: 'multi_domain', label: 'Multi-domain' }
+  { value: 'event_coordination', label: 'Operational events' },
+  { value: 'multi_domain', label: 'All areas together' }
 ];
 
 const THREAD_FILTERS: Array<{ value: 'all' | CollaborationThreadType; label: string }> = [
-  { value: 'all', label: 'All thread types' },
-  { value: 'triage_thread', label: 'Triage thread' },
-  { value: 'approval_thread', label: 'Approval thread' },
-  { value: 'incident_thread', label: 'Incident thread' },
-  { value: 'supplier_coordination_thread', label: 'Supplier coordination thread' },
-  { value: 'task_coordination_thread', label: 'Task coordination thread' },
-  { value: 'governance_review_thread', label: 'Governance review thread' }
+  { value: 'all', label: 'All recommendation types' },
+  { value: 'triage_thread', label: 'Triage guidance' },
+  { value: 'approval_thread', label: 'Approval review' },
+  { value: 'incident_thread', label: 'Incident coordination' },
+  { value: 'task_coordination_thread', label: 'Task coordination' },
+  { value: 'governance_review_thread', label: 'Governance review' }
 ];
 
 const URGENCY_FILTERS: Array<{ value: 'all' | Urgency; label: string }> = [
-  { value: 'all', label: 'All urgency' },
+  { value: 'all', label: 'All urgency levels' },
   { value: 'critical', label: 'Critical' },
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
 ];
 
-const gridStyle: CSSProperties = {
-  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))'
+const LIMIT_FILTERS: Array<{ value: ResultLimit; label: string }> = [
+  { value: '25', label: '25 recommendations' },
+  { value: '50', label: '50 recommendations' },
+  { value: '75', label: '75 recommendations' },
+  { value: '100', label: '100 recommendations' }
+];
+
+const DEFAULT_FILTERS = {
+  collaborationDomain: 'all' as 'all' | CollaborationDomain,
+  threadType: 'all' as 'all' | CollaborationThreadType,
+  urgency: 'all' as 'all' | Urgency,
+  limit: '50' as ResultLimit
 };
 
-const toolbarStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  marginBottom: 16
+const ROLE_LABELS: Record<string, string> = {
+  source_owner: 'Source record owner',
+  governance_reviewer: 'Governance reviewer',
+  operations_manager: 'Operations manager',
+  operator: 'Operator',
+  shift_lead: 'Shift lead',
+  integration_owner: 'Integration owner'
 };
 
-const selectStyle: CSSProperties = {
-  border: '1px solid var(--color-border)',
-  borderRadius: 10,
-  padding: '10px 12px',
-  background: 'white',
-  minWidth: 190
+const CADENCE_LABELS: Record<string, string> = {
+  active_coordination_until_resolved: 'Active coordination until resolved',
+  as_needed_status_review: 'Review when the status changes',
+  monitor_and_review: 'Monitor and review'
 };
 
-const threadListStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
-  gap: 14
+const THREAD_TYPE_LABELS: Record<string, string> = {
+  triage_thread: 'Triage guidance',
+  approval_thread: 'Approval review',
+  incident_thread: 'Incident coordination',
+  supplier_coordination_thread: 'Supplier coordination',
+  task_coordination_thread: 'Task coordination',
+  governance_review_thread: 'Governance review'
 };
 
-const badgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  borderRadius: 999,
-  padding: '4px 9px',
-  background: '#f3f4f6',
-  color: '#374151',
-  fontSize: 12,
-  fontWeight: 700,
-  textTransform: 'capitalize'
+const DOMAIN_LABELS: Record<string, string> = {
+  alerts: 'Alerts',
+  execution: 'Execution',
+  control_tower: 'Control tower',
+  decision_intelligence: 'Decision intelligence',
+  ai_governance: 'AI governance',
+  workflow: 'Workflow',
+  event_coordination: 'Operational events',
+  multi_domain: 'Multiple areas'
 };
 
-const metadataStyle: CSSProperties = {
-  display: 'flex',
-  gap: 10,
-  flexWrap: 'wrap',
-  marginTop: 14
+const TOPIC_LABELS: Record<string, string> = {
+  current_status: 'Current status',
+  owner_assignment: 'Owner assignment',
+  blockers: 'Blockers',
+  manual_resolution_plan: 'Manual resolution plan',
+  event_status: 'Event status',
+  impact_scope: 'Impact and affected area',
+  manual_follow_up_owner: 'Follow-up owner',
+  resolution_notes: 'Resolution notes'
 };
 
-const metadataItemStyle: CSSProperties = {
-  border: '1px solid var(--color-border)',
-  borderRadius: 10,
-  padding: '8px 10px',
-  background: '#f9fafb',
-  color: '#374151',
-  fontSize: 12,
-  fontWeight: 700
+const SOURCE_LABELS: Record<string, string> = {
+  '/action-center': 'Open Action Center',
+  '/alerts': 'Open Alerts',
+  '/execution-tasks': 'Open Execution Tasks',
+  '/real-time-operations-feed': 'Open Operations Feed',
+  '/intelligence-review': 'Open Intelligence Review',
+  '/ai-copilot': 'Open AI Copilot',
+  '/inventory-reservations': 'Open Reservations',
+  '/inventory-requisitions': 'Open Requisitions',
+  '/procurement-recommendations': 'Open Procurement Recommendations',
+  '/shipments': 'Open Shipments',
+  '/reports': 'Open Reports'
 };
 
 function numberValue(value: unknown): number {
@@ -190,256 +198,318 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatLabel(value?: string | null): string {
-  return String(value || 'unknown').replace(/_/g, ' ');
-}
-
-function formatAppliedFilter(value?: string | number | null): string {
-  if (value === undefined || value === null || value === '') {
-    return 'All';
-  }
-
-  if (typeof value === 'number') {
-    return String(value);
-  }
-
-  return formatLabel(value);
+function formatIdentifier(value?: string | null, fallback = 'Not specified'): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return fallback;
+  return normalized
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return 'Not reported';
-  }
-
+  if (!value) return 'Not reported';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
-  if (!sourceSurface || !sourceSurface.startsWith('/')) {
-    return null;
+  if (!sourceSurface) return null;
+  if (sourceSurface === '/operational-action-center/summary' || sourceSurface === '/control-tower') {
+    return '/action-center';
   }
-
-  const tenantRoutes = new Set([
-    '/action-center',
-    '/workspace',
-    '/mobile-execution',
-    '/real-time-operations-feed',
-    '/workflow-composer',
-    '/intelligence-review',
-    '/execution-tasks',
-    '/execution-requests',
-    '/alerts',
-    '/insights',
-    '/inventory-reservations',
-    '/inventory-requisitions',
-    '/procurement-recommendations',
-    '/shipments',
-    '/reports'
-  ]);
-
-  return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+  return Object.prototype.hasOwnProperty.call(SOURCE_LABELS, sourceSurface) ? sourceSurface : null;
 }
 
-async function fetchEnterpriseCollaborationSummary(
-  collaborationDomain: 'all' | CollaborationDomain,
-  threadType: 'all' | CollaborationThreadType,
-  urgency: 'all' | Urgency
-): Promise<CollaborationResponse> {
-  const params = new URLSearchParams({ limit: '75' });
+function urgencyLabel(value?: string | null): string {
+  return formatIdentifier(value, 'Unspecified urgency');
+}
 
-  if (collaborationDomain !== 'all') {
-    params.set('collaboration_domain', collaborationDomain);
-  }
+function threadTypeLabel(value?: string | null): string {
+  return value ? THREAD_TYPE_LABELS[value] || formatIdentifier(value) : 'Coordination guidance';
+}
 
-  if (threadType !== 'all') {
-    params.set('thread_type', threadType);
-  }
+function domainLabel(value?: string | null): string {
+  return value ? DOMAIN_LABELS[value] || formatIdentifier(value) : 'General operations';
+}
 
-  if (urgency !== 'all') {
-    params.set('urgency', urgency);
-  }
+function roleLabel(value: string): string {
+  return ROLE_LABELS[value] || formatIdentifier(value);
+}
 
+function topicLabel(value: string): string {
+  return TOPIC_LABELS[value] || formatIdentifier(value);
+}
+
+function cadenceLabel(value?: string | null): string {
+  if (!value) return 'Review when needed';
+  return CADENCE_LABELS[value] || formatIdentifier(value);
+}
+
+async function fetchEnterpriseCollaborationSummary(filters: typeof DEFAULT_FILTERS): Promise<CollaborationResponse> {
+  const params = new URLSearchParams({ limit: filters.limit });
+  if (filters.collaborationDomain !== 'all') params.set('collaboration_domain', filters.collaborationDomain);
+  if (filters.threadType !== 'all') params.set('thread_type', filters.threadType);
+  if (filters.urgency !== 'all') params.set('urgency', filters.urgency);
   return apiRequest<CollaborationResponse>(`/operational-action-center/enterprise-collaboration-summary?${params.toString()}`);
 }
 
 export default function EnterpriseCollaborationPage() {
-  const [collaborationDomain, setCollaborationDomain] = useState<'all' | CollaborationDomain>('all');
-  const [threadType, setThreadType] = useState<'all' | CollaborationThreadType>('all');
-  const [urgency, setUrgency] = useState<'all' | Urgency>('all');
+  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const canViewIntelligenceReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
+  const [view, setView] = useState<CollaborationView>('recommendations');
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+
+  const queryKey = useMemo(() => [
+    'enterprise-collaboration',
+    filters.collaborationDomain,
+    filters.threadType,
+    filters.urgency,
+    filters.limit
+  ], [filters]);
 
   const collaborationQuery = useQuery({
-    queryKey: ['enterprise-collaboration', collaborationDomain, threadType, urgency],
-    queryFn: () => fetchEnterpriseCollaborationSummary(collaborationDomain, threadType, urgency)
+    queryKey,
+    queryFn: () => fetchEnterpriseCollaborationSummary(filters)
   });
 
   const response = collaborationQuery.data;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
-  const appliedFilters = response?.filters || {};
   const threads = response?.threads || [];
-  const safetyEntries = useMemo(() => {
-    return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
-  }, [response?.definition?.safety_contract]);
+  const appliedLimit = response?.filters?.limit || Number(filters.limit);
+  const hasActiveFilters = filters.collaborationDomain !== 'all'
+    || filters.threadType !== 'all'
+    || filters.urgency !== 'all'
+    || filters.limit !== DEFAULT_FILTERS.limit;
+
+  const clearFilters = () => setFilters(DEFAULT_FILTERS);
+
+  if (collaborationQuery.isLoading) {
+    return <div className="collaboration-state collaboration-state--loading">Loading coordination recommendations…</div>;
+  }
+
+  if (collaborationQuery.error) {
+    return (
+      <div className="collaboration-state collaboration-state--error">
+        <h2>Coordination recommendations could not be loaded</h2>
+        <p>
+          {collaborationQuery.error instanceof ApiError
+            ? collaborationQuery.error.message
+            : 'The collaboration summary is temporarily unavailable.'}
+        </p>
+        <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()}>Retry</button>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="card-grid" style={gridStyle}>
-        <div className="card">
-          <div className="card__label">Collaboration threads</div>
+    <div className="collaboration-page">
+      <section className="card collaboration-intro">
+        <div>
+          <div className="collaboration-eyebrow">Read-only coordination guidance</div>
+          <h2>Coordinate work in the source workflow</h2>
+          <p className="card__subtext">
+            This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.
+          </p>
+        </div>
+        <div className="collaboration-refresh">
+          <span>Last refreshed</span>
+          <strong>{formatDateTime(response?.generated_at)}</strong>
+          <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
+            {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh recommendations'}
+          </button>
+        </div>
+      </section>
+
+      <section className="card collaboration-filters" aria-labelledby="collaboration-filter-title">
+        <div className="collaboration-section-heading">
+          <div>
+            <h2 id="collaboration-filter-title">Filter the recommendations</h2>
+            <p className="card__subtext">Filters change only this read-only snapshot. They do not change any alert, task, review, or operational event.</p>
+          </div>
+          {hasActiveFilters ? <button className="button button--secondary" type="button" onClick={clearFilters}>Clear filters</button> : null}
+        </div>
+        <div className="collaboration-filter-grid">
+          <label>
+            <span>Coordination area</span>
+            <select value={filters.collaborationDomain} onChange={(event) => setFilters((current) => ({ ...current, collaborationDomain: event.target.value as typeof filters.collaborationDomain }))}>
+              {DOMAIN_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Recommendation type</span>
+            <select value={filters.threadType} onChange={(event) => setFilters((current) => ({ ...current, threadType: event.target.value as typeof filters.threadType }))}>
+              {THREAD_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Urgency</span>
+            <select value={filters.urgency} onChange={(event) => setFilters((current) => ({ ...current, urgency: event.target.value as typeof filters.urgency }))}>
+              {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Maximum recommendations</span>
+            <select value={filters.limit} onChange={(event) => setFilters((current) => ({ ...current, limit: event.target.value as ResultLimit }))}>
+              {LIMIT_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="collaboration-summary-grid" aria-label="Collaboration summary">
+        <article className="card">
+          <div className="card__label">Coordination recommendations</div>
           <div className="card__value">{numberValue(summary.total_threads ?? threads.length)}</div>
-          <div className="card__subtext">Read-only coordination contexts sourced from workspace actions and event coordination signals.</div>
-        </div>
-        <div className="card">
-          <div className="card__label">War-room candidates</div>
+          <div className="card__subtext">Suggested human coordination items returned by the current filters.</div>
+        </article>
+        <article className="card">
+          <div className="card__label">Active coordination suggested</div>
           <div className="card__value">{numberValue(summary.war_room_candidates)}</div>
-          <div className="card__subtext">Critical items that may need active human coordination outside this endpoint.</div>
-        </div>
-        <div className="card">
-          <div className="card__label">Escalation recommended</div>
+          <div className="card__subtext">Critical items that may need sustained human coordination.</div>
+        </article>
+        <article className="card">
+          <div className="card__label">Escalation suggested</div>
           <div className="card__value">{numberValue(summary.escalation_recommended)}</div>
-          <div className="card__subtext">Threads where the backend recommends escalation review or owner assignment.</div>
-        </div>
-        <div className="card">
-          <div className="card__label">Execution mode</div>
-          <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(response?.definition?.execution_mode)}</div>
-          <div className="card__subtext">No messages, rooms, notifications, comments, or source workflow mutations are created here.</div>
-        </div>
+          <div className="card__subtext">Critical or high-urgency items where owner or escalation review is recommended.</div>
+        </article>
+        <article className="card">
+          <div className="card__label">Operating mode</div>
+          <div className="collaboration-mode">Read-only guidance</div>
+          <div className="card__subtext">All actions remain in their source workflows.</div>
+        </article>
+      </section>
+
+      <div className="collaboration-view-switch" role="tablist" aria-label="Collaboration views">
+        <button type="button" role="tab" aria-selected={view === 'recommendations'} className={view === 'recommendations' ? 'is-active' : ''} onClick={() => setView('recommendations')}>Coordination recommendations</button>
+        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>Safety and limits</button>
+        {canViewDiagnostics ? (
+          <button type="button" role="tab" aria-selected={view === 'diagnostics'} className={view === 'diagnostics' ? 'is-active' : ''} onClick={() => setView('diagnostics')}>Diagnostics</button>
+        ) : null}
       </div>
 
-      <section className="section">
-        <div className="section__title">Collaboration controls</div>
-        <div className="card">
-          <div style={toolbarStyle}>
-            <select style={selectStyle} value={collaborationDomain} onChange={(event) => setCollaborationDomain(event.target.value as 'all' | CollaborationDomain)}>
-              {DOMAIN_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select style={selectStyle} value={threadType} onChange={(event) => setThreadType(event.target.value as 'all' | CollaborationThreadType)}>
-              {THREAD_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
-              {URGENCY_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
-              {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh threads'}
-            </button>
-            <Link className="button button--secondary" to="/real-time-operations-feed">Open operations feed</Link>
-            <Link className="button button--secondary" to="/intelligence-review">Open intelligence review</Link>
-          </div>
-
-          {collaborationQuery.isLoading ? (
-            <p className="card__subtext">Loading enterprise collaboration context…</p>
-          ) : collaborationQuery.error ? (
-            <p className="form-error">
-              {collaborationQuery.error instanceof ApiError
-                ? collaborationQuery.error.message
-                : 'Unable to load enterprise collaboration context.'}
-            </p>
-          ) : (
-            <>
+      {view === 'recommendations' ? (
+        <section aria-labelledby="coordination-recommendations-title">
+          <div className="collaboration-section-heading collaboration-section-heading--outside">
+            <div>
+              <h2 id="coordination-recommendations-title">Coordination recommendations</h2>
               <p className="card__subtext">
-                {guidance.collaboration_guidance || 'Use collaboration context to coordinate humans in governed source workflows without sending messages from this page.'}
+                {guidance.collaboration_guidance || 'Use these suggestions to coordinate people in the appropriate source workflow.'} Showing up to {appliedLimit} items.
               </p>
-              <div style={metadataStyle} aria-label="Collaboration snapshot metadata">
-                <span style={metadataItemStyle}>Generated: {formatDateTime(response?.generated_at)}</span>
-                <span style={metadataItemStyle}>Domain: {formatAppliedFilter(appliedFilters.collaboration_domain)}</span>
-                <span style={metadataItemStyle}>Thread type: {formatAppliedFilter(appliedFilters.thread_type)}</span>
-                <span style={metadataItemStyle}>Urgency: {formatAppliedFilter(appliedFilters.urgency)}</span>
-                <span style={metadataItemStyle}>Limit: {formatAppliedFilter(appliedFilters.limit)}</span>
-              </div>
-            </>
+            </div>
+            <div className="collaboration-shortcuts">
+              <Link className="button button--secondary" to="/real-time-operations-feed">Open Operations Feed</Link>
+              {canViewIntelligenceReview ? <Link className="button button--secondary" to="/intelligence-review">Open Intelligence Review</Link> : null}
+            </div>
+          </div>
+
+          {threads.length === 0 ? (
+            <div className="collaboration-state">
+              <h3>No coordination recommendations match the current filters</h3>
+              <p>Clear the filters or confirm that an open alert, task, review, or operational event exists for this tenant.</p>
+            </div>
+          ) : (
+            <div className="collaboration-thread-grid">
+              {threads.map((thread, index) => {
+                const sourcePath = sourceSurfaceToAppPath(thread.coordination_context?.source_surface || thread.comment_guidance?.comment_capture_surface);
+                const sourceLabel = sourcePath ? SOURCE_LABELS[sourcePath] : null;
+                const itemKey = thread.thread_key || thread.thread_id || `${thread.title || 'coordination'}-${thread.updated_at || index}-${index}`;
+                const suggestedRoles = thread.participants_hint?.suggested_roles || [];
+                const commentTopics = thread.comment_guidance?.recommended_comment_topics || [];
+                return (
+                  <article className="card collaboration-thread-card" key={itemKey}>
+                    <div className="collaboration-badges">
+                      <span className={`collaboration-badge collaboration-badge--${String(thread.urgency || 'unknown').toLowerCase()}`}>{urgencyLabel(thread.urgency)}</span>
+                      <span className="collaboration-badge">{threadTypeLabel(thread.thread_type)}</span>
+                      <span className="collaboration-badge">{domainLabel(thread.collaboration_domain)}</span>
+                      {thread.war_room_guidance?.war_room_candidate ? <span className="collaboration-badge collaboration-badge--attention">Active coordination suggested</span> : null}
+                    </div>
+
+                    <h3>{thread.title || 'Coordination item'}</h3>
+                    <p className="card__subtext">{thread.summary || 'No additional summary was provided.'}</p>
+
+                    <dl className="collaboration-facts">
+                      <div>
+                        <dt>Suggested participants</dt>
+                        <dd>{suggestedRoles.length ? suggestedRoles.map(roleLabel).join(', ') : 'Source workflow owner and appropriate manager'}</dd>
+                      </div>
+                      <div>
+                        <dt>Review cadence</dt>
+                        <dd>{cadenceLabel(thread.war_room_guidance?.suggested_cadence)}</dd>
+                      </div>
+                      <div>
+                        <dt>Last updated</dt>
+                        <dd>{formatDateTime(thread.updated_at || thread.created_at)}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="collaboration-guidance-block">
+                      <div className="card__label">Recommended next step</div>
+                      <p>{thread.coordination_context?.recommended_next_step || 'Confirm the owner, current status, blockers, and next safe action in the source workflow.'}</p>
+                    </div>
+
+                    {commentTopics.length ? (
+                      <div className="collaboration-guidance-block">
+                        <div className="card__label">Topics to cover in the source workflow</div>
+                        <p>{commentTopics.map(topicLabel).join(' · ')}</p>
+                      </div>
+                    ) : null}
+
+                    <div className="collaboration-card-actions">
+                      {sourcePath && sourceLabel ? <Link className="button button--secondary" to={sourcePath}>{sourceLabel}</Link> : null}
+                      {sourcePath !== '/action-center' ? <Link className="button button--secondary" to="/action-center">Open Action Center</Link> : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section className="section">
-        <div className="section__title">Thread recommendations</div>
-        {threads.length === 0 && !collaborationQuery.isLoading ? (
-          <div className="empty-state">No collaboration thread recommendations match the selected filters.</div>
-        ) : (
-          <div style={threadListStyle}>
-            {threads.map((thread) => {
-              const sourcePath = sourceSurfaceToAppPath(thread.coordination_context?.source_surface || thread.comment_guidance?.comment_capture_surface);
-              return (
-                <article className="card" key={thread.thread_id}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <span style={badgeStyle}>{formatLabel(thread.urgency)}</span>
-                    <span style={badgeStyle}>{formatLabel(thread.thread_type)}</span>
-                    <span style={badgeStyle}>{formatLabel(thread.collaboration_domain)}</span>
-                    {thread.war_room_guidance?.war_room_candidate ? <span style={badgeStyle}>War-room candidate</span> : null}
-                  </div>
-                  <h3 style={{ marginTop: 0 }}>{thread.title || thread.thread_id}</h3>
-                  <p className="card__subtext">{thread.summary || 'No collaboration summary was provided.'}</p>
-
-                  <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
-                    <div>
-                      <div className="card__label">Suggested roles</div>
-                      <strong>{thread.participants_hint?.suggested_roles?.length ? thread.participants_hint.suggested_roles.map(formatLabel).join(', ') : 'Not specified'}</strong>
-                    </div>
-                    <div>
-                      <div className="card__label">Cadence</div>
-                      <strong>{formatLabel(thread.war_room_guidance?.suggested_cadence)}</strong>
-                    </div>
-                    <div>
-                      <div className="card__label">Updated</div>
-                      <strong>{formatDateTime(thread.updated_at || thread.created_at)}</strong>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 12 }}>
-                    <div className="card__label">Recommended next step</div>
-                    <p className="card__subtext">{thread.coordination_context?.recommended_next_step || 'Coordinate owners and status in the source workflow.'}</p>
-                  </div>
-
-                  {thread.comment_guidance?.recommended_comment_topics?.length ? (
-                    <div style={{ marginTop: 12 }}>
-                      <div className="card__label">Comment topics for source workflow</div>
-                      <p className="card__subtext">{thread.comment_guidance.recommended_comment_topics.map(formatLabel).join(' · ')}</p>
-                    </div>
-                  ) : null}
-
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}>Open source surface</Link> : null}
-                    <Link className="button button--secondary" to="/action-center">Open action center</Link>
-                  </div>
-                </article>
-              );
-            })}
+      {view === 'limits' ? (
+        <section className="collaboration-limit-grid" aria-labelledby="collaboration-limits-title">
+          <div className="collaboration-section-heading collaboration-section-heading--outside">
+            <div>
+              <h2 id="collaboration-limits-title">Safety and coordination limits</h2>
+              <p className="card__subtext">These rules apply to every recommendation shown on this page.</p>
+            </div>
           </div>
-        )}
-      </section>
+          <article className="card">
+            <h3>Escalation remains in the source workflow</h3>
+            <p className="card__subtext">{guidance.escalation_thread_guidance || 'Use the existing alert, task, Action Center, or governance process for escalation.'}</p>
+          </article>
+          <article className="card">
+            <h3>No coordination room is created</h3>
+            <p className="card__subtext">{guidance.incident_war_room_guidance || 'Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.'}</p>
+          </article>
+          <article className="card">
+            <h3>No external partner is contacted</h3>
+            <p className="card__subtext">{guidance.supplier_coordination_guidance || 'Supplier, carrier, and partner communication remains in the authorized source process.'}</p>
+          </article>
+          <article className="card">
+            <h3>No messages or comments are recorded</h3>
+            <p className="card__subtext">Use the suggested topics in the source workflow. This page does not send messages, notify users, or save comments.</p>
+          </article>
+          <article className="card">
+            <h3>No operational data is changed</h3>
+            <p className="card__subtext">Opening or refreshing Collaboration does not change stock, alerts, tasks, approvals, suppliers, shipments, finance, or integrations.</p>
+          </article>
+          <article className="card">
+            <h3>Source permissions still apply</h3>
+            <p className="card__subtext">Only recommendations supported by records the current user may read are returned. The source page remains authoritative.</p>
+          </article>
+        </section>
+      ) : null}
 
-      <section className="section">
-        <div className="section__title">Safety and coordination guardrails</div>
-        <div className="card-grid" style={gridStyle}>
-          <div className="card">
-            <div className="card__label">Escalation guidance</div>
-            <p className="card__subtext">{guidance.escalation_thread_guidance || 'Escalation remains in existing governed workflows.'}</p>
-          </div>
-          <div className="card">
-            <div className="card__label">Incident guidance</div>
-            <p className="card__subtext">{guidance.incident_war_room_guidance || 'War-room candidates are suggestions only; rooms are not created here.'}</p>
-          </div>
-          <div className="card">
-            <div className="card__label">External coordination</div>
-            <p className="card__subtext">{guidance.supplier_coordination_guidance || 'External supplier, carrier, or partner actions are never dispatched from this surface.'}</p>
-          </div>
-          <div className="card">
-            <div className="card__label">Safety contract</div>
-            <p className="card__subtext">
-              {safetyEntries.length
-                ? safetyEntries.map(([key]) => formatLabel(key)).join(' · ')
-                : 'This page is read-only and does not send messages, create rooms, or record comments.'}
-            </p>
-          </div>
-        </div>
-      </section>
+      {view === 'diagnostics' && canViewDiagnostics ? (
+        <section className="card collaboration-diagnostics">
+          <h2>Technical response diagnostics</h2>
+          <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+          <pre>{JSON.stringify(response, null, 2)}</pre>
+        </section>
+      ) : null}
     </div>
   );
 }
