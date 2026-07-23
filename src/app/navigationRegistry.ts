@@ -118,14 +118,14 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/probabilistic-forecasting',
         label: 'Probabilistic Forecasting',
-        description: 'Uncertainty-aware forecasts, calibration observations, and manual forecast feedback-loop readiness.',
+        description: 'Read-only review of forecast models, uncertainty ranges, risk probabilities, actual outcomes, and manual confidence checks.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },
       {
         to: '/cross-domain-optimization',
         label: 'Cross-Domain Optimization',
-        description: 'Optimization runs, objectives, tradeoffs, and manual execution feedback-loop readiness.',
+        description: 'Read-only comparison of cross-area planning options, tradeoffs, and actual outcomes recorded through Learning Feedback.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },

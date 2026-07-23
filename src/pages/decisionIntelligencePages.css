@@ -845,3 +845,360 @@
     flex-direction: column;
   }
 }
+
+/* Probabilistic Forecasting separates business evidence, advisory review checks, and restricted diagnostics. */
+.decision-intelligence-page .forecast-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.decision-intelligence-page .forecast-intro h2 {
+  max-width: 780px;
+  margin-top: 6px;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+}
+
+.decision-intelligence-page .forecast-intro .card__subtext {
+  max-width: 900px;
+  margin-top: 10px;
+}
+
+.decision-intelligence-page .forecast-refresh {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.decision-intelligence-page .forecast-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.decision-intelligence-page .forecast-view-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .forecast-view-switch__button {
+  min-height: 40px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-weight: 750;
+}
+
+.decision-intelligence-page .forecast-view-switch__button:hover,
+.decision-intelligence-page .forecast-view-switch__button:focus-visible {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.decision-intelligence-page .forecast-view-switch__button.is-active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.14);
+}
+
+.decision-intelligence-page .forecast-summary-grid,
+.decision-intelligence-page .forecast-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+}
+
+.decision-intelligence-page .forecast-metric {
+  min-width: 0;
+  padding: 15px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.decision-intelligence-page .forecast-metric--wide {
+  grid-column: span 2;
+}
+
+.decision-intelligence-page .forecast-metric__label {
+  display: block;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.decision-intelligence-page .forecast-metric__value {
+  display: block;
+  margin-top: 7px;
+  color: #0f172a;
+  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.decision-intelligence-page .forecast-metric__value--text {
+  font-size: 1rem;
+}
+
+.decision-intelligence-page .forecast-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.decision-intelligence-page .forecast-badge--good {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.decision-intelligence-page .forecast-badge--warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.decision-intelligence-page .forecast-badge--danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.decision-intelligence-page .forecast-empty-state,
+.decision-intelligence-page .forecast-not-assessed-card,
+.decision-intelligence-page .forecast-readiness-note {
+  border-left: 4px solid #64748b;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .forecast-empty-state p,
+.decision-intelligence-page .forecast-not-assessed-card p,
+.decision-intelligence-page .forecast-readiness-note p {
+  margin-top: 9px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.decision-intelligence-page .forecast-limit-note,
+.decision-intelligence-page .forecast-muted {
+  color: #64748b;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.decision-intelligence-page .forecast-evidence-section .card__header {
+  align-items: center;
+}
+
+.decision-intelligence-page .forecast-table {
+  min-width: 900px;
+}
+
+.decision-intelligence-page .forecast-table__subtext {
+  display: block;
+  max-width: 360px;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.decision-intelligence-page .forecast-lifecycle {
+  display: grid;
+  gap: 18px;
+}
+
+.decision-intelligence-page .forecast-lifecycle__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.decision-intelligence-page .forecast-lifecycle__header .card__subtext {
+  max-width: 780px;
+  margin-top: 7px;
+}
+
+.decision-intelligence-page .forecast-decision {
+  flex: 0 1 360px;
+  padding: 12px 14px;
+  border: 1px solid #dbe3f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .forecast-decision span {
+  display: block;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.decision-intelligence-page .forecast-decision strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.decision-intelligence-page .forecast-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+
+.decision-intelligence-page .forecast-check-card {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.decision-intelligence-page .forecast-check-card h3 {
+  margin-bottom: 12px;
+}
+
+.decision-intelligence-page .forecast-check-list {
+  display: grid;
+  gap: 10px;
+}
+
+.decision-intelligence-page .forecast-check-item {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .forecast-check-item__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.decision-intelligence-page .forecast-check-item__heading strong {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.decision-intelligence-page .forecast-check-item p {
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.decision-intelligence-page .forecast-observed {
+  display: block;
+  margin-top: 8px;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.decision-intelligence-page .forecast-not-assessed {
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.decision-intelligence-page .forecast-technical-details {
+  margin-top: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page .forecast-technical-details > summary {
+  padding: 13px 15px;
+  color: #334155;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.decision-intelligence-page .forecast-technical-details pre {
+  max-height: 560px;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  border-top: 1px solid #cbd5e1;
+  color: #e2e8f0;
+  background: #0f172a;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .decision-intelligence-page .forecast-intro,
+  .decision-intelligence-page .forecast-lifecycle__header {
+    flex-direction: column;
+  }
+
+  .decision-intelligence-page .forecast-refresh {
+    align-items: flex-start;
+  }
+
+  .decision-intelligence-page .forecast-decision {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .decision-intelligence-page .forecast-check-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .decision-intelligence-page .forecast-view-switch {
+    display: grid;
+    width: 100%;
+  }
+
+  .decision-intelligence-page .forecast-view-switch__button,
+  .decision-intelligence-page .forecast-refresh .button,
+  .decision-intelligence-page .forecast-filters .button {
+    width: 100%;
+  }
+
+  .decision-intelligence-page .forecast-metric--wide {
+    grid-column: auto;
+  }
+
+  .decision-intelligence-page .forecast-check-item__heading {
+    flex-direction: column;
+  }
+}
