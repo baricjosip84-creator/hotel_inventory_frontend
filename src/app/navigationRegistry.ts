@@ -111,7 +111,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/adaptive-policy-engine',
         label: 'Adaptive Policy Engine',
-        description: 'Policy observation, signal evidence, effectiveness measurement, and manual learning feedback readiness.',
+        description: 'Read-only review of policy signals, recommendations, measured outcomes, and manual safety checks. It does not change policies.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },
