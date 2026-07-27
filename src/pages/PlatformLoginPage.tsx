@@ -3,7 +3,7 @@ import { fetchCurrentPlatformIdentity } from '../lib/platformAuth';
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import type { AuthTokens } from '../types/auth';
 import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
 import { savePlatformAuthTokens } from '../lib/platformAuth';

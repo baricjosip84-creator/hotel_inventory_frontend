@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { apiRequest, ApiError, restoreTenantSession } from '../lib/api';
 import { saveAuthTokens } from '../lib/auth';
 import type { AuthTokens } from '../types/auth';

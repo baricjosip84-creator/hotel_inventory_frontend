@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { platformApiRequest } from '../lib/platformApi';
 
 type RiskFlag = { code: string; severity: string; points: number; message: string };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router';
 import type { TenantPermission, UserRole } from '../lib/permissions';
 import { hasAllPermissions, hasAnyRole, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';

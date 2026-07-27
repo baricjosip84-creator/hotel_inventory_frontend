@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';

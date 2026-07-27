@@ -19,7 +19,8 @@
   system/admin visibility, and management insights.
 */
 
-import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import AppLayout from '../layouts/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
 import DashboardPage from '../pages/DashboardPage';

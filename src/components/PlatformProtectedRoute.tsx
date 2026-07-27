@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router';
 import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
 import { hasAnyPlatformRole } from '../lib/platformAuth';
 import type { PlatformIdentity, PlatformRole } from '../lib/platformAuth';

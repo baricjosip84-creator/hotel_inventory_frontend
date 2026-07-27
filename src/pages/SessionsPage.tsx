@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { clearAuthTokens } from '../lib/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 type SessionItem = {
   id: string;

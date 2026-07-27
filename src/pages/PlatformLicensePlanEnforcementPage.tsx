@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { platformApiRequest } from '../lib/platformApi';
 
 type PlanDefinition = { plan_code: string; commercial_tier: string; required_limits: string[]; required_feature_flags: string[]; recommended_enforcement_mode: string };
