@@ -150,7 +150,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/reliability-command',
         label: 'Reliability Command',
-        description: 'Commercial reliability command board for readiness posture, risks, runbook planning, evidence, release packets, handoff, and closure review.',
+        description: 'Read-only review of operational pressure, reliability safeguards, and the manual evidence, release, monitoring, handoff, and closure path.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.PLATFORM_RELIABILITY_READ
       },
