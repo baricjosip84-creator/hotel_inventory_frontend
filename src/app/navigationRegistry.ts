@@ -157,7 +157,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/alerts',
         label: 'Alerts',
-        description: 'Review and resolve operational issues that require immediate attention.',
+        description: 'Review, acknowledge, escalate, resolve, reopen, and route tenant operational alerts through their authoritative source workflows.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.ALERTS_READ
       },
