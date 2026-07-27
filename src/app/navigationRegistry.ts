@@ -139,9 +139,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/digital-twin',
         label: 'Digital Twin',
-        description: 'Read-only operational topology, dependency, risk overlay, and congestion heatmap visualization sourced from the backend digital twin foundation.',
+        description: 'Read-only operational context map that automatically connects permitted products, suppliers, locations, stock, purchasing, shipments, reservations, requisitions, transfers, tasks, alerts, dependencies, and risks. It is not a live simulation and cannot change business data.',
         section: 'Command',
-        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
+        permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+        requiredPermissions: [
+          TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+          TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+        ]
       },
       {
         to: '/reliability-command',

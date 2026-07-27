@@ -1,0 +1,356 @@
+.digital-twin-page {
+  display: grid;
+  gap: 20px;
+}
+
+.digital-twin-page h2,
+.digital-twin-page h3,
+.digital-twin-page h4,
+.digital-twin-page p {
+  overflow-wrap: anywhere;
+}
+
+.digital-twin-intro,
+.digital-twin-section-heading,
+.digital-twin-filter-summary,
+.digital-twin-card-actions,
+.digital-twin-shortcuts,
+.digital-twin-badges {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.digital-twin-intro,
+.digital-twin-section-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.digital-twin-intro > div:first-child,
+.digital-twin-section-heading > div:first-child {
+  min-width: 0;
+  flex: 1 1 520px;
+}
+
+.digital-twin-intro h2,
+.digital-twin-section-heading h2,
+.digital-twin-section-heading h3,
+.digital-twin-overlay-card h4,
+.digital-twin-node-card h4,
+.digital-twin-limit-grid h3,
+.digital-twin-diagnostics h2 {
+  margin: 0;
+}
+
+.digital-twin-intro .card__subtext,
+.digital-twin-section-heading .card__subtext {
+  margin: 6px 0 0;
+}
+
+.digital-twin-eyebrow {
+  color: #315ea8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.digital-twin-refresh {
+  min-width: 180px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.digital-twin-refresh span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.digital-twin-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.digital-twin-filter-grid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.digital-twin-filter-grid select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.digital-twin-filter-summary {
+  margin-top: 14px;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+}
+
+.digital-twin-filter-summary span {
+  padding: 6px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.digital-twin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.digital-twin-view-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.digital-twin-view-switch button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.digital-twin-view-switch button.is-active {
+  background: #e8eef8;
+  color: #173d78;
+}
+
+.digital-twin-section-heading--outside {
+  margin-bottom: 12px;
+}
+
+.digital-twin-context-section,
+.digital-twin-overlay-section {
+  margin-bottom: 18px;
+}
+
+.digital-twin-node-grid,
+.digital-twin-overlay-grid,
+.digital-twin-limit-grid {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+
+.digital-twin-node-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-top: 14px;
+}
+
+.digital-twin-overlay-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.digital-twin-limit-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.digital-twin-limit-grid > .digital-twin-section-heading {
+  grid-column: 1 / -1;
+}
+
+.digital-twin-node-card,
+.digital-twin-overlay-card {
+  align-self: start;
+  min-width: 0;
+}
+
+.digital-twin-badges {
+  margin-bottom: 10px;
+  gap: 7px;
+}
+
+.digital-twin-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.digital-twin-badge--critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.digital-twin-badge--high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.digital-twin-badge--medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.digital-twin-badge--low {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.digital-twin-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.digital-twin-facts div {
+  min-width: 0;
+}
+
+.digital-twin-facts dt {
+  color: var(--color-text-muted);
+  font-size: 0.77rem;
+}
+
+.digital-twin-facts dd {
+  margin: 4px 0 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.digital-twin-card-actions,
+.digital-twin-shortcuts {
+  margin-top: 14px;
+}
+
+.digital-twin-dependency-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.digital-twin-dependency-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.digital-twin-dependency-list article > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.digital-twin-dependency-list span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.digital-twin-inline-empty,
+.digital-twin-state {
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #f8fafc;
+  color: var(--color-text-muted);
+}
+
+.digital-twin-state h2,
+.digital-twin-state h3 {
+  margin-top: 0;
+  color: var(--color-text);
+}
+
+.digital-twin-state--loading,
+.digital-twin-state--error {
+  min-height: 150px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+}
+
+.digital-twin-state--error {
+  border-color: #f0b8b8;
+  background: #fff6f6;
+}
+
+.digital-twin-diagnostics pre {
+  max-height: 680px;
+  overflow: auto;
+  margin: 14px 0 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .digital-twin-filter-grid,
+  .digital-twin-summary-grid,
+  .digital-twin-limit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .digital-twin-intro,
+  .digital-twin-section-heading {
+    display: grid;
+  }
+
+  .digital-twin-refresh {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .digital-twin-filter-grid,
+  .digital-twin-summary-grid,
+  .digital-twin-limit-grid,
+  .digital-twin-node-grid,
+  .digital-twin-overlay-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .digital-twin-view-switch,
+  .digital-twin-card-actions,
+  .digital-twin-shortcuts {
+    display: grid;
+  }
+
+  .digital-twin-view-switch button,
+  .digital-twin-card-actions .button,
+  .digital-twin-shortcuts .button {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -1061,7 +1061,10 @@ const router = createBrowserRouter([
       {
         path: 'digital-twin',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ]}>
+          <ProtectedRoute requiredPermissions={[
+            TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+            TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+          ]}>
             <DigitalTwinVisualizationPage />
           </ProtectedRoute>
         )
