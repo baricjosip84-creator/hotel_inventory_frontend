@@ -11,6 +11,7 @@ type ProductsQueryState = {
 type ProductListTablePanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
+  emptyMessage: string;
   canManageProducts: boolean;
   canViewProductPackages: boolean;
   deleteProductPending: boolean;
@@ -23,6 +24,7 @@ type ProductListTablePanelProps = {
 export function ProductListTablePanel({
   productsQuery,
   products,
+  emptyMessage,
   canManageProducts,
   canViewProductPackages,
   deleteProductPending,
@@ -61,7 +63,7 @@ export function ProductListTablePanel({
           {products.length === 0 ? (
             <tr>
               <td style={styles.emptyCell} colSpan={11}>
-                No products found.
+                {emptyMessage}
               </td>
             </tr>
           ) : (

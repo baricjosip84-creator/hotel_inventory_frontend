@@ -1,4 +1,5 @@
 import type { SupplierItem } from '../../types/inventory';
+import { ProductSearchBarcodeScanner } from './ProductSearchBarcodeScanner';
 import { styles } from './productStyles';
 
 type ProductListFiltersPanelProps = {
@@ -17,6 +18,7 @@ type ProductListFiltersPanelProps = {
   costVarianceStatusFilter: string;
   setCostVarianceStatusFilter: (value: string) => void;
   productsCount: number;
+  totalProductsCount: number;
   onExportProductsCsv: () => void;
 };
 
@@ -36,16 +38,18 @@ export function ProductListFiltersPanel({
   costVarianceStatusFilter,
   setCostVarianceStatusFilter,
   productsCount,
+  totalProductsCount,
   onExportProductsCsv
 }: ProductListFiltersPanelProps) {
-  const hasActiveFilters = Boolean(
-    search ||
+  const hasTextSearch = Boolean(search.trim());
+  const hasStructuredFilters = Boolean(
     categoryFilter ||
     supplierFilter ||
     costStatusFilter ||
     costBasisFilter ||
     costVarianceStatusFilter
   );
+  const hasActiveFilters = hasTextSearch || hasStructuredFilters;
 
   const clearFilters = () => {
     setSearch('');
@@ -58,19 +62,44 @@ export function ProductListFiltersPanel({
 
   return (
     <>
-      <div style={styles.toolbarGrid}>
+      <div style={styles.productSearchToolsRow}>
         <div>
           <label htmlFor="product-list-search" style={styles.label}>Search products</label>
-          <input
-            id="product-list-search"
-            type="search"
-            placeholder="Name, category, unit, or barcode"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={styles.searchInput}
-          />
+          <div style={styles.productSearchInputWrapper}>
+            <input
+              id="product-list-search"
+              type="text"
+              role="searchbox"
+              inputMode="search"
+              autoComplete="off"
+              placeholder="Name, category, unit, supplier, or barcode"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              style={styles.productSearchInput}
+              aria-describedby="product-list-search-help"
+            />
+            {hasTextSearch ? (
+              <button
+                type="button"
+                data-skip-global-action-feedback="true"
+                aria-label="Clear product search"
+                title="Clear product search"
+                style={styles.clearSearchButton}
+                onClick={() => setSearch('')}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <div id="product-list-search-help" style={styles.productSearchHelp}>
+            Results filter immediately as you type. Exact barcode scans are ranked first.
+          </div>
         </div>
 
+        <ProductSearchBarcodeScanner onDecoded={setSearch} />
+      </div>
+
+      <div style={styles.toolbarGrid}>
         <div>
           <label htmlFor="product-list-category" style={styles.label}>Category</label>
           <select
@@ -153,9 +182,10 @@ export function ProductListFiltersPanel({
       </div>
 
       <div style={styles.filterActionRow}>
-        <div style={styles.filterResultText}>
-          {productsCount.toLocaleString()} product{productsCount === 1 ? '' : 's'} shown
-          {hasActiveFilters ? ' for the active filters' : ''}.
+        <div style={styles.filterResultText} aria-live="polite">
+          {hasTextSearch
+            ? `${productsCount.toLocaleString()} of ${totalProductsCount.toLocaleString()} product${totalProductsCount === 1 ? '' : 's'} match the text search${hasStructuredFilters ? ' within the active filters' : ''}.`
+            : `${productsCount.toLocaleString()} product${productsCount === 1 ? '' : 's'} shown${hasStructuredFilters ? ' for the active filters' : ''}.`}
         </div>
         <div style={styles.actionGroup}>
           <button

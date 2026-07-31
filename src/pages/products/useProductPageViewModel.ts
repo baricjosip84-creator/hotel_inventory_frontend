@@ -12,7 +12,6 @@ export function useProductPageViewModel() {
   const productPageState = useProductPageState();
 
   const queries = useProductPageQueries({
-    search: productPageState.search,
     categoryFilter: productPageState.categoryFilter,
     supplierFilter: productPageState.supplierFilter,
     costStatusFilter: productPageState.costStatusFilter,
@@ -27,7 +26,7 @@ export function useProductPageViewModel() {
     costActionDetailFilters: productPageState.costActionDetailFilters
   });
 
-  const productPageData = useProductPageData(queries);
+  const productPageData = useProductPageData(queries, productPageState.search);
 
   const productPageActions = useProductPageActions({
     queryClient,

@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import { buildCategoryOptions, buildCostingReadiness, buildProductSummary } from './productDerivedState';
+import { filterProductsBySearch } from './productSearch';
 import type { useProductPageQueries } from './productQueries';
 
 type ProductPageDataQueries = ReturnType<typeof useProductPageQueries>;
 
-export function useProductPageData(queries: ProductPageDataQueries) {
-  const products = useMemo(() => queries.productsQuery.data ?? [], [queries.productsQuery.data]);
+export function useProductPageData(queries: ProductPageDataQueries, search: string) {
+  const allProducts = useMemo(() => queries.productsQuery.data ?? [], [queries.productsQuery.data]);
+  const products = useMemo(() => filterProductsBySearch(allProducts, search), [allProducts, search]);
   const suppliers = useMemo(() => queries.suppliersQuery.data ?? [], [queries.suppliersQuery.data]);
   const packages = useMemo(() => queries.packagesQuery.data ?? [], [queries.packagesQuery.data]);
   const costHistory = useMemo(
@@ -19,14 +21,15 @@ export function useProductPageData(queries: ProductPageDataQueries) {
 
   return {
     products,
+    totalProductsCount: allProducts.length,
     suppliers,
     packages,
     costHistory,
     standardCostHistory,
     costSummary: queries.costHistoryQuery.data?.cost_summary,
-    categoryOptions: useMemo(() => buildCategoryOptions(products), [products]),
-    summary: useMemo(() => buildProductSummary(products), [products]),
-    costingReadiness: useMemo(() => buildCostingReadiness(products), [products]),
+    categoryOptions: useMemo(() => buildCategoryOptions(allProducts), [allProducts]),
+    summary: useMemo(() => buildProductSummary(allProducts), [allProducts]),
+    costingReadiness: useMemo(() => buildCostingReadiness(allProducts), [allProducts]),
     costActionSummary: queries.costActionQuery.data,
     costActionPlan: queries.costActionPlanQuery.data,
     costActionCategorySummary: queries.costActionCategoryQuery.data,

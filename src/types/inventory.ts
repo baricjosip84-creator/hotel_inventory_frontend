@@ -46,6 +46,7 @@ export interface ProductItem {
   supplier_name?: string | null;
   barcode?: string | null;
   package_count?: number | string;
+  package_barcodes?: string[];
   current_stock_quantity?: number | string;
   latest_unit_cost?: number | string | null;
   latest_total_cost?: number | string | null;

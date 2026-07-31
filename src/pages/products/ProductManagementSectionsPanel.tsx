@@ -51,6 +51,7 @@ export function ProductManagementSectionsPanel({
   handleClearCostHistoryFilters,
   productsQuery,
   products,
+  totalProductsCount,
   categoryOptions,
   search,
   setSearch,
@@ -95,6 +96,7 @@ export function ProductManagementSectionsPanel({
       <ProductListPanel
         productsQuery={productsQuery}
         products={products}
+        totalProductsCount={totalProductsCount}
         suppliers={suppliers}
         categoryOptions={categoryOptions}
         search={search}

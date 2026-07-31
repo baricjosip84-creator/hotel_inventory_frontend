@@ -43,7 +43,6 @@ import type {
 } from './productCostAssessmentApi';
 
 export type ProductPageQueryInput = {
-  search: string;
   categoryFilter: string;
   supplierFilter: string;
   costStatusFilter: string;
@@ -59,7 +58,6 @@ export type ProductPageQueryInput = {
 };
 
 export function useProductPageQueries({
-  search,
   categoryFilter,
   supplierFilter,
   costStatusFilter,
@@ -74,10 +72,10 @@ export function useProductPageQueries({
   costActionDetailFilters
 }: ProductPageQueryInput) {
   const productsQuery = useQuery({
-    queryKey: ['products', search, categoryFilter, supplierFilter, costStatusFilter, costBasisFilter, costVarianceStatusFilter],
+    queryKey: ['products', categoryFilter, supplierFilter, costStatusFilter, costBasisFilter, costVarianceStatusFilter],
     queryFn: () =>
       fetchProducts({
-        search,
+        search: '',
         category: categoryFilter,
         supplierId: supplierFilter,
         costStatus: costStatusFilter,

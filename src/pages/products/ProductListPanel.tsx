@@ -12,6 +12,7 @@ type ProductsQueryState = {
 type ProductListPanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
+  totalProductsCount: number;
   suppliers: SupplierItem[];
   categoryOptions: string[];
   search: string;
@@ -39,6 +40,7 @@ type ProductListPanelProps = {
 export function ProductListPanel({
   productsQuery,
   products,
+  totalProductsCount,
   suppliers,
   categoryOptions,
   search,
@@ -85,12 +87,14 @@ export function ProductListPanel({
         costVarianceStatusFilter={costVarianceStatusFilter}
         setCostVarianceStatusFilter={setCostVarianceStatusFilter}
         productsCount={products.length}
+        totalProductsCount={totalProductsCount}
         onExportProductsCsv={onExportProductsCsv}
       />
 
       <ProductListTablePanel
         productsQuery={productsQuery}
         products={products}
+        emptyMessage={search.trim() ? 'No products match the current search and filters.' : 'No products found for the current filters.'}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
         deleteProductPending={deleteProductPending}

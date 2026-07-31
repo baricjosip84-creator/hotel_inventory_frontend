@@ -70,6 +70,46 @@ export const productFormStyles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer'
   },
+  productSearchToolsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(260px, 1fr) auto',
+    alignItems: 'start',
+    gap: '12px',
+    marginBottom: '16px'
+  },
+  productSearchInputWrapper: {
+    position: 'relative'
+  },
+  productSearchInput: {
+    width: '100%',
+    padding: '12px 44px 12px 14px',
+    borderRadius: '10px',
+    border: '1px solid #d1d5db',
+    outline: 'none',
+    fontSize: '14px',
+    background: '#ffffff'
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    top: '50%',
+    right: '8px',
+    transform: 'translateY(-50%)',
+    width: '30px',
+    height: '30px',
+    border: 0,
+    borderRadius: '999px',
+    background: '#f1f5f9',
+    color: '#475569',
+    fontSize: '20px',
+    lineHeight: 1,
+    cursor: 'pointer'
+  },
+  productSearchHelp: {
+    marginTop: '6px',
+    color: '#64748b',
+    fontSize: '12px',
+    lineHeight: 1.4
+  },
   toolbarGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
