@@ -1649,6 +1649,11 @@ export default function ShipmentsPage() {
   };
 
   const openProductScanner = () => {
+    if (!canReceiveShipments) {
+      setPageError('Shipment receive permission is required before opening the receiving barcode scanner.');
+      return;
+    }
+
     if (!selectedShipmentId) {
       setPageError('Select a shipment before opening product scanner.');
       return;
@@ -2223,8 +2228,8 @@ export default function ShipmentsPage() {
                         Make scan destination explicit before operators open the scanner.
                       </div>
                     </div>
-                    <span style={selectedScannerLocationId ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
-                      {selectedScannerLocationId ? 'Ready to scan' : 'Location required'}
+                    <span style={canReceiveShipments && selectedScannerLocationId ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
+                      {!canReceiveShipments ? 'Receive permission required' : selectedScannerLocationId ? 'Ready to scan' : 'Location required'}
                     </span>
                   </div>
 
@@ -2237,6 +2242,8 @@ export default function ShipmentsPage() {
                     style={styles.input}
                     value={selectedScannerLocationId}
                     onChange={(event) => setSelectedScannerLocationId(event.target.value)}
+                    disabled={!canReceiveShipments}
+                    title={!canReceiveShipments ? 'Shipment receive permission is required' : undefined}
                   >
                     <option value="">Select location</option>
                     {storageLocations.map((location) => (
@@ -2246,7 +2253,11 @@ export default function ShipmentsPage() {
                     ))}
                   </select>
 
-                  {!hasStorageLocations ? (
+                  {!canReceiveShipments ? (
+                    <div style={styles.scanWarningBanner}>
+                      The current role can review shipments but cannot receive stock. Shipment receive permission is required for barcode receiving.
+                    </div>
+                  ) : !hasStorageLocations ? (
                     <div style={styles.scanWarningBanner}>
                       No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
                     </div>
@@ -2399,15 +2410,17 @@ export default function ShipmentsPage() {
                     style={{
                       ...styles.scannerButton,
                       width: isMobile ? '100%' : undefined,
-                      ...(selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
+                      ...(canReceiveShipments && selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
                     }}
                     onClick={openProductScanner}
                     data-skip-global-action-feedback="true"
-                    disabled={!selectedScannerLocationId}
+                    disabled={!canReceiveShipments || !selectedScannerLocationId}
                     title={
-                      selectedScannerLocationId
-                        ? 'Open receiving barcode scanner'
-                        : 'Select a default scan location first'
+                      !canReceiveShipments
+                        ? 'Shipment receive permission is required'
+                        : selectedScannerLocationId
+                          ? 'Open receiving barcode scanner'
+                          : 'Select a default scan location first'
                     }
                   >
                     Scan Barcode

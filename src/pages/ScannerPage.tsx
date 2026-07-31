@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, CSSProperties } from 'react';
+import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 
 /**
  * SUCCESS FEEDBACK (beep + vibration)
@@ -129,6 +130,54 @@ type ProductBarcodeLookupResponse = {
 
 type ScannerMode = 'shipment' | 'product';
 
+const MAX_SCANNED_CODE_LENGTH = 512;
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function scannerResolutionError(error: unknown, mode: ScannerMode): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'SHIPMENT_NOT_FOUND') {
+      return 'No active shipment matches this QR code.';
+    }
+
+    if (error.code === 'SHIPMENT_PRODUCT_NOT_FOUND') {
+      return 'This barcode does not match an active item in the selected shipment.';
+    }
+
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return mode === 'product'
+    ? 'The barcode could not be resolved in the selected shipment.'
+    : 'The shipment QR code could not be resolved.';
+}
+
+function cameraStartError(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : '';
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || message.includes('permission')) {
+    return 'Camera permission was denied. Allow camera access in the browser, or use manual entry or image upload.';
+  }
+
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No usable camera was found on this device. Use manual entry or image upload.';
+  }
+
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return 'The camera is busy or unavailable. Close other camera applications and try again.';
+  }
+
+  if (name === 'OverconstrainedError') {
+    return 'The requested rear camera is unavailable. The scanner could not open another suitable camera.';
+  }
+
+  return 'The camera could not be started. Check browser permission, HTTPS, and whether another application is using the camera.';
+}
+
 function modeLabel(mode: ScannerMode): string {
   return mode === 'product' ? 'Receiving Barcode Scanner' : 'Shipment QR Scanner';
 }
@@ -160,33 +209,17 @@ function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
 
 export default function ScannerPage() {
   /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the ScannerPage you sent.
-
-    The real scanner behavior is intentionally unchanged:
-    - same shipment/product modes
-    - same manual submit flow
-    - same image decode flow
-    - same resolve/navigation behavior
-    - same html5-qrcode setup
-    - same success feedback behavior
-
-    This pass is UI-only and aligns the page with the shared polished shell:
-    - main sections now use app-panel/app-panel--padded
-    - state banners align with the shared success/error/warning styles
-    - action rows align more closely with the shared app-actions rhythm
-    - width guards and wrapping were tightened for long IDs / decoded values
-    - no scanning logic or routing behavior was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes ScannerPage feel like part of the same operational app as Shipments,
-    Products, and the admin pages without changing decode behavior or backend contracts.
+    REVIEWED SCANNER WORKSPACE
+    --------------------------
+    The page supports shipment QR lookup and shipment-context barcode receiving.
+    It keeps live-camera, manual-entry, image-decode, and navigation contracts,
+    while adding production guardrails for permissions, required receiving context,
+    duplicate decode suppression, secure-camera readiness, upload size/type checks,
+    handheld scanner Enter submission, and success feedback only after a code resolves.
   */
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const manualInputRef = useRef<HTMLInputElement | null>(null);
+  const scanInFlightRef = useRef(false);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -196,7 +229,23 @@ export default function ScannerPage() {
   const locationId = searchParams.get('locationId') || '';
   const shipmentLabel = searchParams.get('shipmentLabel') || '';
   const locationName = searchParams.get('locationName') || '';
-  const isProductContextMissing = mode === 'product' && !shipmentId;
+  const canReceiveShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
+  const isProductContextMissing = mode === 'product' && (!shipmentId || !locationId);
+  const isProductPermissionMissing = mode === 'product' && !canReceiveShipments;
+  const productModeUnavailableReason = isProductPermissionMissing
+    ? 'Shipment receive permission is required for the receiving barcode scanner.'
+    : !shipmentId
+      ? 'Select a shipment before opening the receiving barcode scanner.'
+      : !locationId
+        ? 'Select a default storage location before opening the receiving barcode scanner.'
+        : null;
+  const secureCameraContext = typeof window === 'undefined' ? true : window.isSecureContext;
+  const cameraApiAvailable = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+  const liveCameraUnavailableReason = !secureCameraContext
+    ? 'Live camera scanning requires HTTPS. Manual entry and image upload remain available.'
+    : !cameraApiAvailable
+      ? 'This browser does not provide camera access. Manual entry and image upload remain available.'
+      : null;
 
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -210,7 +259,8 @@ export default function ScannerPage() {
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing;
+  const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing || isProductPermissionMissing;
+  const liveScannerDisabled = isRunning || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
   const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
   const stopScanner = async () => {
@@ -239,6 +289,7 @@ export default function ScannerPage() {
     );
 
     setResolvedShipmentId(shipment.id);
+    playSuccessFeedback();
     navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`);
   };
 
@@ -297,16 +348,30 @@ export default function ScannerPage() {
       );
     }
 
-    if (locationId) {
-      params.set('locationId', locationId);
-    }
+    params.set('locationId', locationId);
 
+    playSuccessFeedback();
     navigate(`/shipments?${params.toString()}`);
   };
 
   const resolveDecodedValue = async (decodedText: string) => {
+    if (scanInFlightRef.current) {
+      return;
+    }
+
     const cleanValue = decodedText.trim();
 
+    if (!cleanValue) {
+      setError('The scanned code is empty. Try again or enter the code manually.');
+      return;
+    }
+
+    if (cleanValue.length > MAX_SCANNED_CODE_LENGTH) {
+      setError(`The scanned code is longer than the supported ${MAX_SCANNED_CODE_LENGTH} characters.`);
+      return;
+    }
+
+    scanInFlightRef.current = true;
     setResult(cleanValue);
     setResolvedShipmentId(null);
     setResolvedShipmentItemId(null);
@@ -324,25 +389,15 @@ export default function ScannerPage() {
         await resolveShipmentCode(cleanValue);
       }
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to resolve scanned code.');
-      }
+      setError(scannerResolutionError(err, mode));
     } finally {
+      scanInFlightRef.current = false;
       setIsResolving(false);
     }
   };
 
   const handleResolvedScan = async (decodedText: string) => {
     try {
-      /**
-       * Give immediate warehouse-style feedback on successful decode.
-       */
-      playSuccessFeedback();
-
       /*
         Stop the camera immediately after a successful decode so the same code
         is not processed repeatedly.
@@ -361,8 +416,13 @@ export default function ScannerPage() {
   const startScanner = async () => {
     setError(null);
 
-    if (isProductContextMissing) {
-      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before scanning a barcode.');
+    if (productModeUnavailableReason) {
+      setError(productModeUnavailableReason);
+      return;
+    }
+
+    if (liveCameraUnavailableReason) {
+      setError(liveCameraUnavailableReason);
       return;
     }
     setResult(null);
@@ -400,7 +460,7 @@ export default function ScannerPage() {
               disableFlip: false
             },
         (decodedText) => {
-          if (!isResolving) {
+          if (!scanInFlightRef.current) {
             void handleResolvedScan(decodedText);
           }
         },
@@ -438,7 +498,7 @@ export default function ScannerPage() {
                 disableFlip: false
               },
           (decodedText) => {
-            if (!isResolving) {
+            if (!scanInFlightRef.current) {
               void handleResolvedScan(decodedText);
             }
           },
@@ -447,11 +507,7 @@ export default function ScannerPage() {
 
         setIsRunning(true);
       } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message || 'Failed to start camera');
-        } else {
-          setError('Failed to start camera');
-        }
+        setError(cameraStartError(err));
       }
     }
   };
@@ -459,8 +515,8 @@ export default function ScannerPage() {
   const handleManualSubmit = async () => {
     const trimmed = manualCode.trim();
 
-    if (isProductContextMissing) {
-      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before entering a barcode.');
+    if (productModeUnavailableReason) {
+      setError(productModeUnavailableReason);
       return;
     }
 
@@ -469,18 +525,13 @@ export default function ScannerPage() {
       return;
     }
 
-    /**
-     * Treat manual submission like a successful scan and give the same feedback.
-     */
-    playSuccessFeedback();
-
     await stopScanner();
     await resolveDecodedValue(trimmed);
   };
 
   const handleChooseImage = () => {
-    if (isProductContextMissing) {
-      setError('Barcode receiving requires a selected shipment. Open the receiving scanner from a shipment before uploading a barcode image.');
+    if (productModeUnavailableReason) {
+      setError(productModeUnavailableReason);
       return;
     }
 
@@ -494,46 +545,49 @@ export default function ScannerPage() {
       return;
     }
 
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file containing a QR code or barcode.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size <= 0 || file.size > MAX_IMAGE_UPLOAD_BYTES) {
+      setError('Choose an image smaller than 10 MB.');
+      event.target.value = '';
+      return;
+    }
+
     setError(null);
     setIsDecodingImage(true);
+    let imageScanner: Html5Qrcode | null = null;
 
     try {
       await stopScanner();
 
-      const imageScanner = new Html5Qrcode('scanner-container', {
+      imageScanner = new Html5Qrcode('scanner-container', {
         formatsToSupport: getFormatsToSupport(mode),
         verbose: false
       });
 
       const decodedText = await imageScanner.scanFile(file, true);
-
-      try {
-        await imageScanner.clear();
-      } catch {
-        // Ignore cleanup errors for temporary image scanner.
-      }
-
-      /**
-       * Treat image decode like a successful scan and give the same feedback.
-       */
-      playSuccessFeedback();
-
       await resolveDecodedValue(decodedText);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message || 'Could not decode code from image.');
-      } else {
-        setError('Could not decode code from image.');
-      }
+    } catch {
+      setError('No supported code could be decoded from this image. Try a sharper image or enter the value manually.');
     } finally {
+      if (imageScanner) {
+        try {
+          await imageScanner.clear();
+        } catch {
+          // Ignore cleanup errors for the temporary image scanner.
+        }
+      }
+
       setIsDecodingImage(false);
       event.target.value = '';
     }
   };
 
   useEffect(() => {
-    manualInputRef.current?.focus();
-
     return () => {
       void stopScanner();
     };
@@ -586,11 +640,29 @@ export default function ScannerPage() {
           </div>
         ) : null}
 
-        {isProductContextMissing ? (
+        {productModeUnavailableReason ? (
           <div className="app-warning-state" style={styles.infoBanner}>
-            Barcode receiving is disabled until a shipment is selected. Open the scanner from a selected shipment to preserve receiving context.
+            {productModeUnavailableReason} Open the scanner from the Shipments page to preserve the selected shipment and destination.
           </div>
         ) : null}
+
+        <div style={styles.readinessGrid}>
+          <div style={styles.readinessCard}>
+            <div style={styles.readinessLabel}>Current mode</div>
+            <div style={styles.readinessValue}>{mode === 'product' ? 'Shipment receiving' : 'Shipment lookup'}</div>
+            <div style={styles.readinessMeta}>{mode === 'product' ? 'A successful match returns to receiving.' : 'A successful QR scan opens the shipment without changing stock.'}</div>
+          </div>
+          <div style={liveCameraUnavailableReason ? styles.readinessCardWarn : styles.readinessCardSuccess}>
+            <div style={styles.readinessLabel}>Live camera</div>
+            <div style={styles.readinessValue}>{liveCameraUnavailableReason ? 'Unavailable' : 'Ready'}</div>
+            <div style={styles.readinessMeta}>{liveCameraUnavailableReason || 'Camera access is supported; browser permission will be requested when scanning starts.'}</div>
+          </div>
+          <div style={styles.readinessCardSuccess}>
+            <div style={styles.readinessLabel}>Fallbacks</div>
+            <div style={styles.readinessValue}>Manual and image</div>
+            <div style={styles.readinessMeta}>Handheld scanners can type into the manual field and submit Enter.</div>
+          </div>
+        </div>
 
         <div style={mode === 'product' ? styles.tipBannerWarn : styles.tipBannerInfo}>
           {mode === 'product' ? (
@@ -601,6 +673,7 @@ export default function ScannerPage() {
               <div>Use strong light and avoid glare.</div>
               <div>If live scan fails, use manual entry or image upload below.</div>
               <div>Camera scanning requires HTTPS and browser camera permission.</div>
+              <div><strong>Action:</strong> a successful match returns to the shipment and receives one base unit or one full scanned package into the selected location.</div>
             </>
           ) : (
             <>
@@ -615,14 +688,14 @@ export default function ScannerPage() {
         <div className="app-actions" style={styles.actionGrid}>
           <button
             onClick={() => void startScanner()}
-            disabled={isRunning || scannerInputDisabled}
-            title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
+            disabled={liveScannerDisabled}
+            title={productModeUnavailableReason || liveCameraUnavailableReason || undefined}
             style={{
               ...styles.primaryButton,
-              ...(isRunning || scannerInputDisabled ? styles.disabledButton : {})
+              ...(liveScannerDisabled ? styles.disabledButton : {})
             }}
           >
-            {isRunning ? 'Scanner Running' : 'Start Scanner'}
+            {isRunning ? 'Scanner Running' : 'Start Camera Scanner'}
           </button>
 
           <button
@@ -633,21 +706,7 @@ export default function ScannerPage() {
               ...(!isRunning ? styles.disabledButton : {})
             }}
           >
-            Stop Scanner
-          </button>
-
-          <button
-            type="button"
-            data-skip-global-action-feedback="true"
-            onClick={handleChooseImage}
-            disabled={scannerInputDisabled}
-            title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
-            style={{
-              ...styles.secondaryButton,
-              ...(scannerInputDisabled ? styles.disabledButton : {})
-            }}
-          >
-            Upload Image
+            Stop Camera Scanner
           </button>
         </div>
 
@@ -670,6 +729,9 @@ export default function ScannerPage() {
         ) : null}
 
         <div style={styles.scannerShell}>
+          <div style={styles.scannerStatus}>
+            {isRunning ? 'Camera is active. Hold one code inside the highlighted scan area.' : 'The camera preview appears below after Start Camera Scanner.'}
+          </div>
           <div
             id="scanner-container"
             style={{
@@ -690,36 +752,47 @@ export default function ScannerPage() {
           </div>
         </div>
 
-        <div style={styles.formGrid}>
+        <form
+          style={styles.formGrid}
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            void handleManualSubmit();
+          }}
+        >
           <div style={styles.formField}>
             <label htmlFor="manual-code-input" style={styles.label}>
               Enter code manually
             </label>
             <input
-              ref={manualInputRef}
               id="manual-code-input"
               type="text"
               value={manualCode}
+              maxLength={MAX_SCANNED_CODE_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              enterKeyHint="go"
               onChange={(event) => setManualCode(event.target.value)}
               placeholder={mode === 'product' ? 'Enter product, package, or inventory-label barcode' : 'Enter shipment QR text'}
-              disabled={isProductContextMissing}
-              title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
+              disabled={scannerInputDisabled}
+              title={productModeUnavailableReason || undefined}
               style={{
                 ...styles.input,
-                ...(isProductContextMissing ? styles.disabledInput : {})
+                ...(scannerInputDisabled ? styles.disabledInput : {})
               }}
             />
+            <div style={styles.fieldHelper}>
+              Type or paste the exact value. A USB or Bluetooth handheld scanner can enter the code here and submit with Enter.
+            </div>
           </div>
 
           <div className="app-actions" style={styles.formActions}>
             <button
-              type="button"
+              type="submit"
               data-skip-global-action-feedback="true"
-              onClick={() => void handleManualSubmit()}
               disabled={manualSubmitDisabled}
               title={
-                isProductContextMissing
-                  ? 'Open receiving scanner from a selected shipment first'
+                productModeUnavailableReason
+                  ? productModeUnavailableReason
                   : !manualCode.trim()
                     ? 'Enter a barcode first'
                     : undefined
@@ -737,7 +810,7 @@ export default function ScannerPage() {
               data-skip-global-action-feedback="true"
               onClick={handleChooseImage}
               disabled={scannerInputDisabled}
-              title={isProductContextMissing ? 'Open receiving scanner from a selected shipment first' : undefined}
+              title={productModeUnavailableReason || undefined}
               style={{
                 ...styles.secondaryButton,
                 ...(scannerInputDisabled ? styles.disabledButton : {})
@@ -746,7 +819,8 @@ export default function ScannerPage() {
               Upload Image
             </button>
           </div>
-        </div>
+          <div style={styles.fieldHelper}>Image upload is decoded only in this browser. Maximum file size: 10 MB.</div>
+        </form>
 
         <input
           ref={fileInputRef}
@@ -765,7 +839,7 @@ export default function ScannerPage() {
             <div style={styles.panelHeaderText}>
               <h3 style={styles.panelTitle}>Latest Scan Result</h3>
               <p style={styles.panelSubtitle}>
-                Real-time decode and resolution output from the existing scanner flow.
+                The last decoded value remains visible when resolution fails, so the operator can verify or correct it.
               </p>
             </div>
           </div>
@@ -929,6 +1003,54 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     wordBreak: 'break-all'
   },
+  readinessGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: '12px',
+    minWidth: 0
+  },
+  readinessCard: {
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  readinessCardSuccess: {
+    border: '1px solid #bbf7d0',
+    background: '#f0fdf4',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  readinessCardWarn: {
+    border: '1px solid #fed7aa',
+    background: '#fff7ed',
+    borderRadius: '12px',
+    padding: '14px',
+    minWidth: 0
+  },
+  readinessLabel: {
+    color: '#64748b',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    marginBottom: '6px'
+  },
+  readinessValue: {
+    color: '#0f172a',
+    fontSize: '17px',
+    fontWeight: 800,
+    lineHeight: 1.3
+  },
+  readinessMeta: {
+    color: '#475569',
+    fontSize: '13px',
+    lineHeight: 1.45,
+    marginTop: '6px',
+    wordBreak: 'break-word'
+  },
   tipBannerInfo: {
     padding: '12px 14px',
     borderRadius: '12px',
@@ -1001,7 +1123,14 @@ const styles: Record<string, CSSProperties> = {
   },
   scannerShell: {
     width: '100%',
-    minWidth: 0
+    minWidth: 0,
+    display: 'grid',
+    gap: '8px'
+  },
+  scannerStatus: {
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.45
   },
   scannerContainer: {
     width: '100%',
@@ -1059,6 +1188,11 @@ const styles: Record<string, CSSProperties> = {
   label: {
     fontWeight: 700,
     color: '#334155'
+  },
+  fieldHelper: {
+    color: '#64748b',
+    fontSize: '12px',
+    lineHeight: 1.45
   },
   input: {
     width: '100%',
