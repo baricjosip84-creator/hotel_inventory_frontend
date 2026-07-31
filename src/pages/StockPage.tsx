@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
@@ -342,6 +342,7 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const {
     role,
     canConsumeStock: canConsume,
@@ -380,6 +381,16 @@ export default function StockPage() {
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
 
   const [selectedStockId, setSelectedStockId] = useState<string>('');
+  const requestedProductId = searchParams.get('product_id') || searchParams.get('productId') || '';
+
+  useEffect(() => {
+    if (!requestedProductId || !rows.length) return;
+    const matchingStock = rows.find((row) => row.product_id === requestedProductId);
+    if (matchingStock && matchingStock.id !== selectedStockId) {
+      setSelectedStockId(matchingStock.id);
+    }
+  }, [requestedProductId, rows, selectedStockId]);
+
   const selectedRow = useMemo(
     () => rows.find((row) => row.id === selectedStockId) ?? rows[0] ?? null,
     [rows, selectedStockId]

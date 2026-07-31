@@ -149,6 +149,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   const normalizedPath = path.toLowerCase();
   const normalizedMethod = method.toUpperCase();
 
+  if (normalizedMethod === 'POST' && normalizedPath === '/system-context/snapshots/capture') {
+    return 'System Context snapshot captured successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPath === '/system-context/snapshots/forecast-scenarios/capture') {
+    return 'Forecast scenario set captured successfully.';
+  }
+
   if (normalizedPath.endsWith('/enterprise-inventory/approvals/execute') && normalizedMethod === 'POST') {
     const action = readMutationAction(body);
     if (action === 'approved') return 'Item approved successfully.';

@@ -164,7 +164,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/insights',
         label: 'Insights',
-        description: 'Management intelligence for depletion risk, anomalies, supplier trust, and reorder actions.',
+        description: 'Management intelligence for operational health, stock pressure, supplier performance, reorder needs, and unusual movement patterns.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.INSIGHTS_READ
       },

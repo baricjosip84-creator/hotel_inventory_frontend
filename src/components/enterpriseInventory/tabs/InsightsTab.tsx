@@ -137,15 +137,15 @@ export function InsightsTab({
       </section>
 
       <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Supplier trust scores</h2>
+        <h2 style={styles.cardTitle}>Supplier performance</h2>
         <DataTable
           loading={supplierTrustScoresLoading}
-          empty="No supplier trust scores returned."
-          headers={['Supplier', 'Trust score', 'Tier', 'Fill rate', 'Discrepancy rate', 'Overdue shipments', 'Open POs', 'PO remaining value', 'Risk flags']}
+          empty="No supplier performance rows returned."
+          headers={['Supplier', 'Performance score', 'Tier', 'Fill rate', 'Discrepancy rate', 'Overdue shipments', 'Open POs', 'PO remaining value', 'Risk flags']}
           rows={supplierTrustScores.map((item) => [
             item.supplier_name || item.supplier_id,
-            formatNumber(item.trust_score),
-            item.trust_tier,
+            item.trust_evidence_status === 'insufficient_history' || item.trust_score === null ? 'Not rated' : formatNumber(item.trust_score),
+            item.trust_tier === 'unrated' ? 'Not enough history' : item.trust_tier,
             `${formatNumber(item.fill_rate_pct)}%`,
             `${formatNumber(item.discrepancy_rate_pct)}%`,
             formatNumber(item.overdue_shipments),

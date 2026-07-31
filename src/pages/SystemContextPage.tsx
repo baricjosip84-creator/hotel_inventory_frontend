@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { SystemContextExecutionGateResponse, SystemContextResponse, SystemContextSnapshot, SystemContextSnapshotCaptureResponse, SystemContextSnapshotComparison, SystemContextSnapshotTrendSeries, SystemContextForecastPreview, SystemContextForecastSeries, SystemContextForecastHorizons, SystemContextBaselineForecast, SystemContextMovingAverageForecast, SystemContextWeightedTrendForecast, SystemContextVolatilityAdjustedForecast, SystemContextForecastConfidence, SystemContextForecastAccuracy, SystemContextForecastComparison, SystemContextForecastRiskClassification, SystemContextForecastAccuracyGovernance, SystemContextForecastErrorGovernance, SystemContextForecastDegradationGovernance, SystemContextForecastConfidenceGovernance, SystemContextForecastAdjustmentGovernance, SystemContextForecastOutcomeValidationGovernance, SystemContextForecastGovernanceReadiness, SystemContextForecastPhaseClosure, SystemContextExecutionIntelligenceLinkage, SystemContextExecutionIntelligenceOutcomeScoring, SystemContextExecutionIntelligenceRollbackEvidence, SystemContextExecutionIntelligenceRiskScoring, SystemContextExecutionIntelligenceClosedLoopLearning, SystemContextExecutionIntelligenceReadiness, SystemContextExecutionIntelligencePhaseClosure, SystemContextAIOperationsPipelineMonitoring, SystemContextAIOperationsHealthMonitoring, SystemContextAIOperationsDegradationMonitoring, SystemContextAIOperationsDataQualityMonitoring, SystemContextAIOperationsStaleIntelligenceMonitoring, SystemContextAIOperationsNotificationMonitoring, SystemContextAIOperationsSlaMonitoring, SystemContextAIOperationsAuditEvidenceMonitoring, SystemContextAIOperationsReadinessGate, SystemContextForecastVersionGovernance, SystemContextForecastRanking, SystemContextForecastScenarioSet, SystemContextForecastScenarioCaptureResponse, SystemContextForecastScenarioHistoryItem } from '../types/inventory';
@@ -25,7 +25,7 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatDateTime(value?: string | null): string {
+function formatDateTime(value?: string | number | null): string {
   if (!value) return '-';
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
@@ -74,8 +74,10 @@ function getSnapshotContextValue(snapshot: SystemContextSnapshot | undefined, ke
 }
 
 export default function SystemContextPage() {
+  const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
+  const canGovernDecisionIntelligence = capabilities.canGovernDecisionIntelligence;
 
   const contextQuery = useQuery({
     queryKey: ['system-context'],
@@ -405,9 +407,35 @@ export default function SystemContextPage() {
   const [capturingForecastScenarioSet, setCapturingForecastScenarioSet] = useState(false);
   const [forecastScenarioCaptureMessage, setForecastScenarioCaptureMessage] = useState<string | null>(null);
   const [forecastScenarioCaptureError, setForecastScenarioCaptureError] = useState<string | null>(null);
+  const [refreshingPage, setRefreshingPage] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+
+  const invalidateSystemContextQueries = () => queryClient.invalidateQueries({
+    predicate: (query) => String(query.queryKey[0] ?? '').startsWith('system-context')
+  });
+
+  const refreshSystemContextPage = async () => {
+    setRefreshingPage(true);
+    setRefreshMessage(null);
+
+    try {
+      await invalidateSystemContextQueries();
+      setRefreshMessage('System Context data refreshed. No operational changes were made.');
+    } catch (error) {
+      setRefreshMessage(`System Context refresh failed: ${readableError(error)}`);
+    } finally {
+      setRefreshingPage(false);
+    }
+  };
 
 
   const captureHistoricalSnapshot = async () => {
+    if (!canGovernDecisionIntelligence) {
+      setSnapshotCaptureMessage(null);
+      setSnapshotCaptureError('Decision Intelligence governance permission is required to capture analytical evidence.');
+      return;
+    }
+
     setCapturingSnapshot(true);
     setSnapshotCaptureMessage(null);
     setSnapshotCaptureError(null);
@@ -423,16 +451,10 @@ export default function SystemContextPage() {
       setSnapshotCaptureMessage(
         `Snapshot captured for read-only history${response.snapshot_id ? `: ${response.snapshot_id}` : ''}. No execution or mutation was performed.`
       );
-      await snapshotsQuery.refetch();
-      await snapshotComparisonQuery.refetch();
-      await snapshotTrendQuery.refetch();
-      await forecastPreviewQuery.refetch();
-      await forecastSeriesQuery.refetch();
-      await forecastScenarioQuery.refetch();
-      await forecastScenarioHistoryQuery.refetch();
       if (response.snapshot_id) {
         setSelectedSnapshotId(response.snapshot_id);
       }
+      await invalidateSystemContextQueries();
     } catch (error) {
       setSnapshotCaptureError(readableError(error));
     } finally {
@@ -442,6 +464,12 @@ export default function SystemContextPage() {
 
 
   const captureForecastScenarioSet = async () => {
+    if (!canGovernDecisionIntelligence) {
+      setForecastScenarioCaptureMessage(null);
+      setForecastScenarioCaptureError('Decision Intelligence governance permission is required to capture analytical evidence.');
+      return;
+    }
+
     setCapturingForecastScenarioSet(true);
     setForecastScenarioCaptureMessage(null);
     setForecastScenarioCaptureError(null);
@@ -457,8 +485,10 @@ export default function SystemContextPage() {
       setForecastScenarioCaptureMessage(
         `Forecast scenario set captured for read-only intelligence${response.scenario_set_id ? `: ${response.scenario_set_id}` : ''}. No execution, mutation, forecast model run, or automation was performed.`
       );
-      await forecastScenarioQuery.refetch();
-      await forecastScenarioHistoryQuery.refetch();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['system-context-forecast-scenarios'] }),
+        queryClient.invalidateQueries({ queryKey: ['system-context-forecast-scenario-history'] })
+      ]);
     } catch (error) {
       setForecastScenarioCaptureError(readableError(error));
     } finally {
@@ -472,6 +502,12 @@ export default function SystemContextPage() {
     if (!canCreateExecutionRequests) {
       setReviewRequestMessage(null);
       setReviewRequestError('Your current role cannot create execution requests.');
+      return;
+    }
+
+    if (data.recommendations.length === 0) {
+      setReviewRequestMessage(null);
+      setReviewRequestError('There are no System Context recommendations to place into a review request.');
       return;
     }
 
@@ -509,6 +545,28 @@ export default function SystemContextPage() {
 
   return (
     <div style={styles.page}>
+      <header style={styles.pageHeader}>
+        <div style={styles.headerCopy}>
+          <p style={styles.eyebrow}>Decision Intelligence</p>
+          <h1 style={styles.pageTitle}>System Context</h1>
+          <p style={styles.pageSubtitle}>
+            Review tenant-scoped operational, forecasting, governance, execution-intelligence, and AI-operations evidence in one read-only workspace. Capturing a snapshot or forecast scenario stores analytical history only; it does not change inventory, run automation, or execute work.
+          </p>
+        </div>
+        <div style={styles.headerActions}>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={refreshSystemContextPage}
+            disabled={refreshingPage}
+          >
+            {refreshingPage ? 'Refreshing…' : 'Refresh page data'}
+          </button>
+          <span style={styles.itemMeta}>Last refreshed: {formatDateTime(contextQuery.dataUpdatedAt || null)}</span>
+        </div>
+      </header>
+      {refreshMessage ? <div style={styles.note}>{refreshMessage}</div> : null}
+
       {contextQuery.error ? (
         <ErrorNotice
           title="System Context failed to load"
@@ -1854,10 +1912,19 @@ export default function SystemContextPage() {
       Forecast scenarios are persisted intelligence only. They do not run forecast models, create execution requests, mutate inventory, or schedule automation.
     </div>
     <div style={styles.actionRow}>
-      <button className="app-button app-button--secondary" type="button" onClick={captureForecastScenarioSet} disabled={capturingForecastScenarioSet || forecastScenarioQuery.data.status !== 'forecast_scenarios_ready'}>
+      <button
+        className="button button--secondary"
+        type="button"
+        onClick={captureForecastScenarioSet}
+        disabled={capturingForecastScenarioSet || !canGovernDecisionIntelligence || forecastScenarioQuery.data.status !== 'forecast_scenarios_ready'}
+      >
         {capturingForecastScenarioSet ? 'Capturing scenario set...' : 'Capture Read-Only Scenario Set'}
       </button>
-      <span style={styles.itemMeta}>Manual capture stores forecast intelligence only.</span>
+      <span style={styles.itemMeta}>
+        {canGovernDecisionIntelligence
+          ? 'Manual capture stores forecast intelligence only.'
+          : 'Decision Intelligence governance permission is required to capture analytical evidence.'}
+      </span>
     </div>
     {forecastScenarioCaptureMessage ? <div className="app-success-state">{forecastScenarioCaptureMessage}</div> : null}
     {forecastScenarioCaptureError ? <div className="app-error-state">{forecastScenarioCaptureError}</div> : null}
@@ -2139,13 +2206,17 @@ export default function SystemContextPage() {
   <div style={styles.actionRow}>
     <button
       type="button"
-      className="btn btn-secondary"
+      className="button button--secondary"
       onClick={captureHistoricalSnapshot}
-      disabled={capturingSnapshot}
+      disabled={capturingSnapshot || !canGovernDecisionIntelligence}
     >
       {capturingSnapshot ? 'Capturing Snapshot...' : 'Capture Read-Only Snapshot'}
     </button>
-    <span style={styles.itemMeta}>Creates historical evidence only. No execution request, automation run, or inventory mutation is performed.</span>
+    <span style={styles.itemMeta}>
+      {canGovernDecisionIntelligence
+        ? 'Creates historical evidence only. No execution request, automation run, or inventory mutation is performed.'
+        : 'Decision Intelligence governance permission is required to capture analytical evidence.'}
+    </span>
   </div>
   {snapshotCaptureMessage ? <div style={styles.note}>{snapshotCaptureMessage}</div> : null}
   {snapshotCaptureError ? <div className="app-error-state">{snapshotCaptureError}</div> : null}
@@ -2712,13 +2783,19 @@ export default function SystemContextPage() {
                 <div style={styles.actionRow}>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="button button--secondary"
                     onClick={createSystemContextReviewRequest}
-                    disabled={creatingReviewRequest || !canCreateExecutionRequests}
+                    disabled={creatingReviewRequest || !canCreateExecutionRequests || recommendationCount === 0}
                   >
                     {creatingReviewRequest ? 'Creating Review Request...' : 'Create Review Request'}
                   </button>
-                  <span style={styles.itemMeta}>{canCreateExecutionRequests ? 'Creates a system_recommendation review request only. No execution is performed.' : 'Creating review requests requires execution request create permission.'}</span>
+                  <span style={styles.itemMeta}>
+                    {!canCreateExecutionRequests
+                      ? 'Creating review requests requires execution request create permission.'
+                      : recommendationCount === 0
+                        ? 'No review request can be created because System Context currently has no recommendations.'
+                        : 'Creates a system_recommendation review request only. No execution is performed.'}
+                  </span>
                 </div>
                 {reviewRequestMessage ? <div style={styles.note}>{reviewRequestMessage}</div> : null}
                 {reviewRequestError ? <div className="app-error-state">{reviewRequestError}</div> : null}
@@ -3162,6 +3239,12 @@ export default function SystemContextPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: '20px', width: '100%', minWidth: 0 },
+  pageHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', padding: '22px', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #dbe3f0', borderRadius: '20px', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)', minWidth: 0 },
+  headerCopy: { flex: '1 1 620px', minWidth: 0 },
+  headerActions: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', minWidth: 0 },
+  eyebrow: { margin: 0, color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase' },
+  pageTitle: { margin: '4px 0 0', color: '#0f172a', fontSize: 'clamp(1.75rem, 2.7vw, 2.25rem)', lineHeight: 1.15 },
+  pageSubtitle: { maxWidth: '820px', margin: '10px 0 0', color: '#64748b', lineHeight: 1.65, overflowWrap: 'anywhere' },
   statsGrid: { width: '100%', minWidth: 0 },
   statCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '18px', minWidth: 0 },
   statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },

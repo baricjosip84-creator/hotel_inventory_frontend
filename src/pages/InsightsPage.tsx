@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 
 type DepletionRiskResponse = {
   generated_at: string;
@@ -164,6 +165,8 @@ type SupplierTrustResponse = {
   tenant_id: string;
   summary?: {
     total_suppliers: number | string;
+    rated_suppliers: number | string;
+    unrated_suppliers: number | string;
     suppliers_with_risk: number | string;
     total_risk_flags: number | string;
     high_risk_flags: number | string;
@@ -182,8 +185,9 @@ type SupplierTrustResponse = {
     overdue_rate_pct: number | string;
     fill_rate_pct: number | string;
     discrepancy_rate_pct: number | string;
-    trust_score: number | string;
+    trust_score: number | string | null;
     trust_tier: string;
+    trust_evidence_status?: 'rated' | 'insufficient_history';
     total_shipments: number | string;
     total_purchase_orders: number | string;
     completed_purchase_orders: number | string;
@@ -251,7 +255,7 @@ type SupplierTrustProductionReviewResponse = {
 };
 
 type SupplierRiskFilter = 'all' | 'with_risk' | 'high' | 'medium' | 'low' | 'none';
-type SupplierTierFilter = 'all' | 'excellent' | 'strong' | 'watch' | 'risk';
+type SupplierTierFilter = 'all' | 'excellent' | 'strong' | 'watch' | 'risk' | 'unrated';
 type SupplierSort =
   | 'trust_asc'
   | 'trust_desc'
@@ -263,7 +267,7 @@ type SupplierSort =
 type SupplierPageSize = 6 | 12 | 24 | 48;
 
 const SUPPLIER_RISK_FILTERS: SupplierRiskFilter[] = ['all', 'with_risk', 'high', 'medium', 'low', 'none'];
-const SUPPLIER_TIER_FILTERS: SupplierTierFilter[] = ['all', 'excellent', 'strong', 'watch', 'risk'];
+const SUPPLIER_TIER_FILTERS: SupplierTierFilter[] = ['all', 'excellent', 'strong', 'watch', 'risk', 'unrated'];
 const SUPPLIER_SORT_OPTIONS: SupplierSort[] = ['trust_asc', 'trust_desc', 'risk_flags_desc', 'remaining_value_desc', 'overdue_pos_desc', 'fill_rate_asc'];
 const SUPPLIER_PAGE_SIZE_OPTIONS: SupplierPageSize[] = [6, 12, 24, 48];
 
@@ -286,7 +290,30 @@ function normalizeSupplierPage(value: string | null): number {
 
 function normalizeSupplierPageSize(value: string | null): SupplierPageSize {
   const parsed = Number(value);
-  return SUPPLIER_PAGE_SIZE_OPTIONS.includes(parsed as SupplierPageSize) ? (parsed as SupplierPageSize) : 12;
+  return SUPPLIER_PAGE_SIZE_OPTIONS.includes(parsed as SupplierPageSize) ? (parsed as SupplierPageSize) : 6;
+}
+
+function normalizeLookbackDays(value: string | null): number {
+  const parsed = Number(value);
+  return [14, 30, 60, 90].includes(parsed) ? parsed : 30;
+}
+
+function formatReadableStatus(value: string | null | undefined): string {
+  if (!value) return 'Not available';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatSupplierTrustScore(row: SupplierTrustResponse['rows'][number]): string {
+  return row.trust_evidence_status === 'insufficient_history' || row.trust_score === null
+    ? 'Not rated'
+    : formatNumber(row.trust_score, 0);
+}
+
+function neutralizeSpreadsheetFormula(value: unknown): string {
+  const normalized = value === null || value === undefined ? '' : String(value);
+  return /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
 }
 
 function toReadableError(error: unknown): string {
@@ -332,7 +359,7 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 function escapeCsv(value: unknown): string {
-  const normalized = value === null || value === undefined ? '' : String(value);
+  const normalized = neutralizeSpreadsheetFormula(value);
   return `"${normalized.replace(/"/g, '""')}"`;
 }
 
@@ -426,6 +453,14 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
     });
   }
 
+  if (row.trust_evidence_status === 'insufficient_history') {
+    actions.push({
+      title: 'Build delivery history',
+      detail: 'Not enough delivery history exists to calculate a trustworthy supplier score. Review open commitments manually until real receiving history is available.',
+      priority: 'medium'
+    });
+  }
+
   if (!actions.length) {
     actions.push({
       title: 'Maintain supplier cadence',
@@ -503,31 +538,8 @@ function StatCard(props: { title: string; value: string; subtitle: string; tone?
 }
 
 export default function InsightsPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the InsightsPage you sent.
-
-    Existing real behavior is preserved:
-    - same insight endpoints
-    - same query keys
-    - same action-agenda logic
-    - same operational health / supplier trust / depletion / reorder / anomaly rendering
-    - same route targets and analytics text
-
-    This pass applies the shared UI foundation carefully:
-    - major sections now use app-panel/app-panel--padded
-    - stats now use app-grid-stats
-    - info/error states align with the shared state layer
-    - no analytics logic was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes Insights consume the same shared visual system as the other polished
-    pages without changing backend contracts, flows, or decision logic.
-  */
   const [searchParams, setSearchParams] = useSearchParams();
-  const [lookbackDays, setLookbackDays] = useState(30);
+  const [lookbackDays, setLookbackDays] = useState(() => normalizeLookbackDays(searchParams.get('lookback_days')));
   const [supplierRiskFilter, setSupplierRiskFilter] = useState<SupplierRiskFilter>(() => normalizeSupplierRiskFilter(searchParams.get('supplier_risk')));
   const [supplierTierFilter, setSupplierTierFilter] = useState<SupplierTierFilter>(() => normalizeSupplierTierFilter(searchParams.get('supplier_tier')));
   const [supplierSort, setSupplierSort] = useState<SupplierSort>(() => normalizeSupplierSort(searchParams.get('supplier_sort')));
@@ -535,6 +547,13 @@ export default function InsightsPage() {
   const [supplierPage, setSupplierPage] = useState(() => normalizeSupplierPage(searchParams.get('supplier_page')));
   const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
+
+  const canOpenDashboard = hasPermission(TENANT_PERMISSIONS.DASHBOARD_READ);
+  const canOpenProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
+  const canOpenStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
+  const canOpenStockMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
+  const canOpenSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
+  const canOpenPurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ);
 
   const depletionRiskQuery = useQuery({
     queryKey: ['insights', 'depletion-risk', lookbackDays],
@@ -590,19 +609,75 @@ export default function InsightsPage() {
       nextParams.set(key, normalizedValue);
     };
 
+    setOrDelete('lookback_days', String(lookbackDays), '30');
     setOrDelete('supplier_search', supplierSearch);
     setOrDelete('supplier_risk', supplierRiskFilter, 'all');
     setOrDelete('supplier_tier', supplierTierFilter, 'all');
     setOrDelete('supplier_sort', supplierSort, 'risk_flags_desc');
     setOrDelete('supplier_page', String(supplierPage), '1');
-    setOrDelete('supplier_page_size', String(supplierPageSize), '12');
+    setOrDelete('supplier_page_size', String(supplierPageSize), '6');
     setOrDelete('supplier_id', selectedSupplierId);
 
     if (nextParams.toString() !== searchParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [searchParams, selectedSupplierId, setSearchParams, supplierPage, supplierPageSize, supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter]);
+  }, [lookbackDays, searchParams, selectedSupplierId, setSearchParams, supplierPage, supplierPageSize, supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter]);
 
+
+  const activeReorderRows = useMemo(
+    () => (reorderQuery.data?.rows ?? []).filter((row) => toNumber(row.recommended_reorder_quantity) > 0),
+    [reorderQuery.data?.rows]
+  );
+
+  const lastRefreshedAt = useMemo(() => {
+    const timestamps = [
+      depletionRiskQuery.data?.generated_at,
+      depletionRootCauseQuery.data?.generated_at,
+      reorderQuery.data?.generated_at,
+      healthQuery.data?.generated_at,
+      anomaliesQuery.data?.generated_at,
+      anomalyProductionReviewQuery.data?.generated_at,
+      supplierTrustQuery.data?.generated_at,
+      supplierTrustProductionReviewQuery.data?.generated_at
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => new Date(value).getTime())
+      .filter(Number.isFinite);
+
+    return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null;
+  }, [
+    anomaliesQuery.data?.generated_at,
+    anomalyProductionReviewQuery.data?.generated_at,
+    depletionRiskQuery.data?.generated_at,
+    depletionRootCauseQuery.data?.generated_at,
+    healthQuery.data?.generated_at,
+    reorderQuery.data?.generated_at,
+    supplierTrustProductionReviewQuery.data?.generated_at,
+    supplierTrustQuery.data?.generated_at
+  ]);
+
+  const allInsightQueries = [
+    depletionRiskQuery,
+    depletionRootCauseQuery,
+    reorderQuery,
+    healthQuery,
+    anomaliesQuery,
+    anomalyProductionReviewQuery,
+    supplierTrustQuery,
+    supplierTrustProductionReviewQuery
+  ];
+  const isRefreshingAll = allInsightQueries.some((query) => query.isFetching);
+
+  async function refreshAllInsights() {
+    try {
+      const results = await Promise.all(allInsightQueries.map((query) => query.refetch()));
+      const failed = results.find((result) => result.isError);
+      if (failed?.error) throw failed.error;
+      showTenantActionSuccess('Insights refreshed.');
+    } catch (error) {
+      showTenantActionError(`Unable to refresh all insights. ${toReadableError(error)}`);
+    }
+  }
 
   const actionAgenda = useMemo(() => {
     const nextActions: Array<{
@@ -614,7 +689,7 @@ export default function InsightsPage() {
     }> = [];
 
     const healthTier = healthQuery.data?.health_tier;
-    if (healthTier === 'critical' || healthTier === 'watch') {
+    if ((healthTier === 'critical' || healthTier === 'watch') && canOpenDashboard) {
       nextActions.push({
         title: 'Operational health needs review',
         detail: `Current tenant health is ${healthTier}. Review low stock, overdue shipments, and unresolved alerts first.`,
@@ -624,8 +699,8 @@ export default function InsightsPage() {
       });
     }
 
-    const reorderTop = reorderQuery.data?.rows?.[0];
-    if (reorderTop) {
+    const reorderTop = activeReorderRows[0];
+    if (reorderTop && canOpenProducts) {
       nextActions.push({
         title: 'Reorder highest urgency product',
         detail: `${reorderTop.product_name} currently recommends a reorder quantity of ${formatNumber(reorderTop.recommended_reorder_quantity)}.`,
@@ -636,35 +711,36 @@ export default function InsightsPage() {
     }
 
     const depletionTop = depletionRiskQuery.data?.rows?.[0];
-    if (depletionTop) {
+    if (depletionTop && canOpenStock) {
       nextActions.push({
         title: 'Protect depletion-risk stock',
         detail: `${depletionTop.product_name} at ${depletionTop.storage_location_name} is currently one of the highest depletion-risk rows.`,
-        route: depletionTop ? `/stock?productId=${encodeURIComponent(depletionTop.product_id)}` : '/stock',
+        route: depletionTop ? `/stock?product_id=${encodeURIComponent(depletionTop.product_id)}` : '/stock',
         linkLabel: 'Open Stock',
         tone: depletionTop.risk_tier === 'critical' ? 'bad' : 'warn'
       });
     }
 
     const anomalyTop = anomaliesQuery.data?.rows?.[0];
-    if (anomalyTop) {
+    if (anomalyTop && canOpenStockMovements) {
       nextActions.push({
         title: 'Review unusual outbound activity',
         detail: `${anomalyTop.product_name} is showing an anomaly spike ratio of ${formatNumber(anomalyTop.spike_ratio)} against baseline demand.`,
-        route: anomalyTop ? `/stock-movements?productId=${encodeURIComponent(anomalyTop.product_id)}` : '/stock-movements',
+        route: anomalyTop ? `/stock-movements?product_id=${encodeURIComponent(anomalyTop.product_id)}` : '/stock-movements',
         linkLabel: 'Open Stock Movements',
         tone: anomalyTop.anomaly_tier === 'critical' ? 'bad' : 'warn'
       });
     }
 
     const supplierBottom = [...(supplierTrustQuery.data?.rows ?? [])]
+      .filter((row) => row.trust_evidence_status !== 'insufficient_history' && row.trust_score !== null)
       .sort((a, b) => toNumber(a.trust_score) - toNumber(b.trust_score))[0];
 
-    if (supplierBottom) {
+    if (supplierBottom && canOpenSuppliers) {
       nextActions.push({
-        title: 'Follow up lowest-trust supplier',
-        detail: `${supplierBottom.supplier_name} currently scores ${formatNumber(supplierBottom.trust_score, 0)} on supplier trust.`,
-        route: supplierBottom ? `/suppliers?search=${encodeURIComponent(supplierBottom.supplier_name)}` : '/suppliers',
+        title: 'Follow up lowest-rated supplier',
+        detail: `${supplierBottom.supplier_name} currently scores ${formatSupplierTrustScore(supplierBottom)} on supplier performance.`,
+        route: `/suppliers?search=${encodeURIComponent(supplierBottom.supplier_name)}`,
         linkLabel: 'Open Suppliers',
         tone: toNumber(supplierBottom.trust_score) < 50 ? 'bad' : 'warn'
       });
@@ -672,10 +748,15 @@ export default function InsightsPage() {
 
     return nextActions.slice(0, 4);
   }, [
+    activeReorderRows,
     anomaliesQuery.data?.rows,
+    canOpenDashboard,
+    canOpenProducts,
+    canOpenStock,
+    canOpenStockMovements,
+    canOpenSuppliers,
     depletionRiskQuery.data?.rows,
     healthQuery.data?.health_tier,
-    reorderQuery.data?.rows,
     supplierTrustQuery.data?.rows
   ]);
 
@@ -722,6 +803,10 @@ export default function InsightsPage() {
         return true;
       })
       .sort((a, b) => {
+        const aRated = a.trust_evidence_status !== 'insufficient_history' && a.trust_score !== null;
+        const bRated = b.trust_evidence_status !== 'insufficient_history' && b.trust_score !== null;
+        if (aRated !== bRated) return aRated ? -1 : 1;
+
         if (supplierSort === 'trust_asc') {
           return toNumber(a.trust_score) - toNumber(b.trust_score);
         }
@@ -767,7 +852,8 @@ export default function InsightsPage() {
       excellent: countTier('excellent'),
       strong: countTier('strong'),
       watch: countTier('watch'),
-      risk: countTier('risk')
+      risk: countTier('risk'),
+      unrated: countTier('unrated')
     };
   }, [supplierTrustQuery.data?.rows]);
 
@@ -859,12 +945,13 @@ export default function InsightsPage() {
       params.set(key, normalizedValue);
     };
 
+    setOrDelete('lookback_days', String(lookbackDays), '30');
     setOrDelete('supplier_search', supplierSearch);
     setOrDelete('supplier_risk', supplierRiskFilter, 'all');
     setOrDelete('supplier_tier', supplierTierFilter, 'all');
     setOrDelete('supplier_sort', supplierSort, 'risk_flags_desc');
     setOrDelete('supplier_page', String(supplierCurrentPage), '1');
-    setOrDelete('supplier_page_size', String(supplierPageSize), '12');
+    setOrDelete('supplier_page_size', String(supplierPageSize), '6');
     setOrDelete('supplier_id', selectedSupplierId);
 
     const query = params.toString();
@@ -874,20 +961,24 @@ export default function InsightsPage() {
   async function copySupplierTrustViewLink() {
     const viewUrl = buildSupplierTrustViewUrl();
 
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(viewUrl);
-      showTenantActionSuccess('Supplier trust view link copied successfully.');
+    if (!navigator.clipboard?.writeText) {
+      showTenantActionError('Clipboard is not available. Copy the link from the address bar instead.');
       return;
     }
 
-    showTenantActionError('Clipboard is not available. Copy the link from the address bar instead.');
+    try {
+      await navigator.clipboard.writeText(viewUrl);
+      showTenantActionSuccess('Supplier performance view link copied.');
+    } catch (error) {
+      showTenantActionError(`Unable to copy the supplier view link. ${toReadableError(error)}`);
+    }
   }
 
   function exportSupplierTrustCsv() {
     const header = [
       'Supplier',
-      'Trust Score',
-      'Trust Tier',
+      'Performance Score',
+      'Performance Tier',
       'Risk Flags',
       'High Risk Flags',
       'Open POs',
@@ -905,7 +996,7 @@ export default function InsightsPage() {
 
       return [
         row.supplier_name,
-        formatNumber(row.trust_score, 0),
+        formatSupplierTrustScore(row),
         row.trust_tier,
         riskFlags.map((flag) => `${flag.severity}: ${flag.label}`).join(' | '),
         riskFlags.filter((flag) => flag.severity === 'high').length,
@@ -920,7 +1011,7 @@ export default function InsightsPage() {
       ];
     });
 
-    downloadCsv('supplier-trust-insights.csv', [header, ...rows]);
+    downloadCsv('supplier-performance-insights.csv', [header, ...rows]);
   }
 
 
@@ -931,8 +1022,8 @@ export default function InsightsPage() {
     const metricRows: Array<Array<unknown>> = [
       ['Metric', 'Value'],
       ['Supplier', row.supplier_name],
-      ['Trust Score', formatNumber(row.trust_score, 0)],
-      ['Trust Tier', row.trust_tier],
+      ['Performance Score', formatSupplierTrustScore(row)],
+      ['Performance Tier', row.trust_tier === 'unrated' ? 'Not enough history' : formatReadableStatus(row.trust_tier)],
       ['Shipment Completion Rate %', formatNumber(row.completion_rate_pct)],
       ['Shipment Overdue Rate %', formatNumber(row.overdue_rate_pct)],
       ['Shipment Fill Rate %', formatNumber(row.fill_rate_pct)],
@@ -965,7 +1056,7 @@ export default function InsightsPage() {
       ...getSupplierRecommendedActions(row).map((action) => [action.priority, action.title, action.detail])
     ];
 
-    downloadCsv(`supplier-trust-detail-${row.supplier_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'supplier'}.csv`, metricRows);
+    downloadCsv(`supplier-performance-detail-${row.supplier_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'supplier'}.csv`, metricRows);
   }
 
   function printSupplierTrustDetail(row: SupplierTrustResponse['rows'][number]) {
@@ -998,7 +1089,7 @@ export default function InsightsPage() {
       <!doctype html>
       <html>
         <head>
-          <title>Supplier Trust Detail - ${escapeHtml(row.supplier_name)}</title>
+          <title>Supplier performance detail - ${escapeHtml(row.supplier_name)}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
             h1 { margin: 0 0 6px; }
@@ -1016,10 +1107,10 @@ export default function InsightsPage() {
         </head>
         <body>
           <h1>${escapeHtml(row.supplier_name)}</h1>
-          <div class="meta">Supplier Trust Detail · Printed ${escapeHtml(printedAt)}</div>
+          <div class="meta">Supplier performance detail · Printed ${escapeHtml(printedAt)}</div>
           <section class="summary-grid">
-            <div><strong>${escapeHtml(formatNumber(row.trust_score, 0))}</strong><span>Trust score</span></div>
-            <div><strong>${escapeHtml(row.trust_tier)}</strong><span>Trust tier</span></div>
+            <div><strong>${escapeHtml(formatSupplierTrustScore(row))}</strong><span>Performance score</span></div>
+            <div><strong>${escapeHtml(row.trust_tier === 'unrated' ? 'Not enough history' : formatReadableStatus(row.trust_tier))}</strong><span>Performance tier</span></div>
             <div><strong>${escapeHtml(formatNumber(row.po_remaining_value))}</strong><span>Remaining PO value</span></div>
             <div><strong>${escapeHtml(String(riskFlags.length))}</strong><span>Risk flags</span></div>
           </section>
@@ -1051,6 +1142,7 @@ export default function InsightsPage() {
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) {
+      showTenantActionError('The print window was blocked. Allow pop-ups and try again.');
       return;
     }
 
@@ -1084,14 +1176,16 @@ export default function InsightsPage() {
       .map((row) => {
         const riskFlags = row.risk_flags ?? [];
         const riskText = riskFlags.length
-          ? riskFlags.map((flag) => `${flag.severity.toUpperCase()}: ${flag.label} — ${flag.detail}`).join('<br />')
+          ? riskFlags
+              .map((flag) => `${escapeHtml(flag.severity.toUpperCase())}: ${escapeHtml(flag.label)} — ${escapeHtml(flag.detail)}`)
+              .join('<br />')
           : 'No risk flags';
 
         return `
           <tr>
             <td>${escapeHtml(row.supplier_name)}</td>
-            <td>${escapeHtml(formatNumber(row.trust_score, 0))}</td>
-            <td>${escapeHtml(row.trust_tier)}</td>
+            <td>${escapeHtml(formatSupplierTrustScore(row))}</td>
+            <td>${escapeHtml(row.trust_tier === 'unrated' ? 'Not enough history' : formatReadableStatus(row.trust_tier))}</td>
             <td>${escapeHtml(formatNumber(row.open_purchase_orders, 0))}</td>
             <td>${escapeHtml(formatNumber(row.overdue_open_purchase_orders, 0))}</td>
             <td>${escapeHtml(formatNumber(row.closed_short_purchase_orders, 0))}</td>
@@ -1106,7 +1200,7 @@ export default function InsightsPage() {
       <!doctype html>
       <html>
         <head>
-          <title>Supplier Trust Insights</title>
+          <title>Supplier Performance Insights</title>
           <style>
             body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
             h1 { margin: 0 0 6px; }
@@ -1122,14 +1216,14 @@ export default function InsightsPage() {
           </style>
         </head>
         <body>
-          <h1>Supplier Trust Insights</h1>
+          <h1>Supplier Performance Insights</h1>
           <div class="meta">Printed ${escapeHtml(printedAt)} · ${escapeHtml(filterLabel)} · ${visibleSupplierTrustRows.length} supplier(s)</div>
           ${summaryHtml}
           <table>
             <thead>
               <tr>
                 <th>Supplier</th>
-                <th>Trust</th>
+                <th>Performance</th>
                 <th>Tier</th>
                 <th>Open POs</th>
                 <th>Overdue POs</th>
@@ -1146,6 +1240,7 @@ export default function InsightsPage() {
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) {
+      showTenantActionError('The print window was blocked. Allow pop-ups and try again.');
       return;
     }
 
@@ -1161,23 +1256,23 @@ export default function InsightsPage() {
         <StatCard
           title="Operational Health"
           value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}
-          subtitle={healthQuery.data ? `Current tier: ${healthQuery.data.health_tier}` : 'Tenant-level health score.'}
+          subtitle={healthQuery.data ? `Current tier: ${formatReadableStatus(healthQuery.data.health_tier)}` : 'Tenant-level health score.'}
           tone={healthQuery.data?.health_tier === 'critical' ? 'bad' : healthQuery.data?.health_tier === 'watch' ? 'warn' : 'good'}
         />
         <StatCard
-          title="Depletion Rows"
+          title="Stock rows assessed"
           value={depletionRiskQuery.data ? String(depletionRiskQuery.data.rows.length) : '-'}
-          subtitle="Products/locations currently ranked for depletion pressure."
+          subtitle="Product and location rows reviewed for depletion pressure."
         />
         <StatCard
           title="Reorder Candidates"
-          value={reorderQuery.data ? String(reorderQuery.data.rows.length) : '-'}
+          value={reorderQuery.data ? String(activeReorderRows.length) : '-'}
           subtitle="Products with a recommended reorder quantity."
         />
         <StatCard
-          title="Supplier Trust Rows"
-          value={supplierTrustQuery.data ? String(supplierTrustQuery.data.rows.length) : '-'}
-          subtitle="Suppliers scored from real shipment behavior."
+          title="Rated suppliers"
+          value={supplierTrustQuery.data ? formatNumber(supplierTrustQuery.data.summary?.rated_suppliers ?? 0, 0) : '-'}
+          subtitle={supplierTrustQuery.data ? `${formatNumber(supplierTrustQuery.data.summary?.unrated_suppliers ?? 0, 0)} supplier(s) need delivery history.` : 'Supplier performance based on real delivery history.'}
         />
       </section>
 
@@ -1204,10 +1299,10 @@ export default function InsightsPage() {
         )}
       </Section>
 
-      <Section title="Insight Controls" subtitle="Tune the lookback window for depletion and reorder recommendations.">
+      <Section title="Insight controls" subtitle="Choose the recent-history window, refresh every insight together, and confirm when the current data was generated.">
         <div className="app-actions" style={styles.controlRow}>
           <label style={styles.label}>
-            Lookback Days
+            Recent history window
             <select style={styles.select} value={lookbackDays} onChange={(event) => setLookbackDays(Number(event.target.value))}>
               <option value={14}>14 days</option>
               <option value={30}>30 days</option>
@@ -1215,11 +1310,18 @@ export default function InsightsPage() {
               <option value={90}>90 days</option>
             </select>
           </label>
+          <button type="button" style={styles.primaryButton} onClick={() => void refreshAllInsights()} disabled={isRefreshingAll}>
+            {isRefreshingAll ? 'Refreshing insights…' : 'Refresh all insights'}
+          </button>
+          <div style={styles.refreshMeta}>
+            <strong>Last refreshed</strong>
+            <span>{lastRefreshedAt ? formatDateTime(lastRefreshedAt) : 'Not loaded yet'}</span>
+          </div>
         </div>
       </Section>
 
       <div style={styles.grid}>
-        <Section title="Operational Health Score" subtitle="Tenant-level health based on alerts, overdue shipments, low-stock pressure, and discrepancy pressure.">
+        <Section title="Operational health" subtitle="Tenant-level health based on alerts, overdue shipments, low-stock pressure, and discrepancy pressure.">
           {healthQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading health score...</div> : null}
           {healthQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(healthQuery.error)}</div> : null}
           {healthQuery.data ? (
@@ -1230,7 +1332,7 @@ export default function InsightsPage() {
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>Tier</strong>
-                <span style={styles.keyValue}>{healthQuery.data.health_tier}</span>
+                <span style={styles.keyValue}>{formatReadableStatus(healthQuery.data.health_tier)}</span>
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>Unresolved Alerts</strong>
@@ -1252,37 +1354,37 @@ export default function InsightsPage() {
           ) : null}
         </Section>
 
-        <Section title="Supplier Trust" subtitle="Supplier trust scores derived from shipment behavior plus PO fulfillment, short-close, and overdue PO signals.">
-          {supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier trust...</div> : null}
+        <Section title="Supplier performance" subtitle="Delivery-based supplier scores plus separate purchase-order and receiving risk signals. Suppliers without shipment history stay unrated.">
+          {supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier performance...</div> : null}
           {supplierTrustQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustQuery.error)}</div> : null}
-          {supplierTrustProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier production review...</div> : null}
+          {supplierTrustProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier performance review...</div> : null}
           {supplierTrustProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustProductionReviewQuery.error)}</div> : null}
           {supplierTrustProductionReviewQuery.data ? (
-            <div style={styles.supplierBreakdownPanel} aria-label="Supplier Trust production review">
-              <div style={styles.itemTitle}>Supplier Production Review</div>
+            <div style={styles.supplierBreakdownPanel} aria-label="Supplier performance review">
+              <div style={styles.itemTitle}>Supplier Performance Review</div>
               <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
                 <StatCard
-                  title="Production Status"
-                  value={supplierTrustProductionReviewQuery.data.production_status.replace(/_/g, ' ')}
-                  subtitle="Read-only supplier trust production decision."
+                  title="Review status"
+                  value={formatReadableStatus(supplierTrustProductionReviewQuery.data.production_status)}
+                  subtitle="Advisory status based on delivery history and active risk factors."
                   tone={supplierTrustProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : supplierTrustProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
                 />
                 <StatCard
-                  title="Human Review Rows"
+                  title="Suppliers needing review"
                   value={formatNumber(supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
-                  subtitle={`${formatNumber(supplierTrustProductionReviewQuery.data.summary.total_rows, 0)} supplier rows reviewed.`}
+                  subtitle={`${formatNumber(supplierTrustProductionReviewQuery.data.summary.total_rows, 0)} suppliers reviewed.`}
                   tone={supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
                 />
                 <StatCard
                   title="Blockers"
                   value={formatNumber(supplierTrustProductionReviewQuery.data.blockers.length, 0)}
-                  subtitle="High-risk supplier trust production blockers."
+                  subtitle="Blocking supplier performance issues requiring human review."
                   tone={supplierTrustProductionReviewQuery.data.blockers.length > 0 ? 'bad' : 'good'}
                 />
                 <StatCard
-                  title="Read Only"
+                  title="Read-only review"
                   value={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'Yes' : 'No'}
-                  subtitle="Does not mutate suppliers, change status, or create POs."
+                  subtitle="Does not change suppliers, update status, or create purchase orders."
                   tone={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'good' : 'bad'}
                 />
               </div>
@@ -1291,7 +1393,7 @@ export default function InsightsPage() {
                   {supplierTrustProductionReviewQuery.data.blockers.map((blocker) => (
                     <div key={blocker.code} style={styles.itemCard}>
                       <div style={styles.itemTitle}>{blocker.message}</div>
-                      <div style={styles.itemMeta}>{blocker.code} · {blocker.severity} · affected {formatNumber(blocker.affected_count, 0)}</div>
+                      <div style={styles.itemMeta}>Severity {formatReadableStatus(blocker.severity)} · {formatNumber(blocker.affected_count, 0)} supplier(s) affected</div>
                     </div>
                   ))}
                 </div>
@@ -1308,13 +1410,13 @@ export default function InsightsPage() {
               {supplierTrustQuery.data.summary ? (
                 <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
                   <StatCard
-                    title="Suppliers With Risk"
+                    title="Suppliers with risk signals"
                     value={formatNumber(supplierTrustQuery.data.summary.suppliers_with_risk, 0)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.risk_supplier_rate_pct)}% of suppliers have at least one active risk flag.`}
                     tone={toNumber(supplierTrustQuery.data.summary.high_risk_flags) > 0 ? 'bad' : toNumber(supplierTrustQuery.data.summary.suppliers_with_risk) > 0 ? 'warn' : 'good'}
                   />
                   <StatCard
-                    title="High Risk Flags"
+                    title="High-risk signals"
                     value={formatNumber(supplierTrustQuery.data.summary.high_risk_flags, 0)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.total_risk_flags, 0)} total supplier risk flags.`}
                     tone={toNumber(supplierTrustQuery.data.summary.high_risk_flags) > 0 ? 'bad' : 'good'}
@@ -1333,7 +1435,7 @@ export default function InsightsPage() {
                   />
                 </div>
               ) : null}
-              <div style={styles.supplierDataMetaPanel} aria-label="Supplier Trust data status">
+              <div style={styles.supplierDataMetaPanel} aria-label="Supplier performance data status">
                 <span>Generated {formatDateTime(supplierTrustQuery.data.generated_at)}</span>
                 <span>{visibleSupplierTrustRows.length} matching suppliers · {supplierTrustQuery.data.rows.length} total suppliers</span>
                 {supplierTrustQuery.isFetching ? <span>Refreshing...</span> : null}
@@ -1341,7 +1443,7 @@ export default function InsightsPage() {
               <div style={styles.supplierActionSummaryPanel} aria-label="Supplier recommended action summary">
                 <div style={styles.supplierActionSummaryHeader}>
                   <div>
-                    <div style={styles.itemTitle}>Recommended Action Summary</div>
+                    <div style={styles.itemTitle}>Recommended action summary</div>
                     <div style={styles.itemMeta}>
                       {supplierRecommendedActionSummary.total
                         ? `${supplierRecommendedActionSummary.total} supplier action(s): ${supplierRecommendedActionSummary.high} high · ${supplierRecommendedActionSummary.medium} medium · ${supplierRecommendedActionSummary.low} low`
@@ -1397,7 +1499,7 @@ export default function InsightsPage() {
                   </select>
                 </label>
                 <label style={styles.label}>
-                  Trust tier
+                  Performance tier
                   <select
                     style={styles.select}
                     value={supplierTierFilter}
@@ -1408,6 +1510,7 @@ export default function InsightsPage() {
                     <option value="strong">Strong</option>
                     <option value="watch">Watch</option>
                     <option value="risk">Risk</option>
+                    <option value="unrated">Not enough history</option>
                   </select>
                 </label>
                 <label style={styles.label}>
@@ -1418,8 +1521,8 @@ export default function InsightsPage() {
                     onChange={(event) => setSupplierSort(event.target.value as SupplierSort)}
                   >
                     <option value="risk_flags_desc">Most risk flags</option>
-                    <option value="trust_asc">Lowest trust first</option>
-                    <option value="trust_desc">Highest trust first</option>
+                    <option value="trust_asc">Lowest performance first</option>
+                    <option value="trust_desc">Highest performance first</option>
                     <option value="remaining_value_desc">Highest remaining value</option>
                     <option value="overdue_pos_desc">Most overdue POs</option>
                     <option value="fill_rate_asc">Lowest PO fill rate</option>
@@ -1444,7 +1547,7 @@ export default function InsightsPage() {
                   onClick={clearSupplierTrustFilters}
                   disabled={!supplierActiveFilterChips.length}
                 >
-                  Clear Supplier Filters
+                  Clear supplier filters
                 </button>
                 <button
                   type="button"
@@ -1453,7 +1556,7 @@ export default function InsightsPage() {
                   onClick={() => void supplierTrustQuery.refetch()}
                   disabled={supplierTrustQuery.isFetching}
                 >
-                  {supplierTrustQuery.isFetching ? 'Refreshing...' : 'Refresh Supplier Trust'}
+                  {supplierTrustQuery.isFetching ? 'Refreshing...' : 'Refresh supplier performance'}
                 </button>
                 <button
                   type="button"
@@ -1462,7 +1565,7 @@ export default function InsightsPage() {
                   onClick={exportSupplierTrustCsv}
                   disabled={!visibleSupplierTrustRows.length}
                 >
-                  Export Supplier Trust CSV
+                  Export supplier CSV
                 </button>
                 <button
                   type="button"
@@ -1471,7 +1574,7 @@ export default function InsightsPage() {
                   onClick={printSupplierTrust}
                   disabled={!visibleSupplierTrustRows.length}
                 >
-                  Print Supplier Trust
+                  Print supplier view
                 </button>
                 <button
                   type="button"
@@ -1479,11 +1582,11 @@ export default function InsightsPage() {
                   style={styles.secondaryButton}
                   onClick={() => void copySupplierTrustViewLink()}
                 >
-                  Copy Supplier View Link
+                  Copy supplier view link
                 </button>
               </div>
               {supplierActiveFilterChips.length ? (
-                <div style={styles.activeFilterBar} aria-label="Active Supplier Trust filters">
+                <div style={styles.activeFilterBar} aria-label="Active supplier performance filters">
                   {supplierActiveFilterChips.map((chip) => (
                     <span key={chip.key} style={styles.activeFilterChip}>
                       {chip.label}
@@ -1492,7 +1595,7 @@ export default function InsightsPage() {
                       </button>
                     </span>
                   ))}
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={clearSupplierTrustFilters}>
+                  <button type="button" style={styles.breakdownButton} onClick={clearSupplierTrustFilters}>
                     Clear all filters
                   </button>
                 </div>
@@ -1500,35 +1603,38 @@ export default function InsightsPage() {
               <div style={styles.itemMeta}>
                 Showing {pagedSupplierTrustRows.length ? ((supplierCurrentPage - 1) * supplierPageSize) + 1 : 0}-{Math.min(supplierCurrentPage * supplierPageSize, visibleSupplierTrustRows.length)} of {visibleSupplierTrustRows.length} matching suppliers · {supplierTrustQuery.data.rows.length} total.
               </div>
-              <div style={styles.supplierBreakdownPanel} aria-label="Supplier Trust breakdown filters">
-                <div style={styles.itemTitle}>Supplier Trust Breakdown</div>
+              <div style={styles.supplierBreakdownPanel} aria-label="Supplier performance breakdown filters">
+                <div style={styles.itemTitle}>Supplier performance breakdown</div>
                 <div style={styles.supplierBreakdownGrid}>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('with_risk'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('with_risk'); setSupplierTierFilter('all'); }}>
                     Any risk · {supplierTrustBreakdown.withRisk}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('high'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('high'); setSupplierTierFilter('all'); }}>
                     High risk · {supplierTrustBreakdown.highRisk}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('medium'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('medium'); setSupplierTierFilter('all'); }}>
                     Medium risk · {supplierTrustBreakdown.mediumRisk}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('low'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('low'); setSupplierTierFilter('all'); }}>
                     Low risk · {supplierTrustBreakdown.lowRisk}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('none'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('none'); setSupplierTierFilter('all'); }}>
                     No risk · {supplierTrustBreakdown.noRisk}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('excellent'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('excellent'); setSupplierRiskFilter('all'); }}>
                     Excellent · {supplierTrustBreakdown.excellent}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('strong'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('strong'); setSupplierRiskFilter('all'); }}>
                     Strong · {supplierTrustBreakdown.strong}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('watch'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('watch'); setSupplierRiskFilter('all'); }}>
                     Watch · {supplierTrustBreakdown.watch}
                   </button>
-                  <button type="button" className="app-button app-button--secondary" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('risk'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('risk'); setSupplierRiskFilter('all'); }}>
                     Risk tier · {supplierTrustBreakdown.risk}
+                  </button>
+                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('unrated'); setSupplierRiskFilter('all'); }}>
+                    Not enough history · {supplierTrustBreakdown.unrated}
                   </button>
                 </div>
               </div>
@@ -1536,7 +1642,7 @@ export default function InsightsPage() {
               {pagedSupplierTrustRows.map((row) => (
                 <article key={row.supplier_id} style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.supplier_name}</div>
-                  <div style={styles.itemMeta}>Trust {formatNumber(row.trust_score, 0)} · Tier {row.trust_tier}</div>
+                  <div style={styles.itemMeta}>Performance {formatSupplierTrustScore(row)} · {row.trust_tier === 'unrated' ? 'Not enough delivery history' : `Tier ${formatReadableStatus(row.trust_tier)}`}</div>
                   <div style={styles.itemText}>
                     Shipments: completion {formatNumber(row.completion_rate_pct)}% · overdue {formatNumber(row.overdue_rate_pct)}% · fill {formatNumber(row.fill_rate_pct)}%
                   </div>
@@ -1558,15 +1664,14 @@ export default function InsightsPage() {
                     <div style={styles.itemText}>No supplier risk flags.</div>
                   )}
                   <div style={styles.inlineActionGroup}>
-                    <Link to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} style={styles.inlineActionLink}>
-                      Open Supplier
-                    </Link>
-                    <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(row.supplier_id)}`} style={styles.inlineActionLink}>
-                      Open POs
-                    </Link>
+                    {canOpenSuppliers ? (
+                      <Link to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} style={styles.inlineActionLink}>Open supplier</Link>
+                    ) : null}
+                    {canOpenPurchaseOrders ? (
+                      <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(row.supplier_id)}`} style={styles.inlineActionLink}>Open POs</Link>
+                    ) : null}
                     <button
                       type="button"
-                      className="app-button app-button--secondary"
                       style={styles.inlineActionButton}
                       onClick={() => setSelectedSupplierId(row.supplier_id)}
                     >
@@ -1598,11 +1703,11 @@ export default function InsightsPage() {
                 </button>
               </div>
               {selectedSupplierTrustRow ? (
-                <article style={styles.supplierDetailPanel} aria-label={`Supplier trust detail for ${selectedSupplierTrustRow.supplier_name}`}>
+                <article style={styles.supplierDetailPanel} aria-label={`Supplier performance detail for ${selectedSupplierTrustRow.supplier_name}`}>
                   <div style={styles.supplierDetailHeader}>
                     <div>
                       <div style={styles.itemTitle}>{selectedSupplierTrustRow.supplier_name}</div>
-                      <div style={styles.itemMeta}>Supplier Trust Detail · Trust {formatNumber(selectedSupplierTrustRow.trust_score, 0)} · Tier {selectedSupplierTrustRow.trust_tier}</div>
+                      <div style={styles.itemMeta}>Supplier performance detail · Performance {formatSupplierTrustScore(selectedSupplierTrustRow)} · {selectedSupplierTrustRow.trust_tier === 'unrated' ? 'Not enough delivery history' : `Tier ${formatReadableStatus(selectedSupplierTrustRow.trust_tier)}`}</div>
                     </div>
                     <div style={styles.inlineActionGroup}>
                       <button
@@ -1611,7 +1716,7 @@ export default function InsightsPage() {
                         style={styles.secondaryButton}
                         onClick={() => exportSupplierTrustDetailCsv(selectedSupplierTrustRow)}
                       >
-                        Export Detail CSV
+                        Export detail CSV
                       </button>
                       <button
                         type="button"
@@ -1619,7 +1724,7 @@ export default function InsightsPage() {
                         style={styles.secondaryButton}
                         onClick={() => printSupplierTrustDetail(selectedSupplierTrustRow)}
                       >
-                        Print Detail
+                        Print detail
                       </button>
                       <button
                         type="button"
@@ -1627,7 +1732,7 @@ export default function InsightsPage() {
                         style={styles.secondaryButton}
                         onClick={() => void copySupplierTrustViewLink()}
                       >
-                        Copy Detail Link
+                        Copy detail link
                       </button>
                       <button
                         type="button"
@@ -1635,7 +1740,7 @@ export default function InsightsPage() {
                         style={styles.secondaryButton}
                         onClick={() => setSelectedSupplierId(null)}
                       >
-                        Close Detail
+                        Close detail
                       </button>
                     </div>
                   </div>
@@ -1708,27 +1813,27 @@ export default function InsightsPage() {
                     </div>
                   </div>
                   <div style={styles.inlineActionGroup}>
-                    <Link to={`/suppliers?search=${encodeURIComponent(selectedSupplierTrustRow.supplier_name)}`} style={styles.inlineActionLink}>
-                      Open Supplier
-                    </Link>
-                    <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`} style={styles.inlineActionLink}>
-                      Open Supplier POs
-                    </Link>
+                    {canOpenSuppliers ? (
+                      <Link to={`/suppliers?search=${encodeURIComponent(selectedSupplierTrustRow.supplier_name)}`} style={styles.inlineActionLink}>Open supplier</Link>
+                    ) : null}
+                    {canOpenPurchaseOrders ? (
+                      <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`} style={styles.inlineActionLink}>Open supplier POs</Link>
+                    ) : null}
                   </div>
                 </article>
               ) : null}
               {!visibleSupplierTrustRows.length ? (
                 <div className="app-empty-state" style={styles.infoState}>
-                  No suppliers match the current supplier trust filters.
+                  No suppliers match the current supplier filters.
                 </div>
               ) : null}
             </>
-          ) : !supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No supplier trust rows returned.</div> : null}
+          ) : !supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No supplier performance rows were returned.</div> : null}
         </Section>
       </div>
 
       <div style={styles.grid}>
-        <Section title="Depletion Risk" subtitle="Products and locations under the greatest consumption pressure relative to stock on hand.">
+        <Section title="Depletion pressure" subtitle="Products and locations under the greatest consumption pressure relative to stock on hand.">
           {depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading depletion risk...</div> : null}
           {depletionRiskQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRiskQuery.error)}</div> : null}
           {depletionRiskQuery.data?.rows.length ? (
@@ -1737,22 +1842,22 @@ export default function InsightsPage() {
                 <article key={row.stock_id} style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
-                    {row.storage_location_name} · Risk {formatNumber(row.risk_score, 0)} · Tier {row.risk_tier}
+                    {row.storage_location_name} · Risk {formatNumber(row.risk_score, 0)} · Tier {formatReadableStatus(row.risk_tier)}
                   </div>
                   <div style={styles.itemText}>
                     Qty {formatNumber(row.current_quantity)} · Min {formatNumber(row.configured_min_quantity)} · Coverage{' '}
                     {row.estimated_days_of_coverage == null ? '-' : formatNumber(row.estimated_days_of_coverage)} days
                   </div>
-                  <Link to={`/stock?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>
-                    Open in Stock
-                  </Link>
+                  {canOpenStock ? (
+                    <Link to={`/stock?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>Open in Stock</Link>
+                  ) : null}
                 </article>
               ))}
             </div>
           ) : !depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No depletion risk rows returned.</div> : null}
         </Section>
 
-        <Section title="Depletion Root-Cause Review" subtitle="Read-only explanation of what is driving depletion-risk rows and what operators should investigate first.">
+        <Section title="Why stock is under pressure" subtitle="Explains the current stock and recent usage factors that operators should verify before replenishment decisions.">
           {depletionRootCauseQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading depletion root-cause review...</div> : null}
           {depletionRootCauseQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRootCauseQuery.error)}</div> : null}
           {depletionRootCauseQuery.data ? (
@@ -1766,13 +1871,13 @@ export default function InsightsPage() {
                 <article key={`${row.stock_id}-root-cause`} style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
-                    {row.storage_location_name} · Factor severity {row.highest_factor_severity} · Risk {formatNumber(row.risk_score, 0)} / {row.risk_tier}
+                    {row.storage_location_name} · Highest concern {formatReadableStatus(row.highest_factor_severity)} · Risk {formatNumber(row.risk_score, 0)} / {formatReadableStatus(row.risk_tier)}
                   </div>
                   <div style={styles.riskFlagDetailList}>
                     {row.root_cause_factors.slice(0, 3).map((factor) => (
                       <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
                         <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                          {factor.severity}
+                          {formatReadableStatus(factor.severity)}
                         </span>
                         <div>
                           <div style={styles.itemTitle}>{factor.label}</div>
@@ -1789,60 +1894,60 @@ export default function InsightsPage() {
                       ))}
                     </ul>
                   </div>
-                  <Link to={`/stock?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>
-                    Open in Stock
-                  </Link>
+                  {canOpenStock ? (
+                    <Link to={`/stock?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>Open in Stock</Link>
+                  ) : null}
                 </article>
               ))}
             </div>
           ) : !depletionRootCauseQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No depletion root-cause review returned.</div> : null}
         </Section>
 
-        <Section title="Reorder Recommendations" subtitle="Explainable reorder quantities based on current stock and recent outbound usage.">
+        <Section title="Reorder recommendations" subtitle="Explainable reorder quantities based on current stock and recent outbound usage.">
           {reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading reorder recommendations...</div> : null}
           {reorderQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(reorderQuery.error)}</div> : null}
-          {reorderQuery.data?.rows.length ? (
+          {activeReorderRows.length ? (
             <div style={styles.list}>
-              {reorderQuery.data.rows.slice(0, 10).map((row) => (
+              {activeReorderRows.slice(0, 8).map((row) => (
                 <article key={row.product_id} style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>Urgency {row.urgency} · Reorder {formatNumber(row.recommended_reorder_quantity)}</div>
                   <div style={styles.itemText}>
                     Current {formatNumber(row.current_quantity)} · Min {formatNumber(row.min_stock)} · Avg Daily Usage {formatNumber(row.average_daily_usage)}
                   </div>
-                  <Link to={`/products?search=${encodeURIComponent(row.product_name)}`} style={styles.inlineActionLink}>
-                    Open Product
-                  </Link>
+                  {canOpenProducts ? (
+                    <Link to={`/products?search=${encodeURIComponent(row.product_name)}`} style={styles.inlineActionLink}>Open product</Link>
+                  ) : null}
                 </article>
               ))}
             </div>
-          ) : !reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No reorder recommendation rows returned.</div> : null}
+          ) : !reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>No active reorder quantity is currently recommended.</div> : null}
         </Section>
       </div>
 
 
 
-      <Section title="Anomaly Production Review" subtitle="Read-only production review for anomaly reliability, root-cause factors, and required human investigation before managers rely on anomaly output.">
-        {anomalyProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly production review...</div> : null}
+      <Section title="Anomaly reliability review" subtitle="Checks whether unusual movement signals have enough context for human review. This section remains read-only and never changes stock or suppresses alerts.">
+        {anomalyProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly reliability review...</div> : null}
         {anomalyProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(anomalyProductionReviewQuery.error)}</div> : null}
         {anomalyProductionReviewQuery.data ? (
           <div style={styles.list}>
             <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
               <StatCard
-                title="Production Status"
-                value={anomalyProductionReviewQuery.data.production_status.replaceAll('_', ' ')}
-                subtitle={`Health tier: ${anomalyProductionReviewQuery.data.operational_health_context.health_tier}`}
+                title="Review status"
+                value={formatReadableStatus(anomalyProductionReviewQuery.data.production_status)}
+                subtitle={`Health tier: ${formatReadableStatus(anomalyProductionReviewQuery.data.operational_health_context.health_tier)}`}
                 tone={anomalyProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : anomalyProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
               />
               <StatCard
-                title="Rows Requiring Review"
+                title="Rows needing review"
                 value={formatNumber(anomalyProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
                 subtitle={`${formatNumber(anomalyProductionReviewQuery.data.summary.total_rows, 0)} anomaly rows reviewed.`}
                 tone={anomalyProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
               />
               <StatCard
-                title="Safety Mode"
-                value={anomalyProductionReviewQuery.data.safety_contract.mode.replaceAll('_', ' ')}
+                title="Review safeguards"
+                value={anomalyProductionReviewQuery.data.safety_contract.read_only ? 'Read-only review' : 'Write-enabled review'}
                 subtitle={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'Mutation enabled' : 'Read-only; no stock mutation or alert suppression.'}
                 tone={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'bad' : 'good'}
               />
@@ -1852,14 +1957,13 @@ export default function InsightsPage() {
               <div style={styles.list}>
                 {[...anomalyProductionReviewQuery.data.blockers, ...anomalyProductionReviewQuery.data.warnings].map((item) => (
                   <article key={item.code} style={item.severity === 'critical' ? styles.actionCardBad : styles.actionCardWarn}>
-                    <div style={styles.actionCardTitle}>{item.code.replaceAll('_', ' ')}</div>
-                    <div style={styles.actionCardText}>{item.message}</div>
-                    <div style={styles.itemMeta}>Affected rows: {formatNumber(item.affected_count, 0)} · Severity {item.severity}</div>
+                    <div style={styles.actionCardTitle}>{item.message}</div>
+                    <div style={styles.itemMeta}>Affected rows: {formatNumber(item.affected_count, 0)} · Severity {formatReadableStatus(item.severity)}</div>
                   </article>
                 ))}
               </div>
             ) : (
-              <div className="app-empty-state" style={styles.infoState}>No production blockers returned for anomaly review.</div>
+              <div className="app-empty-state" style={styles.infoState}>No blocking anomaly-review issues were found.</div>
             )}
 
             <div style={styles.itemCard}>
@@ -1872,7 +1976,7 @@ export default function InsightsPage() {
             {anomalyProductionReviewQuery.data.rows.slice(0, 8).map((row) => (
               <article key={row.product_id} style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
-                <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {row.anomaly_tier} · Review severity {row.highest_factor_severity}</div>
+                <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {formatReadableStatus(row.anomaly_tier)} · Review severity {formatReadableStatus(row.highest_factor_severity)}</div>
                 <div style={styles.itemText}>{row.review_factors.map((factor) => `${factor.label}: ${factor.detail}`).join(' ')}</div>
                 <ul style={styles.compactList}>
                   {row.recommended_investigation_steps.map((step) => <li key={step}>{step}</li>)}
@@ -1883,7 +1987,7 @@ export default function InsightsPage() {
         ) : null}
       </Section>
 
-      <Section title="Inventory Anomalies" subtitle="Products whose recent outbound activity looks unusual compared to their own baseline.">
+      <Section title="Unusual inventory movement" subtitle="Products whose recent outbound activity looks unusual compared to their own baseline.">
         {anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading anomaly signals...</div> : null}
         {anomaliesQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(anomaliesQuery.error)}</div> : null}
         {anomaliesQuery.data?.rows.length ? (
@@ -1891,13 +1995,13 @@ export default function InsightsPage() {
             {anomaliesQuery.data.rows.slice(0, 10).map((row) => (
               <article key={row.product_id} style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
-                <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {row.anomaly_tier}</div>
+                <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {formatReadableStatus(row.anomaly_tier)}</div>
                 <div style={styles.itemText}>
                   Recent Daily {formatNumber(row.recent_daily_outbound)} · Baseline Daily {formatNumber(row.baseline_daily_outbound)} · Spike Ratio {formatNumber(row.spike_ratio)}
                 </div>
-                <Link to={`/stock-movements?productId=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>
-                  Open Movements
-                </Link>
+                {canOpenStockMovements ? (
+                  <Link to={`/stock-movements?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>Open movements</Link>
+                ) : null}
               </article>
             ))}
           </div>
@@ -1984,11 +2088,7 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
-    gap: '20px',
-    width: '100%',
-    minWidth: 0
+    display: 'contents'
   },
   panel: {
     minWidth: 0,
@@ -2017,7 +2117,28 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   controlRow: {
-    minWidth: 0
+    minWidth: 0,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'end',
+    gap: '12px'
+  },
+  refreshMeta: {
+    display: 'grid',
+    gap: '4px',
+    color: '#475569',
+    fontSize: '0.9rem',
+    padding: '8px 0'
+  },
+  primaryButton: {
+    border: '1px solid #1d4ed8',
+    background: '#2563eb',
+    color: '#fff',
+    borderRadius: '10px',
+    padding: '11px 15px',
+    minHeight: '42px',
+    fontWeight: 800,
+    cursor: 'pointer'
   },
   label: {
     display: 'grid',
@@ -2044,7 +2165,15 @@ const styles: Record<string, CSSProperties> = {
   },
   secondaryButton: {
     alignSelf: 'end',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    border: '1px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#0f172a',
+    borderRadius: '9px',
+    padding: '9px 12px',
+    minHeight: '38px',
+    fontWeight: 700,
+    cursor: 'pointer'
   },
   list: {
     display: 'grid',
@@ -2161,9 +2290,15 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '0.92rem'
   },
   inlineActionButton: {
-    padding: '6px 10px',
+    padding: '7px 10px',
     fontSize: '0.85rem',
-    minHeight: 'auto'
+    minHeight: '34px',
+    border: '1px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#0f172a',
+    borderRadius: '8px',
+    fontWeight: 700,
+    cursor: 'pointer'
   },
   supplierDetailPanel: {
     border: '1px solid #bfdbfe',
@@ -2257,10 +2392,16 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center'
   },
   breakdownButton: {
-    padding: '6px 10px',
+    padding: '7px 10px',
     fontSize: '0.85rem',
-    minHeight: 'auto',
-    whiteSpace: 'nowrap'
+    minHeight: '34px',
+    whiteSpace: 'nowrap',
+    border: '1px solid #cbd5e1',
+    background: '#fff',
+    color: '#0f172a',
+    borderRadius: '8px',
+    fontWeight: 700,
+    cursor: 'pointer'
   },
   supplierDataMetaPanel: {
     border: '1px solid #e5e7eb',

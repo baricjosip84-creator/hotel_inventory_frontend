@@ -631,8 +631,9 @@ export type SupplierTrustScore = {
   overdue_shipments: number | string;
   fill_rate_pct: number | string;
   discrepancy_rate_pct: number | string;
-  trust_score: number | string;
+  trust_score: number | string | null;
   trust_tier: string;
+  trust_evidence_status?: 'rated' | 'insufficient_history';
   open_purchase_orders?: number | string | null;
   overdue_open_purchase_orders?: number | string | null;
   po_remaining_value?: number | string | null;
