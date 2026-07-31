@@ -196,6 +196,10 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Barcode label retired successfully.';
   }
 
+  if (normalizedPath.startsWith('/storage-locations/') && normalizedMethod === 'DELETE') {
+    return 'Storage location retired successfully.';
+  }
+
   if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
     if (normalizedMethod === 'POST') return 'Requisition created successfully.';
     if (normalizedMethod === 'DELETE') return 'Requisition deleted successfully.';
