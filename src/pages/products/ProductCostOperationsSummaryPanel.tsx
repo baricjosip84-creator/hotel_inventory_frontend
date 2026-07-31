@@ -4,9 +4,9 @@ import type {
   ProductCostOperationsReadinessSummaryResponse,
   ProductCostOperationsRunbookSummaryResponse
 } from '../../types/inventory';
-import { toNumber } from './productFormatting';
+import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostOperationsQueryState = {
   isLoading: boolean;
@@ -54,7 +54,7 @@ export function ProductCostOperationsSummaryPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Runbook Status" value={costOperationsRunbookSummary?.runbook_status || 'unknown'} subtitle={costOperationsRunbookSummary?.can_handoff ? 'Handoff-capable' : 'Review required'} tone={costOperationsRunbookSummary?.runbook_status === 'steady_state' ? 'good' : 'warn'} />
+                    <StatCard title="Runbook Status" value={formatStatusLabel(costOperationsRunbookSummary?.runbook_status)} subtitle={costOperationsRunbookSummary?.can_handoff ? 'Handoff-capable' : 'Review required'} tone={costOperationsRunbookSummary?.runbook_status === 'steady_state' ? 'good' : 'warn'} />
                     <StatCard title="Hardening Issues" value={toNumber(costOperationsRunbookSummary?.totals.hardening_issues)} subtitle="Must stay visible" tone={toNumber(costOperationsRunbookSummary?.totals.hardening_issues) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Flagged Products" value={toNumber(costOperationsRunbookSummary?.totals.flagged_products)} subtitle="Dashboard follow-up" tone={toNumber(costOperationsRunbookSummary?.totals.flagged_products) > 0 ? 'warn' : 'good'} />
                     <StatCard title="Runbook Rows" value={toNumber(costOperationsRunbookSummary?.totals.runbook_rows)} subtitle="Export-ready evidence" />
@@ -69,7 +69,7 @@ export function ProductCostOperationsSummaryPanel({
                             <div style={styles.rowSubtle}>{item.action}</div>
                             <div style={styles.rowMeta}>{item.source}</div>
                           </div>
-                          <span style={styles.badge}>{item.status}</span>
+                          <StatusBadge status={item.status} />
                         </div>
                       ))}
                     </div>
@@ -115,7 +115,7 @@ export function ProductCostOperationsSummaryPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Control Status" value={costOperationsControlSummary?.control_status || 'unknown'} subtitle={costOperationsControlSummary?.runbook_status || 'runbook'} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'bad' : 'warn'} />
+                    <StatCard title="Control Status" value={formatStatusLabel(costOperationsControlSummary?.control_status)} subtitle={formatStatusLabel(costOperationsControlSummary?.runbook_status)} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'bad' : 'warn'} />
                     <StatCard title="Passed Checks" value={toNumber(costOperationsControlSummary?.totals.passed_checks)} subtitle={`${toNumber(costOperationsControlSummary?.totals.checks)} total checks`} tone="good" />
                     <StatCard title="Watch Checks" value={toNumber(costOperationsControlSummary?.totals.watch_checks)} subtitle="Keep visible" tone={toNumber(costOperationsControlSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
                     <StatCard title="Review Checks" value={toNumber(costOperationsControlSummary?.totals.review_checks)} subtitle="Requires follow-up" tone={toNumber(costOperationsControlSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
@@ -128,7 +128,7 @@ export function ProductCostOperationsSummaryPanel({
                           <div style={styles.rowTitle}>{item.label} · {item.owner}</div>
                           <div style={styles.rowSubtle}>{item.detail}</div>
                         </div>
-                        <span style={styles.badge}>{item.status}: {toNumber(item.value)}</span>
+                        <StatusBadge status={item.status} detail={toNumber(item.value)} />
                       </div>
                     ))}
                   </div>
@@ -161,7 +161,7 @@ export function ProductCostOperationsSummaryPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Evidence Status" value={costOperationsEvidenceSummary?.evidence_status || 'unknown'} subtitle={costOperationsEvidenceSummary?.control_status || 'control'} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'bad' : 'warn'} />
+                    <StatCard title="Evidence Status" value={formatStatusLabel(costOperationsEvidenceSummary?.evidence_status)} subtitle={formatStatusLabel(costOperationsEvidenceSummary?.control_status)} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'bad' : 'warn'} />
                     <StatCard title="Ready Sections" value={toNumber(costOperationsEvidenceSummary?.totals.ready_sections)} subtitle={`${toNumber(costOperationsEvidenceSummary?.totals.evidence_sections)} sections`} tone="good" />
                     <StatCard title="Review Sections" value={toNumber(costOperationsEvidenceSummary?.totals.review_sections)} subtitle="Needs follow-up" tone={toNumber(costOperationsEvidenceSummary?.totals.review_sections) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Evidence Rows" value={toNumber(costOperationsEvidenceSummary?.totals.evidence_rows)} subtitle="Pack rows" />
@@ -174,7 +174,7 @@ export function ProductCostOperationsSummaryPanel({
                           <div style={styles.rowTitle}>{item.label} · {item.source}</div>
                           <div style={styles.rowSubtle}>{item.purpose}</div>
                         </div>
-                        <span style={styles.badge}>{item.status}: {toNumber(item.rows)}</span>
+                        <StatusBadge status={item.status} detail={toNumber(item.rows)} />
                       </div>
                     ))}
                   </div>
@@ -208,7 +208,7 @@ export function ProductCostOperationsSummaryPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Readiness Status" value={costOperationsReadinessSummary?.readiness_status || 'unknown'} subtitle={costOperationsReadinessSummary?.can_handoff ? 'Handoff capable' : 'Review required'} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'bad' : 'warn'} />
+                    <StatCard title="Readiness Status" value={formatStatusLabel(costOperationsReadinessSummary?.readiness_status)} subtitle={costOperationsReadinessSummary?.can_handoff ? 'Handoff capable' : 'Review required'} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'bad' : 'warn'} />
                     <StatCard title="Readiness Score" value={`${toNumber(costOperationsReadinessSummary?.readiness_score).toFixed(0)}%`} subtitle="Derived go/no-go score" tone={toNumber(costOperationsReadinessSummary?.readiness_score) >= 90 ? 'good' : toNumber(costOperationsReadinessSummary?.readiness_score) >= 70 ? 'warn' : 'bad'} />
                     <StatCard title="Review Checks" value={toNumber(costOperationsReadinessSummary?.totals.review_checks)} subtitle={`${toNumber(costOperationsReadinessSummary?.totals.checks)} checks`} tone={toNumber(costOperationsReadinessSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Watch Checks" value={toNumber(costOperationsReadinessSummary?.totals.watch_checks)} subtitle="Carry forward" tone={toNumber(costOperationsReadinessSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
@@ -221,7 +221,7 @@ export function ProductCostOperationsSummaryPanel({
                           <div style={styles.rowTitle}>{item.label}</div>
                           <div style={styles.rowSubtle}>{item.detail}</div>
                         </div>
-                        <span style={styles.badge}>{item.status}: {toNumber(item.value)}</span>
+                        <StatusBadge status={item.status} detail={toNumber(item.value)} />
                       </div>
                     ))}
                   </div>

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { CSSProperties } from 'react';
 import { logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
+import CopyrightNotice from '../components/CopyrightNotice';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
@@ -496,6 +497,7 @@ export default function PlatformLayout() {
       </aside>
       <main key={location.pathname} ref={mainRef} style={styles.main} data-route-scroll-container>
         <Outlet />
+        <CopyrightNotice />
       </main>
     </div>
   );

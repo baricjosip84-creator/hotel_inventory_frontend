@@ -27,25 +27,33 @@ export const productLayoutStyles: Record<string, CSSProperties> = {
     marginBottom: '10px'
   },
   statValue: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 2.3vw, 32px)',
     fontWeight: 700,
+    lineHeight: 1.15,
+    overflowWrap: 'anywhere',
     marginBottom: '8px'
   },
   statValueGood: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 2.3vw, 32px)',
     fontWeight: 700,
+    lineHeight: 1.15,
+    overflowWrap: 'anywhere',
     marginBottom: '8px',
     color: '#166534'
   },
   statValueWarn: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 2.3vw, 32px)',
     fontWeight: 700,
+    lineHeight: 1.15,
+    overflowWrap: 'anywhere',
     marginBottom: '8px',
     color: '#92400e'
   },
   statValueBad: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 2.3vw, 32px)',
     fontWeight: 700,
+    lineHeight: 1.15,
+    overflowWrap: 'anywhere',
     marginBottom: '8px',
     color: '#b91c1c'
   },

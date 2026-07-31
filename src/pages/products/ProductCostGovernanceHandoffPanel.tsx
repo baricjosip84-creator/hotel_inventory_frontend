@@ -1,7 +1,7 @@
 import type { ProductCostGovernanceHandoffSummaryResponse } from '../../types/inventory';
-import { toNumber } from './productFormatting';
+import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -38,7 +38,7 @@ export function ProductCostGovernanceHandoffPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Handoff Status" value={costGovernanceHandoffSummary?.handoff_status || 'unknown'} subtitle={costGovernanceHandoffSummary?.can_handoff ? 'Ready for ownership' : 'Review required'} tone={costGovernanceHandoffSummary?.can_handoff ? 'good' : 'warn'} />
+                    <StatCard title="Handoff Status" value={formatStatusLabel(costGovernanceHandoffSummary?.handoff_status)} subtitle={costGovernanceHandoffSummary?.can_handoff ? 'Ready for ownership' : 'Review required'} tone={costGovernanceHandoffSummary?.can_handoff ? 'good' : 'warn'} />
                     <StatCard title="Evidence Rows" value={toNumber(costGovernanceHandoffSummary?.totals.evidence_rows)} subtitle="Archive + review + audit" />
                     <StatCard title="Blockers" value={toNumber(costGovernanceHandoffSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceHandoffSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Follow-ups" value={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items)} subtitle="Warnings + remediation" tone={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items) > 0 ? 'warn' : 'good'} />
@@ -52,7 +52,7 @@ export function ProductCostGovernanceHandoffPanel({
                             <div style={styles.rowTitle}>{item.label}</div>
                             <div style={styles.rowSubtle}>{item.detail}</div>
                           </div>
-                          <span style={styles.badge}>{item.status}</span>
+                          <StatusBadge status={item.status} />
                         </div>
                       ))}
                     </div>
@@ -63,7 +63,7 @@ export function ProductCostGovernanceHandoffPanel({
                             <div style={styles.rowTitle}>{item.owner}</div>
                             <div style={styles.rowSubtle}>{item.responsibility}</div>
                           </div>
-                          <span style={styles.badge}>{item.status}</span>
+                          <StatusBadge status={item.status} />
                         </div>
                       ))}
                     </div>

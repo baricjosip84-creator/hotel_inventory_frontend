@@ -27,6 +27,7 @@ type ProductListPanelProps = {
   costVarianceStatusFilter: string;
   setCostVarianceStatusFilter: (value: string) => void;
   canManageProducts: boolean;
+  canViewProductPackages: boolean;
   deleteProductPending: boolean;
   onExportProductsCsv: () => void;
   onOpenCostHistory: (product: ProductItem) => void;
@@ -53,6 +54,7 @@ export function ProductListPanel({
   costVarianceStatusFilter,
   setCostVarianceStatusFilter,
   canManageProducts,
+  canViewProductPackages,
   deleteProductPending,
   onExportProductsCsv,
   onOpenCostHistory,
@@ -61,7 +63,7 @@ export function ProductListPanel({
   onDelete
 }: ProductListPanelProps) {
   return (
-    <section style={styles.panel}>
+    <section id="product-list-panel" style={styles.panel}>
       <h3 style={styles.panelTitle}>Product List</h3>
       <p style={styles.panelSubtitle}>
         Search and review products available to stock, shipment, receiving, and reporting workflows.
@@ -90,6 +92,7 @@ export function ProductListPanel({
         productsQuery={productsQuery}
         products={products}
         canManageProducts={canManageProducts}
+        canViewProductPackages={canViewProductPackages}
         deleteProductPending={deleteProductPending}
         onOpenCostHistory={onOpenCostHistory}
         onOpenPackages={onOpenPackages}

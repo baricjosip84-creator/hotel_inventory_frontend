@@ -206,6 +206,7 @@ export function buildProductActionHandlers({
     setPackageForm(emptyPackageForm());
     setPackageError(null);
     setPackageMessage(null);
+    scrollToFormSection('product-packages-panel');
   };
 
   const handleClosePackages = () => {

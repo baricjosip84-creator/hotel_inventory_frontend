@@ -15,14 +15,14 @@ import type {
   ProductCostPerformanceSummaryResponse,
   ProductCostSecurityAuditSummaryResponse
 } from '../../types/inventory';
-import { formatMoney, toNumber } from './productFormatting';
+import { formatMoney, formatStatusLabel, toNumber } from './productFormatting';
 import { ProductCostGovernanceDetailsPanel } from './ProductCostGovernanceDetailsPanel';
 import { ProductCostOperationsSummaryPanel } from './ProductCostOperationsSummaryPanel';
 import { ProductCostGovernanceReviewPanel } from './ProductCostGovernanceReviewPanel';
 import { ProductCostGovernanceHandoffPanel } from './ProductCostGovernanceHandoffPanel';
 import { ProductCostGovernanceFinalizationPanel } from './ProductCostGovernanceFinalizationPanel';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -133,7 +133,7 @@ export function ProductCostGovernanceSummaryPanel({
               <StatCard
                 title="Readiness Score"
                 value={`${toNumber(costGovernanceSummary?.readiness_score).toFixed(0)}%`}
-                subtitle={costGovernanceSummary?.governance_status || 'unknown'}
+                subtitle={formatStatusLabel(costGovernanceSummary?.governance_status)}
                 tone={toNumber(costGovernanceSummary?.readiness_score) >= 90 ? 'good' : toNumber(costGovernanceSummary?.readiness_score) >= 70 ? 'warn' : 'bad'}
               />
               <StatCard
@@ -165,7 +165,7 @@ export function ProductCostGovernanceSummaryPanel({
                       <div style={styles.rowTitle}>{item.label}</div>
                       <div style={styles.rowSubtle}>{item.detail}</div>
                     </div>
-                    <span style={styles.badge}>{item.status}</span>
+                    <StatusBadge status={item.status} />
                   </div>
                 ))}
               </div>

@@ -71,3 +71,7 @@ export default defineConfig([
   },
 ])
 ```
+
+## Copyright and licence
+
+Copyright © 2025–2026 Josip Barić. All rights reserved. This repository is proprietary and is not distributed under an open-source licence. See `COPYRIGHT.md` and `LICENSE.md`.

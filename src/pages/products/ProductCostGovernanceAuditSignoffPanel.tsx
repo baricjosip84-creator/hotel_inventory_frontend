@@ -4,7 +4,7 @@ import type {
 } from '../../types/inventory';
 import { toNumber } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -93,7 +93,7 @@ export function ProductCostGovernanceAuditSignoffPanel({
                   <h4 style={styles.sectionTitle}>Governance sign-off readiness</h4>
                   <div style={styles.rowSubtle}>Derived human-review readiness layer; no approvals or records are created automatically.</div>
                 </div>
-                <span style={styles.badge}>{costGovernanceSignoff?.signoff_status || 'unknown'}</span>
+                <StatusBadge status={costGovernanceSignoff?.signoff_status} />
               </div>
 
               {costGovernanceSignoffQuery.isLoading ? (
@@ -137,7 +137,7 @@ export function ProductCostGovernanceAuditSignoffPanel({
                             <div style={styles.rowTitle}>{item.label}</div>
                             <div style={styles.rowSubtle}>{item.detail}</div>
                           </div>
-                          <span style={styles.badge}>{item.status}</span>
+                          <StatusBadge status={item.status} />
                         </div>
                       ))}
                     </div>
@@ -153,7 +153,7 @@ export function ProductCostGovernanceAuditSignoffPanel({
                               <div style={styles.rowTitle}>{item.label}</div>
                               <div style={styles.rowSubtle}>{item.detail}</div>
                             </div>
-                            <span style={styles.badge}>{item.severity}</span>
+                            <StatusBadge status={item.severity} />
                           </div>
                         ))
                       )}

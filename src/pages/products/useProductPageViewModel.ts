@@ -85,6 +85,7 @@ export function useProductPageViewModel() {
     costRiskDetailsQuery: queries.costRiskDetailsQuery,
     handleExportCostRiskDetailsCsv: productPageActions.handleExportCostRiskDetailsCsv,
     canManageProducts,
+    canViewProductPackages,
     role,
     isSubmitting: productPageActions.createMutation.isPending || productPageActions.updateMutation.isPending,
     handleSubmit: productPageActions.handleSubmit,

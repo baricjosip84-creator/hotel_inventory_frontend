@@ -1,5 +1,5 @@
 import type { ProductCostRiskItem, ProductCostValuationItem } from '../../types/inventory';
-import { formatMoney, formatValuationBasis, toNumber } from './productFormatting';
+import { formatMoney, formatStatusLabel, formatValuationBasis, getProductStatusTone, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 
 export function StatCard(props: {
@@ -23,6 +23,32 @@ export function StatCard(props: {
       <div style={toneStyle}>{props.value}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
+  );
+}
+
+
+export function StatusBadge(props: {
+  status: string | null | undefined;
+  detail?: number | string | null;
+}) {
+  const tone = getProductStatusTone(props.status);
+  const toneStyle =
+    tone === 'good'
+      ? styles.statusBadgeGood
+      : tone === 'warn'
+        ? styles.statusBadgeWarn
+        : tone === 'bad'
+          ? styles.statusBadgeBad
+          : styles.statusBadgeNeutral;
+
+  const detail = props.detail === null || props.detail === undefined || props.detail === ''
+    ? ''
+    : ` · ${String(props.detail)}`;
+
+  return (
+    <span style={{ ...styles.badge, ...toneStyle }}>
+      {formatStatusLabel(props.status)}{detail}
+    </span>
   );
 }
 

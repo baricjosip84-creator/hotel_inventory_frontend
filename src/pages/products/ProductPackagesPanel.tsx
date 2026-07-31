@@ -50,8 +50,10 @@ export function ProductPackagesPanel({
     return null;
   }
 
+  const fieldsDisabled = isPackageSubmitting || !canManageProductPackages;
+
   return (
-    <section style={styles.panel}>
+    <section id="product-packages-panel" style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
           <h3 style={styles.panelTitle}>Packages for {selectedPackageProduct.name}</h3>
@@ -65,13 +67,18 @@ export function ProductPackagesPanel({
         </button>
       </div>
 
+      {!canManageProductPackages ? (
+        <div style={styles.warningBox}>Packages are read-only because the current role does not have product_packages.write permission.</div>
+      ) : null}
+
       {packageError ? <div style={styles.errorBox}>{packageError}</div> : null}
       {packageMessage ? <div style={styles.successBox}>{packageMessage}</div> : null}
 
       <form onSubmit={onSubmit} style={styles.formGrid}>
         <div>
-          <label style={styles.label}>Package Name</label>
+          <label htmlFor="product-package-name" style={styles.label}>Package Name</label>
           <input
+            id="product-package-name"
             style={styles.input}
             value={packageForm.package_name}
             onChange={(event) =>
@@ -79,12 +86,14 @@ export function ProductPackagesPanel({
             }
             placeholder="Example: 6-pack"
             required
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Package Barcode</label>
+          <label htmlFor="product-package-barcode" style={styles.label}>Package Barcode</label>
           <input
+            id="product-package-barcode"
             style={styles.input}
             value={packageForm.barcode}
             onChange={(event) =>
@@ -92,12 +101,14 @@ export function ProductPackagesPanel({
             }
             placeholder="Scan or enter package barcode"
             required
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Units Per Package</label>
+          <label htmlFor="product-package-units" style={styles.label}>Units Per Package</label>
           <input
+            id="product-package-units"
             style={styles.input}
             type="number"
             inputMode="decimal"
@@ -109,6 +120,7 @@ export function ProductPackagesPanel({
             }
             placeholder="1"
             required
+            disabled={fieldsDisabled}
           />
         </div>
 
@@ -119,6 +131,7 @@ export function ProductPackagesPanel({
             onChange={(event) =>
               setPackageForm((current) => ({ ...current, is_default: event.target.checked }))
             }
+            disabled={fieldsDisabled}
           />
           Default package
         </label>
@@ -126,8 +139,8 @@ export function ProductPackagesPanel({
         <div style={styles.formActions}>
           <button
             type="submit"
-            style={styles.primaryButton}
-            disabled={isPackageSubmitting || !canManageProductPackages}
+            style={fieldsDisabled ? styles.disabledButton : styles.primaryButton}
+            disabled={fieldsDisabled}
           >
             {isPackageSubmitting
               ? editingPackage
@@ -147,10 +160,10 @@ export function ProductPackagesPanel({
       </form>
 
       <div style={styles.packageTableBlock}>
-        {packagesQuery.isLoading ? <p>Loading packages...</p> : null}
+        {packagesQuery.isLoading ? <div style={styles.emptyCell}>Loading packages...</div> : null}
 
         {packagesQuery.isError ? (
-          <p>Failed to load packages: {(packagesQuery.error as Error).message || 'Unknown error'}</p>
+          <div style={styles.errorBox}>Failed to load packages: {(packagesQuery.error as Error).message || 'Unknown error'}</div>
         ) : null}
 
         {!packagesQuery.isLoading && !packagesQuery.isError ? (

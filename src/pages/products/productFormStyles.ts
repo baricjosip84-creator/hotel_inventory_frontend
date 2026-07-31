@@ -76,6 +76,19 @@ export const productFormStyles: Record<string, CSSProperties> = {
     gap: '12px',
     marginBottom: '16px'
   },
+  filterActionRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '16px'
+  },
+  filterResultText: {
+    color: '#6b7280',
+    fontSize: '13px',
+    lineHeight: 1.4
+  },
   searchInput: {
     width: '100%',
     padding: '12px 14px',

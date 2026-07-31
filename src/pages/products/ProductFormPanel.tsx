@@ -28,13 +28,15 @@ export function ProductFormPanel({
   onCancelEdit,
   setForm
 }: ProductFormPanelProps) {
+  const fieldsDisabled = isSubmitting || !canManageProducts;
+
   return (
     <section id="product-form-panel" style={styles.panel}>
       <h3 style={styles.panelTitle}>{editingProduct ? 'Edit Product' : 'Create Product'}</h3>
       <p style={styles.panelSubtitle}>
         {canManageProducts
           ? 'Maintain product master records used across stock, shipments, receiving, alerts, and reporting.'
-          : 'This form stays visible for context, but product writes are blocked for your current role.'}
+          : 'This form is read-only because the current role does not have products.write permission.'}
       </p>
       <p style={styles.panelSubtitle}>
         Barcode here is the backward-compatible default package barcode. Additional package barcodes are managed from the Product List.
@@ -45,42 +47,49 @@ export function ProductFormPanel({
 
       <form onSubmit={onSubmit} style={styles.formGrid}>
         <div>
-          <label style={styles.label}>Product Name</label>
+          <label htmlFor="product-name" style={styles.label}>Product Name</label>
           <input
+            id="product-name"
             style={styles.input}
             value={form.name}
             onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
             placeholder="Example: Coffee Beans Premium"
             required
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Category</label>
+          <label htmlFor="product-category" style={styles.label}>Category</label>
           <input
+            id="product-category"
             style={styles.input}
             value={form.category}
             onChange={(event) =>
               setForm((current) => ({ ...current, category: event.target.value }))
             }
             placeholder="Example: Beverages"
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Unit</label>
+          <label htmlFor="product-unit" style={styles.label}>Unit</label>
           <input
+            id="product-unit"
             style={styles.input}
             value={form.unit}
             onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
             placeholder="Example: bottle"
             required
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Minimum Stock</label>
+          <label htmlFor="product-min-stock" style={styles.label}>Minimum Stock</label>
           <input
+            id="product-min-stock"
             style={styles.input}
             type="number"
             inputMode="decimal"
@@ -90,12 +99,14 @@ export function ProductFormPanel({
               setForm((current) => ({ ...current, min_stock: event.target.value }))
             }
             placeholder="0"
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label style={styles.label}>Standard Unit Cost</label>
+          <label htmlFor="product-standard-cost" style={styles.label}>Standard Unit Cost</label>
           <input
+            id="product-standard-cost"
             style={styles.input}
             type="number"
             inputMode="decimal"
@@ -106,18 +117,21 @@ export function ProductFormPanel({
               setForm((current) => ({ ...current, standard_unit_cost: event.target.value }))
             }
             placeholder="Optional fallback cost"
+            disabled={fieldsDisabled}
           />
           <div style={styles.fieldHint}>Used only when no received movement cost exists yet.</div>
         </div>
 
         <div>
-          <label style={styles.label}>Supplier</label>
+          <label htmlFor="product-supplier" style={styles.label}>Supplier</label>
           <select
+            id="product-supplier"
             style={styles.input}
             value={form.supplier_id}
             onChange={(event) =>
               setForm((current) => ({ ...current, supplier_id: event.target.value }))
             }
+            disabled={fieldsDisabled}
           >
             <option value="">No supplier assigned</option>
             {suppliers.map((supplier) => (
@@ -129,19 +143,25 @@ export function ProductFormPanel({
         </div>
 
         <div>
-          <label style={styles.label}>Default Barcode</label>
+          <label htmlFor="product-default-barcode" style={styles.label}>Default Barcode</label>
           <input
+            id="product-default-barcode"
             style={styles.input}
             value={form.barcode}
             onChange={(event) =>
               setForm((current) => ({ ...current, barcode: event.target.value }))
             }
             placeholder="Scan or enter default package barcode"
+            disabled={fieldsDisabled}
           />
         </div>
 
         <div style={styles.formActions}>
-          <button type="submit" style={styles.primaryButton} disabled={isSubmitting || !canManageProducts}>
+          <button
+            type="submit"
+            style={fieldsDisabled ? styles.disabledButton : styles.primaryButton}
+            disabled={fieldsDisabled}
+          >
             {isSubmitting
               ? editingProduct
                 ? 'Updating...'
@@ -152,7 +172,7 @@ export function ProductFormPanel({
           </button>
 
           {editingProduct ? (
-            <button type="button" style={styles.secondaryButton} onClick={onCancelEdit}>
+            <button type="button" style={styles.secondaryButton} onClick={onCancelEdit} disabled={isSubmitting}>
               Cancel
             </button>
           ) : null}

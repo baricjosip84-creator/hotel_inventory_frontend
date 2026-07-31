@@ -1,5 +1,5 @@
 import type { ProductCostReportSummaryResponse } from '../../types/inventory';
-import { formatMoney, toNumber } from './productFormatting';
+import { formatGovernanceValue, formatMoney, formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard } from './productSummaryComponents';
 
@@ -84,9 +84,9 @@ export function ProductCostReportSummaryPanel({
                 <div key={`${row.section}-${row.metric}`} style={styles.riskListItem}>
                   <div>
                     <div style={styles.rowTitle}>{row.metric.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')}</div>
-                    <div style={styles.rowSubtle}>{row.section}</div>
+                    <div style={styles.rowSubtle}>{formatStatusLabel(row.section)}</div>
                   </div>
-                  <strong>{String(row.value)}</strong>
+                  <strong>{formatGovernanceValue(row.value)}</strong>
                 </div>
               ))}
             </div>

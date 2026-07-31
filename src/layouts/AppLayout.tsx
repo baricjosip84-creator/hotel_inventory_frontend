@@ -16,6 +16,7 @@ import { getTenantPermissionSnapshot, hasAllPermissions, hasPermission, TENANT_P
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
+import CopyrightNotice from '../components/CopyrightNotice';
 
 type UserRole = 'admin' | 'manager' | 'staff' | null;
 
@@ -605,6 +606,7 @@ export default function AppLayout() {
         >
           <Outlet />
         </main>
+        <CopyrightNotice />
       </div>
     </div>
   );

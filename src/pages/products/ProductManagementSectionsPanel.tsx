@@ -10,6 +10,7 @@ type ProductManagementSectionsPanelProps = ReturnType<typeof useProductPageViewM
 
 export function ProductManagementSectionsPanel({
   canManageProducts,
+  canViewProductPackages,
   role,
   editingProduct,
   form,
@@ -91,6 +92,33 @@ export function ProductManagementSectionsPanel({
         setForm={setForm}
       />
 
+      <ProductListPanel
+        productsQuery={productsQuery}
+        products={products}
+        suppliers={suppliers}
+        categoryOptions={categoryOptions}
+        search={search}
+        setSearch={setSearch}
+        categoryFilter={categoryFilter}
+        setCategoryFilter={setCategoryFilter}
+        supplierFilter={supplierFilter}
+        setSupplierFilter={setSupplierFilter}
+        costStatusFilter={costStatusFilter}
+        setCostStatusFilter={setCostStatusFilter}
+        costBasisFilter={costBasisFilter}
+        setCostBasisFilter={setCostBasisFilter}
+        costVarianceStatusFilter={costVarianceStatusFilter}
+        setCostVarianceStatusFilter={setCostVarianceStatusFilter}
+        canManageProducts={canManageProducts}
+        canViewProductPackages={canViewProductPackages}
+        deleteProductPending={deleteMutation.isPending}
+        onExportProductsCsv={handleExportProductsCsv}
+        onOpenCostHistory={handleOpenCostHistory}
+        onOpenPackages={handleOpenPackages}
+        onStartEdit={handleStartEdit}
+        onDelete={handleDelete}
+      />
+
       <ProductPackagesPanel
         selectedPackageProduct={selectedPackageProduct}
         packagesQuery={packagesQuery}
@@ -123,32 +151,6 @@ export function ProductManagementSectionsPanel({
         onExportStandardCostHistoryCsv={handleExportStandardCostHistoryCsv}
         onCloseCostHistory={handleCloseCostHistory}
         onClearCostHistoryFilters={handleClearCostHistoryFilters}
-      />
-
-      <ProductListPanel
-        productsQuery={productsQuery}
-        products={products}
-        suppliers={suppliers}
-        categoryOptions={categoryOptions}
-        search={search}
-        setSearch={setSearch}
-        categoryFilter={categoryFilter}
-        setCategoryFilter={setCategoryFilter}
-        supplierFilter={supplierFilter}
-        setSupplierFilter={setSupplierFilter}
-        costStatusFilter={costStatusFilter}
-        setCostStatusFilter={setCostStatusFilter}
-        costBasisFilter={costBasisFilter}
-        setCostBasisFilter={setCostBasisFilter}
-        costVarianceStatusFilter={costVarianceStatusFilter}
-        setCostVarianceStatusFilter={setCostVarianceStatusFilter}
-        canManageProducts={canManageProducts}
-        deleteProductPending={deleteMutation.isPending}
-        onExportProductsCsv={handleExportProductsCsv}
-        onOpenCostHistory={handleOpenCostHistory}
-        onOpenPackages={handleOpenPackages}
-        onStartEdit={handleStartEdit}
-        onDelete={handleDelete}
       />
     </>
   );

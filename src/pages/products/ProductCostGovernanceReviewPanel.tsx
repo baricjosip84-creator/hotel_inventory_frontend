@@ -6,9 +6,9 @@ import type {
   ProductCostGovernanceSignoffSummaryResponse
 } from '../../types/inventory';
 import { ProductCostGovernanceAuditSignoffPanel } from './ProductCostGovernanceAuditSignoffPanel';
-import { toNumber } from './productFormatting';
+import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -64,9 +64,9 @@ export function ProductCostGovernanceReviewPanel({
               <div style={styles.packageHeader}>
                 <div>
                   <h4 style={styles.sectionTitle}>Governance review queue</h4>
-                  <div style={styles.rowSubtle}>Human-review work queue composed from blockers, warnings, remediation items, and priority products. Read-only only.</div>
+                  <div style={styles.rowSubtle}>Human-review work queue composed from blockers, warnings, remediation items, and priority products. Read-only.</div>
                 </div>
-                <span style={styles.badge}>{costGovernanceReviewQueue?.review_status || 'unknown'}</span>
+                <StatusBadge status={costGovernanceReviewQueue?.review_status} />
               </div>
 
               {costGovernanceReviewQueueQuery.isLoading ? (
@@ -95,7 +95,7 @@ export function ProductCostGovernanceReviewPanel({
                               <div style={styles.rowSubtle}>{item.detail}</div>
                               <div style={styles.rowSubtle}>Owner: {item.owner_hint} • Evidence: {item.evidence}</div>
                             </div>
-                            <span style={styles.badge}>{item.priority}</span>
+                            <StatusBadge status={item.priority} />
                           </div>
                         ))
                       )}
@@ -139,7 +139,7 @@ export function ProductCostGovernanceReviewPanel({
               ) : (
                 <>
                   <div style={styles.costReadinessGrid}>
-                    <StatCard title="Closure Status" value={costGovernanceReviewPack?.closure_status || 'unknown'} subtitle={costGovernanceReviewPack?.can_close_review ? 'Ready to close' : 'Keep review open'} tone={costGovernanceReviewPack?.can_close_review ? 'good' : 'warn'} />
+                    <StatCard title="Closure Status" value={formatStatusLabel(costGovernanceReviewPack?.closure_status)} subtitle={costGovernanceReviewPack?.can_close_review ? 'Ready to close' : 'Keep review open'} tone={costGovernanceReviewPack?.can_close_review ? 'good' : 'warn'} />
                     <StatCard title="Review Rows" value={toNumber(costGovernanceReviewPack?.totals.review_export_rows)} subtitle="CSV evidence rows" />
                     <StatCard title="Queue Items" value={toNumber(costGovernanceReviewPack?.totals.queue_items)} subtitle="Included in pack" tone={toNumber(costGovernanceReviewPack?.totals.queue_items) > 0 ? 'warn' : 'good'} />
                     <StatCard title="Product Rows" value={toNumber(costGovernanceReviewPack?.product_review_rows.length)} subtitle="Priority products" />
@@ -150,7 +150,7 @@ export function ProductCostGovernanceReviewPanel({
                       <div key={card.key} style={styles.riskListCard}>
                         <div style={styles.rowTitle}>{card.label}</div>
                         <div style={styles.rowSubtle}>{card.detail}</div>
-                        <span style={styles.badge}>{card.status}</span>
+                        <StatusBadge status={card.status} />
                       </div>
                     ))}
                   </div>
@@ -184,7 +184,7 @@ export function ProductCostGovernanceReviewPanel({
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Closure Status" value={costGovernanceClosureSummary?.closure_status || 'unknown'} subtitle={costGovernanceClosureSummary?.can_archive ? 'Ready to archive' : 'Keep open'} tone={costGovernanceClosureSummary?.can_archive ? 'good' : 'warn'} />
+                    <StatCard title="Closure Status" value={formatStatusLabel(costGovernanceClosureSummary?.closure_status)} subtitle={costGovernanceClosureSummary?.can_archive ? 'Ready to archive' : 'Keep open'} tone={costGovernanceClosureSummary?.can_archive ? 'good' : 'warn'} />
                     <StatCard title="Blockers" value={toNumber(costGovernanceClosureSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceClosureSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
                     <StatCard title="Archive Rows" value={toNumber(costGovernanceClosureSummary?.totals.archive_rows)} subtitle="Closure evidence rows" />
                     <StatCard title="Warnings" value={toNumber(costGovernanceClosureSummary?.totals.warnings)} subtitle="Follow-up visibility" tone={toNumber(costGovernanceClosureSummary?.totals.warnings) > 0 ? 'warn' : 'good'} />
@@ -197,7 +197,7 @@ export function ProductCostGovernanceReviewPanel({
                           <div style={styles.rowTitle}>{item.label}</div>
                           <div style={styles.rowSubtle}>{item.detail}</div>
                         </div>
-                        <span style={styles.badge}>{item.status}</span>
+                        <StatusBadge status={item.status} />
                       </div>
                     ))}
                   </div>

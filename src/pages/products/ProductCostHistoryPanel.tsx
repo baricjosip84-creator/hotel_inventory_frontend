@@ -49,7 +49,7 @@ export function ProductCostHistoryPanel({
   }
 
   return (
-    <section style={styles.panel}>
+    <section id="product-cost-history-panel" style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
           <h3 style={styles.panelTitle}>Cost History for {selectedCostProduct.name}</h3>
@@ -124,10 +124,10 @@ export function ProductCostHistoryPanel({
         </div>
       </div>
 
-      {costHistoryQuery.isLoading ? <p>Loading cost history...</p> : null}
+      {costHistoryQuery.isLoading ? <div style={styles.emptyCell}>Loading cost history...</div> : null}
 
       {costHistoryQuery.isError ? (
-        <p>Failed to load cost history: {(costHistoryQuery.error as Error).message || 'Unknown error'}</p>
+        <div style={styles.errorBox}>Failed to load cost history: {(costHistoryQuery.error as Error).message || 'Unknown error'}</div>
       ) : null}
 
       {!costHistoryQuery.isLoading && !costHistoryQuery.isError ? (

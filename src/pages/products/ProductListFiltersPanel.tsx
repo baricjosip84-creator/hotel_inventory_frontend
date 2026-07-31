@@ -38,84 +38,144 @@ export function ProductListFiltersPanel({
   productsCount,
   onExportProductsCsv
 }: ProductListFiltersPanelProps) {
+  const hasActiveFilters = Boolean(
+    search ||
+    categoryFilter ||
+    supplierFilter ||
+    costStatusFilter ||
+    costBasisFilter ||
+    costVarianceStatusFilter
+  );
+
+  const clearFilters = () => {
+    setSearch('');
+    setCategoryFilter('');
+    setSupplierFilter('');
+    setCostStatusFilter('');
+    setCostBasisFilter('');
+    setCostVarianceStatusFilter('');
+  };
+
   return (
-    <div style={styles.toolbarGrid}>
-      <input
-        type="text"
-        placeholder="Search by product name, category, unit, or barcode..."
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        style={styles.searchInput}
-      />
+    <>
+      <div style={styles.toolbarGrid}>
+        <div>
+          <label htmlFor="product-list-search" style={styles.label}>Search products</label>
+          <input
+            id="product-list-search"
+            type="search"
+            placeholder="Name, category, unit, or barcode"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
 
-      <select
-        value={categoryFilter}
-        onChange={(event) => setCategoryFilter(event.target.value)}
-        style={styles.searchInput}
-      >
-        <option value="">All categories</option>
-        {categoryOptions.map((category) => (
-          <option key={category} value={category}>
-            {category}
-          </option>
-        ))}
-      </select>
+        <div>
+          <label htmlFor="product-list-category" style={styles.label}>Category</label>
+          <select
+            id="product-list-category"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All categories</option>
+            {categoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <select
-        value={supplierFilter}
-        onChange={(event) => setSupplierFilter(event.target.value)}
-        style={styles.searchInput}
-      >
-        <option value="">All suppliers</option>
-        {suppliers.map((supplier) => (
-          <option key={supplier.id} value={supplier.id}>
-            {supplier.name}
-          </option>
-        ))}
-      </select>
+        <div>
+          <label htmlFor="product-list-supplier" style={styles.label}>Supplier</label>
+          <select
+            id="product-list-supplier"
+            value={supplierFilter}
+            onChange={(event) => setSupplierFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All suppliers</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <select
-        value={costStatusFilter}
-        onChange={(event) => setCostStatusFilter(event.target.value)}
-        style={styles.searchInput}
-      >
-        <option value="">All cost statuses</option>
-        <option value="costed">Costed products</option>
-        <option value="uncosted">Uncosted products</option>
-      </select>
+        <div>
+          <label htmlFor="product-list-cost-status" style={styles.label}>Cost status</label>
+          <select
+            id="product-list-cost-status"
+            value={costStatusFilter}
+            onChange={(event) => setCostStatusFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All cost statuses</option>
+            <option value="costed">Costed products</option>
+            <option value="uncosted">Uncosted products</option>
+          </select>
+        </div>
 
-      <select
-        value={costBasisFilter}
-        onChange={(event) => setCostBasisFilter(event.target.value)}
-        style={styles.searchInput}
-      >
-        <option value="">All cost bases</option>
-        <option value="received">Received movement cost</option>
-        <option value="standard">Standard cost fallback</option>
-        <option value="none">No cost</option>
-      </select>
+        <div>
+          <label htmlFor="product-list-cost-basis" style={styles.label}>Cost basis</label>
+          <select
+            id="product-list-cost-basis"
+            value={costBasisFilter}
+            onChange={(event) => setCostBasisFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All cost bases</option>
+            <option value="received">Received movement cost</option>
+            <option value="standard">Standard cost fallback</option>
+            <option value="none">No cost</option>
+          </select>
+        </div>
 
-      <select
-        value={costVarianceStatusFilter}
-        onChange={(event) => setCostVarianceStatusFilter(event.target.value)}
-        style={styles.searchInput}
-      >
-        <option value="">All standard variances</option>
-        <option value="matched">Matches standard</option>
-        <option value="above_standard">Above standard</option>
-        <option value="below_standard">Below standard</option>
-        <option value="no_standard">No standard cost</option>
-        <option value="no_received">No received cost</option>
-      </select>
+        <div>
+          <label htmlFor="product-list-variance" style={styles.label}>Standard variance</label>
+          <select
+            id="product-list-variance"
+            value={costVarianceStatusFilter}
+            onChange={(event) => setCostVarianceStatusFilter(event.target.value)}
+            style={styles.searchInput}
+          >
+            <option value="">All standard variances</option>
+            <option value="matched">Matches standard</option>
+            <option value="above_standard">Above standard</option>
+            <option value="below_standard">Below standard</option>
+            <option value="no_standard">No standard cost</option>
+            <option value="no_received">No received cost</option>
+          </select>
+        </div>
+      </div>
 
-      <button
-        type="button"
-        style={styles.secondaryButton}
-        onClick={onExportProductsCsv}
-        disabled={productsCount === 0}
-      >
-        Export Products CSV
-      </button>
-    </div>
+      <div style={styles.filterActionRow}>
+        <div style={styles.filterResultText}>
+          {productsCount.toLocaleString()} product{productsCount === 1 ? '' : 's'} shown
+          {hasActiveFilters ? ' for the active filters' : ''}.
+        </div>
+        <div style={styles.actionGroup}>
+          <button
+            type="button"
+            style={!hasActiveFilters ? styles.disabledButton : styles.secondaryButton}
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+          >
+            Clear Product Filters
+          </button>
+          <button
+            type="button"
+            style={productsCount === 0 ? styles.disabledButton : styles.secondaryButton}
+            onClick={onExportProductsCsv}
+            disabled={productsCount === 0}
+          >
+            Export Products CSV
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

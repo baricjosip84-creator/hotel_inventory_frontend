@@ -9,8 +9,8 @@ export function ProductPageContent(props: ProductPageContentProps) {
   return (
     <div>
       <ProductSummaryStatsPanel summary={props.summary} />
-      <ProductCostAnalyticsSectionsPanel {...props} />
       <ProductManagementSectionsPanel {...props} />
+      <ProductCostAnalyticsSectionsPanel {...props} />
     </div>
   );
 }

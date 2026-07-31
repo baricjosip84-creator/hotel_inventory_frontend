@@ -34,8 +34,12 @@ type ProductMutationParams = {
 
 const invalidateProductReadModels = async (queryClient: QueryClient) => {
   await queryClient.invalidateQueries({ queryKey: ['products'] });
-  await queryClient.invalidateQueries({ queryKey: ['product-cost-risk-summary'] });
-  await queryClient.invalidateQueries({ queryKey: ['product-cost-valuation-summary'] });
+  await queryClient.invalidateQueries({
+    predicate: (query) => {
+      const rootKey = query.queryKey[0];
+      return typeof rootKey === 'string' && rootKey.startsWith('product-cost-');
+    }
+  });
   await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
 };
 

@@ -1,6 +1,7 @@
 import type { ProductCostGovernanceDetailsResponse } from '../../types/inventory';
 import { formatMoney } from './productFormatting';
 import { styles } from './productStyles';
+import { StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -34,7 +35,7 @@ export function ProductCostGovernanceDetailsPanel({
                 <div style={styles.rowTitle}>{item.action}</div>
                 <div style={styles.rowSubtle}>{item.source}</div>
               </div>
-              <span style={styles.badge}>{item.priority}</span>
+              <StatusBadge status={item.priority} />
             </div>
           ))
         )}

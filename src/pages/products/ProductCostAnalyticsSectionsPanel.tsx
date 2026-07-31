@@ -17,6 +17,7 @@ import { ProductCostGovernanceSummaryPanel } from './ProductCostGovernanceSummar
 import { ProductCostAlertSummaryPanel } from './ProductCostAlertSummaryPanel';
 import { ProductCostReportSummaryPanel } from './ProductCostReportSummaryPanel';
 import { ProductCostActionDetailsPanel } from './ProductCostActionDetailsPanel';
+import { styles } from './productStyles';
 
 type ProductCostAnalyticsSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
@@ -109,6 +110,13 @@ export function ProductCostAnalyticsSectionsPanel({
 }: ProductCostAnalyticsSectionsPanelProps) {
   return (
     <>
+      <section id="product-cost-intelligence" style={styles.panel}>
+        <h3 style={styles.panelTitle}>Cost Intelligence and Governance</h3>
+        <p style={styles.panelSubtitle}>
+          Read-only valuation, risk, action, audit, readiness, and governance views derived from product master data and stock-movement costs. These panels do not change products, standard costs, stock, shipments, or audit records.
+        </p>
+      </section>
+
       <ProductCostingReadinessPanel
         costingReadiness={costingReadiness}
         onCategoryFilterChange={setCategoryFilter}

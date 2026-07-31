@@ -148,6 +148,157 @@ export function formatCostVarianceStatus(value: string | null | undefined): stri
     .join(' ');
 }
 
+
+export type ProductStatusTone = 'good' | 'warn' | 'bad' | 'neutral';
+
+const STATUS_LABELS: Record<string, string> = {
+  pass: 'Passed',
+  fail: 'Failed',
+  watch: 'Watch',
+  ready: 'Ready',
+  clear: 'Clear',
+  controlled: 'Controlled',
+  present: 'Present',
+  none: 'None',
+  scoped: 'Tenant scoped',
+  tenant_actor: 'Tenant actor',
+  no_mutation: 'Read-only',
+  followup_required: 'Follow-up required',
+  review_required: 'Review required',
+  final_review_required: 'Final review required',
+  ready_for_signoff: 'Ready for sign-off',
+  not_ready: 'Not ready',
+  conditional_review: 'Conditional review',
+  ready_to_close: 'Ready to close',
+  ready_to_archive: 'Ready to archive',
+  conditional_followup: 'Conditional follow-up',
+  ready_for_handoff: 'Ready for handoff',
+  conditional_handoff_review: 'Conditional handoff review',
+  evidence_review: 'Evidence review',
+  steady_state: 'Steady state',
+  active_review: 'Active review',
+  control_watch: 'Control watch',
+  control_review: 'Control review',
+  evidence_ready: 'Evidence ready',
+  evidence_watch: 'Evidence watch',
+  operationally_ready: 'Operationally ready',
+  readiness_watch: 'Readiness watch',
+  readiness_review: 'Readiness review',
+  finalized: 'Finalized',
+  final_watch: 'Final watch',
+  performance_ready: 'Performance ready',
+  performance_watch: 'Performance watch',
+  performance_review: 'Performance review',
+  indexes_ready: 'Indexes ready',
+  indexes_pending: 'Indexes pending',
+  security_ready: 'Security ready',
+  security_watch: 'Security watch',
+  security_review: 'Security review',
+  tenant_scoped: 'Tenant scoped',
+  tenant_scope_review: 'Tenant scope review'
+};
+
+export function formatStatusLabel(value: string | null | undefined): string {
+  if (!value) return 'Unknown';
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'Unknown';
+
+  return STATUS_LABELS[normalized] || normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function getProductStatusTone(value: string | null | undefined): ProductStatusTone {
+  const normalized = value?.trim().toLowerCase() || '';
+
+  if (
+    normalized === 'pass' ||
+    normalized === 'ready' ||
+    normalized === 'clear' ||
+    normalized === 'controlled' ||
+    normalized === 'steady_state' ||
+    normalized === 'ready_for_signoff' ||
+    normalized === 'ready_to_close' ||
+    normalized === 'ready_to_archive' ||
+    normalized === 'ready_for_handoff' ||
+    normalized === 'operationally_ready' ||
+    normalized === 'finalized' ||
+    normalized === 'performance_ready' ||
+    normalized === 'indexes_ready' ||
+    normalized === 'security_ready' ||
+    normalized === 'tenant_scoped' ||
+    normalized === 'scoped' ||
+    normalized === 'present' ||
+    normalized === 'evidence_ready'
+  ) {
+    return 'good';
+  }
+
+  if (
+    normalized === 'fail' ||
+    normalized === 'not_ready' ||
+    normalized === 'control_review' ||
+    normalized === 'readiness_review' ||
+    normalized === 'final_review_required' ||
+    normalized === 'performance_review' ||
+    normalized === 'security_review' ||
+    normalized === 'tenant_scope_review'
+  ) {
+    return 'bad';
+  }
+
+  if (
+    normalized.includes('watch') ||
+    normalized.includes('review') ||
+    normalized.includes('followup') ||
+    normalized.includes('blocked') ||
+    normalized === 'warning' ||
+    normalized === 'medium' ||
+    normalized === 'high' ||
+    normalized === 'critical' ||
+    normalized === 'indexes_pending' ||
+    normalized === 'active_review'
+  ) {
+    return 'warn';
+  }
+
+  return 'neutral';
+}
+
+export function formatGovernanceValue(
+  value: number | string | boolean | null | undefined,
+  fallbackStatus?: string | null
+): string {
+  if (value === null || value === undefined || value === '') {
+    return formatStatusLabel(fallbackStatus);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  if (typeof value === 'number') {
+    return value.toLocaleString();
+  }
+
+  const normalized = value.trim();
+  if (!normalized) return formatStatusLabel(fallbackStatus);
+
+  const parsedDate = new Date(normalized);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(normalized) && !Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.toLocaleString();
+  }
+
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/i.test(normalized)) {
+    return formatStatusLabel(normalized);
+  }
+
+  return normalized;
+}
+
 function csvEscape(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value);
   return `"${text.replace(/"/g, '""')}"`;

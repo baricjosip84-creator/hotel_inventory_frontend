@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import type { ProductCostRiskItem, ProductItem, ProductPackageItem } from '../../types/inventory';
 import type {
   CostActionDetailFilterState,
@@ -20,12 +21,15 @@ import {
 } from './productFormDefaults';
 
 export function useProductPageState() {
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [costStatusFilter, setCostStatusFilter] = useState('');
-  const [costBasisFilter, setCostBasisFilter] = useState('');
-  const [costVarianceStatusFilter, setCostVarianceStatusFilter] = useState('');
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
+  const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('category')?.trim() || '');
+  const [supplierFilter, setSupplierFilter] = useState(() => searchParams.get('supplier_id')?.trim() || '');
+  const [costStatusFilter, setCostStatusFilter] = useState(() => searchParams.get('cost_status')?.trim() || '');
+  const [costBasisFilter, setCostBasisFilter] = useState(() => searchParams.get('cost_basis')?.trim() || '');
+  const [costVarianceStatusFilter, setCostVarianceStatusFilter] = useState(
+    () => searchParams.get('cost_variance_status')?.trim() || ''
+  );
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyProductForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);

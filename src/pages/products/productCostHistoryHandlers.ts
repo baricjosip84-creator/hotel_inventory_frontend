@@ -14,6 +14,7 @@ import type {
   ProductStandardCostHistoryItem
 } from '../../types/inventory';
 import { emptyCostHistoryFilters } from './productFormDefaults';
+import { scrollToFormSection } from '../../lib/scrollToForm';
 import type { CostHistoryFilterState } from './productCostHistoryApi';
 import {
   exportCostActionDetailsCsv,
@@ -67,6 +68,7 @@ export function buildProductCostHistoryHandlers({
   const handleOpenCostHistory = (product: ProductItem | ProductCostRiskItem) => {
     setSelectedCostProduct(product);
     setCostHistoryFilters(emptyCostHistoryFilters());
+    scrollToFormSection('product-cost-history-panel');
   };
 
   const handleCloseCostHistory = () => {

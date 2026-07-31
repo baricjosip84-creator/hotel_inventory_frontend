@@ -12,6 +12,7 @@ type ProductListTablePanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
   canManageProducts: boolean;
+  canViewProductPackages: boolean;
   deleteProductPending: boolean;
   onOpenCostHistory: (product: ProductItem) => void;
   onOpenPackages: (product: ProductItem) => void;
@@ -23,6 +24,7 @@ export function ProductListTablePanel({
   productsQuery,
   products,
   canManageProducts,
+  canViewProductPackages,
   deleteProductPending,
   onOpenCostHistory,
   onOpenPackages,
@@ -30,11 +32,11 @@ export function ProductListTablePanel({
   onDelete
 }: ProductListTablePanelProps) {
   if (productsQuery.isLoading) {
-    return <p>Loading products...</p>;
+    return <div style={styles.emptyCell}>Loading products...</div>;
   }
 
   if (productsQuery.isError) {
-    return <p>Failed to load products: {(productsQuery.error as Error).message || 'Unknown error'}</p>;
+    return <div style={styles.errorBox}>Failed to load products: {(productsQuery.error as Error).message || 'Unknown error'}</div>;
   }
 
   return (
@@ -120,7 +122,13 @@ export function ProductListTablePanel({
                       Cost History
                     </button>
 
-                    <button type="button" style={styles.secondaryButton} onClick={() => onOpenPackages(product)}>
+                    <button
+                      type="button"
+                      style={!canViewProductPackages ? styles.disabledButton : styles.secondaryButton}
+                      onClick={() => onOpenPackages(product)}
+                      disabled={!canViewProductPackages}
+                      title={!canViewProductPackages ? 'Product package read permission required' : undefined}
+                    >
                       Packages
                     </button>
 

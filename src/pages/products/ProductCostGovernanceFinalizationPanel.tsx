@@ -3,9 +3,9 @@ import type {
   ProductCostPerformanceSummaryResponse,
   ProductCostSecurityAuditSummaryResponse
 } from '../../types/inventory';
-import { toNumber } from './productFormatting';
+import { formatGovernanceValue, formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { StatCard, StatusBadge } from './productSummaryComponents';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -49,7 +49,7 @@ export function ProductCostGovernanceFinalizationPanel({
   ) : (
     <>
       <div style={styles.summaryGrid}>
-        <StatCard title="Final Status" value={costGovernanceFinalSummary?.final_status || 'unknown'} subtitle={costGovernanceFinalSummary?.can_finalize ? 'Ready to close module' : 'Review required'} tone={costGovernanceFinalSummary?.can_finalize ? 'good' : costGovernanceFinalSummary?.final_status === 'final_watch' ? 'warn' : 'bad'} />
+        <StatCard title="Final Status" value={formatStatusLabel(costGovernanceFinalSummary?.final_status)} subtitle={costGovernanceFinalSummary?.can_finalize ? 'Ready to close module' : 'Review required'} tone={costGovernanceFinalSummary?.can_finalize ? 'good' : costGovernanceFinalSummary?.final_status === 'final_watch' ? 'warn' : 'bad'} />
         <StatCard title="Final Score" value={`${toNumber(costGovernanceFinalSummary?.final_score).toFixed(0)}%`} subtitle="Governance + operations" tone={toNumber(costGovernanceFinalSummary?.final_score) >= 90 ? 'good' : toNumber(costGovernanceFinalSummary?.final_score) >= 70 ? 'warn' : 'bad'} />
         <StatCard title="Blockers" value={toNumber(costGovernanceFinalSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceFinalSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
         <StatCard title="Evidence Rows" value={toNumber(costGovernanceFinalSummary?.totals.evidence_rows)} subtitle="Audit-ready support" tone={toNumber(costGovernanceFinalSummary?.totals.evidence_rows) > 0 ? 'good' : 'warn'} />
@@ -63,7 +63,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{item.label}</div>
                 <div style={styles.rowSubtle}>{item.detail}</div>
               </div>
-              <span style={styles.badge}>{item.status}</span>
+              <StatusBadge status={item.status} />
             </div>
           ))}
         </div>
@@ -74,7 +74,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{row.label}</div>
                 <div style={styles.rowSubtle}>{row.section}</div>
               </div>
-              <span style={styles.badge}>{String(row.value ?? row.status)}</span>
+              <span style={styles.badge}>{formatGovernanceValue(row.value, row.status)}</span>
             </div>
           ))}
         </div>
@@ -108,7 +108,7 @@ export function ProductCostGovernanceFinalizationPanel({
   ) : (
     <>
       <div style={styles.summaryGrid}>
-        <StatCard title="Performance Status" value={costPerformanceSummary?.performance_status || 'unknown'} subtitle={costPerformanceSummary?.query_optimization_status || 'query status'} tone={costPerformanceSummary?.performance_status === 'performance_ready' ? 'good' : costPerformanceSummary?.performance_status === 'performance_watch' ? 'warn' : 'bad'} />
+        <StatCard title="Performance Status" value={formatStatusLabel(costPerformanceSummary?.performance_status)} subtitle={formatStatusLabel(costPerformanceSummary?.query_optimization_status)} tone={costPerformanceSummary?.performance_status === 'performance_ready' ? 'good' : costPerformanceSummary?.performance_status === 'performance_watch' ? 'warn' : 'bad'} />
         <StatCard title="Performance Score" value={`${toNumber(costPerformanceSummary?.performance_score).toFixed(0)}%`} subtitle="Indexes + payloads" tone={toNumber(costPerformanceSummary?.performance_score) >= 90 ? 'good' : toNumber(costPerformanceSummary?.performance_score) >= 70 ? 'warn' : 'bad'} />
         <StatCard title="Indexes Present" value={`${toNumber(costPerformanceSummary?.totals.present_indexes)} / ${toNumber(costPerformanceSummary?.totals.expected_indexes)}`} subtitle="Migration 019 checks" tone={toNumber(costPerformanceSummary?.totals.missing_indexes) > 0 ? 'bad' : 'good'} />
         <StatCard title="Review Checks" value={toNumber(costPerformanceSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costPerformanceSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
@@ -122,7 +122,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{item.label}</div>
                 <div style={styles.rowSubtle}>{item.detail}</div>
               </div>
-              <span style={styles.badge}>{item.status}</span>
+              <StatusBadge status={item.status} />
             </div>
           ))}
         </div>
@@ -133,7 +133,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{item.label}</div>
                 <div style={styles.rowSubtle}>{item.detail}</div>
               </div>
-              <span style={styles.badge}>{String(item.value ?? item.status)}</span>
+              <span style={styles.badge}>{formatGovernanceValue(item.value, item.status)}</span>
             </div>
           ))}
         </div>
@@ -167,10 +167,10 @@ export function ProductCostGovernanceFinalizationPanel({
   ) : (
     <>
       <div style={styles.summaryGrid}>
-        <StatCard title="Security Status" value={costSecurityAuditSummary?.security_status || 'unknown'} subtitle={costSecurityAuditSummary?.tenant_scope_status || 'tenant scope'} tone={costSecurityAuditSummary?.security_status === 'security_ready' ? 'good' : costSecurityAuditSummary?.security_status === 'security_watch' ? 'warn' : 'bad'} />
+        <StatCard title="Security Status" value={formatStatusLabel(costSecurityAuditSummary?.security_status)} subtitle={formatStatusLabel(costSecurityAuditSummary?.tenant_scope_status)} tone={costSecurityAuditSummary?.security_status === 'security_ready' ? 'good' : costSecurityAuditSummary?.security_status === 'security_watch' ? 'warn' : 'bad'} />
         <StatCard title="Security Score" value={`${toNumber(costSecurityAuditSummary?.security_score).toFixed(0)}%`} subtitle="Permissions + boundaries" tone={toNumber(costSecurityAuditSummary?.security_score) >= 90 ? 'good' : toNumber(costSecurityAuditSummary?.security_score) >= 70 ? 'warn' : 'bad'} />
         <StatCard title="Review Checks" value={toNumber(costSecurityAuditSummary?.totals.review_checks)} subtitle="Must be cleared" tone={toNumber(costSecurityAuditSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
-        <StatCard title="Support Session" value={costSecurityAuditSummary?.access_context.support_session_present ? 'present' : 'none'} subtitle={costSecurityAuditSummary?.access_context.actor_type || 'actor context'} tone={costSecurityAuditSummary?.access_context.support_session_present ? 'warn' : 'good'} />
+        <StatCard title="Support Session" value={formatStatusLabel(costSecurityAuditSummary?.access_context.support_session_present ? 'present' : 'none')} subtitle={formatStatusLabel(costSecurityAuditSummary?.access_context.actor_type || 'actor_context')} tone={costSecurityAuditSummary?.access_context.support_session_present ? 'warn' : 'good'} />
       </div>
 
       <div style={styles.riskGrid}>
@@ -181,7 +181,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{item.label}</div>
                 <div style={styles.rowSubtle}>{item.detail}</div>
               </div>
-              <span style={styles.badge}>{item.status}</span>
+              <StatusBadge status={item.status} />
             </div>
           ))}
         </div>
@@ -192,7 +192,7 @@ export function ProductCostGovernanceFinalizationPanel({
                 <div style={styles.rowTitle}>{item.label}</div>
                 <div style={styles.rowSubtle}>{item.detail}</div>
               </div>
-              <span style={styles.badge}>{String(item.value ?? item.status)}</span>
+              <span style={styles.badge}>{formatGovernanceValue(item.value, item.status)}</span>
             </div>
           ))}
         </div>
