@@ -150,8 +150,8 @@ const appLayout = read('src/layouts/AppLayout.tsx');
 const roleAwareWorkspace = read('src/pages/RoleAwareWorkspacePage.tsx');
 const customRolePermissionSurfaces = [
   ['Shipments', read('src/pages/ShipmentsPage.tsx'), 'shipments.receive'],
-  ['Alerts', read('src/pages/AlertsPage.tsx'), 'alerts.write'],
-  ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'stock_transfers.create'],
+  ['Alerts', read('src/pages/AlertsPage.tsx'), 'Alerts write permission'],
+  ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'cannot create stock transfer drafts'],
   ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'storage_locations.write'],
   ['Suppliers', read('src/pages/SuppliersPage.tsx'), 'suppliers.write'],
   ['Products', read('src/pages/products/ProductManagementSectionsPanel.tsx'), 'products.write']
@@ -197,9 +197,9 @@ assertIncludes(permissionSnapshot, [
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');
 assertIncludes(appLayout, ['getCurrentAccessRoleLabel', 'accessRoleLabel.toUpperCase()'], 'custom role shell label');
-assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleLabel', 'getTenantPermissionSnapshot', 'custom_role_name', 'Access role detected from the active tenant session'], 'custom role workspace label');
-for (const [label, source, permission] of customRolePermissionSurfaces) {
-  assertIncludes(source, ['Current access role:', permission], `${label} custom role feedback`);
+assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleLabel', 'getTenantPermissionSnapshot', 'custom_role_name', 'Prepared for the current access role:'], 'custom role workspace label');
+for (const [label, source, feedbackMarker] of customRolePermissionSurfaces) {
+  assertIncludes(source, ['Current access role:', feedbackMarker], `${label} custom role feedback`);
   assertNotIncludes(source, [
     'Current role: {role.toUpperCase()}',
     'Manager or admin role required',
