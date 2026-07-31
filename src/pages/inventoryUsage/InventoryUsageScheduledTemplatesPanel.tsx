@@ -15,10 +15,35 @@ type InventoryUsageScheduledTemplatesPanelProps = {
 
 const getStatusStyle = (status?: string) => {
   if (status === 'due') return styles.warningPill;
-  if (status === 'insufficient_stock' || status === 'missing_stock' || status === 'missing_evidence_acknowledgement_required' || status === 'empty') return styles.dangerPill;
+  if (status === 'insufficient_stock' || status === 'reserved_stock' || status === 'missing_stock' || status === 'missing_evidence_acknowledgement_required' || status === 'empty') return styles.dangerPill;
   if (status === 'ready_with_warnings') return styles.warningPill;
   if (status === 'scheduled') return styles.successPill;
   return styles.filterPill;
+};
+
+const formatScheduleStatus = (status?: string | null): string => {
+  switch (status) {
+    case 'reserved_stock':
+      return 'Blocked by reservations';
+    case 'insufficient_stock':
+      return 'Insufficient stock';
+    case 'missing_stock':
+      return 'Missing stock';
+    case 'missing_evidence_acknowledgement_required':
+      return 'Evidence acknowledgement required';
+    case 'ready_with_warnings':
+      return 'Ready with warnings';
+    case 'due':
+      return 'Due';
+    case 'scheduled':
+      return 'Scheduled';
+    case 'empty':
+      return 'Empty';
+    case 'inactive':
+      return 'Inactive';
+    default:
+      return status ? status.replace(/_/g, ' ') : 'Scheduled';
+  }
 };
 
 const formatSchedule = (frequency?: string | null, interval?: number | string | null) => {
@@ -88,8 +113,13 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
                   {row.department || 'No department'} · {row.event_name || 'No event/job'} · {toNumber(row.line_count)} lines
                 </p>
                 <div style={styles.templateMetrics}>
-                  <span style={getStatusStyle(row.schedule_status)}>{row.schedule_status || 'scheduled'}</span>
-                  <span style={styles.dangerPill}>{toNumber(row.insufficient_stock_count) + toNumber(row.missing_stock_row_count)} blocked lines</span>
+                  <span style={getStatusStyle(row.schedule_status)}>{formatScheduleStatus(row.schedule_status)}</span>
+                  <span style={styles.dangerPill}>
+                    {toNumber(row.insufficient_stock_count) + toNumber(row.reserved_stock_count) + toNumber(row.missing_stock_row_count)} blocked lines
+                  </span>
+                  {toNumber(row.reserved_stock_count) > 0 ? (
+                    <span style={styles.dangerPill}>{toNumber(row.reserved_stock_count)} use reserved stock</span>
+                  ) : null}
                   <span style={styles.warningPill}>{toNumber(row.below_minimum_after_use_count)} below-min warnings</span>
                   <span style={styles.warningPill}>{toNumber(row.evidence_acknowledgement_required_count)} evidence ack</span>
                   <span style={styles.filterPill}>{toNumber(row.use_count)} recorded</span>

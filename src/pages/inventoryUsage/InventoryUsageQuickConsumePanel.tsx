@@ -10,7 +10,9 @@ type BarcodePolicyErrorDetails = {
   storage_location_id?: string | null;
   storage_location_name?: string | null;
   current_quantity?: number | string | null;
+  reserved_quantity?: number | string | null;
   resulting_quantity?: number | string | null;
+  resulting_available_quantity?: number | string | null;
   minimum_quantity?: number | string | null;
   blocking_reasons?: string[];
   acknowledgement_required_reasons?: string[];
@@ -89,6 +91,8 @@ const formatPolicyReason = (reason: string) => {
       return 'No stock row exists at the selected location';
     case 'insufficient_stock':
       return 'The scan would make stock negative';
+    case 'reserved_stock':
+      return 'The scan would use stock reserved for active commitments';
     case 'critical_alert':
       return 'A critical unresolved alert blocks consumption';
     case 'closed_period':
@@ -916,11 +920,17 @@ export function InventoryUsageQuickConsumePanel({
           {previewResult.preview.blocked_by_closed_period ? (
             <p style={styles.errorText}>The selected usage timestamp is inside a closed usage period. Reopen the period or choose a different timestamp before recording.</p>
           ) : null}
-          {previewResult.preview.will_deplete && !previewResult.preview.blocked_by_insufficient_stock ? (
+          {previewResult.preview.blocked_by_reserved_stock ? (
+            <p style={styles.errorText}>
+              This scan is blocked because it would use stock reserved for active commitments.
+              Release or reallocate the reservation, or consume a smaller quantity.
+            </p>
+          ) : null}
+          {previewResult.preview.will_deplete && !previewResult.preview.blocked_by_insufficient_stock && !previewResult.preview.blocked_by_reserved_stock ? (
             <p style={styles.warningText}>This scan will deplete the selected location.</p>
           ) : previewResult.preview.will_go_below_minimum ? (
             <p style={styles.warningText}>This scan will leave stock below the configured minimum.</p>
-          ) : previewResult.preview.has_sufficient_stock && !previewResult.preview.blocked_by_critical_alert && !previewResult.preview.blocked_by_closed_period ? (
+          ) : previewResult.preview.has_sufficient_unreserved_stock && !previewResult.preview.blocked_by_critical_alert && !previewResult.preview.blocked_by_closed_period ? (
             <p style={styles.successText}>Stock is available for this quick-consume scan.</p>
           ) : null}
           {previewResult.preview.requires_evidence_or_acknowledgement ? (

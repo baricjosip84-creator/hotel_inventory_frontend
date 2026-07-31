@@ -251,7 +251,10 @@ export function InventoryUsageTemplatesPanel({
               {templates.map((template) => {
                 const readiness = templateReadinessById[template.id];
                 const canRecord = readiness?.summary?.can_record !== false;
-                const blockedCount = toNumber(readiness?.summary?.missing_stock_row_count) + toNumber(readiness?.summary?.insufficient_stock_count);
+                const reservedStockCount = toNumber(readiness?.summary?.reserved_stock_count);
+                const blockedCount = toNumber(readiness?.summary?.missing_stock_row_count)
+                  + toNumber(readiness?.summary?.insufficient_stock_count)
+                  + reservedStockCount;
                 const warningCount = toNumber(readiness?.summary?.below_minimum_after_use_count);
                 const evidenceAcknowledgementCount = toNumber(readiness?.summary?.evidence_acknowledgement_required_count);
 
@@ -271,6 +274,7 @@ export function InventoryUsageTemplatesPanel({
                         {canRecord ? 'Stock-ready' : 'Blocked by stock'}
                       </span>
                       {blockedCount > 0 ? <span style={styles.dangerPill}>{blockedCount} blocked lines</span> : null}
+                      {reservedStockCount > 0 ? <span style={styles.dangerPill}>{reservedStockCount} use reserved stock</span> : null}
                       {warningCount > 0 ? <span style={styles.warningPill}>{warningCount} below min after use</span> : null}
                       {evidenceAcknowledgementCount > 0 ? <span style={styles.warningPill}>{evidenceAcknowledgementCount} evidence acknowledgements</span> : null}
                     </div>

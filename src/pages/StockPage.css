@@ -1,0 +1,17 @@
+.stock-page__mobile-list {
+  display: none !important;
+}
+
+.stock-page__desktop-table {
+  display: block;
+}
+
+@media (max-width: 820px) {
+  .stock-page__mobile-list {
+    display: grid !important;
+  }
+
+  .stock-page__desktop-table {
+    display: none !important;
+  }
+}

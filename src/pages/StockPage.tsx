@@ -1,9 +1,15 @@
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import {
+  getCurrentAccessRoleLabel,
+  getRoleCapabilities,
+  hasPermission,
+  TENANT_PERMISSIONS
+} from '../lib/permissions';
+import './StockPage.css';
 
 type StockItem = {
   id: string;
@@ -108,6 +114,7 @@ type StockActionDraft = {
   event_name: string;
   notes: string;
   consumed_at: string;
+  reservation_shortfall_acknowledged: boolean;
 };
 
 type UsageReason =
@@ -144,11 +151,18 @@ async function fetchStockMovements(productId: string): Promise<StockMovement[]> 
   return apiRequest<StockMovement[]>(`/stock/movements${suffix}`);
 }
 
-async function fetchInventoryUsageLogs(productId: string): Promise<InventoryUsageLog[]> {
+async function fetchInventoryUsageLogs(
+  productId: string,
+  storageLocationId: string
+): Promise<InventoryUsageLog[]> {
   const params = new URLSearchParams();
 
   if (productId) {
     params.set('product_id', productId);
+  }
+
+  if (storageLocationId) {
+    params.set('storage_location_id', storageLocationId);
   }
 
   params.set('limit', '8');
@@ -157,11 +171,18 @@ async function fetchInventoryUsageLogs(productId: string): Promise<InventoryUsag
   return apiRequest<InventoryUsageLog[]>(`/stock/usage${suffix}`);
 }
 
-async function fetchInventoryUsageSummary(productId: string): Promise<InventoryUsageSummary> {
+async function fetchInventoryUsageSummary(
+  productId: string,
+  storageLocationId: string
+): Promise<InventoryUsageSummary> {
   const params = new URLSearchParams();
 
   if (productId) {
     params.set('product_id', productId);
+  }
+
+  if (storageLocationId) {
+    params.set('storage_location_id', storageLocationId);
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : '';
@@ -192,6 +213,42 @@ function formatUsageReason(reason: string | null | undefined): string {
     .join(' ');
 }
 
+function formatMovementReason(reason: string | null | undefined): string {
+  if (!reason) return 'Unspecified movement';
+
+  const normalized = reason.toLowerCase();
+
+  if (normalized === 'shipment_receive') return 'Shipment received';
+  if (normalized === 'inventory_count') return 'Physical count';
+  if (normalized === 'manual_adjustment') return 'Manual adjustment';
+  if (normalized.startsWith('usage:')) {
+    return formatUsageReason(normalized.slice('usage:'.length));
+  }
+
+  return reason
+    .split(/[_:]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getEffectiveMinimum(item: StockItem): number {
+  return Math.max(toNumber(item.min_quantity), toNumber(item.product_min_stock));
+}
+
+function getProjectedFreeQuantity(item: StockItem): number {
+  const quantity = toNumber(item.quantity);
+  const reservedQuantity = toNumber(item.reserved_quantity);
+
+  return item.projected_free_quantity === undefined
+    ? quantity - reservedQuantity
+    : toNumber(item.projected_free_quantity);
+}
+
+function normalizeSearchText(value: string | null | undefined): string {
+  return (value || '').trim().toLocaleLowerCase();
+}
+
 function getDefaultDraft(action: StockActionType): StockActionDraft {
   if (action === 'consume') {
     return {
@@ -203,34 +260,37 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       department: '',
       event_name: '',
       notes: '',
-      consumed_at: ''
+      consumed_at: '',
+      reservation_shortfall_acknowledged: false
     };
   }
 
   if (action === 'count') {
     return {
       action,
-      quantity: '0',
+      quantity: '',
       change: '',
-      reason: 'inventory_count',
+      reason: '',
       consumption_reason: 'internal_use',
       department: '',
       event_name: '',
       notes: '',
-      consumed_at: ''
+      consumed_at: '',
+      reservation_shortfall_acknowledged: false
     };
   }
 
   return {
     action,
     quantity: '',
-    change: '-1',
-    reason: 'manual_adjustment',
+    change: '',
+    reason: '',
     consumption_reason: 'internal_use',
     department: '',
     event_name: '',
     notes: '',
-    consumed_at: ''
+    consumed_at: '',
+    reservation_shortfall_acknowledged: false
   };
 }
 
@@ -249,7 +309,7 @@ function getActionHelpText(action: StockActionType): string {
     return 'Set stock to the physically verified quantity from a real count.';
   }
 
-  return 'Apply a positive or negative correction delta to the selected stock row.';
+  return 'Apply a positive or negative correction delta to the selected stock position.';
 }
 
 function reasonBadgeStyle(reason: string): CSSProperties {
@@ -263,7 +323,7 @@ function reasonBadgeStyle(reason: string): CSSProperties {
     };
   }
 
-  if (value.includes('consume')) {
+  if (value.includes('consume') || value.startsWith('usage:')) {
     return {
       ...styles.badgeBase,
       background: '#fee2e2',
@@ -342,37 +402,21 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
   const {
-    role,
-    canConsumeStock: canConsume,
+    canConsumeStock,
     canCountStock: canCount,
-    canAdjustStock: canAdjust
+    canAdjustStock: canAdjust,
+    canViewInventoryUsage,
+    canRecordInventoryUsage
   } = useMemo(() => getRoleCapabilities(), []);
+  const canViewMovements = useMemo(
+    () => hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ),
+    []
+  );
+  const canConsume = canConsumeStock && canRecordInventoryUsage;
+  const accessRoleLabel = useMemo(() => getCurrentAccessRoleLabel(), []);
+  const selectedDetailsRef = useRef<HTMLElement | null>(null);
 
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the StockPage you sent.
-
-    The real stock operation flows are intentionally unchanged:
-    - same stock listing and selection flow
-    - same consume / count / adjust mutations
-    - same latest movement verification
-    - same query keys and backend routes
-
-    This pass is UI-only and shared-layout alignment:
-    - major sections now use app-panel/app-panel--padded
-    - feedback and warning surfaces align with shared page states
-    - stat area aligns with the shared app-grid-stats rhythm
-    - action rows align more closely with the shared app-actions rhythm
-    - width guards and wrapping were tightened for dense workbench content
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Keeps the page functionally identical while making the dense stock workbench
-    more consistent with the rest of the polished app shell.
-  */
   const stockQuery = useQuery({
     queryKey: ['stock'],
     queryFn: fetchStock
@@ -380,20 +424,88 @@ export default function StockPage() {
 
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
 
-  const [selectedStockId, setSelectedStockId] = useState<string>('');
-  const requestedProductId = searchParams.get('product_id') || searchParams.get('productId') || '';
+  const [searchText, setSearchText] = useState('');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
 
-  useEffect(() => {
-    if (!requestedProductId || !rows.length) return;
-    const matchingStock = rows.find((row) => row.product_id === requestedProductId);
-    if (matchingStock && matchingStock.id !== selectedStockId) {
-      setSelectedStockId(matchingStock.id);
+  const locationOptions = useMemo(() => {
+    const values = new Map<string, string>();
+
+    for (const row of rows) {
+      if (!row.storage_location_id) continue;
+      values.set(
+        row.storage_location_id,
+        row.storage_location_name || row.storage_location_id
+      );
     }
-  }, [requestedProductId, rows, selectedStockId]);
 
+    return [...values.entries()].sort((left, right) => left[1].localeCompare(right[1]));
+  }, [rows]);
+
+  const categoryOptions = useMemo(() => {
+    return [...new Set(
+      rows
+        .map((row) => row.product_category?.trim())
+        .filter((value): value is string => Boolean(value))
+    )].sort((left, right) => left.localeCompare(right));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const search = normalizeSearchText(searchText);
+
+    return rows
+      .filter((row) => {
+        if (locationFilter !== 'all' && row.storage_location_id !== locationFilter) {
+          return false;
+        }
+
+        if (categoryFilter !== 'all' && row.product_category !== categoryFilter) {
+          return false;
+        }
+
+        const quantity = toNumber(row.quantity);
+        const minimum = getEffectiveMinimum(row);
+        const projectedFree = getProjectedFreeQuantity(row);
+        const isLow = quantity < minimum;
+        const hasReservationRisk = projectedFree < minimum;
+
+        if (statusFilter === 'low' && !isLow) return false;
+        if (statusFilter === 'healthy' && (isLow || hasReservationRisk)) return false;
+        if (statusFilter === 'reserved-risk' && !hasReservationRisk) return false;
+
+        if (!search) return true;
+
+        return [
+          row.product_name,
+          row.product_category,
+          row.product_unit,
+          row.storage_location_name,
+          row.product_id,
+          row.storage_location_id
+        ].some((value) => normalizeSearchText(value).includes(search));
+      })
+      .sort((left, right) => {
+        if (!search) return 0;
+
+        const leftName = normalizeSearchText(left.product_name);
+        const rightName = normalizeSearchText(right.product_name);
+        const leftStarts = leftName.startsWith(search);
+        const rightStarts = rightName.startsWith(search);
+
+        if (leftStarts !== rightStarts) return leftStarts ? -1 : 1;
+
+        return leftName.localeCompare(rightName);
+      });
+  }, [categoryFilter, locationFilter, rows, searchText, statusFilter]);
+
+  const [selectedStockId, setSelectedStockId] = useState<string>('');
   const selectedRow = useMemo(
-    () => rows.find((row) => row.id === selectedStockId) ?? rows[0] ?? null,
-    [rows, selectedStockId]
+    () =>
+      filteredRows.find((row) => row.id === selectedStockId) ??
+      filteredRows[0] ??
+      null,
+    [filteredRows, selectedStockId]
   );
 
   const [draft, setDraft] = useState<StockActionDraft>(getDefaultDraft('consume'));
@@ -401,24 +513,47 @@ export default function StockPage() {
   const [operationError, setOperationError] = useState<string>('');
   const [lastResult, setLastResult] = useState<StockMutationResponse | null>(null);
 
+  useEffect(() => {
+    const effectiveSelectedId = selectedRow?.id || '';
+
+    if (effectiveSelectedId === selectedStockId) return;
+
+    setSelectedStockId(effectiveSelectedId);
+    setDraft((current) => getDefaultDraft(current.action));
+    setOperationFeedback('');
+    setOperationError('');
+    setLastResult(null);
+  }, [selectedRow?.id, selectedStockId]);
+
   const selectedProductId = selectedRow?.product_id ?? '';
+  const selectedLocationId = selectedRow?.storage_location_id ?? '';
 
   const movementsQuery = useQuery({
     queryKey: ['stock-movements', 'selected-stock-page', selectedProductId],
     queryFn: () => fetchStockMovements(selectedProductId),
-    enabled: Boolean(selectedProductId)
+    enabled: Boolean(selectedProductId) && canViewMovements
   });
 
   const usageLogsQuery = useQuery({
-    queryKey: ['inventory-usage-logs', 'selected-stock-page', selectedProductId],
-    queryFn: () => fetchInventoryUsageLogs(selectedProductId),
-    enabled: Boolean(selectedProductId)
+    queryKey: [
+      'inventory-usage-logs',
+      'selected-stock-page',
+      selectedProductId,
+      selectedLocationId
+    ],
+    queryFn: () => fetchInventoryUsageLogs(selectedProductId, selectedLocationId),
+    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage
   });
 
   const usageSummaryQuery = useQuery({
-    queryKey: ['inventory-usage-summary', 'selected-stock-page', selectedProductId],
-    queryFn: () => fetchInventoryUsageSummary(selectedProductId),
-    enabled: Boolean(selectedProductId)
+    queryKey: [
+      'inventory-usage-summary',
+      'selected-stock-page',
+      selectedProductId,
+      selectedLocationId
+    ],
+    queryFn: () => fetchInventoryUsageSummary(selectedProductId, selectedLocationId),
+    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage
   });
 
   const recentMovements = useMemo(() => {
@@ -431,7 +566,7 @@ export default function StockPage() {
 
   const summary = useMemo(() => {
     let low = 0;
-    let ok = 0;
+    let availabilityRisk = 0;
     let quantityTotal = 0;
     let reservedTotal = 0;
     let projectedFreeTotal = 0;
@@ -439,13 +574,8 @@ export default function StockPage() {
     for (const item of rows) {
       const quantity = toNumber(item.quantity);
       const reservedQuantity = toNumber(item.reserved_quantity);
-      const projectedFreeQuantity = item.projected_free_quantity === undefined
-        ? quantity - reservedQuantity
-        : toNumber(item.projected_free_quantity);
-      const minimum = Math.max(
-        toNumber(item.min_quantity),
-        toNumber(item.product_min_stock)
-      );
+      const projectedFreeQuantity = getProjectedFreeQuantity(item);
+      const minimum = getEffectiveMinimum(item);
 
       quantityTotal += quantity;
       reservedTotal += reservedQuantity;
@@ -453,15 +583,15 @@ export default function StockPage() {
 
       if (quantity < minimum) {
         low += 1;
-      } else {
-        ok += 1;
       }
+
+      if (projectedFreeQuantity < minimum) availabilityRisk += 1;
     }
 
     return {
       totalRows: rows.length,
       lowRows: low,
-      okRows: ok,
+      availabilityRiskRows: availabilityRisk,
       quantityTotal,
       reservedTotal,
       projectedFreeTotal
@@ -470,20 +600,19 @@ export default function StockPage() {
 
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
   const currentReservedQuantity = selectedRow ? toNumber(selectedRow.reserved_quantity) : 0;
-  const currentAllocatedQuantity = selectedRow ? toNumber(selectedRow.allocated_quantity ?? selectedRow.reserved_quantity) : 0;
   const currentProjectedFreeQuantity = selectedRow
-    ? selectedRow.projected_free_quantity === undefined
-      ? currentQuantity - currentReservedQuantity
-      : toNumber(selectedRow.projected_free_quantity)
+    ? getProjectedFreeQuantity(selectedRow)
     : 0;
-  const currentMinimum = selectedRow
-    ? Math.max(toNumber(selectedRow.min_quantity), toNumber(selectedRow.product_min_stock))
-    : 0;
+  const currentMinimum = selectedRow ? getEffectiveMinimum(selectedRow) : 0;
+  const selectedLowStock = Boolean(selectedRow) && currentQuantity < currentMinimum;
+  const selectedOverReserved = Boolean(selectedRow) && currentProjectedFreeQuantity < 0;
+  const selectedLowAvailable =
+    Boolean(selectedRow) && !selectedLowStock && currentProjectedFreeQuantity < currentMinimum;
 
   const consumeMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock row before consuming stock.');
+        throw new Error('Select a stock position before consuming stock.');
       }
 
       return apiRequest<StockMutationResponse>('/stock/consume', {
@@ -524,7 +653,7 @@ export default function StockPage() {
   const countMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock row before applying a stock count.');
+        throw new Error('Select a stock position before applying a stock count.');
       }
 
       return apiRequest<StockMutationResponse>('/stock/count', {
@@ -533,7 +662,8 @@ export default function StockPage() {
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
           quantity: Number(draft.quantity),
-          reason: draft.reason.trim() || 'inventory_count'
+          reason: draft.reason.trim() || 'inventory_count',
+          reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
     },
@@ -558,7 +688,7 @@ export default function StockPage() {
   const adjustMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock row before applying an adjustment.');
+        throw new Error('Select a stock position before applying an adjustment.');
       }
 
       return apiRequest<StockMutationResponse>('/stock/adjust', {
@@ -567,7 +697,8 @@ export default function StockPage() {
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
           change: Number(draft.change),
-          reason: draft.reason.trim() || 'manual_adjustment'
+          reason: draft.reason.trim() || 'manual_adjustment',
+          reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
     },
@@ -601,12 +732,10 @@ export default function StockPage() {
 
   const currentActionBlockedMessage =
     draft.action === 'consume'
-      ? 'Your current role cannot consume stock from the existing backend access model.'
+      ? 'Stock consumption requires both stock-consumption and inventory-usage recording access.'
       : draft.action === 'count'
-        ? 'Your current role cannot post physical counts from the existing backend access model.'
-        : 'Your current role cannot apply manual adjustments from the existing backend access model.';
-
-  const currentActionDisabled = activeMutation || !selectedRow || !currentActionAllowed;
+        ? 'Your current access does not allow physical stock counts.'
+        : 'Your current access does not allow manual stock adjustments.';
 
   const nextQuantityPreview = useMemo(() => {
     if (!selectedRow) {
@@ -614,33 +743,130 @@ export default function StockPage() {
     }
 
     if (draft.action === 'consume') {
+      if (draft.quantity.trim() === '') return null;
       const quantity = Number(draft.quantity);
-
-      if (!Number.isFinite(quantity)) {
-        return null;
-      }
-
-      return currentQuantity - quantity;
+      return Number.isFinite(quantity) && quantity > 0 ? currentQuantity - quantity : null;
     }
 
     if (draft.action === 'count') {
+      if (draft.quantity.trim() === '') return null;
       const quantity = Number(draft.quantity);
+      return Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
+    }
 
-      if (!Number.isFinite(quantity)) {
-        return null;
+    if (draft.change.trim() === '') return null;
+    const change = Number(draft.change);
+    return Number.isFinite(change) && change !== 0 ? currentQuantity + change : null;
+  }, [currentQuantity, draft.action, draft.change, draft.quantity, selectedRow]);
+
+  const projectedFreeAfterAction = nextQuantityPreview === null
+    ? null
+    : nextQuantityPreview - currentReservedQuantity;
+  const createsReservationShortfall = projectedFreeAfterAction !== null
+    && projectedFreeAfterAction < 0;
+
+  const actionInputValidation = useMemo(() => {
+    if (!selectedRow) {
+      return { valid: false, message: 'Select a stock position first.' };
+    }
+
+    if (draft.action === 'consume') {
+      if (draft.quantity.trim() === '') {
+        return { valid: false, message: 'Enter the quantity to consume.' };
       }
 
-      return quantity;
+      const quantity = Number(draft.quantity);
+
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return { valid: false, message: 'Quantity to consume must be greater than zero.' };
+      }
+
+      if (quantity > currentQuantity) {
+        return { valid: false, message: 'Quantity to consume cannot exceed the on-hand quantity.' };
+      }
+
+      const unreservedQuantity = Math.max(currentProjectedFreeQuantity, 0);
+      if (quantity > unreservedQuantity) {
+        return {
+          valid: false,
+          message: `Only ${unreservedQuantity} unit(s) are unreserved. Release or reallocate the reservation before consuming more.`
+        };
+      }
+
+      return { valid: true, message: '' };
+    }
+
+    if (draft.action === 'count') {
+      if (draft.quantity.trim() === '') {
+        return { valid: false, message: 'Enter the physically counted quantity.' };
+      }
+
+      const quantity = Number(draft.quantity);
+
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        return { valid: false, message: 'Counted quantity must be zero or greater.' };
+      }
+
+      if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
+        return {
+          valid: false,
+          message: 'Confirm that the physical count creates a shortage against active reservations.'
+        };
+      }
+
+      return { valid: true, message: '' };
+    }
+
+    if (draft.change.trim() === '') {
+      return { valid: false, message: 'Enter a positive or negative adjustment.' };
     }
 
     const change = Number(draft.change);
 
-    if (!Number.isFinite(change)) {
-      return null;
+    if (!Number.isFinite(change) || change === 0) {
+      return { valid: false, message: 'Adjustment must be a non-zero number.' };
     }
 
-    return currentQuantity + change;
-  }, [currentQuantity, draft.action, draft.change, draft.quantity, selectedRow]);
+    if (currentQuantity + change < 0) {
+      return { valid: false, message: 'Adjustment cannot result in negative stock.' };
+    }
+
+    if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
+      return {
+        valid: false,
+        message: 'Confirm that the adjustment creates a shortage against active reservations.'
+      };
+    }
+
+    return { valid: true, message: '' };
+  }, [
+    createsReservationShortfall,
+    currentProjectedFreeQuantity,
+    currentQuantity,
+    draft.action,
+    draft.change,
+    draft.quantity,
+    draft.reservation_shortfall_acknowledged,
+    selectedRow
+  ]);
+
+  const operationalRiskLabel = createsReservationShortfall
+    ? draft.action === 'consume'
+      ? 'Blocked: this consumption would use stock reserved for active commitments.'
+      : draft.reservation_shortfall_acknowledged
+        ? 'Warning acknowledged: this correction leaves active reservations short.'
+        : actionInputValidation.message
+    : !actionInputValidation.valid
+      ? actionInputValidation.message
+      : nextQuantityPreview !== null && nextQuantityPreview < currentMinimum
+        ? 'Warning: this action would leave stock below its minimum level.'
+        : 'Within allowed range';
+
+  const currentActionDisabled =
+    activeMutation ||
+    !selectedRow ||
+    !currentActionAllowed ||
+    !actionInputValidation.valid;
 
   const refreshStockWorkbench = async () => {
     setOperationFeedback('');
@@ -648,24 +874,28 @@ export default function StockPage() {
 
     await Promise.all([
       stockQuery.refetch(),
-      selectedProductId ? movementsQuery.refetch() : Promise.resolve(),
-      selectedProductId ? usageLogsQuery.refetch() : Promise.resolve(),
-      selectedProductId ? usageSummaryQuery.refetch() : Promise.resolve()
+      selectedProductId && canViewMovements ? movementsQuery.refetch() : Promise.resolve(),
+      selectedProductId && selectedLocationId && canViewInventoryUsage
+        ? usageLogsQuery.refetch()
+        : Promise.resolve(),
+      selectedProductId && selectedLocationId && canViewInventoryUsage
+        ? usageSummaryQuery.refetch()
+        : Promise.resolve()
     ]);
   };
 
   const isRefreshingStockWorkbench =
     stockQuery.isFetching ||
-    movementsQuery.isFetching ||
-    usageLogsQuery.isFetching ||
-    usageSummaryQuery.isFetching;
+    (canViewMovements && movementsQuery.isFetching) ||
+    (canViewInventoryUsage && usageLogsQuery.isFetching) ||
+    (canViewInventoryUsage && usageSummaryQuery.isFetching);
 
   const stockWorkflowSteps = [
     {
-      label: '1. Select Stock Row',
+      label: '1. Select Stock Position',
       detail: selectedRow
         ? `${selectedRow.product_name || selectedRow.product_id} is selected for review.`
-        : 'Choose the product/location row you want to operate on.',
+        : 'Choose the product and location you want to review or update.',
       complete: Boolean(selectedRow)
     },
     {
@@ -682,15 +912,15 @@ export default function StockPage() {
       label: '3. Verify Preview',
       detail:
         nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
-          ? 'Enter quantities to preview the resulting stock balance.'
-          : `Projected quantity after submit: ${nextQuantityPreview}.`,
+          ? actionInputValidation.message
+          : `Projected on hand: ${nextQuantityPreview}. Projected available: ${projectedFreeAfterAction}.`,
       complete: nextQuantityPreview !== null && Number.isFinite(nextQuantityPreview)
     },
     {
       label: '4. Confirm in Ledger',
-      detail: recentMovements.length > 0
-        ? 'Use recent stock movements below to verify the latest posted change.'
-        : 'Recent movement history will appear here after stock changes are posted.',
+      detail: lastResult
+        ? 'The action was posted. Verify the result and the refreshed history below.'
+        : 'Post the action, then verify its result and available history.',
       complete: Boolean(lastResult)
     }
   ];
@@ -700,12 +930,17 @@ export default function StockPage() {
     setOperationError('');
 
     if (!selectedRow) {
-      setOperationError('Select a stock row before posting a stock action.');
+      setOperationError('Select a stock position before posting a stock action.');
       return;
     }
 
     if (!currentActionAllowed) {
       setOperationError(currentActionBlockedMessage);
+      return;
+    }
+
+    if (!actionInputValidation.valid) {
+      setOperationError(actionInputValidation.message);
       return;
     }
 
@@ -729,15 +964,59 @@ export default function StockPage() {
     }
   };
 
+  const selectStockRow = (stockId: string) => {
+    setSelectedStockId(stockId);
+    setDraft(getDefaultDraft(draft.action));
+    setOperationFeedback('');
+    setOperationError('');
+    setLastResult(null);
+
+    window.requestAnimationFrame(() => {
+      selectedDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      selectedDetailsRef.current?.focus({ preventScroll: true });
+    });
+  };
+
+  const clearStockFilters = () => {
+    setSearchText('');
+    setLocationFilter('all');
+    setCategoryFilter('all');
+    setStatusFilter('all');
+  };
+
+  const hasActiveStockFilters = Boolean(
+    searchText.trim() ||
+    locationFilter !== 'all' ||
+    categoryFilter !== 'all' ||
+    statusFilter !== 'all'
+  );
+
   if (stockQuery.isLoading) {
-    return <p>Loading stock...</p>;
+    return (
+      <div className="app-panel app-panel--padded">
+        <div className="app-empty-state">Loading stock positions...</div>
+      </div>
+    );
   }
 
   if (stockQuery.isError) {
     return (
-      <p>
-        Failed to load stock: {(stockQuery.error as Error).message || 'Unknown error'}
-      </p>
+      <div className="app-panel app-panel--padded">
+        <div className="app-error-state">
+          Failed to load stock: {(stockQuery.error as Error).message || 'Unknown error'}
+        </div>
+        <div className="app-actions" style={styles.loadingActions}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => {
+              void stockQuery.refetch();
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -747,8 +1026,8 @@ export default function StockPage() {
         <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Stock Operations</h2>
           <p style={styles.description}>
-            Live stock balances, low-stock visibility, and controlled operational actions
-            built directly on your existing stock routes.
+            Review stock by product and location, see quantities assigned to reservations, and post
+            controlled consumption, count, or adjustment actions.
           </p>
         </div>
       </div>
@@ -767,35 +1046,35 @@ export default function StockPage() {
 
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
-          title="Stock Rows"
+          title="Stock Positions"
           value={summary.totalRows}
-          subtitle="Tracked product and location balances"
+          subtitle="Tracked product and location combinations"
         />
         <StatCard
-          title="Low Stock Rows"
+          title="Low Stock"
           value={summary.lowRows}
           subtitle="Below configured minimum threshold"
           tone={summary.lowRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Healthy Rows"
-          value={summary.okRows}
-          subtitle="At or above minimum threshold"
-          tone="good"
+          title="Availability Risk"
+          value={summary.availabilityRiskRows}
+          subtitle="Available quantity below the minimum after reservations"
+          tone={summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Total Quantity"
+          title="Total On Hand"
           value={summary.quantityTotal}
           subtitle="Combined visible quantity across loaded rows"
         />
         <StatCard
-          title="Reserved Quantity"
+          title="Reserved"
           value={summary.reservedTotal}
-          subtitle="Open quantity protected by active reservations"
+          subtitle="Open quantity assigned to active reservations"
           tone={summary.reservedTotal > 0 ? 'warn' : 'default'}
         />
         <StatCard
-          title="Projected Free"
+          title="Available"
           value={summary.projectedFreeTotal}
           subtitle="On-hand quantity after active reservations"
           tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
@@ -807,8 +1086,8 @@ export default function StockPage() {
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Operational Workbench</h3>
             <p style={styles.panelSubtitle}>
-              Select a stock row, post a stock operation, and verify the latest movement
-              history without leaving the page.
+              Find the correct product and location, review its balance, post an authorized
+              stock action, and verify the result without leaving the page.
             </p>
           </div>
           <div style={styles.panelActions}>
@@ -826,18 +1105,20 @@ export default function StockPage() {
             >
               {isRefreshingStockWorkbench ? 'Refreshing...' : 'Refresh Stock'}
             </button>
-            <Link style={styles.secondaryLinkButton} to="/stock-movements">
-              Open Full Stock Ledger
-            </Link>
+            {canViewMovements ? (
+              <Link style={styles.secondaryLinkButton} to="/stock-movements">
+                Open Full Stock Ledger
+              </Link>
+            ) : null}
           </div>
         </div>
 
         <div style={styles.roleGrid}>
           <div style={styles.roleCard}>
-            <div style={styles.roleCardTitle}>Current Role</div>
-            <div style={styles.roleCardValue}>{role.toUpperCase()}</div>
+            <div style={styles.roleCardTitle}>Current Access Role</div>
+            <div style={styles.roleCardValue}>{accessRoleLabel}</div>
             <div style={styles.roleCardSubtitle}>
-              Backend-aligned action permissions from the existing JWT role.
+              Actions and history panels follow the permissions assigned to this role.
             </div>
           </div>
           <div style={styles.permissionCard}>
@@ -859,77 +1140,275 @@ export default function StockPage() {
                 {canAdjust ? 'Allowed' : 'Blocked'}
               </span>
             </div>
+            <div style={styles.permissionRow}>
+              <span>Movement history</span>
+              <span style={canViewMovements ? styles.permissionAllowed : styles.permissionBlocked}>
+                {canViewMovements ? 'Available' : 'Blocked'}
+              </span>
+            </div>
+            <div style={styles.permissionRow}>
+              <span>Usage history</span>
+              <span style={canViewInventoryUsage ? styles.permissionAllowed : styles.permissionBlocked}>
+                {canViewInventoryUsage ? 'Available' : 'Blocked'}
+              </span>
+            </div>
           </div>
         </div>
 
         {rows.length === 0 ? (
           <div style={styles.emptyPanel}>
-            No stock rows found. Stock operations require an existing stock row from your
-            current backend contract.
+            No stock positions are available yet. Stock appears here after a product has an
+            on-hand balance at a storage location.
           </div>
         ) : (
           <>
-            <div style={styles.mobileCardGrid}>
-              {rows.map((item) => {
-                const quantity = toNumber(item.quantity);
-                const minQuantity = Math.max(
-                  toNumber(item.min_quantity),
-                  toNumber(item.product_min_stock)
-                );
-                const reservedQuantity = toNumber(item.reserved_quantity);
-                const projectedFreeQuantity = item.projected_free_quantity === undefined
-                  ? quantity - reservedQuantity
-                  : toNumber(item.projected_free_quantity);
-                const lowStock = quantity < minQuantity;
-                const freeStockRisk = projectedFreeQuantity < minQuantity;
-                const selected = selectedRow?.id === item.id;
+            <div style={styles.selectorPanel}>
+              <div style={styles.selectorHeader}>
+                <div>
+                  <h4 style={styles.sectionTitle}>Stock Positions</h4>
+                  <p style={styles.sectionDescription}>
+                    Search and filter product-location balances, then select the position you
+                    want to review or update.
+                  </p>
+                </div>
+              </div>
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    style={selected ? styles.stockCardSelectedButton : styles.stockCardButton}
-                    onClick={() => {
-                      setSelectedStockId(item.id);
-                      setOperationFeedback('');
-                      setOperationError('');
-                      setLastResult(null);
-                    }}
+              <div style={styles.filterGrid}>
+                <div>
+                  <label style={styles.label} htmlFor="stock-position-search">
+                    Search stock
+                  </label>
+                  <input
+                    id="stock-position-search"
+                    style={styles.input}
+                    type="search"
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    placeholder="Product, category, unit, location, or ID"
+                  />
+                </div>
+                <div>
+                  <label style={styles.label} htmlFor="stock-location-filter">
+                    Storage location
+                  </label>
+                  <select
+                    id="stock-location-filter"
+                    style={styles.input}
+                    value={locationFilter}
+                    onChange={(event) => setLocationFilter(event.target.value)}
                   >
-                    <div style={styles.stockCardTopRow}>
-                      <div style={styles.stockCardTitleBlock}>
-                        <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
-                        <div style={styles.rowSubtle}>
-                          {item.storage_location_name || item.storage_location_id || '-'}
-                        </div>
-                      </div>
-                      <span style={lowStock || freeStockRisk ? styles.badgeWarning : styles.badgeOk}>
-                        {lowStock ? 'LOW' : freeStockRisk ? 'RESERVED' : 'OK'}
-                      </span>
+                    <option value="all">All locations</option>
+                    {locationOptions.map(([id, name]) => (
+                      <option key={id} value={id}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label} htmlFor="stock-category-filter">
+                    Category
+                  </label>
+                  <select
+                    id="stock-category-filter"
+                    style={styles.input}
+                    value={categoryFilter}
+                    onChange={(event) => setCategoryFilter(event.target.value)}
+                  >
+                    <option value="all">All categories</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label} htmlFor="stock-status-filter">
+                    Status
+                  </label>
+                  <select
+                    id="stock-status-filter"
+                    style={styles.input}
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(event.target.value as typeof statusFilter)
+                    }
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="low">Low stock</option>
+                    <option value="reserved-risk">Low available after reservations</option>
+                    <option value="healthy">Healthy</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={styles.selectorFooter}>
+                <span style={styles.resultCount}>
+                  {filteredRows.length} of {rows.length} stock positions shown
+                </span>
+                <button
+                  type="button"
+                  style={hasActiveStockFilters ? styles.secondaryButton : styles.secondaryButtonDisabled}
+                  disabled={!hasActiveStockFilters}
+                  onClick={clearStockFilters}
+                >
+                  Clear Stock Filters
+                </button>
+              </div>
+
+              {filteredRows.length === 0 ? (
+                <div style={styles.emptyPanel}>
+                  No stock positions match the current search and filters.
+                </div>
+              ) : (
+                <>
+                  <div className="stock-page__mobile-list" style={styles.mobileCardGrid}>
+                    {filteredRows.map((item) => {
+                      const quantity = toNumber(item.quantity);
+                      const minQuantity = getEffectiveMinimum(item);
+                      const reservedQuantity = toNumber(item.reserved_quantity);
+                      const projectedFreeQuantity = getProjectedFreeQuantity(item);
+                      const lowStock = quantity < minQuantity;
+                      const overReserved = projectedFreeQuantity < 0;
+                      const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
+                      const selected = selectedRow?.id === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          style={selected ? styles.stockCardSelectedButton : styles.stockCardButton}
+                          onClick={() => selectStockRow(item.id)}
+                        >
+                          <div style={styles.stockCardTopRow}>
+                            <div style={styles.stockCardTitleBlock}>
+                              <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
+                              <div style={styles.rowSubtle}>
+                                {item.storage_location_name || item.storage_location_id || '-'}
+                              </div>
+                            </div>
+                            <span
+                              style={
+                                overReserved
+                                  ? styles.badgeError
+                                  : lowStock || lowAvailable
+                                    ? styles.badgeWarning
+                                    : styles.badgeOk
+                              }
+                            >
+                              {overReserved
+                                ? 'OVER-RESERVED'
+                                : lowStock
+                                  ? 'LOW STOCK'
+                                  : lowAvailable
+                                    ? 'LOW AVAILABLE'
+                                    : 'HEALTHY'}
+                            </span>
+                          </div>
+                          <div style={styles.stockCardMetrics}>
+                            <div style={styles.stockMetricItem}>
+                              <div style={styles.stockMetricLabel}>On Hand</div>
+                              <div style={styles.stockMetricValue}>{quantity}</div>
+                            </div>
+                            <div style={styles.stockMetricItem}>
+                              <div style={styles.stockMetricLabel}>Reserved</div>
+                              <div style={styles.stockMetricValue}>{reservedQuantity}</div>
+                            </div>
+                            <div style={styles.stockMetricItem}>
+                              <div style={styles.stockMetricLabel}>Available</div>
+                              <div style={styles.stockMetricValue}>{projectedFreeQuantity}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="stock-page__desktop-table" style={styles.desktopTablePanel}>
+                    <div style={styles.tableWrapper}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Select</th>
+                            <th style={styles.th}>Product</th>
+                            <th style={styles.th}>Storage Location</th>
+                            <th style={styles.th}>On Hand</th>
+                            <th style={styles.th}>Reserved</th>
+                            <th style={styles.th}>Available</th>
+                            <th style={styles.th}>Minimum</th>
+                            <th style={styles.th}>Unit</th>
+                            <th style={styles.th}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredRows.map((item) => {
+                            const quantity = toNumber(item.quantity);
+                            const minQuantity = getEffectiveMinimum(item);
+                            const reservedQuantity = toNumber(item.reserved_quantity);
+                            const projectedFreeQuantity = getProjectedFreeQuantity(item);
+                            const lowStock = quantity < minQuantity;
+                            const overReserved = projectedFreeQuantity < 0;
+                            const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
+                            const selected = selectedRow?.id === item.id;
+
+                            return (
+                              <tr key={item.id} style={selected ? styles.selectedRow : undefined}>
+                                <td style={styles.td}>
+                                  <button
+                                    type="button"
+                                    style={selected ? styles.rowActionButtonSelected : styles.rowActionButton}
+                                    onClick={() => selectStockRow(item.id)}
+                                  >
+                                    {selected ? 'Selected' : 'Select'}
+                                  </button>
+                                </td>
+                                <td style={styles.td}>
+                                  <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
+                                  <div style={styles.rowSubtle}>Product ID: {item.product_id}</div>
+                                </td>
+                                <td style={styles.td}>
+                                  {item.storage_location_name || item.storage_location_id || '-'}
+                                </td>
+                                <td style={styles.td}>{quantity}</td>
+                                <td style={styles.td}>{reservedQuantity}</td>
+                                <td style={styles.td}>{projectedFreeQuantity}</td>
+                                <td style={styles.td}>{minQuantity}</td>
+                                <td style={styles.td}>{item.product_unit || '-'}</td>
+                                <td style={styles.td}>
+                                  <span
+                                    style={
+                                      overReserved
+                                        ? styles.badgeError
+                                        : lowStock || lowAvailable
+                                          ? styles.badgeWarning
+                                          : styles.badgeOk
+                                    }
+                                  >
+                                    {overReserved
+                                      ? 'OVER-RESERVED'
+                                      : lowStock
+                                        ? 'LOW STOCK'
+                                        : lowAvailable
+                                          ? 'LOW AVAILABLE'
+                                          : 'HEALTHY'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                    <div style={styles.stockCardMetrics}>
-                      <div style={styles.stockMetricItem}>
-                        <div style={styles.stockMetricLabel}>Quantity</div>
-                        <div style={styles.stockMetricValue}>{quantity}</div>
-                      </div>
-                      <div style={styles.stockMetricItem}>
-                        <div style={styles.stockMetricLabel}>Reserved</div>
-                        <div style={styles.stockMetricValue}>{reservedQuantity}</div>
-                      </div>
-                      <div style={styles.stockMetricItem}>
-                        <div style={styles.stockMetricLabel}>Free</div>
-                        <div style={styles.stockMetricValue}>{projectedFreeQuantity}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                  </div>
+                </>
+              )}
             </div>
 
             <div style={styles.workbenchGrid}>
-              <section style={styles.workbenchColumn}>
+              <section
+                ref={selectedDetailsRef}
+                tabIndex={-1}
+                style={styles.workbenchColumn}
+              >
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Selected Stock Row</h4>
+                  <h4 style={styles.sectionTitle}>Selected Stock Position</h4>
 
                   {selectedRow ? (
                     <div style={styles.selectionSummary}>
@@ -942,12 +1421,20 @@ export default function StockPage() {
                         </div>
                         <span
                           style={
-                            currentQuantity < currentMinimum
-                              ? styles.badgeWarning
-                              : styles.badgeOk
+                            selectedOverReserved
+                              ? styles.badgeError
+                              : selectedLowStock || selectedLowAvailable
+                                ? styles.badgeWarning
+                                : styles.badgeOk
                           }
                         >
-                          {currentQuantity < currentMinimum ? 'LOW STOCK' : 'HEALTHY'}
+                          {selectedOverReserved
+                            ? 'OVER-RESERVED'
+                            : selectedLowStock
+                              ? 'LOW STOCK'
+                              : selectedLowAvailable
+                                ? 'LOW AVAILABLE'
+                                : 'HEALTHY'}
                         </span>
                       </div>
 
@@ -961,19 +1448,15 @@ export default function StockPage() {
                           </div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Current Quantity</div>
+                          <div style={styles.selectionLabel}>On-Hand Quantity</div>
                           <div style={styles.selectionValue}>{currentQuantity}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Reserved Quantity</div>
+                          <div style={styles.selectionLabel}>Reserved / Allocated</div>
                           <div style={styles.selectionValue}>{currentReservedQuantity}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Allocated Quantity</div>
-                          <div style={styles.selectionValue}>{currentAllocatedQuantity}</div>
-                        </div>
-                        <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Projected Free Quantity</div>
+                          <div style={styles.selectionLabel}>Available Quantity</div>
                           <div style={styles.selectionValue}>{currentProjectedFreeQuantity}</div>
                         </div>
                         <div style={styles.selectionItem}>
@@ -1001,7 +1484,7 @@ export default function StockPage() {
                       </div>
                     </div>
                   ) : (
-                    <div style={styles.emptyPanel}>Select a stock row to begin.</div>
+                    <div style={styles.emptyPanel}>Select a stock position to begin.</div>
                   )}
                 </div>
 
@@ -1009,7 +1492,7 @@ export default function StockPage() {
                   <h4 style={styles.sectionTitle}>Action Readiness</h4>
                   <div style={styles.readinessList}>
                     <div style={styles.readinessRow}>
-                      <span>Selected row</span>
+                      <span>Selected position</span>
                       <strong>{selectedRow ? 'Ready' : 'Required'}</strong>
                     </div>
                     <div style={styles.readinessRow}>
@@ -1017,7 +1500,7 @@ export default function StockPage() {
                       <strong>{getActionLabel(draft.action)}</strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Projected quantity</span>
+                      <span>Projected on hand</span>
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
@@ -1025,12 +1508,12 @@ export default function StockPage() {
                       </strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Projected free after reservations</span>
-                      <strong>{currentProjectedFreeQuantity}</strong>
+                      <span>Projected available after reservations</span>
+                      <strong>{projectedFreeAfterAction ?? '-'}</strong>
                     </div>
                     <div style={styles.readinessRow}>
                       <span>Ledger verification</span>
-                      <strong>{recentMovements.length > 0 ? 'Available' : 'Pending new action'}</strong>
+                      <strong>{lastResult ? 'Posted — verify below' : 'Pending current action'}</strong>
                     </div>
                   </div>
                 </div>
@@ -1038,8 +1521,8 @@ export default function StockPage() {
                 <div style={styles.innerPanel}>
                   <h4 style={styles.sectionTitle}>Post Stock Action</h4>
                   <p style={styles.sectionDescription}>
-                    Execute live stock operations against the selected row using your
-                    existing backend validation, permissions, and stock movement audit.
+                    Post a controlled stock change against the selected product and location.
+                    The system validates permissions and records the resulting operational history.
                   </p>
 
                   <div style={styles.actionSelectorGrid}>
@@ -1054,6 +1537,7 @@ export default function StockPage() {
                         setDraft(getDefaultDraft('consume'));
                         setOperationFeedback('');
                         setOperationError('');
+                        setLastResult(null);
                       }}
                     >
                       Consume
@@ -1069,6 +1553,7 @@ export default function StockPage() {
                         setDraft(getDefaultDraft('count'));
                         setOperationFeedback('');
                         setOperationError('');
+                        setLastResult(null);
                       }}
                     >
                       Count
@@ -1084,6 +1569,7 @@ export default function StockPage() {
                         setDraft(getDefaultDraft('adjust'));
                         setOperationFeedback('');
                         setOperationError('');
+                        setLastResult(null);
                       }}
                     >
                       Adjust
@@ -1097,36 +1583,38 @@ export default function StockPage() {
 
                   {draft.action === 'consume' && !canConsume ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Your current role cannot consume stock from the existing backend access
-                      model.
+                      Stock consumption requires both stock-consumption and inventory-usage
+                      recording access.
                     </div>
                   ) : null}
 
                   {draft.action === 'count' && !canCount ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Your current role cannot post physical counts from the existing backend
-                      access model.
+                      Your current access role cannot post physical stock counts.
                     </div>
                   ) : null}
 
                   {draft.action === 'adjust' && !canAdjust ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Your current role cannot apply manual adjustments from the existing
-                      backend access model.
+                      Your current access role cannot apply manual stock adjustments.
                     </div>
                   ) : null}
 
                   <div style={styles.formGrid}>
                     {(draft.action === 'consume' || draft.action === 'count') && (
                       <div>
-                        <label style={styles.label}>
+                        <label
+                          style={styles.label}
+                          htmlFor="stock-action-quantity"
+                        >
                           {draft.action === 'consume' ? 'Quantity to Consume' : 'Counted Quantity'}
                         </label>
                         <input
+                          id="stock-action-quantity"
                           style={styles.input}
                           type="number"
                           inputMode="decimal"
-                          min="0"
+                          min={draft.action === 'consume' ? '0.0001' : '0'}
                           step="0.01"
                           value={draft.quantity}
                           onChange={(event) =>
@@ -1141,8 +1629,11 @@ export default function StockPage() {
 
                     {draft.action === 'adjust' && (
                       <div>
-                        <label style={styles.label}>Adjustment Change</label>
+                        <label style={styles.label} htmlFor="stock-adjustment-change">
+                          Adjustment Change
+                        </label>
                         <input
+                          id="stock-adjustment-change"
                           style={styles.input}
                           type="number"
                           inputMode="decimal"
@@ -1158,27 +1649,36 @@ export default function StockPage() {
                       </div>
                     )}
 
-                    <div>
-                      <label style={styles.label}>Reason</label>
-                      <input
-                        style={styles.input}
-                        type="text"
-                        value={draft.reason}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            reason: event.target.value
-                          }))
-                        }
-                        placeholder="Required operational reason"
-                      />
-                    </div>
+                    {draft.action !== 'consume' ? (
+                      <div>
+                        <label style={styles.label} htmlFor="stock-action-reason">
+                          Audit Note
+                        </label>
+                        <input
+                          id="stock-action-reason"
+                          style={styles.input}
+                          type="text"
+                          maxLength={1000}
+                          value={draft.reason}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              reason: event.target.value
+                            }))
+                          }
+                          placeholder="Optional explanation for this count or adjustment"
+                        />
+                      </div>
+                    ) : null}
 
                     {draft.action === 'consume' && (
                       <>
                         <div>
-                          <label style={styles.label}>Usage Reason</label>
+                          <label style={styles.label} htmlFor="stock-usage-reason">
+                            Usage Reason
+                          </label>
                           <select
+                            id="stock-usage-reason"
                             style={styles.input}
                             value={draft.consumption_reason}
                             onChange={(event) => {
@@ -1199,10 +1699,14 @@ export default function StockPage() {
                         </div>
 
                         <div>
-                          <label style={styles.label}>Department / Team</label>
+                          <label style={styles.label} htmlFor="stock-usage-department">
+                            Department / Team
+                          </label>
                           <input
+                            id="stock-usage-department"
                             style={styles.input}
                             type="text"
+                            maxLength={255}
                             value={draft.department}
                             onChange={(event) =>
                               setDraft((current) => ({
@@ -1215,10 +1719,14 @@ export default function StockPage() {
                         </div>
 
                         <div>
-                          <label style={styles.label}>Event / Job Name</label>
+                          <label style={styles.label} htmlFor="stock-usage-event">
+                            Event / Job Name
+                          </label>
                           <input
+                            id="stock-usage-event"
                             style={styles.input}
                             type="text"
+                            maxLength={255}
                             value={draft.event_name}
                             onChange={(event) =>
                               setDraft((current) => ({
@@ -1231,8 +1739,11 @@ export default function StockPage() {
                         </div>
 
                         <div>
-                          <label style={styles.label}>Consumed At</label>
+                          <label style={styles.label} htmlFor="stock-consumed-at">
+                            Consumed At
+                          </label>
                           <input
+                            id="stock-consumed-at"
                             style={styles.input}
                             type="datetime-local"
                             value={draft.consumed_at}
@@ -1246,9 +1757,13 @@ export default function StockPage() {
                         </div>
 
                         <div style={styles.fullWidthField}>
-                          <label style={styles.label}>Usage Notes</label>
+                          <label style={styles.label} htmlFor="stock-usage-notes">
+                            Usage Notes
+                          </label>
                           <textarea
+                            id="stock-usage-notes"
                             style={styles.textarea}
+                            maxLength={4000}
                             value={draft.notes}
                             onChange={(event) =>
                               setDraft((current) => ({
@@ -1272,11 +1787,11 @@ export default function StockPage() {
 
                   <div style={styles.previewBox}>
                     <div style={styles.previewRow}>
-                      <span>Current Quantity</span>
+                      <span>Current On Hand</span>
                       <strong>{currentQuantity}</strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Projected Quantity</span>
+                      <span>Projected On Hand</span>
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
@@ -1284,14 +1799,55 @@ export default function StockPage() {
                       </strong>
                     </div>
                     <div style={styles.previewRow}>
+                      <span>Reserved / Allocated</span>
+                      <strong>{currentReservedQuantity}</strong>
+                    </div>
+                    <div style={styles.previewRow}>
+                      <span>Projected Available</span>
+                      <strong>{projectedFreeAfterAction ?? '-'}</strong>
+                    </div>
+                    <div style={styles.previewRow}>
+                      <span>Minimum Quantity</span>
+                      <strong>{currentMinimum}</strong>
+                    </div>
+                    <div style={styles.previewRow}>
                       <span>Operational Risk</span>
-                      <strong>
-                        {nextQuantityPreview !== null && nextQuantityPreview < 0
-                          ? 'Blocked by backend'
-                          : 'Within allowed range'}
+                      <strong style={createsReservationShortfall || operationalRiskLabel.startsWith('Warning') ? styles.riskWarning : undefined}>
+                        {operationalRiskLabel}
                       </strong>
                     </div>
                   </div>
+
+                  {createsReservationShortfall && draft.action !== 'consume' ? (
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.65rem',
+                        padding: '0.85rem 1rem',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '0.75rem',
+                        background: '#fffbeb',
+                        color: '#92400e',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={draft.reservation_shortfall_acknowledged}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            reservation_shortfall_acknowledged: event.target.checked
+                          }))
+                        }
+                      />
+                      <span>
+                        I confirm this physical count or correction is real, even though it leaves less stock than is reserved.
+                        I understand the affected reservations must be reviewed immediately.
+                      </span>
+                    </label>
+                  ) : null}
 
                   {operationFeedback ? (
                     <div className="app-success-state" style={styles.successBox}>
@@ -1314,7 +1870,13 @@ export default function StockPage() {
                       }
                       disabled={currentActionDisabled}
                       aria-disabled={currentActionDisabled}
-                      title={!currentActionAllowed ? currentActionBlockedMessage : undefined}
+                      title={
+                        !currentActionAllowed
+                          ? currentActionBlockedMessage
+                          : !actionInputValidation.valid
+                            ? actionInputValidation.message
+                            : undefined
+                      }
                       onClick={() => {
                         void submitAction();
                       }}
@@ -1332,6 +1894,16 @@ export default function StockPage() {
                   <div style={styles.innerPanel}>
                     <h4 style={styles.sectionTitle}>Last Operation Result</h4>
                     <div style={styles.selectionGrid}>
+                      <div style={styles.selectionItem}>
+                        <div style={styles.selectionLabel}>Action</div>
+                        <div style={styles.selectionValue}>{getActionLabel(draft.action)}</div>
+                      </div>
+                      <div style={styles.selectionItem}>
+                        <div style={styles.selectionLabel}>Storage Location</div>
+                        <div style={styles.selectionValue}>
+                          {selectedRow?.storage_location_name || selectedRow?.storage_location_id || '-'}
+                        </div>
+                      </div>
                       <div style={styles.selectionItem}>
                         <div style={styles.selectionLabel}>Previous Quantity</div>
                         <div style={styles.selectionValue}>{lastResult.stock.previous_quantity}</div>
@@ -1359,11 +1931,16 @@ export default function StockPage() {
                 <div style={styles.innerPanel}>
                   <h4 style={styles.sectionTitle}>Latest Movement Verification</h4>
                   <p style={styles.sectionDescription}>
-                    Immediate audit visibility for the currently selected product using the
-                    existing stock movement ledger route.
+                    Recent movement history for the selected product. The current movement
+                    ledger is product-wide and may include activity from other storage locations.
                   </p>
 
-                  {movementsQuery.isLoading ? (
+                  {!canViewMovements ? (
+                    <div style={styles.emptyPanel}>
+                      Movement history is unavailable because this role does not have stock
+                      movement read access.
+                    </div>
+                  ) : movementsQuery.isLoading ? (
                     <p style={styles.sectionDescription}>Loading stock movements...</p>
                   ) : movementsQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
@@ -1391,7 +1968,9 @@ export default function StockPage() {
                               <span style={changeBadgeStyle(change)}>{changeDisplay(change)}</span>
                             </div>
                             <div style={styles.movementMetaRow}>
-                              <span style={reasonBadgeStyle(movement.reason)}>{movement.reason}</span>
+                              <span style={reasonBadgeStyle(movement.reason)} title={movement.reason}>
+                                {formatMovementReason(movement.reason)}
+                              </span>
                               <span style={styles.rowSubtle}>
                                 By {movement.user_name || movement.user_id || 'system'}
                               </span>
@@ -1411,11 +1990,18 @@ export default function StockPage() {
                 <div style={styles.innerPanel}>
                   <h4 style={styles.sectionTitle}>Usage Ledger Snapshot</h4>
                   <p style={styles.sectionDescription}>
-                    First-class consumption visibility for the selected product, backed by
-                    the new inventory usage log route instead of generic movement reasons.
+                    Consumption history for the selected product at{' '}
+                    <strong>
+                      {selectedRow?.storage_location_name || selectedRow?.storage_location_id || 'the selected location'}
+                    </strong>.
                   </p>
 
-                  {usageSummaryQuery.isLoading ? (
+                  {!canViewInventoryUsage ? (
+                    <div style={styles.emptyPanel}>
+                      Usage history is unavailable because this role does not have inventory
+                      usage read access.
+                    </div>
+                  ) : usageSummaryQuery.isLoading ? (
                     <p style={styles.sectionDescription}>Loading usage summary...</p>
                   ) : usageSummaryQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
@@ -1445,7 +2031,7 @@ export default function StockPage() {
                     </div>
                   )}
 
-                  {usageSummaryQuery.data?.by_reason?.length ? (
+                  {canViewInventoryUsage && usageSummaryQuery.data?.by_reason?.length ? (
                     <div style={styles.usageReasonGrid}>
                       {usageSummaryQuery.data.by_reason.slice(0, 4).map((row) => (
                         <div key={row.consumption_reason} style={styles.usageReasonCard}>
@@ -1459,7 +2045,7 @@ export default function StockPage() {
                     </div>
                   ) : null}
 
-                  {usageLogsQuery.isLoading ? (
+                  {!canViewInventoryUsage ? null : usageLogsQuery.isLoading ? (
                     <p style={styles.sectionDescription}>Loading usage ledger...</p>
                   ) : usageLogsQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
@@ -1498,6 +2084,9 @@ export default function StockPage() {
                           {usage.event_name ? (
                             <div style={styles.rowSubtle}>Event/job: {usage.event_name}</div>
                           ) : null}
+                          <div style={styles.rowSubtle}>
+                            Location: {usage.storage_location_name || usage.storage_location_id}
+                          </div>
                           {usage.notes ? (
                             <div style={styles.usageNotes}>{usage.notes}</div>
                           ) : null}
@@ -1509,68 +2098,6 @@ export default function StockPage() {
               </section>
             </div>
 
-            <div style={styles.desktopTablePanel}>
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Select</th>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Storage Location</th>
-                      <th style={styles.th}>Quantity</th>
-                      <th style={styles.th}>Minimum Quantity</th>
-                      <th style={styles.th}>Unit</th>
-                      <th style={styles.th}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((item) => {
-                      const quantity = toNumber(item.quantity);
-                      const minQuantity = Math.max(
-                        toNumber(item.min_quantity),
-                        toNumber(item.product_min_stock)
-                      );
-                      const lowStock = quantity < minQuantity;
-                      const selected = selectedRow?.id === item.id;
-
-                      return (
-                        <tr key={item.id} style={selected ? styles.selectedRow : undefined}>
-                          <td style={styles.td}>
-                            <button
-                              type="button"
-                              style={selected ? styles.rowActionButtonSelected : styles.rowActionButton}
-                              onClick={() => {
-                                setSelectedStockId(item.id);
-                                setOperationFeedback('');
-                                setOperationError('');
-                                setLastResult(null);
-                              }}
-                            >
-                              {selected ? 'Selected' : 'Select'}
-                            </button>
-                          </td>
-                          <td style={styles.td}>
-                            <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
-                            <div style={styles.rowSubtle}>Product ID: {item.product_id}</div>
-                          </td>
-                          <td style={styles.td}>
-                            {item.storage_location_name || item.storage_location_id || '-'}
-                          </td>
-                          <td style={styles.td}>{quantity}</td>
-                          <td style={styles.td}>{minQuantity}</td>
-                          <td style={styles.td}>{item.product_unit || '-'}</td>
-                          <td style={styles.td}>
-                            <span style={lowStock ? styles.badgeWarning : styles.badgeOk}>
-                              {lowStock ? 'LOW' : 'OK'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </>
         )}
       </section>
@@ -1603,6 +2130,9 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.6,
     maxWidth: '820px',
     wordBreak: 'break-word'
+  },
+  loadingActions: {
+    marginTop: '14px'
   },
   workflowGuideGrid: {
     display: 'grid',
@@ -1831,6 +2361,41 @@ const styles: Record<string, CSSProperties> = {
     color: '#4b5563',
     lineHeight: 1.6
   },
+  selectorPanel: {
+    border: '1px solid #e5e7eb',
+    borderRadius: '14px',
+    background: '#ffffff',
+    padding: '16px',
+    marginBottom: '16px',
+    minWidth: 0
+  },
+  selectorHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '16px'
+  },
+  filterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(210px, 100%), 1fr))',
+    gap: '12px',
+    marginBottom: '14px',
+    minWidth: 0
+  },
+  selectorFooter: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '14px'
+  },
+  resultCount: {
+    color: '#64748b',
+    fontSize: '13px'
+  },
   mobileCardGrid: {
     display: 'grid',
     gap: '12px',
@@ -1972,6 +2537,30 @@ const styles: Record<string, CSSProperties> = {
     color: '#111827',
     wordBreak: 'break-word'
   },
+  usageReasonGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+    gap: '10px',
+    marginTop: '12px',
+    minWidth: 0
+  },
+  usageReasonCard: {
+    border: '1px solid #e5e7eb',
+    borderRadius: '12px',
+    background: '#f8fafc',
+    padding: '12px',
+    minWidth: 0
+  },
+  usageNotes: {
+    marginTop: '8px',
+    borderRadius: '10px',
+    background: '#f8fafc',
+    padding: '10px',
+    color: '#475569',
+    lineHeight: 1.5,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word'
+  },
   actionSelectorGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -2084,6 +2673,9 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     color: '#374151',
     flexWrap: 'wrap'
+  },
+  riskWarning: {
+    color: '#92400e'
   },
   successBox: {
     marginTop: '14px'
@@ -2271,5 +2863,17 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: 'nowrap',
     background: '#fef3c7',
     color: '#92400e'
+  },
+  badgeError: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    background: '#fee2e2',
+    color: '#991b1b'
   }
 };

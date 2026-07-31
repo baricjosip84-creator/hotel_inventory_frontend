@@ -357,14 +357,18 @@ export type InventoryUsageBarcodePreviewResponse = {
     package_count?: number | string | null;
     quantity_to_consume?: number | string | null;
     current_quantity?: number | string | null;
+    reserved_quantity?: number | string | null;
     resulting_quantity?: number | string | null;
+    resulting_available_quantity?: number | string | null;
     minimum_quantity?: number | string | null;
     has_stock_row?: boolean;
     blocked_by_missing_stock_row?: boolean;
     blocked_by_insufficient_stock?: boolean;
+    blocked_by_reserved_stock?: boolean;
     will_deplete?: boolean;
     will_go_below_minimum?: boolean;
     has_sufficient_stock?: boolean;
+    has_sufficient_unreserved_stock?: boolean;
     blocked_by_critical_alert?: boolean;
     critical_alert_count?: number | string | null;
     critical_alerts?: Array<{
@@ -452,13 +456,16 @@ export type InventoryUsageBulkReadinessLine = {
   notes?: string | null;
   prior_bulk_quantity?: number | string | null;
   current_quantity?: number | string | null;
+  reserved_quantity?: number | string | null;
   resulting_quantity?: number | string | null;
+  resulting_available_quantity?: number | string | null;
   minimum_quantity?: number | string | null;
   has_product?: boolean;
   has_storage_location?: boolean;
   has_stock_row?: boolean;
   blocked_by_missing_stock_row?: boolean;
   blocked_by_insufficient_stock?: boolean;
+  blocked_by_reserved_stock?: boolean;
   blocked_by_critical_alert?: boolean;
   blocked_by_closed_period?: boolean;
   will_deplete?: boolean;
@@ -578,13 +585,16 @@ export type InventoryUsageTemplateReadinessRow = {
   storage_location_name?: string | null;
   required_quantity: number | string;
   current_quantity: number | string;
+  reserved_quantity?: number | string | null;
+  available_quantity?: number | string | null;
   effective_min_quantity: number | string;
   projected_quantity_after_use: number | string;
+  projected_available_after_use?: number | string | null;
   has_stock_row?: boolean | null;
   consumption_reason?: UsageReason | string | null;
   requires_evidence_or_acknowledgement?: boolean | null;
   acknowledgement_required_reasons?: string[];
-  readiness_status: 'ready' | 'missing_stock_row' | 'insufficient_stock' | 'below_minimum_after_use' | string;
+  readiness_status: 'ready' | 'missing_stock_row' | 'insufficient_stock' | 'reserved_stock' | 'below_minimum_after_use' | string;
 };
 
 export type InventoryUsageTemplateReadiness = {
@@ -595,6 +605,7 @@ export type InventoryUsageTemplateReadiness = {
     ready_count?: number | string | null;
     missing_stock_row_count?: number | string | null;
     insufficient_stock_count?: number | string | null;
+    reserved_stock_count?: number | string | null;
     below_minimum_after_use_count?: number | string | null;
     evidence_acknowledgement_required_count?: number | string | null;
     can_record?: boolean | null;
@@ -641,9 +652,10 @@ export type InventoryUsageScheduledTemplateRow = {
   line_count?: number | string | null;
   missing_stock_row_count?: number | string | null;
   insufficient_stock_count?: number | string | null;
+  reserved_stock_count?: number | string | null;
   below_minimum_after_use_count?: number | string | null;
   evidence_acknowledgement_required_count?: number | string | null;
-  schedule_status?: 'due' | 'scheduled' | 'ready_with_warnings' | 'missing_stock' | 'insufficient_stock' | 'missing_evidence_acknowledgement_required' | 'empty' | 'inactive' | string;
+  schedule_status?: 'due' | 'scheduled' | 'ready_with_warnings' | 'missing_stock' | 'insufficient_stock' | 'reserved_stock' | 'missing_evidence_acknowledgement_required' | 'empty' | 'inactive' | string;
 };
 
 export type InventoryUsageScheduledTemplates = {

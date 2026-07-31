@@ -5,6 +5,29 @@ import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageBulkLine, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageTemplate } from './inventoryUsageTypes';
 import { showTenantActionError, showTenantActionSuccess } from '../../lib/actionFeedback';
 
+const formatBulkReadinessReason = (reason: string): string => {
+  switch (reason) {
+    case 'reserved_stock':
+      return 'Reserved stock is protected';
+    case 'insufficient_stock':
+      return 'Insufficient on-hand stock';
+    case 'missing_stock_row':
+      return 'No stock exists at this location';
+    case 'critical_alert':
+      return 'A critical alert blocks usage';
+    case 'closed_period':
+      return 'The usage period is closed';
+    case 'product_not_found':
+      return 'Product not found';
+    case 'storage_location_not_found':
+      return 'Storage location not found';
+    case 'missing_evidence_acknowledgement_required':
+      return 'Missing-evidence acknowledgement required';
+    default:
+      return reason.replace(/_/g, ' ');
+  }
+};
+
 const createBlankLine = (): InventoryUsageBulkLine => ({
   product_id: '',
   storage_location_id: '',
@@ -236,7 +259,9 @@ export function InventoryUsageBulkRecorder({
       'storage_location_name',
       'quantity',
       'current_quantity',
+      'reserved_quantity',
       'resulting_quantity',
+      'resulting_available_quantity',
       'minimum_quantity',
       'blocking_reasons',
       'acknowledgement_required_reasons',
@@ -255,7 +280,9 @@ export function InventoryUsageBulkRecorder({
       storage_location_name: line.storage_location_name || '',
       quantity: line.quantity,
       current_quantity: line.current_quantity ?? '',
+      reserved_quantity: line.reserved_quantity ?? '',
       resulting_quantity: line.resulting_quantity ?? '',
+      resulting_available_quantity: line.resulting_available_quantity ?? '',
       minimum_quantity: line.minimum_quantity ?? '',
       blocking_reasons: (line.blocking_reasons || []).join('; '),
       acknowledgement_required_reasons: (line.acknowledgement_required_reasons || []).join('; '),
@@ -507,7 +534,9 @@ export function InventoryUsageBulkRecorder({
                     <th style={styles.th}>Product</th>
                     <th style={styles.th}>Location</th>
                     <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>Current → Result</th>
+                    <th style={styles.th}>On Hand → Result</th>
+                    <th style={styles.th}>Reserved</th>
+                    <th style={styles.th}>Available After</th>
                     <th style={styles.th}>Evidence</th>
                     <th style={styles.th}>Readiness</th>
                   </tr>
@@ -520,12 +549,18 @@ export function InventoryUsageBulkRecorder({
                       <td style={styles.td}>{line.storage_location_name || line.storage_location_id}</td>
                       <td style={styles.td}>{line.quantity}</td>
                       <td style={styles.td}>{line.current_quantity ?? '—'} → {line.resulting_quantity ?? '—'}</td>
+                      <td style={styles.td}>{line.reserved_quantity ?? '—'}</td>
+                      <td style={styles.td}>{line.resulting_available_quantity ?? '—'}</td>
                       <td style={styles.td}>
                         {line.requires_evidence_or_acknowledgement
                           ? line.missing_evidence_acknowledged ? 'Acknowledged' : 'Acknowledgement required'
                           : 'Not required'}
                       </td>
-                      <td style={styles.td}>{line.can_record ? 'Ready' : (line.blocking_reasons || []).join(', ') || 'Blocked'}</td>
+                      <td style={styles.td}>
+                        {line.can_record
+                          ? 'Ready'
+                          : (line.blocking_reasons || []).map(formatBulkReadinessReason).join(', ') || 'Blocked'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

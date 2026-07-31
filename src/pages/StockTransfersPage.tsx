@@ -63,6 +63,8 @@ type StockTransferAvailabilityItem = {
   product_name: string;
   product_unit: string;
   requested_quantity: number | string;
+  on_hand_quantity: number | string;
+  reserved_quantity: number | string;
   available_quantity: number | string;
   remaining_after_transfer: number | string;
   sufficient: boolean;
@@ -712,9 +714,11 @@ export default function StockTransfersPage() {
           <tr>
             <td>${escapeHtml(item.product_name)}</td>
             <td>${escapeHtml(formatNumber(item.requested_quantity))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.on_hand_quantity))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.reserved_quantity))} ${escapeHtml(item.product_unit)}</td>
             <td>${escapeHtml(formatNumber(item.available_quantity))} ${escapeHtml(item.product_unit)}</td>
             <td>${escapeHtml(formatNumber(item.remaining_after_transfer))} ${escapeHtml(item.product_unit)}</td>
-            <td>${item.sufficient ? 'OK' : 'Not enough stock'}</td>
+            <td>${item.sufficient ? 'OK' : 'Insufficient unreserved stock'}</td>
           </tr>
         `).join('')
       : '';
@@ -768,7 +772,7 @@ export default function StockTransfersPage() {
               <h2>Execution Check</h2>
               <p class="meta">${escapeHtml(selectedTransferAvailability?.message || '')}</p>
               <table>
-                <thead><tr><th>Product</th><th>Requested</th><th>Available</th><th>After Transfer</th><th>Status</th></tr></thead>
+                <thead><tr><th>Product</th><th>Requested</th><th>On Hand</th><th>Reserved</th><th>Available (Unreserved)</th><th>After Transfer</th><th>Status</th></tr></thead>
                 <tbody>${availabilityRows}</tbody>
               </table>
             </section>
@@ -1205,8 +1209,10 @@ export default function StockTransfersPage() {
                           <tr>
                             <th style={styles.th}>Product</th>
                             <th style={styles.th}>Requested</th>
-                            <th style={styles.th}>Available at source</th>
-                            <th style={styles.th}>After transfer</th>
+                            <th style={styles.th}>On Hand</th>
+                            <th style={styles.th}>Reserved</th>
+                            <th style={styles.th}>Available (Unreserved)</th>
+                            <th style={styles.th}>After Transfer</th>
                             <th style={styles.th}>Status</th>
                           </tr>
                         </thead>
@@ -1215,9 +1221,11 @@ export default function StockTransfersPage() {
                             <tr key={item.product_id}>
                               <td style={styles.td}>{item.product_name}</td>
                               <td style={styles.td}>{formatNumber(item.requested_quantity)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.on_hand_quantity)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.reserved_quantity)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.available_quantity)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.remaining_after_transfer)} {item.product_unit}</td>
-                              <td style={styles.td}>{item.sufficient ? 'OK' : 'Not enough stock'}</td>
+                              <td style={styles.td}>{item.sufficient ? 'OK' : 'Insufficient unreserved stock'}</td>
                             </tr>
                           ))}
                         </tbody>
