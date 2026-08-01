@@ -2106,6 +2106,25 @@ export interface ExecutionRequestListResponse {
   notes: string[];
 }
 
+export interface ExecutionRequestOptionsResponse {
+  products: Array<{
+    id: string;
+    name: string;
+    category?: string | null;
+    unit?: string | null;
+    barcode?: string | null;
+    min_stock?: number | string | null;
+    standard_unit_cost?: number | string | null;
+    version?: number | string | null;
+  }>;
+  controlled_request_types: Array<{
+    request_type: ExecutionRequest['request_type'];
+    label: string;
+    risk_level: string;
+  }>;
+  notes: string[];
+}
+
 
 export interface ExecutionModuleHardeningSummaryResponse {
   generated_at: string;
@@ -2121,6 +2140,7 @@ export interface ExecutionModuleHardeningSummaryResponse {
     completed_executions: number | string;
     noop_executions: number | string;
     failed_executions: number | string;
+    system_context_requests: number | string;
     approved_waiting_execution: number | string;
     real_execution_ready: number | string;
     terminal_execution_records: number | string;
