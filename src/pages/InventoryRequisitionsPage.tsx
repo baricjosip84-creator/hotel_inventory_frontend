@@ -1,15 +1,40 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
-import type { ProductItem } from '../types/inventory';
+
+type RequisitionProductOption = {
+  id: string;
+  name: string;
+  category?: string | null;
+  unit: string;
+  standard_unit_cost?: number | string | null;
+  retired?: boolean;
+};
 
 type StorageLocationOption = {
   id: string;
   name: string;
   temperature_zone?: string | null;
+  retired?: boolean;
+};
+
+type RequisitionRequesterOption = {
+  id: string;
+  name: string;
+};
+
+type RequisitionOptions = {
+  products: RequisitionProductOption[];
+  storage_locations: StorageLocationOption[];
+  filter_products: RequisitionProductOption[];
+  filter_storage_locations: StorageLocationOption[];
+  requesters: RequisitionRequesterOption[];
+  requesting_departments: string[];
+  target_departments: string[];
+  product_categories: string[];
 };
 
 type RequisitionStatus =
@@ -161,8 +186,11 @@ type RequisitionReadiness = {
     fulfilled_quantity?: number | string;
     remaining_quantity: number | string;
     preview_quantity?: number | string;
+    on_hand_quantity?: number | string | null;
+    reserved_quantity?: number | string | null;
     available_quantity: number | string | null;
     min_quantity?: number | string | null;
+    projected_on_hand_quantity?: number | string | null;
     projected_quantity: number | string | null;
     ready: boolean;
     blocker_code?: string | null;
@@ -1049,6 +1077,38 @@ function formatNumber(value: number | string | null | undefined): string {
   return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function humanizeCode(value: string | null | undefined): string {
+  if (!value) return '-';
+  const normalized = String(value).replace(/_/g, ' ').trim();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '-';
+}
+
+function requisitionStatusLabel(status: RequisitionStatus): string {
+  const labels: Record<string, string> = {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    partially_fulfilled: 'Partially fulfilled',
+    fulfilled: 'Fulfilled',
+    cancelled: 'Cancelled'
+  };
+  return labels[String(status)] || humanizeCode(String(status));
+}
+
+function rangeError(
+  fromValue: string,
+  toValue: string,
+  message: string,
+  numeric = false
+): string | null {
+  if (!fromValue || !toValue) return null;
+  const from = numeric ? Number(fromValue) : new Date(fromValue).getTime();
+  const to = numeric ? Number(toValue) : new Date(toValue).getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return from > to ? message : null;
+}
+
 
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -1199,7 +1259,7 @@ function requiresApprovalThresholdNotes(requisition?: InventoryRequisition | nul
   return isApprovalThresholdGoverned(requisition);
 }
 
-function estimateDraftApprovalThreshold(form: RequisitionFormState, productById: Map<string, ProductItem>): DraftApprovalThresholdEstimate {
+function estimateDraftApprovalThreshold(form: RequisitionFormState, productById: Map<string, RequisitionProductOption>): DraftApprovalThresholdEstimate {
   const estimatedValueTotal = form.items.reduce((total, item) => {
     const product = productById.get(item.product_id);
     const quantity = Number(item.requested_quantity);
@@ -1395,6 +1455,102 @@ export default function InventoryRequisitionsPage() {
   const [bulkFulfillmentLocationId, setBulkFulfillmentLocationId] = useState('');
   const [bulkFulfillmentNote, setBulkFulfillmentNote] = useState('');
   const [isManualRefresh, setIsManualRefresh] = useState(false);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queuePageSize, setQueuePageSize] = useState(25);
+
+  const queueFilterError = useMemo(() => [
+    rangeError(neededByFromFilter, neededByToFilter, 'Needed-by start date cannot be after the end date.'),
+    rangeError(createdFromFilter, createdToFilter, 'Created start date cannot be after the end date.'),
+    rangeError(minApprovalThresholdGapFilter, maxApprovalThresholdGapFilter, 'Minimum threshold gap cannot be greater than the maximum.', true),
+    rangeError(minRemainingValueFilter, maxRemainingValueFilter, 'Minimum remaining value cannot be greater than the maximum.', true),
+    rangeError(minRemainingQuantityFilter, maxRemainingQuantityFilter, 'Minimum remaining quantity cannot be greater than the maximum.', true)
+  ].find((message): message is string => Boolean(message)) || null, [
+    createdFromFilter,
+    createdToFilter,
+    maxApprovalThresholdGapFilter,
+    maxRemainingQuantityFilter,
+    maxRemainingValueFilter,
+    minApprovalThresholdGapFilter,
+    minRemainingQuantityFilter,
+    minRemainingValueFilter,
+    neededByFromFilter,
+    neededByToFilter
+  ]);
+
+  const filterSignature = useMemo(() => JSON.stringify([
+    status,
+    dueState,
+    fulfillmentState,
+    slaState,
+    ageBucket,
+    approvalThresholdLevel,
+    approvalThresholdReason,
+    approvalThresholdWatch,
+    approvalThresholdNextLevel,
+    approvalThresholdNoteDepthState,
+    minApprovalThresholdGapFilter,
+    maxApprovalThresholdGapFilter,
+    minRemainingValueFilter,
+    maxRemainingValueFilter,
+    minRemainingQuantityFilter,
+    maxRemainingQuantityFilter,
+    priorityFilter,
+    departmentFilter,
+    targetDepartmentFilter,
+    sourceLocationFilter,
+    targetLocationFilter,
+    requesterFilter,
+    neededByFromFilter,
+    neededByToFilter,
+    createdFromFilter,
+    createdToFilter,
+    productFilter,
+    productCategoryFilter,
+    queueSearch
+  ]), [
+    ageBucket,
+    approvalThresholdLevel,
+    approvalThresholdNextLevel,
+    approvalThresholdNoteDepthState,
+    approvalThresholdReason,
+    approvalThresholdWatch,
+    createdFromFilter,
+    createdToFilter,
+    departmentFilter,
+    dueState,
+    fulfillmentState,
+    maxApprovalThresholdGapFilter,
+    maxRemainingQuantityFilter,
+    maxRemainingValueFilter,
+    minApprovalThresholdGapFilter,
+    minRemainingQuantityFilter,
+    minRemainingValueFilter,
+    neededByFromFilter,
+    neededByToFilter,
+    priorityFilter,
+    productCategoryFilter,
+    productFilter,
+    queueSearch,
+    requesterFilter,
+    slaState,
+    sourceLocationFilter,
+    status,
+    targetDepartmentFilter,
+    targetLocationFilter
+  ]);
+
+  useEffect(() => {
+    setQueuePage(1);
+    setBulkFulfillmentIds([]);
+    setBulkFulfillmentLocationId('');
+    setBulkFulfillmentNote('');
+  }, [filterSignature, queuePageSize]);
+
+  useEffect(() => {
+    setBulkFulfillmentIds([]);
+    setBulkFulfillmentLocationId('');
+    setBulkFulfillmentNote('');
+  }, [queuePage]);
 
   const summaryQuery = useQuery({
     queryKey: ['inventory-requisition-summary'],
@@ -1402,9 +1558,13 @@ export default function InventoryRequisitionsPage() {
   });
 
   const requisitionsQuery = useQuery({
-    queryKey: ['inventory-requisitions', status, dueState, fulfillmentState, slaState, ageBucket, approvalThresholdLevel, approvalThresholdReason, approvalThresholdWatch, approvalThresholdNextLevel, approvalThresholdNoteDepthState, minApprovalThresholdGapFilter, maxApprovalThresholdGapFilter, minRemainingValueFilter, maxRemainingValueFilter, minRemainingQuantityFilter, maxRemainingQuantityFilter, priorityFilter, departmentFilter, targetDepartmentFilter, sourceLocationFilter, targetLocationFilter, requesterFilter, neededByFromFilter, neededByToFilter, createdFromFilter, createdToFilter, productFilter, productCategoryFilter, queueSearch],
+    queryKey: ['inventory-requisitions', filterSignature, queuePage, queuePageSize],
+    enabled: !queueFilterError,
     queryFn: () => {
-      const params = new URLSearchParams({ limit: '100' });
+      const params = new URLSearchParams({
+        limit: String(queuePageSize + 1),
+        offset: String((queuePage - 1) * queuePageSize)
+      });
       const trimmedSearch = queueSearch.trim();
       const trimmedDepartment = departmentFilter.trim();
       const trimmedTargetDepartment = targetDepartmentFilter.trim();
@@ -1441,32 +1601,32 @@ export default function InventoryRequisitionsPage() {
     }
   });
 
-  const productsQuery = useQuery({
-    queryKey: ['products', 'requisition-options'],
-    queryFn: () => apiRequest<ProductItem[]>('/products?limit=500')
+  const queueRows = useMemo(
+    () => (requisitionsQuery.data || []).slice(0, queuePageSize),
+    [queuePageSize, requisitionsQuery.data]
+  );
+  const queueHasNextPage = (requisitionsQuery.data?.length || 0) > queuePageSize;
+  const queueRangeStart = queueRows.length > 0 ? ((queuePage - 1) * queuePageSize) + 1 : 0;
+  const queueRangeEnd = queueRows.length > 0 ? queueRangeStart + queueRows.length - 1 : 0;
+
+  const optionsQuery = useQuery({
+    queryKey: ['inventory-requisition-options'],
+    queryFn: () => apiRequest<RequisitionOptions>('/inventory-requisitions/options')
   });
 
-  const productCategoryOptions = useMemo(() => {
-    const categories = new Set<string>();
-    productsQuery.data?.forEach((product) => {
-      const category = String(product.category || '').trim();
-      if (category) categories.add(category);
-    });
-    return Array.from(categories).sort((a, b) => a.localeCompare(b));
-  }, [productsQuery.data]);
+  const createProductOptions = useMemo(() => optionsQuery.data?.products || [], [optionsQuery.data?.products]);
+  const filterProductOptions = useMemo(() => optionsQuery.data?.filter_products || [], [optionsQuery.data?.filter_products]);
+  const activeLocationOptions = useMemo(() => optionsQuery.data?.storage_locations || [], [optionsQuery.data?.storage_locations]);
+  const filterLocationOptions = useMemo(() => optionsQuery.data?.filter_storage_locations || [], [optionsQuery.data?.filter_storage_locations]);
+  const productCategoryOptions = useMemo(() => optionsQuery.data?.product_categories || [], [optionsQuery.data?.product_categories]);
 
   const productById = useMemo(() => {
-    const map = new Map<string, ProductItem>();
-    productsQuery.data?.forEach((product) => {
+    const map = new Map<string, RequisitionProductOption>();
+    createProductOptions.forEach((product) => {
       map.set(product.id, product);
     });
     return map;
-  }, [productsQuery.data]);
-
-  const locationsQuery = useQuery({
-    queryKey: ['storage-locations', 'requisition-options'],
-    queryFn: () => apiRequest<StorageLocationOption[]>('/storage-locations?limit=500')
-  });
+  }, [createProductOptions]);
 
   const detailQuery = useQuery({
     queryKey: ['inventory-requisition-detail', selectedId],
@@ -1486,7 +1646,7 @@ export default function InventoryRequisitionsPage() {
     queryFn: () => apiRequest<RequisitionActivity[]>(`/inventory-requisitions/${selectedId}/activity`)
   });
 
-  const selected = detailQuery.data || requisitionsQuery.data?.find((item) => item.id === selectedId) || null;
+  const selected = detailQuery.data || queueRows.find((item) => item.id === selectedId) || null;
   const effectiveFulfillmentLocationId = fulfillmentLocationId || selected?.source_storage_location_id || '';
 
   const readinessPreviewLines = useMemo(() => Object.entries(fulfillmentLines)
@@ -1517,6 +1677,7 @@ export default function InventoryRequisitionsPage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['inventory-requisitions'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-summary'] }),
+      queryClient.invalidateQueries({ queryKey: ['inventory-requisition-options'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-detail'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-fulfillments'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-readiness'] }),
@@ -1530,11 +1691,7 @@ export default function InventoryRequisitionsPage() {
   const refreshRequisitionPage = async () => {
     setIsManualRefresh(true);
     try {
-      await Promise.all([
-        invalidateRequisitions(),
-        queryClient.invalidateQueries({ queryKey: ['products', 'requisition-options'] }),
-        queryClient.invalidateQueries({ queryKey: ['storage-locations', 'requisition-options'] })
-      ]);
+      await invalidateRequisitions();
     } finally {
       setIsManualRefresh(false);
     }
@@ -1680,7 +1837,7 @@ export default function InventoryRequisitionsPage() {
       ];
 
       if (!entry.lines?.length) {
-        return [[...base, '', '', '', '', '', '', '', '', '', '']];
+        return [[...base, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
       }
 
       return entry.lines.map((line) => [
@@ -1691,7 +1848,10 @@ export default function InventoryRequisitionsPage() {
         line.fulfilled_quantity ?? '',
         line.remaining_quantity ?? '',
         line.preview_quantity ?? '',
+        line.on_hand_quantity ?? '',
+        line.reserved_quantity ?? '',
         line.available_quantity ?? '',
+        line.projected_on_hand_quantity ?? '',
         line.projected_quantity ?? '',
         line.ready ? 'yes' : 'no',
         line.blocker_code || '',
@@ -1721,8 +1881,11 @@ export default function InventoryRequisitionsPage() {
         'Fulfilled quantity',
         'Remaining quantity',
         'Preview quantity',
-        'Available quantity',
-        'Projected quantity',
+        'On-hand quantity',
+        'Reserved quantity',
+        'Available unreserved quantity',
+        'Projected on-hand quantity',
+        'Projected available quantity',
         'Line ready',
         'Line blocker',
         'Line note length',
@@ -2036,8 +2199,8 @@ export default function InventoryRequisitionsPage() {
     setQueueSearch('');
   };
 
-  const visibleBulkFulfillmentIds = useMemo(() => new Set(requisitionsQuery.data?.map((item) => item.id) || []), [requisitionsQuery.data]);
-  const bulkSelectedRequisitions = useMemo(() => (requisitionsQuery.data || []).filter((item) => bulkFulfillmentIds.includes(item.id)), [bulkFulfillmentIds, requisitionsQuery.data]);
+  const visibleBulkFulfillmentIds = useMemo(() => new Set(queueRows.map((item) => item.id)), [queueRows]);
+  const bulkSelectedRequisitions = useMemo(() => queueRows.filter((item) => bulkFulfillmentIds.includes(item.id)), [bulkFulfillmentIds, queueRows]);
   const bulkEligibleRequisitions = bulkSelectedRequisitions.filter((item) => ['approved', 'partially_fulfilled'].includes(String(item.status)));
   const bulkIneligibleCount = bulkSelectedRequisitions.length - bulkEligibleRequisitions.length;
   const bulkThresholdGoverned = bulkEligibleRequisitions.some((item) => requiresApprovalThresholdNotes(item));
@@ -2098,7 +2261,28 @@ export default function InventoryRequisitionsPage() {
   });
   const selectedDraftLineNotesBelowMinimumCount = selectedDraftLineNoteDepths.filter((noteLength) => noteLength < selectedApprovalThresholdNoteMinLength).length;
   const selectedDraftLineNotesMeetThresholdDepth = selectedDraftLineNoteDepths.length > 0 && selectedDraftLineNotesBelowMinimumCount === 0;
-  const canSaveDraft = capabilities.canCreateInventoryRequisitions && (!draftSaveThresholdGoverned || (editedDraftNotesMeetThresholdDepth && editedDraftLineNotesMeetThresholdDepth));
+  const draftProductIds = form.items.map((item) => item.product_id).filter(Boolean);
+  const draftHasDuplicateProducts = new Set(draftProductIds).size !== draftProductIds.length;
+  const draftHasStarted = Boolean(
+    editingDraftId
+    || form.requesting_department.trim()
+    || form.target_department.trim()
+    || form.source_storage_location_id
+    || form.target_storage_location_id
+    || form.needed_by
+    || form.notes.trim()
+    || form.items.some((item) => item.product_id || item.requested_quantity || item.notes.trim())
+  );
+  const draftItemsValid = form.items.length > 0 && form.items.every((item) => {
+    const quantity = Number(item.requested_quantity);
+    return Boolean(item.product_id) && Number.isFinite(quantity) && quantity > 0;
+  });
+  const draftDepartmentValid = Boolean(form.requesting_department.trim());
+  const canSaveDraft = capabilities.canCreateInventoryRequisitions
+    && draftDepartmentValid
+    && draftItemsValid
+    && !draftHasDuplicateProducts
+    && (!draftSaveThresholdGoverned || (editedDraftNotesMeetThresholdDepth && editedDraftLineNotesMeetThresholdDepth));
   const canSubmit = selected?.status === 'draft' && capabilities.canSubmitInventoryRequisitions && (!approvalThresholdNotesRequired || (draftNotesMeetThresholdDepth && selectedDraftLineNotesMeetThresholdDepth));
   const workflowNotesLength = workflowNotes.trim().length;
   const workflowNotesMeetThresholdDepth = workflowNotesLength >= selectedApprovalThresholdNoteMinLength;
@@ -2139,16 +2323,17 @@ export default function InventoryRequisitionsPage() {
             : null
       ].filter((item): item is string => Boolean(item))
     : [];
+  const queryError = summaryQuery.error || requisitionsQuery.error || optionsQuery.error || detailQuery.error || fulfillmentHistoryQuery.error || activityQuery.error || readinessQuery.error;
   const mutationError = saveDraftMutation.error || workflowMutation.error || fulfillMutation.error || bulkFulfillmentMutation.error || bulkReadinessQuery.error || commentMutation.error;
 
   return (
     <div style={styles.page}>
       <section style={styles.headerGrid}>
         <div style={styles.card}>
-          <p style={styles.kicker}>Feature #4</p>
-          <h2 style={styles.title}>Internal requisitions</h2>
+          <p style={styles.kicker}>Operations workflow</p>
+          <h2 style={styles.title}>Internal stock requests</h2>
           <p style={styles.muted}>
-            Capture department demand, route approvals, and fulfill approved requests through the backend requisition workflow.
+            Create, approve, and fulfill internal stock requests. Fulfillment checks current stock, protects quantities already promised to reservations, and records an audit trail.
           </p>
           <div style={styles.actionsRow}>
             <button
@@ -2157,9 +2342,9 @@ export default function InventoryRequisitionsPage() {
               disabled={isManualRefresh}
               onClick={refreshRequisitionPage}
             >
-              {isManualRefresh ? 'Refreshing…' : 'Refresh requisitions'}
+              {isManualRefresh ? 'Refreshing…' : 'Refresh page'}
             </button>
-            {(summaryQuery.isFetching || requisitionsQuery.isFetching || detailQuery.isFetching) && (
+            {(summaryQuery.isFetching || requisitionsQuery.isFetching || optionsQuery.isFetching || detailQuery.isFetching) && (
               <span style={styles.muted}>Refreshing current requisition data…</span>
             )}
           </div>
@@ -2176,6 +2361,7 @@ export default function InventoryRequisitionsPage() {
         </div>
       </section>
 
+      {queryError && <div style={styles.errorBox}>Some requisition data could not be loaded: {errorMessage(queryError)}</div>}
       {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError)}</div>}
       {bulkFulfillmentMutation.data && (
         <div style={styles.successBox}>
@@ -2194,7 +2380,7 @@ export default function InventoryRequisitionsPage() {
               {bulkFulfillmentMutation.data.results.slice(0, 8).map((result) => (
                 <div key={result.requisition_id} style={styles.bulkResultRow}>
                   <strong>{result.requisition_number || result.requisition_id}</strong>
-                  <span>{formatNumber(result.fulfilled_line_count)} line(s) · {formatNumber(result.fulfilled_quantity_total)} units · {result.status || 'updated'}</span>
+                  <span>{formatNumber(result.fulfilled_line_count)} line(s) · {formatNumber(result.fulfilled_quantity_total)} units · {humanizeCode(result.status || 'updated')}</span>
                   {result.approval_threshold_notes_required && (
                     <span>Threshold {result.approval_threshold_level || 'governed'} · note depth {result.approval_threshold_note_depth_state || 'tracked'} · below-minimum fulfillment notes {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
                   )}
@@ -2208,7 +2394,13 @@ export default function InventoryRequisitionsPage() {
         </div>
       )}
 
-      <section style={styles.summaryGrid}>
+      <details style={styles.analyticsDetails}>
+        <summary style={styles.analyticsSummary}>
+          <span>Planning and governance analysis</span>
+          <span style={styles.muted}>Demand, approvals, value, backlog, and SLA breakdowns</span>
+        </summary>
+        <p style={styles.analyticsIntro}>Open this section when you need management analysis. Day-to-day request creation, approval, and fulfillment remain directly below.</p>
+        <section style={styles.summaryGrid}>
         <div style={styles.card}>
           <div style={styles.lineHeader}>
             <h3 style={styles.sectionTitle}>Demand summary</h3>
@@ -2341,7 +2533,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval thresholds by priority</h3>
           {summaryQuery.data?.approval_threshold_by_priority?.length ? summaryQuery.data.approval_threshold_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{priority.priority}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} elevated · {formatNumber(priority.high_value_count)} high value · {formatNumber(priority.executive_value_count)} executive · {formatNumber(priority.overdue_count)} overdue</span></span>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} elevated · {formatNumber(priority.high_value_count)} high value · {formatNumber(priority.executive_value_count)} executive · {formatNumber(priority.overdue_count)} overdue</span></span>
               <strong>{formatNumber(priority.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by priority.</p>}
@@ -2413,7 +2605,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval thresholds by due state</h3>
           {summaryQuery.data?.approval_threshold_by_due_state?.length ? summaryQuery.data.approval_threshold_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{state.due_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
               <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by due state.</p>}
@@ -2422,7 +2614,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval thresholds by age bucket</h3>
           {summaryQuery.data?.approval_threshold_by_age_bucket?.length ? summaryQuery.data.approval_threshold_by_age_bucket.map((bucket) => (
             <div key={bucket.approval_age_bucket} style={styles.departmentRow}>
-              <span>{bucket.approval_age_bucket.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} elevated · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.high_value_count)} high value · {formatNumber(bucket.overdue_count)} overdue</span></span>
+              <span>{humanizeCode(bucket.approval_age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} elevated · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.high_value_count)} high value · {formatNumber(bucket.overdue_count)} overdue</span></span>
               <strong>{formatNumber(bucket.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by age bucket.</p>}
@@ -2431,7 +2623,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval thresholds by SLA state</h3>
           {summaryQuery.data?.approval_threshold_by_sla_state?.length ? summaryQuery.data.approval_threshold_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
-              <span>{state.approval_sla_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
+              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
               <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by SLA state.</p>}
@@ -2449,7 +2641,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval value by priority</h3>
           {summaryQuery.data?.approval_queue_by_priority?.length ? summaryQuery.data.approval_queue_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{priority.priority}</span><br /><span style={styles.muted}>{formatNumber(priority.pending_count)} pending · {formatNumber(priority.overdue_count)} overdue · avg {formatNumber(priority.average_pending_age_days)}d</span></span>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.pending_count)} pending · {formatNumber(priority.overdue_count)} overdue · avg {formatNumber(priority.average_pending_age_days)}d</span></span>
               <strong>{formatNumber(priority.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by priority.</p>}
@@ -2521,7 +2713,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval value by age bucket</h3>
           {summaryQuery.data?.approval_queue_by_age_bucket?.length ? summaryQuery.data.approval_queue_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{bucket.age_bucket.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(bucket.pending_count)} pending · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.overdue_count)} overdue · avg {formatNumber(bucket.average_pending_age_days)}d</span></span>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.pending_count)} pending · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.overdue_count)} overdue · avg {formatNumber(bucket.average_pending_age_days)}d</span></span>
               <strong>{formatNumber(bucket.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by age bucket.</p>}
@@ -2530,7 +2722,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval value by SLA state</h3>
           {summaryQuery.data?.approval_queue_by_sla_state?.length ? summaryQuery.data.approval_queue_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
-              <span>{state.approval_sla_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · avg {formatNumber(state.average_pending_age_days)}d</span></span>
+              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · avg {formatNumber(state.average_pending_age_days)}d</span></span>
               <strong>{formatNumber(state.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by SLA state.</p>}
@@ -2539,7 +2731,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Approval value by due state</h3>
           {summaryQuery.data?.approval_queue_by_due_state?.length ? summaryQuery.data.approval_queue_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{state.due_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · {formatNumber(state.due_soon_count)} due soon · avg {formatNumber(state.average_pending_age_days)}d</span></span>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · {formatNumber(state.due_soon_count)} due soon · avg {formatNumber(state.average_pending_age_days)}d</span></span>
               <strong>{formatNumber(state.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by due state.</p>}
@@ -2548,7 +2740,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Oldest pending approvals</h3>
           {summaryQuery.data?.approval_queue_oldest?.length ? summaryQuery.data.approval_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {request.priority} · {formatNumber(request.product_count)} products</span></span>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)} · {formatNumber(request.product_count)} products</span></span>
               <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatNumber(request.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No pending approvals.</p>}
@@ -2576,7 +2768,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by priority</h3>
           {summaryQuery.data?.estimated_value_by_priority?.length ? summaryQuery.data.estimated_value_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{priority.priority}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
               <strong>{formatNumber(priority.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No priority value exposure.</p>}
@@ -2585,7 +2777,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by status</h3>
           {summaryQuery.data?.estimated_value_by_status?.length ? summaryQuery.data.estimated_value_by_status.map((status) => (
             <div key={status.status} style={styles.departmentRow}>
-              <span><span style={statusStyle(status.status)}>{status.status}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} open · urgent value {formatNumber(status.urgent_remaining_estimated_value_total)}</span></span>
+              <span><span style={statusStyle(status.status)}>{requisitionStatusLabel(status.status)}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} open · urgent value {formatNumber(status.urgent_remaining_estimated_value_total)}</span></span>
               <strong>{formatNumber(status.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No status value exposure.</p>}
@@ -2668,7 +2860,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Oldest partial fulfillments</h3>
           {summaryQuery.data?.fulfillment_backlog_oldest?.length ? summaryQuery.data.fulfillment_backlog_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {request.priority}</span></span>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)}</span></span>
               <strong>{formatNumber(request.partial_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatNumber(request.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No aged partial fulfillments.</p>}
@@ -2677,7 +2869,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Fulfillment backlog by priority</h3>
           {summaryQuery.data?.fulfillment_backlog_by_priority?.length ? summaryQuery.data.fulfillment_backlog_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span>{priority.priority}<br /><span style={styles.muted}>{formatNumber(priority.partially_fulfilled_count)} partial · {formatNumber(priority.stale_partially_fulfilled_count)} stale · oldest {formatNumber(priority.oldest_partial_age_days)}d</span></span>
+              <span>{humanizeCode(priority.priority)}<br /><span style={styles.muted}>{formatNumber(priority.partially_fulfilled_count)} partial · {formatNumber(priority.stale_partially_fulfilled_count)} stale · oldest {formatNumber(priority.oldest_partial_age_days)}d</span></span>
               <strong>{formatNumber(priority.remaining_quantity_total)} units · {formatNumber(priority.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No priority-level fulfillment backlog.</p>}
@@ -2686,7 +2878,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Fulfillment backlog by age bucket</h3>
           {summaryQuery.data?.fulfillment_backlog_by_age_bucket?.length ? summaryQuery.data.fulfillment_backlog_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{bucket.age_bucket.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(bucket.partially_fulfilled_count)} partial · {formatNumber(bucket.stale_partially_fulfilled_count)} stale · oldest {formatNumber(bucket.oldest_partial_age_days)}d</span></span>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.partially_fulfilled_count)} partial · {formatNumber(bucket.stale_partially_fulfilled_count)} stale · oldest {formatNumber(bucket.oldest_partial_age_days)}d</span></span>
               <strong>{formatNumber(bucket.remaining_quantity_total)} units · {formatNumber(bucket.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No age-bucket fulfillment backlog.</p>}
@@ -2695,7 +2887,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Fulfillment backlog by due state</h3>
           {summaryQuery.data?.fulfillment_backlog_by_due_state?.length ? summaryQuery.data.fulfillment_backlog_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{state.due_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
               <strong>{formatNumber(state.remaining_quantity_total)} units · {formatNumber(state.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No due-state fulfillment backlog.</p>}
@@ -2704,7 +2896,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Fulfillment backlog by SLA state</h3>
           {summaryQuery.data?.fulfillment_backlog_by_sla_state?.length ? summaryQuery.data.fulfillment_backlog_by_sla_state.map((state) => (
             <div key={state.sla_state} style={styles.departmentRow}>
-              <span>{state.sla_state.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
+              <span>{humanizeCode(state.sla_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
               <strong>{formatNumber(state.remaining_quantity_total)} units · {formatNumber(state.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No SLA-state fulfillment backlog.</p>}
@@ -2786,7 +2978,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Oldest open requests</h3>
           {summaryQuery.data?.open_queue_oldest?.length ? summaryQuery.data.open_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.status.replace(/_/g, ' ')} · {request.priority} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{requisitionStatusLabel(request.status)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
               <strong>{formatNumber(request.open_age_days)}d · {formatNumber(request.remaining_estimated_value_total)}</strong>
             </div>
           )) : <p style={styles.muted}>No open request aging actions.</p>}
@@ -2795,7 +2987,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by age bucket</h3>
           {summaryQuery.data?.estimated_value_by_age_bucket?.length ? summaryQuery.data.estimated_value_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{bucket.age_bucket.replace(/_/g, ' ')}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} open · urgent value {formatNumber(bucket.urgent_remaining_estimated_value_total)}</span></span>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} open · urgent value {formatNumber(bucket.urgent_remaining_estimated_value_total)}</span></span>
               <strong>{formatNumber(bucket.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No age-bucket value exposure.</p>}
@@ -2814,7 +3006,7 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Oldest SLA risk actions</h3>
           {summaryQuery.data?.sla_risk_oldest?.length ? summaryQuery.data.sla_risk_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.risk_reason.replace(/_/g, ' ')} · {request.priority} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{humanizeCode(request.risk_reason)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
               <strong>{formatNumber(request.action_age_days)}d · {formatNumber(request.remaining_estimated_value_total)}</strong>
             </div>
           )) : <p style={styles.muted}>No breached SLA actions.</p>}
@@ -2850,14 +3042,23 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Priority demand</h3>
           {summaryQuery.data?.priority_breakdown?.length ? summaryQuery.data.priority_breakdown.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{priority.priority}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
               <strong>{formatNumber(priority.remaining_quantity_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No open priority demand.</p>}
         </div>
-      </section>
+        </section>
+      </details>
+
+      <datalist id="requisition-requesting-departments">
+        {(optionsQuery.data?.requesting_departments || []).map((department) => <option key={department} value={department} />)}
+      </datalist>
+      <datalist id="requisition-target-departments">
+        {(optionsQuery.data?.target_departments || []).map((department) => <option key={department} value={department} />)}
+      </datalist>
 
       <section style={styles.grid}>
+        {capabilities.canCreateInventoryRequisitions ? (
         <form id="inventory-requisition-form" style={styles.sideCard} onSubmit={handleSaveDraft}>
           <div style={styles.lineHeader}>
             <h3 style={styles.sectionTitle}>{editingDraftId ? 'Edit draft request' : 'Create request'}</h3>
@@ -2868,6 +3069,7 @@ export default function InventoryRequisitionsPage() {
               Requesting department
               <input
                 style={styles.input}
+                list="requisition-requesting-departments"
                 value={form.requesting_department}
                 onChange={(event) => setForm((current) => ({ ...current, requesting_department: event.target.value }))}
                 required
@@ -2877,6 +3079,7 @@ export default function InventoryRequisitionsPage() {
               Target department
               <input
                 style={styles.input}
+                list="requisition-target-departments"
                 value={form.target_department}
                 onChange={(event) => setForm((current) => ({ ...current, target_department: event.target.value }))}
               />
@@ -2889,8 +3092,8 @@ export default function InventoryRequisitionsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, source_storage_location_id: event.target.value }))}
               >
                 <option value="">Use during fulfillment</option>
-                {locationsQuery.data?.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}</option>
+                {activeLocationOptions.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                 ))}
               </select>
             </label>
@@ -2902,8 +3105,8 @@ export default function InventoryRequisitionsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, target_storage_location_id: event.target.value }))}
               >
                 <option value="">No target location</option>
-                {locationsQuery.data?.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}</option>
+                {activeLocationOptions.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                 ))}
               </select>
             </label>
@@ -2946,20 +3149,20 @@ export default function InventoryRequisitionsPage() {
           {form.items.map((item, index) => (
             <div key={index} style={styles.lineGrid}>
               <select
-                style={styles.input}
+                style={styles.lineProductInput}
                 value={item.product_id}
                 onChange={(event) => updateFormLine(index, 'product_id', event.target.value)}
                 required
               >
                 <option value="">Select product</option>
-                {productsQuery.data?.map((product) => (
-                  <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>
+                {createProductOptions.map((product) => (
+                  <option key={product.id} value={product.id} disabled={form.items.some((otherItem, otherIndex) => otherIndex !== index && otherItem.product_id === product.id)}>{product.name} ({product.unit}){product.retired ? ' (retired)' : ''}</option>
                 ))}
               </select>
               <input
-                style={styles.input}
+                style={styles.lineQuantityInput}
                 type="number"
-                min="0"
+                min="0.0001"
                 step="0.0001"
                 placeholder="Qty"
                 value={item.requested_quantity}
@@ -2967,14 +3170,17 @@ export default function InventoryRequisitionsPage() {
                 required
               />
               <input
-                style={styles.input}
+                style={styles.lineNotesInput}
                 placeholder="Line notes"
                 value={item.notes}
                 onChange={(event) => updateFormLine(index, 'notes', event.target.value)}
               />
-              <button type="button" style={styles.dangerButton} onClick={() => removeFormLine(index)}>Remove</button>
+              <button type="button" style={styles.lineRemoveButton} onClick={() => removeFormLine(index)}>Remove</button>
             </div>
           ))}
+          {draftHasStarted && !draftDepartmentValid && <p style={styles.warningBox}>Enter the requesting department.</p>}
+          {draftHasStarted && !draftItemsValid && <p style={styles.warningBox}>Every request line needs a product and a quantity greater than zero.</p>}
+          {draftHasDuplicateProducts && <p style={styles.warningBox}>The same product cannot appear more than once in a request. Combine duplicate quantities into one line.</p>}
           {draftSaveThresholdGoverned && !editedDraftNotesMeetThresholdDepth && (
             <p style={styles.warningBox}>Draft notes of at least {draftSaveThresholdNoteMinLength} characters are required to save this {approvalThresholdLabel(draftSaveThresholdLevel)} request ({approvalThresholdReasonLabel(draftSaveThresholdReason)} · {editedDraftNotesLength}/{draftSaveThresholdNoteMinLength}).</p>
           )}
@@ -2985,6 +3191,12 @@ export default function InventoryRequisitionsPage() {
             {saveDraftMutation.isPending ? 'Saving…' : editingDraftId ? 'Save draft changes' : 'Create draft requisition'}
           </button>
         </form>
+        ) : (
+          <section style={styles.sideCard}>
+            <h3 style={styles.sectionTitle}>Request creation</h3>
+            <p style={styles.muted}>You have read-only requisition access. You can review requests and their audit history, but you cannot create or edit drafts.</p>
+          </section>
+        )}
 
         <section style={styles.queueCard}>
           <div style={styles.lineHeader}>
@@ -2995,7 +3207,7 @@ export default function InventoryRequisitionsPage() {
                   style={styles.smallInput}
                   value={queueSearch}
                   onChange={(event) => setQueueSearch(event.target.value)}
-                  placeholder="Search number or notes"
+                  placeholder="Search request, department, notes, or product"
                 />
                 <select style={styles.smallSelect} value={status} onChange={(event) => setStatus(event.target.value)}>
                   <option value="">All statuses</option>
@@ -3009,8 +3221,8 @@ export default function InventoryRequisitionsPage() {
                 </select>
                 <select style={styles.smallSelect} value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
                   <option value="">All products</option>
-                  {productsQuery.data?.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
+                  {filterProductOptions.map((product) => (
+                    <option key={product.id} value={product.id}>{product.name}{product.retired ? ' (retired)' : ''}</option>
                   ))}
                 </select>
                 <button
@@ -3027,7 +3239,7 @@ export default function InventoryRequisitionsPage() {
                   type="button"
                   style={styles.secondaryButton}
                   onClick={() => exportQueueMutation.mutate()}
-                  disabled={exportQueueMutation.isPending}
+                  disabled={exportQueueMutation.isPending || Boolean(queueFilterError)}
                 >
                   {exportQueueMutation.isPending ? 'Exporting…' : 'Export queue CSV'}
                 </button>
@@ -3037,12 +3249,14 @@ export default function InventoryRequisitionsPage() {
                   <input
                     style={styles.smallInput}
                     value={departmentFilter}
+                    list="requisition-requesting-departments"
                     onChange={(event) => setDepartmentFilter(event.target.value)}
                     placeholder="Requesting department"
                   />
                   <input
                     style={styles.smallInput}
                     value={targetDepartmentFilter}
+                    list="requisition-target-departments"
                     onChange={(event) => setTargetDepartmentFilter(event.target.value)}
                     placeholder="Target department"
                   />
@@ -3118,20 +3332,20 @@ export default function InventoryRequisitionsPage() {
                   <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingQuantityFilter} onChange={(event) => setMaxRemainingQuantityFilter(event.target.value)} placeholder="Max remaining qty" />
                   <select style={styles.smallSelect} value={sourceLocationFilter} onChange={(event) => setSourceLocationFilter(event.target.value)}>
                     <option value="">All source locations</option>
-                    {locationsQuery.data?.map((location) => (
-                      <option key={location.id} value={location.id}>{location.name}</option>
+                    {filterLocationOptions.map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                     ))}
                   </select>
                   <select style={styles.smallSelect} value={targetLocationFilter} onChange={(event) => setTargetLocationFilter(event.target.value)}>
                     <option value="">All target locations</option>
-                    {locationsQuery.data?.map((location) => (
-                      <option key={location.id} value={location.id}>{location.name}</option>
+                    {filterLocationOptions.map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                     ))}
                   </select>
                   <select style={styles.smallSelect} value={requesterFilter} onChange={(event) => setRequesterFilter(event.target.value)}>
                     <option value="">All requesters</option>
-                    {summaryQuery.data?.top_requesters?.filter((requester) => requester.requester_user_id).map((requester) => (
-                      <option key={requester.requester_user_id} value={requester.requester_user_id || ''}>{requester.requester_user_name}</option>
+                    {(optionsQuery.data?.requesters || []).map((requester) => (
+                      <option key={requester.id} value={requester.id}>{requester.name}</option>
                     ))}
                   </select>
                   <input style={styles.smallInput} type="date" value={neededByFromFilter} onChange={(event) => setNeededByFromFilter(event.target.value)} aria-label="Needed by from" title="Needed by from" />
@@ -3148,6 +3362,7 @@ export default function InventoryRequisitionsPage() {
               )}
             </div>
           </div>
+          {queueFilterError && <p style={styles.errorBox}>{queueFilterError}</p>}
           {capabilities.canFulfillInventoryRequisitions && bulkEligibleRequisitions.length > 0 && (
             <div style={styles.bulkFulfillmentPanel}>
               <div style={styles.lineHeader}>
@@ -3161,8 +3376,8 @@ export default function InventoryRequisitionsPage() {
                   onChange={(event) => setBulkFulfillmentLocationId(event.target.value)}
                 >
                   <option value="">Use each request source location</option>
-                  {locationsQuery.data?.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}</option>
+                  {activeLocationOptions.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                   ))}
                 </select>
                 <input
@@ -3212,7 +3427,7 @@ export default function InventoryRequisitionsPage() {
                         <p style={styles.warningText}>Blocked: {bulkReadinessQuery.data.blocked_requisition_numbers.join(', ')}</p>
                       ) : null}
                       {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).length > 0 && (
-                        <p style={styles.warningText}>Blockers: {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).map(([code, count]) => `${code} (${formatNumber(count)})`).join(', ')}</p>
+                        <p style={styles.warningText}>Blockers: {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).map(([code, count]) => `${humanizeCode(code)} (${formatNumber(count)})`).join(', ')}</p>
                       )}
                       {bulkReadinessQuery.data.results?.length ? (
                         <div style={styles.bulkReadinessResultList}>
@@ -3224,10 +3439,10 @@ export default function InventoryRequisitionsPage() {
                                 <span>Threshold-governed · line note minimum {formatNumber(result.threshold_fulfillment_line_note_min_length)} · below minimum {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
                               )}
                               {result.blockers?.length ? (
-                                <span style={styles.warningText}>Blockers: {result.blockers.slice(0, 3).map((blocker) => blocker.code).join(', ')}</span>
+                                <span style={styles.warningText}>Blockers: {result.blockers.slice(0, 3).map((blocker) => humanizeCode(blocker.code)).join(', ')}</span>
                               ) : null}
                               {result.warnings?.length ? (
-                                <span style={styles.muted}>Warnings: {result.warnings.slice(0, 3).map((warning) => warning.code).join(', ')}</span>
+                                <span style={styles.muted}>Warnings: {result.warnings.slice(0, 3).map((warning) => humanizeCode(warning.code)).join(', ')}</span>
                               ) : null}
                             </div>
                           ))}
@@ -3248,7 +3463,7 @@ export default function InventoryRequisitionsPage() {
             </div>
           )}
           {requisitionsQuery.isLoading && <p style={styles.muted}>Loading requisitions…</p>}
-          {requisitionsQuery.data?.map((item) => {
+          {queueRows.map((item) => {
             const bulkSelectable = ['approved', 'partially_fulfilled'].includes(String(item.status));
             const bulkSelected = bulkFulfillmentIds.includes(item.id);
             return (
@@ -3269,8 +3484,8 @@ export default function InventoryRequisitionsPage() {
                   onClick={() => setSelectedId(item.id)}
                 >
                   <span style={styles.listTitle}>{item.requisition_number}</span>
-                  <span style={statusStyle(item.status)}>{item.status}</span>
-                  <span style={styles.muted}>{item.requesting_department} · {item.priority}</span>
+                  <span style={statusStyle(item.status)}>{requisitionStatusLabel(item.status)}</span>
+                  <span style={styles.muted}>{item.requesting_department} · {humanizeCode(item.priority)}</span>
                   {item.sla_state && (
                     <span style={styles.warningText}>
                       {slaStateLabel(item.sla_state)}{slaStateDetail(item) ? ` · ${slaStateDetail(item)}` : ''}
@@ -3278,7 +3493,7 @@ export default function InventoryRequisitionsPage() {
                   )}
                   {item.approval_threshold_level && (
                     <span style={item.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>
-                      {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${item.approval_threshold_reason}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} to ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
+                      {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${approvalThresholdReasonLabel(item.approval_threshold_reason)}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} to ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
                     </span>
                   )}
                   {formatApprovalThresholdQueueNoteDepth(item) && (
@@ -3297,6 +3512,44 @@ export default function InventoryRequisitionsPage() {
               </div>
             );
           })}
+          {!requisitionsQuery.isLoading && !queueFilterError && queueRows.length === 0 && (
+            <p style={styles.muted}>No requisitions match the current filters.</p>
+          )}
+          <div style={styles.pager}>
+            <label style={styles.pagerInfo}>
+              Rows per page
+              <select
+                style={styles.smallSelect}
+                value={queuePageSize}
+                onChange={(event) => setQueuePageSize(Number(event.target.value))}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+            <span style={styles.pagerInfo}>
+              {queueRows.length > 0 ? `Showing ${queueRangeStart}-${queueRangeEnd}` : 'No rows'} · Page {queuePage}
+            </span>
+            <div style={styles.inlineActions}>
+              <button
+                type="button"
+                style={styles.secondaryButtonSmall}
+                disabled={queuePage === 1 || requisitionsQuery.isFetching}
+                onClick={() => setQueuePage((current) => Math.max(1, current - 1))}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                style={styles.secondaryButtonSmall}
+                disabled={!queueHasNextPage || requisitionsQuery.isFetching || Boolean(queueFilterError)}
+                onClick={() => setQueuePage((current) => current + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -3306,9 +3559,9 @@ export default function InventoryRequisitionsPage() {
         {selected && (
           <div>
             <div style={styles.detailGrid}>
-              <div><strong>{selected.requisition_number}</strong><br /><span style={statusStyle(selected.status)}>{selected.status}</span></div>
+              <div><strong>{selected.requisition_number}</strong><br /><span style={statusStyle(selected.status)}>{requisitionStatusLabel(selected.status)}</span></div>
               <div><strong>Department</strong><br />{selected.requesting_department}</div>
-              <div><strong>Priority</strong><br />{selected.priority}</div>
+              <div><strong>Priority</strong><br />{humanizeCode(selected.priority)}</div>
               <div><strong>Needed by</strong><br />{formatDate(selected.needed_by)}</div>
               <div><strong>Source</strong><br />{selected.source_storage_location_name || '-'}</div>
               <div><strong>Target</strong><br />{selected.target_department || selected.target_storage_location_name || '-'}</div>
@@ -3319,7 +3572,7 @@ export default function InventoryRequisitionsPage() {
               <div><strong>Last fulfilled</strong><br />{formatDateTime(selected.last_fulfilled_at)}<br /><span style={styles.muted}>{selected.last_fulfilled_by_user_name || ''}</span></div>
               <div><strong>Partial fulfillment</strong><br />{selected.partial_fulfillment_state ? <span style={selected.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>{selected.partial_fulfillment_state === 'stale_partial' ? 'Stale partial' : 'Active partial'}</span> : '-'}<br /><span style={styles.muted}>{selected.partial_fulfillment_age_days !== null && selected.partial_fulfillment_age_days !== undefined ? `${formatNumber(selected.partial_fulfillment_age_days)} days since last fulfillment/update` : ''}</span></div>
               <div><strong>SLA state</strong><br />{selected.sla_state ? <span style={styles.warningText}>{slaStateLabel(selected.sla_state)}</span> : '-'}<br /><span style={styles.muted}>{slaStateDetail(selected)}</span></div>
-              <div><strong>Approval threshold</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{selected.approval_threshold_reason || ''}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} to ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
+              <div><strong>Approval threshold</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{approvalThresholdReasonLabel(selected.approval_threshold_reason)}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} to ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
               <div><strong>Estimated value</strong><br />Requested: {formatNumber(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatNumber(selected.remaining_estimated_value_total)}</span></div>
               <div><strong>Updated</strong><br />{formatDateTime(selected.updated_at)}</div>
             </div>
@@ -3460,8 +3713,8 @@ export default function InventoryRequisitionsPage() {
                   onChange={(event) => setFulfillmentLocationId(event.target.value)}
                 >
                   <option value="">Select source location</option>
-                  {locationsQuery.data?.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}</option>
+                  {activeLocationOptions.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
                   ))}
                 </select>
               </label>
@@ -3526,14 +3779,19 @@ export default function InventoryRequisitionsPage() {
                   </p>
                 )}
                 {readinessQuery.data?.lines?.length ? (
-                  <div style={styles.tableWrapper}>
+                  <>
+                    <p style={styles.muted}>Available stock excludes quantities committed to active reservations. Fulfillment cannot use reserved stock.</p>
+                    <div style={styles.tableWrapper}>
                     <table style={styles.table}>
                       <thead>
                         <tr>
                           <th style={styles.th}>Product</th>
                           <th style={styles.th}>Remaining</th>
+                          <th style={styles.th}>On hand</th>
+                          <th style={styles.th}>Reserved</th>
                           <th style={styles.th}>Available</th>
-                          <th style={styles.th}>Projected</th>
+                          <th style={styles.th}>Projected on hand</th>
+                          <th style={styles.th}>Projected available</th>
                           <th style={styles.th}>Readiness</th>
                         </tr>
                       </thead>
@@ -3542,10 +3800,13 @@ export default function InventoryRequisitionsPage() {
                           <tr key={line.requisition_item_id}>
                             <td style={styles.td}>{line.product_name || line.product_id}<br /><span style={styles.muted}>{line.product_unit || ''}</span></td>
                             <td style={styles.td}>{formatNumber(line.remaining_quantity)}</td>
+                            <td style={styles.td}>{line.on_hand_quantity === null || line.on_hand_quantity === undefined ? '-' : formatNumber(line.on_hand_quantity)}</td>
+                            <td style={styles.td}>{line.reserved_quantity === null || line.reserved_quantity === undefined ? '-' : formatNumber(line.reserved_quantity)}</td>
                             <td style={styles.td}>{line.available_quantity === null ? '-' : formatNumber(line.available_quantity)}</td>
+                            <td style={styles.td}>{line.projected_on_hand_quantity === null || line.projected_on_hand_quantity === undefined ? '-' : formatNumber(line.projected_on_hand_quantity)}</td>
                             <td style={styles.td}>{line.projected_quantity === null ? '-' : formatNumber(line.projected_quantity)}</td>
                             <td style={styles.td}>
-                              <span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? 'Warning' : 'Ready') : line.blocker_code || 'Blocked'}</span>
+                              <span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? 'Warning' : 'Ready') : humanizeCode(line.blocker_code || 'blocked')}</span>
                               {line.threshold_fulfillment_line_note_meets_minimum === false && (
                                 <div style={styles.muted}>Note {formatNumber(line.threshold_fulfillment_line_note_length)}/{formatNumber(line.threshold_fulfillment_line_note_min_length)} chars</div>
                               )}
@@ -3554,7 +3815,8 @@ export default function InventoryRequisitionsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                    </div>
+                  </>
                 ) : (
                   <p style={styles.muted}>Select a source location to check fulfillment readiness.</p>
                 )}
@@ -3648,12 +3910,15 @@ export default function InventoryRequisitionsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 24 },
-  headerGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px 220px', gap: 16 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, alignItems: 'stretch' },
-  compactMetrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
+  page: { display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 },
+  headerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16 },
+  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16, alignItems: 'stretch' },
+  compactMetrics: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 12 },
+  analyticsDetails: { border: '1px solid #cbd5e1', borderRadius: 16, background: '#fff', overflow: 'hidden' },
+  analyticsSummary: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '16px 20px', fontWeight: 800, cursor: 'pointer', background: '#f8fafc' },
+  analyticsIntro: { margin: '16px 20px 0', color: '#64748b', fontSize: 13 },
   departmentRow: { display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid #e5e7eb', padding: '10px 0', fontSize: 13 },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.7fr) minmax(360px, 0.75fr)', gap: 16, alignItems: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))', gap: 16, alignItems: 'start' },
   queueCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)', order: 1 },
   sideCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)', order: 2 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 20, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)' },
@@ -3665,21 +3930,25 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: { margin: '0 0 14px', fontSize: 18 },
   subsectionTitle: { margin: 0, fontSize: 15 },
   muted: { color: '#64748b', fontSize: 13 },
-  twoColumns: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
+  twoColumns: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   field: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
   checkboxLabel: { display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#334155' },
   input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minWidth: 0 },
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minHeight: 76, resize: 'vertical' },
-  smallSelect: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit' },
-  smallInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit', minWidth: 150 },
-  filterGroup: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  queueFilterPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
+  smallSelect: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit', minWidth: 0, maxWidth: '100%' },
+  smallInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit', minWidth: 0, maxWidth: '100%' },
+  queueFilterPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12, width: '100%' },
   quickFilterGroup: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   advancedFilterGroup: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8, padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' },
-  lineHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '16px 0 10px' },
-  lineGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) 110px minmax(0, 1fr) auto', gap: 8, marginBottom: 8 },
+  lineHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, margin: '16px 0 10px' },
+  lineGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(90px, 110px) auto', gap: 8, marginBottom: 10, alignItems: 'stretch' },
+  lineProductInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minWidth: 0, gridColumn: '1' },
+  lineQuantityInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minWidth: 0, gridColumn: '2' },
+  lineNotesInput: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 10px', font: 'inherit', minWidth: 0, gridColumn: '1 / 3' },
+  lineRemoveButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '10px 12px', background: '#fff1f2', color: '#be123c', fontWeight: 700, cursor: 'pointer', gridColumn: '3', gridRow: '1 / 3' },
   primaryButton: { border: 0, borderRadius: 10, padding: '10px 14px', background: '#1d4ed8', color: '#fff', fontWeight: 700, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
+  secondaryButtonSmall: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '7px 10px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', background: '#fff1f2', color: '#be123c', fontWeight: 700, cursor: 'pointer' },
   queueItemRow: { display: 'grid', gridTemplateColumns: '32px 1fr', gap: 8, alignItems: 'stretch', marginBottom: 8 },
   bulkResultList: { marginTop: 10, display: 'grid', gap: 8 },
@@ -3697,23 +3966,31 @@ const styles: Record<string, CSSProperties> = {
   activeBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#dbeafe', color: '#1d4ed8', fontSize: 12, fontWeight: 700 },
   successBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#dcfce7', color: '#166534', fontSize: 12, fontWeight: 700 },
   dangerBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#ffe4e6', color: '#be123c', fontSize: 12, fontWeight: 700 },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 },
   noteBox: { borderLeft: '4px solid #bfdbfe', background: '#eff6ff', padding: 12, borderRadius: 10 },
   successBox: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: 12 },
   tableWrapper: { overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#475569', background: '#f8fafc' },
   td: { padding: 10, borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
-  workflowPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', marginTop: 16 },
-  bulkFulfillmentPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'end', margin: '12px 0', padding: 12, border: '1px solid #dbeafe', borderRadius: 12, background: '#eff6ff' },
+  workflowPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end', marginTop: 16 },
+  bulkFulfillmentPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12, alignItems: 'end', margin: '12px 0', padding: 12, border: '1px solid #dbeafe', borderRadius: 12, background: '#eff6ff' },
   actionsRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   readinessPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 },
   activityPanel: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 },
-  commentComposer: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8 },
+  commentComposer: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 },
   timelineList: { display: 'flex', flexDirection: 'column', gap: 10 },
   timelineItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 4 },
   timelineTitle: { textTransform: 'capitalize' },
   compactList: { margin: '8px 0 0', paddingLeft: 18 },
+  filterRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  inlineActions: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  searchInput: { flex: '1 1 240px', border: '1px solid #cbd5e1', borderRadius: 10, padding: '8px 10px', font: 'inherit', minWidth: 0 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 },
+  summaryRow: { display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  pager: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 16, paddingTop: 14, borderTop: '1px solid #e5e7eb' },
+  pagerInfo: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, color: '#64748b', fontSize: 13 },
+  warningText: { color: '#92400e', fontSize: 13 },
   warningBox: { border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', borderRadius: 12, padding: 12 },
   errorBox: { border: '1px solid #fecaca', background: '#fff1f2', color: '#be123c', borderRadius: 12, padding: 12 }
 };
