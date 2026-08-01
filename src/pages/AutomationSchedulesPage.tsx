@@ -1,61 +1,175 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { apiRequest, ApiError } from '../lib/api';
-import { fetchTenantSubscriptionAccess, type TenantFeatureEntitlementRow } from '../lib/tenantSubscriptionAccess';
+import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
-import type { AutomationRunnerAccountabilityDigestResponse, AutomationRunnerActivationChecklistResponse, AutomationRunnerAuditBundleResponse, AutomationRunnerArchiveManifestResponse, AutomationRunnerRetentionReportResponse, AutomationRunnerCertificationEvidenceResponse, AutomationRunnerCertificationReportResponse, AutomationRunnerChangeControlPackResponse, AutomationRunnerClosureSealResponse, AutomationRunnerFinalizationManifestResponse, AutomationRunnerCloseoutReportResponse, AutomationRunnerContainmentReportResponse, AutomationRunnerExecutiveSummaryResponse, AutomationRunnerGovernancePackResponse, AutomationRunnerHandoffBriefResponse, AutomationRunnerIncidentDrillResponse, AutomationRunnerLaunchAttestationResponse, AutomationRunnerDriftReportResponse, AutomationRunnerModuleClosureResponse, AutomationRunnerObservabilitySnapshotResponse, AutomationRunnerProductionSafetyLockResponse, AutomationRunnerOperationsReviewResponse, AutomationRunnerPolicyMatrixResponse, AutomationRunnerPostLaunchMonitorResponse, AutomationRunnerPreflightResponse, AutomationRunnerReadinessCertificationResponse, AutomationRunnerReadinessResponse, AutomationRunnerReleaseGuardResponse, AutomationRunnerRollbackPlanResponse, AutomationRunnerRollbackVerificationResponse, AutomationRunnerSafetyReportResponse, AutomationRunnerStatusResponse, AutomationRunnerRunOnceResponse, AutomationRunnerStewardshipChecklistResponse, AutomationRunnerStewardshipLedgerResponse, AutomationSchedule, AutomationScheduleAuditPackResponse, AutomationScheduleDryRunResponse, AutomationScheduleListResponse, AutomationScheduleManualRunResponse, AutomationScheduleRunEventsResponse, AutomationScheduleTypesResponse } from '../types/inventory';
+import { fetchTenantSubscriptionAccess, type TenantFeatureEntitlementRow } from '../lib/tenantSubscriptionAccess';
+import type {
+  AutomationRunnerExecutiveSummaryResponse,
+  AutomationRunnerLaunchAttestationResponse,
+  AutomationRunnerReadinessResponse,
+  AutomationRunnerRunOnceResponse,
+  AutomationRunnerStatusResponse,
+  AutomationSchedule,
+  AutomationScheduleAuditPackResponse,
+  AutomationScheduleDryRunResponse,
+  AutomationScheduleListResponse,
+  AutomationScheduleManualRunResponse,
+  AutomationScheduleRunEventsResponse,
+  AutomationScheduleTypesResponse,
+  AutomationTypeDefinition
+} from '../types/inventory';
+import './AutomationSchedulesPage.css';
 
 type StatusFilter = '' | AutomationSchedule['status'];
 type TypeFilter = '' | AutomationSchedule['automation_type'];
+type ScheduleKind = 'manual' | 'daily' | 'weekly' | 'monthly';
+type RequestDefaultStatus = 'draft' | 'pending_review';
 
 type FormState = {
   name: string;
   description: string;
   automation_type: AutomationSchedule['automation_type'];
-  schedule_kind: AutomationSchedule['schedule_kind'];
+  schedule_kind: ScheduleKind;
   time: string;
   timezone: string;
-  default_status: 'draft' | 'pending_review';
+  day_of_week: number;
+  day_of_month: number;
+  default_status: RequestDefaultStatus;
 };
 
-const defaultForm: FormState = {
+type ConfirmationState =
+  | { kind: 'activate'; schedule: AutomationSchedule }
+  | { kind: 'disable'; schedule: AutomationSchedule }
+  | { kind: 'manual_run'; schedule: AutomationSchedule }
+  | { kind: 'run_due' }
+  | { kind: 'acknowledge_anomaly' }
+  | null;
+
+const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const PAGE_SIZES = [25, 50, 100];
+
+const fallbackAutomationTypes: AutomationTypeDefinition[] = [
+  {
+    automation_type: 'cost_risk_review',
+    label: 'Cost Risk Review',
+    description: 'Prepare a controlled review request for cost-risk signals.',
+    default_request_type: 'cost_review',
+    creates_execution_requests_later: true,
+    executes_actions: false,
+    risk_level: 'low'
+  },
+  {
+    automation_type: 'cost_governance_review',
+    label: 'Cost Governance Review',
+    description: 'Prepare a controlled review request for costing governance and audit readiness.',
+    default_request_type: 'cost_review',
+    creates_execution_requests_later: true,
+    executes_actions: false,
+    risk_level: 'low'
+  },
+  {
+    automation_type: 'system_context_review',
+    label: 'System Context Review',
+    description: 'Prepare a reviewable System Context recommendation snapshot.',
+    default_request_type: 'system_recommendation',
+    creates_execution_requests_later: true,
+    executes_actions: false,
+    risk_level: 'low'
+  },
+  {
+    automation_type: 'execution_readiness_review',
+    label: 'Execution Readiness Review',
+    description: 'Prepare a review request for execution gates and readiness signals.',
+    default_request_type: 'system_recommendation',
+    creates_execution_requests_later: true,
+    executes_actions: false,
+    risk_level: 'medium'
+  }
+];
+
+const createDefaultForm = (): FormState => ({
   name: '',
   description: '',
   automation_type: 'cost_risk_review',
   schedule_kind: 'manual',
   time: '09:00',
-  timezone: 'Europe/Zagreb',
+  timezone: DEFAULT_TIMEZONE,
+  day_of_week: 1,
+  day_of_month: 1,
   default_status: 'draft'
-};
-
-const automationTypes: AutomationSchedule['automation_type'][] = [
-  'cost_risk_review',
-  'cost_governance_review',
-  'system_context_review',
-  'execution_readiness_review'
-];
-
-const statuses: AutomationSchedule['status'][] = ['draft', 'active', 'paused', 'disabled'];
-const scheduleKinds: AutomationSchedule['schedule_kind'][] = ['manual', 'daily', 'weekly', 'monthly'];
+});
 
 function getAutomationEntitlement(featureEntitlements?: TenantFeatureEntitlementRow[]): TenantFeatureEntitlementRow | null {
   return featureEntitlements?.find((entitlement) => entitlement.feature === 'automation') || null;
 }
 
-function label(value?: string | null): string {
-  return value ? value.replace(/_/g, ' ') : '-';
+function humanize(value?: string | null): string {
+  if (!value) return '—';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return '-';
+function formatDateTime(value?: string | null, timezone?: string | null): string {
+  if (!value) return '—';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleString();
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(timezone ? { timeZone: timezone } : {})
+    }).format(parsed);
+  } catch {
+    return parsed.toLocaleString();
+  }
 }
 
-function JsonBlock({ value }: { value: unknown }) {
-  return <pre style={styles.json}>{JSON.stringify(value ?? null, null, 2)}</pre>;
+function numberValue(value: number | string | undefined | null): number {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function scheduleConfigValue(schedule: AutomationSchedule, key: string): unknown {
+  return schedule.schedule_config?.[key];
+}
+
+function scheduleTimezone(schedule: AutomationSchedule): string {
+  const value = scheduleConfigValue(schedule, 'timezone');
+  return typeof value === 'string' && value.trim() ? value : 'UTC';
+}
+
+function schedulePattern(schedule: AutomationSchedule): string {
+  const kind = schedule.schedule_kind as ScheduleKind;
+  if (kind === 'manual') return 'Manual only';
+  const time = typeof scheduleConfigValue(schedule, 'time') === 'string' ? String(scheduleConfigValue(schedule, 'time')) : '09:00';
+  const timezone = scheduleTimezone(schedule);
+  if (kind === 'daily') return `Daily at ${time} · ${timezone}`;
+  if (kind === 'weekly') {
+    const day = Number(scheduleConfigValue(schedule, 'day_of_week'));
+    return `Every ${DAY_NAMES[Number.isInteger(day) && day >= 0 && day <= 6 ? day : 1]} at ${time} · ${timezone}`;
+  }
+  const day = Number(scheduleConfigValue(schedule, 'day_of_month'));
+  return `Monthly on day ${Number.isInteger(day) && day >= 1 && day <= 31 ? day : 1} at ${time} · ${timezone}`;
+}
+
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function JsonEvidence({ value }: { value: unknown }) {
+  return <pre className="automation-schedules-json">{JSON.stringify(value ?? null, null, 2)}</pre>;
+}
+
+function StatusChip({ status }: { status?: string | null }) {
+  const normalized = status || 'unknown';
+  return <span className={`automation-schedules-chip automation-schedules-chip--${normalized}`}>{humanize(normalized)}</span>;
 }
 
 export default function AutomationSchedulesPage() {
@@ -67,70 +181,86 @@ export default function AutomationSchedulesPage() {
   const canDisableAutomationSchedules = capabilities.canDisableAutomationSchedules;
   const canCreateExecutionRequests = capabilities.canCreateExecutionRequests;
   const canViewExecutionRequests = capabilities.canViewExecutionRequests;
+
+  const [automationEntitlement, setAutomationEntitlement] = useState<TenantFeatureEntitlementRow | null>(null);
   const [data, setData] = useState<AutomationScheduleListResponse | null>(null);
   const [types, setTypes] = useState<AutomationScheduleTypesResponse | null>(null);
   const [runnerReadiness, setRunnerReadiness] = useState<AutomationRunnerReadinessResponse | null>(null);
-  const [runnerExecutiveSummary, setRunnerExecutiveSummary] = useState<AutomationRunnerExecutiveSummaryResponse | null>(null);
   const [runnerStatus, setRunnerStatus] = useState<AutomationRunnerStatusResponse | null>(null);
-  const [runnerReleaseGuard] = useState<AutomationRunnerReleaseGuardResponse | null>(null);
-  const [runnerChangeControlPack] = useState<AutomationRunnerChangeControlPackResponse | null>(null);
-  const [runnerRollbackPlan] = useState<AutomationRunnerRollbackPlanResponse | null>(null);
-  const [runnerRollbackVerification] = useState<AutomationRunnerRollbackVerificationResponse | null>(null);
-  const [runnerCertificationReport] = useState<AutomationRunnerCertificationReportResponse | null>(null);
-  const [runnerCertificationEvidence] = useState<AutomationRunnerCertificationEvidenceResponse | null>(null);
+  const [runnerExecutiveSummary, setRunnerExecutiveSummary] = useState<AutomationRunnerExecutiveSummaryResponse | null>(null);
   const [runnerLaunchAttestation, setRunnerLaunchAttestation] = useState<AutomationRunnerLaunchAttestationResponse | null>(null);
-  const [runnerPostLaunchMonitor] = useState<AutomationRunnerPostLaunchMonitorResponse | null>(null);
-  const [runnerIncidentDrill] = useState<AutomationRunnerIncidentDrillResponse | null>(null);
-  const [runnerCloseoutReport] = useState<AutomationRunnerCloseoutReportResponse | null>(null);
-  const [runnerArchiveManifest] = useState<AutomationRunnerArchiveManifestResponse | null>(null);
-  const [runnerRetentionReport] = useState<AutomationRunnerRetentionReportResponse | null>(null);
-  const [runnerHandoffBrief] = useState<AutomationRunnerHandoffBriefResponse | null>(null);
-  const [runnerStewardshipChecklist] = useState<AutomationRunnerStewardshipChecklistResponse | null>(null);
-  const [runnerStewardshipLedger] = useState<AutomationRunnerStewardshipLedgerResponse | null>(null);
-  const [runnerAuditBundle] = useState<AutomationRunnerAuditBundleResponse | null>(null);
-  const [runnerObservabilitySnapshot] = useState<AutomationRunnerObservabilitySnapshotResponse | null>(null);
-  const [runnerProductionSafetyLock] = useState<AutomationRunnerProductionSafetyLockResponse | null>(null);
-  const [runnerReadinessCertification] = useState<AutomationRunnerReadinessCertificationResponse | null>(null);
-  const [runnerModuleClosure] = useState<AutomationRunnerModuleClosureResponse | null>(null);
-  const [runnerClosureSeal] = useState<AutomationRunnerClosureSealResponse | null>(null);
-  const [runnerFinalizationManifest] = useState<AutomationRunnerFinalizationManifestResponse | null>(null);
-  const [runnerSafetyReport] = useState<AutomationRunnerSafetyReportResponse | null>(null);
-  const [runnerGovernancePack] = useState<AutomationRunnerGovernancePackResponse | null>(null);
-  const [runnerDriftReport] = useState<AutomationRunnerDriftReportResponse | null>(null);
-  const [runnerPreflight] = useState<AutomationRunnerPreflightResponse | null>(null);
-  const [runnerAccountabilityDigest] = useState<AutomationRunnerAccountabilityDigestResponse | null>(null);
-  const [runnerOperationsReview] = useState<AutomationRunnerOperationsReviewResponse | null>(null);
-  const [runnerPolicyMatrix] = useState<AutomationRunnerPolicyMatrixResponse | null>(null);
-  const [runnerActivationChecklist] = useState<AutomationRunnerActivationChecklistResponse | null>(null);
-  const [runnerContainmentReport] = useState<AutomationRunnerContainmentReportResponse | null>(null);
   const [runEvents, setRunEvents] = useState<AutomationScheduleRunEventsResponse | null>(null);
   const [selected, setSelected] = useState<AutomationSchedule | null>(null);
+  const [editForm, setEditForm] = useState<FormState | null>(null);
+  const [form, setForm] = useState<FormState>(() => createDefaultForm());
   const [dryRunResult, setDryRunResult] = useState<AutomationScheduleDryRunResponse | null>(null);
   const [manualRunResult, setManualRunResult] = useState<AutomationScheduleManualRunResponse | null>(null);
   const [runnerRunOnceResult, setRunnerRunOnceResult] = useState<AutomationRunnerRunOnceResponse | null>(null);
   const [auditPack, setAuditPack] = useState<AutomationScheduleAuditPackResponse | null>(null);
+
   const [status, setStatus] = useState<StatusFilter>('');
   const [automationType, setAutomationType] = useState<TypeFilter>('');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState<FormState>(defaultForm);
-  const [editForm, setEditForm] = useState<FormState | null>(null);
+  const [limit, setLimit] = useState(25);
+  const [offset, setOffset] = useState(0);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [governanceOpen, setGovernanceOpen] = useState(false);
+  const [governanceLoading, setGovernanceLoading] = useState(false);
+  const [governanceLoaded, setGovernanceLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [automationEntitlement, setAutomationEntitlement] = useState<TenantFeatureEntitlementRow | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
+  const [confirmationText, setConfirmationText] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setOffset(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (automationType) params.set('automation_type', automationType);
-    if (search.trim()) params.set('search', search.trim());
-    params.set('limit', '50');
+    if (search) params.set('search', search);
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
     return params.toString();
-  }, [status, automationType, search]);
+  }, [automationType, limit, offset, search, status]);
 
-  const loadSchedules = useCallback(async () => {
+  const availableTypes = types?.automation_types?.length ? types.automation_types : fallbackAutomationTypes;
+  const selectedTypeDefinition = availableTypes.find((row) => row.automation_type === form.automation_type) || null;
+  const total = numberValue(data?.total);
+  const currentStart = total === 0 ? 0 : offset + 1;
+  const currentEnd = Math.min(offset + numberValue(data?.rows.length), total);
+  const hasPreviousPage = offset > 0;
+  const hasNextPage = offset + limit < total;
+
+  const activeCount = useMemo(() => {
+    if (!runnerReadiness) return 0;
+    const explicit = runnerReadiness.totals.active_schedules;
+    if (explicit !== undefined) return numberValue(explicit);
+    return Math.max(
+      0,
+      numberValue(runnerReadiness.totals.total_schedules)
+        - numberValue(runnerReadiness.totals.draft_schedules)
+        - numberValue(runnerReadiness.totals.paused_schedules)
+        - numberValue(runnerReadiness.totals.disabled_schedules)
+    );
+  }, [runnerReadiness]);
+
+  const loadCore = useCallback(async ({ preserveMessage = false }: { preserveMessage?: boolean } = {}) => {
     setLoading(true);
     setError(null);
+    setWarning(null);
+    if (!preserveMessage) setMessage(null);
+
     try {
       const subscriptionAccess = await fetchTenantSubscriptionAccess();
       const entitlement = getAutomationEntitlement(subscriptionAccess.feature_entitlements);
@@ -140,47 +270,139 @@ export default function AutomationSchedulesPage() {
         setData(null);
         setTypes(null);
         setRunnerReadiness(null);
-        setRunnerExecutiveSummary(null);
-        setRunnerStatus(null);
-        setRunEvents(null);
         setSelected(null);
         return;
       }
 
-      const [response, typeResponse, readinessResponse, executiveSummaryResponse, runnerStatusResponse, launchAttestationResponse] = await Promise.all([
+      const results = await Promise.allSettled([
         apiRequest<AutomationScheduleListResponse>(`/automation-schedules?${query}`),
         apiRequest<AutomationScheduleTypesResponse>('/automation-schedules/types'),
-        apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness'),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerExecutiveSummaryResponse>('/automation-schedules/runner-executive-summary') : Promise.resolve(null),
-        apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner-status'),
-        canViewExecutionRequests ? apiRequest<AutomationRunnerLaunchAttestationResponse>('/automation-schedules/runner-launch-attestation') : Promise.resolve(null)
+        apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness')
       ]);
-      setData(response);
-      setTypes(typeResponse);
-      setRunnerReadiness(readinessResponse);
-      setRunnerExecutiveSummary(executiveSummaryResponse);
-      setRunnerStatus(runnerStatusResponse);
-      setRunnerLaunchAttestation(launchAttestationResponse);
-      setSelected((current) => (current ? response.rows.find((row) => row.id === current.id) || current : null));
+
+      const [listResult, typesResult, readinessResult] = results;
+      const secondaryWarnings: string[] = [];
+
+      if (listResult.status === 'fulfilled') {
+        setData(listResult.value);
+        setSelected((current) => {
+          if (!current) return null;
+          const refreshed = listResult.value.rows.find((row) => row.id === current.id);
+          return refreshed ? { ...current, ...refreshed } : current;
+        });
+      } else {
+        throw listResult.reason;
+      }
+
+      if (typesResult.status === 'fulfilled') setTypes(typesResult.value);
+      else secondaryWarnings.push('Schedule type guidance could not be refreshed.');
+
+      if (readinessResult.status === 'fulfilled') setRunnerReadiness(readinessResult.value);
+      else secondaryWarnings.push('Runner readiness summary could not be refreshed.');
+
+      if (secondaryWarnings.length) setWarning(secondaryWarnings.join(' '));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load automation schedules');
     } finally {
       setLoading(false);
     }
-  }, [query, canViewExecutionRequests]);
+  }, [query]);
+
+  const loadGovernance = useCallback(async () => {
+    setGovernanceLoading(true);
+    setWarning(null);
+    try {
+      const requests: Array<Promise<unknown>> = [
+        apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner-status')
+      ];
+      if (canViewExecutionRequests) {
+        requests.push(
+          apiRequest<AutomationRunnerExecutiveSummaryResponse>('/automation-schedules/runner-executive-summary'),
+          apiRequest<AutomationRunnerLaunchAttestationResponse>('/automation-schedules/runner-launch-attestation'),
+          apiRequest<AutomationScheduleRunEventsResponse>('/automation-schedules/run-events?limit=25&offset=0')
+        );
+      }
+
+      const results = await Promise.allSettled(requests);
+      const warnings: string[] = [];
+
+      if (results[0]?.status === 'fulfilled') setRunnerStatus(results[0].value as AutomationRunnerStatusResponse);
+      else warnings.push('Runner status could not be loaded.');
+
+      if (canViewExecutionRequests) {
+        if (results[1]?.status === 'fulfilled') setRunnerExecutiveSummary(results[1].value as AutomationRunnerExecutiveSummaryResponse);
+        else warnings.push('Executive governance summary could not be loaded.');
+        if (results[2]?.status === 'fulfilled') setRunnerLaunchAttestation(results[2].value as AutomationRunnerLaunchAttestationResponse);
+        else warnings.push('Launch attestation could not be loaded.');
+        if (results[3]?.status === 'fulfilled') setRunEvents(results[3].value as AutomationScheduleRunEventsResponse);
+        else warnings.push('Run ledger could not be loaded.');
+      }
+
+      setGovernanceLoaded(true);
+      if (warnings.length) setWarning(warnings.join(' '));
+    } finally {
+      setGovernanceLoading(false);
+    }
+  }, [canViewExecutionRequests]);
 
   useEffect(() => {
-    void loadSchedules();
-  }, [loadSchedules]);
+    void loadCore();
+  }, [loadCore]);
+
+  useEffect(() => {
+    if (governanceOpen && !governanceLoaded && !governanceLoading) void loadGovernance();
+  }, [governanceLoaded, governanceLoading, governanceOpen, loadGovernance]);
+
+  const refreshPage = async () => {
+    await loadCore();
+    if (governanceOpen) await loadGovernance();
+  };
+
+  const scheduleToForm = (schedule: AutomationSchedule): FormState => {
+    const config = schedule.schedule_config || {};
+    const defaults = schedule.request_defaults || {};
+    return {
+      name: schedule.name,
+      description: schedule.description || '',
+      automation_type: schedule.automation_type,
+      schedule_kind: (schedule.schedule_kind as ScheduleKind) || 'manual',
+      time: typeof config.time === 'string' ? config.time : '09:00',
+      timezone: typeof config.timezone === 'string' ? config.timezone : DEFAULT_TIMEZONE,
+      day_of_week: Number.isInteger(Number(config.day_of_week)) ? Number(config.day_of_week) : 1,
+      day_of_month: Number.isInteger(Number(config.day_of_month)) ? Number(config.day_of_month) : 1,
+      default_status: defaults.default_status === 'pending_review' ? 'pending_review' : 'draft'
+    };
+  };
+
+  const validateForm = (value: FormState): string | null => {
+    if (value.name.trim().length < 3) return 'Schedule name must contain at least 3 characters.';
+    if (value.name.trim().length > 255) return 'Schedule name must contain 255 characters or fewer.';
+    if (value.description.length > 4000) return 'Description must contain 4,000 characters or fewer.';
+    if (value.schedule_kind !== 'manual' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)) return 'Choose a valid schedule time.';
+    if (value.schedule_kind !== 'manual' && !isValidTimezone(value.timezone.trim())) return 'Enter a valid IANA timezone, such as Europe/Zagreb or UTC.';
+    if (value.schedule_kind === 'weekly' && (value.day_of_week < 0 || value.day_of_week > 6)) return 'Choose a valid weekday.';
+    if (value.schedule_kind === 'monthly' && (value.day_of_month < 1 || value.day_of_month > 31)) return 'Monthly day must be between 1 and 31.';
+    return null;
+  };
+
+  const buildScheduleConfig = (value: FormState) => ({
+    frequency: value.schedule_kind,
+    time: value.time,
+    timezone: value.timezone.trim(),
+    ...(value.schedule_kind === 'weekly' ? { day_of_week: value.day_of_week } : {}),
+    ...(value.schedule_kind === 'monthly' ? { day_of_month: value.day_of_month } : {})
+  });
 
   const createSchedule = async () => {
-    if (!form.name.trim()) {
-      setError('Schedule name is required');
+    const validationError = validateForm(form);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const created = await apiRequest<AutomationSchedule>('/automation-schedules', {
         method: 'POST',
@@ -189,19 +411,16 @@ export default function AutomationSchedulesPage() {
           description: form.description.trim() || null,
           automation_type: form.automation_type,
           schedule_kind: form.schedule_kind,
-          schedule_config: {
-            frequency: form.schedule_kind,
-            time: form.time,
-            timezone: form.timezone
-          },
-          request_defaults: {
-            default_status: form.default_status
-          }
+          schedule_config: buildScheduleConfig(form),
+          request_defaults: { default_status: form.default_status }
         })
       });
       setSelected(created);
-      setForm(defaultForm);
-      await loadSchedules();
+      setEditForm(null);
+      setForm(createDefaultForm());
+      setMessage(`Created draft schedule “${created.name}”. It will not run automatically until it is activated and runner request creation is explicitly enabled.`);
+      await loadCore({ preserveMessage: true });
+      window.setTimeout(() => document.getElementById('automation-schedule-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create automation schedule');
     } finally {
@@ -209,31 +428,18 @@ export default function AutomationSchedulesPage() {
     }
   };
 
-  const scheduleToForm = (schedule: AutomationSchedule): FormState => {
-    const config = schedule.schedule_config || {};
-    const defaults = schedule.request_defaults || {};
-
-    return {
-      name: schedule.name,
-      description: schedule.description || '',
-      automation_type: schedule.automation_type,
-      schedule_kind: schedule.schedule_kind,
-      time: typeof config.time === 'string' ? config.time : '09:00',
-      timezone: typeof config.timezone === 'string' ? config.timezone : 'Europe/Zagreb',
-      default_status: defaults.default_status === 'pending_review' ? 'pending_review' : 'draft'
-    };
-  };
-
   const loadScheduleDetail = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const response = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`);
       setSelected(response);
-      setEditForm(scheduleToForm(response));
+      setEditForm(null);
       setDryRunResult(null);
       setManualRunResult(null);
       setAuditPack(null);
+      window.setTimeout(() => document.getElementById('automation-schedule-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load automation schedule detail');
     } finally {
@@ -242,18 +448,16 @@ export default function AutomationSchedulesPage() {
   };
 
   const updateSchedule = async (schedule: AutomationSchedule) => {
-    if (!editForm) {
-      setError('No schedule edit form is active');
-      return;
-    }
-
-    if (!editForm.name.trim()) {
-      setError('Schedule name is required');
+    if (!editForm) return;
+    const validationError = validateForm(editForm);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`, {
         method: 'PATCH',
@@ -262,19 +466,14 @@ export default function AutomationSchedulesPage() {
           description: editForm.description.trim() || null,
           automation_type: editForm.automation_type,
           schedule_kind: editForm.schedule_kind,
-          schedule_config: {
-            frequency: editForm.schedule_kind,
-            time: editForm.time,
-            timezone: editForm.timezone
-          },
-          request_defaults: {
-            default_status: editForm.default_status
-          }
+          schedule_config: buildScheduleConfig(editForm),
+          request_defaults: { default_status: editForm.default_status }
         })
       });
       setSelected(updated);
-      setEditForm(scheduleToForm(updated));
-      await loadSchedules();
+      setEditForm(null);
+      setMessage(`Saved “${updated.name}”. Its next-run time was recalculated from the updated calendar settings.`);
+      await loadCore({ preserveMessage: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to update automation schedule');
     } finally {
@@ -285,14 +484,16 @@ export default function AutomationSchedulesPage() {
   const pauseSchedule = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}/pause`, {
         method: 'POST',
         body: JSON.stringify({})
       });
       setSelected(updated);
-      setEditForm(scheduleToForm(updated));
-      await loadSchedules();
+      setEditForm(null);
+      setMessage(`Paused “${updated.name}”. It is no longer eligible for automatic due processing.`);
+      await loadCore({ preserveMessage: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to pause automation schedule');
     } finally {
@@ -303,94 +504,162 @@ export default function AutomationSchedulesPage() {
   const resumeSchedule = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}/resume`, {
         method: 'POST',
         body: JSON.stringify({})
       });
       setSelected(updated);
-      setEditForm(scheduleToForm(updated));
-      await loadSchedules();
+      setEditForm(null);
+      setMessage(`Activated “${updated.name}”. Its next run was scheduled from now, so an old paused date will not be processed as an immediate catch-up run.`);
+      await loadCore({ preserveMessage: true });
+      if (governanceOpen) await loadGovernance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to activate automation schedule');
     } finally {
       setSaving(false);
+      setConfirmation(null);
     }
   };
 
-  const disableSchedule = async (schedule: AutomationSchedule) => {
-    const reason = window.prompt('Why should this automation schedule be disabled?');
-    if (!reason || reason.trim().length < 3) return;
-
+  const disableSchedule = async (schedule: AutomationSchedule, reason: string) => {
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}/disable`, {
         method: 'POST',
         body: JSON.stringify({ disabled_reason: reason.trim() })
       });
       setSelected(updated);
-      setEditForm(scheduleToForm(updated));
-      await loadSchedules();
+      setEditForm(null);
+      setMessage(`Disabled “${updated.name}”. The reason is preserved in its audit trail.`);
+      await loadCore({ preserveMessage: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to disable automation schedule');
     } finally {
       setSaving(false);
+      setConfirmation(null);
+      setConfirmationText('');
     }
   };
 
-
-
-  const runDueSchedulesOnce = async () => {
-    const confirmed = window.confirm('Run due active schedules once for this tenant? This can create execution requests, but it will not approve, execute, or mutate inventory.');
-    if (!confirmed) return;
-
+  const dryRunSchedule = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
-      const response = await apiRequest<AutomationRunnerRunOnceResponse>('/automation-schedules/runner/run-once', {
+      const response = await apiRequest<AutomationScheduleDryRunResponse>(`/automation-schedules/${schedule.id}/dry-run`, {
         method: 'POST',
-        body: JSON.stringify({ limit: runnerStatus?.batch_limit ?? 10, confirm_request_creation: true })
+        body: JSON.stringify({})
       });
-      setRunnerRunOnceResult(response);
-      await loadSchedules();
+      setSelected(response.schedule || schedule);
+      setEditForm(null);
+      setDryRunResult(response);
+      setManualRunResult(null);
+      setAuditPack(null);
+      setMessage(`Dry run completed for “${schedule.name}”. No execution request or inventory record was changed.`);
+      window.setTimeout(() => document.getElementById('automation-schedule-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to run due automation schedules once');
+      setError(err instanceof ApiError ? err.message : 'Failed to preview automation schedule');
     } finally {
       setSaving(false);
     }
   };
 
+  const runScheduleManually = async (schedule: AutomationSchedule) => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await apiRequest<AutomationScheduleManualRunResponse>(`/automation-schedules/${schedule.id}/run`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      setSelected(response.schedule);
+      setEditForm(null);
+      setManualRunResult(response);
+      setDryRunResult(null);
+      setAuditPack(null);
+      setMessage(response.duplicate_guard_triggered
+        ? `No duplicate request was created for “${schedule.name}”; the existing matching request was reused.`
+        : `Created a reviewable execution request from “${schedule.name}”. Nothing was approved or executed automatically.`);
+      await loadCore({ preserveMessage: true });
+      if (governanceOpen) await loadGovernance();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to create an execution request from this schedule');
+    } finally {
+      setSaving(false);
+      setConfirmation(null);
+    }
+  };
 
-  const acknowledgeRunnerUnsafeOutputReview = async () => {
-    const expectedLastUnsafeAt = runnerStatus?.unsafe_runner_output_review_expected_last_unsafe_runner_output_at || runnerStatus?.expected_last_unsafe_runner_output_at || runnerStatus?.last_unsafe_runner_output_at || null;
-    const expectedUnsafeCount = Number(runnerStatus?.unsafe_runner_output_review_expected_count ?? runnerStatus?.expected_unsafe_runner_output_count ?? runnerStatus?.unsafe_runner_output_count ?? 0);
-    if (!expectedLastUnsafeAt || !Number.isFinite(expectedUnsafeCount) || expectedUnsafeCount <= 0) {
-      setError('Refresh runner status before acknowledging anomaly review; the latest unsafe-output timestamp and count are required.');
+  const loadAuditPack = async (schedule: AutomationSchedule) => {
+    if (!canViewExecutionRequests) {
+      setError('Your current role cannot read linked execution-request evidence.');
       return;
     }
-
-    const confirmed = window.confirm(`Acknowledge unsafe-output anomaly review for latest unsafe output at ${formatDateTime(expectedLastUnsafeAt)} with anomaly count ${expectedUnsafeCount}? This preserves anomaly evidence, count, and timestamps, but clears the current review-required status only if the confirmation is still current.`);
-    if (!confirmed) return;
-
-    const reviewNoteMinLength = Number(runnerStatus?.unsafe_runner_output_review_note_min_length ?? 10);
-    const reviewNoteMaxLength = Number(runnerStatus?.unsafe_runner_output_review_note_max_length ?? 1000);
-    const note = window.prompt(`Add a specific review note (${reviewNoteMinLength}-${reviewNoteMaxLength} characters). This note is required and will be redacted from runner status and audit body fields.`);
-    if (note === null) return;
-
-    const reviewNote = note.trim();
-    if (reviewNote.length < reviewNoteMinLength) {
-      setError(`A specific review note of at least ${reviewNoteMinLength} characters is required before acknowledging runner anomaly review.`);
-      return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await apiRequest<AutomationScheduleAuditPackResponse>(`/automation-schedules/${schedule.id}/audit-pack`);
+      setSelected(schedule);
+      setEditForm(null);
+      setAuditPack(response);
+      setDryRunResult(null);
+      setManualRunResult(null);
+      setMessage(`Loaded the audit pack for “${schedule.name}”.`);
+      window.setTimeout(() => document.getElementById('automation-schedule-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load the schedule audit pack');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    if (reviewNote.length > reviewNoteMaxLength) {
-      setError(`Review note must be ${reviewNoteMaxLength} characters or less before acknowledging runner anomaly review.`);
+  const runDueSchedulesOnce = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await apiRequest<AutomationRunnerRunOnceResponse>('/automation-schedules/runner/run-once', {
+        method: 'POST',
+        body: JSON.stringify({ limit: numberValue(runnerStatus?.batch_limit) || 10, confirm_request_creation: true })
+      });
+      setRunnerRunOnceResult(response);
+      setMessage(`Run-once finished: ${numberValue(response.created_execution_request_count)} request(s) created, ${numberValue(response.skipped_schedule_count)} schedule(s) skipped, and nothing executed automatically.`);
+      await loadCore({ preserveMessage: true });
+      await loadGovernance();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to run due schedules once');
+    } finally {
+      setSaving(false);
+      setConfirmation(null);
+    }
+  };
+
+  const acknowledgeRunnerUnsafeOutputReview = async (reviewNote: string) => {
+    const expectedLastUnsafeAt = runnerStatus?.unsafe_runner_output_review_expected_last_unsafe_runner_output_at
+      || runnerStatus?.expected_last_unsafe_runner_output_at
+      || runnerStatus?.last_unsafe_runner_output_at
+      || null;
+    const expectedUnsafeCount = numberValue(
+      runnerStatus?.unsafe_runner_output_review_expected_count
+      ?? runnerStatus?.expected_unsafe_runner_output_count
+      ?? runnerStatus?.unsafe_runner_output_count
+    );
+
+    if (!expectedLastUnsafeAt || expectedUnsafeCount <= 0) {
+      setError('Refresh runner evidence before acknowledging the anomaly review.');
+      setConfirmation(null);
       return;
     }
 
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const response = await apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner/unsafe-output-review/acknowledge', {
         method: 'POST',
@@ -398,106 +667,145 @@ export default function AutomationSchedulesPage() {
           confirm_unsafe_output_review: true,
           expected_last_unsafe_runner_output_at: expectedLastUnsafeAt,
           expected_unsafe_runner_output_count: expectedUnsafeCount,
-          review_note: reviewNote
+          review_note: reviewNote.trim()
         })
       });
       setRunnerStatus(response);
-      await loadSchedules();
+      setMessage('Runner anomaly review was acknowledged. The evidence remains preserved and the review note body remains redacted from status output.');
+      await loadGovernance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to acknowledge runner anomaly review');
     } finally {
       setSaving(false);
+      setConfirmation(null);
+      setConfirmationText('');
     }
   };
 
-  const runScheduleManually = async (schedule: AutomationSchedule) => {
-    const confirmed = window.confirm('Create an execution request from this schedule? This will not approve or execute the request.');
-    if (!confirmed) return;
-
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await apiRequest<AutomationScheduleManualRunResponse>(`/automation-schedules/${schedule.id}/run`, {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-      setSelected(response.schedule);
-      setEditForm(scheduleToForm(response.schedule));
-      setManualRunResult(response);
-      setDryRunResult(null);
-      setAuditPack(null);
-      await loadSchedules();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create execution request from automation schedule');
-    } finally {
-      setSaving(false);
+  const confirmAction = async () => {
+    if (!confirmation) return;
+    if (confirmation.kind === 'activate') return resumeSchedule(confirmation.schedule);
+    if (confirmation.kind === 'manual_run') return runScheduleManually(confirmation.schedule);
+    if (confirmation.kind === 'run_due') return runDueSchedulesOnce();
+    if (confirmation.kind === 'disable') {
+      if (confirmationText.trim().length < 3) {
+        setError('Enter a disable reason of at least 3 characters.');
+        return;
+      }
+      return disableSchedule(confirmation.schedule, confirmationText);
+    }
+    if (confirmation.kind === 'acknowledge_anomaly') {
+      const min = numberValue(runnerStatus?.unsafe_runner_output_review_note_min_length) || 10;
+      const max = numberValue(runnerStatus?.unsafe_runner_output_review_note_max_length) || 1000;
+      if (confirmationText.trim().length < min || confirmationText.trim().length > max) {
+        setError(`Review note must contain between ${min} and ${max} characters.`);
+        return;
+      }
+      return acknowledgeRunnerUnsafeOutputReview(confirmationText);
     }
   };
 
-  const dryRunSchedule = async (schedule: AutomationSchedule) => {
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await apiRequest<AutomationScheduleDryRunResponse>(`/automation-schedules/${schedule.id}/dry-run`, {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-      setSelected(schedule);
-      setEditForm(scheduleToForm(schedule));
-      setDryRunResult(response);
-      setManualRunResult(null);
-      setAuditPack(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to dry-run automation schedule');
-    } finally {
-      setSaving(false);
-    }
+  const clearFilters = () => {
+    setStatus('');
+    setAutomationType('');
+    setSearchInput('');
+    setSearch('');
+    setOffset(0);
   };
 
-
-  const loadAuditPack = async (schedule: AutomationSchedule) => {
-    if (!canViewExecutionRequests) {
-      setError('Your current role cannot read execution request audit evidence.');
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await apiRequest<AutomationScheduleAuditPackResponse>(`/automation-schedules/${schedule.id}/audit-pack`);
-      setSelected(schedule);
-      setEditForm(scheduleToForm(schedule));
-      setAuditPack(response);
-      setDryRunResult(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load scheduler audit pack');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const formFields = (value: FormState, onChange: (next: FormState) => void, idPrefix: string) => (
+    <>
+      <div className="automation-schedules-form-grid">
+        <label className="automation-schedules-field" htmlFor={`${idPrefix}-name`}>
+          <span>Name</span>
+          <input id={`${idPrefix}-name`} value={value.name} maxLength={255} onChange={(event) => onChange({ ...value, name: event.target.value })} placeholder="Example: Weekly cost-risk review" />
+        </label>
+        <label className="automation-schedules-field" htmlFor={`${idPrefix}-type`}>
+          <span>Review type</span>
+          <select id={`${idPrefix}-type`} value={value.automation_type} onChange={(event) => onChange({ ...value, automation_type: event.target.value })}>
+            {availableTypes.map((type) => <option key={type.automation_type} value={type.automation_type}>{type.label}</option>)}
+          </select>
+        </label>
+        <label className="automation-schedules-field" htmlFor={`${idPrefix}-frequency`}>
+          <span>Frequency</span>
+          <select id={`${idPrefix}-frequency`} value={value.schedule_kind} onChange={(event) => onChange({ ...value, schedule_kind: event.target.value as ScheduleKind })}>
+            <option value="manual">Manual only</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+        {value.schedule_kind !== 'manual' ? (
+          <>
+            <label className="automation-schedules-field" htmlFor={`${idPrefix}-time`}>
+              <span>Local time</span>
+              <input id={`${idPrefix}-time`} type="time" value={value.time} onChange={(event) => onChange({ ...value, time: event.target.value })} />
+            </label>
+            <label className="automation-schedules-field" htmlFor={`${idPrefix}-timezone`}>
+              <span>Timezone</span>
+              <input id={`${idPrefix}-timezone`} value={value.timezone} maxLength={100} list="automation-timezones" onChange={(event) => onChange({ ...value, timezone: event.target.value })} placeholder="Europe/Zagreb" />
+            </label>
+          </>
+        ) : null}
+        {value.schedule_kind === 'weekly' ? (
+          <label className="automation-schedules-field" htmlFor={`${idPrefix}-weekday`}>
+            <span>Weekday</span>
+            <select id={`${idPrefix}-weekday`} value={value.day_of_week} onChange={(event) => onChange({ ...value, day_of_week: Number(event.target.value) })}>
+              {DAY_NAMES.map((day, index) => <option key={day} value={index}>{day}</option>)}
+            </select>
+          </label>
+        ) : null}
+        {value.schedule_kind === 'monthly' ? (
+          <label className="automation-schedules-field" htmlFor={`${idPrefix}-month-day`}>
+            <span>Day of month</span>
+            <input id={`${idPrefix}-month-day`} type="number" min={1} max={31} value={value.day_of_month} onChange={(event) => onChange({ ...value, day_of_month: Number(event.target.value) })} />
+          </label>
+        ) : null}
+        <label className="automation-schedules-field" htmlFor={`${idPrefix}-request-status`}>
+          <span>Created request starts as</span>
+          <select id={`${idPrefix}-request-status`} value={value.default_status} onChange={(event) => onChange({ ...value, default_status: event.target.value as RequestDefaultStatus })}>
+            <option value="draft">Draft</option>
+            <option value="pending_review">Pending review</option>
+          </select>
+        </label>
+      </div>
+      <label className="automation-schedules-field" htmlFor={`${idPrefix}-description`}>
+        <span>Description</span>
+        <textarea id={`${idPrefix}-description`} value={value.description} maxLength={4000} onChange={(event) => onChange({ ...value, description: event.target.value })} placeholder="Explain the business review this schedule prepares." />
+      </label>
+      <datalist id="automation-timezones">
+        <option value="Europe/Zagreb" />
+        <option value="UTC" />
+        <option value="Europe/London" />
+        <option value="Europe/Berlin" />
+        <option value="America/New_York" />
+        <option value="America/Chicago" />
+        <option value="America/Los_Angeles" />
+        <option value="Asia/Dubai" />
+        <option value="Asia/Singapore" />
+        <option value="Asia/Tokyo" />
+        <option value="Australia/Sydney" />
+      </datalist>
+    </>
+  );
 
   if (automationEntitlement && !automationEntitlement.allowed) {
     return (
-      <div style={styles.page}>
-        <section style={styles.headerCard}>
+      <div className="automation-schedules-page">
+        <section className="automation-schedules-hero">
           <div>
-            <h2 style={styles.title}>Automation Schedules</h2>
-            <p style={styles.subtitle}>
-              Configure future scheduled checks. Step 241 adds final read-only readiness certification. Schedules still create reviewable requests only when explicitly allowed and never approve or execute them.
-            </p>
+            <p className="automation-schedules-eyebrow">Controlled review scheduling</p>
+            <h2>Automation Schedules</h2>
+            <p>Prepare future review requests without automatic approval, execution, or inventory changes.</p>
           </div>
-          <div style={styles.safetyBadge}>Not enabled</div>
+          <StatusChip status="disabled" />
         </section>
-
-        <section style={styles.card}>
-          <h3 style={styles.cardTitle}>Automation schedules are not enabled for this tenant</h3>
-          <p style={styles.muted}>
-            This tenant plan does not include automation schedules, so this page does not call automation schedule endpoints.
-            This keeps Render logs clean and avoids expected 403 entitlement warnings.
-          </p>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{label(automationEntitlement.reason)}</strong><span>Reason</span></div>
-            <div style={styles.metric}><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required tenant flag</span></div>
+        <section className="automation-schedules-card">
+          <h3>Automation schedules are not included in this tenant plan</h3>
+          <p className="automation-schedules-muted">No automation-schedule endpoints are called while the feature is unavailable.</p>
+          <div className="automation-schedules-metrics">
+            <div><strong>{humanize(automationEntitlement.reason)}</strong><span>Reason</span></div>
+            <div><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required entitlement</span></div>
           </div>
         </section>
       </div>
@@ -505,1737 +813,411 @@ export default function AutomationSchedulesPage() {
   }
 
   return (
-    <div style={styles.page}>
-      <section style={styles.headerCard}>
+    <div className="automation-schedules-page">
+      <section className="automation-schedules-hero">
         <div>
-          <h2 style={styles.title}>Automation Schedules</h2>
-          <p style={styles.subtitle}>
-            Configure future scheduled checks. Step 241 adds final read-only readiness certification. Schedules still create reviewable requests only when explicitly allowed and never approve or execute them.
-          </p>
+          <p className="automation-schedules-eyebrow">Controlled review scheduling</p>
+          <h2>Automation Schedules</h2>
+          <p>Create, activate, pause, preview, and audit schedules that may prepare execution requests. Schedules never approve or execute those requests.</p>
         </div>
-        <div style={styles.safetyBadge}>No auto execution</div>
+        <div className="automation-schedules-hero-actions">
+          <span className="automation-schedules-safety-pill">No automatic execution</span>
+          <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={loading || saving} onClick={() => void refreshPage()}>{loading ? 'Refreshing…' : 'Refresh page'}</button>
+        </div>
       </section>
 
-      {error ? <div style={styles.error}>{error}</div> : null}
+      {error ? <div className="automation-schedules-alert automation-schedules-alert--error" role="alert">{error}</div> : null}
+      {warning ? <div className="automation-schedules-alert automation-schedules-alert--warning" role="status">{warning}</div> : null}
+      {message ? <div className="automation-schedules-alert automation-schedules-alert--success" role="status">{message}</div> : null}
 
-      {automationEntitlement && !automationEntitlement.allowed ? (
-        <section style={styles.card}>
-          <h3 style={styles.cardTitle}>Automation schedules are not enabled for this tenant</h3>
-          <p style={styles.muted}>
-            This tenant plan does not include automation schedules, so the page does not load automation schedule endpoints.
-            This keeps Render logs clean and avoids expected 403 entitlement warnings.
-          </p>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{label(automationEntitlement.reason)}</strong><span>Reason</span></div>
-            <div style={styles.metric}><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required tenant flag</span></div>
-          </div>
-        </section>
-      ) : null}
+      <section className="automation-schedules-summary" aria-label="Automation schedule summary">
+        <div><strong>{numberValue(runnerReadiness?.totals.total_schedules)}</strong><span>Total schedules</span></div>
+        <div><strong>{activeCount}</strong><span>Active</span></div>
+        <div><strong>{numberValue(runnerReadiness?.totals.draft_schedules)}</strong><span>Draft</span></div>
+        <div><strong>{numberValue(runnerReadiness?.totals.paused_schedules)}</strong><span>Paused</span></div>
+        <div><strong>{numberValue(runnerReadiness?.totals.due_schedule_count)}</strong><span>Due now</span></div>
+        <div><strong>{numberValue(runnerReadiness?.totals.disabled_schedules)}</strong><span>Disabled</span></div>
+      </section>
 
-      {automationEntitlement && !automationEntitlement.allowed ? null : runnerExecutiveSummary ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
+      <section className="automation-schedules-workspace">
+        <div className="automation-schedules-card automation-schedules-list-card">
+          <div className="automation-schedules-section-heading">
             <div>
-              <h3 style={styles.cardTitle}>Runner executive summary</h3>
-              <p style={styles.muted}>{runnerExecutiveSummary.recommendation}</p>
+              <h3>Schedule registry</h3>
+              <p>Search and manage tenant-owned schedule definitions.</p>
             </div>
-            <div style={styles.safetyBadge}>{label(runnerExecutiveSummary.overall_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{label(String(runnerExecutiveSummary.summary.runner_mode))}</strong><span>Runner mode</span></div>
-            <div style={styles.metric}><strong>{runnerExecutiveSummary.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerExecutiveSummary.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerExecutiveSummary.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <ul style={styles.list}>
-            {runnerExecutiveSummary.decision_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-
-
-      {runnerLaunchAttestation ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner launch attestation</h3>
-              <p style={styles.muted}>Read-only launch evidence for controlled automation request creation. It cannot enable flags, start jobs, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerLaunchAttestation.launch_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerLaunchAttestation.summary.failed_attestation_count}</strong><span>Failed attestations</span></div>
-            <div style={styles.metric}><strong>{runnerLaunchAttestation.summary.watch_attestation_count}</strong><span>Watch attestations</span></div>
-            <div style={styles.metric}><strong>{label(runnerLaunchAttestation.summary.certification_posture)}</strong><span>Certification</span></div>
-            <div style={styles.metric}><strong>{runnerLaunchAttestation.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Attestation rows</h4>
-          <ul style={styles.list}>
-            {runnerLaunchAttestation.attestation_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Launch evidence refs</h4>
-          <JsonBlock value={runnerLaunchAttestation.evidence_refs} />
-        </section>
-      ) : null}
-
-
-
-      {runnerPostLaunchMonitor ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner post-launch monitor</h3>
-              <p style={styles.muted}>Read-only 24-hour monitor for automation request creation evidence. It cannot start jobs, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerPostLaunchMonitor.monitor_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerPostLaunchMonitor.summary.failed_monitor_check_count}</strong><span>Failed checks</span></div>
-            <div style={styles.metric}><strong>{runnerPostLaunchMonitor.summary.watch_monitor_check_count}</strong><span>Watch checks</span></div>
-            <div style={styles.metric}><strong>{runnerPostLaunchMonitor.summary.failed_recent_run_event_count}</strong><span>Recent failures</span></div>
-            <div style={styles.metric}><strong>{runnerPostLaunchMonitor.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Monitor rows</h4>
-          <ul style={styles.list}>
-            {runnerPostLaunchMonitor.monitor_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Recent evidence</h4>
-          <JsonBlock value={{
-            recent_run_event_breakdown: runnerPostLaunchMonitor.recent_run_event_breakdown,
-            recent_schedule_created_request_breakdown: runnerPostLaunchMonitor.recent_schedule_created_request_breakdown
-          }} />
-        </section>
-      ) : null}
-
-
-
-      {runnerIncidentDrill ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner incident drill</h3>
-              <p style={styles.muted}>Read-only containment checklist for automation request creation incidents. It cannot change flags, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerIncidentDrill.drill_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerIncidentDrill.summary.failed_drill_check_count}</strong><span>Failed drill checks</span></div>
-            <div style={styles.metric}><strong>{runnerIncidentDrill.summary.watch_drill_check_count}</strong><span>Watch drill checks</span></div>
-            <div style={styles.metric}><strong>{runnerIncidentDrill.summary.recent_failed_run_event_count}</strong><span>Recent failures</span></div>
-            <div style={styles.metric}><strong>{runnerIncidentDrill.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Drill checks</h4>
-          <ul style={styles.list}>
-            {runnerIncidentDrill.drill_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Incident actions</h4>
-          <ul style={styles.list}>
-            {runnerIncidentDrill.incident_actions.map((row) => (
-              <li key={row.key}><strong>{row.label}</strong> — {label(row.action_type)}: {row.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-
-
-      {runnerCloseoutReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner closeout report</h3>
-              <p style={styles.muted}>Read-only phase closeout for controlled automation request creation. It cannot start jobs, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerCloseoutReport.closeout_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerCloseoutReport.summary.failed_closeout_check_count}</strong><span>Failed closeout checks</span></div>
-            <div style={styles.metric}><strong>{runnerCloseoutReport.summary.watch_closeout_check_count}</strong><span>Watch closeout checks</span></div>
-            <div style={styles.metric}><strong>{runnerCloseoutReport.summary.incident_failed_check_count}</strong><span>Incident failures</span></div>
-            <div style={styles.metric}><strong>{runnerCloseoutReport.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Closeout checks</h4>
-          <ul style={styles.list}>
-            {runnerCloseoutReport.closeout_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Closeout evidence</h4>
-          <JsonBlock value={runnerCloseoutReport.evidence_refs} />
-        </section>
-      ) : null}
-
-
-      {runnerArchiveManifest ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner archive manifest</h3>
-              <p style={styles.muted}>Read-only operator handoff manifest for the automation request-creation phase. It cannot start jobs, create requests, approve, execute, retry, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerArchiveManifest.archive_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerArchiveManifest.summary.failed_manifest_check_count}</strong><span>Failed manifest checks</span></div>
-            <div style={styles.metric}><strong>{runnerArchiveManifest.summary.watch_manifest_check_count}</strong><span>Watch manifest checks</span></div>
-            <div style={styles.metric}><strong>{label(runnerArchiveManifest.summary.closeout_posture)}</strong><span>Closeout posture</span></div>
-            <div style={styles.metric}><strong>{runnerArchiveManifest.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Manifest checks</h4>
-          <ul style={styles.list}>
-            {runnerArchiveManifest.manifest_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Archive evidence</h4>
-          <JsonBlock value={runnerArchiveManifest.evidence_refs} />
-        </section>
-      ) : null}
-
-
-      {runnerRetentionReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner retention report</h3>
-              <p style={styles.muted}>Read-only retention evidence for archive and run-ledger records. It cannot purge, export, compact, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerRetentionReport.retention_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerRetentionReport.summary.total_run_events}</strong><span>Total run events</span></div>
-            <div style={styles.metric}><strong>{runnerRetentionReport.summary.recent_run_events_7d}</strong><span>Recent run events</span></div>
-            <div style={styles.metric}><strong>{runnerRetentionReport.summary.linked_request_events}</strong><span>Linked request events</span></div>
-            <div style={styles.metric}><strong>{runnerRetentionReport.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Retention checks</h4>
-          <ul style={styles.list}>
-            {runnerRetentionReport.retention_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Retention evidence</h4>
-          <JsonBlock value={runnerRetentionReport.evidence_refs} />
-        </section>
-      ) : null}
-
-      {runnerHandoffBrief ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner handoff brief</h3>
-              <p style={styles.muted}>Read-only operator handoff for automation runner governance evidence. It cannot start jobs, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerHandoffBrief.handoff_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerHandoffBrief.summary.failed_handoff_check_count}</strong><span>Failed handoff checks</span></div>
-            <div style={styles.metric}><strong>{runnerHandoffBrief.summary.watch_handoff_check_count}</strong><span>Watch handoff checks</span></div>
-            <div style={styles.metric}><strong>{runnerHandoffBrief.summary.total_run_events}</strong><span>Total run events</span></div>
-            <div style={styles.metric}><strong>{runnerHandoffBrief.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Handoff checks</h4>
-          <ul style={styles.list}>
-            {runnerHandoffBrief.handoff_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Operator follow-ups</h4>
-          <ul style={styles.list}>
-            {runnerHandoffBrief.operator_followups.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-          <JsonBlock value={runnerHandoffBrief.evidence_refs} />
-        </section>
-      ) : null}
-
-
-
-      {runnerStewardshipChecklist ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner stewardship checklist</h3>
-              <p style={styles.muted}>Read-only ownership checklist for post-handoff automation governance. It cannot change flags, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerStewardshipChecklist.stewardship_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerStewardshipChecklist.summary.failed_stewardship_check_count}</strong><span>Failed stewardship checks</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipChecklist.summary.watch_stewardship_check_count}</strong><span>Watch stewardship checks</span></div>
-            <div style={styles.metric}><strong>{label(runnerStewardshipChecklist.summary.handoff_posture)}</strong><span>Handoff posture</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipChecklist.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Stewardship checks</h4>
-          <ul style={styles.list}>
-            {runnerStewardshipChecklist.checklist_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}{row.required ? ' · required' : ''} · owner: {label(row.owner)}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Stewardship actions</h4>
-          <ul style={styles.list}>
-            {runnerStewardshipChecklist.stewardship_actions.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-          <JsonBlock value={runnerStewardshipChecklist.evidence_refs} />
-        </section>
-      ) : null}
-
-
-
-      {runnerStewardshipLedger ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner stewardship ledger</h3>
-              <p style={styles.muted}>Read-only owner ledger for schedules, run events, request traceability, and execution-boundary evidence. It cannot change flags, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerStewardshipLedger.ledger_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.failed_ledger_check_count}</strong><span>Failed ledger checks</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.watch_ledger_check_count}</strong><span>Watch ledger checks</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.total_schedules}</strong><span>Total schedules</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.total_run_events}</strong><span>Total run events</span></div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.linked_request_events}</strong><span>Linked request events</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.summary.failed_run_events}</strong><span>Failed run events</span></div>
-            <div style={styles.metric}><strong>{formatDateTime(runnerStewardshipLedger.summary.latest_run_event_at)}</strong><span>Latest run event</span></div>
-            <div style={styles.metric}><strong>{runnerStewardshipLedger.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Stewardship ledger checks</h4>
-          <ul style={styles.list}>
-            {runnerStewardshipLedger.ledger_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label} · owner: {label(row.owner)}: {row.detail}</li>
-            ))}
-          </ul>
-          <JsonBlock value={runnerStewardshipLedger.evidence_refs} />
-        </section>
-      ) : null}
-
-
-
-
-
-
-      {runnerFinalizationManifest ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Step 245 finalization manifest</h3>
-              <p style={styles.muted}>Read-only operator handoff manifest for the closed automation module. It summarizes the closure seal and final boundaries without creating requests, starting jobs, approving, executing, or mutating inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerFinalizationManifest.manifest_posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerFinalizationManifest.summary.failed_manifest_count}</strong><span>Failed manifest checks</span></div>
-            <div style={styles.metric}><strong>{runnerFinalizationManifest.summary.watch_manifest_count}</strong><span>Watch manifest checks</span></div>
-            <div style={styles.metric}><strong>{label(runnerFinalizationManifest.module_posture)}</strong><span>Module posture</span></div>
-            <div style={styles.metric}><strong>{runnerFinalizationManifest.summary.open_review_queue}</strong><span>Open review queue</span></div>
-            <div style={styles.metric}><strong>{runnerFinalizationManifest.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <p style={styles.muted}>Closure seal: <code>{runnerFinalizationManifest.closure_seal}</code></p>
-          <h4 style={styles.smallTitle}>Manifest rows</h4>
-          <ul style={styles.compactList}>
-            {runnerFinalizationManifest.manifest_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-          {runnerFinalizationManifest.completion_certificate ? (
-            <>
-              <h4 style={styles.smallTitle}>Completion certificate</h4>
-              <div style={styles.metricGrid}>
-                <div style={styles.metric}><strong>{runnerFinalizationManifest.completion_certificate.module_closed ? 'Yes' : 'No'}</strong><span>Module closed</span></div>
-                <div style={styles.metric}><strong>{runnerFinalizationManifest.completion_certificate.future_work_requires_new_phase ? 'Yes' : 'No'}</strong><span>New phase required</span></div>
-                <div style={styles.metric}><strong>{runnerFinalizationManifest.completion_certificate.allowed_current_scope.length}</strong><span>Allowed scopes</span></div>
-                <div style={styles.metric}><strong>{runnerFinalizationManifest.completion_certificate.prohibited_without_new_phase.length}</strong><span>Blocked future actions</span></div>
-              </div>
-            </>
-          ) : null}
-          <h4 style={styles.smallTitle}>Final boundaries</h4>
-          <JsonBlock value={runnerFinalizationManifest.final_boundaries} />
-        </section>
-      ) : null}
-
-      {runnerClosureSeal ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Step 243 closure seal</h3>
-              <p style={styles.muted}>Deterministic read-only seal for the completed automation module. It hashes final boundaries and evidence refs without creating requests, starting jobs, or executing actions.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerClosureSeal.seal_posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerClosureSeal.summary.failed_seal_count}</strong><span>Failed seal checks</span></div>
-            <div style={styles.metric}><strong>{runnerClosureSeal.summary.watch_seal_count}</strong><span>Watch seal checks</span></div>
-            <div style={styles.metric}><strong>{label(runnerClosureSeal.module_posture)}</strong><span>Module posture</span></div>
-            <div style={styles.metric}><strong>{runnerClosureSeal.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerClosureSeal.summary.open_review_queue}</strong><span>Open review queue</span></div>
-            <div style={styles.metric}><strong>{runnerClosureSeal.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <p style={styles.muted}>Seal: <code>{runnerClosureSeal.closure_seal}</code></p>
-          <h4 style={styles.smallTitle}>Seal rows</h4>
-          <ul style={styles.compactList}>
-            {runnerClosureSeal.seal_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Sealed payload</h4>
-          <JsonBlock value={runnerClosureSeal.sealed_payload} />
-        </section>
-      ) : null}
-
-      {runnerModuleClosure ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Step 242 module closure</h3>
-              <p style={styles.muted}>Read-only final closure for the automation module. This confirms the module is complete without enabling execution, retries, background jobs, or inventory mutations.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerModuleClosure.module_posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerModuleClosure.summary.failed_closure_count}</strong><span>Failed closure checks</span></div>
-            <div style={styles.metric}><strong>{runnerModuleClosure.summary.watch_closure_count}</strong><span>Watch closure checks</span></div>
-            <div style={styles.metric}><strong>{label(runnerModuleClosure.summary.certification_posture)}</strong><span>Certification</span></div>
-            <div style={styles.metric}><strong>{runnerModuleClosure.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerModuleClosure.summary.open_review_queue}</strong><span>Open review queue</span></div>
-            <div style={styles.metric}><strong>{runnerModuleClosure.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Closure rows</h4>
-          <ul style={styles.compactList}>
-            {runnerModuleClosure.closure_rows.map((row) => (
-              <li key={row.key}><strong>{label(row.status)}</strong> — {row.label}: {row.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Final boundaries</h4>
-          <JsonBlock value={runnerModuleClosure.final_boundaries} />
-        </section>
-      ) : null}
-
-      {runnerReadinessCertification ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Step 241 readiness certification</h3>
-              <p style={styles.muted}>Final read-only certification surface for automation readiness, evidence traceability, permission posture, and the no-execution boundary.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerReadinessCertification.certification_posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.failed_check_count}</strong><span>Failed checks</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.watch_check_count}</strong><span>Watch checks</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.total_schedule_count}</strong><span>Schedules</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.total_run_events}</strong><span>Run events</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.summary.open_review_queue}</strong><span>Open review queue</span></div>
-            <div style={styles.metric}><strong>{runnerReadinessCertification.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-            <div style={styles.metric}><strong>{label(runnerReadinessCertification.request_creation_posture)}</strong><span>Request posture</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Certification checks</h4>
-          <ul style={styles.compactList}>
-            {runnerReadinessCertification.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Certification evidence refs</h4>
-          <JsonBlock value={runnerReadinessCertification.evidence_refs} />
-        </section>
-      ) : null}
-
-      {runnerProductionSafetyLock ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Production safety lock</h3>
-              <p style={styles.muted}>Global and tenant-level lock posture for schedule-triggered request creation. This panel is read-only and cannot create, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerProductionSafetyLock.posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerProductionSafetyLock.manual_request_creation_allowed ? 'Yes' : 'No'}</strong><span>Manual request creation</span></div>
-            <div style={styles.metric}><strong>{runnerProductionSafetyLock.auto_request_creation_allowed ? 'Yes' : 'No'}</strong><span>Auto request creation</span></div>
-            <div style={styles.metric}><strong>{runnerProductionSafetyLock.locks.manual.global_disable ? 'On' : 'Off'}</strong><span>Global disable</span></div>
-            <div style={styles.metric}><strong>{runnerProductionSafetyLock.locks.manual.tenant_request_creation_enabled ? 'Enabled' : 'Disabled'}</strong><span>Tenant toggle</span></div>
-            <div style={styles.metric}><strong>{runnerProductionSafetyLock.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Lock checks</h4>
-          <ul style={styles.compactList}>
-            {runnerProductionSafetyLock.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-
-      {runnerObservabilitySnapshot ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>Runner observability snapshot</h3>
-              <p style={styles.muted}>{runnerObservabilitySnapshot.headline}</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerObservabilitySnapshot.read_only ? 'Read only' : 'Review required'}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.total_run_events}</strong><span>Run events</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.succeeded_run_events}</strong><span>Succeeded</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.failed_run_events}</strong><span>Failed</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.skipped_run_events}</strong><span>Skipped</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.request_linked_run_events}</strong><span>Request links</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.summary.open_request_count}</strong><span>Open review queue</span></div>
-            <div style={styles.metric}><strong>{formatDateTime(runnerObservabilitySnapshot.summary.latest_run_event_at)}</strong><span>Latest run</span></div>
-            <div style={styles.metric}><strong>{runnerObservabilitySnapshot.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Operator signals</h4>
-          <ul style={styles.compactList}>
-            {runnerObservabilitySnapshot.operator_signals.map((signal) => (
-              <li key={signal.key}><strong>{label(signal.status)}</strong> — {signal.label}: {signal.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Recent schedule run events</h4>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Schedule</th>
-                <th style={styles.th}>Run</th>
-                <th style={styles.th}>Request</th>
-                <th style={styles.th}>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runnerObservabilitySnapshot.recent_events.map((event) => (
-                <tr key={event.id}>
-                  <td style={styles.td}>{event.schedule_name || event.automation_schedule_id}<br /><span style={styles.muted}>{label(event.automation_type)}</span></td>
-                  <td style={styles.td}>{label(event.run_status)}<br /><span style={styles.muted}>{label(event.run_mode)}</span></td>
-                  <td style={styles.td}>{event.execution_request_id ? label(event.execution_request_status) : 'No request'}<br /><span style={styles.muted}>{event.execution_request_id || '-'}</span></td>
-                  <td style={styles.td}>{formatDateTime(event.created_at)}</td>
-                </tr>
-              ))}
-              {!runnerObservabilitySnapshot.recent_events.length ? (
-                <tr><td style={styles.td} colSpan={4}>No schedule run events recorded yet.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
-
-      {runnerAuditBundle ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Step 238 runner audit bundle</h3>
-              <p style={styles.muted}>Read-only trace bundle for schedule run events, linked execution requests, and execution-boundary evidence. It cannot create, approve, execute, retry, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerAuditBundle.read_only ? 'Audit only' : 'Review required'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerAuditBundle.summary.schedule_count}</strong><span>Schedules</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.summary.run_event_count}</strong><span>Run events</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.summary.linked_execution_request_count}</strong><span>Linked requests</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.summary.execution_metadata_count}</strong><span>Execution metadata</span></div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerAuditBundle.traceability.request_links_visible}</strong><span>Visible request links</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.traceability.run_events_without_request}</strong><span>Run events without request</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.summary.failed_run_event_count}</strong><span>Failed runs</span></div>
-            <div style={styles.metric}><strong>{runnerAuditBundle.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Audit bundle checks</h4>
-          <ul style={styles.list}>
-            {runnerAuditBundle.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <JsonBlock value={runnerAuditBundle.evidence_refs} />
-        </section>
-      ) : null}
-
-      {runnerChangeControlPack ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Step 222 change-control pack</h3>
-              <p style={styles.muted}>Read-only rollout evidence for automation request creation. It cannot enable flags, start the runner, create requests, approve requests, execute requests, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerChangeControlPack.change_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerChangeControlPack.summary.failed_required_count}</strong><span>Failed required</span></div>
-            <div style={styles.metric}><strong>{runnerChangeControlPack.summary.watch_required_count}</strong><span>Watch required</span></div>
-            <div style={styles.metric}><strong>{runnerChangeControlPack.summary.recent_run_event_count}</strong><span>Recent run events</span></div>
-            <div style={styles.metric}><strong>{runnerChangeControlPack.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <div style={styles.checkGrid}>
-            {runnerChangeControlPack.change_controls.map((row) => (
-              <div key={row.key} style={styles.checkItem}>
-                <strong>{row.label}</strong>
-                <span>{label(row.status)}{row.required ? ' · required' : ''}</span>
-                <p>{row.detail}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {runnerReleaseGuard ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Step 221 release guard</h3>
-              <p style={styles.muted}>Read-only release guard for automation expansion. It cannot enable flags, start the runner, create requests, approve requests, execute requests, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerReleaseGuard.release_posture)}</div>
-          </div>
-          <div style={styles.metricsGrid}>
-            <div style={styles.metric}><strong>{runnerReleaseGuard.summary.failed_required_count}</strong><span>Failed required</span></div>
-            <div style={styles.metric}><strong>{runnerReleaseGuard.summary.watch_required_count}</strong><span>Watch required</span></div>
-            <div style={styles.metric}><strong>{runnerReleaseGuard.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerReleaseGuard.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-          </div>
-          <div style={styles.checkGrid}>
-            {runnerReleaseGuard.guard_rows.map((row) => (
-              <div key={row.key} style={styles.checkItem}>
-                <strong>{row.label}</strong>
-                <span>{label(row.status)}{row.required ? ' · required' : ''}</span>
-                <p>{row.detail}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {runnerReadiness ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner readiness</h3>
-              <p style={styles.muted}>Step 219 shows controlled runner readiness plus containment report, drift report, activation checklist, policy matrix, operations review, preflight, accountability, duplicate-guard, and run-ledger evidence. Dry run previews, Run Schedule creates at most one request for a run key, and flagged background mode can create due requests without approval/execution.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerReadiness.can_create_execution_requests ? 'Request creation enabled' : 'Readiness only'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerReadiness.totals.total_schedules}</strong><span>Total schedules</span></div>
-            <div style={styles.metric}><strong>{runnerReadiness.totals.eligible_for_future_runner_review}</strong><span>Future review candidates</span></div>
-            <div style={styles.metric}><strong>{runnerReadiness.totals.runnable_now}</strong><span>Due auto-request candidates</span></div>
-            <div style={styles.metric}><strong>{runnerReadiness.runner_enabled ? 'Enabled' : 'Disabled'}</strong><span>Runner</span></div>
-          </div>
-          <div style={styles.detailGrid}>
-            <div>
-              <h4 style={styles.smallTitle}>Readiness checks</h4>
-              <ul style={styles.list}>
-                {runnerReadiness.readiness_checks.map((check) => (
-                  <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 style={styles.smallTitle}>Current blockers</h4>
-              <ul style={styles.list}>
-                {runnerReadiness.blockers.map((blocker) => (
-                  <li key={blocker.key}><strong>{blocker.label}</strong>: {blocker.detail}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          {runnerReadiness.schedule_preview.length ? (
-            <>
-              <h4 style={styles.smallTitle}>Future runner preview</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Schedule</th>
-                      <th style={styles.th}>Type</th>
-                      <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Runner state</th>
-                      <th style={styles.th}>Next run metadata</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runnerReadiness.schedule_preview.map((schedule) => (
-                      <tr key={schedule.id}>
-                        <td style={styles.td}>{schedule.name}</td>
-                        <td style={styles.td}>{label(schedule.automation_type)}</td>
-                        <td style={styles.td}>{label(schedule.status)}</td>
-                        <td style={styles.td}>{label(schedule.runner_state)}</td>
-                        <td style={styles.td}>{formatDateTime(schedule.next_run_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-
-
-
-      {runnerDriftReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner drift report</h3>
-              <p style={styles.muted}>Read-only drift visibility for overdue schedules, failed run events, stale schedule-created review queues, and execution-boundary drift. It cannot create, approve, retry, or execute requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerDriftReport.drift_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerDriftReport.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerDriftReport.summary.overdue_7d_schedule_count}</strong><span>Overdue 7d</span></div>
-            <div style={styles.metric}><strong>{runnerDriftReport.summary.failed_run_event_count}</strong><span>Failed run events</span></div>
-            <div style={styles.metric}><strong>{runnerDriftReport.summary.stale_review_request_count}</strong><span>Stale reviews</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Drift signals</h4>
-          <ul style={styles.list}>
-            {runnerDriftReport.drift_signals.map((signal) => (
-              <li key={signal.key}><strong>{label(signal.status)}</strong> — {signal.label}: {signal.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Drift report checks</h4>
-          <ul style={styles.list}>
-            {runnerDriftReport.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-
-
-
-      {runnerContainmentReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner containment report</h3>
-              <p style={styles.muted}>Read-only scope control for schedule-created requests. It flags unsupported request types, status drift, executable request types, and execution metadata without creating or executing anything.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerContainmentReport.containment_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerContainmentReport.summary.schedule_created_request_count}</strong><span>Schedule-created requests</span></div>
-            <div style={styles.metric}><strong>{runnerContainmentReport.summary.unsupported_request_type_count}</strong><span>Unsupported types</span></div>
-            <div style={styles.metric}><strong>{runnerContainmentReport.summary.executable_request_type_count}</strong><span>Executable types</span></div>
-            <div style={styles.metric}><strong>{runnerContainmentReport.summary.execution_boundary_count}</strong><span>Execution metadata</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Containment checks</h4>
-          <ul style={styles.list}>
-            {runnerContainmentReport.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          {runnerContainmentReport.request_rows.length ? (
-            <>
-              <h4 style={styles.smallTitle}>Schedule-created request containment rows</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Type</th>
-                      <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Execution</th>
-                      <th style={styles.th}>Count</th>
-                      <th style={styles.th}>Latest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runnerContainmentReport.request_rows.map((row) => (
-                      <tr key={`${row.request_type}-${row.request_status}-${row.execution_status}`}>
-                        <td style={styles.td}>{label(row.request_type)} {row.allowed_request_type ? '' : '(review)'}</td>
-                        <td style={styles.td}>{label(row.request_status)} {row.allowed_request_status ? '' : '(drift)'}</td>
-                        <td style={styles.td}>{label(row.execution_status)}</td>
-                        <td style={styles.td}>{row.request_count}</td>
-                        <td style={styles.td}>{formatDateTime(row.latest_request_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-
-      {runnerActivationChecklist ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner activation checklist</h3>
-              <p style={styles.muted}>Read-only checklist for controlled auto-request creation readiness. It cannot enable flags, start a runner, create requests, approve requests, or execute requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerActivationChecklist.activation_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerActivationChecklist.summary.failed_required_count}</strong><span>Failed required</span></div>
-            <div style={styles.metric}><strong>{runnerActivationChecklist.summary.watch_required_count}</strong><span>Watch required</span></div>
-            <div style={styles.metric}><strong>{runnerActivationChecklist.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerActivationChecklist.summary.executed_schedule_request_count}</strong><span>Executed schedule requests</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Activation checks</h4>
-          <ul style={styles.list}>
-            {runnerActivationChecklist.checklist.map((item) => (
-              <li key={item.key}><strong>{label(item.status)}</strong> — {item.label}: {item.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Activation evidence</h4>
-          <JsonBlock value={runnerActivationChecklist.evidence} />
-        </section>
-      ) : null}
-
-      {runnerPreflight ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner request-creation preflight</h3>
-              <p style={styles.muted}>Read-only review of due schedules before controlled auto-request creation. It does not start the runner or create requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerPreflight.request_creation_enabled ? 'Auto-request flag on' : 'Preflight only'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerPreflight.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerPreflight.summary.would_create_request_count_if_enabled}</strong><span>Would create if enabled</span></div>
-            <div style={styles.metric}><strong>{runnerPreflight.summary.schedules_with_existing_open_requests}</strong><span>Existing open requests</span></div>
-            <div style={styles.metric}><strong>{runnerPreflight.summary.schedules_without_run_ledger}</strong><span>No run ledger yet</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Preflight checks</h4>
-          <ul style={styles.list}>
-            {runnerPreflight.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          {runnerPreflight.due_schedules.length ? (
-            <>
-              <h4 style={styles.smallTitle}>Due schedule candidates</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Schedule</th>
-                      <th style={styles.th}>Type</th>
-                      <th style={styles.th}>Due at</th>
-                      <th style={styles.th}>Default request status</th>
-                      <th style={styles.th}>Open requests</th>
-                      <th style={styles.th}>Run events</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runnerPreflight.due_schedules.map((schedule) => (
-                      <tr key={schedule.id}>
-                        <td style={styles.td}>{schedule.name}</td>
-                        <td style={styles.td}>{label(schedule.automation_type)}</td>
-                        <td style={styles.td}>{formatDateTime(schedule.next_run_at)}</td>
-                        <td style={styles.td}>{label(schedule.default_request_status)}</td>
-                        <td style={styles.td}>{schedule.open_schedule_request_count}</td>
-                        <td style={styles.td}>{schedule.run_event_count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-
-      {runnerStatus ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Background runner permission profile</h3>
-              <p style={styles.muted}>Runner status only. Auto-request creation is explicit-flag controlled, race-guarded, and capped; approval, execution, and inventory mutation remain blocked.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerStatus.request_creation_enabled ? 'Creates requests only' : (runnerStatus.enabled ? 'Observe only' : 'Disabled')}</div>
-          </div>
-          {canCreateAutomationSchedules && canCreateExecutionRequests ? (
-            <div style={styles.actions}>
-              <button style={styles.primaryButton} disabled={saving || !runnerStatus.request_creation_enabled} onClick={() => void runDueSchedulesOnce()}>
-                Run due schedules once
-              </button>
-              <span style={styles.muted}>Tenant-scoped run-once now requires explicit confirmation. It only creates execution requests and never approves or executes them.</span>
-            </div>
-          ) : null}
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerStatus.enabled ? 'Enabled flag' : 'Disabled'}</strong><span>Runner flag</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.started ? 'Started' : 'Not started'}</strong><span>Process state</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.request_creation_enabled ? 'Yes' : 'No'}</strong><span>Auto request creation</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.permission_profile?.uses_broad_role ? 'Broad role' : 'Explicit only'}</strong><span>Runner permissions</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.request_creation_hard_cap ?? '—'}</strong><span>Request hard cap</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.race_protection?.enabled ? 'Enabled' : '—'}</strong><span>Race guard</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.tick_in_flight ? 'Running' : 'Idle'}</strong><span>Tick guard</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.skipped_overlap_count ?? 0}</strong><span>Overlap skips</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.successful_tick_count ?? 0}</strong><span>Successful ticks</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.failed_tick_count ?? 0}</strong><span>Failed ticks</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.observe_only_tick_count ?? 0}</strong><span>Observe-only ticks</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.empty_due_tick_count ?? 0}</strong><span>Empty due ticks</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.request_creation_tick_count ?? 0}</strong><span>Request-creation ticks</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_successful_tick_at ? formatDateTime(runnerStatus.last_successful_tick_at) : '—'}</strong><span>Last successful tick</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_failed_tick_at ? formatDateTime(runnerStatus.last_failed_tick_at) : '—'}</strong><span>Last failed tick</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_empty_due_tick_at ? formatDateTime(runnerStatus.last_empty_due_tick_at) : '—'}</strong><span>Last empty-due tick</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_request_creation_tick_at ? formatDateTime(runnerStatus.last_request_creation_tick_at) : '—'}</strong><span>Last request tick</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_overlap_skip_at ? formatDateTime(runnerStatus.last_overlap_skip_at) : '—'}</strong><span>Last overlap skip</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_tick_outcome ? label(runnerStatus.last_tick_outcome) : '—'}</strong><span>Last tick outcome</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.status_generated_at ? formatDateTime(runnerStatus.status_generated_at) : '—'}</strong><span>Status generated</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.tick_status_fresh === false ? 'Stale' : (runnerStatus.tick_status_fresh === true ? 'Fresh' : 'No tick yet')}</strong><span>Tick freshness</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_tick_age_ms ?? '—'}</strong><span>Last tick age ms</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.next_tick_in_ms ?? '—'}</strong><span>Next tick in ms</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.tick_stale_after_ms ?? '—'}</strong><span>Stale after ms</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.failure_backoff_ms ?? '—'}</strong><span>Failure backoff ms</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_tick_output_safety_status ? label(runnerStatus.last_tick_output_safety_status) : '—'}</strong><span>Top-level output safety</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_tick_output_anomaly_status ? label(runnerStatus.last_tick_output_anomaly_status) : '—'}</strong><span>Anomaly status</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_detected ? 'Yes' : 'No'}</strong><span>Top-level unsafe output</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_count ?? 0}</strong><span>Unsafe output count</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_memory_status ? label(runnerStatus.unsafe_runner_output_memory_status) : '—'}</strong><span>Anomaly memory</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_required ? 'Required' : (runnerStatus.unsafe_runner_output_review_acknowledgement_current ? 'Acknowledged' : 'No')}</strong><span>Anomaly review</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_acknowledged_at) : '—'}</strong><span>Review acknowledged</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_by ?? '—'}</strong><span>Reviewed by</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_unsafe_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_acknowledged_unsafe_at) : '—'}</strong><span>Reviewed unsafe output</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledged_count ?? '—'}</strong><span>Reviewed unsafe count</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_timestamp_current ? 'Current' : (runnerStatus.unsafe_runner_output_memory_active ? 'Not current' : '—')}</strong><span>Reviewed timestamp current</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_count_current ? 'Current' : (runnerStatus.unsafe_runner_output_memory_active ? 'Not current' : '—')}</strong><span>Reviewed count current</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_present ? 'Present' : '—'}</strong><span>Review note evidence</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_length ?? '—'}</strong><span>Review note length</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_min_length ?? 10} / {runnerStatus.unsafe_runner_output_review_note_max_length ?? 1000}</strong><span>Review note min/max</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_note_redacted ? 'Redacted' : '—'}</strong><span>Review note body</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_confirmation_required ? 'Required' : 'No'}</strong><span>Review confirmation</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? 'Allowed' : 'Blocked'}</strong><span>Review acknowledge guard</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_block_reason ? label(runnerStatus.unsafe_runner_output_review_acknowledge_block_reason) : '—'}</strong><span>Review block reason</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_evidence_status ? label(runnerStatus.unsafe_runner_output_review_evidence_status) : '—'}</strong><span>Review evidence status</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_evidence_complete ? 'Complete' : (runnerStatus.unsafe_runner_output_memory_active ? 'Incomplete/pending' : '—')}</strong><span>Review evidence complete</span></div>
-            <div style={styles.metric}><strong>{Array.isArray(runnerStatus.unsafe_runner_output_review_evidence_missing) && runnerStatus.unsafe_runner_output_review_evidence_missing.length ? runnerStatus.unsafe_runner_output_review_evidence_missing.map(label).join(', ') : '—'}</strong><span>Missing review evidence</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejected_count ?? 0}</strong><span>Rejected reviews</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_at) : '—'}</strong><span>Last rejected review</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_reason ? label(runnerStatus.last_unsafe_runner_output_review_rejected_reason) : '—'}</strong><span>Reject reason</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_by || '—'}</strong><span>Rejected by</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at) : '—'}</strong><span>Rejected expected timestamp</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at) : '—'}</strong><span>Rejected actual timestamp</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_expected_count ?? '—'}</strong><span>Rejected expected count</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_actual_count ?? '—'}</strong><span>Rejected actual count</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_present ? 'Present' : '—'}</strong><span>Rejected note evidence</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_length ?? '—'}</strong><span>Rejected note length</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_review_rejected_note_redacted ? 'Redacted' : '—'}</strong><span>Rejected note body</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_acknowledge_result ? label(runnerStatus.unsafe_runner_output_review_acknowledge_result) : '—'}</strong><span>Last review acknowledgement result</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejection_evidence_status ? label(runnerStatus.unsafe_runner_output_review_rejection_evidence_status) : '—'}</strong><span>Rejected evidence status</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_rejection_evidence_complete ? 'Complete' : (runnerStatus.unsafe_runner_output_review_rejection_memory_active ? 'Incomplete' : '—')}</strong><span>Rejected evidence complete</span></div>
-            <div style={styles.metric}><strong>{Array.isArray(runnerStatus.unsafe_runner_output_review_rejection_evidence_missing) && runnerStatus.unsafe_runner_output_review_rejection_evidence_missing.length ? runnerStatus.unsafe_runner_output_review_rejection_evidence_missing.map(label).join(', ') : '—'}</strong><span>Missing rejected evidence</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_recency_status ? label(runnerStatus.unsafe_runner_output_review_recency_status) : '—'}</strong><span>Review recency</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_stale ? 'Yes' : 'No'}</strong><span>Stale review</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.last_unsafe_runner_output_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_at) : '—'}</strong><span>Last unsafe output</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at ? formatDateTime(runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at) : '—'}</strong><span>Expected review timestamp</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_expected_count ?? runnerStatus.expected_unsafe_runner_output_count ?? '—'}</strong><span>Expected review count</span></div>
-            <div style={styles.metric}><strong>{runnerStatus.unsafe_runner_output_review_required && runnerStatus.unsafe_runner_output_review_expected_last_unsafe_runner_output_at ? 'Required' : '—'}</strong><span>Latest timestamp/count confirmation</span></div>
-          </div>
-          {runnerStatus.unsafe_runner_output_review_rejection_memory_active ? (
-            <p style={styles.warningText}>Runner status has rejected unsafe-output review acknowledgement attempt(s). Last rejection: {runnerStatus.last_unsafe_runner_output_review_rejected_reason ? label(runnerStatus.last_unsafe_runner_output_review_rejected_reason) : 'unknown reason'} by {runnerStatus.last_unsafe_runner_output_review_rejected_by || 'unknown actor'}. Expected timestamp: {runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_expected_unsafe_at) : '—'}; actual timestamp: {runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at ? formatDateTime(runnerStatus.last_unsafe_runner_output_review_rejected_actual_unsafe_at) : '—'}; expected count: {runnerStatus.last_unsafe_runner_output_review_rejected_expected_count ?? '—'}; actual count: {runnerStatus.last_unsafe_runner_output_review_rejected_actual_count ?? '—'}. Rejected note body is redacted; evidence shows {runnerStatus.last_unsafe_runner_output_review_rejected_note_present ? `present (${runnerStatus.last_unsafe_runner_output_review_rejected_note_length ?? 'unknown'} characters)` : 'not present'}.</p>
-          ) : null}
-          {runnerStatus.unsafe_runner_output_review_required ? (
-            <div style={styles.warningBox}>
-              <p style={styles.warningText}>Runner status has recorded unsafe output anomaly memory that still requires review, even if the latest tick is safe. Inspect the anomaly count, last anomaly timestamp, last tick summary, raw status JSON, and audit ledger before trusting automation status. A specific bounded review note, latest unsafe-output timestamp confirmation, and matching reviewed anomaly count are required before acknowledgement. Current acknowledgement guard: {runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? 'allowed' : `blocked by ${label(runnerStatus.unsafe_runner_output_review_acknowledge_block_reason || 'unknown_reason')}`}.</p>
-              {canCreateAutomationSchedules ? (
-                <button style={styles.secondaryButton} disabled={saving || !runnerStatus.unsafe_runner_output_review_acknowledge_allowed} onClick={() => void acknowledgeRunnerUnsafeOutputReview()}>
-                  Confirm and acknowledge anomaly review
-                </button>
-              ) : null}
-            </div>
-          ) : runnerStatus.unsafe_runner_output_review_acknowledgement_current ? (
-            <p style={styles.muted}>Unsafe-output anomaly evidence is preserved, and the current anomaly memory has been reviewed/acknowledged with a required review note and reviewed unsafe-output count. Note evidence is visible as present/length without needing to open raw JSON.</p>
-          ) : null}
-          {runnerStatus.tick_status_fresh === false ? (
-            <p style={styles.warningText}>Runner status may be stale. Last tick age is {runnerStatus.last_tick_age_ms ?? 'unknown'}ms, above the freshness threshold of {runnerStatus.tick_stale_after_ms ?? 'unknown'}ms.</p>
-          ) : null}
-
-          {runnerStatus.last_tick_outcome === 'empty_due_succeeded' ? (
-            <p style={styles.muted}>Last background tick succeeded with no active schedules due, so no execution requests were created.</p>
-          ) : null}
-          <p style={styles.muted}>Tick timestamps are shown separately from counters so stale runner status is visible without opening raw JSON.</p>
-          {runnerStatus.last_tick_summary ? (
-            <>
-              <h4 style={styles.smallTitle}>Last tick safe summary</h4>
-              <div style={styles.metricGrid}>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.outcome ? label(runnerStatus.last_tick_summary.outcome) : '—'}</strong><span>Outcome</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.processed_schedule_count ?? 0}</strong><span>Processed</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.created_execution_request_count ?? 0}</strong><span>Requests created</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.skipped_schedule_count ?? 0}</strong><span>Schedules skipped</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.failed_schedule_count ?? 0}</strong><span>Schedule failures</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.executed_request_count ?? 0}</strong><span>Requests executed</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.safety_status ? label(runnerStatus.last_tick_summary.safety_status) : '—'}</strong><span>Output safety</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.reported_executed_request_count ?? 0}</strong><span>Reported executions</span></div>
-                <div style={styles.metric}><strong>{runnerStatus.last_tick_summary.unsafe_runner_output_detected ? 'Yes' : 'No'}</strong><span>Unsafe output detected</span></div>
-              </div>
-              {runnerStatus.last_tick_summary.unsafe_runner_output_detected ? (
-                <p style={styles.warningText}>Unsafe runner output was reported by the last tick. The runner should create execution requests only, so inspect the runner result and audit ledger before trusting automation status.</p>
-              ) : null}
-              {runnerStatus.last_tick_summary.runner_batch_id ? (
-                <p style={styles.muted}>Last tick batch: {runnerStatus.last_tick_summary.runner_batch_id}</p>
-              ) : null}
-            </>
-          ) : null}
-          <h4 style={styles.smallTitle}>Runner safety checks</h4>
-          <ul style={styles.list}>
-            {runnerStatus.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Runner status</h4>
-          <JsonBlock value={runnerStatus} />
-        </section>
-      ) : null}
-
-
-
-
-      {runnerRunOnceResult ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Manual runner run-once result</h3>
-              <p style={styles.muted}>Tenant-scoped due-schedule processing result after explicit confirmation. Requests can be created, but approval, execution, and business mutations remain blocked.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerRunOnceResult.skipped ? 'Skipped' : (runnerRunOnceResult.empty_due_batch ? 'No due schedules' : 'Processed')}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.processed_schedule_count}</strong><span>Schedules processed</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.empty_due_batch ? 'Yes' : 'No'}</strong><span>Empty due batch</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.created_execution_request_count}</strong><span>Requests created</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.skipped_schedule_count ?? 0}</strong><span>Skipped schedules</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.failed_schedule_count ?? 0}</strong><span>Failed schedules</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.effective_limit ?? '—'}</strong><span>Effective limit</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.request_limit_clamped ? 'Yes' : 'No'}</strong><span>Limit clamped</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.runner_batch_id ? String(runnerRunOnceResult.runner_batch_id).slice(0, 22) + '…' : '—'}</strong><span>Runner batch</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.tenant_scoped ? 'Yes' : 'No'}</strong><span>Tenant scoped</span></div>
-            <div style={styles.metric}><strong>{runnerRunOnceResult.triggered_by_user_id ? String(runnerRunOnceResult.triggered_by_user_id).slice(0, 18) + '…' : 'System'}</strong><span>Confirmed by</span></div>
-          </div>
-          {runnerRunOnceResult.empty_due_batch ? (
-            <p style={styles.muted}>No active schedules were due in this confirmed pass, so the runner created no execution requests and recorded the empty batch safely.</p>
-          ) : null}
-          {runnerRunOnceResult.runner_batch_id ? (
-            <p style={styles.muted}>Runner batch {runnerRunOnceResult.runner_batch_id} links this UI result with the backend audit summary and schedule-level created/skipped samples.</p>
-          ) : null}
-          {runnerRunOnceResult.triggered_by_user_id ? (
-            <p style={styles.muted}>Confirmed run-once actor {runnerRunOnceResult.triggered_by_user_id} is preserved in backend batch, audit, and schedule-level metadata.</p>
-          ) : null}
-          {runnerRunOnceResult.request_limit_clamped ? (
-            <p style={styles.muted}>Requested limit {runnerRunOnceResult.requested_limit ?? '—'} was clamped to safe effective limit {runnerRunOnceResult.effective_limit ?? '—'} before any request creation.</p>
-          ) : null}
-          <JsonBlock value={runnerRunOnceResult} />
-        </section>
-      ) : null}
-
-      {runnerRollbackPlan ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner rollback plan</h3>
-              <p style={styles.muted}>Read-only rollback guidance for controlled auto-request creation. It cannot change flags, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerRollbackPlan.rollback_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerRollbackPlan.summary.recent_auto_run_event_count}</strong><span>Auto events / 24h</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackPlan.summary.recent_failed_auto_run_event_count}</strong><span>Failed auto events</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackPlan.summary.recent_linked_request_count}</strong><span>Linked requests</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackPlan.summary.required_rollback_step_count}</strong><span>Required steps</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Rollback steps</h4>
-          <ul style={styles.list}>
-            {runnerRollbackPlan.rollback_steps.map((step) => (
-              <li key={step.key}><strong>{step.required ? 'Required' : 'Optional'}</strong> — {step.label}: {step.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Rollback checks</h4>
-          <ul style={styles.list}>
-            {runnerRollbackPlan.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Rollback plan JSON</h4>
-          <JsonBlock value={runnerRollbackPlan} />
-        </section>
-      ) : null}
-
-
-
-
-      {runnerCertificationReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner certification report</h3>
-              <p style={styles.muted}>Read-only certification across runner status, rollback verification, run ledger, and schedule-created request evidence. It cannot create, approve, execute, or mutate anything.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerCertificationReport.certification_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerCertificationReport.summary.schedule_count}</strong><span>Schedules</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationReport.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationReport.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationReport.summary.execution_metadata_count}</strong><span>Execution metadata</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Certification checks</h4>
-          <ul style={styles.list}>
-            {runnerCertificationReport.certification_checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Certification evidence</h4>
-          <JsonBlock value={runnerCertificationReport.evidence_refs} />
-        </section>
-      ) : null}
-
-
-
-      {runnerCertificationEvidence ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner certification evidence</h3>
-              <p style={styles.muted}>Read-only evidence bundle for certification review. It only displays schedule, request, and run-ledger evidence; it cannot start the runner, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerCertificationEvidence.evidence_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerCertificationEvidence.evidence_summary.schedule_breakdown_rows}</strong><span>Schedule rows</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationEvidence.evidence_summary.request_breakdown_rows}</strong><span>Request rows</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationEvidence.evidence_summary.run_breakdown_rows}</strong><span>Run rows</span></div>
-            <div style={styles.metric}><strong>{runnerCertificationEvidence.evidence_summary.latest_evidence_rows}</strong><span>Recent evidence</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Evidence bundle</h4>
-          <JsonBlock value={runnerCertificationEvidence} />
-        </section>
-      ) : null}
-
-      {runnerRollbackVerification ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner rollback verification</h3>
-              <p style={styles.muted}>Read-only verification after controlled auto-request rollback. It cannot change flags, create requests, approve, execute, or mutate inventory.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerRollbackVerification.verification_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerRollbackVerification.summary.recent_auto_run_event_count}</strong><span>Auto events / 24h</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackVerification.summary.recent_failed_auto_run_event_count}</strong><span>Failed auto events</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackVerification.summary.recent_schedule_created_request_count}</strong><span>Schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerRollbackVerification.summary.recent_schedule_request_execution_metadata_count}</strong><span>Execution metadata</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Verification checks</h4>
-          <ul style={styles.list}>
-            {runnerRollbackVerification.verification_checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Rollback verification JSON</h4>
-          <JsonBlock value={runnerRollbackVerification} />
-        </section>
-      ) : null}
-
-      {runnerSafetyReport ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner safety report</h3>
-              <p style={styles.muted}>Read-only governance summary for schedule due-state, run-ledger health, and linked execution-request posture. This report cannot start the runner or create requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerSafetyReport.request_creation_enabled ? 'Auto request flag on' : 'No auto request creation'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerSafetyReport.schedule_summary.due_request_creation_candidates}</strong><span>Due candidates</span></div>
-            <div style={styles.metric}><strong>{runnerSafetyReport.run_ledger_summary.total_run_events}</strong><span>Run events</span></div>
-            <div style={styles.metric}><strong>{runnerSafetyReport.linked_request_summary.awaiting_review_count}</strong><span>Awaiting review</span></div>
-            <div style={styles.metric}><strong>{runnerSafetyReport.linked_request_summary.executed_count}</strong><span>Executed by scheduler</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Safety report checks</h4>
-          <ul style={styles.list}>
-            {runnerSafetyReport.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Safety report JSON</h4>
-          <JsonBlock value={runnerSafetyReport} />
-        </section>
-      ) : null}
-
-
-
-
-      {runnerPolicyMatrix ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner policy matrix</h3>
-              <p style={styles.muted}>Read-only capability matrix for scheduler request creation boundaries. Approval, execution, retry, and inventory mutation remain disallowed.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerPolicyMatrix.request_creation_enabled ? 'Request creation flag on' : 'Policy only'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerPolicyMatrix.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerPolicyMatrix.summary.schedule_created_request_count}</strong><span>Schedule-created requests</span></div>
-            <div style={styles.metric}><strong>{runnerPolicyMatrix.summary.failed_run_event_count}</strong><span>Failed run events</span></div>
-            <div style={styles.metric}><strong>{runnerPolicyMatrix.summary.executed_schedule_created_request_count}</strong><span>Executed schedule requests</span></div>
-          </div>
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
+            <span>{total} matching</span>
+          </div>
+
+          <div className="automation-schedules-filters">
+            <label>
+              <span>Search</span>
+              <input value={searchInput} maxLength={255} onChange={(event) => setSearchInput(event.target.value)} placeholder="Name, description, type, status, or timezone" />
+            </label>
+            <label>
+              <span>Status</span>
+              <select value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setOffset(0); }}>
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+            <label>
+              <span>Review type</span>
+              <select value={automationType} onChange={(event) => { setAutomationType(event.target.value as TypeFilter); setOffset(0); }}>
+                <option value="">All types</option>
+                {availableTypes.map((type) => <option key={type.automation_type} value={type.automation_type}>{type.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Rows</span>
+              <select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setOffset(0); }}>
+                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+              </select>
+            </label>
+            <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={clearFilters}>Clear filters</button>
+          </div>
+
+          <div className="automation-schedules-table-wrap">
+            <table className="automation-schedules-table">
               <thead>
                 <tr>
-                  <th style={styles.th}>Capability</th>
-                  <th style={styles.th}>Manual</th>
-                  <th style={styles.th}>Automatic</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Boundary</th>
+                  <th>Schedule</th>
+                  <th>Status</th>
+                  <th>Timing</th>
+                  <th>Next run</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {runnerPolicyMatrix.policy_rows.map((row) => (
-                  <tr key={row.key}>
-                    <td style={styles.td}>{row.capability}</td>
-                    <td style={styles.td}>{row.manual_allowed ? 'Allowed' : 'Blocked'}</td>
-                    <td style={styles.td}>{row.automatic_allowed ? 'Allowed' : 'Blocked'}</td>
-                    <td style={styles.td}>{label(row.status)}</td>
-                    <td style={styles.td}>{row.boundary}</td>
+                {data?.rows.map((schedule) => (
+                  <tr key={schedule.id} className={selected?.id === schedule.id ? 'automation-schedules-row--selected' : undefined}>
+                    <td>
+                      <button type="button" className="automation-schedules-name-button" onClick={() => void loadScheduleDetail(schedule)}>{schedule.name}</button>
+                      <span>{schedule.type_definition?.label || humanize(schedule.automation_type)}</span>
+                    </td>
+                    <td><StatusChip status={schedule.status} /></td>
+                    <td>{schedulePattern(schedule)}</td>
+                    <td>{schedule.next_run_at ? formatDateTime(schedule.next_run_at, scheduleTimezone(schedule)) : 'Not scheduled'}</td>
+                    <td>
+                      <div className="automation-schedules-row-actions">
+                        <button type="button" onClick={() => void loadScheduleDetail(schedule)}>View</button>
+                        <button type="button" disabled={saving || schedule.status === 'disabled'} onClick={() => void dryRunSchedule(schedule)}>Preview</button>
+                        {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" disabled={saving || schedule.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule })}>Create request</button> : null}
+                        {(schedule.status === 'draft' || schedule.status === 'paused') && canResumeAutomationSchedules ? <button type="button" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule })}>Activate</button> : null}
+                        {(schedule.status === 'draft' || schedule.status === 'active') && canPauseAutomationSchedules ? <button type="button" disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
+                        {schedule.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="automation-schedules-danger-link" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule }); setConfirmationText(''); }}>Disable</button> : null}
+                        {canViewExecutionRequests ? <button type="button" onClick={() => void loadAuditPack(schedule)}>Audit</button> : null}
+                      </div>
+                    </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <h4 style={styles.smallTitle}>Policy checks</h4>
-          <ul style={styles.list}>
-            {runnerPolicyMatrix.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {runnerOperationsReview ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner operations review</h3>
-              <p style={styles.muted}>Read-only operational posture for scheduler request creation. It cannot start the runner, create requests, approve requests, or execute anything.</p>
-            </div>
-            <div style={styles.safetyBadge}>{label(runnerOperationsReview.operations_posture)}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerOperationsReview.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerOperationsReview.summary.open_schedule_request_count}</strong><span>Open schedule requests</span></div>
-            <div style={styles.metric}><strong>{runnerOperationsReview.summary.failed_run_event_count}</strong><span>Failed run events</span></div>
-            <div style={styles.metric}><strong>{runnerOperationsReview.summary.executed_schedule_request_count}</strong><span>Executed schedule requests</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Operations checks</h4>
-          <ul style={styles.list}>
-            {runnerOperationsReview.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Operations review JSON</h4>
-          <JsonBlock value={runnerOperationsReview} />
-        </section>
-      ) : null}
-
-
-
-      {runnerAccountabilityDigest ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner accountability digest</h3>
-              <p style={styles.muted}>Read-only actor and request-state evidence for scheduler-created run events. This digest cannot create, approve, or execute requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerAccountabilityDigest.read_only ? 'Accountability only' : 'Review required'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerAccountabilityDigest.schedule_summary.total_schedules}</strong><span>Total schedules</span></div>
-            <div style={styles.metric}><strong>{runnerAccountabilityDigest.schedule_summary.due_count}</strong><span>Due schedules</span></div>
-            <div style={styles.metric}><strong>{runnerAccountabilityDigest.actor_breakdown.length}</strong><span>Actor rows</span></div>
-            <div style={styles.metric}><strong>{runnerAccountabilityDigest.request_status_breakdown.length}</strong><span>Request state rows</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Accountability checks</h4>
-          <ul style={styles.list}>
-            {runnerAccountabilityDigest.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          {runnerAccountabilityDigest.actor_breakdown.length ? (
-            <>
-              <h4 style={styles.smallTitle}>Actor breakdown</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Actor</th>
-                      <th style={styles.th}>Mode</th>
-                      <th style={styles.th}>Trigger</th>
-                      <th style={styles.th}>Events</th>
-                      <th style={styles.th}>Linked requests</th>
-                      <th style={styles.th}>Latest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runnerAccountabilityDigest.actor_breakdown.map((row) => (
-                      <tr key={`${row.actor_name}-${row.run_mode}-${row.trigger_source}`}>
-                        <td style={styles.td}>{row.actor_name}</td>
-                        <td style={styles.td}>{label(row.run_mode)}</td>
-                        <td style={styles.td}>{label(row.trigger_source)}</td>
-                        <td style={styles.td}>{row.run_event_count} ({row.failed_count} failed)</td>
-                        <td style={styles.td}>{row.linked_request_count}</td>
-                        <td style={styles.td}>{formatDateTime(row.latest_event_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-          {runnerAccountabilityDigest.request_status_breakdown.length ? (
-            <>
-              <h4 style={styles.smallTitle}>Schedule-created request states</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Request status</th>
-                      <th style={styles.th}>Execution status</th>
-                      <th style={styles.th}>Count</th>
-                      <th style={styles.th}>Latest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runnerAccountabilityDigest.request_status_breakdown.map((row) => (
-                      <tr key={`${row.request_status}-${row.execution_status}`}>
-                        <td style={styles.td}>{label(row.request_status)}</td>
-                        <td style={styles.td}>{label(row.execution_status)}</td>
-                        <td style={styles.td}>{row.request_count}</td>
-                        <td style={styles.td}>{formatDateTime(row.latest_request_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-
-      {runnerGovernancePack ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Runner governance pack</h3>
-              <p style={styles.muted}>Read-only evidence pack for due schedules, latest run events, linked schedule-created requests, and safety-report posture. It cannot create or execute requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>{runnerGovernancePack.read_only ? 'Evidence only' : 'Review required'}</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runnerGovernancePack.evidence_summary.due_schedule_sample_count}</strong><span>Due schedule sample</span></div>
-            <div style={styles.metric}><strong>{runnerGovernancePack.evidence_summary.latest_run_event_sample_count}</strong><span>Run event sample</span></div>
-            <div style={styles.metric}><strong>{runnerGovernancePack.evidence_summary.linked_request_sample_count}</strong><span>Linked request sample</span></div>
-            <div style={styles.metric}><strong>{runnerGovernancePack.evidence_summary.executed_linked_request_sample_count}</strong><span>Executed sample</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Governance pack checks</h4>
-          <ul style={styles.list}>
-            {runnerGovernancePack.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Governance pack JSON</h4>
-          <JsonBlock value={runnerGovernancePack} />
-        </section>
-      ) : null}
-
-      {runEvents ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Recent scheduler run ledger</h3>
-              <p style={styles.muted}>Read-only schedule run evidence across manual and controlled runner-created requests. This view cannot create, approve, or execute requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>Ledger only</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{runEvents.total}</strong><span>Total ledger events</span></div>
-            <div style={styles.metric}><strong>{runEvents.summary.succeeded_count}</strong><span>Succeeded</span></div>
-            <div style={styles.metric}><strong>{runEvents.summary.skipped_count}</strong><span>Skipped</span></div>
-            <div style={styles.metric}><strong>{runEvents.summary.linked_execution_request_count}</strong><span>Linked requests shown</span></div>
-          </div>
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Schedule</th>
-                  <th style={styles.th}>Mode</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Request</th>
-                  <th style={styles.th}>Started</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runEvents.rows.map((event) => (
-                  <tr key={event.id}>
-                    <td style={styles.td}>{event.schedule_name}</td>
-                    <td style={styles.td}>{label(event.run_mode)}</td>
-                    <td style={styles.td}>{label(event.status)}</td>
-                    <td style={styles.td}>{event.execution_request_id ? `${label(event.request_type)} / ${label(event.execution_request_status || event.request_status)}` : '-'}</td>
-                    <td style={styles.td}>{formatDateTime(event.started_at)}</td>
-                  </tr>
-                ))}
-                {!runEvents.rows.length ? (
-                  <tr><td style={styles.empty} colSpan={5}>No scheduler run ledger events yet.</td></tr>
+                {!loading && !data?.rows.length ? (
+                  <tr><td colSpan={5} className="automation-schedules-empty">No schedules match the current filters.</td></tr>
+                ) : null}
+                {loading && !data?.rows.length ? (
+                  <tr><td colSpan={5} className="automation-schedules-empty">Loading schedules…</td></tr>
                 ) : null}
               </tbody>
             </table>
           </div>
-          <h4 style={styles.smallTitle}>Run ledger safety checks</h4>
-          <ul style={styles.list}>
-            {runEvents.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
-      <section style={styles.grid}>
-        <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Create schedule</h3>
-          <div style={styles.formGrid}>
-            <label style={styles.field}>
-              <span>Name</span>
-              <input style={styles.input} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-            </label>
-            <label style={styles.field}>
-              <span>Automation type</span>
-              <select style={styles.input} value={form.automation_type} onChange={(event) => setForm({ ...form, automation_type: event.target.value as FormState['automation_type'] })}>
-                {automationTypes.map((type) => <option key={type} value={type}>{label(type)}</option>)}
-              </select>
-            </label>
-            <label style={styles.field}>
-              <span>Frequency</span>
-              <select style={styles.input} value={form.schedule_kind} onChange={(event) => setForm({ ...form, schedule_kind: event.target.value as FormState['schedule_kind'] })}>
-                {scheduleKinds.map((kind) => <option key={kind} value={kind}>{label(kind)}</option>)}
-              </select>
-            </label>
-            <label style={styles.field}>
-              <span>Time</span>
-              <input style={styles.input} type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} />
-            </label>
-            <label style={styles.field}>
-              <span>Timezone</span>
-              <input style={styles.input} value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} />
-            </label>
-            <label style={styles.field}>
-              <span>Future request default</span>
-              <select style={styles.input} value={form.default_status} onChange={(event) => setForm({ ...form, default_status: event.target.value as FormState['default_status'] })}>
-                <option value="draft">Draft</option>
-                <option value="pending_review">Pending review</option>
-              </select>
-            </label>
+          <div className="automation-schedules-pagination">
+            <span>Showing {currentStart}–{currentEnd} of {total}</span>
+            <div>
+              <button type="button" disabled={!hasPreviousPage || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</button>
+              <button type="button" disabled={!hasNextPage || loading} onClick={() => setOffset(offset + limit)}>Next</button>
+            </div>
           </div>
-          <label style={styles.field}>
-            <span>Description</span>
-            <textarea style={styles.textarea} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-          </label>
+        </div>
+
+        <aside className="automation-schedules-card automation-schedules-create-card">
+          <div className="automation-schedules-section-heading">
+            <div>
+              <h3>Create schedule</h3>
+              <p>New schedules start as drafts.</p>
+            </div>
+          </div>
           {canCreateAutomationSchedules ? (
-            <button style={styles.primaryButton} disabled={saving} onClick={() => void createSchedule()}>
-              {saving ? 'Saving…' : 'Create draft schedule'}
-            </button>
-          ) : null}
-        </div>
-
-        <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Step 211 safety contract</h3>
-          <ul style={styles.list}>
-            <li>Background runner startup is explicit and disabled by default.</li>
-            <li>System-runner request creation uses explicit permissions, not a broad tenant role.</li>
-            <li>Auto-request creation requires explicit backend flags.</li>
-            <li>Execution requests can be created manually or by controlled due-schedule processing only.</li>
-            <li>No stock, shipment, or product records are mutated.</li>
-            <li>Run-ledger events record request creation and duplicate-skip evidence without approving or executing requests.</li>
-            <li>Runner safety report is read-only and cannot start jobs, create requests, approve requests, or execute requests.</li>
-            <li>Scheduler audit packs are read-only evidence and do not create or execute requests.</li>
-          </ul>
-          {types ? <JsonBlock value={types.safety} /> : null}
-        </div>
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.toolbar}>
-          <input style={styles.input} placeholder="Search schedules" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <select style={styles.input} value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
-            <option value="">All statuses</option>
-            {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-          </select>
-          <select style={styles.input} value={automationType} onChange={(event) => setAutomationType(event.target.value as TypeFilter)}>
-            <option value="">All types</option>
-            {automationTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-          </select>
-          <button style={styles.secondaryButton} disabled={loading} onClick={() => void loadSchedules()}>Refresh</button>
-        </div>
-
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Name</th>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Frequency</th>
-                <th style={styles.th}>Next run</th>
-                <th style={styles.th}>Last run</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.rows.map((schedule) => (
-                <tr key={schedule.id}>
-                  <td style={styles.td}>{schedule.name}</td>
-                  <td style={styles.td}>{label(schedule.automation_type)}</td>
-                  <td style={styles.td}>{label(schedule.status)}</td>
-                  <td style={styles.td}>{label(schedule.schedule_kind)}</td>
-                  <td style={styles.td}>{formatDateTime(schedule.next_run_at)}</td>
-                  <td style={styles.td}>{formatDateTime(schedule.last_run_at)}</td>
-                  <td style={styles.tdActions}>
-                    <button style={styles.linkButton} disabled={saving} onClick={() => void loadScheduleDetail(schedule)}>View detail</button>
-                    {schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void dryRunSchedule(schedule)}>Dry run</button> : null}
-                    {canViewExecutionRequests ? <button style={styles.linkButton} disabled={saving} onClick={() => void loadAuditPack(schedule)}>Audit Pack</button> : null}
-                    {canCreateAutomationSchedules && canCreateExecutionRequests && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void runScheduleManually(schedule)}>Run Schedule</button> : null}
-                    {canPauseAutomationSchedules && schedule.status === 'active' ? <button style={styles.linkButton} disabled={saving} onClick={() => void pauseSchedule(schedule)}>Pause</button> : null}
-                    {canResumeAutomationSchedules && (schedule.status === 'draft' || schedule.status === 'paused') ? <button style={styles.linkButton} disabled={saving} onClick={() => void resumeSchedule(schedule)}>Activate</button> : null}
-                    {canDisableAutomationSchedules && schedule.status !== 'disabled' ? <button style={styles.linkButton} disabled={saving} onClick={() => void disableSchedule(schedule)}>Disable</button> : null}
-                    
-                  </td>
-                </tr>
-              ))}
-              {!loading && !data?.rows.length ? (
-                <tr><td style={styles.empty} colSpan={7}>No automation schedules found.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-
-
-      {manualRunResult ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Manual schedule run result</h3>
-              <p style={styles.muted}>Execution request created. It was not approved, executed, or applied to stock/products/shipments.</p>
-            </div>
-            <div style={styles.safetyBadge}>Request created only</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{manualRunResult.created_execution_request_count}</strong><span>Requests created</span></div>
-            <div style={styles.metric}><strong>{manualRunResult.duplicate_guard_triggered ? 'Yes' : 'No'}</strong><span>Duplicate guard</span></div>
-            <div style={styles.metric}><strong>{label(manualRunResult.execution_request.status)}</strong><span>Request status</span></div>
-            <div style={styles.metric}><strong>{manualRunResult.executes_requests ? 'Yes' : 'No'}</strong><span>Executed request</span></div>
-            <div style={styles.metric}><strong>{manualRunResult.runner_enabled ? 'Enabled' : 'Disabled'}</strong><span>Runner</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Created execution request</h4>
-          <JsonBlock value={manualRunResult.execution_request} />
-          {manualRunResult.run_event ? (
             <>
-              <h4 style={styles.smallTitle}>Run ledger event</h4>
-              <JsonBlock value={manualRunResult.run_event} />
+              {formFields(form, setForm, 'automation-create')}
+              {selectedTypeDefinition ? <p className="automation-schedules-type-help"><strong>{selectedTypeDefinition.label}:</strong> {selectedTypeDefinition.description}</p> : null}
+              <p className="automation-schedules-muted">A schedule can prepare a request only. It cannot approve, execute, or change stock.</p>
+              <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving || form.name.trim().length < 3} onClick={() => void createSchedule()}>{saving ? 'Creating…' : 'Create draft schedule'}</button>
             </>
-          ) : null}
-          <h4 style={styles.smallTitle}>Safety checks</h4>
-          <ul style={styles.list}>
-            {manualRunResult.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Notes</h4>
-          <ul style={styles.list}>
-            {manualRunResult.notes.map((note) => <li key={note}>{note}</li>)}
-          </ul>
-        </section>
-      ) : null}
-
-
-      {auditPack ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Scheduler audit pack</h3>
-              <p style={styles.muted}>Read-only evidence for schedule configuration, run-ledger events, audit events, and linked execution requests.</p>
-            </div>
-            <div style={styles.safetyBadge}>Read only</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{auditPack.evidence_summary.schedule_audit_event_count}</strong><span>Schedule audit events</span></div>
-            <div style={styles.metric}><strong>{auditPack.evidence_summary.execution_request_count}</strong><span>Linked requests</span></div>
-            <div style={styles.metric}><strong>{auditPack.evidence_summary.execution_request_audit_event_count}</strong><span>Request audit events</span></div>
-            <div style={styles.metric}><strong>{auditPack.evidence_summary.run_event_count ?? 0}</strong><span>Run ledger events</span></div>
-            <div style={styles.metric}><strong>{auditPack.evidence_summary.duplicate_skipped_audit_event_count ?? 0}</strong><span>Duplicate skips</span></div>
-            <div style={styles.metric}><strong>{auditPack.completeness.safe_for_scheduler_governance_review ? 'Ready' : 'Review'}</strong><span>Governance status</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Audit pack checks</h4>
-          <ul style={styles.list}>
-            {auditPack.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Evidence summary</h4>
-          <JsonBlock value={auditPack.evidence_summary} />
-          <h4 style={styles.smallTitle}>Linked execution requests</h4>
-          <JsonBlock value={auditPack.linked_execution_requests} />
-          <h4 style={styles.smallTitle}>Run ledger</h4>
-          <JsonBlock value={auditPack.run_ledger || []} />
-          <h4 style={styles.smallTitle}>Full scheduler audit pack JSON</h4>
-          <JsonBlock value={auditPack} />
-        </section>
-      ) : null}
-
-      {dryRunResult ? (
-        <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.cardTitle}>Manual dry-run result</h3>
-              <p style={styles.muted}>Preview only. No execution request was created and no business records were changed.</p>
-            </div>
-            <div style={styles.safetyBadge}>Dry run only</div>
-          </div>
-          <div style={styles.metricGrid}>
-            <div style={styles.metric}><strong>{dryRunResult.would_create_execution_request ? 'Yes later' : 'No'}</strong><span>Would create request</span></div>
-            <div style={styles.metric}><strong>{dryRunResult.would_execute_request ? 'Yes' : 'No'}</strong><span>Would execute</span></div>
-            <div style={styles.metric}><strong>{dryRunResult.would_mutate_inventory ? 'Yes' : 'No'}</strong><span>Would mutate inventory</span></div>
-            <div style={styles.metric}><strong>{dryRunResult.runner_enabled ? 'Enabled' : 'Disabled'}</strong><span>Runner</span></div>
-          </div>
-          <h4 style={styles.smallTitle}>Dry-run checks</h4>
-          <ul style={styles.list}>
-            {dryRunResult.checks.map((check) => (
-              <li key={check.key}><strong>{label(check.status)}</strong> — {check.label}: {check.detail}</li>
-            ))}
-          </ul>
-          <h4 style={styles.smallTitle}>Candidate execution request preview</h4>
-          <JsonBlock value={dryRunResult.candidate_request} />
-          <h4 style={styles.smallTitle}>Notes</h4>
-          <ul style={styles.list}>
-            {dryRunResult.notes.map((note) => <li key={note}>{note}</li>)}
-          </ul>
-        </section>
-      ) : null}
+          ) : (
+            <div className="automation-schedules-readonly">You can view schedules, but your role cannot create them.</div>
+          )}
+        </aside>
+      </section>
 
       {selected ? (
-        <section style={styles.card}>
-          <h3 style={styles.cardTitle}>Schedule detail</h3>
-          <div style={styles.detailGrid}>
-            <div><strong>Name</strong><br />{selected.name}</div>
-            <div><strong>Status</strong><br />{label(selected.status)}</div>
-            <div><strong>Type</strong><br />{label(selected.automation_type)}</div>
-            <div><strong>Next run metadata</strong><br />{formatDateTime(selected.next_run_at)}</div>
+        <section id="automation-schedule-detail" className="automation-schedules-card automation-schedules-detail-card">
+          <div className="automation-schedules-section-heading">
+            <div>
+              <p className="automation-schedules-eyebrow">Selected schedule</p>
+              <h3>{selected.name}</h3>
+              <p>{selected.description || 'No description recorded.'}</p>
+            </div>
+            <StatusChip status={selected.status} />
           </div>
 
-          {editForm ? (
-            <div id="automation-schedule-edit-form" style={styles.editBox}>
-              <h4 style={styles.smallTitle}>Edit schedule</h4>
-              <div style={styles.formGrid}>
-                <label style={styles.field}>
-                  <span>Name</span>
-                  <input style={styles.input} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
-                </label>
-                <label style={styles.field}>
-                  <span>Automation type</span>
-                  <select style={styles.input} value={editForm.automation_type} onChange={(event) => setEditForm({ ...editForm, automation_type: event.target.value as FormState['automation_type'] })}>
-                    {automationTypes.map((type) => <option key={type} value={type}>{label(type)}</option>)}
-                  </select>
-                </label>
-                <label style={styles.field}>
-                  <span>Frequency</span>
-                  <select style={styles.input} value={editForm.schedule_kind} onChange={(event) => setEditForm({ ...editForm, schedule_kind: event.target.value as FormState['schedule_kind'] })}>
-                    {scheduleKinds.map((kind) => <option key={kind} value={kind}>{label(kind)}</option>)}
-                  </select>
-                </label>
-                <label style={styles.field}>
-                  <span>Time</span>
-                  <input style={styles.input} type="time" value={editForm.time} onChange={(event) => setEditForm({ ...editForm, time: event.target.value })} />
-                </label>
-                <label style={styles.field}>
-                  <span>Timezone</span>
-                  <input style={styles.input} value={editForm.timezone} onChange={(event) => setEditForm({ ...editForm, timezone: event.target.value })} />
-                </label>
-                <label style={styles.field}>
-                  <span>Future request default</span>
-                  <select style={styles.input} value={editForm.default_status} onChange={(event) => setEditForm({ ...editForm, default_status: event.target.value as FormState['default_status'] })}>
-                    <option value="draft">Draft</option>
-                    <option value="pending_review">Pending review</option>
-                  </select>
-                </label>
-              </div>
-              <label style={styles.field}>
-                <span>Description</span>
-                <textarea style={styles.textarea} value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} />
-              </label>
-              <div style={styles.toolbar}>
-                {canUpdateAutomationSchedules ? (
-                  <button style={styles.primaryButton} disabled={saving} onClick={() => void updateSchedule(selected)}>
-                    {saving ? 'Saving…' : 'Save schedule'}
-                  </button>
-                ) : null}
-                <button style={styles.secondaryButton} disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Reset edit form</button>
-              </div>
+          <div className="automation-schedules-detail-actions" aria-label="Selected schedule actions">
+            <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving || selected.status === 'disabled'} onClick={() => void dryRunSchedule(selected)}>Preview</button>
+            {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving || selected.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule: selected })}>Create request</button> : null}
+            {(selected.status === 'draft' || selected.status === 'paused') && canResumeAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule: selected })}>Activate</button> : null}
+            {(selected.status === 'draft' || selected.status === 'active') && canPauseAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => void pauseSchedule(selected)}>Pause</button> : null}
+            {selected.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--danger" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule: selected }); setConfirmationText(''); }}>Disable</button> : null}
+            {canViewExecutionRequests ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => void loadAuditPack(selected)}>Load audit pack</button> : null}
+          </div>
+
+          <div className="automation-schedules-detail-grid">
+            <div><span>Review type</span><strong>{selected.type_definition?.label || humanize(selected.automation_type)}</strong></div>
+            <div><span>Schedule</span><strong>{schedulePattern(selected)}</strong></div>
+            <div><span>Next run</span><strong>{selected.next_run_at ? formatDateTime(selected.next_run_at, scheduleTimezone(selected)) : 'Not scheduled'}</strong></div>
+            <div><span>Last run</span><strong>{formatDateTime(selected.last_run_at, scheduleTimezone(selected))}</strong></div>
+            <div><span>Created by</span><strong>{selected.created_by_name || 'System / unavailable'}</strong></div>
+            <div><span>Updated</span><strong>{formatDateTime(selected.updated_at)}</strong></div>
+            <div><span>Created request status</span><strong>{humanize(String(selected.request_defaults?.default_status || 'draft'))}</strong></div>
+            <div><span>Automatic execution</span><strong>No</strong></div>
+          </div>
+
+          {selected.disabled_reason ? <div className="automation-schedules-alert automation-schedules-alert--warning"><strong>Disable reason:</strong> {selected.disabled_reason}</div> : null}
+
+          {selected.timeline?.length ? (
+            <div className="automation-schedules-timeline">
+              <h4>Lifecycle</h4>
+              {selected.timeline.map((row, index) => (
+                <div key={`${row.status}-${row.at || index}`}>
+                  <span className="automation-schedules-timeline-dot" />
+                  <div><strong>{row.label}</strong><span>{formatDateTime(row.at)} · {row.by || 'Unknown user'}</span></div>
+                </div>
+              ))}
             </div>
-          ) : canUpdateAutomationSchedules ? (
-            <button style={styles.secondaryButton} disabled={saving} onClick={() => { setEditForm(scheduleToForm(selected)); scrollToFormSection('automation-schedule-edit-form'); }}>Edit loaded schedule</button>
           ) : null}
 
-          <h4 style={styles.smallTitle}>Schedule config</h4>
-          <JsonBlock value={selected.schedule_config} />
-          <h4 style={styles.smallTitle}>Request defaults</h4>
-          <JsonBlock value={selected.request_defaults} />
-          <h4 style={styles.smallTitle}>Safety</h4>
-          <JsonBlock value={selected.safety} />
+          {canUpdateAutomationSchedules && selected.status !== 'disabled' ? (
+            <div id="automation-schedule-edit-form" className="automation-schedules-edit-panel">
+              <div className="automation-schedules-section-heading">
+                <div><h4>Edit schedule</h4><p>Changing calendar settings recalculates the next future occurrence.</p></div>
+                {!editForm ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => { setEditForm(scheduleToForm(selected)); scrollToFormSection('automation-schedule-edit-form'); }}>Edit</button> : null}
+              </div>
+              {editForm ? (
+                <>
+                  {formFields(editForm, setEditForm, 'automation-edit')}
+                  <div className="automation-schedules-actions">
+                    <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving} onClick={() => void updateSchedule(selected)}>{saving ? 'Saving…' : 'Save changes'}</button>
+                    <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Reset</button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {dryRunResult ? (
+            <div className="automation-schedules-result-panel">
+              <div className="automation-schedules-section-heading"><div><h4>Preview result</h4><p>No request or business record was changed.</p></div><span className="automation-schedules-safety-pill">Preview only</span></div>
+              <div className="automation-schedules-metrics">
+                <div><strong>{dryRunResult.would_create_execution_request ? 'Yes' : 'No'}</strong><span>Would prepare request</span></div>
+                <div><strong>{dryRunResult.would_execute_request ? 'Yes' : 'No'}</strong><span>Would execute</span></div>
+                <div><strong>{dryRunResult.would_mutate_inventory ? 'Yes' : 'No'}</strong><span>Would change inventory</span></div>
+                <div><strong>{humanize(dryRunResult.candidate_request.status)}</strong><span>Request starting status</span></div>
+              </div>
+              <ul className="automation-schedules-check-list">{dryRunResult.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
+              <details><summary>Technical request preview</summary><JsonEvidence value={dryRunResult.candidate_request} /></details>
+            </div>
+          ) : null}
+
+          {manualRunResult ? (
+            <div className="automation-schedules-result-panel">
+              <div className="automation-schedules-section-heading"><div><h4>Manual request-creation result</h4><p>The resulting request still requires its normal review and approval workflow.</p></div><StatusChip status={manualRunResult.execution_request?.status} /></div>
+              <div className="automation-schedules-metrics">
+                <div><strong>{manualRunResult.created_execution_request_count}</strong><span>Requests created</span></div>
+                <div><strong>{manualRunResult.duplicate_guard_triggered ? 'Yes' : 'No'}</strong><span>Duplicate guard</span></div>
+                <div><strong>No</strong><span>Automatic approval</span></div>
+                <div><strong>No</strong><span>Automatic execution</span></div>
+              </div>
+              <ul className="automation-schedules-check-list">{manualRunResult.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
+              <details><summary>Technical result evidence</summary><JsonEvidence value={manualRunResult} /></details>
+            </div>
+          ) : null}
+
+          {auditPack ? (
+            <div className="automation-schedules-result-panel">
+              <div className="automation-schedules-section-heading"><div><h4>Audit pack</h4><p>Schedule history, linked requests, run ledger, and completeness checks.</p></div><StatusChip status={auditPack.completeness.complete ? 'pass' : 'watch'} /></div>
+              <div className="automation-schedules-metrics">
+                <div><strong>{auditPack.evidence_summary.schedule_audit_event_count}</strong><span>Schedule audit events</span></div>
+                <div><strong>{auditPack.evidence_summary.execution_request_count}</strong><span>Linked requests</span></div>
+                <div><strong>{auditPack.evidence_summary.run_event_count || 0}</strong><span>Run events</span></div>
+                <div><strong>{auditPack.completeness.complete ? 'Complete' : 'Review needed'}</strong><span>Evidence status</span></div>
+              </div>
+              <ul className="automation-schedules-check-list">{auditPack.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
+              {auditPack.linked_execution_requests.length ? (
+                <div className="automation-schedules-table-wrap">
+                  <table className="automation-schedules-table automation-schedules-table--compact">
+                    <thead><tr><th>Request</th><th>Type</th><th>Workflow</th><th>Execution</th><th>Created</th></tr></thead>
+                    <tbody>{auditPack.linked_execution_requests.map((request) => <tr key={request.id}><td>{request.id}</td><td>{humanize(request.request_type)}</td><td>{humanize(request.status)}</td><td>{humanize(request.execution_status)}</td><td>{formatDateTime(request.created_at)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              ) : <p className="automation-schedules-muted">No linked execution requests were found.</p>}
+              <details><summary>Complete technical audit evidence</summary><JsonEvidence value={auditPack} /></details>
+            </div>
+          ) : null}
+
+          <details className="automation-schedules-technical-details">
+            <summary>Stored schedule configuration and safety metadata</summary>
+            <div className="automation-schedules-evidence-grid">
+              <div><h4>Schedule configuration</h4><JsonEvidence value={selected.schedule_config} /></div>
+              <div><h4>Request defaults</h4><JsonEvidence value={selected.request_defaults} /></div>
+              <div><h4>Safety metadata</h4><JsonEvidence value={selected.safety} /></div>
+            </div>
+          </details>
         </section>
+      ) : null}
+
+      <section className="automation-schedules-card automation-schedules-governance-card">
+        <button type="button" className="automation-schedules-governance-toggle" aria-expanded={governanceOpen} onClick={() => setGovernanceOpen((current) => !current)}>
+          <span><strong>Runner governance and technical evidence</strong><small>Readiness, request-creation controls, run ledger, anomaly evidence, and launch attestation</small></span>
+          <span>{governanceOpen ? 'Hide' : 'Show'}</span>
+        </button>
+
+        {governanceOpen ? (
+          <div className="automation-schedules-governance-content">
+            {!governanceLoaded && governanceLoading ? <p className="automation-schedules-muted">Loading runner governance evidence…</p> : null}
+            {!governanceLoaded && !governanceLoading ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => void loadGovernance()}>Load governance evidence</button> : null}
+
+            {runnerStatus ? (
+              <>
+                <div className="automation-schedules-section-heading">
+                  <div><h3>Runner status</h3><p>The runner may create reviewable requests only when all explicit safety flags are enabled. It cannot approve or execute them.</p></div>
+                  <StatusChip status={runnerStatus.request_creation_enabled ? 'watch' : 'pass'} />
+                </div>
+                <div className="automation-schedules-summary automation-schedules-summary--governance">
+                  <div><strong>{runnerStatus.enabled ? 'Enabled' : 'Disabled'}</strong><span>Runner flag</span></div>
+                  <div><strong>{runnerStatus.started ? 'Started' : 'Not started'}</strong><span>Process</span></div>
+                  <div><strong>{runnerStatus.request_creation_enabled ? 'Enabled' : 'Disabled'}</strong><span>Auto request creation</span></div>
+                  <div><strong>No</strong><span>Automatic execution</span></div>
+                  <div><strong>{numberValue(runnerStatus.failed_tick_count)}</strong><span>Failed ticks</span></div>
+                  <div><strong>{humanize(runnerStatus.last_tick_outcome)}</strong><span>Last tick</span></div>
+                </div>
+
+                {canCreateAutomationSchedules && canCreateExecutionRequests ? (
+                  <div className="automation-schedules-actions">
+                    <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving || !runnerStatus.request_creation_enabled} onClick={() => setConfirmation({ kind: 'run_due' })}>Run due schedules once</button>
+                    <span className="automation-schedules-muted">Available only when controlled request creation is explicitly enabled. It never approves or executes requests.</span>
+                  </div>
+                ) : null}
+
+                {runnerStatus.unsafe_runner_output_review_required ? (
+                  <div className="automation-schedules-alert automation-schedules-alert--warning">
+                    <strong>Runner anomaly review is required.</strong> Evidence is preserved. A current timestamp, count, confirmation, and review note are required to acknowledge it.
+                    {canCreateAutomationSchedules && runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => { setConfirmation({ kind: 'acknowledge_anomaly' }); setConfirmationText(''); }}>Acknowledge review</button> : null}
+                  </div>
+                ) : null}
+
+                <ul className="automation-schedules-check-list">{runnerStatus.checks.slice(0, 12).map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
+                {runnerStatus.checks.length > 12 ? <details><summary>Show all {runnerStatus.checks.length} runner safety checks</summary><ul className="automation-schedules-check-list">{runnerStatus.checks.slice(12).map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul></details> : null}
+              </>
+            ) : null}
+
+            {runnerExecutiveSummary ? (
+              <div className="automation-schedules-governance-section">
+                <div className="automation-schedules-section-heading"><div><h3>Executive summary</h3><p>{runnerExecutiveSummary.recommendation}</p></div><StatusChip status={runnerExecutiveSummary.overall_posture} /></div>
+                <div className="automation-schedules-metrics">
+                  <div><strong>{humanize(String(runnerExecutiveSummary.summary.runner_mode))}</strong><span>Runner mode</span></div>
+                  <div><strong>{runnerExecutiveSummary.summary.due_schedule_count}</strong><span>Due schedules</span></div>
+                  <div><strong>{runnerExecutiveSummary.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
+                  <div><strong>{runnerExecutiveSummary.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
+                </div>
+                <ul className="automation-schedules-check-list">{runnerExecutiveSummary.decision_rows.map((row) => <li key={row.key}><StatusChip status={row.status} /><span><strong>{row.label}</strong>{row.detail}</span></li>)}</ul>
+              </div>
+            ) : null}
+
+            {runnerLaunchAttestation ? (
+              <div className="automation-schedules-governance-section">
+                <div className="automation-schedules-section-heading"><div><h3>Launch attestation</h3><p>Read-only evidence only. This section cannot enable flags, create requests, approve, execute, or change inventory.</p></div><StatusChip status={runnerLaunchAttestation.launch_posture} /></div>
+                <div className="automation-schedules-metrics">
+                  <div><strong>{runnerLaunchAttestation.summary.failed_attestation_count}</strong><span>Failed checks</span></div>
+                  <div><strong>{runnerLaunchAttestation.summary.watch_attestation_count}</strong><span>Watch checks</span></div>
+                  <div><strong>{humanize(runnerLaunchAttestation.summary.certification_posture)}</strong><span>Certification</span></div>
+                  <div><strong>No</strong><span>Execution enabled</span></div>
+                </div>
+                <ul className="automation-schedules-check-list">{runnerLaunchAttestation.attestation_rows.map((row) => <li key={row.key}><StatusChip status={row.status} /><span><strong>{row.label}</strong>{row.detail}</span></li>)}</ul>
+              </div>
+            ) : null}
+
+            {runEvents ? (
+              <div className="automation-schedules-governance-section">
+                <div className="automation-schedules-section-heading"><div><h3>Recent run ledger</h3><p>Latest manual or controlled due-processing attempts and their linked request evidence.</p></div><span>{runEvents.total} total</span></div>
+                <div className="automation-schedules-table-wrap">
+                  <table className="automation-schedules-table automation-schedules-table--compact">
+                    <thead><tr><th>Schedule</th><th>Mode</th><th>Outcome</th><th>Request</th><th>Time</th></tr></thead>
+                    <tbody>{runEvents.rows.map((event) => <tr key={event.id}><td>{event.schedule_name}</td><td>{humanize(event.run_mode)}</td><td><StatusChip status={event.status} /></td><td>{event.execution_request_id || 'None'}</td><td>{formatDateTime(event.created_at)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {runnerRunOnceResult ? (
+              <div className="automation-schedules-result-panel">
+                <h4>Latest run-once result</h4>
+                <div className="automation-schedules-metrics">
+                  <div><strong>{runnerRunOnceResult.processed_schedule_count}</strong><span>Processed</span></div>
+                  <div><strong>{runnerRunOnceResult.created_execution_request_count}</strong><span>Requests created</span></div>
+                  <div><strong>{runnerRunOnceResult.skipped_schedule_count || 0}</strong><span>Skipped</span></div>
+                  <div><strong>{runnerRunOnceResult.failed_schedule_count || 0}</strong><span>Failed</span></div>
+                </div>
+              </div>
+            ) : null}
+
+            <details className="automation-schedules-technical-details">
+              <summary>Complete raw runner evidence</summary>
+              <div className="automation-schedules-evidence-grid">
+                <div><h4>Runner status</h4><JsonEvidence value={runnerStatus} /></div>
+                <div><h4>Executive summary</h4><JsonEvidence value={runnerExecutiveSummary} /></div>
+                <div><h4>Launch attestation</h4><JsonEvidence value={runnerLaunchAttestation} /></div>
+                <div><h4>Run ledger</h4><JsonEvidence value={runEvents} /></div>
+              </div>
+            </details>
+          </div>
+        ) : null}
+      </section>
+
+      {confirmation ? (
+        <div className="automation-schedules-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setConfirmation(null); }}>
+          <section className="automation-schedules-modal" role="dialog" aria-modal="true" aria-labelledby="automation-confirmation-title">
+            <h3 id="automation-confirmation-title">
+              {confirmation.kind === 'activate' ? 'Activate schedule' : null}
+              {confirmation.kind === 'disable' ? 'Disable schedule' : null}
+              {confirmation.kind === 'manual_run' ? 'Create execution request' : null}
+              {confirmation.kind === 'run_due' ? 'Run due schedules once' : null}
+              {confirmation.kind === 'acknowledge_anomaly' ? 'Acknowledge runner anomaly review' : null}
+            </h3>
+            {confirmation.kind === 'activate' ? <p>Activate “{confirmation.schedule.name}”? Its next run will be recalculated from now. If controlled request creation is enabled, a due run may prepare a reviewable request but cannot approve or execute it.</p> : null}
+            {confirmation.kind === 'manual_run' ? <p>Create one reviewable execution request from “{confirmation.schedule.name}”? Duplicate protection applies. Nothing will be approved or executed automatically.</p> : null}
+            {confirmation.kind === 'run_due' ? <p>Process currently due active schedules once for this tenant? This may create reviewable execution requests only.</p> : null}
+            {confirmation.kind === 'disable' ? (
+              <label className="automation-schedules-field">
+                <span>Disable reason</span>
+                <textarea value={confirmationText} minLength={3} maxLength={1000} onChange={(event) => setConfirmationText(event.target.value)} placeholder="Explain why this schedule is being disabled." />
+              </label>
+            ) : null}
+            {confirmation.kind === 'acknowledge_anomaly' ? (
+              <label className="automation-schedules-field">
+                <span>Review note</span>
+                <textarea value={confirmationText} minLength={numberValue(runnerStatus?.unsafe_runner_output_review_note_min_length) || 10} maxLength={numberValue(runnerStatus?.unsafe_runner_output_review_note_max_length) || 1000} onChange={(event) => setConfirmationText(event.target.value)} placeholder="Record what was reviewed and why the evidence is understood." />
+                <small>The note body is not exposed in runner status. Evidence counts and timestamps remain preserved.</small>
+              </label>
+            ) : null}
+            <div className="automation-schedules-modal-actions">
+              <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => { setConfirmation(null); setConfirmationText(''); }}>Cancel</button>
+              <button type="button" className={`automation-schedules-button ${confirmation.kind === 'disable' ? 'automation-schedules-button--danger' : 'automation-schedules-button--primary'}`} disabled={saving} onClick={() => void confirmAction()}>{saving ? 'Working…' : 'Confirm'}</button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  headerCard: { display: 'flex', justifyContent: 'space-between', gap: 16, padding: 20, border: '1px solid #e5e7eb', borderRadius: 16, background: '#fff' },
-  title: { margin: 0, fontSize: 24 },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 760 },
-  safetyBadge: { alignSelf: 'flex-start', padding: '8px 12px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontWeight: 700 },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', gap: 16 },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  muted: { margin: '4px 0 0', color: '#64748b' },
-  metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, margin: '12px 0' },
-  metric: { display: 'flex', flexDirection: 'column', gap: 4, padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' },
-  card: { padding: 16, border: '1px solid #e5e7eb', borderRadius: 16, background: '#fff' },
-  cardTitle: { margin: '0 0 12px', fontSize: 18 },
-  smallTitle: { margin: '16px 0 8px', fontSize: 14 },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  field: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
-  input: { padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff' },
-  textarea: { minHeight: 80, padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, resize: 'vertical' },
-  primaryButton: { marginTop: 12, padding: '10px 14px', border: 0, borderRadius: 10, background: '#0f172a', color: '#fff', cursor: 'pointer' },
-  secondaryButton: { padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', cursor: 'pointer' },
-  linkButton: { padding: 0, border: 0, background: 'transparent', color: '#2563eb', cursor: 'pointer', fontWeight: 600 },
-  disabledLinkButton: { padding: 0, border: 0, background: 'transparent', color: '#64748b', cursor: 'not-allowed', fontWeight: 600, opacity: 0.75 },
-  toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb', color: '#475569', fontSize: 13 },
-  td: { padding: 10, borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
-  tdActions: { padding: 10, borderBottom: '1px solid #f1f5f9', display: 'flex', gap: 10, flexWrap: 'wrap' },
-  empty: { padding: 20, textAlign: 'center', color: '#64748b' },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  editBox: { marginTop: 16, padding: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc' },
-  json: { margin: 0, padding: 12, borderRadius: 12, background: '#f8fafc', overflowX: 'auto', fontSize: 12 },
-  list: { margin: 0, paddingLeft: 18, color: '#475569' },
-  error: { padding: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12 }
-};

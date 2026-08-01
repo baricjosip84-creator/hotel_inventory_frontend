@@ -2235,6 +2235,7 @@ export interface AutomationScheduleTypesResponse {
     registry_only: boolean;
     runner_enabled: boolean;
     creates_jobs: boolean;
+    auto_creates_requests?: boolean;
     auto_executes: boolean;
   };
   notes: string[];
@@ -2699,6 +2700,7 @@ export interface AutomationRunnerSafetyReportResponse {
   schedule_summary: {
     total_schedules: number | string;
     draft_schedules: number | string;
+    active_schedules?: number | string;
     paused_schedules: number | string;
     disabled_schedules: number | string;
     due_request_creation_candidates: number | string;
@@ -3097,6 +3099,7 @@ export interface AutomationRunnerReadinessResponse {
   totals: {
     total_schedules: number | string;
     draft_schedules: number | string;
+    active_schedules?: number | string;
     paused_schedules: number | string;
     disabled_schedules: number | string;
     eligible_for_future_runner_review: number | string;
@@ -3604,6 +3607,7 @@ export interface AutomationRunnerStewardshipLedgerResponse {
     stewardship_posture: string;
     total_schedules: number | string;
     draft_schedules: number | string;
+    active_schedules?: number | string;
     paused_schedules: number | string;
     disabled_schedules: number | string;
     due_schedules: number | string;
