@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { CSSProperties } from 'react';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import './ExecutionTasksPage.css';
 
 type ExecutionTaskStatus = 'draft' | 'ready' | 'assigned' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 type ExecutionTaskType = 'picking' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'cycle_count' | 'general';
 type ExecutionTaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment' | 'execution_request';
+type ExecutionTaskBatchStatus = 'draft' | 'released' | 'cancelled';
+type ExecutionTaskBatchType = 'manual' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'mixed';
+type TaskAction = 'ready' | 'start' | 'unblock' | 'complete' | 'cancel' | 'block' | 'assign';
+type BatchAction = 'release' | 'cancel';
 
 type ExecutionTaskAuditRow = {
   id: string;
@@ -23,6 +27,7 @@ type ExecutionTask = {
   id: string;
   tenant_id: string;
   task_code: string;
+  batch_id?: string | null;
   task_type: ExecutionTaskType;
   status: ExecutionTaskStatus;
   priority: ExecutionTaskPriority;
@@ -56,14 +61,7 @@ type ExecutionTask = {
   is_due_soon?: boolean;
   sla_status?: 'overdue' | 'due_soon' | 'blocked' | 'on_track';
   escalation_level?: number;
-  hours_past_due?: number | null;
-  hours_until_due?: number | null;
 };
-
-
-
-type ExecutionTaskBatchStatus = 'draft' | 'released' | 'cancelled';
-type ExecutionTaskBatchType = 'manual' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'mixed';
 
 type ExecutionTaskBatch = {
   id: string;
@@ -101,7 +99,6 @@ type ExecutionTaskWorkload = {
   workload_score: number;
 };
 
-
 type ExecutionTaskThroughputDashboard = {
   window_days: number;
   totals: {
@@ -119,7 +116,6 @@ type ExecutionTaskThroughputDashboard = {
   by_source: Array<{ source_type: ExecutionTaskSourceType; count: number }>;
   daily: Array<{ day: string; created_count: number; completed_count: number; cancelled_count: number }>;
 };
-
 
 type MobileExecutionQueueTask = {
   id: string;
@@ -162,7 +158,6 @@ type MobileExecutionQueue = {
   tasks: MobileExecutionQueueTask[];
 };
 
-
 type MobileOptimizationVisibility = {
   generated_at: string;
   summary: {
@@ -187,13 +182,6 @@ type MobileOptimizationVisibility = {
     rationale?: string | null;
     compact_label: string;
     action_hint: string;
-    source_type?: string | null;
-    source_id?: string | null;
-    target_type?: string | null;
-    target_id?: string | null;
-    assigned_to?: string | null;
-    facility_id?: string | null;
-    storage_location_id?: string | null;
   }>;
 };
 
@@ -225,13 +213,44 @@ type OptimizationExecutionDashboard = {
   }>;
 };
 
+type ExecutionTaskOptionUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+};
+
+type ExecutionTaskOptionLocation = {
+  id: string;
+  name: string;
+  temperature_zone?: string | null;
+  is_active: boolean;
+};
+
+type ExecutionTaskOptions = {
+  users: ExecutionTaskOptionUser[];
+  active_users: ExecutionTaskOptionUser[];
+  locations: ExecutionTaskOptionLocation[];
+  active_locations: ExecutionTaskOptionLocation[];
+};
+
+type ExecutionTaskSummary = {
+  matching_task_count: number;
+  open_task_count: number;
+  blocked_task_count: number;
+  overdue_task_count: number;
+  due_soon_task_count: number;
+  unassigned_task_count: number;
+};
+
 type NewTaskForm = {
   title: string;
   description: string;
   task_type: ExecutionTaskType;
   priority: ExecutionTaskPriority;
   status: 'draft' | 'ready';
-  source_type: ExecutionTaskSourceType;
+  source_type: Exclude<ExecutionTaskSourceType, 'execution_request'>;
   source_id: string;
   facility_id: string;
   storage_location_id: string;
@@ -240,15 +259,27 @@ type NewTaskForm = {
   sla_due_at: string;
 };
 
+type ActionDialog =
+  | { kind: 'task'; action: TaskAction; task: ExecutionTask; value: string; assigneeId: string }
+  | { kind: 'batch'; action: BatchAction; batch: ExecutionTaskBatch; value: string };
+
 const TASK_TYPES: ExecutionTaskType[] = ['picking', 'reservation_fulfillment', 'receiving', 'replenishment', 'transfer', 'cycle_count', 'general'];
 const PRIORITIES: ExecutionTaskPriority[] = ['urgent', 'high', 'normal', 'low'];
 const STATUSES: ExecutionTaskStatus[] = ['draft', 'ready', 'assigned', 'in_progress', 'blocked', 'completed', 'cancelled'];
 const BATCH_STATUSES: ExecutionTaskBatchStatus[] = ['draft', 'released', 'cancelled'];
 const BATCH_TYPES: ExecutionTaskBatchType[] = ['manual', 'reservation_fulfillment', 'receiving', 'replenishment', 'transfer', 'mixed'];
 const SOURCE_TYPES: ExecutionTaskSourceType[] = ['manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment', 'execution_request'];
-const MANUAL_CREATE_SOURCE_TYPES: ExecutionTaskSourceType[] = SOURCE_TYPES.filter((sourceType) => sourceType !== 'execution_request');
-
-const initialForm: NewTaskForm = {
+const MANUAL_CREATE_SOURCE_TYPES = SOURCE_TYPES.filter((sourceType): sourceType is Exclude<ExecutionTaskSourceType, 'execution_request'> => sourceType !== 'execution_request');
+const EMPTY_SUMMARY: ExecutionTaskSummary = {
+  matching_task_count: 0,
+  open_task_count: 0,
+  blocked_task_count: 0,
+  overdue_task_count: 0,
+  due_soon_task_count: 0,
+  unassigned_task_count: 0
+};
+const EMPTY_OPTIONS: ExecutionTaskOptions = { users: [], active_users: [], locations: [], active_locations: [] };
+const INITIAL_FORM: NewTaskForm = {
   title: '',
   description: '',
   task_type: 'general',
@@ -264,50 +295,83 @@ const initialForm: NewTaskForm = {
 };
 
 function label(value?: string | null): string {
-  if (!value) return '-';
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  if (!value) return 'Not recorded';
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function dateTime(value?: string | null): string {
-  if (!value) return '-';
+  if (!value) return 'Not scheduled';
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
 function toIsoOrNull(value: string): string | null {
   if (!value.trim()) return null;
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
-  return 'Unknown request failure.';
-}
-
-function hasJsonContent(value: unknown): boolean {
-  return Boolean(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
+  return 'The request could not be completed.';
 }
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function hasJsonContent(value: unknown): boolean {
+  return Boolean(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
+}
+
+function downloadTextFile(content: string, filename: string, type = 'text/csv;charset=utf-8;') {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function payloadFacts(payload?: Record<string, unknown>): Array<{ key: string; value: string }> {
+  if (!payload) return [];
+  const preferredKeys = [
+    'product_name', 'product_unit', 'storage_location_name', 'from_storage_location_name',
+    'to_storage_location_name', 'reservation_number', 'purchase_order_number', 'transfer_number',
+    'requisition_number', 'replenishment_quantity', 'allocated_quantity', 'total_quantity',
+    'item_count', 'line_count', 'status', 'adapter'
+  ];
+  return preferredKeys.flatMap((key) => {
+    const value = payload[key];
+    if (value === undefined || value === null || value === '') return [];
+    if (typeof value === 'object') return [];
+    return [{ key: label(key), value: String(value) }];
+  });
+}
+
 export default function ExecutionTasksPage() {
   const [searchParams] = useSearchParams();
   const requestedTaskId = searchParams.get('task_id')?.trim() || '';
+  const queueRef = useRef<HTMLDivElement | null>(null);
+  const detailRef = useRef<HTMLDivElement | null>(null);
+
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
-  const canReadOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
-  const canCreateOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE);
   const canCreate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CREATE);
   const canAssign = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_ASSIGN);
   const canUpdate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE);
   const canComplete = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_COMPLETE);
   const canCancel = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CANCEL);
+  const canReadOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
+  const canCreateOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE);
 
+  const [options, setOptions] = useState<ExecutionTaskOptions>(EMPTY_OPTIONS);
+  const [summary, setSummary] = useState<ExecutionTaskSummary>(EMPTY_SUMMARY);
   const [tasks, setTasks] = useState<ExecutionTask[]>([]);
+  const [selected, setSelected] = useState<ExecutionTask | null>(null);
+  const [taskAudit, setTaskAudit] = useState<ExecutionTaskAuditRow[]>([]);
   const [batches, setBatches] = useState<ExecutionTaskBatch[]>([]);
   const [workload, setWorkload] = useState<ExecutionTaskWorkload[]>([]);
   const [slaQueue, setSlaQueue] = useState<ExecutionTask[]>([]);
@@ -315,365 +379,448 @@ export default function ExecutionTasksPage() {
   const [mobileQueue, setMobileQueue] = useState<MobileExecutionQueue | null>(null);
   const [optimizationDashboard, setOptimizationDashboard] = useState<OptimizationExecutionDashboard | null>(null);
   const [mobileOptimization, setMobileOptimization] = useState<MobileOptimizationVisibility | null>(null);
-  const [selected, setSelected] = useState<ExecutionTask | null>(null);
-  const [taskAudit, setTaskAudit] = useState<ExecutionTaskAuditRow[]>([]);
+
   const [loading, setLoading] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState<ExecutionTaskStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ExecutionTaskType | 'all'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<ExecutionTaskPriority | 'all'>('all');
   const [sourceFilter, setSourceFilter] = useState<ExecutionTaskSourceType | 'all'>('all');
-  const [sourceIdFilter, setSourceIdFilter] = useState('');
-  const [batchStatusFilter, setBatchStatusFilter] = useState<ExecutionTaskBatchStatus | 'all'>('all');
-  const [batchTypeFilter, setBatchTypeFilter] = useState<ExecutionTaskBatchType | 'all'>('all');
-  const [facilityIdFilter, setFacilityIdFilter] = useState('');
+  const [assignedToFilter, setAssignedToFilter] = useState('');
   const [storageLocationIdFilter, setStorageLocationIdFilter] = useState('');
-  const sourceIdFilterError = useMemo(() => {
-    const normalized = sourceIdFilter.trim();
-    return normalized && !isUuid(normalized) ? 'Source ID must be a valid UUID before filters can be applied.' : null;
-  }, [sourceIdFilter]);
-  const facilityIdFilterError = useMemo(() => {
-    const normalized = facilityIdFilter.trim();
-    return normalized && !isUuid(normalized) ? 'Facility ID must be a valid UUID before filters can be applied.' : null;
-  }, [facilityIdFilter]);
-  const storageLocationIdFilterError = useMemo(() => {
-    const normalized = storageLocationIdFilter.trim();
-    return normalized && !isUuid(normalized) ? 'Storage location ID must be a valid UUID before filters can be applied.' : null;
-  }, [storageLocationIdFilter]);
+  const [sourceIdFilter, setSourceIdFilter] = useState('');
+  const [facilityIdFilter, setFacilityIdFilter] = useState('');
   const [openOnly, setOpenOnly] = useState(true);
   const [priorityQueueMode, setPriorityQueueMode] = useState(false);
+  const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState<NewTaskForm>(initialForm);
-  const formSourceIdError = useMemo(() => {
-    const normalized = form.source_id.trim();
-    return normalized && !isUuid(normalized) ? 'Source ID must be a valid UUID before the task can be created.' : null;
-  }, [form.source_id]);
-  const formFacilityIdError = useMemo(() => {
-    const normalized = form.facility_id.trim();
-    return normalized && !isUuid(normalized) ? 'Facility ID must be a valid UUID before the task can be created.' : null;
-  }, [form.facility_id]);
-  const formStorageLocationIdError = useMemo(() => {
-    const normalized = form.storage_location_id.trim();
-    return normalized && !isUuid(normalized) ? 'Storage location ID must be a valid UUID before the task can be created.' : null;
-  }, [form.storage_location_id]);
-  const formAssignedToError = useMemo(() => {
-    const normalized = form.assigned_to.trim();
-    return normalized && !isUuid(normalized) ? 'Assigned user must be a valid UUID before the task can be created.' : null;
-  }, [form.assigned_to]);
-  const createTaskDisabled = saving || form.title.trim().length < 3 || Boolean(formSourceIdError || formFacilityIdError || formStorageLocationIdError || formAssignedToError);
+  const [pageSize, setPageSize] = useState(25);
+  const [offset, setOffset] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [batchStatusFilter, setBatchStatusFilter] = useState<ExecutionTaskBatchStatus | 'all'>('all');
+  const [batchTypeFilter, setBatchTypeFilter] = useState<ExecutionTaskBatchType | 'all'>('all');
+  const [form, setForm] = useState<NewTaskForm>(INITIAL_FORM);
+  const [actionDialog, setActionDialog] = useState<ActionDialog | null>(null);
 
-  const summary = useMemo(() => {
-    const open = tasks.filter((task) => !['completed', 'cancelled'].includes(task.status)).length;
-    const blocked = tasks.filter((task) => task.status === 'blocked').length;
-    const overdue = tasks.filter((task) => {
-      const due = task.sla_due_at || task.due_at;
-      return due && !['completed', 'cancelled'].includes(task.status) && new Date(due).getTime() < Date.now();
-    }).length;
+  const userById = useMemo(() => new Map(options.users.map((user) => [user.id, user])), [options.users]);
+  const locationById = useMemo(() => new Map(options.locations.map((location) => [location.id, location])), [options.locations]);
+  const displayedTasks = tasks.slice(0, pageSize);
+  const canGoPrevious = offset > 0;
+  const visibleStart = displayedTasks.length ? offset + 1 : 0;
+  const visibleEnd = offset + displayedTasks.length;
 
-    return { open, blocked, overdue, total: tasks.length };
-  }, [tasks]);
-
-  const loadTasks = useCallback(async () => {
-    if (!canRead) return;
-
-    setLoading(true);
-    setError(null);
-
-    const normalizedSourceIdFilter = sourceIdFilter.trim();
-    const normalizedFacilityIdFilter = facilityIdFilter.trim();
-    const normalizedStorageLocationIdFilter = storageLocationIdFilter.trim();
-    const filterValidationError = sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError;
-    if (filterValidationError) {
-      setLoading(false);
-      setError(filterValidationError);
-      return;
+  const advancedIdError = useMemo(() => {
+    const checks = [
+      ['Source ID', sourceIdFilter],
+      ['Facility ID', facilityIdFilter]
+    ] as const;
+    for (const [name, value] of checks) {
+      if (value.trim() && !isUuid(value.trim())) return `${name} must be a valid UUID.`;
     }
+    return null;
+  }, [facilityIdFilter, sourceIdFilter]);
 
-    const appendLocationFilters = (paramsToUpdate: URLSearchParams) => {
-      if (normalizedFacilityIdFilter) paramsToUpdate.set('facility_id', normalizedFacilityIdFilter);
-      if (normalizedStorageLocationIdFilter) paramsToUpdate.set('storage_location_id', normalizedStorageLocationIdFilter);
-    };
+  const createValidation = useMemo(() => {
+    if (form.title.trim().length < 3) return 'Enter a title with at least three characters.';
+    if (form.source_type !== 'manual' && !form.source_id.trim()) return 'A linked source ID is required for a non-manual source.';
+    if (form.source_id.trim() && !isUuid(form.source_id.trim())) return 'Source ID must be a valid UUID.';
+    if (form.facility_id.trim() && !isUuid(form.facility_id.trim())) return 'Facility ID must be a valid UUID.';
+    return null;
+  }, [form]);
 
+  useEffect(() => {
+    const handle = window.setTimeout(() => setSearch(searchDraft.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [searchDraft]);
+
+  useEffect(() => {
+    setOffset(0);
+  }, [assignedToFilter, facilityIdFilter, openOnly, pageSize, priorityFilter, priorityQueueMode, search, sourceFilter, sourceIdFilter, statusFilter, storageLocationIdFilter, typeFilter]);
+
+  const buildTaskParams = useCallback((includePagination = true) => {
     const params = new URLSearchParams();
-    params.set('limit', '100');
+    if (includePagination) {
+      params.set('limit', String(Math.min(pageSize + 1, 101)));
+      params.set('offset', String(offset));
+    }
     if (priorityQueueMode) {
-      if (typeFilter !== 'all') params.set('task_type', typeFilter);
-      if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
-      if (normalizedSourceIdFilter) params.set('source_id', normalizedSourceIdFilter);
-      appendLocationFilters(params);
+      params.set('open_only', 'true');
     } else {
       params.set('open_only', openOnly ? 'true' : 'false');
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (typeFilter !== 'all') params.set('task_type', typeFilter);
-      if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
-      if (normalizedSourceIdFilter) params.set('source_id', normalizedSourceIdFilter);
-      appendLocationFilters(params);
-      if (search.trim()) params.set('search', search.trim());
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter);
+      if (search) params.set('search', search);
     }
+    if (typeFilter !== 'all') params.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
+    if (assignedToFilter) params.set('assigned_to', assignedToFilter);
+    if (storageLocationIdFilter) params.set('storage_location_id', storageLocationIdFilter);
+    if (sourceIdFilter.trim()) params.set('source_id', sourceIdFilter.trim());
+    if (facilityIdFilter.trim()) params.set('facility_id', facilityIdFilter.trim());
+    return params;
+  }, [assignedToFilter, facilityIdFilter, offset, openOnly, pageSize, priorityFilter, priorityQueueMode, search, sourceFilter, sourceIdFilter, statusFilter, storageLocationIdFilter, typeFilter]);
 
-    const workloadParams = new URLSearchParams();
-    workloadParams.set('limit', '25');
-    if (typeFilter !== 'all') workloadParams.set('task_type', typeFilter);
-    if (sourceFilter !== 'all') workloadParams.set('source_type', sourceFilter);
-    if (normalizedSourceIdFilter) workloadParams.set('source_id', normalizedSourceIdFilter);
-    appendLocationFilters(workloadParams);
+  const loadOptions = useCallback(async () => {
+    if (!canRead) return;
+    setOptionsLoading(true);
+    try {
+      setOptions(await apiRequest<ExecutionTaskOptions>('/execution-tasks/options'));
+    } catch (requestError) {
+      setError(`Task options could not be loaded. ${errorMessage(requestError)}`);
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, [canRead]);
 
-    const slaParams = new URLSearchParams();
-    slaParams.set('limit', '25');
-    slaParams.set('sla_status', 'all');
-    if (typeFilter !== 'all') slaParams.set('task_type', typeFilter);
-    if (sourceFilter !== 'all') slaParams.set('source_type', sourceFilter);
-    if (normalizedSourceIdFilter) slaParams.set('source_id', normalizedSourceIdFilter);
-    appendLocationFilters(slaParams);
+  const loadOperationalData = useCallback(async (preserveMessage = false) => {
+    if (!canRead) return;
+    if (advancedIdError) {
+      setError(advancedIdError);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    if (!preserveMessage) setMessage(null);
 
-    const throughputParams = new URLSearchParams();
-    throughputParams.set('days', '14');
-    if (typeFilter !== 'all') throughputParams.set('task_type', typeFilter);
-    if (sourceFilter !== 'all') throughputParams.set('source_type', sourceFilter);
-    if (normalizedSourceIdFilter) throughputParams.set('source_id', normalizedSourceIdFilter);
-    appendLocationFilters(throughputParams);
-
-    const mobileParams = new URLSearchParams();
-    mobileParams.set('limit', '20');
-    if (typeFilter !== 'all') mobileParams.set('task_type', typeFilter);
-    if (sourceFilter !== 'all') mobileParams.set('source_type', sourceFilter);
-    if (normalizedSourceIdFilter) mobileParams.set('source_id', normalizedSourceIdFilter);
-    appendLocationFilters(mobileParams);
-
-    const batchParams = new URLSearchParams();
-    batchParams.set('limit', '25');
-    if (batchStatusFilter !== 'all') batchParams.set('status', batchStatusFilter);
-    if (batchTypeFilter !== 'all') batchParams.set('batch_type', batchTypeFilter);
-    if (sourceFilter !== 'all') batchParams.set('source_type', sourceFilter);
-    if (normalizedSourceIdFilter) batchParams.set('source_id', normalizedSourceIdFilter);
-    appendLocationFilters(batchParams);
-    if (search.trim()) batchParams.set('search', search.trim());
-
-    const optimizationParams = new URLSearchParams();
-    optimizationParams.set('limit', '10');
-    optimizationParams.set('minimum_score', '0');
-
-    const mobileOptimizationParams = new URLSearchParams();
-    mobileOptimizationParams.set('limit', '8');
-    mobileOptimizationParams.set('minimum_score', '0');
+    const taskParams = buildTaskParams(true);
+    const summaryParams = buildTaskParams(false);
+    const taskEndpoint = priorityQueueMode ? '/execution-tasks/priority-queue' : '/execution-tasks';
 
     try {
-      const endpoint = priorityQueueMode ? '/execution-tasks/priority-queue' : '/execution-tasks';
-      const [nextTasks, nextBatches, nextWorkload, nextSlaQueue, nextThroughput, nextMobileQueue, nextOptimizationDashboard, nextMobileOptimization] = await Promise.all([
-        apiRequest<ExecutionTask[]>(`${endpoint}?${params.toString()}`),
+      const [taskRows, nextSummary] = await Promise.all([
+        apiRequest<ExecutionTask[]>(`${taskEndpoint}?${taskParams.toString()}`),
+        apiRequest<ExecutionTaskSummary>(`/execution-tasks/summary?${summaryParams.toString()}`)
+      ]);
+      let nextTasks = taskRows;
+      let linkedTaskError: string | null = null;
+      setHasNextPage(taskRows.length > pageSize);
+      nextTasks = taskRows.slice(0, pageSize);
+
+      if (requestedTaskId && isUuid(requestedTaskId) && !nextTasks.some((task) => task.id === requestedTaskId)) {
+        try {
+          const linkedTask = await apiRequest<ExecutionTask>(`/execution-tasks/${requestedTaskId}`);
+          nextTasks = [linkedTask, ...nextTasks.filter((task) => task.id !== linkedTask.id)].slice(0, pageSize);
+        } catch (requestError) {
+          linkedTaskError = `The linked task could not be opened. ${errorMessage(requestError)}`;
+        }
+      } else if (requestedTaskId && !isUuid(requestedTaskId)) {
+        linkedTaskError = 'The linked execution task ID is invalid.';
+      }
+
+      setTasks(nextTasks);
+      setSummary(nextSummary);
+      setSelected((current) => {
+        if (requestedTaskId) {
+          const linked = nextTasks.find((task) => task.id === requestedTaskId);
+          if (linked) return linked;
+        }
+        return nextTasks.find((task) => task.id === current?.id) || nextTasks[0] || null;
+      });
+      if (linkedTaskError) setError(linkedTaskError);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }, [advancedIdError, buildTaskParams, canRead, pageSize, priorityQueueMode, requestedTaskId]);
+
+  const buildSharedAnalyticsParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (typeFilter !== 'all') params.set('task_type', typeFilter);
+    if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
+    if (assignedToFilter) params.set('assigned_to', assignedToFilter);
+    if (storageLocationIdFilter) params.set('storage_location_id', storageLocationIdFilter);
+    if (sourceIdFilter.trim()) params.set('source_id', sourceIdFilter.trim());
+    if (facilityIdFilter.trim()) params.set('facility_id', facilityIdFilter.trim());
+    return params;
+  }, [assignedToFilter, facilityIdFilter, sourceFilter, sourceIdFilter, storageLocationIdFilter, typeFilter]);
+
+  const loadAnalytics = useCallback(async () => {
+    if (!canRead || advancedIdError) return;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    const shared = buildSharedAnalyticsParams();
+    const workloadParams = new URLSearchParams(shared);
+    workloadParams.set('limit', '25');
+    const slaParams = new URLSearchParams(shared);
+    slaParams.set('limit', '25');
+    slaParams.set('sla_status', 'all');
+    const throughputParams = new URLSearchParams(shared);
+    throughputParams.set('days', '14');
+    const mobileParams = new URLSearchParams(shared);
+    mobileParams.set('limit', '20');
+    const batchParams = new URLSearchParams(shared);
+    batchParams.set('limit', '50');
+    if (batchStatusFilter !== 'all') batchParams.set('status', batchStatusFilter);
+    if (batchTypeFilter !== 'all') batchParams.set('batch_type', batchTypeFilter);
+    if (search) batchParams.set('search', search);
+
+    try {
+      const [nextBatches, nextWorkload, nextSlaQueue, nextThroughput, nextMobileQueue, nextOptimization, nextMobileOptimization] = await Promise.all([
         apiRequest<ExecutionTaskBatch[]>(`/execution-tasks/batches?${batchParams.toString()}`),
         apiRequest<ExecutionTaskWorkload[]>(`/execution-tasks/workload?${workloadParams.toString()}`),
         apiRequest<ExecutionTask[]>(`/execution-tasks/sla-queue?${slaParams.toString()}`),
         apiRequest<ExecutionTaskThroughputDashboard>(`/execution-tasks/throughput-dashboard?${throughputParams.toString()}`),
         apiRequest<MobileExecutionQueue>(`/execution-tasks/mobile-queue?${mobileParams.toString()}`),
-        canReadOptimization
-          ? apiRequest<OptimizationExecutionDashboard>(`/optimization-plans/execution-dashboard?${optimizationParams.toString()}`)
-          : Promise.resolve(null),
-        canReadOptimization
-          ? apiRequest<MobileOptimizationVisibility>(`/optimization-plans/mobile-visibility?${mobileOptimizationParams.toString()}`)
-          : Promise.resolve(null)
+        canReadOptimization ? apiRequest<OptimizationExecutionDashboard>('/optimization-plans/execution-dashboard?limit=10&minimum_score=0') : Promise.resolve(null),
+        canReadOptimization ? apiRequest<MobileOptimizationVisibility>('/optimization-plans/mobile-visibility?limit=8&minimum_score=0') : Promise.resolve(null)
       ]);
-      let visibleTasks = nextTasks;
-      let linkedTaskError: string | null = null;
-
-      if (requestedTaskId) {
-        if (!isUuid(requestedTaskId)) {
-          linkedTaskError = 'The linked execution task ID is invalid.';
-        } else if (!nextTasks.some((task) => task.id === requestedTaskId)) {
-          try {
-            const linkedTask = await apiRequest<ExecutionTask>(`/execution-tasks/${requestedTaskId}`);
-            visibleTasks = [linkedTask, ...nextTasks];
-          } catch (linkedTaskRequestError) {
-            linkedTaskError = `The linked execution task could not be opened. ${errorMessage(linkedTaskRequestError)}`;
-          }
-        }
-      }
-
-      setTasks(visibleTasks);
       setBatches(nextBatches);
       setWorkload(nextWorkload);
       setSlaQueue(nextSlaQueue);
       setThroughput(nextThroughput);
       setMobileQueue(nextMobileQueue);
-      setOptimizationDashboard(nextOptimizationDashboard);
+      setOptimizationDashboard(nextOptimization);
       setMobileOptimization(nextMobileOptimization);
-      setSelected((current) => {
-        if (requestedTaskId) {
-          const requestedTask = visibleTasks.find((task) => task.id === requestedTaskId);
-          if (requestedTask) return requestedTask;
-        }
-        return visibleTasks.find((task) => task.id === current?.id) || visibleTasks[0] || null;
-      });
-      if (linkedTaskError) setError(linkedTaskError);
-    } catch (err) {
-      setError(errorMessage(err));
+    } catch (requestError) {
+      setAnalyticsError(errorMessage(requestError));
     } finally {
-      setLoading(false);
+      setAnalyticsLoading(false);
     }
-  }, [batchStatusFilter, batchTypeFilter, canRead, canReadOptimization, facilityIdFilter, facilityIdFilterError, openOnly, priorityQueueMode, requestedTaskId, search, sourceFilter, sourceIdFilter, sourceIdFilterError, statusFilter, storageLocationIdFilter, storageLocationIdFilterError, typeFilter]);
+  }, [advancedIdError, batchStatusFilter, batchTypeFilter, buildSharedAnalyticsParams, canRead, canReadOptimization, search]);
 
   useEffect(() => {
-    void loadTasks();
-  }, [loadTasks]);
+    void loadOptions();
+  }, [loadOptions]);
 
   useEffect(() => {
-    if (!requestedTaskId || selected?.id !== requestedTaskId) return;
-    const element = document.getElementById(`execution-task-${requestedTaskId}`);
-    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [requestedTaskId, selected?.id]);
+    void loadOperationalData();
+  }, [loadOperationalData]);
+
+  useEffect(() => {
+    if (analyticsOpen) void loadAnalytics();
+  }, [analyticsOpen, loadAnalytics]);
 
   useEffect(() => {
     if (!canRead || !selected?.id) {
       setTaskAudit([]);
       return;
     }
-
     let cancelled = false;
     const loadAudit = async () => {
       try {
-        const rows = await apiRequest<ExecutionTaskAuditRow[]>(`/execution-tasks/${selected.id}/audit?limit=50`);
+        const rows = await apiRequest<ExecutionTaskAuditRow[]>(`/execution-tasks/${selected.id}/audit?limit=100`);
         if (!cancelled) setTaskAudit(rows);
       } catch {
         if (!cancelled) setTaskAudit([]);
       }
     };
-
     void loadAudit();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [canRead, selected?.id]);
 
-  const refreshSelected = (updated: ExecutionTask) => {
-    setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
-    setSelected(updated);
+  useEffect(() => {
+    if (requestedTaskId && selected?.id === requestedTaskId) {
+      window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+  }, [requestedTaskId, selected?.id]);
+
+  const userLabel = (userId?: string | null) => {
+    if (!userId) return 'Unassigned';
+    const user = userById.get(userId);
+    return user ? `${user.name}${user.is_active ? '' : ' (inactive)'}` : `User ${userId.slice(0, 8)}…`;
+  };
+
+  const locationLabel = (locationId?: string | null) => {
+    if (!locationId) return 'No storage location';
+    const location = locationById.get(locationId);
+    return location ? `${location.name}${location.is_active ? '' : ' (retired)'}` : `Location ${locationId.slice(0, 8)}…`;
+  };
+
+  const selectTask = (task: ExecutionTask) => {
+    setSelected(task);
+    window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  const openTaskById = async (taskId: string) => {
+    const loadedTask = tasks.find((candidate) => candidate.id === taskId);
+    if (loadedTask) {
+      selectTask(loadedTask);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const task = await apiRequest<ExecutionTask>(`/execution-tasks/${taskId}`);
+      selectTask(task);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setPriorityFilter('all');
+    setSourceFilter('all');
+    setAssignedToFilter('');
+    setStorageLocationIdFilter('');
+    setSourceIdFilter('');
+    setFacilityIdFilter('');
+    setOpenOnly(true);
+    setPriorityQueueMode(false);
+    setSearchDraft('');
+    setBatchStatusFilter('all');
+    setBatchTypeFilter('all');
+    setOffset(0);
   };
 
   const createTask = async () => {
+    if (createValidation) {
+      setError(createValidation);
+      return;
+    }
     setSaving(true);
     setMessage(null);
     setError(null);
-
-    const formValidationError = formSourceIdError || formFacilityIdError || formStorageLocationIdError || formAssignedToError;
-    if (formValidationError) {
-      setError(formValidationError);
-      setSaving(false);
-      return;
-    }
-
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      task_type: form.task_type,
-      priority: form.priority,
-      status: form.status,
-      source_type: form.source_type,
-      source_id: form.source_id.trim() || null,
-      facility_id: form.facility_id.trim() || null,
-      storage_location_id: form.storage_location_id.trim() || null,
-      assigned_to: form.assigned_to.trim() || null,
-      due_at: toIsoOrNull(form.due_at),
-      sla_due_at: toIsoOrNull(form.sla_due_at)
-    };
-
     try {
       const created = await apiRequest<ExecutionTask>('/execution-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          task_type: form.task_type,
+          priority: form.priority,
+          status: form.status,
+          source_type: form.source_type,
+          source_id: form.source_type === 'manual' ? null : form.source_id.trim(),
+          facility_id: form.facility_id.trim() || null,
+          storage_location_id: form.storage_location_id || null,
+          assigned_to: form.assigned_to || null,
+          due_at: toIsoOrNull(form.due_at),
+          sla_due_at: toIsoOrNull(form.sla_due_at)
+        })
       });
-      setForm(initialForm);
-      setTasks((current) => [created, ...current]);
+      setForm(INITIAL_FORM);
       setSelected(created);
-      setMessage(`Created execution task ${created.task_code}.`);
-    } catch (err) {
-      setError(errorMessage(err));
+      setMessage(`Created ${created.task_code}.`);
+      await loadOperationalData(true);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
     } finally {
       setSaving(false);
     }
   };
 
-  const exportAnalyticsCsv = async () => {
+  const runTaskAction = async (task: ExecutionTask, action: TaskAction, body: Record<string, string> = {}) => {
     setSaving(true);
     setMessage(null);
     setError(null);
-
-    const exportValidationError = sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError;
-    if (exportValidationError) {
-      setError(exportValidationError);
+    try {
+      const updated = await apiRequest<ExecutionTask>(`/execution-tasks/${task.id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      setSelected(updated);
+      setMessage(`${updated.task_code} is now ${label(updated.status).toLowerCase()}.`);
+      await loadOperationalData(true);
+      if (analyticsOpen) await loadAnalytics();
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
       setSaving(false);
+    }
+  };
+
+  const runBatchAction = async (batch: ExecutionTaskBatch, action: BatchAction, body: Record<string, string> = {}) => {
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const updated = await apiRequest<ExecutionTaskBatch>(`/execution-tasks/batches/${batch.id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      setMessage(`${updated.batch_code} is now ${label(updated.status).toLowerCase()}.`);
+      await loadOperationalData(true);
+      await loadAnalytics();
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDialogAction = async () => {
+    if (!actionDialog) return;
+    if (actionDialog.kind === 'task') {
+      const { action, task, value, assigneeId } = actionDialog;
+      if (action === 'assign' && !assigneeId) return;
+      if ((action === 'block' || action === 'cancel') && value.trim().length < 3) return;
+      const body: Record<string, string> = action === 'assign'
+        ? { assigned_to: assigneeId }
+        : action === 'block'
+          ? { blocked_reason: value.trim() }
+          : action === 'cancel'
+            ? { cancellation_reason: value.trim() }
+            : action === 'complete'
+              ? { completion_note: value.trim() }
+              : {};
+      setActionDialog(null);
+      await runTaskAction(task, action, body);
       return;
     }
 
-    const params = new URLSearchParams();
-    params.set('days', '30');
-    params.set('limit', '10000');
-    params.set('open_only', openOnly ? 'true' : 'false');
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    if (typeFilter !== 'all') params.set('task_type', typeFilter);
-    if (sourceFilter !== 'all') params.set('source_type', sourceFilter);
-    if (sourceIdFilter.trim()) params.set('source_id', sourceIdFilter.trim());
-    if (facilityIdFilter.trim()) params.set('facility_id', facilityIdFilter.trim());
-    if (storageLocationIdFilter.trim()) params.set('storage_location_id', storageLocationIdFilter.trim());
-    if (search.trim()) params.set('search', search.trim());
-
-    try {
-      const csv = await apiRequest<string>(`/execution-tasks/analytics.csv?${params.toString()}`);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `execution-task-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setMessage('Execution task analytics CSV exported.');
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
+    if (actionDialog.action === 'cancel' && actionDialog.value.trim().length < 3) return;
+    const body: Record<string, string> = actionDialog.action === 'cancel' ? { cancellation_reason: actionDialog.value.trim() } : {};
+    const { batch, action } = actionDialog;
+    setActionDialog(null);
+    await runBatchAction(batch, action, body);
   };
 
-
-  const exportOptimizationAnalyticsCsv = async () => {
+  const exportTaskAnalytics = async () => {
+    if (advancedIdError) {
+      setError(advancedIdError);
+      return;
+    }
     setSaving(true);
     setMessage(null);
     setError(null);
-
-    const params = new URLSearchParams();
-    params.set('days', '90');
+    const params = buildTaskParams(false);
+    params.set('days', '365');
     params.set('limit', '10000');
-    params.set('minimum_score', '0');
-
     try {
-      const csv = await apiRequest<string>(`/optimization-plans/analytics.csv?${params.toString()}`);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `inventory-optimization-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setMessage('Optimization analytics CSV exported.');
-    } catch (err) {
-      setError(errorMessage(err));
+      const csv = await apiRequest<string>(`/execution-tasks/analytics.csv?${params.toString()}`);
+      downloadTextFile(csv, `execution-task-analytics-${new Date().toISOString().slice(0, 10)}.csv`);
+      setMessage('Complete filtered task analytics exported. The export is safely limited to 10,000 rows.');
+    } catch (requestError) {
+      setError(errorMessage(requestError));
     } finally {
       setSaving(false);
     }
   };
 
+  const exportOptimizationAnalytics = async () => {
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const csv = await apiRequest<string>('/optimization-plans/analytics.csv?days=90&limit=10000&minimum_score=0');
+      downloadTextFile(csv, `inventory-optimization-analytics-${new Date().toISOString().slice(0, 10)}.csv`);
+      setMessage('Optimization analytics exported.');
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const generateAiRecommendationScaffolds = async () => {
     setSaving(true);
     setMessage(null);
     setError(null);
-
     try {
       const plan = await apiRequest<{ plan_code: string; item_count: number }>('/optimization-plans/ai-recommendations', {
         method: 'POST',
@@ -685,692 +832,431 @@ export default function ExecutionTasksPage() {
           limit: 25
         })
       });
-      setMessage(`Generated AI recommendation scaffolding ${plan.plan_code} with ${plan.item_count} advisory signals.`);
-      await loadTasks();
-    } catch (err) {
-      setError(errorMessage(err));
+      setMessage(`Generated advisory plan ${plan.plan_code} with ${plan.item_count} signals. No task or stock record was changed.`);
+      await loadAnalytics();
+    } catch (requestError) {
+      setError(errorMessage(requestError));
     } finally {
       setSaving(false);
     }
   };
-
-  const runTransition = async (task: ExecutionTask, action: 'ready' | 'start' | 'unblock' | 'complete' | 'cancel' | 'block' | 'assign') => {
-    let body: Record<string, string> = {};
-
-    if (action === 'assign') {
-      const assignedTo = window.prompt('Assign to user ID');
-      if (!assignedTo) return;
-      body = { assigned_to: assignedTo.trim() };
-    }
-
-    if (action === 'block') {
-      const blockedReason = window.prompt('Blocked reason');
-      if (!blockedReason) return;
-      body = { blocked_reason: blockedReason.trim() };
-    }
-
-    if (action === 'complete') {
-      const completionNote = window.prompt('Completion note (optional)') || '';
-      body = { completion_note: completionNote.trim() };
-    }
-
-    if (action === 'cancel') {
-      const cancellationReason = window.prompt('Cancellation reason');
-      if (!cancellationReason) return;
-      body = { cancellation_reason: cancellationReason.trim() };
-    }
-
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-
-    try {
-      const updated = await apiRequest<ExecutionTask>(`/execution-tasks/${task.id}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      refreshSelected(updated);
-      setMessage(`Updated ${updated.task_code} to ${label(updated.status)}.`);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const runBatchTransition = async (batch: ExecutionTaskBatch, action: 'release' | 'cancel') => {
-    let body: Record<string, string> = {};
-
-    if (action === 'cancel') {
-      const cancellationReason = window.prompt('Cancellation reason');
-      if (!cancellationReason) return;
-      body = { cancellation_reason: cancellationReason.trim() };
-    }
-
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-
-    try {
-      const updated = await apiRequest<ExecutionTaskBatch>(`/execution-tasks/batches/${batch.id}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      setBatches((current) => current.map((candidate) => (candidate.id === updated.id ? updated : candidate)));
-      setMessage(`Updated execution batch ${updated.batch_code} to ${label(updated.status)}.`);
-      await loadTasks();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
 
   if (!canRead) {
     return (
-      <main style={styles.page}>
-        <section style={styles.card}>
-          <h1 style={styles.title}>Execution Tasks</h1>
-          <p style={styles.muted}>You do not have permission to view execution tasks.</p>
+      <main className="execution-tasks-page">
+        <section className="execution-tasks-card execution-tasks-permission-state">
+          <h1>Execution Tasks</h1>
+          <p>You do not have permission to view this tenant’s execution-task queue.</p>
         </section>
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.hero}>
+    <main className="execution-tasks-page">
+      <section className="execution-tasks-hero">
         <div>
-          <p style={styles.eyebrow}>Feature #7</p>
-          <h1 style={styles.title}>Execution Tasks</h1>
-          <p style={styles.subtitle}>Coordinate picking, receiving, replenishment, transfer, cycle count, reservation-fulfillment, and execution-request closure work from one operational task queue.</p>
+          <p className="execution-tasks-eyebrow">Operations workflow</p>
+          <h2>Operational task queue</h2>
+          <p>Create, assign, start, block, complete, and audit tenant work. These task records coordinate work; they do not by themselves receive, transfer, count, reserve, or consume stock.</p>
         </div>
-        <div style={styles.actionRow}>
-          <button type="button" className="btn btn-secondary" disabled={saving || Boolean(sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError)} onClick={() => void exportAnalyticsCsv()}>
-            Export analytics CSV
-          </button>
-          <button type="button" className="btn btn-secondary" disabled={loading || Boolean(sourceIdFilterError || facilityIdFilterError || storageLocationIdFilterError)} onClick={() => void loadTasks()}>
-            Refresh
-          </button>
+        <div className="execution-tasks-actions">
+          <button type="button" className="btn btn-secondary" disabled={saving || loading} onClick={() => void exportTaskAnalytics()}>Export filtered CSV</button>
+          <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={() => void Promise.all([loadOptions(), loadOperationalData(true), analyticsOpen ? loadAnalytics() : Promise.resolve()])}>Refresh page</button>
         </div>
       </section>
 
-      {message ? <div style={styles.success}>{message}</div> : null}
-      {error ? <div style={styles.error}>{error}</div> : null}
+      {message ? <div className="execution-tasks-alert execution-tasks-alert--success" role="status">{message}</div> : null}
+      {error ? <div className="execution-tasks-alert execution-tasks-alert--error" role="alert">{error}</div> : null}
 
-      <section style={styles.summaryGrid}>
-        <SummaryCard label="Open tasks" value={summary.open} />
-        <SummaryCard label="Blocked" value={summary.blocked} />
-        <SummaryCard label="Overdue" value={summary.overdue} />
-        <SummaryCard label="Loaded" value={summary.total} />
+      <section className="execution-tasks-summary-grid" aria-label="Task summary">
+        <SummaryCard label="Matching tasks" value={summary.matching_task_count} helper="All statuses under the current filters" />
+        <SummaryCard label="Open" value={summary.open_task_count} helper="Draft through blocked" />
+        <SummaryCard label="Blocked" value={summary.blocked_task_count} helper="Needs a blocker resolved" />
+        <SummaryCard label="Overdue" value={summary.overdue_task_count} helper="Past due or SLA time" />
+        <SummaryCard label="Unassigned" value={summary.unassigned_task_count} helper={`${summary.due_soon_task_count} due within 24 hours`} />
       </section>
 
-
-
-      {canReadOptimization ? (
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
+      <section className="execution-tasks-core-grid">
+        <div className="execution-tasks-card" ref={queueRef}>
+          <div className="execution-tasks-card-header">
             <div>
-              <h2 style={styles.cardTitle}>Intelligent Execution Dashboard</h2>
-              <p style={styles.muted}>Optimization-plan signal rollup across assignment, waves, routes, FEFO/FIFO, SLA risk, labor, bottlenecks, replenishment, facility balancing, and AI recommendation scaffolds.</p>
+              <h3>Task queue</h3>
+              <p>{priorityQueueMode ? 'Backend priority scoring orders open work by urgency, status, source, and due risk.' : 'Search and filter tenant execution tasks. Select a row to review its detail and evidence.'}</p>
             </div>
-            <div style={styles.actionRow}>
-              {canCreateOptimization ? (
-                <button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void generateAiRecommendationScaffolds()}>
-                  Generate AI scaffolds
-                </button>
-              ) : null}
-              <button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void exportOptimizationAnalyticsCsv()}>
-                Export optimization CSV
-              </button>
-              <span style={styles.muted}>{optimizationDashboard ? `Generated ${dateTime(optimizationDashboard.generated_at)}` : 'Not loaded'}</span>
-            </div>
-          </div>
-          {optimizationDashboard ? (
-            <>
-              <div style={styles.throughputGrid}>
-                <SummaryCard label="Plans" value={optimizationDashboard.summary.plan_count} />
-                <SummaryCard label="Signals" value={optimizationDashboard.summary.optimization_signal_count} />
-                <SummaryCard label="Top signals" value={optimizationDashboard.summary.top_signal_count} />
-                <div style={styles.summaryCard}><span style={styles.summaryValue}>{optimizationDashboard.summary.execution_pressure_score}</span><span style={styles.muted}>Execution pressure</span></div>
-              </div>
-              <div style={styles.distributionGrid}>
-                <Distribution title="By plan type" rows={optimizationDashboard.by_plan_type.map((row) => ({ label: label(row.plan_type), count: row.count }))} />
-                <Distribution title="By signal type" rows={optimizationDashboard.by_signal_type.map((row) => ({ label: label(row.item_type), count: row.count }))} />
-                <Distribution title="By status" rows={optimizationDashboard.by_plan_status.map((row) => ({ label: label(row.status), count: row.count }))} />
-              </div>
-              <div style={styles.mobileQueueList}>
-                {optimizationDashboard.top_recommendations.slice(0, 8).map((item) => (
-                  <div key={item.id} style={styles.mobileQueueItem}>
-                    <strong>{label(item.item_type)} · score {item.score}</strong>
-                    <span>{item.recommendation}</span>
-                    <span style={styles.muted}>{item.rationale || `Status ${label(item.status)}`}</span>
-                  </div>
-                ))}
-                {!optimizationDashboard.top_recommendations.length ? <p style={styles.muted}>No optimization recommendations are available yet.</p> : null}
-              </div>
-            </>
-          ) : <p style={styles.muted}>{loading ? 'Loading optimization dashboard…' : 'No optimization dashboard data available.'}</p>}
-        </section>
-      ) : null}
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Throughput Dashboard</h2>
-            <p style={styles.muted}>Created, completed, cancelled, blocked, overdue, and average completion-hour signals for the last {throughput?.window_days ?? 14} days.</p>
-          </div>
-        </div>
-        {throughput ? (
-          <>
-            <div style={styles.throughputGrid}>
-              <SummaryCard label="Created" value={throughput.totals.total_task_count} />
-              <SummaryCard label="Completed" value={throughput.totals.completed_task_count} />
-              <SummaryCard label="Blocked" value={throughput.totals.blocked_task_count} />
-              <div style={styles.summaryCard}><span style={styles.summaryValue}>{throughput.totals.avg_completion_hours ?? '-'}</span><span style={styles.muted}>Avg completion hours</span></div>
-            </div>
-            <div style={styles.distributionGrid}>
-              <Distribution title="By status" rows={throughput.by_status.map((row) => ({ label: label(row.status), count: row.count }))} />
-              <Distribution title="By task type" rows={throughput.by_type.map((row) => ({ label: label(row.task_type), count: row.count }))} />
-              <Distribution title="By source" rows={throughput.by_source.map((row) => ({ label: label(row.source_type), count: row.count }))} />
-            </div>
-            <div style={styles.dailyList}>
-              {throughput.daily.slice(-7).map((day) => (
-                <div key={day.day} style={styles.dailyItem}>
-                  <span>{dateTime(day.day).split(',')[0]}</span>
-                  <span>Created {day.created_count}</span>
-                  <span>Done {day.completed_count}</span>
-                  <span>Cancelled {day.cancelled_count}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : <p style={styles.muted}>{loading ? 'Loading throughput…' : 'No throughput data available.'}</p>}
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Operator Workload</h2>
-            <p style={styles.muted}>Open workload grouped by assignee, including unassigned work, overdue pressure, blocked tasks, and priority score.</p>
-          </div>
-        </div>
-        <div style={styles.workloadGrid}>
-          {workload.map((row) => (
-            <div key={row.assigned_to || 'unassigned'} style={styles.workloadCard}>
-              <div style={styles.strong}>{row.operator_label}</div>
-              <div style={styles.muted}>{row.open_task_count} open · score {row.workload_score}</div>
-              <div style={styles.workloadMetrics}>
-                <span>Ready {row.ready_task_count}</span>
-                <span>Assigned {row.assigned_task_count}</span>
-                <span>Doing {row.in_progress_task_count}</span>
-                <span>Blocked {row.blocked_task_count}</span>
-                <span>Overdue {row.overdue_task_count}</span>
-                <span>Due soon {row.due_soon_task_count}</span>
-              </div>
-              <div style={row.overdue_task_count ? styles.overdueText : styles.muted}>Next due: {dateTime(row.next_due_at)}</div>
-            </div>
-          ))}
-          {!workload.length ? <p style={styles.muted}>{loading ? 'Loading workload…' : 'No open workload for the current filters.'}</p> : null}
-        </div>
-      </section>
-
-
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Mobile Execution Queue</h2>
-            <p style={styles.muted}>Operator-ready mobile work list optimized for compact cards, scan-required work, action hints, and the next executable step.</p>
-          </div>
-          <span style={styles.muted}>{mobileQueue ? `${mobileQueue.count} tasks` : 'Not loaded'}</span>
-        </div>
-        {mobileQueue ? (
-          <>
-            <div style={styles.mobileSummaryGrid}>
-              <SummaryCard label="Ready" value={mobileQueue.summary.ready} />
-              <SummaryCard label="Doing" value={mobileQueue.summary.in_progress} />
-              <SummaryCard label="Blocked" value={mobileQueue.summary.blocked} />
-              <SummaryCard label="Scan required" value={mobileQueue.summary.scan_required} />
-            </div>
-            <div style={styles.mobileQueueList}>
-              {mobileQueue.tasks.map((task) => (
-                <button key={task.id} type="button" style={styles.mobileQueueItem} onClick={() => setSelected(tasks.find((candidate) => candidate.id === task.id) || null)}>
-                  <span style={styles.strong}>{task.task_code} · {task.title}</span>
-                  <span style={task.is_overdue ? styles.overdueText : styles.muted}>{task.step_label} · {label(task.action_hint)} · score {task.priority_score ?? '-'}</span>
-                  <span style={styles.muted}>{label(task.task_type)} · {label(task.status)} · {task.scan_required ? 'Scan required' : 'No scan required'} · due {dateTime(task.sla_due_at || task.due_at)}</span>
-                  {task.compact_payload.product_name || task.compact_payload.line_count ? <span style={styles.muted}>{task.compact_payload.product_name || 'Operational payload'} · lines {task.compact_payload.line_count ?? 0}</span> : null}
-                </button>
-              ))}
-              {!mobileQueue.tasks.length ? <p style={styles.muted}>{loading ? 'Loading mobile queue…' : 'No mobile-ready tasks for the current filters.'}</p> : null}
-            </div>
-          </>
-        ) : <p style={styles.muted}>{loading ? 'Loading mobile queue…' : 'No mobile queue data available.'}</p>}
-      </section>
-
-
-      {canReadOptimization ? (
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>Mobile Optimization Visibility</h2>
-              <p style={styles.muted}>Compact advisory optimization signals for supervisors using mobile execution views. These cards are read-only and do not apply recommendations.</p>
-            </div>
-            <span style={styles.muted}>{mobileOptimization ? `${mobileOptimization.summary.visible_signal_count} signals` : 'Not loaded'}</span>
-          </div>
-          {mobileOptimization ? (
-            <>
-              <div style={styles.mobileSummaryGrid}>
-                <SummaryCard label="Signals" value={mobileOptimization.summary.visible_signal_count} />
-                <SummaryCard label="Pressure" value={mobileOptimization.summary.execution_pressure_score} />
-                <SummaryCard label="Blocked" value={mobileOptimization.summary.blocked_task_count} />
-                <SummaryCard label="Overdue" value={mobileOptimization.summary.overdue_task_count} />
-              </div>
-              <div style={styles.mobileQueueList}>
-                {mobileOptimization.signals.map((signal) => (
-                  <div key={signal.id} style={styles.mobileQueueItem}>
-                    <span style={styles.strong}>{label(signal.item_type)} · score {signal.score}</span>
-                    <span>{signal.recommendation}</span>
-                    <span style={styles.muted}>{label(signal.plan_type)} · {label(signal.status)} · {signal.action_hint ? label(signal.action_hint) : 'Review signal'}</span>
-                    {signal.rationale ? <span style={styles.muted}>{signal.rationale}</span> : null}
-                  </div>
-                ))}
-                {!mobileOptimization.signals.length ? <p style={styles.muted}>{loading ? 'Loading mobile optimization signals…' : 'No mobile optimization signals for the current filters.'}</p> : null}
-              </div>
-            </>
-          ) : <p style={styles.muted}>{loading ? 'Loading mobile optimization visibility…' : 'No mobile optimization data available.'}</p>}
-        </section>
-      ) : null}
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>SLA & Escalation Queue</h2>
-            <p style={styles.muted}>Open tasks ordered by blocked state, overdue SLA pressure, due-soon risk, and priority score.</p>
-          </div>
-        </div>
-        <div style={styles.slaList}>
-          {slaQueue.map((task) => (
-            <button key={task.id} type="button" style={styles.slaItem} onClick={() => setSelected(task)}>
-              <span style={styles.strong}>{task.task_code} · {task.title}</span>
-              <span style={task.sla_status === 'overdue' || task.sla_status === 'blocked' ? styles.overdueText : styles.muted}>
-                {label(task.sla_status)} · escalation {task.escalation_level ?? 0} · due {dateTime(task.sla_due_at || task.due_at)}
-              </span>
-              <span style={styles.muted}>{label(task.task_type)} · {label(task.status)} · score {task.priority_score ?? '-'}</span>
-            </button>
-          ))}
-          {!slaQueue.length ? <p style={styles.muted}>{loading ? 'Loading SLA queue…' : 'No SLA-risk tasks for the current filters.'}</p> : null}
-        </div>
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Execution Batches</h2>
-            <p style={styles.muted}>Released and draft task batches using the same facility, storage-location, and search filters as the task queue.</p>
-          </div>
-          <span style={styles.muted}>{batches.length} loaded</span>
-        </div>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Batch</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Priority</th>
-                <th style={styles.th}>Tasks</th>
-                <th style={styles.th}>Location</th>
-                <th style={styles.th}>Due</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((batch) => (
-                <tr key={batch.id}>
-                  <td style={styles.td}>
-                    <div style={styles.strong}>{batch.batch_code}</div>
-                    <div>{batch.title}</div>
-                    <div style={styles.muted}>{label(batch.batch_type)}</div>
-                  </td>
-                  <td style={styles.td}><StatusPill status={batch.status} /></td>
-                  <td style={styles.td}>{label(batch.priority)}</td>
-                  <td style={styles.td}>{batch.completed_task_count ?? 0} completed / {batch.open_task_count ?? 0} open / {batch.task_count ?? 0} total</td>
-                  <td style={styles.td}>{batch.storage_location_id || batch.facility_id || '-'}</td>
-                  <td style={styles.td}>{dateTime(batch.sla_due_at || batch.due_at)}</td>
-                  <td style={styles.td}>
-                    <div style={styles.actionRow}>
-                      {canUpdate && batch.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void runBatchTransition(batch, 'release')}>Release</button> : null}
-                      {canCancel && batch.status !== 'cancelled' ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => void runBatchTransition(batch, 'cancel')}>Cancel</button> : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!batches.length ? (
-                <tr>
-                  <td style={styles.td} colSpan={7}>{loading ? 'Loading execution batches…' : 'No execution batches match the current filters.'}</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section style={styles.grid}>
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>Task Queue</h2>
-              <p style={styles.muted}>{priorityQueueMode ? 'Priority engine queue sorted by urgency, SLA/due risk, source, and lifecycle state.' : 'Filtered by status, type, source, open-state, and search.'}</p>
+            <div className="execution-tasks-actions">
+              <button type="button" className={priorityQueueMode ? 'btn btn-primary' : 'btn btn-secondary'} disabled={loading} onClick={() => setPriorityQueueMode((current) => !current)}>{priorityQueueMode ? 'Priority order on' : 'Use priority order'}</button>
+              <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={clearFilters}>Clear filters</button>
             </div>
           </div>
 
-          <div style={styles.modeRow}>
-            <button type="button" className={priorityQueueMode ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setPriorityQueueMode(!priorityQueueMode)}>
-              {priorityQueueMode ? 'Priority queue enabled' : 'Use priority queue'}
-            </button>
-            <span style={styles.muted}>Priority mode uses backend scoring and always returns open operational tasks first.</span>
-          </div>
-
-          <div style={styles.filters}>
-            <label style={styles.fieldLabel}>
-              Status
-              <select style={styles.input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ExecutionTaskStatus | 'all')}>
+          <div className="execution-tasks-filter-grid">
+            <label>Search
+              <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Code, title, description, type, status, source" disabled={priorityQueueMode} />
+            </label>
+            <label>Status
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ExecutionTaskStatus | 'all')} disabled={priorityQueueMode}>
                 <option value="all">All statuses</option>
                 {STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}
               </select>
             </label>
-            <label style={styles.fieldLabel}>
-              Type
-              <select style={styles.input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as ExecutionTaskType | 'all')}>
-                <option value="all">All types</option>
-                {TASK_TYPES.map((taskType) => <option key={taskType} value={taskType}>{label(taskType)}</option>)}
+            <label>Task type
+              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as ExecutionTaskType | 'all')}>
+                <option value="all">All task types</option>
+                {TASK_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}
               </select>
             </label>
-            <label style={styles.fieldLabel}>
-              Source
-              <select style={styles.input} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExecutionTaskSourceType | 'all')}>
+            <label>Priority
+              <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as ExecutionTaskPriority | 'all')} disabled={priorityQueueMode}>
+                <option value="all">All priorities</option>
+                {PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}
+              </select>
+            </label>
+            <label>Source
+              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExecutionTaskSourceType | 'all')}>
                 <option value="all">All sources</option>
-                {SOURCE_TYPES.map((sourceType) => <option key={sourceType} value={sourceType}>{label(sourceType)}</option>)}
+                {SOURCE_TYPES.map((source) => <option key={source} value={source}>{label(source)}</option>)}
               </select>
             </label>
-            <label style={styles.fieldLabel}>
-              Source ID
-              <input style={styles.input} value={sourceIdFilter} onChange={(event) => setSourceIdFilter(event.target.value)} placeholder="Optional source UUID" aria-invalid={Boolean(sourceIdFilterError)} />
-              {sourceIdFilterError ? <span style={styles.errorText}>{sourceIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every source record.</span>}
-            </label>
-            <label style={styles.fieldLabel}>
-              Batch Status
-              <select style={styles.input} value={batchStatusFilter} onChange={(event) => setBatchStatusFilter(event.target.value as ExecutionTaskBatchStatus | 'all')}>
-                <option value="all">All batch statuses</option>
-                {BATCH_STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+            <label>Assigned operator
+              <select value={assignedToFilter} onChange={(event) => setAssignedToFilter(event.target.value)} disabled={optionsLoading}>
+                <option value="">All operators</option>
+                {options.users.map((user) => <option key={user.id} value={user.id}>{user.name}{user.is_active ? '' : ' (inactive)'}</option>)}
               </select>
             </label>
-            <label style={styles.fieldLabel}>
-              Batch Type
-              <select style={styles.input} value={batchTypeFilter} onChange={(event) => setBatchTypeFilter(event.target.value as ExecutionTaskBatchType | 'all')}>
-                <option value="all">All batch types</option>
-                {BATCH_TYPES.map((batchType) => <option key={batchType} value={batchType}>{label(batchType)}</option>)}
+            <label>Storage location
+              <select value={storageLocationIdFilter} onChange={(event) => setStorageLocationIdFilter(event.target.value)} disabled={optionsLoading}>
+                <option value="">All locations</option>
+                {options.locations.map((location) => <option key={location.id} value={location.id}>{location.name}{location.is_active ? '' : ' (retired)'}</option>)}
               </select>
             </label>
-            <label style={styles.fieldLabel}>
-              Facility ID
-              <input style={styles.input} value={facilityIdFilter} onChange={(event) => setFacilityIdFilter(event.target.value)} placeholder="Optional facility UUID" aria-invalid={Boolean(facilityIdFilterError)} />
-              {facilityIdFilterError ? <span style={styles.errorText}>{facilityIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every facility.</span>}
-            </label>
-            <label style={styles.fieldLabel}>
-              Storage Location ID
-              <input style={styles.input} value={storageLocationIdFilter} onChange={(event) => setStorageLocationIdFilter(event.target.value)} placeholder="Optional storage location UUID" aria-invalid={Boolean(storageLocationIdFilterError)} />
-              {storageLocationIdFilterError ? <span style={styles.errorText}>{storageLocationIdFilterError}</span> : <span style={styles.muted}>Leave blank to include every storage location.</span>}
-            </label>
-            <label style={styles.fieldLabel}>
-              Search
-              <input style={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Task code, title, description" disabled={priorityQueueMode} />
-            </label>
-            <label style={styles.checkboxLabel}>
-              <input type="checkbox" checked={openOnly} onChange={(event) => setOpenOnly(event.target.checked)} />
-              Open only
+            <label>Rows per page
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </label>
           </div>
 
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
+          <div className="execution-tasks-filter-footer">
+            <label className="execution-tasks-checkbox"><input type="checkbox" checked={openOnly} onChange={(event) => setOpenOnly(event.target.checked)} disabled={priorityQueueMode} /> Open tasks only</label>
+            <details className="execution-tasks-advanced-filters">
+              <summary>Advanced ID and batch filters</summary>
+              <div className="execution-tasks-filter-grid execution-tasks-filter-grid--advanced">
+                <label>Source ID
+                  <input value={sourceIdFilter} onChange={(event) => setSourceIdFilter(event.target.value)} placeholder="Exact source UUID" aria-invalid={Boolean(sourceIdFilter.trim() && !isUuid(sourceIdFilter.trim()))} />
+                </label>
+                <label>Facility ID
+                  <input value={facilityIdFilter} onChange={(event) => setFacilityIdFilter(event.target.value)} placeholder="Exact facility UUID" aria-invalid={Boolean(facilityIdFilter.trim() && !isUuid(facilityIdFilter.trim()))} />
+                </label>
+                <label>Batch status
+                  <select value={batchStatusFilter} onChange={(event) => setBatchStatusFilter(event.target.value as ExecutionTaskBatchStatus | 'all')}>
+                    <option value="all">All batch statuses</option>
+                    {BATCH_STATUSES.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+                  </select>
+                </label>
+                <label>Batch type
+                  <select value={batchTypeFilter} onChange={(event) => setBatchTypeFilter(event.target.value as ExecutionTaskBatchType | 'all')}>
+                    <option value="all">All batch types</option>
+                    {BATCH_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <p>Advanced IDs are intended for links from other modules or support investigations. Normal users should use the readable selectors above.</p>
+            </details>
+          </div>
+
+          <div className="execution-tasks-table-wrap">
+            <table className="execution-tasks-table">
               <thead>
                 <tr>
-                  <th style={styles.th}>Task</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Priority</th>
-                  <th style={styles.th}>Due</th>
-                  <th style={styles.th}>Assigned</th>
-                  <th style={styles.th}>Score</th>
-                  <th style={styles.th}>Actions</th>
+                  <th>Task</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Due</th>
+                  <th>Assigned to</th>
+                  <th>Score</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task) => (
-                  <tr id={`execution-task-${task.id}`} key={task.id} style={selected?.id === task.id ? styles.selectedRow : undefined}>
-                    <td style={styles.td}>
-                      <button type="button" style={styles.linkButton} onClick={() => setSelected(task)}>{task.task_code}</button>
-                      <div style={styles.strong}>{task.title}</div>
-                      <div style={styles.muted}>{label(task.task_type)} · {label(task.source_type)}</div>
+                {displayedTasks.map((task) => (
+                  <tr key={task.id} className={selected?.id === task.id ? 'is-selected' : ''}>
+                    <td>
+                      <button type="button" className="execution-tasks-link" onClick={() => selectTask(task)}>{task.task_code}</button>
+                      <strong>{task.title}</strong>
+                      <span>{label(task.task_type)} · {label(task.source_type)}</span>
                     </td>
-                    <td style={styles.td}><StatusPill status={task.status} /></td>
-                    <td style={styles.td}>{label(task.priority)}</td>
-                    <td style={styles.td}>{dateTime(task.sla_due_at || task.due_at)}</td>
-                    <td style={styles.td}>{task.assigned_to || '-'}</td>
-                    <td style={styles.td}><PriorityScore task={task} /></td>
-                    <td style={styles.td}><TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} runTransition={runTransition} /></td>
+                    <td><StatusPill status={task.status} /></td>
+                    <td>{label(task.priority)}</td>
+                    <td><span className={task.is_overdue ? 'execution-tasks-text-danger' : ''}>{dateTime(task.sla_due_at || task.due_at)}</span></td>
+                    <td>{userLabel(task.assigned_to)}</td>
+                    <td><strong>{task.priority_score ?? '—'}</strong><span>{label(task.due_bucket)}</span></td>
+                    <td><TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => void runTaskAction(task, action)} onDialogAction={(action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} /></td>
                   </tr>
                 ))}
-                {!tasks.length ? (
-                  <tr>
-                    <td style={styles.td} colSpan={7}>{loading ? 'Loading execution tasks…' : 'No execution tasks match the current filters.'}</td>
-                  </tr>
-                ) : null}
+                {!displayedTasks.length ? <tr><td colSpan={7} className="execution-tasks-empty-cell">{loading ? 'Loading tasks…' : 'No execution tasks match the current filters.'}</td></tr> : null}
               </tbody>
             </table>
           </div>
+
+          <div className="execution-tasks-pagination">
+            <button type="button" className="btn btn-secondary" disabled={loading || !canGoPrevious} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous</button>
+            <span>Showing {visibleStart}–{visibleEnd} of {summary.matching_task_count} matching tasks</span>
+            <button type="button" className="btn btn-secondary" disabled={loading || !hasNextPage} onClick={() => setOffset(offset + pageSize)}>Next</button>
+          </div>
         </div>
 
-        <aside style={styles.sideColumn}>
+        <aside className="execution-tasks-side-column">
           {canCreate ? (
-            <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Create Task</h2>
-              <div style={styles.formGrid}>
-                <label style={styles.fieldLabel}>Title<input style={styles.input} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
-                <label style={styles.fieldLabel}>Description<textarea style={styles.textarea} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-                <label style={styles.fieldLabel}>Type<select style={styles.input} value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((taskType) => <option key={taskType} value={taskType}>{label(taskType)}</option>)}</select></label>
-                <label style={styles.fieldLabel}>Priority<select style={styles.input} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label>
-                <label style={styles.fieldLabel}>Initial status<select style={styles.input} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">Draft</option><option value="ready">Ready</option></select></label>
-                <label style={styles.fieldLabel}>Source<select style={styles.input} value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as ExecutionTaskSourceType })}>{MANUAL_CREATE_SOURCE_TYPES.map((sourceType) => <option key={sourceType} value={sourceType}>{label(sourceType)}</option>)}</select></label>
-                <label style={styles.fieldLabel}>Source ID<input style={styles.input} value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Optional UUID" aria-invalid={Boolean(formSourceIdError)} />{formSourceIdError ? <span style={styles.errorText}>{formSourceIdError}</span> : null}</label>
-                <label style={styles.fieldLabel}>Facility ID<input style={styles.input} value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder="Optional facility UUID" aria-invalid={Boolean(formFacilityIdError)} />{formFacilityIdError ? <span style={styles.errorText}>{formFacilityIdError}</span> : null}</label>
-                <label style={styles.fieldLabel}>Storage Location ID<input style={styles.input} value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} placeholder="Optional storage location UUID" aria-invalid={Boolean(formStorageLocationIdError)} />{formStorageLocationIdError ? <span style={styles.errorText}>{formStorageLocationIdError}</span> : null}</label>
-                <label style={styles.fieldLabel}>Assign to<input style={styles.input} value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} placeholder="Optional user UUID" aria-invalid={Boolean(formAssignedToError)} />{formAssignedToError ? <span style={styles.errorText}>{formAssignedToError}</span> : null}</label>
-                <label style={styles.fieldLabel}>Due at<input style={styles.input} type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
-                <label style={styles.fieldLabel}>SLA due at<input style={styles.input} type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
-                <button type="button" className="btn btn-primary" disabled={createTaskDisabled} onClick={() => void createTask()}>Create execution task</button>
+            <section className="execution-tasks-card">
+              <div className="execution-tasks-card-header">
+                <div><h3>Create task</h3><p>Create a coordination record. Use the source module’s own workflow for stock-changing work.</p></div>
               </div>
-            </div>
-          ) : null}
-
-          <TaskDetail task={selected} auditRows={taskAudit} />
+              <div className="execution-tasks-form-grid">
+                <label>Title<input value={form.title} maxLength={180} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+                <label>Description<textarea value={form.description} maxLength={2000} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+                <div className="execution-tasks-two-column">
+                  <label>Task type<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}</select></label>
+                  <label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label>
+                  <label>Initial state<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">Draft</option><option value="ready">Ready</option></select></label>
+                  <label>Assign to<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">Unassigned</option>{options.active_users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label>
+                  <label>Storage location<select value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} disabled={optionsLoading}><option value="">No location</option>{options.active_locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
+                  <label>Due at<input type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
+                  <label>SLA due at<input type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
+                </div>
+                <details className="execution-tasks-advanced-filters">
+                  <summary>Advanced source linkage</summary>
+                  <div className="execution-tasks-form-grid">
+                    <label>Source type<select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as NewTaskForm['source_type'], source_id: event.target.value === 'manual' ? '' : form.source_id })}>{MANUAL_CREATE_SOURCE_TYPES.map((source) => <option key={source} value={source}>{label(source)}</option>)}</select></label>
+                    {form.source_type !== 'manual' ? <label>Source ID<input value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Required tenant-owned source UUID" /></label> : null}
+                    <label>Facility ID<input value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder="Optional facility UUID" /></label>
+                  </div>
+                  <p>For reservation, requisition, purchase-order, shipment, transfer, cycle-count, or replenishment records, prefer creating the task from that source module. The backend verifies that a linked source belongs to this tenant.</p>
+                </details>
+                {createValidation ? <p className="execution-tasks-form-help">{createValidation}</p> : null}
+                <button type="button" className="btn btn-primary" disabled={saving || Boolean(createValidation)} onClick={() => void createTask()}>Create execution task</button>
+              </div>
+            </section>
+          ) : (
+            <section className="execution-tasks-card execution-tasks-readonly-note"><h3>Create task</h3><p>You have read access but not permission to create execution tasks.</p></section>
+          )}
         </aside>
       </section>
+
+      <section ref={detailRef}>
+        <TaskDetail task={selected} auditRows={taskAudit} userLabel={userLabel} locationLabel={locationLabel} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(task, action) => void runTaskAction(task, action)} onDialogAction={(task, action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} />
+      </section>
+
+      <details className="execution-tasks-governance" open={analyticsOpen} onToggle={(event) => setAnalyticsOpen((event.currentTarget as HTMLDetailsElement).open)}>
+        <summary><span>Planning, mobile queues, batches, workload, SLA, and optimization</span><span>{analyticsLoading ? 'Loading…' : 'Open management analysis'}</span></summary>
+        <div className="execution-tasks-governance-body">
+          {analyticsError ? <div className="execution-tasks-alert execution-tasks-alert--warning">Operational task work remains available, but management analysis could not be loaded: {analyticsError}</div> : null}
+
+          <section className="execution-tasks-card">
+            <div className="execution-tasks-card-header"><div><h3>Throughput — last {throughput?.window_days ?? 14} days</h3><p>Created, completed, blocked, cancelled, and completion-time signals.</p></div></div>
+            <div className="execution-tasks-summary-grid execution-tasks-summary-grid--compact">
+              <SummaryCard label="Created" value={throughput?.totals.total_task_count ?? 0} />
+              <SummaryCard label="Completed" value={throughput?.totals.completed_task_count ?? 0} />
+              <SummaryCard label="Blocked" value={throughput?.totals.blocked_task_count ?? 0} />
+              <SummaryCard label="Average completion" value={throughput?.totals.avg_completion_hours ?? '—'} helper="Hours" />
+            </div>
+            <div className="execution-tasks-distribution-grid">
+              <Distribution title="By status" rows={throughput?.by_status.map((row) => ({ label: label(row.status), count: row.count })) ?? []} />
+              <Distribution title="By task type" rows={throughput?.by_type.map((row) => ({ label: label(row.task_type), count: row.count })) ?? []} />
+              <Distribution title="By source" rows={throughput?.by_source.map((row) => ({ label: label(row.source_type), count: row.count })) ?? []} />
+            </div>
+          </section>
+
+          <section className="execution-tasks-card">
+            <div className="execution-tasks-card-header"><div><h3>Operator workload</h3><p>Open work grouped by assigned operator, including blocked and overdue pressure.</p></div></div>
+            <div className="execution-tasks-workload-grid">
+              {workload.map((row) => (
+                <article key={row.assigned_to || 'unassigned'} className="execution-tasks-mini-card">
+                  <strong>{row.assigned_to ? userLabel(row.assigned_to) : 'Unassigned'}</strong>
+                  <span>{row.open_task_count} open · score {row.workload_score}</span>
+                  <div className="execution-tasks-metric-pairs"><span>Ready {row.ready_task_count}</span><span>Doing {row.in_progress_task_count}</span><span>Blocked {row.blocked_task_count}</span><span>Overdue {row.overdue_task_count}</span></div>
+                  <span>Next due: {dateTime(row.next_due_at)}</span>
+                </article>
+              ))}
+              {!workload.length ? <p className="execution-tasks-empty">No open workload for the current filters.</p> : null}
+            </div>
+          </section>
+
+          <section className="execution-tasks-card">
+            <div className="execution-tasks-card-header"><div><h3>Mobile execution queue</h3><p>Compact operator-ready task guidance. Selecting a card opens the full task detail above.</p></div><span>{mobileQueue?.count ?? 0} tasks</span></div>
+            <div className="execution-tasks-mobile-list">
+              {mobileQueue?.tasks.map((task) => (
+                <button key={task.id} type="button" disabled={saving} onClick={() => void openTaskById(task.id)}>
+                  <strong>{task.task_code} · {task.title}</strong>
+                  <span>{task.step_label} · {label(task.action_hint)} · score {task.priority_score ?? '—'}</span>
+                  <span>{label(task.status)} · {task.scan_required ? 'Scan required' : 'No scan required'} · {dateTime(task.sla_due_at || task.due_at)}</span>
+                </button>
+              )) ?? null}
+              {!mobileQueue?.tasks.length ? <p className="execution-tasks-empty">No mobile-ready tasks for the current filters.</p> : null}
+            </div>
+          </section>
+
+          <section className="execution-tasks-card">
+            <div className="execution-tasks-card-header"><div><h3>SLA and escalation queue</h3><p>Open work ordered by blocker state, overdue pressure, due-soon risk, and priority score.</p></div></div>
+            <div className="execution-tasks-mobile-list">
+              {slaQueue.map((task) => <button key={task.id} type="button" onClick={() => selectTask(task)}><strong>{task.task_code} · {task.title}</strong><span>{label(task.sla_status)} · escalation {task.escalation_level ?? 0} · score {task.priority_score ?? '—'}</span><span>{dateTime(task.sla_due_at || task.due_at)}</span></button>)}
+              {!slaQueue.length ? <p className="execution-tasks-empty">No SLA-risk tasks for the current filters.</p> : null}
+            </div>
+          </section>
+
+          <section className="execution-tasks-card">
+            <div className="execution-tasks-card-header"><div><h3>Execution batches</h3><p>Draft and released groups of already-created tasks. Batch actions do not perform the source inventory operation.</p></div><span>{batches.length} loaded</span></div>
+            <div className="execution-tasks-table-wrap">
+              <table className="execution-tasks-table">
+                <thead><tr><th>Batch</th><th>Status</th><th>Priority</th><th>Tasks</th><th>Location</th><th>Due</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {batches.map((batch) => <tr key={batch.id}><td><strong>{batch.batch_code}</strong><span>{batch.title}</span><span>{label(batch.batch_type)}</span></td><td><StatusPill status={batch.status} /></td><td>{label(batch.priority)}</td><td>{batch.completed_task_count ?? 0} completed · {batch.open_task_count ?? 0} open · {batch.task_count ?? 0} total</td><td>{locationLabel(batch.storage_location_id)}</td><td>{dateTime(batch.sla_due_at || batch.due_at)}</td><td><div className="execution-tasks-actions">{canUpdate && batch.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void runBatchAction(batch, 'release')}>Release</button> : null}{canCancel && batch.status !== 'cancelled' ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => setActionDialog({ kind: 'batch', action: 'cancel', batch, value: '' })}>Cancel</button> : null}</div></td></tr>)}
+                  {!batches.length ? <tr><td colSpan={7} className="execution-tasks-empty-cell">No batches match the current filters.</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {canReadOptimization ? (
+            <section className="execution-tasks-card">
+              <div className="execution-tasks-card-header">
+                <div><h3>Advisory optimization</h3><p>Read-only planning signals. Generating scaffolds creates advisory evidence only; it does not apply recommendations or change tasks.</p></div>
+                <div className="execution-tasks-actions">{canCreateOptimization ? <button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void generateAiRecommendationScaffolds()}>Generate advisory scaffolds</button> : null}<button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void exportOptimizationAnalytics()}>Export optimization CSV</button></div>
+              </div>
+              <div className="execution-tasks-summary-grid execution-tasks-summary-grid--compact">
+                <SummaryCard label="Plans" value={optimizationDashboard?.summary.plan_count ?? 0} />
+                <SummaryCard label="Signals" value={optimizationDashboard?.summary.optimization_signal_count ?? 0} />
+                <SummaryCard label="Pressure" value={optimizationDashboard?.summary.execution_pressure_score ?? 0} />
+                <SummaryCard label="Mobile signals" value={mobileOptimization?.summary.visible_signal_count ?? 0} />
+              </div>
+              <div className="execution-tasks-mobile-list">
+                {optimizationDashboard?.top_recommendations.slice(0, 8).map((item) => <article key={item.id}><strong>{label(item.item_type)} · score {item.score}</strong><span>{item.recommendation}</span><span>{item.rationale || label(item.status)}</span></article>) ?? null}
+                {!optimizationDashboard?.top_recommendations.length ? <p className="execution-tasks-empty">No advisory optimization recommendations are available.</p> : null}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </details>
+
+      {actionDialog ? <ActionDialogModal dialog={actionDialog} users={options.active_users} saving={saving} onChange={setActionDialog} onCancel={() => setActionDialog(null)} onConfirm={() => void confirmDialogAction()} /> : null}
     </main>
   );
 }
 
-
-function Distribution({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
-  return (
-    <div style={styles.distributionCard}>
-      <div style={styles.strong}>{title}</div>
-      {rows.length ? rows.map((row) => (
-        <div key={row.label} style={styles.distributionRow}>
-          <span>{row.label}</span>
-          <span>{row.count}</span>
-        </div>
-      )) : <p style={styles.muted}>No data</p>}
-    </div>
-  );
-}
-
-function SummaryCard({ label: cardLabel, value }: { label: string; value: number }) {
-  return <div style={styles.summaryCard}><span style={styles.summaryValue}>{value}</span><span style={styles.muted}>{cardLabel}</span></div>;
+function SummaryCard({ label: cardLabel, value, helper }: { label: string; value: number | string; helper?: string }) {
+  return <article className="execution-tasks-summary-card"><strong>{value}</strong><span>{cardLabel}</span>{helper ? <small>{helper}</small> : null}</article>;
 }
 
 function StatusPill({ status }: { status: ExecutionTaskStatus | ExecutionTaskBatchStatus }) {
-  return <span style={styles.pill}>{label(status)}</span>;
+  return <span className={`execution-tasks-pill execution-tasks-pill--${status}`}>{label(status)}</span>;
 }
 
-type TaskActionsProps = {
+function Distribution({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
+  return <article className="execution-tasks-mini-card"><strong>{title}</strong>{rows.length ? rows.map((row) => <div key={row.label} className="execution-tasks-distribution-row"><span>{row.label}</span><span>{row.count}</span></div>) : <span>No data</span>}</article>;
+}
+
+function TaskActions({ task, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
   task: ExecutionTask;
   saving: boolean;
   canAssign: boolean;
   canUpdate: boolean;
   canComplete: boolean;
   canCancel: boolean;
-  runTransition: (task: ExecutionTask, action: 'ready' | 'start' | 'unblock' | 'complete' | 'cancel' | 'block' | 'assign') => Promise<void>;
-};
-
-
-function PriorityScore({ task }: { task: ExecutionTask }) {
-  if (typeof task.priority_score !== 'number') {
-    return <span style={styles.muted}>-</span>;
-  }
-
-  return (
-    <div>
-      <span style={styles.score}>{task.priority_score}</span>
-      <div style={task.is_overdue ? styles.overdueText : styles.muted}>{label(task.due_bucket)}</div>
-    </div>
-  );
-}
-
-function TaskActions({ task, saving, canAssign, canUpdate, canComplete, canCancel, runTransition }: TaskActionsProps) {
+  onDirectAction: (action: 'ready' | 'start' | 'unblock') => void;
+  onDialogAction: (action: 'assign' | 'block' | 'complete' | 'cancel') => void;
+}) {
   const terminal = task.status === 'completed' || task.status === 'cancelled';
+  return <div className="execution-tasks-actions execution-tasks-actions--compact">
+    {canUpdate && task.status === 'draft' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('ready')}>Mark ready</button> : null}
+    {canAssign && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('assign')}>Assign</button> : null}
+    {canUpdate && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDirectAction('start')}>Start</button> : null}
+    {canUpdate && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('block')}>Block</button> : null}
+    {canUpdate && task.status === 'blocked' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('unblock')}>Unblock</button> : null}
+    {canComplete && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDialogAction('complete')}>Complete</button> : null}
+    {canCancel && !terminal ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => onDialogAction('cancel')}>Cancel</button> : null}
+  </div>;
+}
+
+function TaskDetail({ task, auditRows, userLabel, locationLabel, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
+  task: ExecutionTask | null;
+  auditRows: ExecutionTaskAuditRow[];
+  userLabel: (id?: string | null) => string;
+  locationLabel: (id?: string | null) => string;
+  saving: boolean;
+  canAssign: boolean;
+  canUpdate: boolean;
+  canComplete: boolean;
+  canCancel: boolean;
+  onDirectAction: (task: ExecutionTask, action: 'ready' | 'start' | 'unblock') => void;
+  onDialogAction: (task: ExecutionTask, action: 'assign' | 'block' | 'complete' | 'cancel') => void;
+}) {
+  if (!task) return <section className="execution-tasks-card execution-tasks-empty-detail"><h3>Selected task</h3><p>Select a task in the queue to inspect it.</p></section>;
+  const facts = payloadFacts(task.payload);
   return (
-    <div style={styles.actionRow}>
-      {canUpdate && task.status === 'draft' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void runTransition(task, 'ready')}>Ready</button> : null}
-      {canAssign && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void runTransition(task, 'assign')}>Assign</button> : null}
-      {canUpdate && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void runTransition(task, 'start')}>Start</button> : null}
-      {canUpdate && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void runTransition(task, 'block')}>Block</button> : null}
-      {canUpdate && task.status === 'blocked' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void runTransition(task, 'unblock')}>Unblock</button> : null}
-      {canComplete && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void runTransition(task, 'complete')}>Complete</button> : null}
-      {canCancel && !terminal ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => void runTransition(task, 'cancel')}>Cancel</button> : null}
-    </div>
+    <section className="execution-tasks-card execution-tasks-detail-card">
+      <div className="execution-tasks-card-header">
+        <div><p className="execution-tasks-eyebrow">Selected task</p><h3>{task.task_code} · {task.title}</h3><p>{task.description || 'No task description was recorded.'}</p></div>
+        <StatusPill status={task.status} />
+      </div>
+      <TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => onDirectAction(task, action)} onDialogAction={(action) => onDialogAction(task, action)} />
+      <div className="execution-tasks-detail-grid">
+        <KeyValue title="Type" value={label(task.task_type)} />
+        <KeyValue title="Priority" value={label(task.priority)} />
+        <KeyValue title="Assigned to" value={userLabel(task.assigned_to)} />
+        <KeyValue title="Storage location" value={locationLabel(task.storage_location_id)} />
+        <KeyValue title="Source" value={label(task.source_type)} />
+        <KeyValue title="Source ID" value={task.source_id || 'Not linked'} mono />
+        <KeyValue title="Due" value={dateTime(task.due_at)} />
+        <KeyValue title="SLA due" value={dateTime(task.sla_due_at)} />
+        <KeyValue title="Priority score" value={String(task.priority_score ?? 'Not calculated')} />
+        <KeyValue title="Due state" value={label(task.due_bucket)} />
+        <KeyValue title="Created" value={dateTime(task.created_at)} />
+        <KeyValue title="Updated" value={dateTime(task.updated_at)} />
+      </div>
+      {task.blocked_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>Blocked reason:</strong> {task.blocked_reason}</div> : null}
+      {task.cancellation_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>Cancellation reason:</strong> {task.cancellation_reason}</div> : null}
+      {task.completion_note ? <div className="execution-tasks-alert execution-tasks-alert--success"><strong>Completion note:</strong> {task.completion_note}</div> : null}
+      {facts.length ? <div><h4>Operational context</h4><div className="execution-tasks-detail-grid">{facts.map((fact) => <KeyValue key={fact.key} title={fact.key} value={fact.value} />)}</div></div> : null}
+      <div><h4>Lifecycle timeline</h4><div className="execution-tasks-timeline"><TimelineItem title="Ready" value={task.ready_at} /><TimelineItem title="Assigned" value={task.assigned_at} /><TimelineItem title="Started" value={task.started_at} /><TimelineItem title="Blocked" value={task.blocked_at} /><TimelineItem title="Completed" value={task.completed_at} /><TimelineItem title="Cancelled" value={task.cancelled_at} /></div></div>
+      <details className="execution-tasks-evidence"><summary>Technical payload and dependency evidence</summary>{hasJsonContent(task.payload) ? <><h4>Stored payload</h4><pre>{JSON.stringify(task.payload, null, 2)}</pre></> : <p>No stored payload evidence.</p>}{task.dependency_snapshot?.length ? <><h4>Dependency snapshot</h4><pre>{JSON.stringify(task.dependency_snapshot, null, 2)}</pre></> : <p>No dependency snapshot was stored.</p>}</details>
+      <details className="execution-tasks-evidence"><summary>Audit trail ({auditRows.length})</summary>{auditRows.length ? <div className="execution-tasks-audit-list">{auditRows.map((row) => <article key={row.id}><strong>{label(row.action)}</strong><span>{dateTime(row.created_at)} · {userLabel(row.user_id)}</span>{hasJsonContent(row.metadata) ? <details><summary>Event metadata</summary><pre>{JSON.stringify(row.metadata, null, 2)}</pre></details> : null}</article>)}</div> : <p>No audit events were returned for this task.</p>}</details>
+    </section>
   );
 }
 
-function TaskDetail({ task, auditRows }: { task: ExecutionTask | null; auditRows: ExecutionTaskAuditRow[] }) {
-  if (!task) {
-    return <div style={styles.card}><h2 style={styles.cardTitle}>Task Detail</h2><p style={styles.muted}>Select a task to inspect timing, source, dependency, and payload context.</p></div>;
-  }
-
-  return (
-    <div style={styles.card}>
-      <h2 style={styles.cardTitle}>Task Detail</h2>
-      <div style={styles.detailGrid}>
-        <KeyValue label="Code" value={task.task_code} />
-        <KeyValue label="Status" value={label(task.status)} />
-        <KeyValue label="Type" value={label(task.task_type)} />
-        <KeyValue label="Priority" value={label(task.priority)} />
-        <KeyValue label="Priority score" value={typeof task.priority_score === 'number' ? String(task.priority_score) : '-'} />
-        <KeyValue label="Due bucket" value={label(task.due_bucket)} />
-        <KeyValue label="Source" value={`${label(task.source_type)} ${task.source_id || ''}`.trim()} />
-        <KeyValue label="Location" value={task.storage_location_id || task.facility_id || '-'} />
-        <KeyValue label="Due" value={dateTime(task.due_at)} />
-        <KeyValue label="SLA due" value={dateTime(task.sla_due_at)} />
-        <KeyValue label="Ready" value={dateTime(task.ready_at)} />
-        <KeyValue label="Assigned" value={dateTime(task.assigned_at)} />
-        <KeyValue label="Started" value={dateTime(task.started_at)} />
-        <KeyValue label="Blocked" value={dateTime(task.blocked_at)} />
-        <KeyValue label="Completed" value={dateTime(task.completed_at)} />
-        <KeyValue label="Cancelled" value={dateTime(task.cancelled_at)} />
-      </div>
-      {task.description ? <p style={styles.description}>{task.description}</p> : null}
-      {task.blocked_reason ? <p style={styles.warningText}>Blocked: {task.blocked_reason}</p> : null}
-      {task.cancellation_reason ? <p style={styles.warningText}>Cancelled: {task.cancellation_reason}</p> : null}
-      {task.completion_note ? <p style={styles.description}>Completion: {task.completion_note}</p> : null}
-      {hasJsonContent(task.payload) ? <pre style={styles.pre}>{JSON.stringify(task.payload, null, 2)}</pre> : null}
-      {task.dependency_snapshot?.length ? <pre style={styles.pre}>{JSON.stringify(task.dependency_snapshot, null, 2)}</pre> : null}
-      <div style={styles.auditPanel}>
-        <div style={styles.strong}>Audit Trail</div>
-        {auditRows.length ? auditRows.map((row) => (
-          <div key={row.id} style={styles.auditRow}>
-            <span style={styles.strong}>{label(row.action)}</span>
-            <span style={styles.muted}>{dateTime(row.created_at)} · {row.user_id || 'system'}</span>
-            {hasJsonContent(row.metadata) ? <pre style={styles.auditPre}>{JSON.stringify(row.metadata, null, 2)}</pre> : null}
-          </div>
-        )) : <p style={styles.muted}>No audit events recorded for this task yet.</p>}
-      </div>
-    </div>
-  );
+function KeyValue({ title, value, mono = false }: { title: string; value: string; mono?: boolean }) {
+  return <div className="execution-tasks-key-value"><span>{title}</span><strong className={mono ? 'is-mono' : ''}>{value}</strong></div>;
 }
 
-function KeyValue({ label: key, value }: { label: string; value: string }) {
-  return <div><span style={styles.key}>{key}</span><span style={styles.value}>{value || '-'}</span></div>;
+function TimelineItem({ title, value }: { title: string; value?: string | null }) {
+  return <div><span>{title}</span><strong>{value ? dateTime(value) : 'Not reached'}</strong></div>;
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  hero: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', padding: '1.25rem', border: '1px solid #e5e7eb', borderRadius: '1rem', background: '#fff' },
-  eyebrow: { margin: 0, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748b' },
-  title: { margin: '0.15rem 0', fontSize: '2rem', lineHeight: 1.1 },
-  subtitle: { margin: 0, color: '#475569', maxWidth: '52rem' },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(320px, 0.8fr)', gap: '1rem', alignItems: 'start' },
-  sideColumn: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  card: { padding: '1rem', border: '1px solid #e5e7eb', borderRadius: '1rem', background: '#fff', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' },
-  cardTitle: { margin: 0, fontSize: '1.15rem' },
-  muted: { color: '#64748b', fontSize: '0.86rem' },
-  strong: { fontWeight: 700 },
-  success: { padding: '0.75rem 1rem', borderRadius: '0.75rem', background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0' },
-  error: { padding: '0.75rem 1rem', borderRadius: '0.75rem', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem' },
-  throughputGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
-  distributionGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
-  distributionCard: { padding: '0.85rem', borderRadius: '0.85rem', border: '1px solid #e5e7eb', background: '#f8fafc' },
-  distributionRow: { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.3rem 0', fontSize: '0.86rem', color: '#334155' },
-  dailyList: { display: 'grid', gap: '0.35rem' },
-  dailyItem: { display: 'grid', gridTemplateColumns: '1.5fr repeat(3, 1fr)', gap: '0.5rem', padding: '0.45rem 0.65rem', borderRadius: '0.65rem', background: '#f8fafc', fontSize: '0.82rem', color: '#334155' },
-  workloadGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '1rem' },
-  workloadCard: { padding: '0.85rem', borderRadius: '0.85rem', border: '1px solid #e5e7eb', background: '#f8fafc' },
-  workloadMetrics: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.35rem', margin: '0.65rem 0', fontSize: '0.78rem', color: '#334155' },
-  mobileSummaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem', margin: '1rem 0' },
-  mobileQueueList: { display: 'grid', gap: '0.6rem' },
-  mobileQueueItem: { width: '100%', display: 'grid', gap: '0.25rem', textAlign: 'left', padding: '0.8rem', borderRadius: '0.9rem', border: '1px solid #dbeafe', background: '#eff6ff', cursor: 'pointer' },
-  slaList: { display: 'grid', gap: '0.6rem', marginTop: '1rem' },
-  slaItem: { width: '100%', display: 'grid', gap: '0.25rem', textAlign: 'left', padding: '0.75rem', borderRadius: '0.85rem', border: '1px solid #e5e7eb', background: '#f8fafc', cursor: 'pointer' },
-  summaryCard: { padding: '1rem', borderRadius: '1rem', border: '1px solid #e5e7eb', background: '#fff' },
-  summaryValue: { display: 'block', fontSize: '1.6rem', fontWeight: 800 },
-  modeRow: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' },
-  filters: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem', margin: '1rem 0' },
-  fieldLabel: { display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 700, color: '#334155' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.9rem', fontWeight: 700, marginTop: '1.35rem' },
-  input: { width: '100%', padding: '0.55rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '0.65rem', font: 'inherit' },
-  textarea: { width: '100%', minHeight: '5rem', padding: '0.55rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '0.65rem', font: 'inherit' },
-  formGrid: { display: 'grid', gap: '0.75rem' },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #e5e7eb', padding: '0.6rem' },
-  td: { borderBottom: '1px solid #eef2f7', padding: '0.7rem', verticalAlign: 'top' },
-  selectedRow: { background: '#f8fafc' },
-  linkButton: { border: 0, background: 'transparent', color: '#2563eb', padding: 0, fontWeight: 800, cursor: 'pointer' },
-  pill: { display: 'inline-flex', padding: '0.25rem 0.55rem', borderRadius: '999px', background: '#eef2ff', color: '#3730a3', fontWeight: 800, fontSize: '0.75rem' },
-  actionRow: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.7rem' },
-  key: { display: 'block', fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  value: { display: 'block', fontWeight: 700, overflowWrap: 'anywhere' },
-  description: { color: '#334155', lineHeight: 1.5 },
-  score: { display: 'block', fontWeight: 900, fontSize: '1rem' },
-  overdueText: { color: '#b91c1c', fontSize: '0.8rem', fontWeight: 800 },
-  warningText: { color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '0.75rem', padding: '0.6rem' },
-  pre: { maxHeight: '14rem', overflow: 'auto', padding: '0.75rem', background: '#0f172a', color: '#e2e8f0', borderRadius: '0.75rem', fontSize: '0.78rem' },
-  auditPanel: { display: 'grid', gap: '0.65rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' },
-  auditRow: { display: 'grid', gap: '0.25rem', padding: '0.65rem', borderRadius: '0.75rem', background: '#f8fafc', border: '1px solid #e5e7eb' },
-  auditPre: { maxHeight: '8rem', overflow: 'auto', padding: '0.55rem', background: '#0f172a', color: '#e2e8f0', borderRadius: '0.65rem', fontSize: '0.72rem' }
-};
+function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfirm }: {
+  dialog: ActionDialog;
+  users: ExecutionTaskOptionUser[];
+  saving: boolean;
+  onChange: (next: ActionDialog) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const taskAction = dialog.kind === 'task' ? dialog.action : null;
+  const needsReason = taskAction === 'block' || taskAction === 'cancel' || (dialog.kind === 'batch' && dialog.action === 'cancel');
+  const canConfirm = taskAction === 'assign'
+    ? Boolean(dialog.kind === 'task' && dialog.assigneeId)
+    : needsReason
+      ? dialog.value.trim().length >= 3
+      : true;
+  const title = dialog.kind === 'task' ? `${label(dialog.action)} ${dialog.task.task_code}` : `${label(dialog.action)} ${dialog.batch.batch_code}`;
+  return <div className="execution-tasks-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onCancel(); }}>
+    <section className="execution-tasks-modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="execution-tasks-card-header"><div><h3>{title}</h3><p>Confirm the information that will be written to the task audit trail.</p></div><button type="button" className="execution-tasks-close" onClick={onCancel} aria-label="Close">×</button></div>
+      {dialog.kind === 'task' && dialog.action === 'assign' ? <label>Assign to<select value={dialog.assigneeId} onChange={(event) => onChange({ ...dialog, assigneeId: event.target.value })}><option value="">Select an active user</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label> : null}
+      {dialog.kind === 'task' && dialog.action === 'complete' ? <label>Completion note (optional)<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} /></label> : null}
+      {needsReason ? <label>{taskAction === 'block' ? 'Blocked reason' : 'Cancellation reason'}<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} placeholder="Enter at least three characters" /></label> : null}
+      <div className="execution-tasks-actions execution-tasks-modal-actions"><button type="button" className="btn btn-secondary" disabled={saving} onClick={onCancel}>Back</button><button type="button" className={taskAction === 'cancel' || (dialog.kind === 'batch' && dialog.action === 'cancel') ? 'btn btn-danger' : 'btn btn-primary'} disabled={saving || !canConfirm} onClick={onConfirm}>Confirm {label(dialog.kind === 'task' ? dialog.action : dialog.action).toLowerCase()}</button></div>
+    </section>
+  </div>;
+}
