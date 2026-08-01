@@ -1,13 +1,17 @@
-import { formatUsageReason, toNumber } from "./inventoryUsageFormatting";
+import { useState } from "react";
+import { formatCodeLabel, formatUsageReason, toNumber } from "./inventoryUsageFormatting";
+import { fetchInventoryUsageExceptions } from "./inventoryUsageApi";
 import { styles } from "./inventoryUsageStyles";
 import type {
   InventoryUsageAlertScanResponse,
   InventoryUsageExceptions,
   InventoryUsageLog,
   InventoryUsageSummary,
+  UsageFilters,
 } from "./inventoryUsageTypes";
 
 type InventoryUsageGovernancePanelProps = {
+  filters: UsageFilters;
   canReviewUsage?: boolean;
   summary?: InventoryUsageSummary;
   exceptions?: InventoryUsageExceptions;
@@ -34,6 +38,7 @@ const getRiskLevel = (count: number) => {
 };
 
 export function InventoryUsageGovernancePanel({
+  filters,
   canReviewUsage,
   summary,
   exceptions,
@@ -48,6 +53,8 @@ export function InventoryUsageGovernancePanel({
   alertScanResult,
   onScanAlerts,
 }: InventoryUsageGovernancePanelProps) {
+  const [exportingExceptions, setExportingExceptions] = useState(false);
+  const [exceptionExportError, setExceptionExportError] = useState("");
   const missingDepartmentCount = logs.filter(
     (usage) => !usage.department,
   ).length;
@@ -94,71 +101,76 @@ export function InventoryUsageGovernancePanel({
     return `"${safeRaw.replace(/"/g, '""')}"`;
   };
 
-  const exportExceptionsCsv = () => {
-    const headers = [
-      "usage_log_id",
-      "exception_types",
-      "product_id",
-      "product_name",
-      "storage_location_id",
-      "storage_location_name",
-      "consumption_reason",
-      "department",
-      "quantity",
-      "unit",
-      "estimated_usage_value",
-      "review_status",
-      "reviewed_at",
-      "reviewed_by_user_id",
-      "reviewed_by_user_name",
-      "reversed_at",
-      "consumed_at",
-      "created_by_user_id",
-      "created_by_user_name",
-      "notes",
-    ];
+  const exportExceptionsCsv = async () => {
+    setExportingExceptions(true);
+    setExceptionExportError("");
 
-    const rows = exceptionRows.map((row) => ({
-      usage_log_id: row.id,
-      exception_types: (row.exception_types || []).join(";"),
-      product_id: row.product_id,
-      product_name: row.product_name,
-      storage_location_id: row.storage_location_id,
-      storage_location_name: row.storage_location_name,
-      consumption_reason: row.consumption_reason,
-      department: row.department || "",
-      quantity: row.quantity,
-      unit: row.product_unit || "",
-      estimated_usage_value: row.estimated_usage_value ?? "",
-      review_status: row.review_status || "pending",
-      reviewed_at: row.reviewed_at || "",
-      reviewed_by_user_id: row.reviewed_by_user_id || "",
-      reviewed_by_user_name: row.reviewed_by_user_name || "",
-      reversed_at: row.reversed_at || "",
-      consumed_at: row.consumed_at || "",
-      created_by_user_id: row.created_by_user_id || "",
-      created_by_user_name: row.created_by_user_name || "",
-      notes: row.notes || "",
-    }));
+    try {
+      const allRows = [];
+      const batchSize = 500;
+      let offset = 0;
 
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) =>
-        headers
-          .map((header) => escapeCsvCell(row[header as keyof typeof row]))
-          .join(","),
-      ),
-    ].join("\n");
+      while (true) {
+        const response = await fetchInventoryUsageExceptions(filters, batchSize, offset);
+        const batch = response.rows || [];
+        allRows.push(...batch);
+        if (batch.length < batchSize) break;
+        offset += batchSize;
+      }
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `inventory-usage-exceptions-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const headers = [
+        "usage_log_id", "exception_types", "product_id", "product_name",
+        "storage_location_id", "storage_location_name", "consumption_reason",
+        "department", "quantity", "unit", "estimated_usage_value",
+        "review_status", "reviewed_at", "reviewed_by_user_id",
+        "reviewed_by_user_name", "reversed_at", "consumed_at",
+        "created_by_user_id", "created_by_user_name", "notes",
+      ];
+
+      const rows = allRows.map((row) => ({
+        usage_log_id: row.id,
+        exception_types: (row.exception_types || []).join(";"),
+        product_id: row.product_id,
+        product_name: row.product_name,
+        storage_location_id: row.storage_location_id,
+        storage_location_name: row.storage_location_name,
+        consumption_reason: row.consumption_reason,
+        department: row.department || "",
+        quantity: row.quantity,
+        unit: row.product_unit || "",
+        estimated_usage_value: row.estimated_usage_value ?? "",
+        review_status: row.review_status || "pending",
+        reviewed_at: row.reviewed_at || "",
+        reviewed_by_user_id: row.reviewed_by_user_id || "",
+        reviewed_by_user_name: row.reviewed_by_user_name || "",
+        reversed_at: row.reversed_at || "",
+        consumed_at: row.consumed_at || "",
+        created_by_user_id: row.created_by_user_id || "",
+        created_by_user_name: row.created_by_user_name || "",
+        notes: row.notes || "",
+      }));
+
+      const csv = [
+        headers.join(","),
+        ...rows.map((row) =>
+          headers.map((header) => escapeCsvCell(row[header as keyof typeof row])).join(","),
+        ),
+      ].join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `inventory-usage-exceptions-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setExceptionExportError(error instanceof Error ? error.message : "Could not export usage exceptions.");
+    } finally {
+      setExportingExceptions(false);
+    }
   };
 
   const attentionCount = [
@@ -183,9 +195,9 @@ export function InventoryUsageGovernancePanel({
             type="button"
             style={styles.secondaryButton}
             onClick={exportExceptionsCsv}
-            disabled={!exceptionRows.length}
+            disabled={exportingExceptions || !exceptionRows.length}
           >
-            Export exceptions CSV
+            {exportingExceptions ? "Preparing exceptions CSV..." : "Export filtered exceptions CSV"}
           </button>
           {canScanAlerts && onScanAlerts ? (
             <button
@@ -205,6 +217,10 @@ export function InventoryUsageGovernancePanel({
 
       {alertScanError ? (
         <p style={styles.errorText}>{alertScanError.message}</p>
+      ) : null}
+
+      {exceptionExportError ? (
+        <p style={styles.errorText}>Usage exception export failed: {exceptionExportError}</p>
       ) : null}
 
       {alertScanResult ? (
@@ -289,10 +305,10 @@ export function InventoryUsageGovernancePanel({
                 {exceptionRows.slice(0, 3).map((row) => (
                   <div key={row.id} style={styles.reviewRow}>
                     <small>
-                      {(row.exception_types || []).join(", ") || "exception"} ·{" "}
+                      {(row.exception_types || []).map(formatCodeLabel).join(", ") || "Exception"} ·{" "}
                       {row.product_name || row.product_id} ·{" "}
                       {formatUsageReason(row.consumption_reason)} ·{" "}
-                      {row.review_status || "pending"}
+                      {formatCodeLabel(row.review_status || "pending")}
                     </small>
 
                     {!row.reversed_at && row.review_status !== "reviewed" ? (

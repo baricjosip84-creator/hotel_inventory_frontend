@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { formatDateTime, formatUsageReason, toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
-import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness } from './inventoryUsageTypes';
+import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 import { showTenantActionError } from '../../lib/actionFeedback';
 
 const createBlankLine = (): InventoryUsageTemplateLine => ({
@@ -15,6 +15,9 @@ const createBlankLine = (): InventoryUsageTemplateLine => ({
 });
 
 type InventoryUsageTemplatesPanelProps = {
+  productOptions: InventoryUsageProductOption[];
+  storageLocations: InventoryUsageStorageLocationOption[];
+  optionsLoading?: boolean;
   templates: InventoryUsageTemplate[];
   loading: boolean;
   error?: Error | null;
@@ -35,6 +38,9 @@ type InventoryUsageTemplatesPanelProps = {
 };
 
 export function InventoryUsageTemplatesPanel({
+  productOptions,
+  storageLocations,
+  optionsLoading = false,
   templates,
   loading,
   error,
@@ -202,12 +208,22 @@ export function InventoryUsageTemplatesPanel({
           {lines.map((line, index) => (
             <div key={index} style={styles.bulkLineGrid}>
               <label style={styles.fieldLabel}>
-                Product ID
-                <input style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} placeholder="Product UUID" />
+                Product
+                <select style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} disabled={optionsLoading}>
+                  <option value="">Select product</option>
+                  {productOptions.map((product) => (
+                    <option key={product.id} value={product.id}>{product.name}{product.unit ? ` · ${product.unit}` : ""}</option>
+                  ))}
+                </select>
               </label>
               <label style={styles.fieldLabel}>
-                Location ID
-                <input style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} placeholder="Location UUID" />
+                Storage location
+                <select style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} disabled={optionsLoading}>
+                  <option value="">Select location</option>
+                  {storageLocations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
               </label>
               <label style={styles.fieldLabel}>
                 Quantity

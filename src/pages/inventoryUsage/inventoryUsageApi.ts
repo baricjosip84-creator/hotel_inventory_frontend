@@ -1,9 +1,13 @@
 import { apiMutationRequest, apiRequest } from '../../lib/api';
 import { buildUsageQuery } from './inventoryUsageFormatting';
-import type { InventoryUsageAlertScanResponse, InventoryUsageAttachmentDraft, InventoryUsageAttachmentResponse, InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageBulkRequest, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageAnomalies, InventoryUsageScheduledTemplates, InventoryUsageTemplate, InventoryUsageTemplateDraft, InventoryUsageTemplateResponse, InventoryUsageTemplateArchiveResponse, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateReadiness, InventoryUsageScheduledTemplateRunDueResponse, InventoryUsageExceptions, InventoryUsageImpact, InventoryUsageLog, InventoryUsageLogDetail, InventoryUsagePeriodClosure, InventoryUsagePeriodClosureDraft, InventoryUsagePeriodClosurePreviewResponse, InventoryUsagePeriodClosureResponse, InventoryUsageReviewResponse, InventoryUsageReversalResponse, InventoryUsageSummary, InventoryUsageStorageLocationOption, UsageFilters } from './inventoryUsageTypes';
+import type { InventoryUsageAlertScanResponse, InventoryUsageAttachmentDraft, InventoryUsageAttachmentResponse, InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageBulkRequest, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageAnomalies, InventoryUsageScheduledTemplates, InventoryUsageTemplate, InventoryUsageTemplateDraft, InventoryUsageTemplateResponse, InventoryUsageTemplateArchiveResponse, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateReadiness, InventoryUsageScheduledTemplateRunDueResponse, InventoryUsageExceptions, InventoryUsageImpact, InventoryUsageLog, InventoryUsageLogDetail, InventoryUsagePeriodClosure, InventoryUsagePeriodClosureDraft, InventoryUsagePeriodClosurePreviewResponse, InventoryUsagePeriodClosureResponse, InventoryUsageReviewResponse, InventoryUsageReversalResponse, InventoryUsageSummary, InventoryUsageStorageLocationOption, InventoryUsageOptions, UsageFilters } from './inventoryUsageTypes';
 
-export async function fetchInventoryUsageLogs(filters: UsageFilters): Promise<InventoryUsageLog[]> {
-  return apiRequest<InventoryUsageLog[]>(`/stock/usage${buildUsageQuery(filters, 100)}`);
+export async function fetchInventoryUsageLogs(filters: UsageFilters, limit = 100, offset = 0): Promise<InventoryUsageLog[]> {
+  return apiRequest<InventoryUsageLog[]>(`/stock/usage${buildUsageQuery(filters, limit, offset)}`);
+}
+
+export async function fetchInventoryUsageOptions(): Promise<InventoryUsageOptions> {
+  return apiRequest<InventoryUsageOptions>('/stock/usage/options');
 }
 
 export async function fetchInventoryUsageStorageLocations(): Promise<InventoryUsageStorageLocationOption[]> {
@@ -19,17 +23,17 @@ export async function fetchInventoryUsageSummary(filters: UsageFilters): Promise
   return apiRequest<InventoryUsageSummary>(`/stock/usage/summary${buildUsageQuery(filters)}`);
 }
 
-export async function fetchInventoryUsageExceptions(filters: UsageFilters): Promise<InventoryUsageExceptions> {
-  return apiRequest<InventoryUsageExceptions>(`/stock/usage/exceptions${buildUsageQuery(filters, 25)}`);
+export async function fetchInventoryUsageExceptions(filters: UsageFilters, limit = 25, offset = 0): Promise<InventoryUsageExceptions> {
+  return apiRequest<InventoryUsageExceptions>(`/stock/usage/exceptions${buildUsageQuery(filters, limit, offset)}`);
 }
 
 
-export async function fetchInventoryUsageImpact(filters: UsageFilters): Promise<InventoryUsageImpact> {
-  return apiRequest<InventoryUsageImpact>(`/stock/usage/impact${buildUsageQuery(filters, 25)}`);
+export async function fetchInventoryUsageImpact(filters: UsageFilters, limit = 25, offset = 0): Promise<InventoryUsageImpact> {
+  return apiRequest<InventoryUsageImpact>(`/stock/usage/impact${buildUsageQuery(filters, limit, offset)}`);
 }
 
-export async function fetchInventoryUsageAnomalies(filters: UsageFilters): Promise<InventoryUsageAnomalies> {
-  return apiRequest<InventoryUsageAnomalies>(`/stock/usage/anomalies${buildUsageQuery(filters, 25)}`);
+export async function fetchInventoryUsageAnomalies(filters: UsageFilters, limit = 25, offset = 0): Promise<InventoryUsageAnomalies> {
+  return apiRequest<InventoryUsageAnomalies>(`/stock/usage/anomalies${buildUsageQuery(filters, limit, offset)}`);
 }
 
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { styles } from './inventoryUsageStyles';
-import type { InventoryUsageBulkLine, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageTemplate } from './inventoryUsageTypes';
+import type { InventoryUsageBulkLine, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageTemplate, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 import { showTenantActionError, showTenantActionSuccess } from '../../lib/actionFeedback';
 
 const formatBulkReadinessReason = (reason: string): string => {
@@ -43,6 +43,9 @@ const createBlankLine = (): InventoryUsageBulkLine => ({
 
 type InventoryUsageBulkRecorderProps = {
   selectedTemplate?: InventoryUsageTemplate | null;
+  productOptions: InventoryUsageProductOption[];
+  storageLocations: InventoryUsageStorageLocationOption[];
+  optionsLoading?: boolean;
   previewing?: boolean;
   previewError?: Error | null;
   previewResult?: InventoryUsageBulkReadinessResponse | null;
@@ -75,6 +78,9 @@ type InventoryUsageBulkRecorderProps = {
 
 export function InventoryUsageBulkRecorder({
   selectedTemplate,
+  productOptions,
+  storageLocations,
+  optionsLoading = false,
   previewing = false,
   previewError,
   previewResult,
@@ -425,9 +431,9 @@ export function InventoryUsageBulkRecorder({
 
       <div style={styles.importPanel}>
         <div>
-          <h3 style={styles.subsectionTitle}>Paste usage lines</h3>
+          <h3 style={styles.subsectionTitle}>Advanced: paste usage lines</h3>
           <p style={styles.sectionDescription}>
-            Paste CSV or spreadsheet rows as product_id, storage_location_id, quantity, reason, department,
+            For system exports or spreadsheet imports, paste rows as product_id, storage_location_id, quantity, reason, department,
             event_name, notes, reference_type, reference_id, missing_evidence_acknowledged. A header row is optional.
           </p>
         </div>
@@ -449,12 +455,22 @@ export function InventoryUsageBulkRecorder({
       {lines.map((line, index) => (
         <div key={index} style={styles.bulkLineGrid}>
           <label style={styles.fieldLabel}>
-            Product ID
-            <input style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} placeholder="Product UUID" />
+            Product
+            <select style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} disabled={optionsLoading}>
+              <option value="">Select product</option>
+              {productOptions.map((product) => (
+                <option key={product.id} value={product.id}>{product.name}{product.unit ? ` · ${product.unit}` : ""}</option>
+              ))}
+            </select>
           </label>
           <label style={styles.fieldLabel}>
-            Location ID
-            <input style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} placeholder="Location UUID" />
+            Storage location
+            <select style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} disabled={optionsLoading}>
+              <option value="">Select location</option>
+              {storageLocations.map((location) => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
           </label>
           <label style={styles.fieldLabel}>
             Quantity
@@ -594,8 +610,8 @@ export function InventoryUsageBulkRecorder({
                 <thead>
                   <tr>
                     <th style={styles.th}>Line</th>
-                    <th style={styles.th}>Product ID</th>
-                    <th style={styles.th}>Location ID</th>
+                    <th style={styles.th}>Product</th>
+                    <th style={styles.th}>Location</th>
                     <th style={styles.th}>Qty</th>
                     <th style={styles.th}>Balance impact</th>
                     <th style={styles.th}>Usage log</th>
@@ -607,8 +623,8 @@ export function InventoryUsageBulkRecorder({
                   {result.items.map((item) => (
                     <tr key={`${item.line_number}-${item.usage?.id || item.product_id}`}>
                       <td style={styles.td}>{item.line_number}</td>
-                      <td style={styles.td}>{item.product_id}</td>
-                      <td style={styles.td}>{item.storage_location_id}</td>
+                      <td style={styles.td}>{productOptions.find((product) => product.id === item.product_id)?.name || item.product_id}</td>
+                      <td style={styles.td}>{storageLocations.find((location) => location.id === item.storage_location_id)?.name || item.storage_location_id}</td>
                       <td style={styles.td}>{item.quantity}</td>
                       <td style={styles.td}>
                         {item.stock?.previous_quantity ?? '—'} → {item.stock?.new_quantity ?? '—'}

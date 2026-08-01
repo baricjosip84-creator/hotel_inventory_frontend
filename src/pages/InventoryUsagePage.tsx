@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { InventoryUsageDashboard } from "./inventoryUsage/InventoryUsageDashboard";
@@ -16,7 +16,7 @@ import {
   fetchInventoryUsageLogs,
   fetchInventoryUsagePeriodClosures,
   fetchInventoryUsageSummary,
-  fetchInventoryUsageStorageLocations,
+  fetchInventoryUsageOptions,
   fetchInventoryUsageTemplates,
   fetchInventoryUsageScheduledTemplates,
   fetchInventoryUsageTemplateReadiness,
@@ -51,30 +51,41 @@ export default function InventoryUsagePage() {
   const [filters, setFilters] = useState(DEFAULT_USAGE_FILTERS);
   const [selectedUsageLogId, setSelectedUsageLogId] = useState<string>("");
   const [barcodeCompletion, setBarcodeCompletion] = useState({ key: 0, message: "" });
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerPageSize, setLedgerPageSize] = useState(25);
+  const [exportingUsage, setExportingUsage] = useState(false);
+  const hasValidDateRange = !filters.start_date
+    || !filters.end_date
+    || filters.end_date >= filters.start_date;
 
   const summaryQuery = useQuery({
     queryKey: ["inventory-usage-summary-page", filters],
     queryFn: () => fetchInventoryUsageSummary(filters),
+    enabled: hasValidDateRange,
   });
 
   const logsQuery = useQuery({
-    queryKey: ["inventory-usage-logs-page", filters],
-    queryFn: () => fetchInventoryUsageLogs(filters),
+    queryKey: ["inventory-usage-logs-page", filters, ledgerPage, ledgerPageSize],
+    queryFn: () => fetchInventoryUsageLogs(filters, ledgerPageSize, (ledgerPage - 1) * ledgerPageSize),
+    enabled: hasValidDateRange,
   });
 
   const exceptionsQuery = useQuery({
     queryKey: ["inventory-usage-exceptions-page", filters],
     queryFn: () => fetchInventoryUsageExceptions(filters),
+    enabled: hasValidDateRange,
   });
 
   const impactQuery = useQuery({
     queryKey: ["inventory-usage-impact-page", filters],
     queryFn: () => fetchInventoryUsageImpact(filters),
+    enabled: hasValidDateRange,
   });
 
   const anomaliesQuery = useQuery({
     queryKey: ["inventory-usage-anomalies-page", filters],
     queryFn: () => fetchInventoryUsageAnomalies(filters),
+    enabled: hasValidDateRange,
   });
 
   const templatesQuery = useQuery({
@@ -98,10 +109,14 @@ export default function InventoryUsagePage() {
     enabled: Boolean(selectedUsageLogId),
   });
 
-  const storageLocationsQuery = useQuery({
-    queryKey: ["inventory-usage-storage-locations-page"],
-    queryFn: fetchInventoryUsageStorageLocations,
+  const usageOptionsQuery = useQuery({
+    queryKey: ["inventory-usage-options-page"],
+    queryFn: fetchInventoryUsageOptions,
   });
+
+  useEffect(() => {
+    setLedgerPage(1);
+  }, [filters]);
 
   const templates = templatesQuery.data || [];
 
@@ -259,7 +274,7 @@ export default function InventoryUsagePage() {
     onSuccess: (data, variables) => {
       barcodePreviewMutation.reset();
 
-      const locationName = storageLocationsQuery.data?.find(
+      const locationName = usageOptionsQuery.data?.storage_locations.find(
         (location) => location.id === variables.storage_location_id,
       )?.name;
       const productLabel = data?.barcode_match?.product_name
@@ -755,8 +770,7 @@ export default function InventoryUsagePage() {
     return Object.values(filters).filter((value) => value.trim()).length;
   }, [filters]);
 
-  const exportRows = useMemo(() => {
-    return usageLogs.map((usage) => ({
+  const buildExportRows = (rows: typeof usageLogs) => rows.map((usage) => ({
       consumed_at: usage.consumed_at,
       product_id: usage.product_id,
       product: usage.product_name || usage.product_id,
@@ -789,9 +803,36 @@ export default function InventoryUsagePage() {
       reference_id: usage.reference_id || "",
       stock_movement_id: usage.stock_movement_id || "",
     }));
-  }, [usageLogs]);
 
-  const handleExportCsv = () => {
+  const exportRows = buildExportRows(usageLogs);
+
+  const handleExportCsv = async () => {
+    setExportingUsage(true);
+    let exportSource = usageLogs;
+
+    try {
+      const allRows = [];
+      const batchSize = 500;
+      let offset = 0;
+
+      while (true) {
+        const batch = await fetchInventoryUsageLogs(filters, batchSize, offset);
+        allRows.push(...batch);
+        if (batch.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      exportSource = allRows;
+    } catch (exportError) {
+      const message = exportError instanceof Error ? exportError.message : "Unexpected export error.";
+      window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
+        detail: { type: "error", message: `Usage CSV export failed: ${message}` },
+      }));
+      setExportingUsage(false);
+      return;
+    }
+
+    const rowsToExport = buildExportRows(exportSource);
     const headers = [
       "consumed_at",
       "product_id",
@@ -834,7 +875,7 @@ export default function InventoryUsagePage() {
 
     const csv = [
       headers.join(","),
-      ...exportRows.map((row) =>
+      ...rowsToExport.map((row) =>
         headers
           .map((header) => escapeCell(row[header as keyof typeof row]))
           .join(","),
@@ -850,7 +891,27 @@ export default function InventoryUsagePage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    setExportingUsage(false);
   };
+
+
+  const handleRefreshPage = async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => String(query.queryKey[0] || "").startsWith("inventory-usage-"),
+    });
+  };
+
+  const pageRefreshing = [
+    summaryQuery,
+    logsQuery,
+    exceptionsQuery,
+    impactQuery,
+    anomaliesQuery,
+    templatesQuery,
+    scheduledTemplatesQuery,
+    periodClosuresQuery,
+    usageOptionsQuery,
+  ].some((query) => query.isFetching);
 
   const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;
   const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
@@ -869,7 +930,11 @@ export default function InventoryUsagePage() {
       filters={filters}
       setFilters={setFilters}
       activeFilterCount={activeFilterCount}
-      exportRowCount={exportRows.length}
+      invalidDateRange={!hasValidDateRange}
+      exportRowCount={Number(summaryQuery.data?.totals?.usage_count || exportRows.length)}
+      exportingCsv={exportingUsage}
+      refreshingPage={pageRefreshing}
+      onRefreshPage={handleRefreshPage}
       onExportCsv={handleExportCsv}
       summary={summaryQuery.data}
       summaryLoading={summaryQuery.isLoading}
@@ -982,11 +1047,15 @@ export default function InventoryUsagePage() {
           : null
       }
       barcodeEvidenceResult={barcodeEvidenceAttachmentMutation.data || null}
-      storageLocations={storageLocationsQuery.data || []}
-      storageLocationsLoading={storageLocationsQuery.isLoading}
-      storageLocationsError={
-        storageLocationsQuery.isError
-          ? (storageLocationsQuery.error as Error)
+      productOptions={usageOptionsQuery.data?.products || []}
+      storageLocations={usageOptionsQuery.data?.storage_locations || []}
+      filterProductOptions={usageOptionsQuery.data?.filter_products || usageOptionsQuery.data?.products || []}
+      filterStorageLocations={usageOptionsQuery.data?.filter_storage_locations || usageOptionsQuery.data?.storage_locations || []}
+      departmentOptions={usageOptionsQuery.data?.departments || []}
+      usageOptionsLoading={usageOptionsQuery.isLoading}
+      usageOptionsError={
+        usageOptionsQuery.isError
+          ? (usageOptionsQuery.error as Error)
           : null
       }
       onPreviewBarcodeUsage={handlePreviewBarcodeUsage}
@@ -1006,6 +1075,11 @@ export default function InventoryUsagePage() {
       bulkResult={bulkUsageMutation.data || null}
       onRecordBulkUsage={handleRecordBulkUsage}
       logs={usageLogs}
+      ledgerPage={ledgerPage}
+      ledgerPageSize={ledgerPageSize}
+      ledgerTotal={Number(summaryQuery.data?.totals?.usage_count || 0)}
+      onLedgerPageChange={setLedgerPage}
+      onLedgerPageSizeChange={(size) => { setLedgerPageSize(size); setLedgerPage(1); }}
       logsLoading={logsQuery.isLoading}
       logsError={logsQuery.isError ? (logsQuery.error as Error) : null}
       selectedUsageLogId={selectedUsageLogId}

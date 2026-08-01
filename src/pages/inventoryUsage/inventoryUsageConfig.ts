@@ -15,7 +15,7 @@ export const DEFAULT_USAGE_FILTERS: UsageFilters = {
   storage_location_id: '',
   consumption_reason: '',
   department: '',
-  date_from: '',
-  date_to: '',
+  start_date: '',
+  end_date: '',
   include_reversed: ''
 };

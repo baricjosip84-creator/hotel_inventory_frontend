@@ -4,6 +4,24 @@ export type InventoryUsageStorageLocationOption = {
   name: string;
   temperature_zone?: string | null;
   deleted_at?: string | null;
+  retired?: boolean;
+};
+
+export type InventoryUsageProductOption = {
+  id: string;
+  name: string;
+  category?: string | null;
+  unit?: string | null;
+  barcode?: string | null;
+  retired?: boolean;
+};
+
+export type InventoryUsageOptions = {
+  products: InventoryUsageProductOption[];
+  storage_locations: InventoryUsageStorageLocationOption[];
+  filter_products: InventoryUsageProductOption[];
+  filter_storage_locations: InventoryUsageStorageLocationOption[];
+  departments: string[];
 };
 
 export type UsageReason =
@@ -201,8 +219,8 @@ export type UsageFilters = {
   storage_location_id: string;
   consumption_reason: string;
   department: string;
-  date_from: string;
-  date_to: string;
+  start_date: string;
+  end_date: string;
   include_reversed: string;
 };
 

@@ -694,9 +694,9 @@ export function InventoryUsageQuickConsumePanel({
       <div style={styles.importPanel}>
         <div style={styles.sectionHeader}>
           <div>
-            <h3 style={styles.subsectionTitle}>Evidence attachment link</h3>
+            <h3 style={styles.subsectionTitle}>Advanced evidence link</h3>
             <p style={styles.sectionDescription}>
-              Optional: link an already-stored photo, PDF, or damage note file to the usage log after the barcode consume is recorded.
+              Optional advanced fields for linking a file that has already been stored elsewhere. This panel does not upload a file.
               {requiresEvidencePrompt ? ' Damage and waste scans should include evidence whenever possible.' : ''}
             </p>
           </div>
@@ -788,7 +788,7 @@ export function InventoryUsageQuickConsumePanel({
 
         <div style={styles.bulkFooter}>
           <p style={styles.sectionDescription}>
-            The backend resolves active inventory labels first, then package and product barcodes, validates location stock, records a normal usage log, links the stock movement, stores operator acknowledgements in notes, and uses the same device-generated scan id for retries until a scan is confirmed. Camera scanning fills the barcode field; preview the stock impact before recording.
+            Preview before recording. The preview checks the selected location, available unreserved stock, critical alerts, closed periods, reason, and evidence requirements. A successful record creates the usage log and its linked stock movement.
           </p>
           {requiresFreshPreview && !previewMatchesDraft ? (
             <p style={styles.warningText}>Preview the current scan before recording so stock, alert, period, reason, and evidence controls are checked against this exact draft.</p>

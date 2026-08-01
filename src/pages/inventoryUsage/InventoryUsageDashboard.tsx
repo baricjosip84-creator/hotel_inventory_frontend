@@ -1,18 +1,23 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { InventoryUsageBulkRecorder } from "./InventoryUsageBulkRecorder";
 import { InventoryUsageQuickConsumePanel } from "./InventoryUsageQuickConsumePanel";
 import { InventoryUsageGovernancePanel } from "./InventoryUsageGovernancePanel";
 import { InventoryUsagePeriodClosuresPanel } from "./InventoryUsagePeriodClosuresPanel";
 import { InventoryUsageScheduledTemplatesPanel } from "./InventoryUsageScheduledTemplatesPanel";
 import { InventoryUsageTemplatesPanel } from "./InventoryUsageTemplatesPanel";
+import { fetchInventoryUsageAnomalies, fetchInventoryUsageImpact } from "./inventoryUsageApi";
 import {
   DEFAULT_USAGE_FILTERS,
   USAGE_REASON_OPTIONS,
 } from "./inventoryUsageConfig";
 import {
+  formatCodeLabel,
+  formatDate,
   formatDateTime,
+  formatDays,
   formatMoney,
   formatUsageReason,
+  shortenId,
   toNumber,
 } from "./inventoryUsageFormatting";
 import { styles } from "./inventoryUsageStyles";
@@ -34,6 +39,7 @@ import type {
   InventoryUsagePeriodClosureDraft,
   InventoryUsagePeriodClosurePreviewResponse,
   InventoryUsagePeriodClosureResponse,
+  InventoryUsageProductOption,
   InventoryUsageScheduledTemplates,
   InventoryUsageStorageLocationOption,
   InventoryUsageSummary,
@@ -58,7 +64,11 @@ type InventoryUsageDashboardProps = {
   filters: UsageFilters;
   setFilters: Dispatch<SetStateAction<UsageFilters>>;
   activeFilterCount: number;
+  invalidDateRange: boolean;
   exportRowCount: number;
+  exportingCsv?: boolean;
+  refreshingPage?: boolean;
+  onRefreshPage: () => void;
   onExportCsv: () => void;
   summary?: InventoryUsageSummary;
   summaryLoading: boolean;
@@ -113,9 +123,13 @@ type InventoryUsageDashboardProps = {
   barcodeEvidenceLinking?: boolean;
   barcodeEvidenceError?: Error | null;
   barcodeEvidenceResult?: InventoryUsageAttachmentResponse | null;
+  productOptions: InventoryUsageProductOption[];
   storageLocations: InventoryUsageStorageLocationOption[];
-  storageLocationsLoading: boolean;
-  storageLocationsError?: Error | null;
+  filterProductOptions: InventoryUsageProductOption[];
+  filterStorageLocations: InventoryUsageStorageLocationOption[];
+  departmentOptions: string[];
+  usageOptionsLoading: boolean;
+  usageOptionsError?: Error | null;
   onPreviewBarcodeUsage?: (payload: InventoryUsageBarcodeRequest) => void;
   onRecordBarcodeUsage: (payload: InventoryUsageBarcodeRequest) => Promise<InventoryUsageBarcodeResponse>;
   bulkPreviewing?: boolean;
@@ -145,6 +159,11 @@ type InventoryUsageDashboardProps = {
     items: InventoryUsageBulkLine[];
   }) => void;
   logs: InventoryUsageLog[];
+  ledgerPage: number;
+  ledgerPageSize: number;
+  ledgerTotal: number;
+  onLedgerPageChange: (page: number) => void;
+  onLedgerPageSizeChange: (size: number) => void;
   logsLoading: boolean;
   logsError?: Error | null;
   selectedUsageLogId?: string;
@@ -173,7 +192,11 @@ export function InventoryUsageDashboard({
   filters,
   setFilters,
   activeFilterCount,
+  invalidDateRange,
   exportRowCount,
+  exportingCsv = false,
+  refreshingPage = false,
+  onRefreshPage,
   onExportCsv,
   summary,
   summaryLoading,
@@ -228,9 +251,13 @@ export function InventoryUsageDashboard({
   barcodeEvidenceLinking,
   barcodeEvidenceError,
   barcodeEvidenceResult,
+  productOptions,
   storageLocations,
-  storageLocationsLoading,
-  storageLocationsError,
+  filterProductOptions,
+  filterStorageLocations,
+  departmentOptions,
+  usageOptionsLoading,
+  usageOptionsError,
   onPreviewBarcodeUsage,
   onRecordBarcodeUsage,
   bulkPreviewing,
@@ -242,6 +269,11 @@ export function InventoryUsageDashboard({
   bulkResult,
   onRecordBulkUsage,
   logs,
+  ledgerPage,
+  ledgerPageSize,
+  ledgerTotal,
+  onLedgerPageChange,
+  onLedgerPageSizeChange,
   logsLoading,
   logsError,
   selectedUsageLogId,
@@ -262,6 +294,13 @@ export function InventoryUsageDashboard({
   onScanAlerts,
 }: InventoryUsageDashboardProps) {
   const totals = summary?.totals;
+  const ledgerStart = ledgerTotal > 0 ? (ledgerPage - 1) * ledgerPageSize + 1 : 0;
+  const ledgerEnd = ledgerTotal > 0
+    ? Math.min(ledgerPage * ledgerPageSize, ledgerTotal)
+    : 0;
+  const [exportingImpact, setExportingImpact] = useState(false);
+  const [exportingAnomalies, setExportingAnomalies] = useState(false);
+  const [analyticsExportError, setAnalyticsExportError] = useState("");
 
   const escapeCsvCell = (value: unknown) => {
     const raw = value === null || value === undefined ? "" : String(value);
@@ -292,87 +331,110 @@ export function InventoryUsageDashboard({
     URL.revokeObjectURL(url);
   };
 
-  const exportImpactCsv = () => {
-    const headers = [
-      "product_id",
-      "product_name",
-      "storage_location_id",
-      "storage_location_name",
-      "usage_count",
-      "total_quantity",
-      "unit",
-      "estimated_usage_value",
-      "missing_cost_count",
-      "observed_usage_days",
-      "average_daily_usage",
-      "current_quantity",
-      "effective_min_quantity",
-      "estimated_days_of_coverage",
-      "recommended_reorder_quantity",
-      "impact_status",
-      "last_consumed_at",
-    ];
+  const exportImpactCsv = async () => {
+    setExportingImpact(true);
+    setAnalyticsExportError("");
 
-    downloadCsv(
-      `inventory-usage-stock-impact-${new Date().toISOString().slice(0, 10)}.csv`,
-      headers,
-      (impact?.rows ?? []).map((row) => ({
-        product_id: row.product_id,
-        product_name: row.product_name,
-        storage_location_id: row.storage_location_id,
-        storage_location_name: row.storage_location_name,
-        usage_count: row.usage_count,
-        total_quantity: row.total_quantity,
-        unit: row.product_unit,
-        estimated_usage_value: row.estimated_usage_value,
-        missing_cost_count: row.missing_cost_count,
-        observed_usage_days: row.observed_usage_days,
-        average_daily_usage: row.average_daily_usage,
-        current_quantity: row.current_quantity,
-        effective_min_quantity: row.effective_min_quantity,
-        estimated_days_of_coverage: row.estimated_days_of_coverage,
-        recommended_reorder_quantity: row.recommended_reorder_quantity,
-        impact_status: row.impact_status,
-        last_consumed_at: row.last_consumed_at,
-      })),
-    );
+    try {
+      const allRows = [];
+      const batchSize = 500;
+      let offset = 0;
+
+      while (true) {
+        const response = await fetchInventoryUsageImpact(filters, batchSize, offset);
+        const batch = response.rows || [];
+        allRows.push(...batch);
+        if (batch.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      const headers = [
+        "product_id", "product_name", "storage_location_id", "storage_location_name",
+        "usage_count", "total_quantity", "unit", "estimated_usage_value",
+        "missing_cost_count", "observed_usage_days", "average_daily_usage",
+        "current_quantity", "effective_min_quantity", "estimated_days_of_coverage",
+        "recommended_reorder_quantity", "impact_status", "last_consumed_at",
+      ];
+
+      downloadCsv(
+        `inventory-usage-stock-impact-${new Date().toISOString().slice(0, 10)}.csv`,
+        headers,
+        allRows.map((row) => ({
+          product_id: row.product_id,
+          product_name: row.product_name,
+          storage_location_id: row.storage_location_id,
+          storage_location_name: row.storage_location_name,
+          usage_count: row.usage_count,
+          total_quantity: row.total_quantity,
+          unit: row.product_unit,
+          estimated_usage_value: row.estimated_usage_value,
+          missing_cost_count: row.missing_cost_count,
+          observed_usage_days: row.observed_usage_days,
+          average_daily_usage: row.average_daily_usage,
+          current_quantity: row.current_quantity,
+          effective_min_quantity: row.effective_min_quantity,
+          estimated_days_of_coverage: row.estimated_days_of_coverage,
+          recommended_reorder_quantity: row.recommended_reorder_quantity,
+          impact_status: row.impact_status,
+          last_consumed_at: row.last_consumed_at,
+        })),
+      );
+    } catch (error) {
+      setAnalyticsExportError(error instanceof Error ? error.message : "Could not export usage impact.");
+    } finally {
+      setExportingImpact(false);
+    }
   };
 
-  const exportAnomaliesCsv = () => {
-    const headers = [
-      "usage_date",
-      "product_id",
-      "product_name",
-      "daily_quantity",
-      "unit",
-      "usage_count",
-      "average_daily_quantity",
-      "spike_multiplier",
-      "observed_days",
-    ];
+  const exportAnomaliesCsv = async () => {
+    setExportingAnomalies(true);
+    setAnalyticsExportError("");
 
-    downloadCsv(
-      `inventory-usage-anomalies-${new Date().toISOString().slice(0, 10)}.csv`,
-      headers,
-      (anomalies?.rows ?? []).map((row) => ({
-        usage_date: row.usage_date,
-        product_id: row.product_id,
-        product_name: row.product_name,
-        daily_quantity: row.daily_quantity,
-        unit: row.product_unit,
-        usage_count: row.usage_count,
-        average_daily_quantity: row.average_daily_quantity,
-        spike_multiplier: row.spike_multiplier,
-        observed_days: row.observed_days,
-      })),
-    );
+    try {
+      const allRows = [];
+      const batchSize = 500;
+      let offset = 0;
+
+      while (true) {
+        const response = await fetchInventoryUsageAnomalies(filters, batchSize, offset);
+        const batch = response.rows || [];
+        allRows.push(...batch);
+        if (batch.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      const headers = [
+        "usage_date", "product_id", "product_name", "daily_quantity", "unit",
+        "usage_count", "average_daily_quantity", "spike_multiplier", "observed_days",
+      ];
+
+      downloadCsv(
+        `inventory-usage-anomalies-${new Date().toISOString().slice(0, 10)}.csv`,
+        headers,
+        allRows.map((row) => ({
+          usage_date: row.usage_date,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          daily_quantity: row.daily_quantity,
+          unit: row.product_unit,
+          usage_count: row.usage_count,
+          average_daily_quantity: row.average_daily_quantity,
+          spike_multiplier: row.spike_multiplier,
+          observed_days: row.observed_days,
+        })),
+      );
+    } catch (error) {
+      setAnalyticsExportError(error instanceof Error ? error.message : "Could not export usage anomalies.");
+    } finally {
+      setExportingAnomalies(false);
+    }
   };
 
   return (
     <div style={styles.page}>
       <section style={styles.heroCard}>
         <div>
-          <p style={styles.eyebrow}>Feature 2 · Usage / Consumption Logging</p>
+          <p style={styles.eyebrow}>Usage / consumption logging</p>
           <h1 style={styles.title}>Inventory usage ledger</h1>
           <p style={styles.subtitle}>
             Track why stock leaves the business: guest use, internal use, waste,
@@ -380,6 +442,14 @@ export function InventoryUsageDashboard({
           </p>
         </div>
         <div style={styles.heroActions}>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={onRefreshPage}
+            disabled={refreshingPage}
+          >
+            {refreshingPage ? "Refreshing..." : "Refresh page"}
+          </button>
           <button
             type="button"
             style={styles.secondaryButton}
@@ -392,9 +462,9 @@ export function InventoryUsageDashboard({
             type="button"
             style={styles.primaryButton}
             onClick={onExportCsv}
-            disabled={!exportRowCount}
+            disabled={!exportRowCount || exportingCsv}
           >
-            Export CSV
+            {exportingCsv ? "Preparing CSV..." : "Export filtered CSV"}
           </button>
         </div>
       </section>
@@ -404,8 +474,7 @@ export function InventoryUsageDashboard({
           <div>
             <h2 style={styles.sectionTitle}>Operational filters</h2>
             <p style={styles.sectionDescription}>
-              Use exact product/location IDs when drilling from audit records or
-              stock screens.
+              Filter by product, location, reason, department, date, and reversal status.
             </p>
           </div>
           <span style={styles.filterPill}>{activeFilterCount} active</span>
@@ -413,8 +482,8 @@ export function InventoryUsageDashboard({
 
         <div style={styles.filterGrid}>
           <label style={styles.fieldLabel}>
-            Product ID
-            <input
+            Product
+            <select
               style={styles.input}
               value={filters.product_id}
               onChange={(event) =>
@@ -423,12 +492,19 @@ export function InventoryUsageDashboard({
                   product_id: event.target.value,
                 }))
               }
-              placeholder="Optional product UUID"
-            />
+              disabled={usageOptionsLoading}
+            >
+              <option value="">All products</option>
+              {filterProductOptions.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}{product.unit ? ` · ${product.unit}` : ""}{product.retired ? " · Retired" : ""}
+                </option>
+              ))}
+            </select>
           </label>
           <label style={styles.fieldLabel}>
-            Location ID
-            <input
+            Storage location
+            <select
               style={styles.input}
               value={filters.storage_location_id}
               onChange={(event) =>
@@ -437,8 +513,15 @@ export function InventoryUsageDashboard({
                   storage_location_id: event.target.value,
                 }))
               }
-              placeholder="Optional location UUID"
-            />
+              disabled={usageOptionsLoading}
+            >
+              <option value="">All locations</option>
+              {filterStorageLocations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}{location.retired ? " · Retired" : ""}
+                </option>
+              ))}
+            </select>
           </label>
           <label style={styles.fieldLabel}>
             Reason
@@ -472,18 +555,24 @@ export function InventoryUsageDashboard({
                 }))
               }
               placeholder="Housekeeping, kitchen, maintenance..."
+              list="inventory-usage-departments"
             />
+            <datalist id="inventory-usage-departments">
+              {departmentOptions.map((department) => (
+                <option key={department} value={department} />
+              ))}
+            </datalist>
           </label>
           <label style={styles.fieldLabel}>
             From
             <input
               type="date"
               style={styles.input}
-              value={filters.date_from}
+              value={filters.start_date}
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
-                  date_from: event.target.value,
+                  start_date: event.target.value,
                 }))
               }
             />
@@ -493,11 +582,11 @@ export function InventoryUsageDashboard({
             <input
               type="date"
               style={styles.input}
-              value={filters.date_to}
+              value={filters.end_date}
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
-                  date_to: event.target.value,
+                  end_date: event.target.value,
                 }))
               }
             />
@@ -516,7 +605,56 @@ export function InventoryUsageDashboard({
             Include reversed usage
           </label>
         </div>
+        {invalidDateRange ? (
+          <p style={styles.errorText}>
+            The To date must be the same as or later than the From date.
+          </p>
+        ) : null}
+        {usageOptionsError ? (
+          <p style={styles.errorText}>
+            Product and location choices could not be loaded: {usageOptionsError.message}
+          </p>
+        ) : null}
       </section>
+
+      {permissions.canRecord ? (
+        <InventoryUsageQuickConsumePanel
+          key={barcodeCompletionKey}
+          completionMessage={barcodeCompletionMessage}
+          canRecord={permissions.canRecord}
+          previewing={Boolean(barcodePreviewing)}
+          previewError={barcodePreviewError}
+          previewResult={barcodePreviewResult}
+          recording={barcodeRecording}
+          error={barcodeError}
+          result={barcodeResult}
+          evidenceLinking={barcodeEvidenceLinking}
+          evidenceError={barcodeEvidenceError}
+          evidenceResult={barcodeEvidenceResult}
+          storageLocations={storageLocations}
+          storageLocationsLoading={usageOptionsLoading}
+          storageLocationsError={usageOptionsError}
+          onPreviewBarcodeUsage={onPreviewBarcodeUsage}
+          onRecordBarcodeUsage={onRecordBarcodeUsage}
+        />
+      ) : null}
+
+      {permissions.canBulkRecord ? (
+        <InventoryUsageBulkRecorder
+          selectedTemplate={selectedTemplate}
+          productOptions={productOptions}
+          storageLocations={storageLocations}
+          optionsLoading={usageOptionsLoading}
+          previewing={Boolean(bulkPreviewing)}
+          previewError={bulkPreviewError}
+          previewResult={bulkPreviewResult}
+          onPreviewBulkUsage={onPreviewBulkUsage}
+          recording={bulkRecording}
+          error={bulkError}
+          result={bulkResult}
+          onRecordBulkUsage={onRecordBulkUsage}
+        />
+      ) : null}
 
       <InventoryUsageScheduledTemplatesPanel
         canRunDueTemplates={permissions.canRunScheduled}
@@ -534,6 +672,9 @@ export function InventoryUsageDashboard({
       <InventoryUsageTemplatesPanel
         canManageTemplates={permissions.canManageTemplates}
         canRecordTemplates={permissions.canRecord}
+        productOptions={productOptions}
+        storageLocations={storageLocations}
+        optionsLoading={usageOptionsLoading}
         templates={templates}
         loading={templatesLoading}
         error={templatesError}
@@ -550,42 +691,6 @@ export function InventoryUsageDashboard({
         onArchiveTemplate={onArchiveTemplate}
         onRecordTemplate={onRecordTemplate}
       />
-
-      {permissions.canRecord ? (
-        <InventoryUsageQuickConsumePanel
-          key={barcodeCompletionKey}
-          completionMessage={barcodeCompletionMessage}
-          canRecord={permissions.canRecord}
-          previewing={Boolean(barcodePreviewing)}
-          previewError={barcodePreviewError}
-          previewResult={barcodePreviewResult}
-          recording={barcodeRecording}
-          error={barcodeError}
-          result={barcodeResult}
-          evidenceLinking={barcodeEvidenceLinking}
-          evidenceError={barcodeEvidenceError}
-          evidenceResult={barcodeEvidenceResult}
-          storageLocations={storageLocations}
-          storageLocationsLoading={storageLocationsLoading}
-          storageLocationsError={storageLocationsError}
-          onPreviewBarcodeUsage={onPreviewBarcodeUsage}
-          onRecordBarcodeUsage={onRecordBarcodeUsage}
-        />
-      ) : null}
-
-      {permissions.canBulkRecord ? (
-        <InventoryUsageBulkRecorder
-          selectedTemplate={selectedTemplate}
-          previewing={Boolean(bulkPreviewing)}
-          previewError={bulkPreviewError}
-          previewResult={bulkPreviewResult}
-          onPreviewBulkUsage={onPreviewBulkUsage}
-          recording={bulkRecording}
-          error={bulkError}
-          result={bulkResult}
-          onRecordBulkUsage={onRecordBulkUsage}
-        />
-      ) : null}
 
       <section style={styles.statsGrid}>
         <div style={styles.statCard}>
@@ -625,8 +730,12 @@ export function InventoryUsageDashboard({
           </strong>
         </div>
       </section>
+      <p style={styles.warningText}>
+        Quantity totals can combine products measured in different units. Filter to one product before treating the total as one directly comparable quantity.
+      </p>
 
       <InventoryUsageGovernancePanel
+        filters={filters}
         canReviewUsage={permissions.canReview}
         summary={summary}
         exceptions={exceptions}
@@ -778,6 +887,12 @@ export function InventoryUsageDashboard({
           )}
         </div>
 
+        {analyticsExportError ? (
+          <div style={styles.cardWide}>
+            <p style={styles.errorText}>Usage analytics export failed: {analyticsExportError}</p>
+          </div>
+        ) : null}
+
         <div style={styles.cardWide}>
           <h2 style={styles.sectionTitle}>Daily usage trend</h2>
           {summaryLoading ? (
@@ -792,7 +907,7 @@ export function InventoryUsageDashboard({
             <div style={styles.trendList}>
               {summary.by_day.map((row) => (
                 <div key={row.usage_date} style={styles.trendRow}>
-                  <span>{row.usage_date}</span>
+                  <span>{formatDate(row.usage_date)}</span>
                   <strong>{toNumber(row.total_quantity)} consumed</strong>
                   <small>
                     {toNumber(row.usage_count)} events ·{" "}
@@ -823,9 +938,9 @@ export function InventoryUsageDashboard({
               type="button"
               style={styles.secondaryButton}
               onClick={exportImpactCsv}
-              disabled={!impact?.rows?.length}
+              disabled={exportingImpact || !impact?.rows?.length}
             >
-              Export impact CSV
+              {exportingImpact ? "Preparing impact CSV..." : "Export filtered impact CSV"}
             </button>
           </div>
           {impactLoading ? (
@@ -908,16 +1023,14 @@ export function InventoryUsageDashboard({
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {row.estimated_days_of_coverage === null || row.estimated_days_of_coverage === undefined
-                            ? "-"
-                            : `${toNumber(row.estimated_days_of_coverage)} days`}
+                          {formatDays(row.estimated_days_of_coverage)}
                         </td>
                         <td style={styles.td}>
                           {toNumber(row.recommended_reorder_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {String(row.impact_status).replace(/_/g, " ")}
+                          {formatCodeLabel(String(row.impact_status))}
                         </td>
                         <td style={styles.td}>
                           {formatDateTime(row.last_consumed_at)}
@@ -944,9 +1057,9 @@ export function InventoryUsageDashboard({
               type="button"
               style={styles.secondaryButton}
               onClick={exportAnomaliesCsv}
-              disabled={!anomalies?.rows?.length}
+              disabled={exportingAnomalies || !anomalies?.rows?.length}
             >
-              Export anomalies CSV
+              {exportingAnomalies ? "Preparing anomalies CSV..." : "Export filtered anomalies CSV"}
             </button>
           </div>
           {anomaliesLoading ? (
@@ -990,7 +1103,7 @@ export function InventoryUsageDashboard({
                   <tbody>
                     {anomalies.rows.map((row) => (
                       <tr key={`${row.product_id}-${row.usage_date}`}>
-                        <td style={styles.td}>{row.usage_date}</td>
+                        <td style={styles.td}>{formatDate(row.usage_date)}</td>
                         <td style={styles.td}>
                           {row.product_name || row.product_id}
                         </td>
@@ -1033,6 +1146,8 @@ export function InventoryUsageDashboard({
                     <th style={styles.th}>Product</th>
                     <th style={styles.th}>Events</th>
                     <th style={styles.th}>Quantity</th>
+                    <th style={styles.th}>Estimated value</th>
+                    <th style={styles.th}>Unit cost</th>
                     <th style={styles.th}>Unit</th>
                   </tr>
                 </thead>
@@ -1158,12 +1273,12 @@ export function InventoryUsageDashboard({
                     {usageLogDetail.quantity_after ?? "-"}
                   </strong>
                   <small>
-                    Movement {usageLogDetail.stock_movement_id || "not linked"}
+                    Movement {shortenId(usageLogDetail.stock_movement_id, 12)}
                   </small>
                 </div>
                 <div style={styles.governanceCard}>
                   <span>Review status</span>
-                  <strong>{usageLogDetail.review_status || "pending"}</strong>
+                  <strong>{formatCodeLabel(usageLogDetail.review_status || "pending")}</strong>
                   <small>
                     {usageLogDetail.reviewed_by_user_name ||
                       usageLogDetail.reviewed_by_user_id ||
@@ -1181,7 +1296,7 @@ export function InventoryUsageDashboard({
                   <strong>{usageLogDetail.notes || "No notes captured"}</strong>
                   <small>
                     {usageLogDetail.reference_type
-                      ? `${usageLogDetail.reference_type}: ${usageLogDetail.reference_id || "unlinked"}`
+                      ? `${formatCodeLabel(usageLogDetail.reference_type)}: ${shortenId(usageLogDetail.reference_id, 12)}`
                       : "No linked reference"}
                   </small>
                   <small>
@@ -1196,9 +1311,7 @@ export function InventoryUsageDashboard({
                   <span>Movement audit</span>
                   <strong>
                     Usage movement:{" "}
-                    {usageLogDetail.stock_movement?.id ||
-                      usageLogDetail.stock_movement_id ||
-                      "not linked"}
+                    {shortenId(usageLogDetail.stock_movement?.id || usageLogDetail.stock_movement_id, 12)}
                   </strong>
                   <small>
                     {usageLogDetail.stock_movement
@@ -1207,9 +1320,7 @@ export function InventoryUsageDashboard({
                   </small>
                   <strong>
                     Reversal movement:{" "}
-                    {usageLogDetail.reversal_stock_movement?.id ||
-                      usageLogDetail.reversal_stock_movement_id ||
-                      "not linked"}
+                    {shortenId(usageLogDetail.reversal_stock_movement?.id || usageLogDetail.reversal_stock_movement_id, 12)}
                   </strong>
                   <small>
                     {usageLogDetail.reversal_stock_movement
@@ -1271,9 +1382,12 @@ export function InventoryUsageDashboard({
           <div>
             <h2 style={styles.sectionTitle}>Usage ledger</h2>
             <p style={styles.sectionDescription}>
-              Latest 100 first-class usage logs, linked back to stock movement
-              IDs for audit traceability. Reversals restore stock through a
-              compensating movement instead of deleting history.
+              Filtered usage records linked to stock movement IDs for audit
+              traceability. Reversals restore stock through a compensating
+              movement instead of deleting history.
+            </p>
+            <p style={styles.sectionDescription}>
+              Showing {ledgerStart}-{ledgerEnd} of {ledgerTotal} matching usage records.
             </p>
             {reverseError ? (
               <p style={styles.errorText}>
@@ -1281,6 +1395,18 @@ export function InventoryUsageDashboard({
               </p>
             ) : null}
           </div>
+          <label style={styles.fieldLabel}>
+            Rows per page
+            <select
+              style={styles.input}
+              value={ledgerPageSize}
+              onChange={(event) => onLedgerPageSizeChange(Number(event.target.value))}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
         </div>
 
         {logsLoading ? (
@@ -1347,14 +1473,14 @@ export function InventoryUsageDashboard({
                     <td style={styles.td}>
                       <div style={styles.contextCell}>
                         <span>{usage.event_name || "No event/job"}</span>
-                        <small>{usage.notes || "No notes"}</small>
+                        <small>{usage.notes ? "Notes recorded — open Details" : "No notes"}</small>
                         <small>
                           {usage.reference_type
-                            ? `${usage.reference_type}: ${usage.reference_id || "unlinked"}`
+                            ? `${formatCodeLabel(usage.reference_type)}: ${shortenId(usage.reference_id, 12)}`
                             : "No linked reference"}
                         </small>
                         <small>
-                          Movement {usage.stock_movement_id || "not linked"}
+                          Movement {shortenId(usage.stock_movement_id, 12)}
                         </small>
                         <small>
                           By{" "}
@@ -1410,6 +1536,27 @@ export function InventoryUsageDashboard({
             </table>
           </div>
         )}
+        {ledgerTotal > ledgerPageSize ? (
+          <div style={styles.bulkFooter}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => onLedgerPageChange(Math.max(1, ledgerPage - 1))}
+              disabled={ledgerPage <= 1 || logsLoading}
+            >
+              Previous
+            </button>
+            <span style={styles.filterPill}>Page {ledgerPage} of {Math.max(1, Math.ceil(ledgerTotal / ledgerPageSize))}</span>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => onLedgerPageChange(ledgerPage + 1)}
+              disabled={ledgerPage >= Math.ceil(ledgerTotal / ledgerPageSize) || logsLoading}
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

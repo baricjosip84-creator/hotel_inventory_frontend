@@ -453,5 +453,47 @@ export const styles: Record<string, CSSProperties> = {
     color: '#92400e',
     fontWeight: 700,
     margin: '0.75rem 0 0'
+  },
+
+  dangerText: {
+    color: '#b91c1c',
+    fontWeight: 800
+  },
+  checkboxRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    color: '#374151',
+    fontSize: '0.9rem',
+    fontWeight: 600
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '0.85rem',
+    marginTop: '1rem'
+  },
+  metricGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '0.75rem',
+    marginTop: '1rem'
+  },
+  metricCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.35rem',
+    padding: '0.85rem',
+    border: '1px solid #e2e8f0',
+    borderRadius: '0.85rem',
+    background: '#f8fafc',
+    color: '#0f172a'
+  },
+  metricLabel: {
+    color: '#64748b',
+    fontSize: '0.78rem',
+    fontWeight: 800,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase'
   }
 };
