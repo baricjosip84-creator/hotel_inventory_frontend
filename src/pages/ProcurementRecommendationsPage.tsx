@@ -23,6 +23,24 @@ type RecommendationSummary = {
 };
 
 
+type ProcurementRecommendationOptionsResponse = {
+  generated_at: string;
+  tenant_id: string;
+  suppliers: Array<{
+    id: string;
+    name: string;
+    email?: string | null;
+  }>;
+};
+
+type ConfirmationState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone: "primary" | "danger";
+  action: () => void;
+};
+
 type RecommendationProductionReviewResponse = {
   generated_at: string;
   tenant_id: string;
@@ -84,6 +102,7 @@ type RecommendationPagination = {
 type ReplenishmentRecommendation = {
   product_id: string;
   product_name: string;
+  product_version?: number | string | null;
   category?: string | null;
   unit?: string | null;
   current_quantity: number | string;
@@ -174,16 +193,27 @@ type ReplenishmentRecommendation = {
   decided_by_user_id?: string | null;
   decision_id?: string | null;
   converted_purchase_order_id?: string | null;
+  converted_purchase_order_status?: string | null;
   converted_at?: string | null;
+  previous_decision_status?: string | null;
+  previous_decision_note?: string | null;
+  previous_decided_at?: string | null;
+  previous_decision_id?: string | null;
+  previous_converted_purchase_order_id?: string | null;
+  previous_converted_purchase_order_status?: string | null;
+  previous_converted_at?: string | null;
 };
 
 type ReplenishmentRecommendationDetail = ReplenishmentRecommendation & {
   detail?: {
     recommendation_key?: string;
     execution_scope?: string;
+    can_enter_approval_review?: boolean;
     can_generate_po_draft?: boolean;
+    current_conversion_open?: boolean;
     readiness?: string;
     blockers?: Array<{ code?: string | null; message?: string | null }>;
+    warnings?: Array<{ code?: string | null; message?: string | null }>;
     reasoning?: string[];
   };
 };
@@ -302,6 +332,7 @@ type ProcurementExecutionDashboardResponse = {
     estimated_recommendation_spend: number | string;
     open_po_draft_spend: number | string;
     shortages_preventable_count: number | string;
+    po_conversion_evidence_count?: number | string;
     projected_stockout_avoidance_count: number | string;
     pending_procurement_risk_count: number | string;
     execution_risk_score: number | string;
@@ -381,6 +412,7 @@ type ProcurementExceptionQueueResponse = {
     projected_depletion_date?: string | null;
     converted_purchase_order_id?: string | null;
     resolution_hint?: string | null;
+    row?: ReplenishmentRecommendationDetail;
   }>;
 };
 
@@ -388,7 +420,7 @@ type ProcurementExceptionQueueResponse = {
 type ProcurementExceptionResolutionResponse = {
   generated_at: string;
   tenant_id: string;
-  action: "assign_supplier" | "approve" | "reject" | "defer" | "suppress" | "rerun";
+  action: "assign_supplier" | "approve" | "reject" | "defer" | "rerun";
   product_id: string;
   cleared_exception_count: number | string;
   remaining_exception_count: number | string;
@@ -598,6 +630,7 @@ type ReplenishmentRecommendationsResponse = {
 type RecommendationFilters = {
   lookbackDays: number;
   urgency: string;
+  supplierId: string;
   procurementReady: string;
   shortageWindowDays: string;
   search: string;
@@ -609,6 +642,7 @@ type RecommendationFilters = {
 const DEFAULT_FILTERS: RecommendationFilters = {
   lookbackDays: 30,
   urgency: "",
+  supplierId: "",
   procurementReady: "",
   shortageWindowDays: "",
   search: "",
@@ -635,37 +669,6 @@ function formatNumber(
   }).format(parsed);
 }
 
-
-function isActiveRecommendation(row: ReplenishmentRecommendation): boolean {
-  return (
-    toNumber(row.recommended_reorder_quantity) > 0 &&
-    !row.converted_purchase_order_id
-  );
-}
-
-function buildActiveRecommendationSummary(rows: ReplenishmentRecommendation[]) {
-  return rows.reduce(
-    (acc, row) => {
-      acc.recommended_count += 1;
-      if (row.urgency === "critical") acc.critical_count += 1;
-      if (row.urgency === "high") acc.high_count += 1;
-      if (row.urgency === "medium") acc.medium_count += 1;
-      if (row.urgency === "low") acc.low_count += 1;
-      if (!row.procurement_ready) acc.blocked_count += 1;
-      acc.estimated_total_cost += toNumber(row.estimated_total_cost);
-      return acc;
-    },
-    {
-      recommended_count: 0,
-      critical_count: 0,
-      high_count: 0,
-      medium_count: 0,
-      low_count: 0,
-      blocked_count: 0,
-      estimated_total_cost: 0,
-    },
-  );
-}
 
 function formatMoney(
   value: number | string | null | undefined,
@@ -707,8 +710,30 @@ function titleCase(value: string | null | undefined): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function isRecommendationRowApprovalReady(row: ReplenishmentRecommendation): boolean {
+  return Boolean(
+    row.procurement_ready &&
+      row.recommended_supplier_id &&
+      row.supplier_selection_confidence !== "blocked" &&
+      toNumber(row.recommended_reorder_quantity) > 0 &&
+      toNumber(row.lead_time_days) >= 0 &&
+      row.budget_status !== "over_budget" &&
+      !row.converted_purchase_order_id,
+  );
+}
+
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError || error instanceof Error) return error.message;
+  if (error instanceof ApiError) {
+    const details = error.details && typeof error.details === "object"
+      ? (error.details as { blockers?: Array<{ message?: string | null; code?: string | null }> })
+      : null;
+    const blockerText = (details?.blockers || [])
+      .map((blocker) => blocker.message || blocker.code)
+      .filter(Boolean)
+      .join("; ");
+    return blockerText ? `${error.message}: ${blockerText}` : error.message;
+  }
+  if (error instanceof Error) return error.message;
   return "Unable to load procurement recommendations.";
 }
 
@@ -717,8 +742,10 @@ function buildRecommendationsPath(filters: RecommendationFilters): string {
   params.set("lookback_days", String(filters.lookbackDays));
   params.set("limit", String(filters.limit));
   params.set("offset", String(filters.offset));
+  params.set("active_only", "true");
 
   if (filters.urgency) params.set("urgency", filters.urgency);
+  if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.procurementReady)
     params.set("procurement_ready", filters.procurementReady);
   if (filters.shortageWindowDays)
@@ -740,11 +767,45 @@ async function fetchRecommendations(
 
 
 
+async function fetchProcurementRecommendationOptions(): Promise<ProcurementRecommendationOptionsResponse> {
+  return apiRequest<ProcurementRecommendationOptionsResponse>(
+    "/reorder-insights/recommendations/options",
+  );
+}
+
+async function fetchAllRecommendationRows(
+  filters: RecommendationFilters,
+): Promise<{ rows: ReplenishmentRecommendation[]; generatedAt?: string; total: number }> {
+  const rows: ReplenishmentRecommendation[] = [];
+  let offset = 0;
+  let generatedAt: string | undefined;
+  let total = 0;
+
+  while (rows.length < 5000) {
+    const page = await fetchRecommendations({ ...filters, limit: 500, offset });
+    generatedAt = page.generated_at || generatedAt;
+    total = toNumber(page.pagination?.total);
+    rows.push(...(page.rows || []));
+    if (!page.pagination?.has_more || page.rows.length === 0) break;
+    offset += page.rows.length;
+  }
+
+  const exportedRows = rows.slice(0, 5000);
+  if (total > exportedRows.length) {
+    throw new Error(
+      `The filtered result contains ${total} recommendations. Export is limited to 5,000 rows; narrow the filters and try again.`,
+    );
+  }
+
+  return { rows: exportedRows, generatedAt, total };
+}
+
 async function fetchRecommendationProductionReview(
   filters: RecommendationFilters,
 ): Promise<RecommendationProductionReviewResponse> {
   const params = new URLSearchParams();
   params.set("lookback_days", String(filters.lookbackDays));
+  if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.shortageWindowDays) {
     params.set("shortage_window_days", filters.shortageWindowDays);
   }
@@ -765,6 +826,7 @@ async function fetchProcurementExecutionDashboard(
 ): Promise<ProcurementExecutionDashboardResponse> {
   const params = new URLSearchParams();
   params.set("lookback_days", String(filters.lookbackDays));
+  if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.shortageWindowDays) {
     params.set("shortage_window_days", filters.shortageWindowDays);
   }
@@ -801,6 +863,7 @@ async function fetchProcurementExceptionQueue(
   params.set("lookback_days", String(filters.lookbackDays));
   params.set("limit", "50");
   params.set("offset", "0");
+  if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.shortageWindowDays) {
     params.set("shortage_window_days", filters.shortageWindowDays);
   }
@@ -819,7 +882,7 @@ async function fetchProcurementExceptionQueue(
 async function resolveProcurementException(
   productId: string,
   filters: RecommendationFilters,
-  action: "assign_supplier" | "approve" | "reject" | "defer" | "suppress" | "rerun",
+  action: "assign_supplier" | "approve" | "reject" | "defer" | "rerun",
   supplierId?: string,
   note?: string,
 ): Promise<ProcurementExceptionResolutionResponse> {
@@ -881,6 +944,7 @@ function buildRecommendationActionQuery(
 ): string {
   const params = new URLSearchParams();
   params.set("lookback_days", String(filters.lookbackDays));
+  if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.shortageWindowDays) {
     params.set("shortage_window_days", filters.shortageWindowDays);
   }
@@ -925,10 +989,50 @@ async function decideRecommendationsBulk(
   );
 }
 
-async function fetchRecommendationPoDraftReview(): Promise<RecommendationPoDraftReviewResponse> {
+async function fetchRecommendationPoDraftReview(
+  offset = 0,
+  limit = 25,
+): Promise<RecommendationPoDraftReviewResponse> {
   return apiRequest<RecommendationPoDraftReviewResponse>(
-    "/reorder-insights/recommendations/po-drafts?status=all&limit=25&offset=0",
+    `/reorder-insights/recommendations/po-drafts?status=all&limit=${limit}&offset=${offset}`,
   );
+}
+
+async function fetchAllRecommendationPoDraftReview(): Promise<RecommendationPoDraftReviewResponse> {
+  const rows: RecommendationPoDraftReviewResponse["rows"] = [];
+  let offset = 0;
+  let firstPage: RecommendationPoDraftReviewResponse | null = null;
+  let total = 0;
+
+  while (rows.length < 5000) {
+    const page = await fetchRecommendationPoDraftReview(offset, 200);
+    firstPage ||= page;
+    total = toNumber(page.pagination.total);
+    rows.push(...page.rows);
+    if (!page.pagination.has_more || page.rows.length === 0) break;
+    offset += page.rows.length;
+  }
+
+  const exportedRows = rows.slice(0, 5000);
+  if (total > exportedRows.length) {
+    throw new Error(
+      `The generated purchase-order review contains ${total} records. Export is limited to 5,000 rows; narrow the underlying data set before exporting.`,
+    );
+  }
+
+  const base = firstPage ?? (await fetchRecommendationPoDraftReview(0, 1));
+  return {
+    ...base,
+    pagination: {
+      ...base.pagination,
+      limit: exportedRows.length || 1,
+      offset: 0,
+      returned: exportedRows.length,
+      total,
+      has_more: false,
+    },
+    rows: exportedRows,
+  };
 }
 
 async function convertRecommendationsToPoDrafts(
@@ -1294,6 +1398,7 @@ export default function ProcurementRecommendationsPage() {
   const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
   const canCreatePurchaseOrderDrafts = capabilities.canCreatePurchaseOrders;
   const canViewGeneratedPurchaseOrderDrafts = capabilities.canViewPurchaseOrders;
+  const canManageProducts = capabilities.canManageProducts;
   const [filters, setFilters] =
     useState<RecommendationFilters>(DEFAULT_FILTERS);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
@@ -1307,10 +1412,30 @@ export default function ProcurementRecommendationsPage() {
   const [scheduledMaxApprovals, setScheduledMaxApprovals] = useState(25);
   const [scheduledNote, setScheduledNote] = useState("Scheduled procurement recommendation run.");
   const [scheduledConvertToPo, setScheduledConvertToPo] = useState(false);
+  const [governanceOpen, setGovernanceOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
+  const [poDraftOffset, setPoDraftOffset] = useState(0);
+  const poDraftLimit = 25;
+
+  const optionsQuery = useQuery({
+    queryKey: ["procurement-recommendation-options"],
+    queryFn: fetchProcurementRecommendationOptions,
+  });
 
   const recommendationsQuery = useQuery({
     queryKey: ["procurement-recommendations", filters],
     queryFn: () => fetchRecommendations(filters),
+  });
+
+  const exportFilteredMutation = useMutation({
+    mutationFn: () => fetchAllRecommendationRows(filters),
+    onSuccess: (payload) => {
+      exportRecommendationRowsCsv({
+        rows: payload.rows,
+        generatedAt: payload.generatedAt,
+        scope: "filtered",
+      });
+    },
   });
 
   const decisionMutation = useMutation({
@@ -1384,6 +1509,7 @@ export default function ProcurementRecommendationsPage() {
       convertRecommendationsToPoDrafts(productIds, filters),
     onSuccess: () => {
       setSelectedProductIds([]);
+      setPoDraftOffset(0);
       bulkReadinessMutation.reset();
       void queryClient.invalidateQueries({
         queryKey: ["procurement-recommendations"],
@@ -1403,9 +1529,14 @@ export default function ProcurementRecommendationsPage() {
   });
 
   const poDraftReviewQuery = useQuery({
-    queryKey: ["procurement-recommendation-po-draft-review"],
-    queryFn: fetchRecommendationPoDraftReview,
+    queryKey: ["procurement-recommendation-po-draft-review", poDraftOffset, poDraftLimit],
+    queryFn: () => fetchRecommendationPoDraftReview(poDraftOffset, poDraftLimit),
     enabled: canViewGeneratedPurchaseOrderDrafts,
+  });
+
+  const exportPoDraftReviewMutation = useMutation({
+    mutationFn: fetchAllRecommendationPoDraftReview,
+    onSuccess: exportPoDraftReviewCsv,
   });
 
 
@@ -1417,6 +1548,7 @@ export default function ProcurementRecommendationsPage() {
       filters.budgetLimit,
       filters.search,
     ],
+    enabled: governanceOpen,
     queryFn: () => fetchProcurementExecutionDashboard(filters),
   });
 
@@ -1430,17 +1562,20 @@ export default function ProcurementRecommendationsPage() {
       filters.budgetLimit,
       filters.search,
     ],
+    enabled: governanceOpen,
     queryFn: () => fetchRecommendationProductionReview(filters),
   });
 
 
   const executionHistoryQuery = useQuery({
     queryKey: ["procurement-execution-history"],
+    enabled: governanceOpen,
     queryFn: fetchProcurementExecutionHistory,
   });
 
   const recommendationOutcomesQuery = useQuery({
     queryKey: ["procurement-recommendation-outcomes"],
+    enabled: governanceOpen,
     queryFn: fetchProcurementRecommendationOutcomes,
   });
 
@@ -1453,6 +1588,7 @@ export default function ProcurementRecommendationsPage() {
       filters.budgetLimit,
       filters.search,
     ],
+    enabled: governanceOpen,
     queryFn: () => fetchProcurementExceptionQueue(filters),
   });
 
@@ -1465,13 +1601,16 @@ export default function ProcurementRecommendationsPage() {
       note,
     }: {
       productId: string;
-      action: "assign_supplier" | "approve" | "reject" | "defer" | "suppress" | "rerun";
+      action: "assign_supplier" | "approve" | "reject" | "defer" | "rerun";
       supplierId?: string;
       note?: string;
     }) => resolveProcurementException(productId, filters, action, supplierId, note),
     onSuccess: () => {
       setExceptionResolutionNotes({});
       setExceptionSupplierIds({});
+      setSelectedProductIds([]);
+      bulkReadinessMutation.reset();
+      poDraftConversionMutation.reset();
       void queryClient.invalidateQueries({ queryKey: ["procurement-exception-queue"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-recommendations"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-recommendation-detail"] });
@@ -1493,6 +1632,10 @@ export default function ProcurementRecommendationsPage() {
         note: scheduledNote,
       }),
     onSuccess: () => {
+      setSelectedProductIds([]);
+      setPoDraftOffset(0);
+      bulkReadinessMutation.reset();
+      poDraftConversionMutation.reset();
       void queryClient.invalidateQueries({ queryKey: ["procurement-recommendations"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-execution-dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["procurement-exception-queue"] });
@@ -1516,15 +1659,8 @@ export default function ProcurementRecommendationsPage() {
   });
 
   const data = recommendationsQuery.data;
-  const rows = useMemo(
-    () => (data?.rows ?? []).filter(isActiveRecommendation),
-    [data?.rows],
-  );
-  const activeSummary = useMemo(() => buildActiveRecommendationSummary(rows), [rows]);
-  const summary: RecommendationSummary = {
-    ...(data?.summary ?? {}),
-    ...activeSummary,
-  };
+  const rows = useMemo(() => data?.rows ?? [], [data?.rows]);
+  const summary: RecommendationSummary = data?.summary ?? {};
   const dashboard = executionDashboardQuery.data;
   const dashboardSummary = dashboard?.summary;
   const productionReview = productionReviewQuery.data;
@@ -1547,10 +1683,17 @@ export default function ProcurementRecommendationsPage() {
       .slice(0, 5);
   }, [rows]);
 
+  const clearBulkSelectionState = () => {
+    setSelectedProductIds([]);
+    bulkReadinessMutation.reset();
+    poDraftConversionMutation.reset();
+  };
+
   const setFilter = <K extends keyof RecommendationFilters>(
     key: K,
     value: RecommendationFilters[K],
   ) => {
+    clearBulkSelectionState();
     setFilters((current) => ({
       ...current,
       [key]: value,
@@ -1560,21 +1703,18 @@ export default function ProcurementRecommendationsPage() {
 
   const canPrevious = filters.offset > 0;
   const canNext = Boolean(pagination?.has_more);
-  const totalRows = rows.length;
+  const totalRows = toNumber(pagination?.total ?? rows.length);
   const selectedDetail = detailQuery.data?.row;
   const selectedRows = rows.filter((row) =>
     selectedProductIds.includes(row.product_id),
   );
   const approvableSelectedCount = selectedRows.filter(
-    (row) =>
-      row.procurement_ready && toNumber(row.recommended_reorder_quantity) > 0,
+    isRecommendationRowApprovalReady,
   ).length;
   const poConvertibleSelectedCount = selectedRows.filter(
     (row) =>
-      row.procurement_ready &&
-      toNumber(row.recommended_reorder_quantity) > 0 &&
-      row.decision_status === "approved" &&
-      !row.converted_purchase_order_id,
+      isRecommendationRowApprovalReady(row) &&
+      row.decision_status === "approved",
   ).length;
   const bulkReadiness = bulkReadinessMutation.data;
   const approvalPreviewReady = Boolean(bulkReadiness?.summary?.approval_ready);
@@ -1587,9 +1727,13 @@ export default function ProcurementRecommendationsPage() {
   const updateExceptionSupplierId = (exceptionKey: string, value: string) => {
     setExceptionSupplierIds((current) => ({ ...current, [exceptionKey]: value }));
   };
+  const requestConfirmation = (next: ConfirmationState) => {
+    setConfirmation(next);
+  };
+
   const resolveException = (
     exception: ProcurementExceptionQueueResponse["rows"][number],
-    action: "assign_supplier" | "approve" | "reject" | "defer" | "suppress" | "rerun",
+    action: "assign_supplier" | "approve" | "reject" | "defer" | "rerun",
   ) => {
     exceptionResolutionMutation.mutate({
       productId: exception.product_id,
@@ -1610,11 +1754,7 @@ export default function ProcurementRecommendationsPage() {
   const selectPageReady = () => {
     setSelectedProductIds(
       rows
-        .filter(
-          (row) =>
-            row.procurement_ready &&
-            toNumber(row.recommended_reorder_quantity) > 0,
-        )
+        .filter(isRecommendationRowApprovalReady)
         .map((row) => row.product_id),
     );
     bulkReadinessMutation.reset();
@@ -1626,11 +1766,11 @@ export default function ProcurementRecommendationsPage() {
       <header style={styles.header}>
         <div>
           <p style={styles.kicker}>
-            Feature #5 · Procurement Execution Automation
+            Procurement workflow
           </p>
           <h1 style={styles.title}>Procurement recommendations</h1>
           <p style={styles.subtitle}>
-            All-products workbench that keeps minimum-stock thresholds separate from order quantities, counts only reliable inbound supply, and routes approved replenishment into purchase order drafts.
+            Review active replenishment needs, keep governed stock thresholds separate from order quantities, count only reliable inbound supply, and convert approved recommendations into purchase order drafts.
           </p>
         </div>
         <div style={styles.generatedBox}>
@@ -1640,9 +1780,30 @@ export default function ProcurementRecommendationsPage() {
               ? new Date(data.generated_at).toLocaleString()
               : "-"}
           </div>
-          <button type="button" style={styles.secondaryButton} onClick={() => navigate('/replenishment-planning')}>
-            Open transfer-before-buy planning
-          </button>
+          <div style={styles.headerActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => {
+                clearBulkSelectionState();
+                void recommendationsQuery.refetch();
+                void optionsQuery.refetch();
+                if (canViewGeneratedPurchaseOrderDrafts) void poDraftReviewQuery.refetch();
+                if (governanceOpen) {
+                  void executionDashboardQuery.refetch();
+                  void productionReviewQuery.refetch();
+                  void executionHistoryQuery.refetch();
+                  void recommendationOutcomesQuery.refetch();
+                  void exceptionQueueQuery.refetch();
+                }
+              }}
+            >
+              Refresh page
+            </button>
+            <button type="button" style={styles.secondaryButton} onClick={() => navigate('/replenishment-planning')}>
+              Open transfer-before-buy planning
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1679,12 +1840,23 @@ export default function ProcurementRecommendationsPage() {
         />
       </section>
 
+      <details
+        style={styles.governanceDetails}
+        open={governanceOpen}
+        onToggle={(event) => setGovernanceOpen(event.currentTarget.open)}
+      >
+        <summary style={styles.governanceSummary}>
+          <span>Planning, automation, exceptions, and governance</span>
+          <span style={styles.mutedText}>Dashboards, production review, scheduled runs, outcomes, history, and exception handling</span>
+        </summary>
+        <div style={styles.governanceContent}>
+
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
             <h2 style={styles.panelTitle}>Procurement execution dashboard</h2>
             <p style={styles.panelSubtitle}>
-              Execution-level view of shortage prevention, pending risk,
+              Execution-level view of shortage response, pending risk,
               supplier workload, generated PO drafts, and recommendation aging.
             </p>
           </div>
@@ -1720,9 +1892,9 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Stockout avoided"
+                label="PO conversions recorded"
                 value={formatNumber(
-                  dashboardSummary.projected_stockout_avoidance_count,
+                  dashboardSummary.po_conversion_evidence_count ?? dashboardSummary.projected_stockout_avoidance_count,
                   0,
                 )}
                 tone="good"
@@ -1979,7 +2151,17 @@ export default function ProcurementRecommendationsPage() {
             <button
               style={styles.primaryButton}
               type="button"
-              onClick={() => scheduledRunMutation.mutate({ dryRun: false })}
+              onClick={() =>
+                requestConfirmation({
+                  title: "Execute scheduled procurement run?",
+                  message: scheduledConvertToPo && canCreatePurchaseOrderDrafts
+                    ? `This can approve up to ${scheduledMaxApprovals} ready recommendations and create purchase order drafts.`
+                    : `This can approve up to ${scheduledMaxApprovals} ready recommendations. It will not create purchase order drafts.`,
+                  confirmLabel: "Execute run",
+                  tone: "primary",
+                  action: () => scheduledRunMutation.mutate({ dryRun: false }),
+                })
+              }
               disabled={!canApproveRecommendations || scheduledRunMutation.isPending}
             >
               Execute scheduled run
@@ -2282,6 +2464,12 @@ export default function ProcurementRecommendationsPage() {
         {!canApproveRecommendations ? (
           <div style={styles.infoBox}>Purchase order approval permission is required to resolve procurement exceptions or apply recommendation decisions from this page.</div>
         ) : null}
+        {canApproveRecommendations && !canManageProducts ? (
+          <div style={styles.infoBox}>Product write permission is additionally required to assign a supplier to a product from an exception.</div>
+        ) : null}
+        {optionsQuery.isError ? (
+          <div style={styles.errorBox}>Supplier choices could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
+        ) : null}
         {exceptions ? (
           <>
             <div style={styles.bulkGrid}>
@@ -2383,12 +2571,17 @@ export default function ProcurementRecommendationsPage() {
                       <td style={styles.td}>
                         <div style={styles.mutedText}>{exception.resolution_hint || "Review recommendation detail."}</div>
                         {exception.code === "MISSING_SUPPLIER" ? (
-                          <input
+                          <select
                             style={{ ...styles.input, marginTop: 8, width: "100%" }}
                             value={exceptionSupplierIds[exception.exception_key] || ""}
                             onChange={(event) => updateExceptionSupplierId(exception.exception_key, event.target.value)}
-                            placeholder="Supplier UUID"
-                          />
+                            disabled={!canManageProducts}
+                          >
+                            <option value="">Select active supplier</option>
+                            {(optionsQuery.data?.suppliers || []).map((supplier) => (
+                              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                            ))}
+                          </select>
                         ) : null}
                         <textarea
                           style={{ ...styles.textarea, marginTop: 8, width: "100%", minHeight: 54 }}
@@ -2401,8 +2594,16 @@ export default function ProcurementRecommendationsPage() {
                             <button
                               style={styles.secondaryButton}
                               type="button"
-                              disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
-                              onClick={() => resolveException(exception, "assign_supplier")}
+                              disabled={!canApproveRecommendations || !canManageProducts || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}
+                              onClick={() =>
+                                requestConfirmation({
+                                  title: "Assign supplier to product?",
+                                  message: "This changes the product's default supplier and records the change in the audit trail.",
+                                  confirmLabel: "Assign supplier",
+                                  tone: "primary",
+                                  action: () => resolveException(exception, "assign_supplier"),
+                                })
+                              }
                             >
                               Assign supplier
                             </button>
@@ -2415,40 +2616,52 @@ export default function ProcurementRecommendationsPage() {
                           >
                             Re-run
                           </button>
-                          <button
-                            style={styles.secondaryButton}
-                            type="button"
-                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
-                            onClick={() => resolveException(exception, "suppress")}
-                          >
-                            Suppress
-                          </button>
-                          <button
-                            style={styles.secondaryButton}
-                            type="button"
-                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
-                            onClick={() => resolveException(exception, "defer")}
-                          >
-                            Defer
-                          </button>
-                          {exception.procurement_ready ? (
-                            <button
-                              style={styles.primaryButton}
-                              type="button"
-                              disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
-                              onClick={() => resolveException(exception, "approve")}
-                            >
-                              Approve
-                            </button>
+                          {exception.code === "HIGH_RISK_PENDING_DECISION" ? (
+                            <>
+                              <button
+                                style={styles.secondaryButton}
+                                type="button"
+                                disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
+                                onClick={() => resolveException(exception, "defer")}
+                              >
+                                Defer
+                              </button>
+                              {exception.row?.detail?.can_enter_approval_review ? (
+                                <button
+                                  style={styles.primaryButton}
+                                  type="button"
+                                  disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
+                                  onClick={() =>
+                                    requestConfirmation({
+                                      title: "Approve recommendation?",
+                                      message: "Approval records a governed procurement decision. It does not create a purchase order until conversion is requested.",
+                                      confirmLabel: "Approve",
+                                      tone: "primary",
+                                      action: () => resolveException(exception, "approve"),
+                                    })
+                                  }
+                                >
+                                  Approve
+                                </button>
+                              ) : null}
+                              <button
+                                style={styles.dangerButton}
+                                type="button"
+                                disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
+                                onClick={() =>
+                                  requestConfirmation({
+                                    title: "Reject recommendation?",
+                                    message: "This records a rejection decision for the current recommendation evidence.",
+                                    confirmLabel: "Reject",
+                                    tone: "danger",
+                                    action: () => resolveException(exception, "reject"),
+                                  })
+                                }
+                              >
+                                Reject
+                              </button>
+                            </>
                           ) : null}
-                          <button
-                            style={styles.dangerButton}
-                            type="button"
-                            disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
-                            onClick={() => resolveException(exception, "reject")}
-                          >
-                            Reject
-                          </button>
                         </div>
                         {resolvingExceptionKey?.startsWith(`${exception.product_id}:`) ? (
                           <div style={styles.mutedText}>Applying resolution...</div>
@@ -2470,19 +2683,24 @@ export default function ProcurementRecommendationsPage() {
         ) : null}
       </section>
 
+        </div>
+      </details>
+
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
             <h2 style={styles.panelTitle}>Queue controls</h2>
             <p style={styles.panelSubtitle}>
-              Filter recommendations before future approval and PO conversion
-              flows are added.
+              Filter active recommendations before approval, deferral, rejection, or purchase-order draft conversion.
             </p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
-            onClick={() => setFilters(DEFAULT_FILTERS)}
+            onClick={() => {
+              clearBulkSelectionState();
+              setFilters(DEFAULT_FILTERS);
+            }}
           >
             Reset
           </button>
@@ -2512,7 +2730,22 @@ export default function ProcurementRecommendationsPage() {
             </select>
           </label>
           <label style={styles.label}>
-            Procurement readiness
+            Supplier
+            <select
+              style={styles.input}
+              value={filters.supplierId}
+              onChange={(event) => setFilter("supplierId", event.target.value)}
+            >
+              <option value="">All suppliers</option>
+              {(optionsQuery.data?.suppliers || []).map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={styles.label}>
+            Supplier assignment
             <select
               style={styles.input}
               value={filters.procurementReady}
@@ -2521,8 +2754,8 @@ export default function ProcurementRecommendationsPage() {
               }
             >
               <option value="">All</option>
-              <option value="true">Ready</option>
-              <option value="false">Blocked</option>
+              <option value="true">Assigned</option>
+              <option value="false">Missing</option>
             </select>
           </label>
           <label style={styles.label}>
@@ -2566,6 +2799,24 @@ export default function ProcurementRecommendationsPage() {
               }
             />
           </label>
+          <label style={styles.label}>
+            Rows per page
+            <select
+              style={styles.input}
+              value={filters.limit}
+              onChange={(event) => setFilter("limit", Number(event.target.value))}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+        </div>
+        {optionsQuery.isError ? (
+          <div style={styles.errorBox}>Supplier filters could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
+        ) : null}
+        <div style={styles.infoBox}>
+          “Supplier assigned” means the recommendation can enter review. Missing cost, lead-time, package, budget, or supplier-performance evidence can still require attention before a purchase order is submitted.
         </div>
       </section>
 
@@ -2585,16 +2836,12 @@ export default function ProcurementRecommendationsPage() {
               onClick={selectPageReady}
               disabled={rows.length === 0}
             >
-              Select page-ready
+              Select page-ready candidates
             </button>
             <button
               style={styles.secondaryButton}
               type="button"
-              onClick={() => {
-                setSelectedProductIds([]);
-                bulkReadinessMutation.reset();
-                poDraftConversionMutation.reset();
-              }}
+              onClick={clearBulkSelectionState}
               disabled={selectedProductIds.length === 0}
             >
               Clear
@@ -2607,7 +2854,7 @@ export default function ProcurementRecommendationsPage() {
             value={formatNumber(selectedProductIds.length, 0)}
           />
           <StatCard
-            label="Approvable selected"
+            label="Row-ready selected"
             value={formatNumber(approvableSelectedCount, 0)}
             tone={
               approvableSelectedCount === selectedProductIds.length &&
@@ -2631,7 +2878,7 @@ export default function ProcurementRecommendationsPage() {
             }
           />
           <StatCard
-            label="Blocked selected"
+            label="Row blockers"
             value={formatNumber(
               Math.max(0, selectedProductIds.length - approvableSelectedCount),
               0,
@@ -2778,10 +3025,17 @@ export default function ProcurementRecommendationsPage() {
               bulkDecisionMutation.isPending
             }
             onClick={() =>
-              bulkDecisionMutation.mutate({
-                productIds: selectedProductIds,
-                status: "approved",
-                note: bulkDecisionNote,
+              requestConfirmation({
+                title: `Approve ${selectedProductIds.length} recommendation(s)?`,
+                message: "This records approval decisions only after the server rechecks every selected recommendation under transaction locks.",
+                confirmLabel: "Bulk approve",
+                tone: "primary",
+                action: () =>
+                  bulkDecisionMutation.mutate({
+                    productIds: selectedProductIds,
+                    status: "approved",
+                    note: bulkDecisionNote,
+                  }),
               })
             }
           >
@@ -2797,8 +3051,15 @@ export default function ProcurementRecommendationsPage() {
               poDraftConversionMutation.isPending
             }
             onClick={() =>
-              poDraftConversionMutation.mutate({
-                productIds: selectedProductIds,
+              requestConfirmation({
+                title: `Create purchase order draft(s) from ${selectedProductIds.length} approval(s)?`,
+                message: "The server rechecks approved supplier, quantity, cost, package, and threshold evidence under transaction locks before creating supplier-grouped purchase order drafts. Stock is not changed.",
+                confirmLabel: "Create PO drafts",
+                tone: "primary",
+                action: () =>
+                  poDraftConversionMutation.mutate({
+                    productIds: selectedProductIds,
+                  }),
               })
             }
           >
@@ -2829,10 +3090,17 @@ export default function ProcurementRecommendationsPage() {
               selectedProductIds.length === 0 || bulkDecisionMutation.isPending
             }
             onClick={() =>
-              bulkDecisionMutation.mutate({
-                productIds: selectedProductIds,
-                status: "rejected",
-                note: bulkDecisionNote,
+              requestConfirmation({
+                title: `Reject ${selectedProductIds.length} recommendation(s)?`,
+                message: "This records a rejection decision for every selected recommendation.",
+                confirmLabel: "Bulk reject",
+                tone: "danger",
+                action: () =>
+                  bulkDecisionMutation.mutate({
+                    productIds: selectedProductIds,
+                    status: "rejected",
+                    note: bulkDecisionNote,
+                  }),
               })
             }
           >
@@ -2849,31 +3117,27 @@ export default function ProcurementRecommendationsPage() {
           {getErrorMessage(recommendationsQuery.error)}
         </div>
       ) : null}
+      {exportFilteredMutation.isError ? (
+        <div style={styles.errorBox}>Filtered export failed: {getErrorMessage(exportFilteredMutation.error)}</div>
+      ) : null}
 
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
             <h2 style={styles.panelTitle}>Recommendation queue</h2>
             <p style={styles.panelSubtitle}>
-              {formatNumber(totalRows, 0)} matching products ·{" "}
-              {formatNumber(toNumber(pagination?.returned ?? rows.length), 0)}{" "}
-              shown
+              {formatNumber(totalRows, 0)} matching active recommendation(s) · showing{" "}
+              {formatNumber(rows.length ? filters.offset + 1 : 0, 0)}–{formatNumber(filters.offset + rows.length, 0)}
             </p>
           </div>
           <div style={styles.paginationControls}>
             <button
               style={styles.secondaryButton}
               type="button"
-              disabled={rows.length === 0}
-              onClick={() =>
-                exportRecommendationRowsCsv({
-                  rows,
-                  generatedAt: data?.generated_at,
-                  scope: "queue",
-                })
-              }
+              disabled={rows.length === 0 || exportFilteredMutation.isPending}
+              onClick={() => exportFilteredMutation.mutate()}
             >
-              Export queue CSV
+              {exportFilteredMutation.isPending ? "Preparing export..." : "Export filtered CSV"}
             </button>
             <button
               style={styles.secondaryButton}
@@ -3121,7 +3385,7 @@ export default function ProcurementRecommendationsPage() {
                   </td>
                   <td style={styles.td}>
                     <Badge tone={row.procurement_ready ? "good" : "bad"}>
-                      {row.procurement_ready ? "Ready" : "Blocked"}
+                      {row.procurement_ready ? "Supplier assigned" : "Supplier missing"}
                     </Badge>
                     {row.blocker_message ? (
                       <div style={styles.blockerText}>
@@ -3150,6 +3414,9 @@ export default function ProcurementRecommendationsPage() {
                     ) : null}
                     {row.converted_purchase_order_id ? (
                       <div style={styles.mutedText}>PO draft created</div>
+                    ) : null}
+                    {!row.converted_purchase_order_id && row.previous_converted_purchase_order_id ? (
+                      <div style={styles.mutedText}>Previous PO {titleCase(row.previous_converted_purchase_order_status || "closed")} · new cycle</div>
                     ) : null}
                   </td>
                   <td style={styles.td}>
@@ -3188,14 +3455,10 @@ export default function ProcurementRecommendationsPage() {
             <button
               style={styles.secondaryButton}
               type="button"
-              disabled={!canViewGeneratedPurchaseOrderDrafts || !poDraftReviewQuery.data?.rows.length}
-              onClick={() => {
-                if (poDraftReviewQuery.data) {
-                  exportPoDraftReviewCsv(poDraftReviewQuery.data);
-                }
-              }}
+              disabled={!canViewGeneratedPurchaseOrderDrafts || toNumber(poDraftReviewQuery.data?.pagination.total) === 0 || exportPoDraftReviewMutation.isPending}
+              onClick={() => exportPoDraftReviewMutation.mutate()}
             >
-              Export PO draft CSV
+              {exportPoDraftReviewMutation.isPending ? "Preparing export..." : "Export all PO draft CSV"}
             </button>
             <button
               style={styles.secondaryButton}
@@ -3218,11 +3481,14 @@ export default function ProcurementRecommendationsPage() {
             {getErrorMessage(poDraftReviewQuery.error)}
           </div>
         ) : null}
+        {exportPoDraftReviewMutation.isError ? (
+          <div style={styles.errorBox}>PO draft export failed: {getErrorMessage(exportPoDraftReviewMutation.error)}</div>
+        ) : null}
         {poDraftReviewQuery.data ? (
           <>
             <div style={styles.bulkGrid}>
               <StatCard
-                label="Generated drafts"
+                label="Loaded drafts"
                 value={formatNumber(
                   poDraftReviewQuery.data.summary.draft_count,
                   0,
@@ -3234,14 +3500,14 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Submitted"
+                label="Loaded submitted"
                 value={formatNumber(
                   poDraftReviewQuery.data.summary.submitted_count,
                   0,
                 )}
               />
               <StatCard
-                label="Warnings"
+                label="Loaded warnings"
                 value={formatNumber(
                   poDraftReviewQuery.data.summary.warning_count,
                   0,
@@ -3253,7 +3519,7 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Draft spend"
+                label="Loaded spend"
                 value={formatMoney(
                   poDraftReviewQuery.data.summary.estimated_total_cost,
                 )}
@@ -3391,6 +3657,29 @@ export default function ProcurementRecommendationsPage() {
                 </tbody>
               </table>
             </div>
+            <div style={styles.paginationFooter}>
+              <span style={styles.mutedText}>
+                Showing {poDraftReviewQuery.data.rows.length ? poDraftOffset + 1 : 0}–{poDraftOffset + poDraftReviewQuery.data.rows.length} of {formatNumber(poDraftReviewQuery.data.pagination.total, 0)} generated purchase order(s)
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={poDraftOffset === 0 || poDraftReviewQuery.isFetching}
+                  onClick={() => setPoDraftOffset(Math.max(0, poDraftOffset - poDraftLimit))}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={!poDraftReviewQuery.data.pagination.has_more || poDraftReviewQuery.isFetching}
+                  onClick={() => setPoDraftOffset(poDraftOffset + poDraftLimit)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </>
         ) : null}
       </section>
@@ -3459,7 +3748,7 @@ export default function ProcurementRecommendationsPage() {
                 {titleCase(selectedDetail.source_signal)}
               </p>
               <Badge tone={selectedDetail.procurement_ready ? "good" : "bad"}>
-                {selectedDetail.procurement_ready ? "PO-ready" : "Blocked"}
+                {selectedDetail.procurement_ready ? "Supplier assigned" : "Supplier missing"}
               </Badge>
               <p style={styles.riskText}>
                 Execution scope:{" "}
@@ -3616,6 +3905,24 @@ export default function ProcurementRecommendationsPage() {
                     : ""}
                 </div>
               ) : null}
+              {selectedDetail.previous_converted_purchase_order_id ? (
+                <div style={styles.infoBox}>
+                  <strong>Previous procurement cycle:</strong>{" "}
+                  <button
+                    type="button"
+                    style={styles.linkButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.previous_converted_purchase_order_id as string))}
+                  >
+                    Open previous purchase order
+                  </button>
+                  {selectedDetail.previous_converted_purchase_order_status
+                    ? ` · ${titleCase(selectedDetail.previous_converted_purchase_order_status)}`
+                    : ""}
+                  <div style={styles.mutedText}>
+                    That purchase order is closed. The current stock need is a new recommendation cycle and requires a new decision.
+                  </div>
+                </div>
+              ) : null}
               <label style={{ ...styles.label, marginTop: 10 }}>
                 Decision note
                 <textarea
@@ -3623,6 +3930,7 @@ export default function ProcurementRecommendationsPage() {
                   value={decisionNote}
                   onChange={(event) => setDecisionNote(event.target.value)}
                   placeholder="Optional approval, rejection, or defer note"
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open)}
                 />
               </label>
               {!canApproveRecommendations ? (
@@ -3639,14 +3947,21 @@ export default function ProcurementRecommendationsPage() {
                   type="button"
                   disabled={
                     !canApproveRecommendations ||
-                    !selectedDetail.detail?.can_generate_po_draft ||
+                    !selectedDetail.detail?.can_enter_approval_review ||
                     decisionMutation.isPending
                   }
                   onClick={() =>
-                    decisionMutation.mutate({
-                      productId: selectedDetail.product_id,
-                      status: "approved",
-                      note: decisionNote,
+                    requestConfirmation({
+                      title: "Approve recommendation?",
+                      message: "The server rechecks approval readiness under a transaction lock, then records the current commercial snapshot. Purchase order creation remains a separate action.",
+                      confirmLabel: "Approve",
+                      tone: "primary",
+                      action: () =>
+                        decisionMutation.mutate({
+                          productId: selectedDetail.product_id,
+                          status: "approved",
+                          note: decisionNote,
+                        }),
                     })
                   }
                 >
@@ -3655,7 +3970,7 @@ export default function ProcurementRecommendationsPage() {
                 <button
                   style={styles.secondaryButton}
                   type="button"
-                  disabled={!canApproveRecommendations || decisionMutation.isPending}
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
                   onClick={() =>
                     decisionMutation.mutate({
                       productId: selectedDetail.product_id,
@@ -3669,22 +3984,28 @@ export default function ProcurementRecommendationsPage() {
                 <button
                   style={styles.dangerButton}
                   type="button"
-                  disabled={!canApproveRecommendations || decisionMutation.isPending}
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
                   onClick={() =>
-                    decisionMutation.mutate({
-                      productId: selectedDetail.product_id,
-                      status: "rejected",
-                      note: decisionNote,
+                    requestConfirmation({
+                      title: "Reject recommendation?",
+                      message: "This records a rejection decision for the current recommendation evidence.",
+                      confirmLabel: "Reject",
+                      tone: "danger",
+                      action: () =>
+                        decisionMutation.mutate({
+                          productId: selectedDetail.product_id,
+                          status: "rejected",
+                          note: decisionNote,
+                        }),
                     })
                   }
                 >
                   Reject
                 </button>
               </div>
-              {!selectedDetail.detail?.can_generate_po_draft ? (
+              {!selectedDetail.detail?.can_enter_approval_review ? (
                 <p style={styles.blockerText}>
-                  Approval is blocked until the recommendation is
-                  procurement-ready and has a positive reorder quantity.
+                  Approval is blocked until the current recommendation passes all row-level readiness checks. Review the blockers below.
                 </p>
               ) : null}
             </div>
@@ -3701,6 +4022,11 @@ export default function ProcurementRecommendationsPage() {
                     style={styles.blockerText}
                   >
                     {blocker.message || blocker.code}
+                  </li>
+                ))}
+                {selectedDetail.detail?.warnings?.map((warning) => (
+                  <li key={`warning-${warning.code}-${warning.message}`} style={styles.warningText}>
+                    {warning.message || warning.code}
                   </li>
                 ))}
               </ul>
@@ -3748,7 +4074,11 @@ export default function ProcurementRecommendationsPage() {
                 </div>
               ) : null}
               <div style={styles.metricLine}>
-                <strong>Can generate PO draft:</strong>{" "}
+                <strong>Approval readiness:</strong>{" "}
+                {selectedDetail.detail?.can_enter_approval_review ? "Ready" : "Blocked"}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Approved and eligible for PO-draft conversion:</strong>{" "}
                 {selectedDetail.detail?.can_generate_po_draft ? "Yes" : "No"}
               </div>
             </div>
@@ -3806,6 +4136,37 @@ export default function ProcurementRecommendationsPage() {
           ) : null}
         </div>
       </section>
+
+      {confirmation ? (
+        <div style={styles.modalBackdrop} role="presentation" onMouseDown={() => setConfirmation(null)}>
+          <div
+            style={styles.modalCard}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="procurement-confirmation-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="procurement-confirmation-title" style={styles.modalTitle}>{confirmation.title}</h2>
+            <p style={styles.modalMessage}>{confirmation.message}</p>
+            <div style={styles.modalActions}>
+              <button type="button" style={styles.secondaryButton} onClick={() => setConfirmation(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={confirmation.tone === "danger" ? styles.dangerButton : styles.primaryButton}
+                onClick={() => {
+                  const action = confirmation.action;
+                  setConfirmation(null);
+                  action();
+                }}
+              >
+                {confirmation.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3843,6 +4204,10 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: 1,
   },
   generatedValue: { fontWeight: 700, marginTop: 4 },
+  headerActions: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 },
+  governanceDetails: { border: "1px solid #cbd5e1", borderRadius: 16, background: "#f8fafc", overflow: "hidden" },
+  governanceSummary: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "16px 18px", cursor: "pointer", fontWeight: 800, color: "#0f172a", flexWrap: "wrap" },
+  governanceContent: { display: "flex", flexDirection: "column", gap: 20, padding: "0 14px 14px" },
   statsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -3933,6 +4298,8 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
   actionRow: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 },
+  actionGroup: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
+  buttonRow: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
   inlineActionButton: { border: "1px solid #cbd5e1", borderRadius: 8, padding: "5px 8px", background: "#ffffff", color: "#0f172a", cursor: "pointer", fontSize: 12, fontWeight: 800 },
   conversionResultItem: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
   commercialWarningBox: { border: "1px solid #fed7aa", background: "#fff7ed", color: "#9a3412", borderRadius: 14, padding: 14, marginTop: 12, lineHeight: 1.5 },
@@ -3945,7 +4312,8 @@ const styles: Record<string, CSSProperties> = {
     background: "#ffffff",
     minHeight: 76,
   },
-  paginationControls: { display: "flex", gap: 8 },
+  paginationControls: { display: "flex", gap: 8, flexWrap: "wrap" },
+  paginationFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 14 },
   tableWrap: { overflowX: "auto" },
   table: { width: "100%", borderCollapse: "collapse", minWidth: 1120 },
   th: {
@@ -3963,6 +4331,7 @@ const styles: Record<string, CSSProperties> = {
   primaryText: { fontWeight: 800, color: "#0f172a" },
   mutedText: { color: "#64748b", fontSize: 12, marginTop: 3 },
   blockerText: { color: "#b91c1c", fontSize: 12, marginTop: 5, maxWidth: 220 },
+  warningText: { color: "#b45309", fontSize: 12, marginTop: 5, lineHeight: 1.4 },
   badge: {
     display: "inline-flex",
     alignItems: "center",
@@ -3991,6 +4360,26 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     padding: 14,
   },
+  modalBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1000,
+    background: "rgba(15, 23, 42, 0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "min(520px, 100%)",
+    borderRadius: 18,
+    background: "#ffffff",
+    padding: 22,
+    boxShadow: "0 24px 64px rgba(15, 23, 42, 0.3)",
+  },
+  modalTitle: { margin: 0, fontSize: 22, color: "#0f172a" },
+  modalMessage: { margin: "10px 0 0", color: "#475569", lineHeight: 1.55 },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap", marginTop: 20 },
   riskGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -4051,6 +4440,12 @@ const styles: Record<string, CSSProperties> = {
   },
   detailTitle: { margin: "6px 0", fontSize: 18 },
   metricLine: { marginTop: 8, color: "#334155", lineHeight: 1.4 },
+  list: {
+    margin: "8px 0 0",
+    paddingLeft: 20,
+    color: "#475569",
+    lineHeight: 1.5,
+  },
   reasonList: {
     margin: "8px 0 0",
     paddingLeft: 18,
