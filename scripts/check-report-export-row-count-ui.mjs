@@ -18,7 +18,6 @@ const requiredApiSnippets = [
   "return normalizedValue === 'true';",
   'function sanitizeDownloadFilename(filename: string): string',
   ".replace(/[\\\\/]/g, '-')",
-  ".replace(/[\\u0000-\\u001f\\u007f]/g, '')",
   "link.download = sanitizeDownloadFilename(filename);",
   'try {',
   "link.style.display = 'none';",
@@ -141,6 +140,15 @@ const requiredReportsSnippets = [
 ];
 
 const missing = [];
+
+const hasControlCharacterFilenameSanitizer =
+  (api.includes('const codePoint = character.charCodeAt(0);') &&
+    api.includes('return codePoint >= 32 && codePoint !== 127;'));
+
+if (!hasControlCharacterFilenameSanitizer) {
+  missing.push('src/lib/api.ts missing control-character download filename sanitization');
+}
+
 for (const snippet of requiredApiSnippets) {
   if (!api.includes(snippet)) {
     missing.push(`src/lib/api.ts missing ${snippet}`);

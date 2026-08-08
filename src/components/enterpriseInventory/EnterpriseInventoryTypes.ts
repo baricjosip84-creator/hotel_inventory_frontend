@@ -362,6 +362,7 @@ export type InventoryValuationRow = {
   storage_location_name?: string | null;
   quantity: number | string;
   estimated_unit_cost: number | string;
+  estimated_cost_source?: string | null;
   estimated_total_value: number | string;
   updated_at?: string | null;
 };
@@ -380,6 +381,7 @@ export type StockByLocationReportRow = {
   temperature_zone?: string | null;
   stock_row_count: number | string;
   total_quantity: number | string;
+  quantity_by_unit?: Record<string, number | string>;
 };
 
 export type ProductMovementReportRow = {
@@ -406,6 +408,11 @@ export type ProcurementSummaryReport = {
     total_ordered_quantity?: number | string;
     total_received_quantity?: number | string;
     total_discrepancy?: number | string;
+    quantity_by_unit?: Record<string, {
+      ordered_quantity: number | string;
+      received_quantity: number | string;
+      discrepancy: number | string;
+    }>;
   };
 };
 
@@ -701,6 +708,7 @@ export type InventoryAnomaliesResponse = {
 export type DemandForecastRow = {
   product_id: string;
   product_name?: string | null;
+  product_unit?: string | null;
   avg_daily_usage: number | string;
 };
 

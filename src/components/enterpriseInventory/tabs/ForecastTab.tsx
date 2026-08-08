@@ -28,11 +28,11 @@ function formatAccuracyPercent(value?: number | string | null): string {
 export function ForecastTab({ demandForecastRows, forecastDataQualityReview, forecastAccuracyBacktest, forecastCalibrationReview, forecastReliabilityMatrix, isLoading, dataQualityLoading = false, accuracyLoading = false, calibrationLoading = false, reliabilityLoading = false }: ForecastTabProps) {
   const forecastSummary = useMemo(() => {
     const sorted = [...demandForecastRows].sort((left, right) => toNumber(right.avg_daily_usage) - toNumber(left.avg_daily_usage));
-    const totalAverageDailyUsage = sorted.reduce((total, item) => total + toNumber(item.avg_daily_usage), 0);
+    const unitCount = new Set(sorted.map((item) => item.product_unit || 'Unspecified')).size;
 
     return {
       rowCount: sorted.length,
-      totalAverageDailyUsage,
+      unitCount,
       highestUsageProduct: sorted[0]?.product_name || sorted[0]?.product_id || '-'
     };
   }, [demandForecastRows]);
@@ -53,7 +53,7 @@ export function ForecastTab({ demandForecastRows, forecastDataQualityReview, for
         <p style={styles.helper}>Reads the existing GET /forecast endpoint. Backend calculates 30-day average daily outbound usage from stock movements.</p>
         <div style={styles.statGrid}>
           <MetricCard label="Forecast rows" value={forecastSummary.rowCount} />
-          <MetricCard label="Total avg daily usage" value={formatNumber(forecastSummary.totalAverageDailyUsage)} />
+          <MetricCard label="Units represented" value={forecastSummary.unitCount} />
           <MetricCard label="Highest usage product" value={forecastSummary.highestUsageProduct} />
         </div>
       </section>
@@ -182,7 +182,7 @@ export function ForecastTab({ demandForecastRows, forecastDataQualityReview, for
             .sort((left, right) => toNumber(right.avg_daily_usage) - toNumber(left.avg_daily_usage))
             .map((item) => [
               item.product_name || item.product_id,
-              formatNumber(item.avg_daily_usage)
+              `${formatNumber(item.avg_daily_usage)} ${item.product_unit || 'units'} / day`
             ])}
         />
       </section>

@@ -2,7 +2,7 @@ import type { CSSProperties, KeyboardEvent } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 
 type ReportTab =
@@ -143,6 +143,7 @@ type InventoryValuationRow = {
   storage_location_name: string;
   quantity: number | string;
   estimated_unit_cost: number | string;
+  estimated_cost_source?: string | null;
   estimated_total_value: number | string;
   updated_at?: string | null;
 };
@@ -161,6 +162,7 @@ type StockByLocationRow = {
   temperature_zone?: string | null;
   stock_row_count: number | string;
   total_quantity: number | string;
+  quantity_by_unit?: Record<string, number | string>;
 };
 
 type ProductMovementRow = {
@@ -173,6 +175,12 @@ type ProductMovementRow = {
   total_decrease: number | string;
   last_movement_at?: string | null;
 };
+
+type ProcurementQuantityByUnit = Record<string, {
+  ordered_quantity: number | string;
+  received_quantity: number | string;
+  discrepancy: number | string;
+}>;
 
 type ProcurementSummaryReport = {
   shipments: {
@@ -187,12 +195,14 @@ type ProcurementSummaryReport = {
     total_ordered_quantity: number | string;
     total_received_quantity: number | string;
     total_discrepancy: number | string;
+    quantity_by_unit?: ProcurementQuantityByUnit;
   };
 };
 
 type ForecastRow = {
   product_id: string;
   product_name: string;
+  product_unit?: string | null;
   avg_daily_usage: number | string;
 };
 
@@ -218,12 +228,8 @@ function formatNumber(
   }).format(toNumber(value));
 }
 
-function formatCurrency(value: number | string | null | undefined): string {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2
-  }).format(toNumber(value));
+function formatCostAmount(value: number | string | null | undefined): string {
+  return formatNumber(value, 2);
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -404,38 +410,47 @@ function getReadableError(error: unknown): string {
   return 'Unknown error';
 }
 
-function getErrorStatus(error: unknown): number | null {
-  if (error instanceof ApiError) {
-    return error.status;
+function isFeatureEntitlementError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'TENANT_FEATURE_NOT_ENTITLED';
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && !isFeatureEntitlementError(error);
+}
+
+function formatCostSource(value: string | null | undefined): string {
+  switch (value) {
+    case 'stock_movement':
+      return 'Stock movement';
+    case 'shipment_item_unit_cost':
+      return 'Shipment receipt';
+    case 'product_standard':
+      return 'Product standard cost';
+    case 'no_cost':
+      return 'No cost available';
+    default:
+      return value ? value.replace(/_/g, ' ') : '-';
+  }
+}
+
+function formatQuantityByUnit(
+  quantities: Record<string, number | string> | null | undefined,
+  fallbackTotal?: number | string | null
+): string {
+  const entries = Object.entries(quantities || {}).filter(([, quantity]) => Number.isFinite(Number(quantity)));
+  if (entries.length > 0) {
+    return entries
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([unit, quantity]) => `${formatNumber(quantity)} ${unit}`)
+      .join(', ');
   }
 
-  return null;
+  return fallbackTotal === undefined || fallbackTotal === null
+    ? 'No quantity recorded'
+    : `${formatNumber(fallbackTotal)} (unit breakdown unavailable)`;
 }
 
 export default function ReportsPage() {
-  /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the ReportsPage you sent.
-
-    Existing real behavior is preserved:
-    - same backend endpoints
-    - same query keys
-    - same tab structure
-    - same filters and report logic
-    - same management-access behavior
-
-    This pass applies the shared UI foundation carefully:
-    - major sections now use app-panel/app-panel--padded
-    - stats now use app-grid-stats
-    - empty and error states align with the shared layer
-    - no reporting logic was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes Reports consume the same shared visual system as the rest of the
-    polished pages without changing contracts, flows, or management gating.
-  */
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
   const [movementLimit, setMovementLimit] = useState(50);
@@ -447,23 +462,26 @@ export default function ReportsPage() {
     [locationCategoryFilter]
   );
 
-  const { role: currentUserRole, canViewInsights } = getRoleCapabilities();
+  const { canViewInsights } = getRoleCapabilities();
+  const currentAccessRoleLabel = getCurrentAccessRoleLabel();
+  const canReadTenantSubscriptionAccess = hasPermission(TENANT_PERMISSIONS.TENANT_READ);
 
   const subscriptionAccessQuery = useQuery({
     queryKey: ['tenant-subscription-access', 'reports'],
-    queryFn: fetchTenantSubscriptionAccess
+    queryFn: fetchTenantSubscriptionAccess,
+    enabled: canReadTenantSubscriptionAccess
   });
   const reportsEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'reports');
   const reportsEntitled = reportsEntitlement ? reportsEntitlement.allowed : true;
-  const reportsFeatureReady = Boolean(subscriptionAccessQuery.data) && reportsEntitled;
+  const subscriptionAccessResolved =
+    !canReadTenantSubscriptionAccess || subscriptionAccessQuery.isSuccess || subscriptionAccessQuery.isError;
+  const reportsFeatureReady =
+    subscriptionAccessResolved && (subscriptionAccessQuery.isSuccess ? reportsEntitled : true);
   const forecastingEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'forecasting');
   const forecastingFeatureAllowed = forecastingEntitlement ? forecastingEntitlement.allowed : true;
-  const forecastFeatureReady = reportsFeatureReady && forecastingFeatureAllowed && canViewInsights;
-  const forecastUnavailableReason = !canViewInsights
-    ? 'Forecast requires insights.read in addition to reports.read.'
-    : forecastingEntitlement && !forecastingEntitlement.allowed
-      ? `Forecasting is not enabled for this tenant plan. Required feature flags: ${(forecastingEntitlement.required_flags || ['forecasting']).join(', ')}.`
-      : null;
+  const forecastFeatureReady =
+    reportsFeatureReady && canViewInsights &&
+    (subscriptionAccessQuery.isSuccess ? forecastingFeatureAllowed : true);
 
   const inventoryValuationQuery = useQuery({
     queryKey: ['reports', 'inventory-valuation'],
@@ -495,6 +513,21 @@ export default function ReportsPage() {
     enabled: forecastFeatureReady
   });
 
+  const reportErrors = [
+    inventoryValuationQuery.error,
+    stockByLocationQuery.error,
+    productMovementsQuery.error,
+    procurementSummaryQuery.error
+  ];
+  const reportsDeniedByFeature = reportErrors.some(isFeatureEntitlementError);
+  const forecastDeniedByFeature = isFeatureEntitlementError(forecastQuery.error);
+  const forecastDeniedByPermission = isPermissionDeniedError(forecastQuery.error);
+  const forecastUnavailableReason = !canViewInsights || forecastDeniedByPermission
+    ? 'Forecast access requires the Insights - Read permission in addition to Reports - Read.'
+    : (forecastingEntitlement && !forecastingEntitlement.allowed) || forecastDeniedByFeature
+      ? 'Forecasting is not enabled for this tenant subscription.'
+      : null;
+
   const inventoryValuationRows = inventoryValuationQuery.data?.rows ?? [];
   const stockByLocationRows = useMemo(() => stockByLocationQuery.data ?? [], [stockByLocationQuery.data]);
   const productMovementRows = useMemo(() => productMovementsQuery.data ?? [], [productMovementsQuery.data]);
@@ -506,7 +539,7 @@ export default function ReportsPage() {
     }
 
     return [...stockByLocationRows].sort(
-      (left, right) => toNumber(right.total_quantity) - toNumber(left.total_quantity)
+      (left, right) => toNumber(right.stock_row_count) - toNumber(left.stock_row_count)
     )[0];
   }, [stockByLocationRows]);
 
@@ -530,13 +563,7 @@ export default function ReportsPage() {
     )[0];
   }, [forecastRows]);
 
-  const anyForbidden = [
-    inventoryValuationQuery.error,
-    stockByLocationQuery.error,
-    productMovementsQuery.error,
-    procurementSummaryQuery.error,
-    forecastFeatureReady ? forecastQuery.error : null
-  ].some((error) => getErrorStatus(error) === 403);
+  const anyForbidden = reportErrors.some(isPermissionDeniedError);
 
   const clearDownloadStatus = () => {
     setDownloadError(null);
@@ -670,44 +697,37 @@ export default function ReportsPage() {
     return (
       <div style={styles.pageStack}>
         <section className="app-warning-state" style={styles.permissionPanel}>
-          <h2 style={styles.permissionTitle}>Management access required</h2>
+          <h2 style={styles.permissionTitle}>Reports access required</h2>
           <p style={styles.permissionText}>
-            The reports and forecast module is backed by your existing
-            management-only backend routes. The current session role is{' '}
-            <strong>{currentUserRole || 'unknown'}</strong>, and the backend is
-            correctly denying access.
+            Your current access role (<strong>{currentAccessRoleLabel || 'unknown'}</strong>) does not have permission
+            to read one or more reporting datasets on this page.
           </p>
           <p style={styles.permissionText}>
-            This protects valuation, procurement summary, movement analysis, and
-            forecast data from being exposed to unauthorized roles.
+            Ask a tenant administrator to review your Reports and, for Forecast, Insights permissions.
           </p>
         </section>
       </div>
     );
   }
 
-  if (subscriptionAccessQuery.isLoading) {
+  if (canReadTenantSubscriptionAccess && subscriptionAccessQuery.isLoading) {
     return (
       <div style={styles.pageStack}>
         <section className="app-panel app-panel--padded" style={styles.panel}>
           <h3 style={styles.panelTitle}>Management Reporting</h3>
-          <p style={styles.panelSubtitle}>Checking tenant plan access…</p>
+          <p style={styles.panelSubtitle}>Checking tenant subscription access…</p>
         </section>
       </div>
     );
   }
 
-  if (reportsEntitlement && !reportsEntitlement.allowed) {
+  if ((reportsEntitlement && !reportsEntitlement.allowed) || reportsDeniedByFeature) {
     return (
       <div style={styles.pageStack}>
         <section className="app-panel app-panel--padded" style={styles.panel}>
           <h3 style={styles.panelTitle}>Management Reporting</h3>
           <p style={styles.panelSubtitle}>
-            Reports are not enabled for this tenant plan, so this page does not call report endpoints.
-            This keeps Render logs clean and avoids expected 403 entitlement warnings.
-          </p>
-          <p style={styles.permissionText}>
-            Required feature flags: {(reportsEntitlement.required_flags || ['reports']).join(', ')}.
+            Reports are not enabled for this tenant subscription. No reporting data is available on this page.
           </p>
         </section>
       </div>
@@ -723,18 +743,23 @@ export default function ReportsPage() {
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Management Reporting</h3>
             <p style={styles.panelSubtitle}>
-              Frontend reporting surface built directly on the backend routes already
-              present in your existing codebase: valuation, stock distribution,
-              movement analysis, procurement summary, and forecast.
+              Review inventory value, stock distribution, product movement activity,
+              procurement status, and recent demand signals from one reporting workspace.
             </p>
           </div>
         </div>
 
+        {canReadTenantSubscriptionAccess && subscriptionAccessQuery.isError ? (
+          <p style={styles.infoNote}>
+            Subscription details could not be loaded. Report access is being verified directly by the reporting service.
+          </p>
+        ) : null}
+
         <div className="app-grid-stats" style={styles.statsGrid}>
           <StatCard
             title="Estimated Inventory Value"
-            value={formatCurrency(inventoryValuationQuery.data?.totals.estimated_inventory_value)}
-            subtitle="Based on the latest available movement, shipment, or standard product cost"
+            value={formatCostAmount(inventoryValuationQuery.data?.totals.estimated_inventory_value)}
+            subtitle="Latest available cost basis; currency is not stored on these inventory cost fields"
           />
           <StatCard
             title="Tracked Valuation Rows"
@@ -753,27 +778,31 @@ export default function ReportsPage() {
           />
           <StatCard
             title="Top Forecast Product"
-            value={highestForecastProduct?.product_name || 'None'}
+            value={forecastUnavailableReason ? 'Unavailable' : highestForecastProduct?.product_name || 'None'}
             subtitle={
-              highestForecastProduct
-                ? `${formatNumber(highestForecastProduct.avg_daily_usage)} avg daily usage`
-                : 'No recent consumption data available'
+              forecastUnavailableReason
+                ? forecastUnavailableReason
+                : highestForecastProduct
+                  ? `${formatNumber(highestForecastProduct.avg_daily_usage)} ${highestForecastProduct.product_unit || 'units'} per day`
+                  : forecastQuery.isLoading
+                    ? 'Loading recent demand data…'
+                    : 'No recent outbound usage available'
             }
           />
         </div>
 
         <div style={styles.insightGrid}>
           <div style={styles.insightCard}>
-            <div style={styles.insightLabel}>Top quantity location</div>
+            <div style={styles.insightLabel}>Largest location by stock rows</div>
             <div style={styles.insightValue}>
               {topLocation?.storage_location_name || 'None'}
             </div>
             <div style={styles.insightText}>
               {topLocation
-                ? `${formatNumber(topLocation.total_quantity)} total units across ${formatNumber(
-                    topLocation.stock_row_count,
-                    0
-                  )} stock rows`
+                ? `${formatNumber(topLocation.stock_row_count, 0)} stock rows · ${formatQuantityByUnit(
+                    topLocation.quantity_by_unit,
+                    topLocation.total_quantity
+                  )}`
                 : 'No location stock rows returned from report.'}
             </div>
           </div>
@@ -787,7 +816,7 @@ export default function ReportsPage() {
               {mostActiveProduct
                 ? `${formatNumber(mostActiveProduct.movement_count, 0)} movements, ${formatNumber(
                     mostActiveProduct.total_increase
-                  )} in, ${formatNumber(mostActiveProduct.total_decrease)} out`
+                  )} ${mostActiveProduct.product_unit || 'units'} in, ${formatNumber(mostActiveProduct.total_decrease)} ${mostActiveProduct.product_unit || 'units'} out`
                 : 'No product movement rows returned from report.'}
             </div>
           </div>
@@ -912,7 +941,7 @@ export default function ReportsPage() {
           id={getReportPanelId('inventory-valuation')}
           labelledBy={getReportTabId('inventory-valuation')}
           title="Inventory Valuation"
-          subtitle="Estimated stock value by product and storage location using the latest available movement, shipment, or standard product cost."
+          subtitle="Estimated stock value by product and storage location using the latest available movement, shipment, or standard product cost. Cost amounts are shown without a currency symbol because the current inventory cost fields do not store a currency."
           actions={
             <div className="app-actions" style={styles.filterRow}>
               <RefreshReportButton
@@ -957,6 +986,7 @@ export default function ReportsPage() {
                         <th style={styles.th}>Location</th>
                         <th style={styles.th}>Quantity</th>
                         <th style={styles.th}>Unit Cost</th>
+                        <th style={styles.th}>Cost Source</th>
                         <th style={styles.th}>Estimated Value</th>
                         <th style={styles.th}>Updated</th>
                       </tr>
@@ -972,12 +1002,15 @@ export default function ReportsPage() {
                           <td style={styles.td}>
                             {row.storage_location_name || row.storage_location_id}
                           </td>
-                          <td style={styles.td}>{formatNumber(row.quantity)}</td>
                           <td style={styles.td}>
-                            {formatCurrency(row.estimated_unit_cost)}
+                            {formatNumber(row.quantity)} {row.product_unit || 'units'}
                           </td>
                           <td style={styles.td}>
-                            {formatCurrency(row.estimated_total_value)}
+                            {formatCostAmount(row.estimated_unit_cost)}
+                          </td>
+                          <td style={styles.td}>{formatCostSource(row.estimated_cost_source)}</td>
+                          <td style={styles.td}>
+                            {formatCostAmount(row.estimated_total_value)}
                           </td>
                           <td style={styles.td}>{formatDateTime(row.updated_at)}</td>
                         </tr>
@@ -1002,13 +1035,16 @@ export default function ReportsPage() {
                         Location: {row.storage_location_name || row.storage_location_id}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Quantity: {formatNumber(row.quantity)}
+                        Quantity: {formatNumber(row.quantity)} {row.product_unit || 'units'}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Unit Cost: {formatCurrency(row.estimated_unit_cost)}
+                        Unit Cost: {formatCostAmount(row.estimated_unit_cost)}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Estimated Value: {formatCurrency(row.estimated_total_value)}
+                        Cost Source: {formatCostSource(row.estimated_cost_source)}
+                      </div>
+                      <div style={styles.mobileCardText}>
+                        Estimated Value: {formatCostAmount(row.estimated_total_value)}
                       </div>
                       <div style={styles.mobileCardText}>
                         Updated: {formatDateTime(row.updated_at)}
@@ -1027,7 +1063,7 @@ export default function ReportsPage() {
           id={getReportPanelId('stock-by-location')}
           labelledBy={getReportTabId('stock-by-location')}
           title="Stock by Location"
-          subtitle="Grouped stock totals per storage location using the existing backend stock-by-location report."
+          subtitle="Stock positions grouped by storage location, with quantities kept separate by product unit."
           actions={
             <div className="app-actions" style={styles.filterRow}>
               <RefreshReportButton
@@ -1089,7 +1125,7 @@ export default function ReportsPage() {
                         <th style={styles.th}>Location</th>
                         <th style={styles.th}>Temperature Zone</th>
                         <th style={styles.th}>Stock Rows</th>
-                        <th style={styles.th}>Total Quantity</th>
+                        <th style={styles.th}>Quantity by Unit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1102,7 +1138,7 @@ export default function ReportsPage() {
                           <td style={styles.td}>
                             {formatNumber(row.stock_row_count, 0)}
                           </td>
-                          <td style={styles.td}>{formatNumber(row.total_quantity)}</td>
+                          <td style={styles.td}>{formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1125,7 +1161,7 @@ export default function ReportsPage() {
                         Stock Rows: {formatNumber(row.stock_row_count, 0)}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Total Quantity: {formatNumber(row.total_quantity)}
+                        Quantity by Unit: {formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)}
                       </div>
                     </div>
                   ))}
@@ -1141,7 +1177,7 @@ export default function ReportsPage() {
           id={getReportPanelId('product-movements')}
           labelledBy={getReportTabId('product-movements')}
           title="Product Movements"
-          subtitle="Product-level movement summary using your existing product movement report endpoint."
+          subtitle="Product-level movement counts and quantity changes, shown with each product's configured unit."
           actions={
             <div className="app-actions" style={styles.filterRow}>
               <RefreshReportButton
@@ -1222,8 +1258,8 @@ export default function ReportsPage() {
                           <td style={styles.td}>
                             {formatNumber(row.movement_count, 0)}
                           </td>
-                          <td style={styles.td}>{formatNumber(row.total_increase)}</td>
-                          <td style={styles.td}>{formatNumber(row.total_decrease)}</td>
+                          <td style={styles.td}>{formatNumber(row.total_increase)} {row.product_unit || 'units'}</td>
+                          <td style={styles.td}>{formatNumber(row.total_decrease)} {row.product_unit || 'units'}</td>
                           <td style={styles.td}>{formatDateTime(row.last_movement_at)}</td>
                         </tr>
                       ))}
@@ -1247,10 +1283,10 @@ export default function ReportsPage() {
                         Movements: {formatNumber(row.movement_count, 0)}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Increase: {formatNumber(row.total_increase)}
+                        Increase: {formatNumber(row.total_increase)} {row.product_unit || 'units'}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Decrease: {formatNumber(row.total_decrease)}
+                        Decrease: {formatNumber(row.total_decrease)} {row.product_unit || 'units'}
                       </div>
                       <div style={styles.mobileCardText}>
                         Last Movement: {formatDateTime(row.last_movement_at)}
@@ -1269,7 +1305,7 @@ export default function ReportsPage() {
           id={getReportPanelId('procurement-summary')}
           labelledBy={getReportTabId('procurement-summary')}
           title="Procurement Summary"
-          subtitle="Shipment and line-level procurement summary from your existing backend procurement report."
+          subtitle="Shipment status and receiving totals, with product quantities separated by configured unit."
           actions={
             <div className="app-actions" style={styles.filterRow}>
               <RefreshReportButton
@@ -1336,18 +1372,32 @@ export default function ReportsPage() {
                     {formatNumber(procurementSummary.lines.total_active_shipment_lines, 0)}
                   </strong>
                 </div>
-                <div style={styles.summaryRow}>
-                  <span>Ordered Quantity</span>
-                  <strong>{formatNumber(procurementSummary.lines.total_ordered_quantity)}</strong>
-                </div>
-                <div style={styles.summaryRow}>
-                  <span>Received Quantity</span>
-                  <strong>{formatNumber(procurementSummary.lines.total_received_quantity)}</strong>
-                </div>
-                <div style={styles.summaryRow}>
-                  <span>Discrepancy</span>
-                  <strong>{formatNumber(procurementSummary.lines.total_discrepancy)}</strong>
-                </div>
+                {procurementSummary.lines.quantity_by_unit &&
+                Object.keys(procurementSummary.lines.quantity_by_unit).length > 0 ? (
+                  Object.entries(procurementSummary.lines.quantity_by_unit)
+                    .sort(([left], [right]) => left.localeCompare(right))
+                    .map(([unit, quantities]) => (
+                      <div key={unit} style={styles.unitBreakdownBlock}>
+                        <div style={styles.unitBreakdownTitle}>{unit}</div>
+                        <div style={styles.summaryRow}>
+                          <span>Ordered</span>
+                          <strong>{formatNumber(quantities.ordered_quantity)} {unit}</strong>
+                        </div>
+                        <div style={styles.summaryRow}>
+                          <span>Received</span>
+                          <strong>{formatNumber(quantities.received_quantity)} {unit}</strong>
+                        </div>
+                        <div style={styles.summaryRow}>
+                          <span>Discrepancy</span>
+                          <strong>{formatNumber(quantities.discrepancy)} {unit}</strong>
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <div style={styles.infoNote}>
+                    Unit breakdown is unavailable. Legacy aggregate quantities: ordered {formatNumber(procurementSummary.lines.total_ordered_quantity)}, received {formatNumber(procurementSummary.lines.total_received_quantity)}, discrepancy {formatNumber(procurementSummary.lines.total_discrepancy)}.
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
@@ -1374,19 +1424,21 @@ export default function ReportsPage() {
           }
         >
           <p id={FORECAST_ACCESS_NOTE_ID} style={styles.infoNote}>
-            Forecast is read-only, has no CSV export, and requires forecasting feature access plus insights.read separately from reports.read.
+            Forecast is read-only, has no CSV export, and requires Forecasting subscription access plus the Insights - Read permission.
           </p>
           {forecastUnavailableReason ? (
             <ErrorState message={forecastUnavailableReason} />
           ) : null}
-          <LastRefreshedText timestamp={forecastQuery.dataUpdatedAt} />
+          {forecastFeatureReady && !forecastDeniedByFeature ? (
+            <LastRefreshedText timestamp={forecastQuery.dataUpdatedAt} />
+          ) : null}
           {forecastFeatureReady && forecastQuery.isLoading ? <div>Loading forecast...</div> : null}
-          {forecastFeatureReady && forecastQuery.isError ? (
+          {forecastFeatureReady && forecastQuery.isError && !forecastDeniedByFeature ? (
             <ErrorState
               message={`Failed to load forecast: ${getReadableError(forecastQuery.error)}`}
             />
           ) : null}
-          {forecastFeatureReady && !forecastQuery.isLoading && !forecastQuery.isError ? (
+          {forecastFeatureReady && !forecastDeniedByFeature && !forecastQuery.isLoading && !forecastQuery.isError ? (
             forecastRows.length === 0 ? (
               <EmptyState message="No recent consumption data was available to produce a forecast." />
             ) : (
@@ -1406,7 +1458,7 @@ export default function ReportsPage() {
                             <div style={styles.rowTitle}>{row.product_name || row.product_id}</div>
                             <div style={styles.rowSubtle}>Product ID: {row.product_id}</div>
                           </td>
-                          <td style={styles.td}>{formatNumber(row.avg_daily_usage)}</td>
+                          <td style={styles.td}>{formatNumber(row.avg_daily_usage)} {row.product_unit || 'units'} / day</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1423,7 +1475,7 @@ export default function ReportsPage() {
                         {row.product_name || row.product_id}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Average Daily Usage: {formatNumber(row.avg_daily_usage)}
+                        Average Daily Usage: {formatNumber(row.avg_daily_usage)} {row.product_unit || 'units'} / day
                       </div>
                     </div>
                   ))}
@@ -1796,6 +1848,18 @@ const styles: Record<string, CSSProperties> = {
     gap: '16px',
     padding: '10px 0',
     borderBottom: '1px solid #f1f5f9'
+  },
+  unitBreakdownBlock: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #e2e8f0'
+  },
+  unitBreakdownTitle: {
+    fontSize: '13px',
+    fontWeight: 800,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
   },
   permissionPanel: {
     margin: 0
