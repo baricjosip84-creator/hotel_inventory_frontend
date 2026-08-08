@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import { DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
 type FeatureFlags = Record<string, boolean | string | number | null>;
 type TenantLimits = Record<string, number | string | null>;
@@ -22,6 +23,8 @@ type TenantRow = {
   location?: string | null;
   write_locked?: boolean;
   organization_type?: string | null;
+  inventory_currency?: string | null;
+  inventory_currency_configured_at?: string | null;
   status?: string;
   billing_status?: string;
   plan_code?: string;
@@ -62,6 +65,7 @@ export default function PlatformTenantsPage() {
     location: '',
     preset: 'hotel',
     plan_code: 'standard',
+    inventory_currency: DEFAULT_INVENTORY_CURRENCY,
     initial_admin_email: '',
     initial_admin_name: '',
     initial_admin_password: '',
@@ -134,6 +138,7 @@ export default function PlatformTenantsPage() {
         location: form.location.trim(),
         preset: form.preset,
         plan_code: form.plan_code,
+        inventory_currency: form.inventory_currency.trim().toUpperCase(),
         initial_admin: hasCompleteInitialAdmin ? {
           email: form.initial_admin_email.trim(),
           name: form.initial_admin_name.trim(),
@@ -148,6 +153,7 @@ export default function PlatformTenantsPage() {
         location: '',
         preset: 'hotel',
         plan_code: 'standard',
+        inventory_currency: DEFAULT_INVENTORY_CURRENCY,
         initial_admin_email: '',
         initial_admin_name: '',
         initial_admin_password: '',
@@ -265,6 +271,8 @@ const lock = useMutation({
   const hasValidInitialAdminPassword = !hasAnyInitialAdminValue || form.initial_admin_password.length >= 10;
   const createTenantBlockedReason = !form.name.trim()
     ? 'Enter a tenant name before creating a tenant.'
+    : !/^[A-Za-z]{3}$/.test(form.inventory_currency.trim())
+      ? 'Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.'
     : hasAnyInitialAdminValue && !hasCompleteInitialAdmin
       ? 'Complete initial admin email, name, and password, or leave all three blank.'
       : !hasValidInitialAdminPassword
@@ -345,6 +353,17 @@ const lock = useMutation({
                 <option key={plan.code} value={plan.code}>{plan.label} ({plan.code})</option>
               ))}
             </select>
+            <label style={styles.checkboxLabel}>
+              Inventory currency
+              <input
+                style={styles.input}
+                value={form.inventory_currency}
+                onChange={(event) => setForm({ ...form, inventory_currency: event.target.value.toUpperCase().slice(0, 3) })}
+                maxLength={3}
+                pattern="[A-Za-z]{3}"
+                aria-label="Inventory currency"
+              />
+            </label>
             <input style={styles.input} placeholder="Initial admin email" value={form.initial_admin_email} onChange={(event) => setForm({ ...form, initial_admin_email: event.target.value })} />
             <input style={styles.input} placeholder="Initial admin name" value={form.initial_admin_name} onChange={(event) => setForm({ ...form, initial_admin_name: event.target.value })} />
             <input style={styles.input} type="password" placeholder="Initial admin password" value={form.initial_admin_password} onChange={(event) => setForm({ ...form, initial_admin_password: event.target.value })} />
@@ -368,6 +387,7 @@ const lock = useMutation({
               <th style={styles.th}>Status</th>
               <th style={styles.th}>Billing</th>
               <th style={styles.th}>Plan</th>
+              <th style={styles.th}>Inventory currency</th>
               <th style={styles.th}>Lock</th>
               <th style={styles.th}>Actions</th>
             </tr>
@@ -380,6 +400,45 @@ const lock = useMutation({
                 <td style={styles.td}>{canUpdate ? <select value={tenant.status || 'active'} onChange={(event) => patchTenant.mutate({ id: tenant.id, body: { status: event.target.value } })}><option>trial</option><option>active</option><option>suspended</option><option>maintenance</option><option>offboarding</option><option>archived</option></select> : tenant.status}</td>
                 <td style={styles.td}>{canUpdate ? <select value={tenant.billing_status || 'not_configured'} onChange={(event) => patchTenant.mutate({ id: tenant.id, body: { billing_status: event.target.value } })}><option>not_configured</option><option>trialing</option><option>active</option><option>past_due</option><option>cancelled</option><option>comped</option></select> : tenant.billing_status}</td>
                 <td style={styles.td}>{tenant.plan_code || '-'}</td>
+                <td style={styles.td}>
+                  {canUpdate ? (
+                    <div>
+                      <input
+                        aria-label={`${tenant.name} inventory currency`}
+                        style={{ ...styles.input, maxWidth: 90 }}
+                        defaultValue={tenant.inventory_currency || DEFAULT_INVENTORY_CURRENCY}
+                        maxLength={3}
+                        onBlur={(event) => {
+                          const current = (tenant.inventory_currency || DEFAULT_INVENTORY_CURRENCY).toUpperCase();
+                          const next = event.currentTarget.value.trim().toUpperCase();
+                          if (!/^[A-Z]{3}$/.test(next)) {
+                            event.currentTarget.value = current;
+                            return;
+                          }
+                          if (next === current) return;
+                          const legacyMessage = tenant.inventory_currency_configured_at
+                            ? 'The backend will block this change once currency-dependent financial evidence exists.'
+                            : 'This tenant has not confirmed its legacy inventory currency yet. This change declares the currency of legacy monetary evidence; it does not convert historical amounts.';
+                          if (!window.confirm(`Change ${tenant.name} inventory currency from ${current} to ${next}? ${legacyMessage} No automatic FX conversion will be performed.`)) {
+                            event.currentTarget.value = current;
+                            return;
+                          }
+                          patchTenant.mutate({ id: tenant.id, body: { inventory_currency: next } });
+                        }}
+                      />
+                      {!tenant.inventory_currency_configured_at ? (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#92400e' }}>Legacy currency not confirmed</div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div>
+                      <div>{tenant.inventory_currency || DEFAULT_INVENTORY_CURRENCY}</div>
+                      {!tenant.inventory_currency_configured_at ? (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#92400e' }}>Legacy currency not confirmed</div>
+                      ) : null}
+                    </div>
+                  )}
+                </td>
                 <td style={styles.td}>{tenant.write_locked ? 'Locked' : 'Open'}</td>
                 <td style={styles.td}>
                   {tenant.write_locked ? (canUnlock ? <button style={styles.button} onClick={() => unlock.mutate(tenant.id)}>Unlock</button> : null) : (canLock ? <button style={styles.button} onClick={() => lock.mutate(tenant.id)}>Lock</button> : null)}{' '}

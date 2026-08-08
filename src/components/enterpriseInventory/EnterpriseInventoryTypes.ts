@@ -56,6 +56,7 @@ export type ApprovalRule = {
   storage_location_id?: string | null;
   min_amount: number | string;
   max_amount?: number | string | null;
+  currency?: string | null;
   required_role: string;
   active: boolean;
 };
@@ -66,6 +67,7 @@ export type ApprovalRuleForm = {
   storage_location_id: string;
   min_amount: string;
   max_amount: string;
+  currency: string;
   required_role: string;
 };
 
@@ -362,6 +364,7 @@ export type InventoryValuationRow = {
   storage_location_name?: string | null;
   quantity: number | string;
   estimated_unit_cost: number | string;
+  currency_code?: string | null;
   estimated_cost_source?: string | null;
   estimated_total_value: number | string;
   updated_at?: string | null;
@@ -371,6 +374,7 @@ export type InventoryValuationReport = {
   totals?: {
     row_count?: number | string;
     estimated_inventory_value?: number | string;
+    currency_code?: string | null;
   };
   rows: InventoryValuationRow[];
 };
@@ -1276,6 +1280,7 @@ export type SupplierInvoiceForm = {
   shipment_id: string;
   invoice_number: string;
   invoice_date: string;
+  currency: string;
   subtotal_amount: string;
   tax_amount: string;
   total_amount: string;

@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -56,6 +57,7 @@ type ShipmentItem = {
   storage_location_name?: string | null;
   storage_location_retired?: boolean;
   unit_cost?: number | string | null;
+  unit_cost_currency?: string | null;
   version?: number;
 };
 
@@ -360,14 +362,8 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatCurrency(value: number | string | null | undefined): string {
-  const numeric = toNumber(value);
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(Number.isFinite(numeric) ? numeric : 0);
+function formatCurrency(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(value, currency, 4);
 }
 
 function clampPercentage(value: number): number {
@@ -2840,7 +2836,7 @@ export default function ShipmentsPage() {
                           </div>
                           <div>
                             <strong>Unit Cost</strong>
-                            <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost)}</div>
+                            <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost, item.unit_cost_currency)}</div>
                           </div>
                           <div>
                             <strong>Recorded Location</strong>

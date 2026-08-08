@@ -1,3 +1,4 @@
+import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
 import type {
   AlertForm,
   ApprovalRuleForm,
@@ -115,6 +116,7 @@ export function buildApprovalRulePayload(input: ApprovalRuleForm): Record<string
     storage_location_id: input.storage_location_id || null,
     min_amount: Number(input.min_amount || 0),
     max_amount: input.max_amount === '' ? null : Number(input.max_amount),
+    currency: input.currency.trim().toUpperCase() || getActiveTenantCurrency(),
     required_role: input.required_role.trim(),
     active: true
   };
@@ -161,7 +163,7 @@ export function buildSupplierCatalogPayload(input: SupplierCatalogForm): Record<
     preferred: input.preferred,
     active: true,
     unit_cost: input.unit_cost === '' ? null : Number(input.unit_cost),
-    currency: input.currency.trim() || 'EUR',
+    currency: input.currency.trim().toUpperCase() || getActiveTenantCurrency(),
     effective_from: input.effective_from || null
   };
 }
@@ -173,7 +175,7 @@ export function buildSupplierInvoicePayload(input: SupplierInvoiceForm): Record<
     shipment_id: input.shipment_id || null,
     invoice_number: input.invoice_number.trim(),
     invoice_date: input.invoice_date,
-    currency: 'EUR',
+    currency: input.currency.trim().toUpperCase() || getActiveTenantCurrency(),
     subtotal_amount: Number(input.subtotal_amount || 0),
     tax_amount: Number(input.tax_amount || 0),
     total_amount: Number(input.total_amount || 0),

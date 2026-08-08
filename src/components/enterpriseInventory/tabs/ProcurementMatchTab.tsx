@@ -16,7 +16,8 @@ type ProcurementMatchRow = {
   purchaseOrder: PurchaseOrder;
   linkedShipmentCount: number;
   linkedInvoiceCount: number;
-  totalInvoiced: number;
+  totalInvoiced: number | null;
+  totalInvoicedByCurrency: Array<{ currency: string; amount: number }>;
   shipmentStatus: string;
   invoiceVariance: string;
 };
@@ -195,7 +196,7 @@ export function ProcurementMatchTab({
                       <td style={styles.td}>{formatNumber(row.linkedShipmentCount)}</td>
                       <td style={styles.td}>{formatBusinessLabel(row.shipmentStatus)}</td>
                       <td style={styles.td}>{formatNumber(row.linkedInvoiceCount)}</td>
-                      <td style={styles.td}>{formatCurrency(row.totalInvoiced)}</td>
+                      <td style={styles.td}>{row.totalInvoicedByCurrency.length > 0 ? row.totalInvoicedByCurrency.map((item) => formatCurrency(item.amount, item.currency)).join(' · ') : '-'}</td>
                       <td style={styles.td}>{formatBusinessLabel(row.invoiceVariance || purchaseOrder.variance_status)}</td>
                       <td style={styles.td}>{formatDate(purchaseOrder.expected_delivery_date)}</td>
                       <td style={styles.td}>

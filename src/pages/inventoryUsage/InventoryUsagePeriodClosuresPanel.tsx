@@ -153,6 +153,7 @@ export function InventoryUsagePeriodClosuresPanel({
       "usage_count",
       "total_quantity",
       "estimated_usage_value",
+      "currency_code",
       "exception_count",
       "reversed_count",
       "follow_up_count",
@@ -173,6 +174,7 @@ export function InventoryUsagePeriodClosuresPanel({
           usage_count: preview.usage_count ?? "",
           total_quantity: preview.total_quantity ?? "",
           estimated_usage_value: preview.estimated_usage_value ?? "",
+          currency_code: preview.currency_code || "",
           exception_count: preview.exception_count ?? "",
           reversed_count: preview.reversed_count ?? "",
           follow_up_count: preview.follow_up_count ?? "",
@@ -193,6 +195,7 @@ export function InventoryUsagePeriodClosuresPanel({
       "usage_count",
       "total_quantity",
       "estimated_usage_value",
+      "currency_code",
       "exception_count",
       "reversed_count",
       "follow_up_count",
@@ -213,6 +216,7 @@ export function InventoryUsagePeriodClosuresPanel({
         usage_count: closure.usage_count ?? "",
         total_quantity: closure.total_quantity ?? "",
         estimated_usage_value: closure.estimated_usage_value ?? "",
+        currency_code: closure.currency_code || "",
         exception_count: closure.exception_count ?? "",
         reversed_count: closure.reversed_count ?? "",
         follow_up_count: closure.follow_up_count ?? "",
@@ -379,7 +383,7 @@ export function InventoryUsagePeriodClosuresPanel({
           <div style={styles.metricCard}>
             <span style={styles.metricLabel}>Estimated value</span>
             <strong>
-              {formatMoney(previewResult.preview.estimated_usage_value)}
+              {formatMoney(previewResult.preview.estimated_usage_value, previewResult.preview.currency_code)}
             </strong>
             <small>
               {toNumber(previewResult.preview.exception_count)} exceptions
@@ -400,7 +404,7 @@ export function InventoryUsagePeriodClosuresPanel({
       {closeResult?.closure ? (
         <p style={styles.successText}>
           Closed period with {toNumber(closeResult.closure.usage_count)} usage
-          events and {formatMoney(closeResult.closure.estimated_usage_value)}{" "}
+          events and {formatMoney(closeResult.closure.estimated_usage_value, closeResult.closure.currency_code)}{" "}
           estimated usage value.
         </p>
       ) : null}
@@ -439,7 +443,7 @@ export function InventoryUsagePeriodClosuresPanel({
                   <td style={styles.td}>{toNumber(closure.usage_count)}</td>
                   <td style={styles.td}>{toNumber(closure.total_quantity)}</td>
                   <td style={styles.td}>
-                    {formatMoney(closure.estimated_usage_value)}
+                    {formatMoney(closure.estimated_usage_value, closure.currency_code)}
                   </td>
                   <td style={styles.td}>{toNumber(closure.exception_count)}</td>
                   <td style={styles.td}>{toNumber(closure.reversed_count)}</td>

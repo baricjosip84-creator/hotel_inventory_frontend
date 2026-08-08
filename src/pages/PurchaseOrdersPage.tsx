@@ -8,6 +8,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 
 type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | string;
 
@@ -29,6 +30,7 @@ type PurchaseOrderListItem = {
   supplier_name: string;
   supplier_email?: string | null;
   po_number: string;
+  currency?: string | null;
   status: PurchaseOrderStatus;
   expected_delivery_date?: string | null;
   notes?: string | null;
@@ -361,11 +363,24 @@ function formatNumber(value: number | string | null | undefined): string {
   return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function formatMoney(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '-';
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return String(value);
-  return parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatMoney(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(value, currency || getActiveTenantCurrency());
+}
+
+function formatAggregateMoney(
+  rows: PurchaseOrderListItem[],
+  selector: (row: PurchaseOrderListItem) => number | string | null | undefined
+): string {
+  if (!rows.length) return formatMoney(0);
+  const totals = new Map<string, number>();
+  rows.forEach((row) => {
+    const code = (row.currency || getActiveTenantCurrency()).toUpperCase();
+    totals.set(code, (totals.get(code) || 0) + Number(selector(row) || 0));
+  });
+  return Array.from(totals.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, amount]) => formatMoney(amount, currency))
+    .join(' + ');
 }
 
 function completionTypeLabel(type?: string | null): string {
@@ -1338,7 +1353,7 @@ export default function PurchaseOrdersPage() {
         <td>${escapeHtml(receivingStatusLabel(row.receiving_status))} (${escapeHtml(formatPercent(row.receiving_percent))})</td>
         <td>${escapeHtml(formatNumber(row.total_received_quantity))} / ${escapeHtml(formatNumber(row.total_quantity))}</td>
         <td>${escapeHtml(formatNumber(row.linked_shipment_count))} total / ${escapeHtml(formatNumber(row.open_linked_shipment_count))} open</td>
-        <td>${escapeHtml(formatMoney(row.estimated_total_cost))}</td>
+        <td>${escapeHtml(formatMoney(row.estimated_total_cost, row.currency))}</td>
         <td>${escapeHtml(formatDateTime(row.created_at))}</td>
       </tr>
     `).join('');
@@ -1406,10 +1421,10 @@ export default function PurchaseOrdersPage() {
         <td>${escapeHtml(formatNumber(item.received_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(formatNumber(item.remaining_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(receivingStatusLabel(item.receiving_status))} (${escapeHtml(formatPercent(item.receiving_percent))})</td>
-        <td>${escapeHtml(formatMoney(item.unit_cost))}</td>
-        <td>${escapeHtml(formatMoney(item.estimated_line_total))}</td>
-        <td>${escapeHtml(formatMoney(item.received_estimated_cost))}</td>
-        <td>${escapeHtml(formatMoney(item.remaining_estimated_cost))}</td>
+        <td>${escapeHtml(formatMoney(item.unit_cost, selectedDetail?.currency))}</td>
+        <td>${escapeHtml(formatMoney(item.estimated_line_total, selectedDetail?.currency))}</td>
+        <td>${escapeHtml(formatMoney(item.received_estimated_cost, selectedDetail?.currency))}</td>
+        <td>${escapeHtml(formatMoney(item.remaining_estimated_cost, selectedDetail?.currency))}</td>
       </tr>
     `).join('');
 
@@ -1466,9 +1481,9 @@ export default function PurchaseOrdersPage() {
             <div><span class="label">Received:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.received_quantity))} / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.ordered_quantity))} (${escapeHtml(formatPercent(selectedDetail.receiving_summary?.receiving_percent))})</div>
             <div><span class="label">Remaining:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.remaining_quantity))}</div>
             <div><span class="label">Linked shipments:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.linked_shipment_count))} total / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count))} open</div>
-            <div><span class="label">Estimated cost:</span> ${escapeHtml(formatMoney(selectedDetail.estimated_total_cost))}</div>
-            <div><span class="label">Received value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost))}</div>
-            <div><span class="label">Remaining value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost))}</div>
+            <div><span class="label">Estimated cost:</span> ${escapeHtml(formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency))}</div>
+            <div><span class="label">Received value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost, selectedDetail.currency))}</div>
+            <div><span class="label">Remaining value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency))}</div>
             <div><span class="label">Created:</span> ${escapeHtml(formatDateTime(selectedDetail.created_at))}</div>
             <div><span class="label">Submitted:</span> ${escapeHtml(formatDateTime(selectedDetail.submitted_at))}</div>
             <div><span class="label">Approved:</span> ${escapeHtml(formatDateTime(selectedDetail.approved_at))}</div>
@@ -1643,7 +1658,7 @@ export default function PurchaseOrdersPage() {
             <div style={styles.summaryBox}><strong>{summary.completed}</strong><span>Completed</span></div>
             <div style={styles.summaryBox}><strong>{summary.overdue}</strong><span>Overdue</span></div>
             <div style={styles.summaryBox}><strong>{summary.needsAction}</strong><span>Needs action</span></div>
-            <div style={styles.summaryBox}><strong>{formatMoney(summary.estimatedTotal)}</strong><span>Est. cost</span></div>
+            <div style={styles.summaryBox}><strong>{formatAggregateMoney(purchaseOrdersQuery.data || [], (row) => row.estimated_total_cost)}</strong><span>Est. cost</span></div>
           </div>
         </div>
 
@@ -2014,7 +2029,7 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td style={styles.td}>{formatNumber(row.total_received_quantity)}</td>
                   <td style={styles.td}>{formatNumber(row.linked_shipment_count)}</td>
-                  <td style={styles.td}>{formatMoney(row.estimated_total_cost)}</td>
+                  <td style={styles.td}>{formatMoney(row.estimated_total_cost, row.currency)}</td>
                   <td style={styles.td}>{formatDateTime(row.created_at)}</td>
                 </tr>
               ))}
@@ -2038,8 +2053,8 @@ export default function PurchaseOrdersPage() {
               <div style={styles.totalBox}><span>Received qty</span><strong>{formatNumber(filteredTotals.receivedQuantity)}</strong></div>
               <div style={styles.totalBox}><span>Remaining qty</span><strong>{formatNumber(filteredTotals.remainingQuantity)}</strong></div>
               <div style={styles.totalBox}><span>Open shipments</span><strong>{formatNumber(filteredTotals.openLinkedShipmentCount)}</strong></div>
-              <div style={styles.totalBox}><span>Filtered value</span><strong>{formatMoney(filteredTotals.estimatedTotalCost)}</strong></div>
-              <div style={styles.totalBox}><span>Remaining value</span><strong>{formatMoney(filteredTotals.remainingEstimatedCost)}</strong></div>
+              <div style={styles.totalBox}><span>Filtered value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.estimated_total_cost)}</strong></div>
+              <div style={styles.totalBox}><span>Remaining value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.remaining_estimated_cost)}</strong></div>
             </div>
           </div>
         ) : null}
@@ -2255,13 +2270,13 @@ export default function PurchaseOrdersPage() {
               </div>
               <dl style={styles.detailGrid}>
                 <dt>Expected delivery</dt><dd>{formatDate(selectedDetail.expected_delivery_date)}</dd>
-                <dt>Estimated cost</dt><dd>{formatMoney(selectedDetail.estimated_total_cost)}</dd>
-                <dt>Estimated received value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost)}</dd>
-                <dt>Estimated remaining value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost)}</dd>
+                <dt>Estimated cost</dt><dd>{formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency)}</dd>
+                <dt>Estimated received value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost, selectedDetail.currency)}</dd>
+                <dt>Estimated remaining value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency)}</dd>
                 <dt>Receiving status</dt><dd><span style={{ ...styles.badge, ...receivingBadgeStyle(selectedDetail.receiving_summary?.receiving_status) }}>{receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status)}</span></dd>
                 <dt>Variance status</dt><dd><span style={{ ...styles.badge, ...varianceBadgeStyle(selectedDetail.receiving_summary?.variance_status) }}>{varianceStatusLabel(selectedDetail.receiving_summary?.variance_status)}</span></dd>
                 <dt>Quantity variance</dt><dd>{formatNumber(selectedDetail.receiving_summary?.quantity_variance)}</dd>
-                <dt>Value variance</dt><dd>{formatMoney(selectedDetail.receiving_summary?.estimated_cost_variance)}</dd>
+                <dt>Value variance</dt><dd>{formatMoney(selectedDetail.receiving_summary?.estimated_cost_variance, selectedDetail.currency)}</dd>
                 <dt>Next action</dt><dd><span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span></dd>
                 <dt>PO received</dt><dd>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)} ({formatPercent(selectedDetail.receiving_summary?.receiving_percent)})</dd>
                 <dt>Remaining</dt><dd>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</dd>
@@ -2390,10 +2405,10 @@ export default function PurchaseOrdersPage() {
                           </span>
                           <div style={styles.smallMuted}>{formatNumber(item.quantity_variance)}</div>
                         </td>
-                        <td style={styles.td}>{formatMoney(item.unit_cost)}</td>
-                        <td style={styles.td}>{formatMoney(item.estimated_line_total)}</td>
-                        <td style={styles.td}>{formatMoney(item.received_estimated_cost)}</td>
-                        <td style={styles.td}>{formatMoney(item.remaining_estimated_cost)}</td>
+                        <td style={styles.td}>{formatMoney(item.unit_cost, selectedDetail?.currency)}</td>
+                        <td style={styles.td}>{formatMoney(item.estimated_line_total, selectedDetail?.currency)}</td>
+                        <td style={styles.td}>{formatMoney(item.received_estimated_cost, selectedDetail?.currency)}</td>
+                        <td style={styles.td}>{formatMoney(item.remaining_estimated_cost, selectedDetail?.currency)}</td>
                       </tr>
                     ))}
                   </tbody>

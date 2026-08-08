@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 
 type ReportTab =
   | 'inventory-valuation'
@@ -146,12 +147,14 @@ type InventoryValuationRow = {
   estimated_cost_source?: string | null;
   estimated_total_value: number | string;
   updated_at?: string | null;
+  currency_code?: string | null;
 };
 
 type InventoryValuationReport = {
   totals: {
     row_count: number;
     estimated_inventory_value: number | string;
+    currency_code?: string | null;
   };
   rows: InventoryValuationRow[];
 };
@@ -228,8 +231,8 @@ function formatNumber(
   }).format(toNumber(value));
 }
 
-function formatCostAmount(value: number | string | null | undefined): string {
-  return formatNumber(value, 2);
+function formatCostAmount(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(value, currency);
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -758,8 +761,8 @@ export default function ReportsPage() {
         <div className="app-grid-stats" style={styles.statsGrid}>
           <StatCard
             title="Estimated Inventory Value"
-            value={formatCostAmount(inventoryValuationQuery.data?.totals.estimated_inventory_value)}
-            subtitle="Latest available cost basis; currency is not stored on these inventory cost fields"
+            value={formatCostAmount(inventoryValuationQuery.data?.totals.estimated_inventory_value, inventoryValuationQuery.data?.totals.currency_code)}
+            subtitle={`Latest available cost basis in ${inventoryValuationQuery.data?.totals.currency_code || 'the tenant inventory currency'}`}
           />
           <StatCard
             title="Tracked Valuation Rows"
@@ -941,7 +944,7 @@ export default function ReportsPage() {
           id={getReportPanelId('inventory-valuation')}
           labelledBy={getReportTabId('inventory-valuation')}
           title="Inventory Valuation"
-          subtitle="Estimated stock value by product and storage location using the latest available movement, shipment, or standard product cost. Cost amounts are shown without a currency symbol because the current inventory cost fields do not store a currency."
+          subtitle={`Estimated stock value by product and storage location in ${inventoryValuationQuery.data?.totals.currency_code || 'the tenant inventory currency'}. Foreign-currency receipt costs are preserved separately and are not silently converted.`}
           actions={
             <div className="app-actions" style={styles.filterRow}>
               <RefreshReportButton
@@ -1006,11 +1009,11 @@ export default function ReportsPage() {
                             {formatNumber(row.quantity)} {row.product_unit || 'units'}
                           </td>
                           <td style={styles.td}>
-                            {formatCostAmount(row.estimated_unit_cost)}
+                            {formatCostAmount(row.estimated_unit_cost, row.currency_code)}
                           </td>
                           <td style={styles.td}>{formatCostSource(row.estimated_cost_source)}</td>
                           <td style={styles.td}>
-                            {formatCostAmount(row.estimated_total_value)}
+                            {formatCostAmount(row.estimated_total_value, row.currency_code)}
                           </td>
                           <td style={styles.td}>{formatDateTime(row.updated_at)}</td>
                         </tr>
@@ -1038,13 +1041,13 @@ export default function ReportsPage() {
                         Quantity: {formatNumber(row.quantity)} {row.product_unit || 'units'}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Unit Cost: {formatCostAmount(row.estimated_unit_cost)}
+                        Unit Cost: {formatCostAmount(row.estimated_unit_cost, row.currency_code)}
                       </div>
                       <div style={styles.mobileCardText}>
                         Cost Source: {formatCostSource(row.estimated_cost_source)}
                       </div>
                       <div style={styles.mobileCardText}>
-                        Estimated Value: {formatCostAmount(row.estimated_total_value)}
+                        Estimated Value: {formatCostAmount(row.estimated_total_value, row.currency_code)}
                       </div>
                       <div style={styles.mobileCardText}>
                         Updated: {formatDateTime(row.updated_at)}

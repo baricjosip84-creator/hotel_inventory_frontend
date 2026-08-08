@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import './StockMovementsPage.css';
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
@@ -26,6 +27,7 @@ type StockMovement = {
   unit_cost?: number | string | null;
   total_cost?: number | string | null;
   cost_source?: string | null;
+  cost_currency?: string | null;
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
@@ -44,6 +46,8 @@ type StockMovementSummary = {
   package_audited_rows?: number | string;
   costed_rows?: number | string;
   received_cost?: number | string;
+  received_cost_currency?: string | null;
+  received_cost_by_currency?: Array<{ currency_code: string; received_cost: number | string }>;
   earliest_movement_at?: string | null;
   latest_movement_at?: string | null;
 };
@@ -194,9 +198,9 @@ function formatDateTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function formatMoney(value: number | string | null | undefined): string {
+function formatMoney(value: number | string | null | undefined, currency?: string | null): string {
   if (value === null || value === undefined || value === '') return '—';
-  return toNumber(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrencyAmount(value, currency || getActiveTenantCurrency());
 }
 
 function humanizeCode(value?: string | null): string {
@@ -236,6 +240,12 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 function movementTypeLabel(value?: string | null): string {
   return MOVEMENT_LABELS[value || ''] || humanizeCode(value);
+}
+
+function formatCurrencyBreakdown(rows?: Array<{ currency_code: string; received_cost: number | string }>): string {
+  const values = (rows ?? []).filter((row) => row.currency_code);
+  if (values.length === 0) return '—';
+  return values.map((row) => formatCurrencyAmount(row.received_cost, row.currency_code)).join(' · ');
 }
 
 function costSourceLabel(value?: string | null): string {
@@ -298,12 +308,12 @@ function downloadCsv(rows: Array<Array<string | number | null | undefined>>) {
 
 function exportRows(rows: StockMovement[]) {
   downloadCsv([
-    ['Created', 'Product', 'Product ID', 'Storage Location', 'Storage Location ID', 'Movement Type', 'Change', 'Unit', 'Reason', 'Receiving Note', 'Unit Cost', 'Total Cost', 'Cost Source', 'Shipment', 'Shipment ID', 'Transfer ID', 'User', 'Package', 'Package Barcode', 'Package Count', 'Movement ID'],
+    ['Created', 'Product', 'Product ID', 'Storage Location', 'Storage Location ID', 'Movement Type', 'Change', 'Unit', 'Reason', 'Receiving Note', 'Unit Cost', 'Total Cost', 'Cost Currency', 'Cost Source', 'Shipment', 'Shipment ID', 'Transfer ID', 'User', 'Package', 'Package Barcode', 'Package Count', 'Movement ID'],
     ...rows.map((movement) => [
       formatDateTime(movement.created_at), movement.product_name, movement.product_id,
       movement.storage_location_name || '', movement.storage_location_id || '',
       movementTypeLabel(movementTypeFromRow(movement)), toNumber(movement.change), movement.product_unit,
-      movement.reason, movement.receiving_note || '', movement.unit_cost ?? '', movement.total_cost ?? '',
+      movement.reason, movement.receiving_note || '', movement.unit_cost ?? '', movement.total_cost ?? '', movement.cost_currency || '',
       movement.cost_source || '', movement.shipment_po_number || '', movement.shipment_id || '',
       movement.stock_transfer_id || '', movement.user_name || movement.user_id || '', movement.package_name || '',
       movement.package_barcode || '', movement.package_count_received ?? '', movement.id
@@ -469,7 +479,7 @@ export default function StockMovementsPage() {
           ['Net Change', toNumber(summary.net_change), 'Inbound minus outbound'],
           ['Package Audited', toNumber(summary.package_audited_rows), 'Rows with package receiving evidence'],
           ['Cost Captured', toNumber(summary.costed_rows), 'Rows with cost evidence'],
-          ['Received Cost', formatMoney(summary.received_cost), 'Captured value on inbound rows']
+          ['Received Cost', formatCurrencyBreakdown(summary.received_cost_by_currency), 'Inbound receipt cost grouped by currency; currencies are never added together']
         ].map(([label, value, helper]) => (
           <article key={String(label)} style={styles.summaryCard}><div style={styles.summaryLabel}>{label}</div><div style={styles.summaryValue}>{value}</div><div style={styles.summaryHelper}>{helper}</div></article>
         ))}
@@ -509,7 +519,7 @@ export default function StockMovementsPage() {
                   <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name}</div><div style={styles.rowSubtle}>{movement.storage_location_name || 'Location not recorded (legacy row)'}</div><div style={styles.rowSubtle}>{movement.product_unit}</div></td>
                   <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${amount}` : amount}</span><div style={styles.rowSubtle}>{Math.abs(amount)} {movement.product_unit}</div></td>
                   <td style={styles.td}><span style={badgeStyle(type)}>{movementTypeLabel(type)}</span>{detail ? <div style={styles.rowSubtle}>{detail}</div> : null}{movement.receiving_note ? <div style={styles.note}>Note: {movement.receiving_note}</div> : null}</td>
-                  <td style={styles.td}>{movement.total_cost !== null && movement.total_cost !== undefined ? <><div style={styles.rowTitle}>{formatMoney(movement.total_cost)}</div><div style={styles.rowSubtle}>Unit: {formatMoney(movement.unit_cost)}</div><div style={styles.rowSubtle}>{costSourceLabel(movement.cost_source)}</div></> : <span style={styles.rowSubtle}>No cost captured</span>}</td>
+                  <td style={styles.td}>{movement.total_cost !== null && movement.total_cost !== undefined ? <><div style={styles.rowTitle}>{formatMoney(movement.total_cost, movement.cost_currency)}</div><div style={styles.rowSubtle}>Unit: {formatMoney(movement.unit_cost, movement.cost_currency)}</div><div style={styles.rowSubtle}>{costSourceLabel(movement.cost_source)}</div></> : <span style={styles.rowSubtle}>No cost captured</span>}</td>
                   <td style={styles.td}>{hasPackageAudit(movement) ? <><div style={styles.rowTitle}>{toNumber(movement.package_count_received) > 0 ? `${toNumber(movement.package_count_received)} × ` : ''}{movement.package_name || 'Package'}</div>{movement.units_per_package ? <div style={styles.rowSubtle}>{movement.units_per_package} units per package</div> : null}{movement.package_barcode ? <div style={styles.rowSubtle}>Barcode: {movement.package_barcode}</div> : null}</> : <span style={styles.rowSubtle}>Base-unit or manual movement</span>}</td>
                   <td style={styles.td}>{movement.shipment_id ? <><div style={styles.rowTitle}>{movement.shipment_po_number || 'Shipment'}</div><div style={styles.rowSubtle} title={movement.shipment_id}>{shortId(movement.shipment_id)}</div></> : movement.stock_transfer_id ? <><div style={styles.rowTitle}>Stock transfer</div><div style={styles.rowSubtle} title={movement.stock_transfer_id}>{shortId(movement.stock_transfer_id)}</div></> : <span style={styles.rowSubtle}>No linked shipment or transfer</span>}</td>
                   <td style={styles.td}><div style={styles.rowTitle}>{movement.user_name || 'System / support actor'}</div>{!movement.user_name && movement.user_id ? <div style={styles.rowSubtle} title={movement.user_id}>{shortId(movement.user_id)}</div> : null}</td>

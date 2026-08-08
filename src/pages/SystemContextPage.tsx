@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { SystemContextExecutionGateResponse, SystemContextResponse, SystemContextSnapshot, SystemContextSnapshotCaptureResponse, SystemContextSnapshotComparison, SystemContextSnapshotTrendSeries, SystemContextForecastPreview, SystemContextForecastSeries, SystemContextForecastHorizons, SystemContextBaselineForecast, SystemContextMovingAverageForecast, SystemContextWeightedTrendForecast, SystemContextVolatilityAdjustedForecast, SystemContextForecastConfidence, SystemContextForecastAccuracy, SystemContextForecastComparison, SystemContextForecastRiskClassification, SystemContextForecastAccuracyGovernance, SystemContextForecastErrorGovernance, SystemContextForecastDegradationGovernance, SystemContextForecastConfidenceGovernance, SystemContextForecastAdjustmentGovernance, SystemContextForecastOutcomeValidationGovernance, SystemContextForecastGovernanceReadiness, SystemContextForecastPhaseClosure, SystemContextExecutionIntelligenceLinkage, SystemContextExecutionIntelligenceOutcomeScoring, SystemContextExecutionIntelligenceRollbackEvidence, SystemContextExecutionIntelligenceRiskScoring, SystemContextExecutionIntelligenceClosedLoopLearning, SystemContextExecutionIntelligenceReadiness, SystemContextExecutionIntelligencePhaseClosure, SystemContextAIOperationsPipelineMonitoring, SystemContextAIOperationsHealthMonitoring, SystemContextAIOperationsDegradationMonitoring, SystemContextAIOperationsDataQualityMonitoring, SystemContextAIOperationsStaleIntelligenceMonitoring, SystemContextAIOperationsNotificationMonitoring, SystemContextAIOperationsSlaMonitoring, SystemContextAIOperationsAuditEvidenceMonitoring, SystemContextAIOperationsReadinessGate, SystemContextForecastVersionGovernance, SystemContextForecastRanking, SystemContextForecastScenarioSet, SystemContextForecastScenarioCaptureResponse, SystemContextForecastScenarioHistoryItem } from '../types/inventory';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
@@ -16,8 +17,7 @@ function formatNumber(value: number | string | null | undefined): string {
 }
 
 function formatCurrency(value: number | string | null | undefined): string {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed.toLocaleString(undefined, { style: 'currency', currency: 'USD' }) : '$0.00';
+  return formatCurrencyAmount(value);
 }
 
 function toNumber(value: number | string | null | undefined): number {

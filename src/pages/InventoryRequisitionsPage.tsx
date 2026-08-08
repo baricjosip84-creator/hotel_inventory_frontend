@@ -1,3 +1,4 @@
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1077,6 +1078,10 @@ function formatNumber(value: number | string | null | undefined): string {
   return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function formatMoney(value: number | string | null | undefined): string {
+  return formatCurrencyAmount(value);
+}
+
 function humanizeCode(value: string | null | undefined): string {
   if (!value) return '-';
   const normalized = String(value).replace(/_/g, ' ').trim();
@@ -1990,6 +1995,7 @@ export default function InventoryRequisitionsPage() {
         'Product',
         'Category',
         'Unit',
+        'Currency',
         'Standard unit cost',
         'Requested estimated value',
         'Remaining estimated value',
@@ -2075,6 +2081,7 @@ export default function InventoryRequisitionsPage() {
         row.product_name,
         row.product_category || '',
         row.product_unit || '',
+        getActiveTenantCurrency(),
         row.standard_unit_cost ?? '',
         row.requested_estimated_value ?? '',
         row.remaining_estimated_value ?? '',
@@ -2485,17 +2492,17 @@ export default function InventoryRequisitionsPage() {
             <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.due_soon_count)}</strong><br /><span style={styles.muted}>Due soon</span></div>
           </div>
           <p style={styles.muted}>Average pending age: {formatNumber(summaryQuery.data?.approval_queue?.average_pending_age_days)} days · Oldest: {formatNumber(summaryQuery.data?.approval_queue?.oldest_pending_age_days)} days</p>
-          <p style={styles.muted}>Pending value: {formatNumber(summaryQuery.data?.approval_queue?.pending_remaining_estimated_value_total)} · Urgent value: {formatNumber(summaryQuery.data?.approval_queue?.urgent_remaining_estimated_value_total)} · Overdue value: {formatNumber(summaryQuery.data?.approval_queue?.overdue_remaining_estimated_value_total)}</p>
+          <p style={styles.muted}>Pending value: {formatMoney(summaryQuery.data?.approval_queue?.pending_remaining_estimated_value_total)} · Urgent value: {formatMoney(summaryQuery.data?.approval_queue?.urgent_remaining_estimated_value_total)} · Overdue value: {formatMoney(summaryQuery.data?.approval_queue?.overdue_remaining_estimated_value_total)}</p>
         </div>
         <div style={styles.card}>
           <h3 style={styles.sectionTitle}>Approval threshold exposure</h3>
           <div style={styles.compactMetrics}>
             <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_approval_count)}</strong><br /><span style={styles.muted}>Elevated approvals</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_threshold || 1000)}</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_threshold || 5000)}</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.largest_pending_remaining_estimated_value)}</strong><br /><span style={styles.muted}>Largest pending value</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatMoney(summaryQuery.data?.approval_threshold_exposure?.high_value_threshold || 1000)}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatMoney(summaryQuery.data?.approval_threshold_exposure?.executive_value_threshold || 5000)}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.approval_threshold_exposure?.largest_pending_remaining_estimated_value)}</strong><br /><span style={styles.muted}>Largest pending value</span></div>
           </div>
-          <p style={styles.muted}>Elevated value: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_remaining_estimated_value_total)} · High priority: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_priority_count)} · Urgent: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.urgent_count)} · Overdue: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.overdue_count)}</p>
+          <p style={styles.muted}>Elevated value: {formatMoney(summaryQuery.data?.approval_threshold_exposure?.elevated_remaining_estimated_value_total)} · High priority: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_priority_count)} · Urgent: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.urgent_count)} · Overdue: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.overdue_count)}</p>
         </div>
         <div style={styles.card}>
           <h3 style={styles.sectionTitle}>Approval threshold watchlist</h3>
@@ -2505,9 +2512,9 @@ export default function InventoryRequisitionsPage() {
                 <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_count)}</strong><br /><span style={styles.muted}>Near high-value floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.high_value_watch_floor)}</span></div>
                 <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_count)}</strong><br /><span style={styles.muted}>Near executive floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.executive_value_watch_floor)}</span></div>
                 <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.overdue_near_threshold_count)}</strong><br /><span style={styles.muted}>Overdue near-threshold</span></div>
-                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.largest_near_threshold_value)}</strong><br /><span style={styles.muted}>Largest near threshold</span></div>
+                <div><strong>{formatMoney(summaryQuery.data.approval_threshold_near_miss.largest_near_threshold_value)}</strong><br /><span style={styles.muted}>Largest near threshold</span></div>
               </div>
-              <p style={styles.muted}>Near high-value total: {formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_total)} · Near executive total: {formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_total)}</p>
+              <p style={styles.muted}>Near high-value total: {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_high_value_total)} · Near executive total: {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_executive_value_total)}</p>
             </>
           ) : <p style={styles.muted}>No approval threshold watchlist data.</p>}
         </div>
@@ -2516,7 +2523,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_reason?.length ? summaryQuery.data.approval_threshold_by_reason.map((reason) => (
             <div key={reason.approval_threshold_reason} style={styles.departmentRow}>
               <span>{approvalThresholdReasonLabel(reason.approval_threshold_reason)}<br /><span style={styles.muted}>{formatNumber(reason.pending_count)} pending · {formatNumber(reason.urgent_count)} urgent · {formatNumber(reason.high_value_count)} high value · {formatNumber(reason.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(reason.pending_remaining_estimated_value_total)} pending value</strong>
+              <strong>{formatMoney(reason.pending_remaining_estimated_value_total)} pending value</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by reason.</p>}
         </div>
@@ -2525,7 +2532,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_level?.length ? summaryQuery.data.approval_threshold_by_level.map((level) => (
             <div key={level.approval_threshold_level} style={styles.departmentRow}>
               <span>{approvalThresholdLabel(level.approval_threshold_level)}<br /><span style={styles.muted}>{formatNumber(level.pending_count)} pending · {formatNumber(level.urgent_count)} urgent · {formatNumber(level.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(level.pending_remaining_estimated_value_total)} pending value</strong>
+              <strong>{formatMoney(level.pending_remaining_estimated_value_total)} pending value</strong>
             </div>
           )) : <p style={styles.muted}>No approval threshold level exposure.</p>}
         </div>
@@ -2534,7 +2541,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_priority?.length ? summaryQuery.data.approval_threshold_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
               <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} elevated · {formatNumber(priority.high_value_count)} high value · {formatNumber(priority.executive_value_count)} executive · {formatNumber(priority.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(priority.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(priority.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by priority.</p>}
         </div>
@@ -2543,7 +2550,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_department?.length ? summaryQuery.data.approval_threshold_by_department.map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
               <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(department.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by department.</p>}
         </div>
@@ -2552,7 +2559,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_requester?.length ? summaryQuery.data.approval_threshold_by_requester.map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
               <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.elevated_approval_count)} elevated · {formatNumber(requester.urgent_count)} urgent · {formatNumber(requester.high_value_count)} high value · {formatNumber(requester.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(requester.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(requester.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by requester.</p>}
         </div>
@@ -2561,7 +2568,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_target_department?.length ? summaryQuery.data.approval_threshold_by_target_department.map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
               <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(department.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by target department.</p>}
         </div>
@@ -2570,7 +2577,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_source_location?.length ? summaryQuery.data.approval_threshold_by_source_location.map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
               <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(location.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by source location.</p>}
         </div>
@@ -2579,7 +2586,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_target_location?.length ? summaryQuery.data.approval_threshold_by_target_location.map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
               <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(location.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by target location.</p>}
         </div>
@@ -2588,7 +2595,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_product?.length ? summaryQuery.data.approval_threshold_by_product.map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
               <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.elevated_approval_count)} elevated requests · {formatNumber(product.high_value_count)} high value · {formatNumber(product.executive_value_count)} executive · {formatNumber(product.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(product.elevated_product_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(product.elevated_product_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by product.</p>}
         </div>
@@ -2597,7 +2604,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_category?.length ? summaryQuery.data.approval_threshold_by_category.map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
               <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.elevated_approval_count)} elevated · {formatNumber(category.urgent_count)} urgent · {formatNumber(category.high_value_count)} high value · {formatNumber(category.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(category.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(category.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by category.</p>}
         </div>
@@ -2606,7 +2613,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_due_state?.length ? summaryQuery.data.approval_threshold_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by due state.</p>}
         </div>
@@ -2615,7 +2622,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_age_bucket?.length ? summaryQuery.data.approval_threshold_by_age_bucket.map((bucket) => (
             <div key={bucket.approval_age_bucket} style={styles.departmentRow}>
               <span>{humanizeCode(bucket.approval_age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} elevated · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.high_value_count)} high value · {formatNumber(bucket.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(bucket.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(bucket.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by age bucket.</p>}
         </div>
@@ -2624,7 +2631,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_by_sla_state?.length ? summaryQuery.data.approval_threshold_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
-              <strong>{formatNumber(state.elevated_remaining_estimated_value_total)} elevated</strong>
+              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} elevated</strong>
             </div>
           )) : <p style={styles.muted}>No threshold exposure by SLA state.</p>}
         </div>
@@ -2633,7 +2640,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_threshold_oldest?.length ? summaryQuery.data.approval_threshold_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
               <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {approvalThresholdLabel(request.approval_threshold_level || 'standard')} · {formatNumber(request.product_count)} products</span></span>
-              <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(request.pending_age_days)}d · {formatMoney(request.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No elevated threshold approvals.</p>}
         </div>
@@ -2642,7 +2649,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_priority?.length ? summaryQuery.data.approval_queue_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
               <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.pending_count)} pending · {formatNumber(priority.overdue_count)} overdue · avg {formatNumber(priority.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(priority.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(priority.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by priority.</p>}
         </div>
@@ -2651,7 +2658,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_department?.length ? summaryQuery.data.approval_queue_by_department.map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
               <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} pending · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.overdue_count)} overdue · avg {formatNumber(department.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(department.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by department.</p>}
         </div>
@@ -2660,7 +2667,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_target_department?.length ? summaryQuery.data.approval_queue_by_target_department.map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
               <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} pending · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.overdue_count)} overdue · avg {formatNumber(department.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(department.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by target department.</p>}
         </div>
@@ -2669,7 +2676,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_source_location?.length ? summaryQuery.data.approval_queue_by_source_location.map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
               <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} pending · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.overdue_count)} overdue · avg {formatNumber(location.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(location.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by source location.</p>}
         </div>
@@ -2678,7 +2685,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_target_location?.length ? summaryQuery.data.approval_queue_by_target_location.map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
               <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} pending · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.overdue_count)} overdue · avg {formatNumber(location.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(location.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by target location.</p>}
         </div>
@@ -2687,7 +2694,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_requester?.length ? summaryQuery.data.approval_queue_by_requester.map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
               <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.pending_count)} pending · {formatNumber(requester.urgent_count)} urgent · {formatNumber(requester.overdue_count)} overdue · avg {formatNumber(requester.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(requester.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(requester.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by requester.</p>}
         </div>
@@ -2696,7 +2703,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_product?.length ? summaryQuery.data.approval_queue_by_product.map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
               <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.pending_count)} pending · {formatNumber(product.urgent_count)} urgent · {formatNumber(product.overdue_count)} overdue · {formatNumber(product.pending_remaining_quantity_total)} {product.product_unit || 'units'} remaining</span></span>
-              <strong>{formatNumber(product.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(product.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by product.</p>}
         </div>
@@ -2705,7 +2712,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_category?.length ? summaryQuery.data.approval_queue_by_category.map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
               <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.pending_count)} pending · {formatNumber(category.urgent_count)} urgent · {formatNumber(category.overdue_count)} overdue · {formatNumber(category.pending_remaining_quantity_total)} units remaining</span></span>
-              <strong>{formatNumber(category.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(category.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by category.</p>}
         </div>
@@ -2714,7 +2721,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_age_bucket?.length ? summaryQuery.data.approval_queue_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
               <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.pending_count)} pending · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.overdue_count)} overdue · avg {formatNumber(bucket.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(bucket.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(bucket.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by age bucket.</p>}
         </div>
@@ -2723,7 +2730,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_sla_state?.length ? summaryQuery.data.approval_queue_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · avg {formatNumber(state.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(state.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by SLA state.</p>}
         </div>
@@ -2732,7 +2739,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_by_due_state?.length ? summaryQuery.data.approval_queue_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · {formatNumber(state.due_soon_count)} due soon · avg {formatNumber(state.average_pending_age_days)}d</span></span>
-              <strong>{formatNumber(state.pending_remaining_estimated_value_total)} pending</strong>
+              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} pending</strong>
             </div>
           )) : <p style={styles.muted}>No pending approval value by due state.</p>}
         </div>
@@ -2741,7 +2748,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.approval_queue_oldest?.length ? summaryQuery.data.approval_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
               <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)} · {formatNumber(request.product_count)} products</span></span>
-              <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatNumber(request.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatMoney(request.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No pending approvals.</p>}
         </div>
@@ -2757,19 +2764,19 @@ export default function InventoryRequisitionsPage() {
         <div style={styles.card}>
           <h3 style={styles.sectionTitle}>Estimated value exposure</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.estimated_value_summary?.requested_estimated_value_total)}</strong><br /><span style={styles.muted}>Open requested value</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.estimated_value_summary?.fulfilled_estimated_value_total)}</strong><br /><span style={styles.muted}>Fulfilled value</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.estimated_value_summary?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Remaining value</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.estimated_value_summary?.urgent_remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Urgent remaining value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.requested_estimated_value_total)}</strong><br /><span style={styles.muted}>Open requested value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.fulfilled_estimated_value_total)}</strong><br /><span style={styles.muted}>Fulfilled value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Remaining value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.urgent_remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Urgent remaining value</span></div>
           </div>
-          <p style={styles.muted}>Actionable remaining value: {formatNumber(summaryQuery.data?.estimated_value_summary?.actionable_remaining_estimated_value_total)}</p>
+          <p style={styles.muted}>Actionable remaining value: {formatMoney(summaryQuery.data?.estimated_value_summary?.actionable_remaining_estimated_value_total)}</p>
         </div>
         <div style={styles.card}>
           <h3 style={styles.sectionTitle}>Value exposure by priority</h3>
           {summaryQuery.data?.estimated_value_by_priority?.length ? summaryQuery.data.estimated_value_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
               <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
-              <strong>{formatNumber(priority.remaining_estimated_value_total)} remaining</strong>
+              <strong>{formatMoney(priority.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No priority value exposure.</p>}
         </div>
@@ -2777,8 +2784,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by status</h3>
           {summaryQuery.data?.estimated_value_by_status?.length ? summaryQuery.data.estimated_value_by_status.map((status) => (
             <div key={status.status} style={styles.departmentRow}>
-              <span><span style={statusStyle(status.status)}>{requisitionStatusLabel(status.status)}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} open · urgent value {formatNumber(status.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(status.remaining_estimated_value_total)} remaining</strong>
+              <span><span style={statusStyle(status.status)}>{requisitionStatusLabel(status.status)}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} open · urgent value {formatMoney(status.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(status.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No status value exposure.</p>}
         </div>
@@ -2786,8 +2793,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by department</h3>
           {summaryQuery.data?.top_estimated_value_departments?.length ? summaryQuery.data.top_estimated_value_departments.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatNumber(department.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(department.remaining_estimated_value_total)} remaining</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(department.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No department value exposure.</p>}
         </div>
@@ -2795,8 +2802,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by target department</h3>
           {summaryQuery.data?.top_estimated_value_target_departments?.length ? summaryQuery.data.top_estimated_value_target_departments.slice(0, 4).map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatNumber(department.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(department.remaining_estimated_value_total)} remaining</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(department.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No target department value exposure.</p>}
         </div>
@@ -2804,8 +2811,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by source location</h3>
           {summaryQuery.data?.top_estimated_value_source_locations?.length ? summaryQuery.data.top_estimated_value_source_locations.slice(0, 4).map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatNumber(location.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(location.remaining_estimated_value_total)} remaining</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(location.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No source location value exposure.</p>}
         </div>
@@ -2813,8 +2820,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by target location</h3>
           {summaryQuery.data?.top_estimated_value_target_locations?.length ? summaryQuery.data.top_estimated_value_target_locations.slice(0, 4).map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatNumber(location.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(location.remaining_estimated_value_total)} remaining</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(location.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No target location value exposure.</p>}
         </div>
@@ -2822,8 +2829,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by product</h3>
           {summaryQuery.data?.top_estimated_value_products?.length ? summaryQuery.data.top_estimated_value_products.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{product.product_unit || product.product_category || '-'} · urgent value {formatNumber(product.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(product.remaining_estimated_value_total)} remaining</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{product.product_unit || product.product_category || '-'} · urgent value {formatMoney(product.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(product.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No product value exposure.</p>}
         </div>
@@ -2831,8 +2838,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by category</h3>
           {summaryQuery.data?.top_estimated_value_categories?.length ? summaryQuery.data.top_estimated_value_categories.slice(0, 4).map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.request_count)} open · urgent value {formatNumber(category.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(category.remaining_estimated_value_total)} remaining</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.request_count)} open · urgent value {formatMoney(category.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(category.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No category value exposure.</p>}
         </div>
@@ -2840,8 +2847,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by requester</h3>
           {summaryQuery.data?.top_estimated_value_requesters?.length ? summaryQuery.data.top_estimated_value_requesters.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} open · urgent value {formatNumber(requester.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(requester.remaining_estimated_value_total)} remaining</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} open · urgent value {formatMoney(requester.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(requester.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No requester value exposure.</p>}
         </div>
@@ -2852,7 +2859,7 @@ export default function InventoryRequisitionsPage() {
             <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_partially_fulfilled_count)}</strong><br /><span style={styles.muted}>Stale &gt; {formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_after_days || 3)}d</span></div>
             <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.oldest_partial_age_days)}</strong><br /><span style={styles.muted}>Oldest partial days</span></div>
             <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.remaining_quantity_total)}</strong><br /><span style={styles.muted}>Partial remaining</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Partial value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.fulfillment_backlog?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Partial value</span></div>
           </div>
         </div>
 
@@ -2861,7 +2868,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_oldest?.length ? summaryQuery.data.fulfillment_backlog_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
               <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)}</span></span>
-              <strong>{formatNumber(request.partial_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatNumber(request.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(request.partial_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatMoney(request.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No aged partial fulfillments.</p>}
         </div>
@@ -2870,7 +2877,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_priority?.length ? summaryQuery.data.fulfillment_backlog_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
               <span>{humanizeCode(priority.priority)}<br /><span style={styles.muted}>{formatNumber(priority.partially_fulfilled_count)} partial · {formatNumber(priority.stale_partially_fulfilled_count)} stale · oldest {formatNumber(priority.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(priority.remaining_quantity_total)} units · {formatNumber(priority.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(priority.remaining_quantity_total)} units · {formatMoney(priority.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No priority-level fulfillment backlog.</p>}
         </div>
@@ -2879,7 +2886,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_age_bucket?.length ? summaryQuery.data.fulfillment_backlog_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
               <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.partially_fulfilled_count)} partial · {formatNumber(bucket.stale_partially_fulfilled_count)} stale · oldest {formatNumber(bucket.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(bucket.remaining_quantity_total)} units · {formatNumber(bucket.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(bucket.remaining_quantity_total)} units · {formatMoney(bucket.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No age-bucket fulfillment backlog.</p>}
         </div>
@@ -2888,7 +2895,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_due_state?.length ? summaryQuery.data.fulfillment_backlog_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatNumber(state.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatMoney(state.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No due-state fulfillment backlog.</p>}
         </div>
@@ -2897,7 +2904,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_sla_state?.length ? summaryQuery.data.fulfillment_backlog_by_sla_state.map((state) => (
             <div key={state.sla_state} style={styles.departmentRow}>
               <span>{humanizeCode(state.sla_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatNumber(state.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatMoney(state.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No SLA-state fulfillment backlog.</p>}
         </div>
@@ -2906,7 +2913,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_product?.length ? summaryQuery.data.fulfillment_backlog_by_product.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
               <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.partially_fulfilled_count)} partial · {formatNumber(product.stale_partially_fulfilled_count)} stale · oldest {formatNumber(product.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(product.remaining_quantity_total)} {product.product_unit || 'units'} · {formatNumber(product.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(product.remaining_quantity_total)} {product.product_unit || 'units'} · {formatMoney(product.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No product-level fulfillment backlog.</p>}
         </div>
@@ -2915,7 +2922,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_category?.length ? summaryQuery.data.fulfillment_backlog_by_category.slice(0, 4).map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
               <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.partially_fulfilled_count)} partial · {formatNumber(category.stale_partially_fulfilled_count)} stale · oldest {formatNumber(category.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(category.remaining_quantity_total)} units · {formatNumber(category.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(category.remaining_quantity_total)} units · {formatMoney(category.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No category-level fulfillment backlog.</p>}
         </div>
@@ -2924,7 +2931,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_requester?.length ? summaryQuery.data.fulfillment_backlog_by_requester.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
               <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.partially_fulfilled_count)} partial · {formatNumber(requester.stale_partially_fulfilled_count)} stale · oldest {formatNumber(requester.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(requester.remaining_quantity_total)} units · {formatNumber(requester.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(requester.remaining_quantity_total)} units · {formatMoney(requester.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No requester-level fulfillment backlog.</p>}
         </div>
@@ -2933,7 +2940,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_department?.length ? summaryQuery.data.fulfillment_backlog_by_department.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
               <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} partial · {formatNumber(department.stale_partially_fulfilled_count)} stale · oldest {formatNumber(department.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatNumber(department.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatMoney(department.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No department-level fulfillment backlog.</p>}
         </div>
@@ -2942,7 +2949,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_target_department?.length ? summaryQuery.data.fulfillment_backlog_by_target_department.slice(0, 4).map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
               <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} partial · {formatNumber(department.stale_partially_fulfilled_count)} stale · oldest {formatNumber(department.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatNumber(department.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatMoney(department.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No target-department fulfillment backlog.</p>}
         </div>
@@ -2951,7 +2958,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_source_location?.length ? summaryQuery.data.fulfillment_backlog_by_source_location.slice(0, 4).map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
               <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} partial · {formatNumber(location.stale_partially_fulfilled_count)} stale · oldest {formatNumber(location.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatNumber(location.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatMoney(location.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No source-location fulfillment backlog.</p>}
         </div>
@@ -2960,7 +2967,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.fulfillment_backlog_by_target_location?.length ? summaryQuery.data.fulfillment_backlog_by_target_location.slice(0, 4).map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
               <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} partial · {formatNumber(location.stale_partially_fulfilled_count)} stale · oldest {formatNumber(location.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatNumber(location.remaining_estimated_value_total)} value</strong>
+              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatMoney(location.remaining_estimated_value_total)} value</strong>
             </div>
           )) : <p style={styles.muted}>No target-location fulfillment backlog.</p>}
         </div>
@@ -2979,7 +2986,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.open_queue_oldest?.length ? summaryQuery.data.open_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
               <span>{request.requisition_number}<br /><span style={styles.muted}>{requisitionStatusLabel(request.status)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
-              <strong>{formatNumber(request.open_age_days)}d · {formatNumber(request.remaining_estimated_value_total)}</strong>
+              <strong>{formatNumber(request.open_age_days)}d · {formatMoney(request.remaining_estimated_value_total)}</strong>
             </div>
           )) : <p style={styles.muted}>No open request aging actions.</p>}
         </div>
@@ -2987,8 +2994,8 @@ export default function InventoryRequisitionsPage() {
           <h3 style={styles.sectionTitle}>Value exposure by age bucket</h3>
           {summaryQuery.data?.estimated_value_by_age_bucket?.length ? summaryQuery.data.estimated_value_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} open · urgent value {formatNumber(bucket.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatNumber(bucket.remaining_estimated_value_total)} remaining</strong>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} open · urgent value {formatMoney(bucket.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(bucket.remaining_estimated_value_total)} remaining</strong>
             </div>
           )) : <p style={styles.muted}>No age-bucket value exposure.</p>}
         </div>
@@ -3007,7 +3014,7 @@ export default function InventoryRequisitionsPage() {
           {summaryQuery.data?.sla_risk_oldest?.length ? summaryQuery.data.sla_risk_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
               <span>{request.requisition_number}<br /><span style={styles.muted}>{humanizeCode(request.risk_reason)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
-              <strong>{formatNumber(request.action_age_days)}d · {formatNumber(request.remaining_estimated_value_total)}</strong>
+              <strong>{formatNumber(request.action_age_days)}d · {formatMoney(request.remaining_estimated_value_total)}</strong>
             </div>
           )) : <p style={styles.muted}>No breached SLA actions.</p>}
         </div>
@@ -3507,7 +3514,7 @@ export default function InventoryRequisitionsPage() {
                       Partial fulfillment: {item.partial_fulfillment_state === 'stale_partial' ? 'stale' : 'active'}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}d` : ''}
                     </span>
                   )}
-                  <span style={styles.muted}>Est. remaining value: {formatNumber(item.remaining_estimated_value_total)}</span>
+                  <span style={styles.muted}>Est. remaining value: {formatMoney(item.remaining_estimated_value_total)}</span>
                 </button>
               </div>
             );
@@ -3573,7 +3580,7 @@ export default function InventoryRequisitionsPage() {
               <div><strong>Partial fulfillment</strong><br />{selected.partial_fulfillment_state ? <span style={selected.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>{selected.partial_fulfillment_state === 'stale_partial' ? 'Stale partial' : 'Active partial'}</span> : '-'}<br /><span style={styles.muted}>{selected.partial_fulfillment_age_days !== null && selected.partial_fulfillment_age_days !== undefined ? `${formatNumber(selected.partial_fulfillment_age_days)} days since last fulfillment/update` : ''}</span></div>
               <div><strong>SLA state</strong><br />{selected.sla_state ? <span style={styles.warningText}>{slaStateLabel(selected.sla_state)}</span> : '-'}<br /><span style={styles.muted}>{slaStateDetail(selected)}</span></div>
               <div><strong>Approval threshold</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{approvalThresholdReasonLabel(selected.approval_threshold_reason)}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} to ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
-              <div><strong>Estimated value</strong><br />Requested: {formatNumber(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatNumber(selected.remaining_estimated_value_total)}</span></div>
+              <div><strong>Estimated value</strong><br />Requested: {formatMoney(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatMoney(selected.remaining_estimated_value_total)}</span></div>
               <div><strong>Updated</strong><br />{formatDateTime(selected.updated_at)}</div>
             </div>
             {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && (
@@ -3629,7 +3636,7 @@ export default function InventoryRequisitionsPage() {
                         <td style={styles.td}>{formatNumber(item.requested_quantity)}</td>
                         <td style={styles.td}>{formatNumber(item.fulfilled_quantity)}</td>
                         <td style={styles.td}>{formatNumber(remaining)}</td>
-                        <td style={styles.td}>{formatNumber(item.remaining_estimated_value)}</td>
+                        <td style={styles.td}>{formatMoney(item.remaining_estimated_value)}</td>
                         <td style={styles.td}>
                           {item.notes ? <span>{item.notes}</span> : <span style={styles.muted}>No request note</span>}
                           {formatApprovalThresholdLineNoteDepth(item) && (

@@ -1,7 +1,7 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
-import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { formatCurrency, formatDateTime } from '../EnterpriseInventoryFormat';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ApprovalRule, ApprovalRuleForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
@@ -80,7 +80,8 @@ export function ApprovalsTab({
   const amountRangeValid = Number.isFinite(minimumAmount)
     && minimumAmount >= 0
     && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount));
-  const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid)
+  const currencyValid = /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
+  const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid)
     && !createApprovalRuleMutation.isPending;
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
 
@@ -119,6 +120,7 @@ export function ApprovalsTab({
         <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
         <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
         <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Currency" value={approvalRuleForm.currency} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
         <SelectField
           disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
           label="Required role"
@@ -132,6 +134,7 @@ export function ApprovalsTab({
         />
         {!canWriteApprovalRules ? <p style={styles.helper}>Creating approval rules requires {TENANT_PERMISSIONS.APPROVAL_RULES_WRITE} permission.</p> : null}
         {!amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
+        {!currencyValid ? <p style={styles.helper}>Currency must be a three-letter ISO code.</p> : null}
         <button type="submit" disabled={!canSaveRule} style={canSaveRule ? styles.primaryButton : styles.disabledButton}>
           {createApprovalRuleMutation.isPending ? 'Saving…' : 'Save approval rule'}
         </button>
@@ -197,13 +200,14 @@ export function ApprovalsTab({
           <DataTable
             loading={approvalRulesQuery.isLoading}
             empty="No approval rules configured yet."
-            headers={['Entity', 'Department', 'Location', 'Min amount', 'Max amount', 'Required role', 'Active']}
+            headers={['Entity', 'Department', 'Location', 'Min amount', 'Max amount', 'Currency', 'Required role', 'Active']}
             rows={(approvalRulesQuery.data ?? []).map((item) => [
               displayLabel(item.entity_type, entityTypeLabels),
               item.department || '-',
               item.storage_location_id ? storageLocationNames.get(item.storage_location_id) || 'Unknown location' : 'All locations',
-              formatNumber(item.min_amount),
-              item.max_amount === null || item.max_amount === undefined ? 'No maximum' : formatNumber(item.max_amount),
+              formatCurrency(item.min_amount, item.currency),
+              item.max_amount === null || item.max_amount === undefined ? 'No maximum' : formatCurrency(item.max_amount, item.currency),
+              item.currency || '-',
               displayLabel(item.required_role, roleLabels),
               item.active ? 'Yes' : 'No'
             ])}

@@ -1,3 +1,4 @@
+import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
 import type {
   AlertFilters,
   AlertForm,
@@ -137,6 +138,7 @@ export const emptyApprovalRuleForm: ApprovalRuleForm = {
   storage_location_id: '',
   min_amount: '0',
   max_amount: '',
+  currency: getActiveTenantCurrency(),
   required_role: 'manager'
 };
 
@@ -159,7 +161,7 @@ export const emptySupplierCatalogForm: SupplierCatalogForm = {
   min_order_quantity: '0',
   preferred: false,
   unit_cost: '',
-  currency: 'EUR',
+  currency: getActiveTenantCurrency(),
   effective_from: new Date().toISOString().slice(0, 10)
 };
 
@@ -169,6 +171,7 @@ export const emptySupplierInvoiceForm: SupplierInvoiceForm = {
   shipment_id: '',
   invoice_number: '',
   invoice_date: new Date().toISOString().slice(0, 10),
+  currency: getActiveTenantCurrency(),
   subtotal_amount: '',
   tax_amount: '0',
   total_amount: '',

@@ -7,6 +7,7 @@ import {
   getCurrentUserRole,
   hasPermission
 } from '../lib/permissions';
+import { DEFAULT_INVENTORY_CURRENCY, normalizeCurrencyCode, setActiveTenantCurrency } from '../lib/tenantCurrency';
 
 type TenantSettingsRow = {
   id: string;
@@ -15,6 +16,8 @@ type TenantSettingsRow = {
   season_start?: string | null;
   season_end?: string | null;
   organization_type?: string | null;
+  inventory_currency?: string | null;
+  inventory_currency_configured_at?: string | null;
   metadata?: Record<string, unknown> | null;
   write_locked?: boolean;
   created_at?: string | null;
@@ -27,6 +30,7 @@ type TenantSettingsFormState = {
   season_start: string;
   season_end: string;
   organization_type: string;
+  inventory_currency: string;
   metadata: string;
 };
 
@@ -36,6 +40,8 @@ type TenantPayload = {
   season_start: string | null;
   season_end: string | null;
   organization_type: string;
+  inventory_currency: string;
+  confirm_inventory_currency: boolean;
   metadata: Record<string, unknown>;
 };
 
@@ -45,6 +51,7 @@ const emptyFormState: TenantSettingsFormState = {
   season_start: '',
   season_end: '',
   organization_type: 'facility',
+  inventory_currency: DEFAULT_INVENTORY_CURRENCY,
   metadata: '{}'
 };
 
@@ -91,6 +98,7 @@ function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormSt
     season_start: normalizeDateInput(tenant.season_start),
     season_end: normalizeDateInput(tenant.season_end),
     organization_type: tenant.organization_type ?? 'facility',
+    inventory_currency: normalizeCurrencyCode(tenant.inventory_currency),
     metadata: formatMetadata(tenant.metadata)
   };
 }
@@ -102,6 +110,8 @@ function buildPayload(formState: TenantSettingsFormState, metadata: Record<strin
     season_start: formState.season_start || null,
     season_end: formState.season_end || null,
     organization_type: formState.organization_type.trim() || 'facility',
+    inventory_currency: normalizeCurrencyCode(formState.inventory_currency),
+    confirm_inventory_currency: false,
     metadata
   };
 }
@@ -130,6 +140,7 @@ export default function TenantSettingsPage() {
   const [formState, setFormState] = useState<TenantSettingsFormState>(emptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [confirmInventoryCurrency, setConfirmInventoryCurrency] = useState(false);
 
   const tenantsQuery = useQuery({
     queryKey: ['tenants'],
@@ -151,6 +162,7 @@ export default function TenantSettingsPage() {
     setFormState(createFormState(selectedTenant));
     setFormError(null);
     setSuccessMessage(null);
+    setConfirmInventoryCurrency(false);
   }, [selectedTenant]);
 
   const parsedMetadata = useMemo(() => {
@@ -173,7 +185,8 @@ export default function TenantSettingsPage() {
       setSelectedTenantId(tenant.id);
       setFormState(createFormState(tenant));
       setFormError(null);
-      setSuccessMessage('Tenant settings updated.');
+      setActiveTenantCurrency(tenant.inventory_currency);
+      setSuccessMessage('Tenant settings updated. Inventory currency is used for standard costs and tenant-base valuation; no automatic FX conversion is performed.');
       await queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
     onError: (error) => {
@@ -233,19 +246,28 @@ export default function TenantSettingsPage() {
       return null;
     }
 
+    if (!/^[A-Za-z]{3}$/.test(formState.inventory_currency.trim())) {
+      setSuccessMessage(null);
+      setFormError('Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.');
+      return null;
+    }
+
     if (!parsedMetadata.valid || !parsedMetadata.value) {
       setSuccessMessage(null);
       setFormError('Metadata must be a valid JSON object.');
       return null;
     }
 
-    return buildPayload(
-      {
-        ...formState,
-        name: normalizedName
-      },
-      parsedMetadata.value
-    );
+    return {
+      ...buildPayload(
+        {
+          ...formState,
+          name: normalizedName
+        },
+        parsedMetadata.value
+      ),
+      confirm_inventory_currency: confirmInventoryCurrency
+    };
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -388,6 +410,46 @@ export default function TenantSettingsPage() {
                 disabled={!canUpdateTenants || isSaving}
               />
             </label>
+
+            <label style={styles.field}>
+              <span style={styles.label}>Inventory Currency</span>
+              <input
+                style={styles.input}
+                value={formState.inventory_currency}
+                onChange={(event) => updateField('inventory_currency', event.target.value.toUpperCase())}
+                disabled={!canUpdateTenants || isSaving}
+                maxLength={3}
+                pattern="[A-Za-z]{3}"
+                placeholder={DEFAULT_INVENTORY_CURRENCY}
+                required
+              />
+              <span style={styles.helperText}>
+                Base ISO currency for product standard costs, inventory valuation, and tenant-base cost analytics. Supplier prices, invoices, and purchase orders can preserve their own explicit currency. The app does not automatically convert foreign exchange.
+              </span>
+            </label>
+
+            {!selectedTenant?.inventory_currency_configured_at ? (
+              <label style={{ ...styles.field, ...styles.fullWidth }}>
+                <span style={styles.label}>Legacy currency confirmation</span>
+                <span style={styles.helperText}>
+                  This tenant existed before currency tracking. You may correct the displayed default before confirming it. Changing the code is treated as confirmation. If the code is already correct, check this box to confirm it explicitly. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists because the application never silently relabels or converts historical amounts.
+                </span>
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={confirmInventoryCurrency}
+                    onChange={(event) => setConfirmInventoryCurrency(event.target.checked)}
+                    disabled={!canUpdateTenants || isSaving}
+                  />{' '}
+                  Confirm that this is the currency of existing inventory standard costs
+                </span>
+              </label>
+            ) : (
+              <div style={{ ...styles.field, ...styles.fullWidth }}>
+                <span style={styles.label}>Currency status</span>
+                <span style={styles.helperText}>Confirmed. Currency changes remain possible only while there is no currency-dependent financial evidence that would be relabelled.</span>
+              </div>
+            )}
 
             <label style={styles.field}>
               <span style={styles.label}>Season Start</span>

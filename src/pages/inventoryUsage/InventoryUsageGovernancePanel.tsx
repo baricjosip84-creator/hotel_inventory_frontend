@@ -121,7 +121,7 @@ export function InventoryUsageGovernancePanel({
       const headers = [
         "usage_log_id", "exception_types", "product_id", "product_name",
         "storage_location_id", "storage_location_name", "consumption_reason",
-        "department", "quantity", "unit", "estimated_usage_value",
+        "department", "quantity", "unit", "estimated_usage_value", "currency_code",
         "review_status", "reviewed_at", "reviewed_by_user_id",
         "reviewed_by_user_name", "reversed_at", "consumed_at",
         "created_by_user_id", "created_by_user_name", "notes",
@@ -139,6 +139,7 @@ export function InventoryUsageGovernancePanel({
         quantity: row.quantity,
         unit: row.product_unit || "",
         estimated_usage_value: row.estimated_usage_value ?? "",
+        currency_code: row.currency_code || "",
         review_status: row.review_status || "pending",
         reviewed_at: row.reviewed_at || "",
         reviewed_by_user_id: row.reviewed_by_user_id || "",

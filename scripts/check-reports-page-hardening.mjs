@@ -17,7 +17,8 @@ const requiredReportsSnippets = [
   'formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)',
   'formatCostSource(row.estimated_cost_source)',
   'function formatCostAmount',
-  'currency is not stored on these inventory cost fields',
+  'formatCurrencyAmount',
+  'Foreign-currency receipt costs are preserved separately and are not silently converted.',
   "row.product_unit || 'units'",
   'Forecasting is not enabled for this tenant subscription.'
 ];

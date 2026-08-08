@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 
 const DECISIONS = ['pending', 'accepted', 'overridden', 'rejected', 'deferred', 'already_handled'] as const;
 type Decision = (typeof DECISIONS)[number];
@@ -74,6 +75,7 @@ type PlanItem = {
   remaining_purchase_requirement: number | string;
   recommended_purchase_quantity: number | string;
   estimated_purchase_cost?: number | string | null;
+  estimated_cost_currency?: string | null;
   linked_purchase_order_id?: string | null;
   linked_purchase_order_number?: string | null;
   linked_purchase_order_status?: string | null;
@@ -593,14 +595,14 @@ export default function ReplenishmentPlanningPage() {
             const draft = drafts[key] ?? { decision: row.decision_status, quantity: String(row.final_purchase_quantity), reason: row.decision_reason ?? '' };
             const disabled = !canGovern || runLocked || Boolean(row.linked_purchase_order_id);
             const supplierMissing = !row.supplier_id;
-            const currency = row.evidence?.supplier?.currency || '';
+            const currency = row.estimated_cost_currency || row.evidence?.supplier?.currency || null;
             return <tr key={row.id}>
               <td><strong>{row.product_name}</strong><br/><span style={styles.muted}>{row.storage_location_name} · {row.product_unit || 'unit not recorded'}</span></td>
               <td>{formatNumber(row.usable_inventory_position)}<br/><span style={styles.muted}>On hand {formatNumber(row.current_stock)} · reserved {formatNumber(row.reserved_quantity)} · reliable inbound {formatNumber(row.reliable_inbound_quantity)}</span></td>
               <td>{formatNumber(row.configured_target_quantity)}<br/><span style={styles.muted}>Governed minimum {formatNumber(row.governed_min_quantity)}</span></td>
               <td>{formatNumber(row.transfer_covered_quantity)}</td>
               <td>{formatNumber(row.remaining_purchase_requirement)}</td>
-              <td><strong>{formatNumber(row.recommended_purchase_quantity)}</strong><br/><span style={styles.muted}>Estimated cost {row.estimated_purchase_cost == null ? 'not available' : `${formatNumber(row.estimated_purchase_cost)} ${currency}`.trim()}</span></td>
+              <td><strong>{formatNumber(row.recommended_purchase_quantity)}</strong><br/><span style={styles.muted}>Estimated cost {row.estimated_purchase_cost == null ? 'not available' : formatCurrencyAmount(row.estimated_purchase_cost, currency, 4)}</span></td>
               <td>{row.supplier_name || <span style={styles.inlineError}>Supplier missing</span>}</td>
               <td><select style={styles.compactInput} value={draft.decision} disabled={disabled} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, decision: event.target.value as Decision } }))}>{DECISIONS.map((decision) => <option key={decision} value={decision} disabled={(decision === 'pending' && row.decision_status !== 'pending') || (supplierMissing && ['accepted', 'overridden'].includes(decision))}>{decisionLabel(decision)}</option>)}</select></td>
               <td><input style={styles.qtyInput} type="number" min={0} step="0.0001" value={draft.quantity} disabled={disabled || draft.decision !== 'overridden' || supplierMissing} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, quantity: event.target.value } }))}/></td>

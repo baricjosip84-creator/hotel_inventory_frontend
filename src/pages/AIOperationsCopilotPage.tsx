@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError } from '../lib/actionFeedback';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import type { ProductItem } from '../types/inventory';
 import './AIOperationsCopilotPage.css';
 
@@ -274,6 +275,11 @@ function formatDateTime(value?: string | null): string {
 function formatConfidence(value?: number | null): string {
   if (typeof value !== 'number' || Number.isNaN(value)) return 'Not scored';
   return `${Math.round(value * 100)}%`;
+}
+
+function displayCost(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Not reported';
+  return formatCurrencyAmount(value as number | string);
 }
 
 function displayUnknown(value: unknown): string {
@@ -667,7 +673,7 @@ export default function AIOperationsCopilotPage() {
                   <option value="">Select a product</option>
                   {(productsQuery.data || []).map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} — min {displayUnknown(product.min_stock)} {product.unit} · standard cost {displayUnknown(product.standard_unit_cost)}
+                      {product.name} — min {displayUnknown(product.min_stock)} {product.unit} · standard cost {displayCost(product.standard_unit_cost)}
                     </option>
                   ))}
                 </select>
@@ -926,9 +932,9 @@ export default function AIOperationsCopilotPage() {
                   <div style={styles.keyValueGrid}>
                     <div><span style={styles.keyLabel}>Request type</span><strong>{formatLabel(proposal.request_type)}</strong></div>
                     <div><span style={styles.keyLabel}>Product</span><strong>{proposal.payload?.product_name || (capabilities.canViewTenantDiagnostics ? proposal.payload?.product_id : null) || 'Not reported'}</strong></div>
-                    <div><span style={styles.keyLabel}>Current {proposalValueLabel}</span><strong>{displayUnknown(proposalCurrentValue)}</strong></div>
+                    <div><span style={styles.keyLabel}>Current {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalCurrentValue) : displayUnknown(proposalCurrentValue)}</strong></div>
                     {isMinStockProposal ? <div><span style={styles.keyLabel}>System recommendation</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock)}</strong></div> : null}
-                    <div><span style={styles.keyLabel}>Final proposed {proposalValueLabel}</span><strong>{displayUnknown(proposalTargetValue)}</strong></div>
+                    <div><span style={styles.keyLabel}>Final proposed {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalTargetValue) : displayUnknown(proposalTargetValue)}</strong></div>
                     {isMinStockProposal ? <div><span style={styles.keyLabel}>Human override</span><strong>{proposal.payload?.user_override_applied ? 'Yes' : 'No'}</strong></div> : null}
                   </div>
                   {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>Override reason: {proposal.payload.override_reason}</p> : null}

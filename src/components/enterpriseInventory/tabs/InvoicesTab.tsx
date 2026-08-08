@@ -1,3 +1,4 @@
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../../../lib/tenantCurrency';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
@@ -92,22 +93,10 @@ function validRequiredNonNegativeNumber(value: string): boolean {
 
 function formatAmount(
   value: number | string | null | undefined,
-  currency = 'EUR',
+  currency = getActiveTenantCurrency(),
   maximumFractionDigits = 4
 ): string {
-  if (value === null || value === undefined || value === '') return '-';
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return String(value);
-
-  try {
-    return parsed.toLocaleString(undefined, {
-      style: 'currency',
-      currency: currency || 'EUR',
-      maximumFractionDigits
-    });
-  } catch {
-    return `${formatNumber(parsed)} ${currency || 'EUR'}`;
-  }
+  return formatCurrencyAmount(value, currency, maximumFractionDigits);
 }
 
 export function InvoicesTab({
@@ -148,7 +137,8 @@ export function InvoicesTab({
     && validRequiredNonNegativeNumber(supplierInvoiceForm.total_amount)
     && validRequiredNonNegativeNumber(supplierInvoiceForm.quantity)
     && validRequiredNonNegativeNumber(supplierInvoiceForm.unit_cost);
-  const canCreateInvoice = canWriteInvoices && Boolean(
+  const invoiceCurrencyValid = /^[A-Za-z]{3}$/.test(supplierInvoiceForm.currency.trim());
+  const canCreateInvoice = canWriteInvoices && invoiceCurrencyValid && Boolean(
     supplierInvoiceForm.supplier_id
       && supplierInvoiceForm.invoice_number.trim()
       && supplierInvoiceForm.invoice_date
@@ -217,6 +207,7 @@ export function InvoicesTab({
           />
           <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Invoice number" value={supplierInvoiceForm.invoice_number} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_number: value }))} required />
           <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Invoice date" type="date" value={supplierInvoiceForm.invoice_date} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_date: value }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Currency" value={supplierInvoiceForm.currency} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
           <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Subtotal" type="number" min="0" value={supplierInvoiceForm.subtotal_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, subtotal_amount: value }))} />
           <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Tax" type="number" min="0" value={supplierInvoiceForm.tax_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, tax_amount: value }))} />
           <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Total" type="number" min="0" value={supplierInvoiceForm.total_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, total_amount: value }))} required />
@@ -249,7 +240,7 @@ export function InvoicesTab({
             item.supplier_sku || '-',
             item.latest_unit_cost === null || item.latest_unit_cost === undefined
               ? '-'
-              : formatAmount(item.latest_unit_cost, item.latest_currency || 'EUR'),
+              : formatAmount(item.latest_unit_cost, item.latest_currency || getActiveTenantCurrency()),
             `${formatNumber(item.lead_time_days)} days`,
             formatNumber(item.min_order_quantity),
             item.preferred ? 'Yes' : 'No'
@@ -279,7 +270,7 @@ export function InvoicesTab({
             })(),
             formatBusinessLabel(item.status),
             formatBusinessLabel(item.variance_status),
-            formatAmount(item.total_amount, item.currency || 'EUR', 2),
+            formatAmount(item.total_amount, item.currency || getActiveTenantCurrency(), 2),
             formatDate(item.invoice_date),
             formatDateTime(item.created_at)
           ])}

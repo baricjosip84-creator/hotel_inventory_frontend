@@ -708,7 +708,7 @@ export function InventoryUsageDashboard({
         <div style={styles.statCard}>
           <span style={styles.statLabel}>Estimated usage value</span>
           <strong style={styles.statValue}>
-            {formatMoney(totals?.estimated_usage_value)}
+            {formatMoney(totals?.estimated_usage_value, summary?.currency_code)}
           </strong>
         </div>
         <div style={styles.statCard}>
@@ -770,7 +770,7 @@ export function InventoryUsageDashboard({
                   <strong>{toNumber(row.total_quantity)}</strong>
                   <small>
                     {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value)} est. value
+                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
                     {toNumber(row.missing_cost_count)
                       ? ` · ${toNumber(row.missing_cost_count)} missing cost`
                       : ""}
@@ -802,7 +802,7 @@ export function InventoryUsageDashboard({
                   <strong>{toNumber(row.total_quantity)}</strong>
                   <small>
                     {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value)} est. value
+                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
                     {toNumber(row.missing_cost_count)
                       ? ` · ${toNumber(row.missing_cost_count)} missing cost`
                       : ""}
@@ -836,7 +836,7 @@ export function InventoryUsageDashboard({
                   <strong>{toNumber(row.total_quantity)}</strong>
                   <small>
                     {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value)} est. value · last{" "}
+                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value · last{" "}
                     {formatDateTime(row.last_consumed_at)}
                     {toNumber(row.missing_cost_count)
                       ? ` · ${toNumber(row.missing_cost_count)} missing cost`
@@ -875,7 +875,7 @@ export function InventoryUsageDashboard({
                   <strong>{toNumber(row.total_quantity)}</strong>
                   <small>
                     {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value)} est. value · last{" "}
+                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value · last{" "}
                     {formatDateTime(row.last_consumed_at)}
                     {toNumber(row.missing_cost_count)
                       ? ` · ${toNumber(row.missing_cost_count)} missing cost`
@@ -913,7 +913,7 @@ export function InventoryUsageDashboard({
                     {toNumber(row.usage_count)} events ·{" "}
                     {toNumber(row.product_count)} products ·{" "}
                     {toNumber(row.location_count)} locations ·{" "}
-                    {formatMoney(row.estimated_usage_value)} est. value
+                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
                     {toNumber(row.missing_cost_count)
                       ? ` · ${toNumber(row.missing_cost_count)} missing cost`
                       : ""}
@@ -971,7 +971,7 @@ export function InventoryUsageDashboard({
                 <div style={styles.governanceCard}>
                   <span>Usage value</span>
                   <strong>
-                    {formatMoney(impact.summary?.estimated_usage_value)}
+                    {formatMoney(impact.summary?.estimated_usage_value, impact?.currency_code)}
                   </strong>
                 </div>
                 <div style={styles.governanceCard}>
@@ -1160,11 +1160,11 @@ export function InventoryUsageDashboard({
                       <td style={styles.td}>{toNumber(row.usage_count)}</td>
                       <td style={styles.td}>{toNumber(row.total_quantity)}</td>
                       <td style={styles.td}>
-                        {formatMoney(row.estimated_usage_value)}
+                        {formatMoney(row.estimated_usage_value, summary?.currency_code)}
                       </td>
                       <td style={styles.td}>
                         {row.estimated_unit_cost
-                          ? formatMoney(row.estimated_unit_cost)
+                          ? formatMoney(row.estimated_unit_cost, summary?.currency_code)
                           : "Missing"}
                       </td>
                       <td style={styles.td}>{row.product_unit || "-"}</td>
@@ -1258,11 +1258,11 @@ export function InventoryUsageDashboard({
                 <div style={styles.governanceCard}>
                   <span>Estimated value</span>
                   <strong>
-                    {formatMoney(usageLogDetail.estimated_usage_value)}
+                    {formatMoney(usageLogDetail.estimated_usage_value, usageLogDetail.currency_code)}
                   </strong>
                   <small>
                     {usageLogDetail.estimated_unit_cost
-                      ? `${formatMoney(usageLogDetail.estimated_unit_cost)} / ${usageLogDetail.product_unit || "unit"}`
+                      ? `${formatMoney(usageLogDetail.estimated_unit_cost, usageLogDetail.currency_code)} / ${usageLogDetail.product_unit || "unit"}`
                       : "Missing standard cost"}
                   </small>
                 </div>
@@ -1458,10 +1458,10 @@ export function InventoryUsageDashboard({
                     </td>
                     <td style={styles.td}>
                       <div style={styles.contextCell}>
-                        <span>{formatMoney(usage.estimated_usage_value)}</span>
+                        <span>{formatMoney(usage.estimated_usage_value, usage.currency_code)}</span>
                         <small>
                           {usage.estimated_unit_cost
-                            ? `${formatMoney(usage.estimated_unit_cost)} / ${usage.product_unit || "unit"}`
+                            ? `${formatMoney(usage.estimated_unit_cost, usage.currency_code)} / ${usage.product_unit || "unit"}`
                             : "Missing standard cost"}
                         </small>
                       </div>

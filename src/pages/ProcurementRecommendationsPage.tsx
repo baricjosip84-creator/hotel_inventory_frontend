@@ -1,9 +1,12 @@
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
 import { getRoleCapabilities } from "../lib/permissions";
+
+type CurrencyTotal = { currency_code: string; amount: number | string };
 
 type RecommendationSummary = {
   total_products?: number | string;
@@ -13,7 +16,11 @@ type RecommendationSummary = {
   medium_count?: number | string;
   low_count?: number | string;
   blocked_count?: number | string;
-  estimated_total_cost?: number | string;
+  estimated_total_cost?: number | string | null;
+  estimated_total_cost_by_currency?: CurrencyTotal[];
+  mixed_currency?: boolean;
+  currency?: string | null;
+  budget_currency?: string | null;
   budget_limit?: number | string | null;
   budget_variance?: number | string | null;
   budget_remaining_after_recommendation?: number | string | null;
@@ -167,6 +174,7 @@ type ReplenishmentRecommendation = {
   estimated_cost_source?: string | null;
   estimated_total_cost?: number | string | null;
   budget_limit?: number | string | null;
+  budget_currency?: string | null;
   budget_variance?: number | string | null;
   budget_remaining_after_recommendation?: number | string | null;
   budget_status?: string | null;
@@ -252,6 +260,8 @@ type RecommendationPoDraftConversionResponse = {
   converted_count: number | string;
   purchase_order_count: number | string;
   estimated_total_cost?: number | string | null;
+  estimated_total_cost_by_currency?: CurrencyTotal[];
+  mixed_currency?: boolean;
   purchase_orders: Array<{
     purchase_order_id: string;
     po_number: string;
@@ -260,6 +270,7 @@ type RecommendationPoDraftConversionResponse = {
     expected_delivery_date?: string | null;
     status: string;
     item_count: number | string;
+    currency?: string | null;
     estimated_total_cost?: number | string | null;
   }>;
 };
@@ -273,11 +284,14 @@ type RecommendationPoDraftReviewResponse = {
     draft_count: number | string;
     submitted_count: number | string;
     warning_count: number | string;
-    estimated_total_cost: number | string;
+    estimated_total_cost: number | string | null;
+    estimated_total_cost_by_currency?: CurrencyTotal[];
+    mixed_currency?: boolean;
   };
   rows: Array<{
     purchase_order_id: string;
     po_number: string;
+    currency?: string | null;
     status: string;
     supplier_id: string;
     supplier_name?: string | null;
@@ -329,8 +343,12 @@ type ProcurementExecutionDashboardResponse = {
     converted_count: number | string;
     open_po_draft_count: number | string;
     po_draft_warning_count: number | string;
-    estimated_recommendation_spend: number | string;
-    open_po_draft_spend: number | string;
+    estimated_recommendation_spend: number | string | null;
+    estimated_recommendation_spend_by_currency?: CurrencyTotal[];
+    mixed_recommendation_currency?: boolean;
+    open_po_draft_spend: number | string | null;
+    open_po_draft_spend_by_currency?: CurrencyTotal[];
+    mixed_po_currency?: boolean;
     shortages_preventable_count: number | string;
     po_conversion_evidence_count?: number | string;
     projected_stockout_avoidance_count: number | string;
@@ -345,9 +363,13 @@ type ProcurementExecutionDashboardResponse = {
     blocked_count: number | string;
     approved_count: number | string;
     converted_count: number | string;
-    estimated_total_cost: number | string;
+    estimated_total_cost: number | string | null;
+    estimated_total_cost_by_currency?: CurrencyTotal[];
+    mixed_recommendation_currency?: boolean;
     open_po_draft_count: number | string;
-    open_po_draft_spend: number | string;
+    open_po_draft_spend: number | string | null;
+    open_po_draft_spend_by_currency?: CurrencyTotal[];
+    mixed_po_currency?: boolean;
   }>;
   recommendation_aging: {
     buckets: Record<string, number | string>;
@@ -408,6 +430,7 @@ type ProcurementExceptionQueueResponse = {
     procurement_ready?: boolean;
     recommended_reorder_quantity?: number | string | null;
     estimated_total_cost?: number | string | null;
+    currency?: string | null;
     estimated_days_of_coverage?: number | string | null;
     projected_depletion_date?: string | null;
     converted_purchase_order_id?: string | null;
@@ -445,6 +468,7 @@ type ProcurementRecommendationScheduledRunResponse = {
   lookback_days: number | string;
   shortage_window_days?: number | string | null;
   budget_limit?: number | string | null;
+  budget_currency?: string | null;
   summary: {
     candidate_count: number | string;
     ready_count: number | string;
@@ -452,6 +476,9 @@ type ProcurementRecommendationScheduledRunResponse = {
     approved_count: number | string;
     po_draft_count: number | string;
     estimated_total_cost?: number | string | null;
+    estimated_total_cost_by_currency?: CurrencyTotal[];
+    mixed_currency?: boolean;
+    currency?: string | null;
     status: string;
   };
   blockers?: Array<{ code?: string | null; message?: string | null }>;
@@ -463,6 +490,7 @@ type ProcurementRecommendationScheduledRunResponse = {
     urgency?: string | null;
     recommended_reorder_quantity?: number | string | null;
     estimated_total_cost?: number | string | null;
+    currency?: string | null;
     readiness?: string | null;
     warnings?: Array<{ code?: string | null; message?: string | null }>;
   }>;
@@ -492,6 +520,8 @@ type ProcurementExecutionHistoryResponse = {
     blocked_run_count: number | string;
     po_draft_count: number | string;
     estimated_total_cost?: number | string | null;
+    estimated_total_cost_by_currency?: CurrencyTotal[];
+    mixed_currency?: boolean;
   };
   decisions: Array<{
     event_type: "recommendation_decision";
@@ -505,6 +535,7 @@ type ProcurementExecutionHistoryResponse = {
     decision_note?: string | null;
     recommended_reorder_quantity?: number | string | null;
     estimated_total_cost?: number | string | null;
+    currency?: string | null;
     urgency?: string | null;
     procurement_ready?: boolean;
     blocker_code?: string | null;
@@ -524,6 +555,8 @@ type ProcurementExecutionHistoryResponse = {
     approved_count: number | string;
     po_draft_count: number | string;
     estimated_total_cost?: number | string | null;
+    budget_currency?: string | null;
+    estimated_total_cost_by_currency?: Record<string, number | string>;
     created_at?: string | null;
     blockers?: Array<{ code?: string | null; message?: string | null }>;
     warnings?: Array<{ code?: string | null; message?: string | null }>;
@@ -587,8 +620,11 @@ type ReplenishmentRecommendationBulkReadinessResponse = {
     blocked_count: number | string;
     failed_count: number | string;
     warning_count: number | string;
-    estimated_total_cost: number | string;
+    estimated_total_cost: number | string | null;
+    estimated_total_cost_by_currency?: CurrencyTotal[];
+    mixed_currency?: boolean;
     budget_limit?: number | string | null;
+    budget_currency?: string | null;
     budget_variance?: number | string | null;
     budget_status?: string | null;
     budget_blocker_message?: string | null;
@@ -610,6 +646,7 @@ type ReplenishmentRecommendationBulkReadinessResponse = {
     package_rounding_applied?: boolean;
     package_rounding_added_quantity?: number | string | null;
     estimated_total_cost?: number | string | null;
+    currency?: string | null;
     blocker_codes?: string[];
     blockers?: Array<{ code?: string | null; message?: string | null }>;
     warnings?: Array<{ code?: string | null; message?: string | null }>;
@@ -677,18 +714,20 @@ function formatMoney(
   if (value === null || value === undefined || value === "") return "-";
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
-  const currencyCode = currency || "USD";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-      maximumFractionDigits: 2,
-    }).format(parsed);
-  } catch {
-    return `${formatNumber(parsed)} ${currencyCode}`;
-  }
+  return formatCurrencyAmount(parsed, currency || getActiveTenantCurrency(), 2);
 }
 
+
+function formatMoneyBreakdown(rows?: CurrencyTotal[] | null, fallbackValue?: number | string | null, fallbackCurrency?: string | null): string {
+  const usable = (rows ?? []).filter((row) => row.currency_code && Number.isFinite(Number(row.amount)));
+  if (usable.length > 0) return usable.map((row) => formatMoney(row.amount, row.currency_code)).join(' · ');
+  return formatMoney(fallbackValue, fallbackCurrency);
+}
+
+function formatMoneyRecordBreakdown(rows?: Record<string, number | string> | null, fallbackValue?: number | string | null, fallbackCurrency?: string | null): string {
+  const usable = Object.entries(rows ?? {}).map(([currency_code, amount]) => ({ currency_code, amount }));
+  return formatMoneyBreakdown(usable, fallbackValue, fallbackCurrency);
+}
 
 function hasPoDraftCostWarning(po: RecommendationPoDraftReviewResponse["rows"][number]): boolean {
   return toNumber(po.estimated_total_cost) <= 0 || po.governance_warnings.some((warning) => warning.code === "MISSING_ESTIMATED_COST");
@@ -1825,7 +1864,7 @@ export default function ProcurementRecommendationsPage() {
         />
         <StatCard
           label="Estimated spend"
-          value={formatMoney(summary.estimated_total_cost ?? 0)}
+          value={formatMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
         />
         <StatCard
           label="Budget status"
@@ -1922,7 +1961,7 @@ export default function ProcurementRecommendationsPage() {
               />
               <StatCard
                 label="Open draft spend"
-                value={formatMoney(dashboardSummary.open_po_draft_spend)}
+                value={formatMoneyBreakdown(dashboardSummary.open_po_draft_spend_by_currency, dashboardSummary.open_po_draft_spend)}
               />
               <StatCard
                 label="Execution risk score"
@@ -1952,7 +1991,7 @@ export default function ProcurementRecommendationsPage() {
                         </div>
                       </div>
                       <div style={styles.primaryText}>
-                        {formatMoney(supplier.estimated_total_cost)}
+                        {formatMoneyBreakdown(supplier.estimated_total_cost_by_currency, supplier.estimated_total_cost)}
                       </div>
                     </div>
                   ))}
@@ -2246,7 +2285,7 @@ export default function ProcurementRecommendationsPage() {
                       <td style={styles.td}>{row.supplier_name || "-"}</td>
                       <td style={styles.td}>{titleCase(row.urgency)}</td>
                       <td style={styles.td}>{formatNumber(row.recommended_reorder_quantity)}</td>
-                      <td style={styles.td}>{formatMoney(row.estimated_total_cost)}</td>
+                      <td style={styles.td}>{formatMoney(row.estimated_total_cost, row.currency)}</td>
                       <td style={styles.td}>{(row.warnings ?? []).map((warning) => warning.code).join(", ") || "-"}</td>
                     </tr>
                   ))}
@@ -2317,7 +2356,9 @@ export default function ProcurementRecommendationsPage() {
                         <td style={styles.td}>{isRun ? "Scheduled run" : "Decision"}</td>
                         <td style={styles.td}>{subject}</td>
                         <td style={styles.td}><Badge tone={status === "blocked" || status === "rejected" ? "bad" : status === "deferred" || status === "completed_with_warnings" ? "warn" : "good"}>{titleCase(status)}</Badge></td>
-                        <td style={styles.td}>{formatMoney(event.estimated_total_cost as string | number | null | undefined)}</td>
+                        <td style={styles.td}>{isRun
+                          ? formatMoneyRecordBreakdown(event.estimated_total_cost_by_currency as Record<string, number | string> | undefined, event.estimated_total_cost as string | number | null | undefined, event.budget_currency as string | null | undefined)
+                          : formatMoney(event.estimated_total_cost as string | number | null | undefined, event.currency as string | null | undefined)}</td>
                         <td style={styles.td}>{poLink}</td>
                       </tr>
                     );
@@ -2540,7 +2581,7 @@ export default function ProcurementRecommendationsPage() {
                         </button>
                         <div style={styles.mutedText}>{titleCase(exception.urgency || "unknown")}</div>
                         <div style={styles.mutedText}>
-                          Recommend {formatNumber(exception.recommended_reorder_quantity)} · {formatMoney(exception.estimated_total_cost)}
+                          Recommend {formatNumber(exception.recommended_reorder_quantity)} · {formatMoney(exception.estimated_total_cost, exception.currency || exception.row?.currency)}
                         </div>
                       </td>
                       <td style={styles.td}>{exception.supplier_name || "Unassigned"}</td>
@@ -2929,13 +2970,20 @@ export default function ProcurementRecommendationsPage() {
             {formatNumber(bulkReadiness.summary.failed_count, 0)} failed,{" "}
             {formatNumber(bulkReadiness.summary.warning_count, 0)} warnings ·
             estimated spend{" "}
-            {formatMoney(bulkReadiness.summary.estimated_total_cost)}.
+            {formatMoneyBreakdown(
+              bulkReadiness.summary.estimated_total_cost_by_currency,
+              bulkReadiness.summary.estimated_total_cost,
+              bulkReadiness.summary.budget_currency,
+            )}.
             {bulkReadiness.summary.budget_status &&
             bulkReadiness.summary.budget_status !== "not_configured" ? (
               <>
                 {" "}
                 Budget: {titleCase(bulkReadiness.summary.budget_status)} (
-                {formatMoney(bulkReadiness.summary.budget_variance)} variance).
+                {formatMoney(
+                  bulkReadiness.summary.budget_variance,
+                  bulkReadiness.summary.budget_currency,
+                )} variance).
               </>
             ) : null}
             {bulkReadiness.results.some((row) => !row.can_approve) ? (
@@ -2984,7 +3032,7 @@ export default function ProcurementRecommendationsPage() {
                   <span>
                     {po.po_number} · {po.supplier_name || po.supplier_id} ·{" "}
                     {formatNumber(po.item_count, 0)} item(s) ·{" "}
-                    {formatMoney(po.estimated_total_cost)}
+                    {formatMoney(po.estimated_total_cost, po.currency)}
                   </span>
                   <button
                     type="button"
@@ -3362,7 +3410,7 @@ export default function ProcurementRecommendationsPage() {
                   <td style={styles.td}>
                     <Badge
                       tone={
-                        row.budget_status === "over_budget"
+                        ["over_budget", "currency_mismatch"].includes(row.budget_status || "")
                           ? "bad"
                           : row.budget_status === "within_budget"
                             ? "good"
@@ -3373,8 +3421,8 @@ export default function ProcurementRecommendationsPage() {
                     </Badge>
                     {row.budget_limit ? (
                       <div style={styles.mutedText}>
-                        Limit {formatMoney(row.budget_limit)} · remaining{" "}
-                        {formatMoney(row.budget_remaining_after_recommendation)}
+                        Limit {formatMoney(row.budget_limit, row.budget_currency)} · remaining{" "}
+                        {formatMoney(row.budget_remaining_after_recommendation, row.budget_currency)}
                       </div>
                     ) : null}
                     {row.budget_blocker_message ? (
@@ -3520,7 +3568,8 @@ export default function ProcurementRecommendationsPage() {
               />
               <StatCard
                 label="Loaded spend"
-                value={formatMoney(
+                value={formatMoneyBreakdown(
+                  poDraftReviewQuery.data.summary.estimated_total_cost_by_currency,
                   poDraftReviewQuery.data.summary.estimated_total_cost,
                 )}
               />
@@ -3587,7 +3636,7 @@ export default function ProcurementRecommendationsPage() {
                             >
                               {item.product_name || item.product_id}:{" "}
                               {formatNumber(item.quantity)} @{" "}
-                              {formatMoney(item.unit_cost)}
+                              {formatMoney(item.unit_cost, po.currency)}
                               {item.recommendation_key ? (
                                 <div style={styles.mutedText}>
                                   Recommendation {item.recommendation_key}
@@ -3601,7 +3650,7 @@ export default function ProcurementRecommendationsPage() {
                         </ul>
                       </td>
                       <td style={styles.td}>
-                        {formatMoney(po.estimated_total_cost)}
+                        {formatMoney(po.estimated_total_cost, po.currency)}
                       </td>
                       <td style={styles.td}>
                         <Badge
@@ -3825,12 +3874,13 @@ export default function ProcurementRecommendationsPage() {
               </div>
               <div style={styles.metricLine}>
                 <strong>Limit:</strong>{" "}
-                {formatMoney(selectedDetail.budget_limit)}
+                {formatMoney(selectedDetail.budget_limit, selectedDetail.budget_currency)}
               </div>
               <div style={styles.metricLine}>
                 <strong>Remaining:</strong>{" "}
                 {formatMoney(
                   selectedDetail.budget_remaining_after_recommendation,
+                  selectedDetail.budget_currency,
                 )}
               </div>
               {selectedDetail.budget_blocker_message ? (

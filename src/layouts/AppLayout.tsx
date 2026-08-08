@@ -17,6 +17,7 @@ import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
 import CopyrightNotice from '../components/CopyrightNotice';
+import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
 type UserRole = 'admin' | 'manager' | 'staff' | null;
 
@@ -87,9 +88,27 @@ export default function AppLayout() {
   const [announcementContext, setAnnouncementContext] = useState<AnnouncementContext | null>(null);
   const [incidentContext, setIncidentContext] = useState<IncidentContext | null>(null);
   const [tenantSubscriptionAccess, setTenantSubscriptionAccess] = useState<TenantSubscriptionAccess | null>(null);
+  const [, setTenantCurrencyRevision] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const mainAreaRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!tenantAccess.hasTenantContext) {
+      setActiveTenantCurrency(DEFAULT_INVENTORY_CURRENCY);
+      return () => { cancelled = true; };
+    }
+    fetchTenantCurrencyContext()
+      .then(() => { if (!cancelled) setTenantCurrencyRevision((value) => value + 1); })
+      .catch(() => {
+        if (!cancelled) {
+          setActiveTenantCurrency(DEFAULT_INVENTORY_CURRENCY);
+          setTenantCurrencyRevision((value) => value + 1);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [tenantAccess.tenantId, tenantAccess.hasTenantContext]);
 
   const currentModule = useMemo(() => getTenantModuleForPathname(location.pathname), [location.pathname]);
   const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);

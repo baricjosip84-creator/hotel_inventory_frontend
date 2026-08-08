@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,
@@ -927,8 +928,8 @@ export default function ExecutionRequestsPage() {
               <div style={styles.summaryGrid}>
                 <div style={styles.summaryTile}><span style={styles.summaryLabel}>Type</span><strong>{selected.adapter?.label || label(selected.request_type)}</strong></div>
                 <div style={styles.summaryTile}><span style={styles.summaryLabel}>Product / subject</span><strong>{selected.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(selected)}</strong></div>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Requested change</span><strong>{formatUnknown(getRequestedValue(selected))}</strong></div>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Value at request time</span><strong>{formatUnknown(getExpectedValue(selected))}</strong></div>
+                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Requested change</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getRequestedValue(selected) as number | string | null | undefined) : formatUnknown(getRequestedValue(selected))}</strong></div>
+                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Value at request time</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getExpectedValue(selected) as number | string | null | undefined) : formatUnknown(getExpectedValue(selected))}</strong></div>
               </div>
 
               <KeyValue label="Requested by" value={selected.requested_by_name || selected.requested_by || 'System/support'} />

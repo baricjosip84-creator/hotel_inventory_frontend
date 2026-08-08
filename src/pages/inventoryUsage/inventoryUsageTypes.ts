@@ -38,6 +38,7 @@ export type InventoryUsageLog = {
   product_id: string;
   product_name?: string | null;
   product_unit?: string | null;
+  currency_code?: string | null;
   storage_location_id: string;
   storage_location_name?: string | null;
   stock_movement_id?: string | null;
@@ -97,6 +98,7 @@ export type InventoryUsageLogDetail = InventoryUsageLog & {
 };
 
 export type InventoryUsageSummary = {
+  currency_code?: string | null;
   totals?: {
     usage_count?: number | string | null;
     total_quantity?: number | string | null;
@@ -294,6 +296,7 @@ export type InventoryUsageImpactRow = {
 };
 
 export type InventoryUsageImpact = {
+  currency_code?: string | null;
   summary?: {
     impacted_count?: number | string | null;
     depleted_count?: number | string | null;
@@ -736,6 +739,7 @@ export type InventoryUsagePeriodClosure = {
   usage_count?: number | string | null;
   total_quantity?: number | string | null;
   estimated_usage_value?: number | string | null;
+  currency_code?: string | null;
   exception_count?: number | string | null;
   reversed_count?: number | string | null;
   follow_up_count?: number | string | null;
@@ -762,6 +766,7 @@ export type InventoryUsagePeriodClosurePreview = {
   usage_count?: number | string | null;
   total_quantity?: number | string | null;
   estimated_usage_value?: number | string | null;
+  currency_code?: string | null;
   exception_count?: number | string | null;
   reversed_count?: number | string | null;
   follow_up_count?: number | string | null;

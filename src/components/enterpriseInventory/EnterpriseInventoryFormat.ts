@@ -1,3 +1,5 @@
+import { formatCurrencyAmount } from '../../lib/tenantCurrency';
+
 import { ApiError } from '../../lib/api';
 
 export function normalizeError(error: unknown, fallback: string): string {
@@ -28,11 +30,8 @@ export function formatNumber(value: number | string | null | undefined): string 
 }
 
 
-export function formatCurrency(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '-';
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return String(value);
-  return parsed.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 });
+export function formatCurrency(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(value, currency, 4);
 }
 
 export function formatValue(value: unknown): string {

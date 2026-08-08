@@ -1,4 +1,5 @@
 import type { UsageFilters } from './inventoryUsageTypes';
+import { formatCurrencyAmount } from '../../lib/tenantCurrency';
 
 export function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
@@ -16,13 +17,8 @@ export function formatDateTime(dateString: string | null | undefined): string {
 }
 
 
-export function formatMoney(value: number | string | null | undefined): string {
-  const amount = toNumber(value);
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2
-  }).format(amount);
+export function formatMoney(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(toNumber(value), currency);
 }
 
 export function formatUsageReason(reason: string | null | undefined): string {

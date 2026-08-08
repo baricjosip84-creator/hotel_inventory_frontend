@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import './decisionIntelligencePages.css';
 
 type FeedbackMode = 'learning-outcomes' | 'forecast-accuracy' | 'policy-effectiveness' | 'optimization-results';
@@ -53,7 +54,10 @@ type ContinuousLearningSummary = {
     waste_reduction_outcome_count?: number;
     service_level_improved_outcome_count?: number;
     business_impact_evidence_count?: number;
-    total_financial_impact_amount?: number;
+    total_financial_impact_amount?: number | null;
+    total_financial_impact_by_currency?: Array<{ currency_code: string; amount: number }>;
+    financial_impact_currency?: string | null;
+    mixed_financial_impact_currency?: boolean;
     total_waste_reduced_quantity?: number;
     average_service_level_delta_percent?: number | null;
     outcome_link_coverage_percent?: number;
@@ -167,8 +171,10 @@ type ContinuousLearningSummary = {
         accepted_count?: number;
         corrective_action_required_count?: number;
         corrective_action_resolved_count?: number;
-        total_financial_impact_amount?: number;
+        total_financial_impact_amount?: number | null;
         financial_impact_currency?: string | null;
+        financial_impact_by_currency?: Array<{ currency_code: string; amount: number }>;
+        mixed_financial_impact_currency?: boolean;
         success_rate_percent?: number;
         failure_rate_percent?: number;
         acceptance_rate_percent?: number;
@@ -1428,7 +1434,7 @@ const defaultForm: FeedbackFormState = {
   outcomeReviewRequired: '',
   outcomeReviewReason: '',
   financialImpactAmount: '',
-  financialImpactCurrency: '',
+  financialImpactCurrency: getActiveTenantCurrency(),
   stockoutPrevented: '',
   overstockPrevented: '',
   wasteReducedQuantity: '',
@@ -1509,6 +1515,14 @@ function numberOrNull(value: string): number | null {
 function formatLabel(value: unknown): string {
   if (value === undefined || value === null || value === '') return '—';
   return String(value).replace(/_/g, ' ');
+}
+
+function formatMoneyBreakdown(rows?: Array<{ currency_code: string; amount: number }>, amount?: number | null, currency?: string | null): string {
+  if (rows && rows.length > 0) {
+    return rows.map((row) => formatCurrencyAmount(row.amount, row.currency_code, 2)).join(' · ');
+  }
+  if (amount !== null && amount !== undefined && currency) return formatCurrencyAmount(amount, currency, 2);
+  return '—';
 }
 
 function formatTimestamp(value: unknown): string {
@@ -4211,7 +4225,7 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
         <p className="card__subtext">Negative financial impact: {formatLabel(foundation.negative_financial_impact_count)}</p>
         <p className="card__subtext">Waste reduction outcomes: {formatLabel(foundation.waste_reduction_outcome_count)}</p>
         <p className="card__subtext">Service level improved: {formatLabel(foundation.service_level_improved_outcome_count)}</p>
-        <p className="card__subtext">Total financial impact: {formatLabel(foundation.total_financial_impact_amount)}</p>
+        <p className="card__subtext">Total financial impact: {formatMoneyBreakdown(foundation.total_financial_impact_by_currency, foundation.total_financial_impact_amount, foundation.financial_impact_currency)}</p>
         <p className="card__subtext">Total waste reduced: {formatLabel(foundation.total_waste_reduced_quantity)}</p>
         <p className="card__subtext">Avg service delta %: {formatLabel(foundation.average_service_level_delta_percent)}</p>
         <p className="card__subtext">Generated: {formatLabel(foundation.lifecycle_generated_count)}</p>
@@ -4254,7 +4268,7 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
                   <td>{formatLabel(item.outcome_count)}</td>
                   <td>{formatLabel(item.success_rate_percent)}</td>
                   <td>{formatLabel(item.acceptance_rate_percent)}</td>
-                  <td>{formatLabel(item.total_financial_impact_amount)} {item.financial_impact_currency || ''}</td>
+                  <td>{formatMoneyBreakdown(item.financial_impact_by_currency, item.total_financial_impact_amount, item.financial_impact_currency)}</td>
                   <td>{formatLabel(item.corrective_action_closure_rate_percent)}</td>
                   <td>{formatLabel(item.portfolio_posture)}</td>
                 </tr>
@@ -4401,7 +4415,7 @@ export default function DecisionLearningFeedbackPage() {
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
-  const [form, setForm] = useState<FeedbackFormState>(defaultForm);
+  const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, financialImpactCurrency: getActiveTenantCurrency() }));
   const [message, setMessage] = useState<string | null>(null);
 
   const summaryQuery = useQuery({
@@ -4417,7 +4431,7 @@ export default function DecisionLearningFeedbackPage() {
     }),
     onSuccess: async () => {
       setMessage(`${modeLabels[mode]} recorded. The backend stores this as learning evidence only.`);
-      setForm(defaultForm);
+      setForm({ ...defaultForm, financialImpactCurrency: getActiveTenantCurrency() });
       await queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] });
     },
     onError: (error) => {
@@ -4434,7 +4448,7 @@ export default function DecisionLearningFeedbackPage() {
 
   const handleModeChange = (nextMode: FeedbackMode) => {
     setMode(nextMode);
-    setForm({ ...defaultForm, status: statusOptions[nextMode][0] || 'observed' });
+    setForm({ ...defaultForm, financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
     setMessage(null);
   };
 
@@ -4623,7 +4637,7 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">Currency</span>
-              <input className="input" value={form.financialImpactCurrency} onChange={(event) => updateForm('financialImpactCurrency', event.target.value)} placeholder="EUR" maxLength={3} />
+              <input className="input" value={form.financialImpactCurrency} onChange={(event) => updateForm('financialImpactCurrency', event.target.value)} placeholder={getActiveTenantCurrency()} maxLength={3} />
             </label>
             <label>
               <span className="form-label">Stockout prevented</span>

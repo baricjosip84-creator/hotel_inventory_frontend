@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DataTable, MetricCard, SectionCard } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
-import { formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
+import { formatCurrency, formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
 import type {
   InventoryValuationReport,
   ProductMovementReportRow,
@@ -75,7 +75,7 @@ export function ReportsTab({
         <p style={styles.helper}>Reads the existing report endpoints for inventory valuation, stock by location, product movements, and procurement summary.</p>
         <div style={styles.statGrid}>
           <MetricCard label="Valuation rows" value={formatNumber(reportsSummary.valuationRows)} />
-          <MetricCard label="Estimated value" value={formatNumber(reportsSummary.estimatedValue)} />
+          <MetricCard label="Estimated value" value={formatCurrency(reportsSummary.estimatedValue, inventoryValuationReport?.totals?.currency_code)} />
           <MetricCard label="Stock locations" value={reportsSummary.stockLocations} />
           <MetricCard label="Movement rows" value={reportsSummary.movementRows} />
           <MetricCard label="Overdue shipments" value={formatNumber(reportsSummary.overdueShipments)} />
@@ -93,9 +93,9 @@ export function ReportsTab({
             item.product_category || '-',
             item.storage_location_name || item.storage_location_id,
             `${formatNumber(item.quantity)} ${item.product_unit || ''}`.trim(),
-            formatNumber(item.estimated_unit_cost),
+            formatCurrency(item.estimated_unit_cost, item.currency_code || inventoryValuationReport?.totals?.currency_code),
             formatCostSource(item.estimated_cost_source),
-            formatNumber(item.estimated_total_value),
+            formatCurrency(item.estimated_total_value, item.currency_code || inventoryValuationReport?.totals?.currency_code),
             formatDateTime(item.updated_at)
           ])}
         />

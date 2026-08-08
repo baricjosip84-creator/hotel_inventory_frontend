@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 
 type DepletionRiskResponse = {
   generated_at: string;
@@ -176,6 +177,7 @@ type SupplierTrustResponse = {
     closed_short_purchase_orders: number | string;
     po_remaining_quantity: number | string;
     po_remaining_value: number | string;
+    currency_code?: string | null;
     risk_supplier_rate_pct: number | string;
   };
   rows: Array<{
@@ -203,6 +205,7 @@ type SupplierTrustResponse = {
     po_ordered_value: number | string;
     po_received_value: number | string;
     po_remaining_value: number | string;
+    currency_code?: string | null;
     po_fill_rate_pct: number | string;
     po_completion_rate_pct: number | string;
     po_short_close_rate_pct: number | string;
@@ -345,6 +348,10 @@ function formatNumber(value: number | string | null | undefined, digits = 2): st
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }).format(toNumber(value));
 }
 
+function formatSupplierMoney(value: number | string | null | undefined, currency?: string | null): string {
+  return formatCurrencyAmount(value, currency, 2);
+}
+
 function formatDateTime(value: string | null | undefined): string {
   if (!value) {
     return '-';
@@ -432,7 +439,7 @@ function getSupplierRecommendedActions(row: SupplierTrustResponse['rows'][number
   if (hasRiskCode('po_remaining_quantity')) {
     actions.push({
       title: 'Monitor remaining exposure',
-      detail: `${formatNumber(row.po_remaining_quantity)} units remain open with estimated value ${formatNumber(row.po_remaining_value)}.`,
+      detail: `${formatNumber(row.po_remaining_quantity)} units remain open with estimated value ${formatSupplierMoney(row.po_remaining_value, row.currency_code)}.`,
       priority: 'medium'
     });
   }
@@ -988,7 +995,8 @@ export default function InsightsPage() {
       'PO Remaining Quantity',
       'PO Remaining Value',
       'PO Ordered Value',
-      'PO Received Value'
+      'PO Received Value',
+      'Currency'
     ];
 
     const rows = visibleSupplierTrustRows.map((row) => {
@@ -1007,7 +1015,8 @@ export default function InsightsPage() {
         formatNumber(row.po_remaining_quantity),
         formatNumber(row.po_remaining_value),
         formatNumber(row.po_ordered_value),
-        formatNumber(row.po_received_value)
+        formatNumber(row.po_received_value),
+        row.currency_code || ''
       ];
     });
 
@@ -1040,9 +1049,10 @@ export default function InsightsPage() {
       ['PO Ordered Quantity', formatNumber(row.po_ordered_quantity)],
       ['PO Received Quantity', formatNumber(row.po_received_quantity)],
       ['PO Remaining Quantity', formatNumber(row.po_remaining_quantity)],
-      ['PO Ordered Value', formatNumber(row.po_ordered_value)],
-      ['PO Received Value', formatNumber(row.po_received_value)],
-      ['PO Remaining Value', formatNumber(row.po_remaining_value)],
+      ['PO Ordered Value', formatSupplierMoney(row.po_ordered_value, row.currency_code)],
+      ['PO Received Value', formatSupplierMoney(row.po_received_value, row.currency_code)],
+      ['PO Remaining Value', formatSupplierMoney(row.po_remaining_value, row.currency_code)],
+      ['Currency', row.currency_code || ''],
       ['PO Fill Rate %', formatNumber(row.po_fill_rate_pct)],
       ['PO Completion Rate %', formatNumber(row.po_completion_rate_pct)],
       ['PO Short Close Rate %', formatNumber(row.po_short_close_rate_pct)],
@@ -1111,7 +1121,7 @@ export default function InsightsPage() {
           <section class="summary-grid">
             <div><strong>${escapeHtml(formatSupplierTrustScore(row))}</strong><span>Performance score</span></div>
             <div><strong>${escapeHtml(row.trust_tier === 'unrated' ? 'Not enough history' : formatReadableStatus(row.trust_tier))}</strong><span>Performance tier</span></div>
-            <div><strong>${escapeHtml(formatNumber(row.po_remaining_value))}</strong><span>Remaining PO value</span></div>
+            <div><strong>${escapeHtml(formatSupplierMoney(row.po_remaining_value, row.currency_code))}</strong><span>Remaining PO value</span></div>
             <div><strong>${escapeHtml(String(riskFlags.length))}</strong><span>Risk flags</span></div>
           </section>
           <h2>Performance Metrics</h2>
@@ -1123,8 +1133,8 @@ export default function InsightsPage() {
               <tr><th>Overdue open POs</th><td>${escapeHtml(formatNumber(row.overdue_open_purchase_orders, 0))}</td><th>Closed-short POs</th><td>${escapeHtml(formatNumber(row.closed_short_purchase_orders, 0))}</td></tr>
               <tr><th>PO ordered qty</th><td>${escapeHtml(formatNumber(row.po_ordered_quantity))}</td><th>PO received qty</th><td>${escapeHtml(formatNumber(row.po_received_quantity))}</td></tr>
               <tr><th>PO remaining qty</th><td>${escapeHtml(formatNumber(row.po_remaining_quantity))}</td><th>PO fill rate</th><td>${escapeHtml(formatNumber(row.po_fill_rate_pct))}%</td></tr>
-              <tr><th>PO ordered value</th><td>${escapeHtml(formatNumber(row.po_ordered_value))}</td><th>PO received value</th><td>${escapeHtml(formatNumber(row.po_received_value))}</td></tr>
-              <tr><th>PO remaining value</th><td>${escapeHtml(formatNumber(row.po_remaining_value))}</td><th>Short-close rate</th><td>${escapeHtml(formatNumber(row.po_short_close_rate_pct))}%</td></tr>
+              <tr><th>PO ordered value</th><td>${escapeHtml(formatSupplierMoney(row.po_ordered_value, row.currency_code))}</td><th>PO received value</th><td>${escapeHtml(formatSupplierMoney(row.po_received_value, row.currency_code))}</td></tr>
+              <tr><th>PO remaining value</th><td>${escapeHtml(formatSupplierMoney(row.po_remaining_value, row.currency_code))}</td><th>Short-close rate</th><td>${escapeHtml(formatNumber(row.po_short_close_rate_pct))}%</td></tr>
             </tbody>
           </table>
           <h2>Risk Flags</h2>
@@ -1168,7 +1178,7 @@ export default function InsightsPage() {
           <div><strong>${escapeHtml(formatNumber(summary.suppliers_with_risk, 0))}</strong><span>Suppliers with risk</span></div>
           <div><strong>${escapeHtml(formatNumber(summary.high_risk_flags, 0))}</strong><span>High-risk flags</span></div>
           <div><strong>${escapeHtml(formatNumber(summary.overdue_open_purchase_orders, 0))}</strong><span>Overdue open POs</span></div>
-          <div><strong>${escapeHtml(formatNumber(summary.po_remaining_value))}</strong><span>Remaining PO value</span></div>
+          <div><strong>${escapeHtml(formatSupplierMoney(summary.po_remaining_value, summary.currency_code))}</strong><span>Remaining PO value</span></div>
         </section>`
       : '';
 
@@ -1190,7 +1200,7 @@ export default function InsightsPage() {
             <td>${escapeHtml(formatNumber(row.overdue_open_purchase_orders, 0))}</td>
             <td>${escapeHtml(formatNumber(row.closed_short_purchase_orders, 0))}</td>
             <td>${escapeHtml(formatNumber(row.po_fill_rate_pct))}%</td>
-            <td>${escapeHtml(formatNumber(row.po_remaining_value))}</td>
+            <td>${escapeHtml(formatSupplierMoney(row.po_remaining_value, row.currency_code))}</td>
             <td>${riskText}</td>
           </tr>`;
       })
@@ -1429,7 +1439,7 @@ export default function InsightsPage() {
                   />
                   <StatCard
                     title="Remaining PO Value"
-                    value={formatNumber(supplierTrustQuery.data.summary.po_remaining_value)}
+                    value={formatSupplierMoney(supplierTrustQuery.data.summary.po_remaining_value, supplierTrustQuery.data.summary.currency_code)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.po_remaining_quantity)} units still open across supplier POs.`}
                     tone={toNumber(supplierTrustQuery.data.summary.po_remaining_quantity) > 0 ? 'warn' : 'good'}
                   />
@@ -1650,7 +1660,7 @@ export default function InsightsPage() {
                     POs: {formatNumber(row.total_purchase_orders, 0)} total · {formatNumber(row.open_purchase_orders, 0)} open · {formatNumber(row.overdue_open_purchase_orders, 0)} overdue
                   </div>
                   <div style={styles.itemText}>
-                    PO fill {formatNumber(row.po_fill_rate_pct)}% · short-closed {formatNumber(row.closed_short_purchase_orders, 0)} · remaining value {formatNumber(row.po_remaining_value)}
+                    PO fill {formatNumber(row.po_fill_rate_pct)}% · short-closed {formatNumber(row.closed_short_purchase_orders, 0)} · remaining value {formatSupplierMoney(row.po_remaining_value, row.currency_code)}
                   </div>
                   {row.risk_flags?.length ? (
                     <div style={styles.riskFlagGroup} aria-label={`Supplier risk flags for ${row.supplier_name}`}>
@@ -1759,7 +1769,7 @@ export default function InsightsPage() {
                     />
                     <StatCard
                       title="Open PO Exposure"
-                      value={formatNumber(selectedSupplierTrustRow.po_remaining_value)}
+                      value={formatSupplierMoney(selectedSupplierTrustRow.po_remaining_value, selectedSupplierTrustRow.currency_code)}
                       subtitle={`${formatNumber(selectedSupplierTrustRow.po_remaining_quantity)} units remaining · ${formatNumber(selectedSupplierTrustRow.overdue_open_purchase_orders, 0)} overdue open POs`}
                       tone={toNumber(selectedSupplierTrustRow.overdue_open_purchase_orders) > 0 ? 'bad' : toNumber(selectedSupplierTrustRow.po_remaining_quantity) > 0 ? 'warn' : 'good'}
                     />
@@ -1777,7 +1787,7 @@ export default function InsightsPage() {
                     </div>
                     <div style={styles.keyValueRow}>
                       <strong style={styles.keyLabel}>PO values</strong>
-                      <span style={styles.keyValue}>Ordered {formatNumber(selectedSupplierTrustRow.po_ordered_value)} · Received {formatNumber(selectedSupplierTrustRow.po_received_value)} · Remaining {formatNumber(selectedSupplierTrustRow.po_remaining_value)}</span>
+                      <span style={styles.keyValue}>Ordered {formatSupplierMoney(selectedSupplierTrustRow.po_ordered_value, selectedSupplierTrustRow.currency_code)} · Received {formatSupplierMoney(selectedSupplierTrustRow.po_received_value, selectedSupplierTrustRow.currency_code)} · Remaining {formatSupplierMoney(selectedSupplierTrustRow.po_remaining_value, selectedSupplierTrustRow.currency_code)}</span>
                     </div>
                     <div style={styles.keyValueRow}>
                       <strong style={styles.keyLabel}>PO counts</strong>

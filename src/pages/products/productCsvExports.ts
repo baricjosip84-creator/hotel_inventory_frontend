@@ -12,7 +12,13 @@ import type {
   ProductItem,
   ProductStandardCostHistoryItem
 } from '../../types/inventory';
+import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
 import { downloadCsv } from './productFormatting';
+
+
+function withTenantCurrency<T extends Record<string, unknown>>(row: T): T & { currency_code: string } {
+  return { ...row, currency_code: getActiveTenantCurrency() };
+}
 
 export function exportCostHistoryCsv(
   selectedCostProduct: ProductItem | ProductCostRiskItem | null,
@@ -20,7 +26,7 @@ export function exportCostHistoryCsv(
 ) {
   if (!selectedCostProduct || costHistory.length === 0) return;
 
-  const rows = costHistory.map((movement) => ({
+  const rows = costHistory.map((movement) => withTenantCurrency({
     movement_id: movement.id,
     product_id: movement.product_id,
     product_name: movement.product_name,
@@ -45,7 +51,7 @@ export function exportStandardCostHistoryCsv(
 ) {
   if (!selectedCostProduct || standardCostHistory.length === 0) return;
 
-  const rows = standardCostHistory.map((entry) => ({
+  const rows = standardCostHistory.map((entry) => withTenantCurrency({
     history_id: entry.id,
     product_id: entry.product_id,
     product_name: entry.product_name,
@@ -60,7 +66,7 @@ export function exportStandardCostHistoryCsv(
 }
 
 export function exportProductsCsv(products: ProductItem[]) {
-  const rows = products.map((product) => ({
+  const rows = products.map((product) => withTenantCurrency({
     id: product.id,
     name: product.name,
     category: product.category || '',
@@ -88,7 +94,7 @@ export function exportProductsCsv(products: ProductItem[]) {
 }
 
 export function exportCostReportCsv(costReportSummary: ProductCostReportSummaryResponse | undefined) {
-  const rows = costReportSummary?.export_rows ?? [];
+  const rows = (costReportSummary?.export_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
   downloadCsv('product-cost-report-summary.csv', rows);
 }
@@ -101,7 +107,7 @@ export function printCostReport(costReportSummary: ProductCostReportSummaryRespo
 export function exportCostGovernanceAuditCsv(
   costGovernanceAuditPack: ProductCostGovernanceAuditPackResponse | undefined
 ) {
-  const rows = costGovernanceAuditPack?.audit_rows ?? [];
+  const rows = (costGovernanceAuditPack?.audit_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-audit-pack.csv', rows);
 }
@@ -109,7 +115,7 @@ export function exportCostGovernanceAuditCsv(
 export function exportCostGovernanceReviewPackCsv(
   costGovernanceReviewPack: ProductCostGovernanceReviewPackResponse | undefined
 ) {
-  const rows = costGovernanceReviewPack?.review_export_rows ?? [];
+  const rows = (costGovernanceReviewPack?.review_export_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-review-pack.csv', rows);
 }
@@ -117,7 +123,7 @@ export function exportCostGovernanceReviewPackCsv(
 export function exportCostGovernanceClosureCsv(
   costGovernanceClosureSummary: ProductCostGovernanceClosureSummaryResponse | undefined
 ) {
-  const rows = costGovernanceClosureSummary?.archive_rows ?? [];
+  const rows = (costGovernanceClosureSummary?.archive_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-closure-summary.csv', rows);
 }
@@ -125,7 +131,7 @@ export function exportCostGovernanceClosureCsv(
 export function exportCostGovernanceHandoffCsv(
   costGovernanceHandoffSummary: ProductCostGovernanceHandoffSummaryResponse | undefined
 ) {
-  const rows = costGovernanceHandoffSummary?.handoff_rows ?? [];
+  const rows = (costGovernanceHandoffSummary?.handoff_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-handoff-summary.csv', rows);
 }
@@ -140,7 +146,7 @@ export function printCostGovernanceAudit(
 export function exportCostValuationDetailsCsv(
   costValuationDetails: ProductCostValuationDetailsResponse | undefined
 ) {
-  const rows = (costValuationDetails?.rows ?? []).map((row) => ({
+  const rows = (costValuationDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
     product_name: row.name,
     category: row.category || '',
@@ -162,7 +168,7 @@ export function exportCostValuationDetailsCsv(
 export function exportCostActionDetailsCsv(
   costActionDetails: ProductCostActionDetailsResponse | undefined
 ) {
-  const rows = (costActionDetails?.rows ?? []).map((row) => ({
+  const rows = (costActionDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
     product_name: row.name,
     category: row.category || '',
@@ -183,7 +189,7 @@ export function exportCostActionDetailsCsv(
 }
 
 export function exportCostRiskDetailsCsv(costRiskDetails: ProductCostRiskDetailsResponse | undefined) {
-  const rows = (costRiskDetails?.rows ?? []).map((row) => ({
+  const rows = (costRiskDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
     product_name: row.name,
     category: row.category || '',

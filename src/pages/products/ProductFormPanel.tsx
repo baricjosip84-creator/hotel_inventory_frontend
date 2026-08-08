@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import type { ProductItem, SupplierItem } from '../../types/inventory';
 import type { ProductFormState } from './productCoreApi';
 import { styles } from './productStyles';
+import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
 
 type ProductFormPanelProps = {
   editingProduct: ProductItem | null;
@@ -104,7 +105,7 @@ export function ProductFormPanel({
         </div>
 
         <div>
-          <label htmlFor="product-standard-cost" style={styles.label}>Standard Unit Cost</label>
+          <label htmlFor="product-standard-cost" style={styles.label}>Standard Unit Cost ({getActiveTenantCurrency()})</label>
           <input
             id="product-standard-cost"
             style={styles.input}
@@ -119,7 +120,7 @@ export function ProductFormPanel({
             placeholder="Optional fallback cost"
             disabled={fieldsDisabled}
           />
-          <div style={styles.fieldHint}>Used only when no received movement cost exists yet.</div>
+          <div style={styles.fieldHint}>Tenant-base cost in {getActiveTenantCurrency()}; used only when no compatible received movement cost exists yet.</div>
         </div>
 
         <div>

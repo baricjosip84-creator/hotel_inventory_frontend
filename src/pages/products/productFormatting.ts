@@ -1,3 +1,5 @@
+import { formatCurrencyAmount } from '../../lib/tenantCurrency';
+
 export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return '-';
 
@@ -14,16 +16,7 @@ export function toNumber(value: number | string | null | undefined): number {
 }
 
 export function formatMoney(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '-';
-
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return String(value);
-
-  return amount.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2
-  });
+  return formatCurrencyAmount(value);
 }
 
 

@@ -67,14 +67,23 @@ export function buildProcurementMatchRows(
   return purchaseOrders.map((purchaseOrder) => {
     const linkedShipments = shipments.filter((shipment) => shipment.purchase_order_id === purchaseOrder.id);
     const linkedInvoices = invoices.filter((invoice) => invoice.purchase_order_id === purchaseOrder.id);
-    const totalInvoiced = linkedInvoices.reduce((total, invoice) => total + toNumber(invoice.total_amount), 0);
+    const invoicedByCurrencyMap = new Map<string, number>();
+    linkedInvoices.forEach((invoice) => {
+      const currency = String(invoice.currency || purchaseOrder.currency || '').trim().toUpperCase();
+      if (!currency) return;
+      invoicedByCurrencyMap.set(currency, (invoicedByCurrencyMap.get(currency) || 0) + toNumber(invoice.total_amount));
+    });
+    const totalInvoicedByCurrency = [...invoicedByCurrencyMap.entries()]
+      .map(([currency, amount]) => ({ currency, amount }))
+      .sort((left, right) => left.currency.localeCompare(right.currency));
     const varianceLabels = Array.from(new Set(linkedInvoices.map((invoice) => invoice.variance_status).filter(Boolean)));
 
     return {
       purchaseOrder,
       linkedShipmentCount: linkedShipments.length || toNumber(purchaseOrder.linked_shipment_count),
       linkedInvoiceCount: linkedInvoices.length,
-      totalInvoiced,
+      totalInvoiced: totalInvoicedByCurrency.length === 1 ? totalInvoicedByCurrency[0].amount : null,
+      totalInvoicedByCurrency,
       shipmentStatus: linkedShipments.length ? linkedShipments.map((shipment) => shipment.status).join(', ') : '-',
       invoiceVariance: varianceLabels.length ? varianceLabels.join(', ') : '-',
       firstShipment: linkedShipments[0]
