@@ -1971,7 +1971,18 @@ export default function ShipmentsPage() {
 
           {purchaseOrdersFeatureReady ? (
           <div>
-            <label style={styles.label}>Linked Purchase Order</label>
+            <div style={styles.fieldLabelRow}>
+              <label style={styles.labelInline}>Linked Purchase Order</label>
+              <span
+                style={styles.infoBadge}
+                role="note"
+                tabIndex={0}
+                aria-label="Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic."
+                title="Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic."
+              >
+                i
+              </span>
+            </div>
             <select
               style={styles.input}
               value={shipmentForm.purchase_order_id}
@@ -1995,13 +2006,11 @@ export default function ShipmentsPage() {
                 </option>
               ))}
             </select>
-            <p style={styles.fieldHint}>
-              Optional bridge only: this links an approved PO to the shipment without changing stock or receiving logic.
-            </p>
           </div>
           ) : null}
 
           <div style={styles.formActionRow}>
+            <span style={styles.actionLabelSpacer} aria-hidden="true">Action</span>
             <button
               type="submit"
               style={{
@@ -2020,7 +2029,7 @@ export default function ShipmentsPage() {
               {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
             </button>
             {!shipmentForm.supplier_id || !shipmentForm.delivery_date ? (
-              <p style={styles.fieldHint}>
+              <p style={styles.formActionHint}>
                 Select a supplier and delivery date before creating a shipment.
               </p>
             ) : null}
@@ -2145,36 +2154,48 @@ export default function ShipmentsPage() {
 
           {filteredShipments.length > 0 ? (
             <div style={styles.paginationRow}>
-              <div style={styles.inlineHint}>
-                Showing {(safeShipmentPage - 1) * shipmentPageSize + 1}–{Math.min(safeShipmentPage * shipmentPageSize, filteredShipments.length)} of {filteredShipments.length}
+              <div style={styles.paginationMetaRow}>
+                <span style={styles.paginationSummary}>
+                  Showing {(safeShipmentPage - 1) * shipmentPageSize + 1}–{Math.min(safeShipmentPage * shipmentPageSize, filteredShipments.length)} of {filteredShipments.length}
+                </span>
+                <select
+                  style={styles.compactSelect}
+                  value={shipmentPageSize}
+                  onChange={(event) => setShipmentPageSize(Number(event.target.value))}
+                  aria-label="Shipments per page"
+                >
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
               </div>
-              <select
-                style={styles.compactSelect}
-                value={shipmentPageSize}
-                onChange={(event) => setShipmentPageSize(Number(event.target.value))}
-                aria-label="Shipments per page"
-              >
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={100}>100 / page</option>
-              </select>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => setShipmentPage((page) => Math.max(1, page - 1))}
-                disabled={safeShipmentPage <= 1}
-              >
-                Previous
-              </button>
-              <span style={styles.inlineHint}>Page {safeShipmentPage} of {shipmentPageCount}</span>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => setShipmentPage((page) => Math.min(shipmentPageCount, page + 1))}
-                disabled={safeShipmentPage >= shipmentPageCount}
-              >
-                Next
-              </button>
+              <div style={styles.paginationControls}>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.secondaryButton,
+                    ...styles.paginationButton,
+                    ...(safeShipmentPage <= 1 ? styles.secondaryButtonDisabled : {})
+                  }}
+                  onClick={() => setShipmentPage((page) => Math.max(1, page - 1))}
+                  disabled={safeShipmentPage <= 1}
+                >
+                  Previous
+                </button>
+                <span style={styles.paginationPageLabel}>Page {safeShipmentPage} of {shipmentPageCount}</span>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.secondaryButton,
+                    ...styles.paginationButton,
+                    ...(safeShipmentPage >= shipmentPageCount ? styles.secondaryButtonDisabled : {})
+                  }}
+                  onClick={() => setShipmentPage((page) => Math.min(shipmentPageCount, page + 1))}
+                  disabled={safeShipmentPage >= shipmentPageCount}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
@@ -3106,11 +3127,54 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 16,
-    alignItems: 'end'
+    alignItems: 'start'
   },
   formActionRow: {
     display: 'flex',
-    alignItems: 'end'
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    minWidth: 0
+  },
+  actionLabelSpacer: {
+    display: 'block',
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: 600,
+    visibility: 'hidden'
+  },
+  formActionHint: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 1.45,
+    margin: '8px 2px 0',
+    maxWidth: 240
+  },
+  fieldLabelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8
+  },
+  labelInline: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#374151'
+  },
+  infoBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    border: '1px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: 800,
+    lineHeight: 1,
+    cursor: 'help',
+    userSelect: 'none'
   },
   label: {
     display: 'block',
@@ -3283,11 +3347,40 @@ const styles: Record<string, CSSProperties> = {
   },
   paginationRow: {
     display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTop: '1px solid #e5e7eb'
+  },
+  paginationMetaRow: {
+    display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 14
+    gap: 8
+  },
+  paginationSummary: {
+    fontSize: 12,
+    color: '#6b7280',
+    lineHeight: 1.4
+  },
+  paginationControls: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: 10
+  },
+  paginationButton: {
+    width: '100%',
+    minWidth: 0
+  },
+  paginationPageLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    lineHeight: 1.4,
+    whiteSpace: 'nowrap',
+    textAlign: 'center'
   },
   compactSelect: {
     border: '1px solid #d1d5db',
