@@ -28,6 +28,7 @@ type ShipmentSummary = {
   id: string;
   supplier_id: string;
   supplier_name?: string;
+  supplier_retired?: boolean;
   delivery_date: string;
   status: 'pending' | 'partial' | 'received' | string;
   qr_code: string;
@@ -46,12 +47,14 @@ type ShipmentItem = {
   shipment_id: string;
   product_id: string;
   product_name?: string;
+  product_retired?: boolean;
   quantity: number | string;
   received_quantity?: number | string;
   discrepancy?: number | string;
   discrepancy_reason?: string | null;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
+  storage_location_retired?: boolean;
   unit_cost?: number | string | null;
   version?: number;
 };
@@ -81,6 +84,17 @@ type PurchaseOrderOption = {
   po_number: string;
   status: string;
   expected_delivery_date?: string | null;
+  items?: Array<{
+    product_id: string;
+    quantity: number | string;
+  }>;
+};
+
+type ShipmentOptions = {
+  suppliers: SupplierOption[];
+  products: ProductOption[];
+  storage_locations: StorageLocationOption[];
+  approved_purchase_orders: PurchaseOrderOption[];
 };
 
 type ShipmentFormState = {
@@ -174,20 +188,8 @@ async function fetchShipments(): Promise<ShipmentSummary[]> {
   return apiRequest<ShipmentSummary[]>('/shipments');
 }
 
-async function fetchSuppliers(): Promise<SupplierOption[]> {
-  return apiRequest<SupplierOption[]>('/suppliers/available');
-}
-
-async function fetchProducts(): Promise<ProductOption[]> {
-  return apiRequest<ProductOption[]>('/products');
-}
-
-async function fetchStorageLocations(): Promise<StorageLocationOption[]> {
-  return apiRequest<StorageLocationOption[]>('/storage-locations');
-}
-
-async function fetchApprovedPurchaseOrders(): Promise<PurchaseOrderOption[]> {
-  return apiRequest<PurchaseOrderOption[]>('/purchase-orders?status=approved');
+async function fetchShipmentOptions(): Promise<ShipmentOptions> {
+  return apiRequest<ShipmentOptions>('/shipments/options');
 }
 
 async function fetchShipmentItems(shipmentId: string): Promise<ShipmentItem[]> {
@@ -279,6 +281,23 @@ async function deleteShipmentItem(input: {
     headers: {
       'If-Match-Version': String(input.version)
     }
+  });
+}
+
+async function recordReceivingDiscrepancy(input: {
+  itemId: string;
+  version: number;
+  discrepancyReason: string;
+}): Promise<ShipmentItem> {
+  return apiRequest<ShipmentItem>(`/shipment-items/${input.itemId}/receiving-discrepancy`, {
+    method: 'PATCH',
+    headers: {
+      'If-Match-Version': String(input.version)
+    },
+    body: JSON.stringify({
+      discrepancy_reason: input.discrepancyReason
+    }),
+    skipMutationFeedback: true
   });
 }
 
@@ -381,7 +400,7 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
   return {
     quantity_received: remaining > 0 ? String(remaining) : '1',
     storage_location_id: item.storage_location_id || '',
-    discrepancy_reason: '',
+    discrepancy_reason: item.discrepancy_reason || '',
     receiving_note: ''
   };
 }
@@ -445,6 +464,7 @@ export default function ShipmentsPage() {
   const {
     canManageShipments,
     canManageShipmentItems,
+    canViewShipmentItems,
     canSendShipments,
     canReceiveShipments,
     canFinalizeShipments,
@@ -460,6 +480,8 @@ export default function ShipmentsPage() {
   const [highlightedItemId, setHighlightedItemId] = useState('');
   const [shipmentSearch, setShipmentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [shipmentPageSize, setShipmentPageSize] = useState(25);
+  const [shipmentPage, setShipmentPage] = useState(1);
   const [selectedScannerLocationId, setSelectedScannerLocationId] = useState('');
 
   const [shipmentForm, setShipmentForm] = useState<ShipmentFormState>(emptyShipmentForm());
@@ -479,14 +501,9 @@ export default function ShipmentsPage() {
     queryFn: fetchShipments
   });
 
-  const suppliersQuery = useQuery({
-    queryKey: ['suppliers-available'],
-    queryFn: fetchSuppliers
-  });
-
-  const productsQuery = useQuery({
-    queryKey: ['products'],
-    queryFn: fetchProducts
+  const shipmentOptionsQuery = useQuery({
+    queryKey: ['shipments', 'options'],
+    queryFn: fetchShipmentOptions
   });
 
   const subscriptionAccessQuery = useQuery({
@@ -496,22 +513,12 @@ export default function ShipmentsPage() {
   });
   const purchaseOrdersEntitlement = getTenantFeatureEntitlement(subscriptionAccessQuery.data, 'purchase_orders');
   const purchaseOrdersEntitled = purchaseOrdersEntitlement ? purchaseOrdersEntitlement.allowed : true;
-
-  const approvedPurchaseOrdersQuery = useQuery({
-    queryKey: ['purchase-orders', 'approved'],
-    queryFn: fetchApprovedPurchaseOrders,
-    enabled: canViewPurchaseOrders && Boolean(subscriptionAccessQuery.data) && purchaseOrdersEntitled
-  });
-
-  const storageLocationsQuery = useQuery({
-    queryKey: ['storage-locations'],
-    queryFn: fetchStorageLocations
-  });
+  const purchaseOrdersFeatureReady = Boolean(subscriptionAccessQuery.data) && purchaseOrdersEntitled;
 
   const shipmentItemsQuery = useQuery({
     queryKey: ['shipment-items', selectedShipmentId],
     queryFn: () => fetchShipmentItems(selectedShipmentId),
-    enabled: Boolean(selectedShipmentId)
+    enabled: Boolean(selectedShipmentId) && canViewShipmentItems
   });
 
   const createShipmentMutation = useMutation({
@@ -622,6 +629,20 @@ export default function ShipmentsPage() {
     onError: (error) => {
       setPageMessage(null);
       setPageError(error instanceof ApiError ? error.message : 'Failed to delete shipment item.');
+    }
+  });
+
+  const recordReceivingDiscrepancyMutation = useMutation({
+    mutationFn: recordReceivingDiscrepancy,
+    onSuccess: async () => {
+      setPageError(null);
+      setPageMessage('Shortage reason saved. This incomplete line can now be finalized as a documented discrepancy.');
+      await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
+      await queryClient.refetchQueries({ queryKey: ['shipments'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to save shortage reason.');
     }
   });
 
@@ -751,21 +772,34 @@ export default function ShipmentsPage() {
 
   const shipments = useMemo(() => shipmentsQuery.data ?? [], [shipmentsQuery.data]);
   const shipmentItems = useMemo(() => shipmentItemsQuery.data ?? [], [shipmentItemsQuery.data]);
+  const suppliers = useMemo(
+    () => shipmentOptionsQuery.data?.suppliers ?? [],
+    [shipmentOptionsQuery.data]
+  );
+  const products = useMemo(
+    () => shipmentOptionsQuery.data?.products ?? [],
+    [shipmentOptionsQuery.data]
+  );
   const storageLocations = useMemo(
-    () => storageLocationsQuery.data ?? [],
-    [storageLocationsQuery.data]
+    () => shipmentOptionsQuery.data?.storage_locations ?? [],
+    [shipmentOptionsQuery.data]
   );
   const approvedPurchaseOrders = useMemo(
-    () => approvedPurchaseOrdersQuery.data ?? [],
-    [approvedPurchaseOrdersQuery.data]
+    () => purchaseOrdersFeatureReady ? shipmentOptionsQuery.data?.approved_purchase_orders ?? [] : [],
+    [purchaseOrdersFeatureReady, shipmentOptionsQuery.data]
   );
   const linkablePurchaseOrders = useMemo(() => {
     if (!shipmentForm.supplier_id) return approvedPurchaseOrders;
     return approvedPurchaseOrders.filter((order) => order.supplier_id === shipmentForm.supplier_id);
   }, [approvedPurchaseOrders, shipmentForm.supplier_id]);
+  const editLinkablePurchaseOrders = useMemo(() => {
+    if (!editShipmentForm.supplier_id) return approvedPurchaseOrders;
+    return approvedPurchaseOrders.filter((order) => order.supplier_id === editShipmentForm.supplier_id);
+  }, [approvedPurchaseOrders, editShipmentForm.supplier_id]);
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
+  const selectedShipmentIsPending = selectedShipment?.status === 'pending';
 
   useEffect(() => {
     if (!selectedShipment) {
@@ -790,20 +824,31 @@ export default function ShipmentsPage() {
   }, [shipmentItems]);
 
   const shipmentProductOptions = useMemo(() => {
-    const allProducts = productsQuery.data ?? [];
+    const allProducts = products;
 
     if (!selectedShipment) {
       return allProducts;
     }
 
+    const linkedPurchaseOrder = approvedPurchaseOrders.find(
+      (order) => order.id === selectedShipment.purchase_order_id
+    );
+    const linkedProductIds = linkedPurchaseOrder
+      ? new Set((linkedPurchaseOrder.items ?? []).map((item) => item.product_id))
+      : null;
+
     return allProducts.filter((product) => {
+      if (linkedProductIds && !linkedProductIds.has(product.id)) {
+        return false;
+      }
+
       if (!product.supplier_id) {
         return true;
       }
 
       return product.supplier_id === selectedShipment.supplier_id;
     });
-  }, [productsQuery.data, selectedShipment]);
+  }, [approvedPurchaseOrders, products, selectedShipment]);
 
   const selectedShipmentOrderedTotal = shipmentItems.reduce(
     (sum, item) => sum + toNumber(item.quantity),
@@ -846,6 +891,8 @@ export default function ShipmentsPage() {
   const finalizeReadinessMessage =
     !selectedShipment
       ? 'Select a shipment first.'
+      : !canViewShipmentItems
+        ? 'Shipment item read permission is required to review finalization readiness.'
       : selectedShipment.status === 'received'
         ? 'Shipment already finalized.'
         : shipmentItems.length === 0
@@ -878,12 +925,16 @@ export default function ShipmentsPage() {
     },
     {
       label: '3. Receive Items',
-      detail: hasShipmentItems
-        ? hasRemainingQuantity
-          ? 'Receive lines manually or through the receiving barcode scanner.'
-          : 'All current shipment lines are fully received.'
-        : 'Add shipment items before receiving inventory.',
-      complete: hasShipmentItems && !hasRemainingQuantity
+      detail: !canViewShipmentItems
+        ? 'Shipment item details are hidden for this role.'
+        : shipmentItemsQuery.isError
+          ? 'Shipment lines could not be loaded. Refresh the page before receiving or finalizing.'
+          : hasShipmentItems
+            ? hasRemainingQuantity
+              ? 'Receive lines manually or through the receiving barcode scanner.'
+              : 'All current shipment lines are fully received.'
+            : 'Add shipment items before receiving inventory.',
+      complete: canViewShipmentItems && !shipmentItemsQuery.isError && hasShipmentItems && !hasRemainingQuantity
     },
     {
       label: '4. Finalize Shipment',
@@ -895,27 +946,55 @@ export default function ShipmentsPage() {
   const filteredShipments = useMemo(() => {
     const search = shipmentSearch.trim().toLowerCase();
 
-    return shipments.filter((shipment) => {
-      const matchesStatus = statusFilter ? shipment.status === statusFilter : true;
+    const statusPriority: Record<string, number> = {
+      partial: 0,
+      pending: 1,
+      received: 2
+    };
 
-      const haystack = [
-        shipment.id,
-        shipment.po_number,
-        shipment.linked_purchase_order_number,
-        shipment.purchase_order_id,
-        shipment.supplier_name,
-        shipment.supplier_id,
-        shipment.status,
-        shipment.delivery_date
-      ]
-        .map((value) => String(value ?? '').toLowerCase())
-        .join(' ');
+    return shipments
+      .filter((shipment) => {
+        const matchesStatus = statusFilter ? shipment.status === statusFilter : true;
 
-      const matchesSearch = search ? haystack.includes(search) : true;
+        const haystack = [
+          shipment.id,
+          shipment.po_number,
+          shipment.linked_purchase_order_number,
+          shipment.purchase_order_id,
+          shipment.qr_code,
+          shipment.supplier_name,
+          shipment.supplier_id,
+          shipment.status,
+          shipment.delivery_date
+        ]
+          .map((value) => String(value ?? '').toLowerCase())
+          .join(' ');
 
-      return matchesStatus && matchesSearch;
-    });
+        const matchesSearch = search ? haystack.includes(search) : true;
+
+        return matchesStatus && matchesSearch;
+      })
+      .sort((left, right) =>
+        (statusPriority[left.status] ?? 99) - (statusPriority[right.status] ?? 99)
+      );
   }, [shipments, shipmentSearch, statusFilter]);
+
+  const shipmentPageCount = Math.max(1, Math.ceil(filteredShipments.length / shipmentPageSize));
+  const safeShipmentPage = Math.min(shipmentPage, shipmentPageCount);
+  const pagedShipments = useMemo(() => {
+    const start = (safeShipmentPage - 1) * shipmentPageSize;
+    return filteredShipments.slice(start, start + shipmentPageSize);
+  }, [filteredShipments, safeShipmentPage, shipmentPageSize]);
+
+  useEffect(() => {
+    setShipmentPage(1);
+  }, [shipmentSearch, statusFilter, shipmentPageSize]);
+
+  useEffect(() => {
+    if (shipmentPage > shipmentPageCount) {
+      setShipmentPage(shipmentPageCount);
+    }
+  }, [shipmentPage, shipmentPageCount]);
 
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
@@ -1309,6 +1388,11 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (selectedShipment.status !== 'pending') {
+      setPageError('Shipment headers can only be edited while the shipment is pending.');
+      return;
+    }
+
     setPageError(null);
     setPageMessage(null);
     updateShipmentMutation.mutate({
@@ -1326,6 +1410,11 @@ export default function ShipmentsPage() {
 
     if (!selectedShipment) {
       setPageError('Select a shipment first.');
+      return;
+    }
+
+    if (selectedShipment.status !== 'pending') {
+      setPageError('Only pending shipments can be deleted.');
       return;
     }
 
@@ -1350,6 +1439,11 @@ export default function ShipmentsPage() {
   const handleUpdateShipmentItem = (item: ShipmentItem) => {
     if (!canManageShipmentItems) {
       setPageError('Your current role cannot update shipment items.');
+      return;
+    }
+
+    if (!selectedShipmentIsPending) {
+      setPageError('Shipment lines can only be changed while the shipment is pending.');
       return;
     }
 
@@ -1379,6 +1473,11 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (!selectedShipmentIsPending) {
+      setPageError('Shipment lines can only be deleted while the shipment is pending.');
+      return;
+    }
+
     if (item.version === undefined || item.version === null) {
       setPageError('Cannot delete this shipment item because the backend did not return a version. Refresh and try again.');
       return;
@@ -1395,6 +1494,37 @@ export default function ShipmentsPage() {
     });
   };
 
+  const handleSaveShortageReason = (item: ShipmentItem) => {
+    if (!canReceiveShipments) {
+      setPageError('Shipment receive permission is required to document a receiving shortage.');
+      return;
+    }
+
+    if (selectedShipment?.status === 'received') {
+      setPageError('This shipment is already finalized.');
+      return;
+    }
+
+    if (item.version === undefined || item.version === null) {
+      setPageError('Cannot save the shortage reason because the item version is missing. Refresh and try again.');
+      return;
+    }
+
+    const reason = getReceiveDraft(item).discrepancy_reason.trim();
+    if (!reason) {
+      setPageError('Enter a shortage reason before saving it.');
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    recordReceivingDiscrepancyMutation.mutate({
+      itemId: item.id,
+      version: item.version,
+      discrepancyReason: reason
+    });
+  };
+
   const canSubmitCreateShipment =
     canManageShipments &&
     Boolean(shipmentForm.supplier_id) &&
@@ -1406,6 +1536,7 @@ export default function ShipmentsPage() {
     itemForm.unit_cost.trim() === '' ? null : Number(itemForm.unit_cost);
   const canSubmitShipmentItem =
     canManageShipmentItems &&
+    selectedShipmentIsPending &&
     Boolean(selectedShipmentId) &&
     Boolean(itemForm.product_id) &&
     Number.isFinite(parsedShipmentItemQuantity) &&
@@ -1447,6 +1578,11 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (!selectedShipmentIsPending) {
+      setPageError('Shipment items can only be added while the shipment is pending.');
+      return;
+    }
+
     if (!itemForm.product_id) {
       setPageError('Select a product before adding a shipment item.');
       return;
@@ -1458,7 +1594,7 @@ export default function ShipmentsPage() {
       return;
     }
 
-    const selectedProduct = (productsQuery.data ?? []).find(
+    const selectedProduct = products.find(
       (product) => product.id === itemForm.product_id
     );
 
@@ -1592,7 +1728,7 @@ export default function ShipmentsPage() {
 
     if (incompleteShipmentLinesWithoutReason.length > 0) {
       setPageError(
-        `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) still need a saved discrepancy reason before finalization. Enter a discrepancy reason while receiving a partial quantity, then receive that partial quantity to save it.`
+        `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) still need a saved discrepancy reason before finalization. Enter a shortage reason on each incomplete line and use Save shortage reason; receiving additional stock is not required.`
       );
       return;
     }
@@ -1674,30 +1810,62 @@ export default function ShipmentsPage() {
     navigate(`/scanner?${scannerParams.toString()}`);
   };
 
+  const handleRefreshPage = async () => {
+    setPageError(null);
+    setPageMessage(null);
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['shipments'] }),
+      queryClient.refetchQueries({ queryKey: ['shipments', 'options'] }),
+      canViewPurchaseOrders
+        ? queryClient.refetchQueries({ queryKey: ['tenant-subscription-access', 'shipments-purchase-orders'] })
+        : Promise.resolve(),
+      selectedShipmentId && canViewShipmentItems
+        ? queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] })
+        : Promise.resolve()
+    ]);
+    setPageMessage('Shipment data refreshed.');
+  };
+
   return (
     <div>
       <div style={styles.header}>
         <div>
-          <h2 style={styles.title}>Shipments</h2>
+          <h2 style={styles.title}>Inbound Receiving</h2>
           <p style={styles.description}>
             Create inbound shipments, add shipment items, receive lines partially
             or fully, and finalize only when all shortages are documented.
           </p>
         </div>
-        {canAutoReorderShipments ? (
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={handleAutoReorderShipments}
-            disabled={autoReorderShipmentMutation.isPending}
-          >
-            {autoReorderShipmentMutation.isPending ? 'Running Auto Reorder...' : 'Run Auto Reorder'}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          style={styles.secondaryButton}
+          onClick={handleRefreshPage}
+          disabled={shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching}
+        >
+          {shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching ? 'Refreshing...' : 'Refresh page'}
+        </button>
       </div>
 
       {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
       {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
+
+      {shipmentsQuery.isError ? (
+        <div style={styles.errorBox}>
+          Shipment list could not be loaded. {shipmentsQuery.error instanceof ApiError ? shipmentsQuery.error.message : 'Refresh the page and try again.'}
+        </div>
+      ) : null}
+
+      {shipmentOptionsQuery.isError ? (
+        <div style={styles.warningBox}>
+          Some shipment form choices could not be loaded. The shipment list remains available, but creating shipments, adding lines, or choosing receiving locations may be unavailable until the options refresh succeeds.
+        </div>
+      ) : null}
+
+      {canViewPurchaseOrders && subscriptionAccessQuery.isError ? (
+        <div style={styles.warningBox}>
+          Purchase Order linking is temporarily unavailable because feature access could not be verified. Shipments can still be managed without a linked Purchase Order when your permissions allow it.
+        </div>
+      ) : null}
 
       {!canManageShipments || !canManageShipmentItems || !canFinalizeShipments ? (
         <div style={styles.warningBox}>
@@ -1713,9 +1881,37 @@ export default function ShipmentsPage() {
         </div>
       ) : null}
 
+      {!canViewShipmentItems ? (
+        <div style={styles.warningBox}>
+          Shipment item read permission is not available for this role. Shipment headers can still be reviewed, but line-level receiving progress and item details are hidden.
+        </div>
+      ) : null}
+
+      {canAutoReorderShipments ? (
+        <details style={styles.advancedPanel}>
+          <summary style={styles.advancedSummary}>Direct shipment reorder (legacy)</summary>
+          <p style={styles.panelSubtitle}>
+            This directly creates pending shipment records from low-stock rules. It does not create or approve a Purchase Order. Use Procurement Recommendations or Replenishment Planning for the governed planning workflows.
+          </p>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={handleAutoReorderShipments}
+            disabled={autoReorderShipmentMutation.isPending}
+          >
+            {autoReorderShipmentMutation.isPending ? 'Running direct reorder...' : 'Run direct reorder'}
+          </button>
+        </details>
+      ) : null}
+
       <section style={styles.panel}>
         <h3 style={styles.panelTitle}>Create Shipment</h3>
 
+        {!canManageShipments ? (
+          <div style={styles.readOnlyNotice}>
+            This role can review shipments but cannot create or edit shipment headers.
+          </div>
+        ) : (
         <form
           onSubmit={handleCreateShipment}
           style={styles.formGrid}
@@ -1736,7 +1932,7 @@ export default function ShipmentsPage() {
               required
             >
               <option value="">Select supplier</option>
-              {(suppliersQuery.data ?? []).map((supplier) => (
+              {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name}
                 </option>
@@ -1773,10 +1969,11 @@ export default function ShipmentsPage() {
                 }))
               }
               placeholder="Optional purchase order number"
+              maxLength={100}
             />
           </div>
 
-          {canViewPurchaseOrders ? (
+          {purchaseOrdersFeatureReady ? (
           <div>
             <label style={styles.label}>Linked Purchase Order</label>
             <select
@@ -1833,6 +2030,7 @@ export default function ShipmentsPage() {
             ) : null}
           </div>
         </form>
+        )}
       </section>
 
       <section
@@ -1863,6 +2061,7 @@ export default function ShipmentsPage() {
               placeholder="Search by PO, supplier, shipment ID, status..."
               value={shipmentSearch}
               onChange={(event) => setShipmentSearch(event.target.value)}
+              maxLength={255}
             />
 
             <select
@@ -1879,8 +2078,7 @@ export default function ShipmentsPage() {
 
           <div
             style={{
-              ...styles.shipmentList,
-              maxHeight: isMobile ? 'none' : 720
+              ...styles.shipmentList
             }}
           >
             {shipmentsQuery.isLoading ? (
@@ -1888,7 +2086,7 @@ export default function ShipmentsPage() {
             ) : filteredShipments.length === 0 ? (
               <p style={styles.emptyState}>No shipments match the current filter.</p>
             ) : (
-              filteredShipments.map((shipment) => {
+              pagedShipments.map((shipment) => {
                 const isSelected = shipment.id === selectedShipmentId;
                 const ordered = toNumber(shipment.total_ordered_quantity);
                 const received = toNumber(shipment.total_received_quantity);
@@ -1914,9 +2112,7 @@ export default function ShipmentsPage() {
                         <div style={styles.shipmentCardTitle}>
                           {shipment.po_number || 'No PO Number'}
                         </div>
-                        <div style={styles.shipmentCardSubtle}>
-                          Shipment ID: {shipment.id}
-                        </div>
+                        <div style={styles.shipmentCardSubtle}>Reference: {shipment.id.slice(0, 8)}…</div>
                       </div>
 
                       <span style={statusBadgeStyle(shipment.status)}>
@@ -1927,15 +2123,13 @@ export default function ShipmentsPage() {
                     <div style={styles.shipmentCardMeta}>
                       <div>
                         <strong>Supplier:</strong> {shipment.supplier_name || shipment.supplier_id}
+                        {shipment.supplier_retired ? ' (retired)' : ''}
                       </div>
                       <div>
                         <strong>Linked PO:</strong> {shipment.linked_purchase_order_number || '-'}
                       </div>
                       <div>
                         <strong>Delivery:</strong> {formatDate(shipment.delivery_date)}
-                      </div>
-                      <div style={{ wordBreak: 'break-all' }}>
-                        <strong>QR:</strong> {shipment.qr_code}
                       </div>
                       <div>
                         <strong>Lines:</strong> {shipment.line_count ?? 0}
@@ -1952,6 +2146,41 @@ export default function ShipmentsPage() {
               })
             )}
           </div>
+
+          {filteredShipments.length > 0 ? (
+            <div style={styles.paginationRow}>
+              <div style={styles.inlineHint}>
+                Showing {(safeShipmentPage - 1) * shipmentPageSize + 1}–{Math.min(safeShipmentPage * shipmentPageSize, filteredShipments.length)} of {filteredShipments.length}
+              </div>
+              <select
+                style={styles.compactSelect}
+                value={shipmentPageSize}
+                onChange={(event) => setShipmentPageSize(Number(event.target.value))}
+                aria-label="Shipments per page"
+              >
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setShipmentPage((page) => Math.max(1, page - 1))}
+                disabled={safeShipmentPage <= 1}
+              >
+                Previous
+              </button>
+              <span style={styles.inlineHint}>Page {safeShipmentPage} of {shipmentPageCount}</span>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setShipmentPage((page) => Math.min(shipmentPageCount, page + 1))}
+                disabled={safeShipmentPage >= shipmentPageCount}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div style={styles.panel}>
@@ -2018,6 +2247,7 @@ export default function ShipmentsPage() {
                     <strong>Supplier</strong>
                     <div style={{ wordBreak: 'break-word' }}>
                       {selectedShipment.supplier_name || selectedShipment.supplier_id}
+                      {selectedShipment.supplier_retired ? ' (retired)' : ''}
                     </div>
                   </div>
                   <div>
@@ -2033,7 +2263,7 @@ export default function ShipmentsPage() {
                     <div style={{ wordBreak: 'break-all' }}>
                       {selectedShipment.linked_purchase_order_number || selectedShipment.purchase_order_id || '-'}
                     </div>
-                    {selectedShipment.purchase_order_id && canViewPurchaseOrders ? (
+                    {selectedShipment.purchase_order_id && purchaseOrdersFeatureReady ? (
                       <>
                         <button
                           type="button"
@@ -2052,10 +2282,14 @@ export default function ShipmentsPage() {
                     <strong>Version</strong>
                     <div>{selectedShipment.version}</div>
                   </div>
+                  <div>
+                    <strong>QR Code</strong>
+                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.qr_code}</div>
+                  </div>
                 </div>
               </div>
 
-              {canManageShipments ? (
+              {canManageShipments && selectedShipmentIsPending ? (
                 <div style={styles.selectedActionRow}>
                   <button
                     type="button"
@@ -2073,6 +2307,10 @@ export default function ShipmentsPage() {
                   >
                     {deleteShipmentMutation.isPending ? 'Deleting...' : 'Delete Shipment'}
                   </button>
+                </div>
+              ) : canManageShipments ? (
+                <div style={styles.readOnlyNotice}>
+                  Shipment header and line structure are locked after receiving starts. Receiving and finalization remain available according to your permissions.
                 </div>
               ) : null}
 
@@ -2093,7 +2331,7 @@ export default function ShipmentsPage() {
                       required
                     >
                       <option value="">Select supplier</option>
-                      {(suppliersQuery.data ?? []).map((supplier) => (
+                      {suppliers.map((supplier) => (
                         <option key={supplier.id} value={supplier.id}>
                           {supplier.name}
                         </option>
@@ -2130,10 +2368,11 @@ export default function ShipmentsPage() {
                         }))
                       }
                       placeholder="Optional purchase order number"
+                      maxLength={100}
                     />
                   </div>
 
-                  {canViewPurchaseOrders ? (
+                  {purchaseOrdersFeatureReady ? (
                     <div>
                       <label style={styles.label}>Linked Purchase Order</label>
                       <select
@@ -2151,7 +2390,7 @@ export default function ShipmentsPage() {
                         }}
                       >
                         <option value="">No linked PO</option>
-                        {approvedPurchaseOrders.map((order) => (
+                        {editLinkablePurchaseOrders.map((order) => (
                           <option key={order.id} value={order.id}>
                             {order.po_number} · {order.supplier_name || order.supplier_id}
                           </option>
@@ -2276,6 +2515,15 @@ export default function ShipmentsPage() {
               <div style={styles.sectionDivider} />
 
               <h4 style={styles.sectionTitle}>Add Shipment Item</h4>
+              {!canManageShipmentItems ? (
+                <div style={styles.readOnlyNotice}>
+                  This role can review shipment lines but cannot add or change ordered shipment items.
+                </div>
+              ) : !selectedShipmentIsPending ? (
+                <div style={styles.readOnlyNotice}>
+                  Ordered shipment lines are locked because receiving has already started. Continue with receiving and discrepancy documentation below.
+                </div>
+              ) : (
               <form
                 onSubmit={handleAddShipmentItem}
                 style={styles.formGrid}
@@ -2305,7 +2553,9 @@ export default function ShipmentsPage() {
                   </select>
                   {selectedShipment ? (
                     <div style={styles.inlineHint}>
-                      List is limited to products from this shipment supplier, plus products without supplier assignment.
+                      {selectedShipment.purchase_order_id
+                        ? 'List is limited to products on the linked Purchase Order that are compatible with this supplier.'
+                        : 'List is limited to products from this shipment supplier, plus products without supplier assignment.'}
                     </div>
                   ) : null}
                 </div>
@@ -2315,7 +2565,7 @@ export default function ShipmentsPage() {
                   <input
                     style={styles.input}
                     type="number"
-                    min="1"
+                    min="0.01"
                     step="0.01"
                     value={itemForm.quantity}
                     onChange={(event) =>
@@ -2372,6 +2622,7 @@ export default function ShipmentsPage() {
                   ) : null}
                 </div>
               </form>
+              )}
 
               <div style={styles.sectionDivider} />
 
@@ -2492,7 +2743,15 @@ export default function ShipmentsPage() {
                 </div>
               ) : null}
 
-              {shipmentItemsQuery.isLoading ? (
+              {!canViewShipmentItems ? (
+                <div style={styles.readOnlyNotice}>
+                  Shipment item details are not available to this role. No line-level data has been loaded.
+                </div>
+              ) : shipmentItemsQuery.isError ? (
+                <div style={styles.errorBox}>
+                  Shipment items could not be loaded. {shipmentItemsQuery.error instanceof ApiError ? shipmentItemsQuery.error.message : 'Refresh the selected shipment and try again.'}
+                </div>
+              ) : shipmentItemsQuery.isLoading ? (
                 <p style={styles.emptyState}>Loading shipment items...</p>
               ) : shipmentItems.length === 0 ? (
                 <p style={styles.emptyState}>No shipment items yet.</p>
@@ -2545,6 +2804,7 @@ export default function ShipmentsPage() {
                         <div style={styles.mobileItemCardHeader}>
                           <div style={styles.mobileItemCardTitle}>
                             {item.product_name || item.product_id}
+                            {item.product_retired ? ' (retired)' : ''}
                           </div>
                           <div style={styles.mobileBadgeRow}>
                             {isHighlighted ? (
@@ -2556,7 +2816,7 @@ export default function ShipmentsPage() {
                                 remaining <= 0 ? styles.mobileDoneBadge : styles.mobilePendingBadge
                               }
                             >
-                              {remaining <= 0 ? 'Received' : `${remaining} remaining`}
+                              {remaining <= 0 ? 'Received' : `${formatQuantity(remaining)} remaining`}
                             </span>
 
                             {remaining > 0 && hasSavedShortageReason ? (
@@ -2568,19 +2828,26 @@ export default function ShipmentsPage() {
                         <div style={styles.mobileItemMetaGrid}>
                           <div>
                             <strong>Ordered</strong>
-                            <div>{ordered}</div>
+                            <div>{formatQuantity(ordered)}</div>
                           </div>
                           <div>
                             <strong>Received</strong>
-                            <div>{received}</div>
+                            <div>{formatQuantity(received)}</div>
                           </div>
                           <div>
                             <strong>Remaining</strong>
-                            <div>{remaining}</div>
+                            <div>{formatQuantity(remaining)}</div>
                           </div>
                           <div>
                             <strong>Unit Cost</strong>
                             <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost)}</div>
+                          </div>
+                          <div>
+                            <strong>Recorded Location</strong>
+                            <div style={{ wordBreak: 'break-word' }}>
+                              {item.storage_location_name || item.storage_location_id || '-'}
+                              {item.storage_location_retired ? ' (retired)' : ''}
+                            </div>
                           </div>
                           <div>
                             <strong>Product ID</strong>
@@ -2588,7 +2855,7 @@ export default function ShipmentsPage() {
                           </div>
                         </div>
 
-                        {canManageShipmentItems ? (
+                        {canManageShipmentItems && selectedShipmentIsPending ? (
                           <div style={styles.itemManagementPanel}>
                             <div style={styles.itemManagementInputBlock}>
                               <label style={styles.label}>Ordered Quantity</label>
@@ -2644,7 +2911,7 @@ export default function ShipmentsPage() {
                                 }
                               >
                                 <option value="">Select location</option>
-                                {(storageLocationsQuery.data ?? []).map((location) => (
+                                {storageLocations.map((location) => (
                                   <option key={location.id} value={location.id}>
                                     {location.name}
                                   </option>
@@ -2676,6 +2943,7 @@ export default function ShipmentsPage() {
                                 type="text"
                                 placeholder="Required only if this line remains short"
                                 value={draft.discrepancy_reason}
+                                maxLength={1000}
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
@@ -2692,6 +2960,7 @@ export default function ShipmentsPage() {
                                 type="text"
                                 placeholder="Optional receiving note"
                                 value={draft.receiving_note}
+                                maxLength={4000}
                                 onChange={(event) =>
                                   updateReceiveDraft(item.id, (current) => ({
                                     ...current,
@@ -2715,8 +2984,28 @@ export default function ShipmentsPage() {
                               >
                                 {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
                               </button>
+                              {remaining > 0 && selectedShipment.status !== 'received' && canReceiveShipments ? (
+                                <button
+                                  type="button"
+                                  data-skip-global-action-feedback="true"
+                                  style={styles.secondaryButton}
+                                  onClick={() => handleSaveShortageReason(item)}
+                                  disabled={
+                                    recordReceivingDiscrepancyMutation.isPending ||
+                                    !draft.discrepancy_reason.trim()
+                                  }
+                                  title="Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short."
+                                >
+                                  {recordReceivingDiscrepancyMutation.isPending ? 'Saving reason...' : 'Save shortage reason'}
+                                </button>
+                              ) : null}
                               {receiveLineDisabledReason ? (
                                 <div style={styles.inlineHint}>{receiveLineDisabledReason}</div>
+                              ) : null}
+                              {remaining > 0 && canReceiveShipments ? (
+                                <div style={styles.inlineHint}>
+                                  If no units arrived, enter the shortage reason and save it without receiving stock.
+                                </div>
                               ) : null}
                             </div>
                           </div>
@@ -2784,6 +3073,26 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     marginBottom: 20,
     minWidth: 0
+  },
+  advancedPanel: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: '12px 14px',
+    marginBottom: 20
+  },
+  advancedSummary: {
+    cursor: 'pointer',
+    fontWeight: 700,
+    color: '#374151'
+  },
+  readOnlyNotice: {
+    border: '1px solid #cbd5e1',
+    borderRadius: 10,
+    background: '#f8fafc',
+    color: '#475569',
+    padding: '12px 14px',
+    lineHeight: 1.5
   },
   panelTitle: {
     margin: 0,
@@ -2973,8 +3282,23 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-    overflowY: 'auto',
+    overflowY: 'visible',
     minWidth: 0
+  },
+  paginationRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14
+  },
+  compactSelect: {
+    border: '1px solid #d1d5db',
+    borderRadius: 10,
+    padding: '9px 10px',
+    background: '#ffffff',
+    color: '#111827'
   },
   shipmentCard: {
     textAlign: 'left',
@@ -3221,7 +3545,9 @@ const styles: Record<string, CSSProperties> = {
   },
   receiveLineActionBlock: {
     display: 'flex',
-    alignItems: 'end',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
     minWidth: 0
   },
   mobilePendingBadge: {
