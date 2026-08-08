@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { InputField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { StorageLocationForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type StorageLocationSaveMutation = {
@@ -41,8 +42,11 @@ export function LocationsTab({
   saveStorageLocationMutation,
   deleteStorageLocationMutation
 }: LocationsTabProps) {
+  const canWriteLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE);
+
   const handleStorageLocationSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canWriteLocations || saveStorageLocationMutation.isPending) return;
     saveStorageLocationMutation.mutate(storageLocationForm);
   };
 
@@ -59,10 +63,10 @@ export function LocationsTab({
       <form onSubmit={handleStorageLocationSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>{editingStorageLocationId ? 'Edit storage location' : 'Create storage location'}</h2>
         <p style={styles.helper}>Create and maintain storage areas used for receiving, transfers, stock counts, and inventory control.</p>
-        <InputField label="Name" value={storageLocationForm.name} onChange={(value) => setStorageLocationForm((current) => ({ ...current, name: value }))} required />
-        <InputField label="Temperature zone" value={storageLocationForm.temperature_zone} onChange={(value) => setStorageLocationForm((current) => ({ ...current, temperature_zone: value }))} />
+        <InputField label="Name" value={storageLocationForm.name} onChange={(value) => setStorageLocationForm((current) => ({ ...current, name: value }))} required disabled={!canWriteLocations} />
+        <InputField label="Temperature zone" value={storageLocationForm.temperature_zone} onChange={(value) => setStorageLocationForm((current) => ({ ...current, temperature_zone: value }))} disabled={!canWriteLocations} />
         <div style={styles.actions}>
-          <button type="submit" disabled={saveStorageLocationMutation.isPending} style={styles.primaryButton}>{editingStorageLocationId ? 'Update location' : 'Create location'}</button>
+          <button type="submit" disabled={saveStorageLocationMutation.isPending || !canWriteLocations} style={styles.primaryButton}>{editingStorageLocationId ? 'Update location' : 'Create location'}</button>
           {editingStorageLocationId ? (
             <button type="button" style={styles.secondaryButton} onClick={() => { setEditingStorageLocationId(null); setStorageLocationForm(emptyStorageLocationForm); }}>Cancel edit</button>
           ) : null}
@@ -93,8 +97,8 @@ export function LocationsTab({
                   <td style={styles.td}>{formatDateTime(location.created_at)}</td>
                   <td style={styles.td}>
                     <div style={styles.actions}>
-                      <button type="button" style={styles.smallButton} onClick={() => startEditingStorageLocation(location)}>Edit</button>
-                      <button type="button" style={styles.dangerButton} disabled={deleteStorageLocationMutation.isPending} onClick={() => deleteStorageLocationMutation.mutate(location.id)}>Delete</button>
+                      <button type="button" style={canWriteLocations ? styles.smallButton : styles.disabledButton} disabled={!canWriteLocations} onClick={() => startEditingStorageLocation(location)}>Edit</button>
+                      <button type="button" style={styles.dangerButton} disabled={deleteStorageLocationMutation.isPending || !canWriteLocations} onClick={() => deleteStorageLocationMutation.mutate(location.id)}>Delete</button>
                     </div>
                   </td>
                 </tr>

@@ -1,4 +1,5 @@
 import { TENANT_PERMISSIONS, type TenantPermission } from '../lib/permissions';
+import { enterpriseInventoryReadPermissions } from '../components/enterpriseInventory/EnterpriseInventoryTabConfig';
 
 export type TenantUserRole = 'admin' | 'manager' | 'staff';
 
@@ -9,6 +10,7 @@ export type TenantNavigationItem = {
   section: string;
   permission?: TenantPermission;
   requiredPermissions?: TenantPermission[];
+  requiredAnyPermissions?: TenantPermission[];
   roles?: TenantUserRole[];
 };
 
@@ -317,7 +319,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         label: 'Enterprise Inventory',
         description: 'Manage par levels, cycle counts, department requisitions, approvals, invoices, notifications, and labels.',
         section: 'Procurement',
-        permission: TENANT_PERMISSIONS.PAR_LEVELS_READ
+        requiredAnyPermissions: [...enterpriseInventoryReadPermissions]
       }
     ]
   },

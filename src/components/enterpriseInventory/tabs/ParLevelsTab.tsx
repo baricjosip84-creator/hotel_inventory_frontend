@@ -2,6 +2,7 @@ import type { FormEvent } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ParLevel, ParLevelForm, ProductOption, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type ParLevelsTabProps = {
@@ -25,6 +26,8 @@ export function ParLevelsTab({
   parLevels,
   loading
 }: ParLevelsTabProps) {
+  const canWriteParLevels = hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_WRITE);
+
   return (
     <section style={styles.grid}>
       <form onSubmit={onSubmit} style={styles.card}>
@@ -35,18 +38,20 @@ export function ParLevelsTab({
           onChange={(value) => onFormChange((current) => ({ ...current, product_id: value }))}
           options={products.map((product) => ({ value: product.id, label: product.name }))}
           required
+          disabled={!canWriteParLevels}
         />
         <SelectField
           label="Storage location"
           value={form.storage_location_id}
           onChange={(value) => onFormChange((current) => ({ ...current, storage_location_id: value }))}
           options={storageLocations.map((location) => ({ value: location.id, label: location.name }))}
+          disabled={!canWriteParLevels}
         />
-        <InputField label="Department" value={form.department} onChange={(value) => onFormChange((current) => ({ ...current, department: value }))} />
-        <InputField label="Minimum quantity" type="number" value={form.min_quantity} onChange={(value) => onFormChange((current) => ({ ...current, min_quantity: value }))} required />
-        <InputField label="Par / target quantity" type="number" value={form.par_quantity} onChange={(value) => onFormChange((current) => ({ ...current, par_quantity: value }))} required />
-        <InputField label="Optional maximum quantity" type="number" value={form.max_quantity} onChange={(value) => onFormChange((current) => ({ ...current, max_quantity: value }))} />
-        <InputField label="Legacy reorder quantity" type="number" value={form.reorder_quantity} onChange={(value) => onFormChange((current) => ({ ...current, reorder_quantity: value }))} required />
+        <InputField label="Department" value={form.department} onChange={(value) => onFormChange((current) => ({ ...current, department: value }))} disabled={!canWriteParLevels} />
+        <InputField label="Minimum quantity" type="number" value={form.min_quantity} onChange={(value) => onFormChange((current) => ({ ...current, min_quantity: value }))} required disabled={!canWriteParLevels} />
+        <InputField label="Par / target quantity" type="number" value={form.par_quantity} onChange={(value) => onFormChange((current) => ({ ...current, par_quantity: value }))} required disabled={!canWriteParLevels} />
+        <InputField label="Optional maximum quantity" type="number" value={form.max_quantity} onChange={(value) => onFormChange((current) => ({ ...current, max_quantity: value }))} disabled={!canWriteParLevels} />
+        <InputField label="Legacy reorder quantity" type="number" value={form.reorder_quantity} onChange={(value) => onFormChange((current) => ({ ...current, reorder_quantity: value }))} required disabled={!canWriteParLevels} />
         <SelectField
           label="Replenishment priority"
           value={form.replenishment_priority}
@@ -57,11 +62,12 @@ export function ParLevelsTab({
             { value: 'high', label: 'High' },
             { value: 'critical', label: 'Critical' }
           ]}
+          disabled={!canWriteParLevels}
         />
-        <InputField label="Effective from" type="date" value={form.effective_from} onChange={(value) => onFormChange((current) => ({ ...current, effective_from: value }))} />
-        <InputField label="Effective to" type="date" value={form.effective_to} onChange={(value) => onFormChange((current) => ({ ...current, effective_to: value }))} />
-        <InputField label="Override reason / policy note" value={form.override_reason} onChange={(value) => onFormChange((current) => ({ ...current, override_reason: value }))} />
-        <button type="submit" disabled={isSaving} style={styles.primaryButton}>Save par level</button>
+        <InputField label="Effective from" type="date" value={form.effective_from} onChange={(value) => onFormChange((current) => ({ ...current, effective_from: value }))} disabled={!canWriteParLevels} />
+        <InputField label="Effective to" type="date" value={form.effective_to} onChange={(value) => onFormChange((current) => ({ ...current, effective_to: value }))} disabled={!canWriteParLevels} />
+        <InputField label="Override reason / policy note" value={form.override_reason} onChange={(value) => onFormChange((current) => ({ ...current, override_reason: value }))} disabled={!canWriteParLevels} />
+        <button type="submit" disabled={isSaving || !canWriteParLevels} style={isSaving || !canWriteParLevels ? styles.disabledButton : styles.primaryButton} title={!canWriteParLevels ? `Requires ${TENANT_PERMISSIONS.PAR_LEVELS_WRITE} permission.` : undefined}>Save par level</button>
       </form>
 
       <div style={styles.card}>

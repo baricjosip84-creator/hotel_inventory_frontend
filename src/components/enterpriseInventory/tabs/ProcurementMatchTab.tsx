@@ -2,6 +2,7 @@ import type { CSSProperties, Dispatch, FormEvent, SetStateAction } from 'react';
 import { InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatCurrency, formatDate, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { PurchaseOrder, PurchaseOrderShipmentForm } from '../EnterpriseInventoryTypes';
 
 type ProcurementSummary = {
@@ -114,10 +115,14 @@ export function ProcurementMatchTab({
   setPurchaseOrderShipmentForm,
   shipmentsQuery
 }: ProcurementMatchTabProps) {
+  const canCreateShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_WRITE);
+  const canSubmitPurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_SUBMIT);
+  const canApprovePurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE);
+  const canCancelPurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_CANCEL);
   const approvedPurchaseOrders = purchaseOrders.filter((purchaseOrder) => purchaseOrder.status === 'approved');
   const approvedPurchaseOrdersLoading = purchaseOrdersQuery.isLoading;
   const hasApprovedPurchaseOrders = approvedPurchaseOrders.length > 0;
-  const canCreateLinkedShipment = hasApprovedPurchaseOrders && Boolean(purchaseOrderShipmentForm.purchase_order_id) && !createShipmentFromPurchaseOrderMutation.isPending;
+  const canCreateLinkedShipment = canCreateShipments && hasApprovedPurchaseOrders && Boolean(purchaseOrderShipmentForm.purchase_order_id) && !createShipmentFromPurchaseOrderMutation.isPending;
   const linkedShipmentButtonStyle = canCreateLinkedShipment
     ? styles.primaryButton
     : { ...styles.primaryButton, background: '#9ca3af', cursor: 'not-allowed' };
@@ -145,7 +150,7 @@ export function ProcurementMatchTab({
             onChange={(value) => setPurchaseOrderShipmentForm((current) => ({ ...current, purchase_order_id: value }))}
             options={approvedPurchaseOrders.map((purchaseOrder) => ({ value: purchaseOrder.id, label: purchaseOrderOptionLabel(purchaseOrder) }))}
             required
-            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders}
+            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders || !canCreateShipments}
           />
           {approvedPurchaseOrdersLoading ? (
             <p style={styles.helper}>Loading approved purchase orders…</p>
@@ -156,7 +161,7 @@ export function ProcurementMatchTab({
             label="Delivery date"
             type="date"
             value={purchaseOrderShipmentForm.delivery_date}
-            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders}
+            disabled={approvedPurchaseOrdersLoading || !hasApprovedPurchaseOrders || !canCreateShipments}
             onChange={(value) => setPurchaseOrderShipmentForm((current) => ({ ...current, delivery_date: value }))}
           />
           <button type="submit" disabled={!canCreateLinkedShipment} style={linkedShipmentButtonStyle}>Create linked shipment</button>
@@ -195,11 +200,11 @@ export function ProcurementMatchTab({
                       <td style={styles.td}>{formatDate(purchaseOrder.expected_delivery_date)}</td>
                       <td style={styles.td}>
                         <div style={styles.actions}>
-                          {purchaseOrder.status === 'draft' ? <button type="button" style={styles.secondarySmallButton} disabled={purchaseOrderLifecycleMutation.isPending} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'submit')}>Submit</button> : null}
-                          {purchaseOrder.status === 'submitted' ? <button type="button" style={styles.smallButton} disabled={purchaseOrderLifecycleMutation.isPending} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'approve')}>Approve</button> : null}
-                          {['approved', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={styles.secondarySmallButton} disabled={purchaseOrderLifecycleMutation.isPending} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'close')}>Close</button> : null}
-                          {purchaseOrder.status === 'cancelled' ? <button type="button" style={styles.secondarySmallButton} disabled={purchaseOrderLifecycleMutation.isPending} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'reopen')}>Reopen</button> : null}
-                          {!['cancelled', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={styles.dangerButton} disabled={purchaseOrderLifecycleMutation.isPending} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'cancel')}>Cancel</button> : null}
+                          {purchaseOrder.status === 'draft' ? <button type="button" style={canSubmitPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canSubmitPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'submit')}>Submit</button> : null}
+                          {purchaseOrder.status === 'submitted' ? <button type="button" style={canApprovePurchaseOrders ? styles.smallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canApprovePurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'approve')}>Approve</button> : null}
+                          {['approved', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={canCancelPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'close')}>Close</button> : null}
+                          {purchaseOrder.status === 'cancelled' ? <button type="button" style={canCancelPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'reopen')}>Reopen</button> : null}
+                          {!['cancelled', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={canCancelPurchaseOrders ? styles.dangerButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'cancel')}>Cancel</button> : null}
                         </div>
                       </td>
                     </tr>

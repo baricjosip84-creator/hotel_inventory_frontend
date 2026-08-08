@@ -68,6 +68,7 @@ import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
 import EnterpriseInventoryPage from '../pages/EnterpriseInventoryPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
+import { enterpriseInventoryReadPermissions } from '../components/enterpriseInventory/EnterpriseInventoryTabConfig';
 import { PlatformProtectedRoute } from '../components/PlatformProtectedRoute';
 import PlatformLayout from '../layouts/PlatformLayout';
 import PlatformLoginPage from '../pages/PlatformLoginPage';
@@ -1273,7 +1274,7 @@ const router = createBrowserRouter([
       {
         path: 'enterprise-inventory',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PAR_LEVELS_READ]}>
+          <ProtectedRoute requiredAnyPermissions={[...enterpriseInventoryReadPermissions]}>
             <EnterpriseInventoryPage />
           </ProtectedRoute>
         )

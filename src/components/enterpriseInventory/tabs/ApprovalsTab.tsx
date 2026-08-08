@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ApprovalRule, ApprovalRuleForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type ApprovalQueueItem = {
@@ -72,12 +73,14 @@ export function ApprovalsTab({
   setApprovalRuleForm,
   storageLocations
 }: ApprovalsTabProps) {
+  const canWriteApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_WRITE);
+  const canExecuteApprovals = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
   const minimumAmount = Number(approvalRuleForm.min_amount);
   const maximumAmount = approvalRuleForm.max_amount === '' ? null : Number(approvalRuleForm.max_amount);
   const amountRangeValid = Number.isFinite(minimumAmount)
     && minimumAmount >= 0
     && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount));
-  const canSaveRule = Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid)
+  const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid)
     && !createApprovalRuleMutation.isPending;
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
 
@@ -89,6 +92,7 @@ export function ApprovalsTab({
 
   const handleApprovalAction = (item: ApprovalQueueItem, action: 'approved' | 'rejected') => {
     const actionLabel = action === 'approved' ? 'Approve' : 'Reject';
+    if (!canExecuteApprovals) return;
     if (!window.confirm(`${actionLabel} ${item.label}?`)) return;
     executeApprovalMutation.mutate({ entity_type: item.entity_type, entity_id: item.entity_id, action });
   };
@@ -98,6 +102,7 @@ export function ApprovalsTab({
       <form onSubmit={handleApprovalRuleSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>Create approval rule</h2>
         <SelectField
+          disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
           label="Entity type"
           value={approvalRuleForm.entity_type}
           onChange={(value) => setApprovalRuleForm((current) => ({ ...current, entity_type: value }))}
@@ -110,11 +115,12 @@ export function ApprovalsTab({
           ]}
           required
         />
-        <InputField label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
-        <SelectField label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
-        <InputField label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
-        <InputField label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
+        <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
         <SelectField
+          disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
           label="Required role"
           value={approvalRuleForm.required_role}
           onChange={(value) => setApprovalRuleForm((current) => ({ ...current, required_role: value }))}
@@ -124,6 +130,7 @@ export function ApprovalsTab({
           ]}
           required
         />
+        {!canWriteApprovalRules ? <p style={styles.helper}>Creating approval rules requires {TENANT_PERMISSIONS.APPROVAL_RULES_WRITE} permission.</p> : null}
         {!amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
         <button type="submit" disabled={!canSaveRule} style={canSaveRule ? styles.primaryButton : styles.disabledButton}>
           {createApprovalRuleMutation.isPending ? 'Saving…' : 'Save approval rule'}
@@ -158,8 +165,9 @@ export function ApprovalsTab({
                           <button
                             type="button"
                             data-skip-global-action-feedback="true"
-                            style={styles.smallButton}
-                            disabled={executeApprovalMutation.isPending}
+                            disabled={!canExecuteApprovals || executeApprovalMutation.isPending}
+                            title={!canExecuteApprovals ? `Requires ${TENANT_PERMISSIONS.APPROVALS_EXECUTE} permission.` : undefined}
+                            style={!canExecuteApprovals || executeApprovalMutation.isPending ? styles.disabledButton : styles.smallButton}
                             onClick={() => handleApprovalAction(item, 'approved')}
                           >
                             Approve
@@ -167,8 +175,9 @@ export function ApprovalsTab({
                           <button
                             type="button"
                             data-skip-global-action-feedback="true"
-                            style={styles.dangerButton}
-                            disabled={executeApprovalMutation.isPending}
+                            disabled={!canExecuteApprovals || executeApprovalMutation.isPending}
+                            title={!canExecuteApprovals ? `Requires ${TENANT_PERMISSIONS.APPROVALS_EXECUTE} permission.` : undefined}
+                            style={!canExecuteApprovals || executeApprovalMutation.isPending ? styles.disabledButton : styles.dangerButton}
                             onClick={() => handleApprovalAction(item, 'rejected')}
                           >
                             Reject

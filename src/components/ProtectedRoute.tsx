@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import type { TenantPermission, UserRole } from '../lib/permissions';
-import { hasAllPermissions, hasAnyRole, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { hasAllPermissions, hasAnyPermission, hasAnyRole, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { restoreTenantSession } from '../lib/api';
 
 type ProtectedRouteProps = PropsWithChildren<{
   allowedRoles?: UserRole[];
   requiredPermissions?: TenantPermission[];
+  requiredAnyPermissions?: TenantPermission[];
 }>;
 
-export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles, requiredPermissions, requiredAnyPermissions }: ProtectedRouteProps) {
   const location = useLocation();
   const [, setPermissionRevision] = useState(0);
   const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>('checking');
@@ -59,6 +60,10 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions }: 
   }
 
   if (requiredPermissions && !hasAllPermissions(requiredPermissions)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requiredAnyPermissions?.length && !hasAnyPermission(requiredAnyPermissions)) {
     return <Navigate to="/dashboard" replace />;
   }
 

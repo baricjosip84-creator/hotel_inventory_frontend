@@ -1,6 +1,7 @@
 import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatCurrency, formatDateTime, formatNumber, formatRecordValue } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 
 import type { CostControlTabProps, DynamicApiValue } from '../EnterpriseInventoryCostControlTypes';
 
@@ -206,6 +207,7 @@ export function CostControlTab({
   procurementSpendProductionControls,
   procurementSpendProductionReviewQuery,
 }: CostControlTabProps) {
+  const canReadFinancialIntelligence = hasPermission(TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ);
   const productCostHardeningReviewRows = toHardeningReviewRows(
     productCostHardeningSummaryQuery.data,
     productCostHardeningFailedChecklist
@@ -238,7 +240,11 @@ export function CostControlTab({
 
   return (
     <section style={styles.stack}>
-
+      {!canReadFinancialIntelligence ? (
+        <p style={styles.helper}>
+          The four production-review panels require {TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ} permission. Product cost-control panels below remain available.
+        </p>
+      ) : null}
 
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>Carrying-cost production review</h2>
@@ -253,7 +259,7 @@ export function CostControlTab({
         </div>
         <DataTable
           loading={carryingCostProductionReviewQuery.isLoading}
-          empty="No carrying-cost production review rows returned."
+          empty={canReadFinancialIntelligence ? 'No carrying-cost production review rows returned.' : `Requires ${TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ} permission.`}
           headers={['Product', 'Location', 'Readiness', 'Score', 'Monthly cost', 'Factors']}
           rows={carryingCostProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',
@@ -284,7 +290,7 @@ export function CostControlTab({
         </div>
         <DataTable
           loading={deadStockProductionReviewQuery.isLoading}
-          empty="No dead-stock production review rows returned."
+          empty={canReadFinancialIntelligence ? 'No dead-stock production review rows returned.' : `Requires ${TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ} permission.`}
           headers={['Product', 'Location', 'Readiness', 'Score', 'Capital', 'Factors']}
           rows={deadStockProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',
@@ -318,7 +324,7 @@ export function CostControlTab({
         </div>
         <DataTable
           loading={procurementSpendProductionReviewQuery.isLoading}
-          empty="No procurement spend production review rows returned."
+          empty={canReadFinancialIntelligence ? 'No procurement spend production review rows returned.' : `Requires ${TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ} permission.`}
           headers={['Category', 'Readiness', 'Pressure', 'Committed', 'Open', 'Factors']}
           rows={procurementSpendProductionReviewRows.map((item: DynamicApiValue) => [
             item.category || '-',
@@ -349,7 +355,7 @@ export function CostControlTab({
         </div>
         <DataTable
           loading={marginAwareProductionReviewQuery.isLoading}
-          empty="No margin-aware production review rows returned."
+          empty={canReadFinancialIntelligence ? 'No margin-aware production review rows returned.' : `Requires ${TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ} permission.`}
           headers={['Product', 'Location', 'Readiness', 'Decision', 'Spend', 'Factors']}
           rows={marginAwareProductionReviewRows.map((item: DynamicApiValue) => [
             item.product_name || item.product_id || '-',

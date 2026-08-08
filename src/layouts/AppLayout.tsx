@@ -12,7 +12,7 @@ import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/mainten
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
-import { getTenantPermissionSnapshot, hasAllPermissions, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { getTenantPermissionSnapshot, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
@@ -110,6 +110,10 @@ export default function AppLayout() {
     }
 
     if (item.requiredPermissions?.length && !hasAllPermissions(item.requiredPermissions)) {
+      return false;
+    }
+
+    if (item.requiredAnyPermissions?.length && !hasAnyPermission(item.requiredAnyPermissions)) {
       return false;
     }
 

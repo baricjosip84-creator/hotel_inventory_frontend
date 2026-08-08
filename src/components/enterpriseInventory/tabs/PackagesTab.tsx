@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ProductOption, ProductPackage, ProductPackageForm } from '../EnterpriseInventoryTypes';
 
 type ProductPackagesQuery = {
@@ -50,6 +51,8 @@ export function PackagesTab({
   setProductPackageForm,
   onProductPackageSubmit
 }: PackagesTabProps) {
+  const canWritePackages = hasPermission(TENANT_PERMISSIONS.PRODUCT_PACKAGES_WRITE);
+
   return (
     <section style={styles.grid}>
       <form onSubmit={onProductPackageSubmit} style={styles.card}>
@@ -63,19 +66,21 @@ export function PackagesTab({
           }}
           options={products.map((product) => ({ value: product.id, label: product.name }))}
           required
+          disabled={!canWritePackages}
         />
-        <InputField label="Package name" value={productPackageForm.package_name} onChange={(value) => setProductPackageForm((current) => ({ ...current, package_name: value }))} required />
-        <InputField label="Package barcode" value={productPackageForm.barcode} onChange={(value) => setProductPackageForm((current) => ({ ...current, barcode: value }))} required />
-        <InputField label="Units per package" type="number" min="0.0001" value={productPackageForm.units_per_package} onChange={(value) => setProductPackageForm((current) => ({ ...current, units_per_package: value }))} required />
+        <InputField label="Package name" value={productPackageForm.package_name} onChange={(value) => setProductPackageForm((current) => ({ ...current, package_name: value }))} required disabled={!canWritePackages} />
+        <InputField label="Package barcode" value={productPackageForm.barcode} onChange={(value) => setProductPackageForm((current) => ({ ...current, barcode: value }))} required disabled={!canWritePackages} />
+        <InputField label="Units per package" type="number" min="0.0001" value={productPackageForm.units_per_package} onChange={(value) => setProductPackageForm((current) => ({ ...current, units_per_package: value }))} required disabled={!canWritePackages} />
         <label style={styles.checkboxRow}>
           <input
             type="checkbox"
             checked={productPackageForm.is_default}
+            disabled={!canWritePackages}
             onChange={(event) => setProductPackageForm((current) => ({ ...current, is_default: event.target.checked }))}
           />
           Set as default product barcode
         </label>
-        <button type="submit" disabled={createProductPackageMutation.isPending || updateProductPackageMutation.isPending} style={styles.primaryButton}>
+        <button type="submit" disabled={createProductPackageMutation.isPending || updateProductPackageMutation.isPending || !canWritePackages} style={styles.primaryButton}>
           {editingProductPackageId ? 'Update package barcode' : 'Create package barcode'}
         </button>
         {editingProductPackageId ? <button type="button" onClick={cancelEditProductPackage} style={styles.secondaryButton}>Cancel edit</button> : null}
@@ -111,8 +116,8 @@ export function PackagesTab({
                     <td style={styles.td}>{item.is_default ? 'Yes' : 'No'}</td>
                     <td style={styles.td}>{formatDateTime(item.created_at)}</td>
                     <td style={styles.td}>
-                      <button type="button" style={styles.smallButton} onClick={() => beginEditProductPackage(item)}>Edit</button>
-                      <button type="button" style={styles.dangerButton} disabled={deleteProductPackageMutation.isPending} onClick={() => deleteProductPackageMutation.mutate(item)}>Delete</button>
+                      <button type="button" style={canWritePackages ? styles.smallButton : styles.disabledButton} disabled={!canWritePackages} onClick={() => beginEditProductPackage(item)}>Edit</button>
+                      <button type="button" style={styles.dangerButton} disabled={deleteProductPackageMutation.isPending || !canWritePackages} onClick={() => deleteProductPackageMutation.mutate(item)}>Delete</button>
                     </td>
                   </tr>
                 ))}

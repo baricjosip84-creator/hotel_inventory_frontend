@@ -1,6 +1,7 @@
 import { DataTable, InputField, MetricCard, SectionCard, SelectField, TextareaField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatRecordValue } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { AutomationTabProps } from '../EnterpriseInventoryAutomationTabProps';
 
 export function AutomationTab({
@@ -34,6 +35,13 @@ export function AutomationTab({
   pauseAutomationScheduleMutation,
   disableAutomationScheduleMutation
 }: AutomationTabProps) {
+  const canCreateSchedules = hasPermission(TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_CREATE);
+  const canCreateExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_CREATE);
+  const canViewExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
+  const canPauseSchedules = hasPermission(TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_PAUSE);
+  const canDisableSchedules = hasPermission(TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_DISABLE);
+  const canRunSchedules = canCreateSchedules && canCreateExecutionRequests;
+
   const automationSummary = {
     total: automationSchedules.length,
     draft: automationSchedules.filter((item) => item.status === 'draft').length,
@@ -55,7 +63,7 @@ export function AutomationTab({
 
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>Create automation schedule</h2>
-        <form onSubmit={(event) => { event.preventDefault(); createAutomationScheduleMutation.mutate(automationScheduleForm); }}>
+        <form onSubmit={(event) => { event.preventDefault(); if (!canCreateSchedules || createAutomationScheduleMutation.isPending) return; createAutomationScheduleMutation.mutate(automationScheduleForm); }}>
           <div style={styles.inlineGrid}>
             <SelectField
               label="Automation type"
@@ -63,6 +71,7 @@ export function AutomationTab({
               required
               onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, automation_type: value }))}
               options={(automationTypesQuery.data?.automation_types ?? []).map((item) => ({ value: item.automation_type, label: item.label || item.automation_type }))}
+              disabled={!canCreateSchedules}
             />
             <SelectField
               label="Schedule kind"
@@ -70,6 +79,7 @@ export function AutomationTab({
               required
               onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, schedule_kind: value }))}
               options={(automationTypesQuery.data?.schedule_kinds ?? ['manual', 'daily', 'weekly', 'monthly']).map((item: string) => ({ value: item, label: item }))}
+              disabled={!canCreateSchedules}
             />
             <SelectField
               label="Default request status"
@@ -77,17 +87,19 @@ export function AutomationTab({
               required
               onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, default_status: value }))}
               options={(automationTypesQuery.data?.request_default_statuses ?? ['draft', 'pending_review']).map((item: string) => ({ value: item, label: item }))}
+              disabled={!canCreateSchedules}
             />
-            <InputField label="Run time" value={automationScheduleForm.time} required onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, time: value }))} />
+            <InputField label="Run time" value={automationScheduleForm.time} required onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, time: value }))} disabled={!canCreateSchedules} />
           </div>
-          <InputField label="Name" value={automationScheduleForm.name} required onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, name: value }))} />
-          <InputField label="Timezone" value={automationScheduleForm.timezone} onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, timezone: value }))} />
+          <InputField label="Name" value={automationScheduleForm.name} required onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, name: value }))} disabled={!canCreateSchedules} />
+          <InputField label="Timezone" value={automationScheduleForm.timezone} onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, timezone: value }))} disabled={!canCreateSchedules} />
           <TextareaField
             label="Description"
             value={automationScheduleForm.description}
             onChange={(value) => setAutomationScheduleForm((current) => ({ ...current, description: value }))}
+            disabled={!canCreateSchedules}
           />
-          <button type="submit" style={styles.primaryButton} disabled={createAutomationScheduleMutation.isPending}>
+          <button type="submit" style={styles.primaryButton} disabled={createAutomationScheduleMutation.isPending || !canCreateSchedules}>
             {createAutomationScheduleMutation.isPending ? 'Creating…' : 'Create schedule'}
           </button>
         </form>
@@ -119,9 +131,9 @@ export function AutomationTab({
               <p style={styles.helper}>{schedule.automation_type} · {schedule.schedule_kind} · {schedule.status} · next {formatDateTime(schedule.next_run_at)}</p>
               {schedule.description ? <p style={styles.helper}>{schedule.description}</p> : null}
               <div style={styles.actions}>
-                <button type="button" style={styles.secondarySmallButton} onClick={() => dryRunAutomationScheduleMutation.mutate(schedule.id)}>Dry run</button>
-                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.smallButton} disabled={schedule.status === 'disabled'} title={schedule.status === 'disabled' ? 'Disabled automation schedules cannot be run manually.' : undefined} onClick={() => runAutomationScheduleMutation.mutate(schedule.id)}>Manual run</button>
-                <button type="button" style={schedule.status === 'disabled' ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled'} title={schedule.status === 'disabled' ? 'Disabled automation schedules are already blocked.' : undefined} onClick={() => pauseAutomationScheduleMutation.mutate(schedule.id)}>Pause</button>
+                <button type="button" style={styles.secondarySmallButton} disabled={dryRunAutomationScheduleMutation.isPending} onClick={() => dryRunAutomationScheduleMutation.mutate(schedule.id)}>Dry run</button>
+                <button type="button" style={schedule.status === 'disabled' || !canRunSchedules ? styles.disabledButton : styles.smallButton} disabled={schedule.status === 'disabled' || !canRunSchedules || runAutomationScheduleMutation.isPending} title={!canRunSchedules ? `Requires ${TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_CREATE} and ${TENANT_PERMISSIONS.EXECUTION_REQUESTS_CREATE} permissions.` : schedule.status === 'disabled' ? 'Disabled automation schedules cannot be run manually.' : undefined} onClick={() => runAutomationScheduleMutation.mutate(schedule.id)}>Manual run</button>
+                <button type="button" style={schedule.status === 'disabled' || !canPauseSchedules ? styles.disabledButton : styles.secondarySmallButton} disabled={schedule.status === 'disabled' || !canPauseSchedules || pauseAutomationScheduleMutation.isPending} title={!canPauseSchedules ? `Requires ${TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_PAUSE} permission.` : schedule.status === 'disabled' ? 'Disabled automation schedules are already blocked.' : undefined} onClick={() => pauseAutomationScheduleMutation.mutate(schedule.id)}>Pause</button>
                 {schedule.status === 'paused' ? <button type="button" style={styles.disabledButton} disabled title="Resume is intentionally blocked until the automation runner is enabled.">Resume locked</button> : null}
               </div>
               <div style={{ ...styles.actions, marginTop: 8 }}>
@@ -129,13 +141,14 @@ export function AutomationTab({
                   style={styles.inlineInput}
                   placeholder="Disable reason"
                   value={automationDisableReasons[schedule.id] ?? ''}
+                  disabled={!canDisableSchedules || schedule.status === 'disabled'}
                   onChange={(event) => setAutomationDisableReasons((current) => ({ ...current, [schedule.id]: event.target.value }))}
                 />
                 <button
                   type="button"
-                  style={schedule.status === 'disabled' ? styles.disabledButton : styles.dangerButton}
-                  disabled={schedule.status === 'disabled'}
-                  title={schedule.status === 'disabled' ? 'This schedule is already disabled.' : undefined}
+                  style={schedule.status === 'disabled' || !canDisableSchedules ? styles.disabledButton : styles.dangerButton}
+                  disabled={schedule.status === 'disabled' || !canDisableSchedules || disableAutomationScheduleMutation.isPending}
+                  title={!canDisableSchedules ? `Requires ${TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_DISABLE} permission.` : schedule.status === 'disabled' ? 'This schedule is already disabled.' : undefined}
                   onClick={() => disableAutomationScheduleMutation.mutate({ id: schedule.id, reason: automationDisableReasons[schedule.id] ?? '' })}
                 >
                   Disable
@@ -157,6 +170,7 @@ export function AutomationTab({
 
       <SectionCard title="Runner governance evidence">
         <p style={styles.helper}>Reads existing automation runner governance endpoints only; these controls do not start jobs, approve requests, execute requests, or mutate inventory.</p>
+        {!canViewExecutionRequests ? <p style={styles.helper}>Runner governance evidence also requires {TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW} permission.</p> : null}
         <div style={styles.statGrid}>
           <MetricCard label="Safety mode" value={formatRecordValue(automationRunnerSafetyReportQuery.data, 'runner_mode')} />
           <MetricCard label="Request creation" value={automationRunnerSafetyReportQuery.data?.request_creation_enabled ? 'Enabled' : 'Locked'} />

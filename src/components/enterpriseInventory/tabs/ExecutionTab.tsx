@@ -3,6 +3,7 @@ import { DataTable, MetricCard, SelectField } from '../EnterpriseInventoryShared
 import { styles } from '../EnterpriseInventoryStyles';
 import { emptyExecutionFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ExecutionAdapter, ExecutionFilters, ExecutionHardeningSummary, ExecutionRequest, ExecutionRequestsResponse } from '../EnterpriseInventoryTypes';
 
 type SystemStatusResponse = {
@@ -61,7 +62,21 @@ export function ExecutionTab({
   executeNoopExecutionRequestMutation,
   cancelExecutionRequestMutation
 }: ExecutionTabProps) {
+  const canSubmitRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_SUBMIT);
+  const canReviewRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_REVIEW);
+  const canExecuteRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_EXECUTE);
+  const canCancelRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_CANCEL);
+
   const handleExecutionAction = (request: ExecutionRequest, action: ExecutionAction) => {
+    const permissionAllowed = action === 'submit'
+      ? canSubmitRequests
+      : action === 'approve' || action === 'reject'
+        ? canReviewRequests
+        : action === 'execute' || action === 'noop'
+          ? canExecuteRequests
+          : canCancelRequests;
+    if (!permissionAllowed) return;
+
     if (action === 'submit') {
       const note = window.prompt('Submit note (optional)', '') || '';
       submitExecutionRequestMutation.mutate({ id: request.id, note });
@@ -158,10 +173,10 @@ export function ExecutionTab({
           formatDateTime(request.updated_at || request.created_at),
           JSON.stringify(request.payload || {}).slice(0, 120),
           [
-            canSubmitExecutionRequest(request) ? 'Submit' : null,
-            canReviewExecutionRequest(request) ? 'Approve / reject' : null,
-            canRunExecutionRequest(request) ? 'Execute / no-op' : null,
-            canCancelExecutionRequest(request) ? 'Cancel' : null
+            canSubmitRequests && canSubmitExecutionRequest(request) ? 'Submit' : null,
+            canReviewRequests && canReviewExecutionRequest(request) ? 'Approve / reject' : null,
+            canExecuteRequests && canRunExecutionRequest(request) ? 'Execute / no-op' : null,
+            canCancelRequests && canCancelExecutionRequest(request) ? 'Cancel' : null
           ].filter(Boolean).join(', ') || '-'
         ])}
       />
@@ -174,12 +189,12 @@ export function ExecutionTab({
             <p>Status: <strong>{request.status}</strong></p>
             <p>Execution: <strong>{request.execution_status || 'not executed'}</strong></p>
             <div style={styles.actions}>
-              {canSubmitExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'submit')}>Submit</button> : null}
-              {canReviewExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'approve')}>Approve</button> : null}
-              {canReviewExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'reject')}>Reject</button> : null}
-              {canRunExecutionRequest(request) ? <button type="button" style={styles.primaryButton} onClick={() => handleExecutionAction(request, 'execute')}>Execute</button> : null}
-              {canRunExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'noop')}>No-op</button> : null}
-              {canCancelExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'cancel')}>Cancel</button> : null}
+              {canSubmitRequests && canSubmitExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'submit')}>Submit</button> : null}
+              {canReviewRequests && canReviewExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'approve')}>Approve</button> : null}
+              {canReviewRequests && canReviewExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'reject')}>Reject</button> : null}
+              {canExecuteRequests && canRunExecutionRequest(request) ? <button type="button" style={styles.primaryButton} onClick={() => handleExecutionAction(request, 'execute')}>Execute</button> : null}
+              {canExecuteRequests && canRunExecutionRequest(request) ? <button type="button" style={styles.secondaryButton} onClick={() => handleExecutionAction(request, 'noop')}>No-op</button> : null}
+              {canCancelRequests && canCancelExecutionRequest(request) ? <button type="button" style={styles.dangerButton} onClick={() => handleExecutionAction(request, 'cancel')}>Cancel</button> : null}
             </div>
           </article>
         ))}

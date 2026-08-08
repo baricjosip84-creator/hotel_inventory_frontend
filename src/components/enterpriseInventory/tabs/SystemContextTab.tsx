@@ -1,6 +1,7 @@
 import { DataTable, MetricCard } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatRecordValue, formatValue } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { SystemContextResponse, SystemContextSnapshot, SystemExecutionGateResponse, TenantPublicContext } from '../EnterpriseInventoryTypes';
 
 type QueryState<T> = {
@@ -62,6 +63,7 @@ export function SystemContextTab({
   captureSystemContextSnapshotMutation,
   refreshSystemContextQueries
 }: SystemContextTabProps) {
+  const canCaptureSnapshot = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const inventoryContext = getSystemContextSection(systemContextQuery.data, 'inventory');
   const procurementContext = getSystemContextSection(systemContextQuery.data, 'procurement');
   const costingContext = getSystemContextSection(systemContextQuery.data, 'costing');
@@ -72,7 +74,7 @@ export function SystemContextTab({
   return (
     <section style={styles.stack}>
       <div style={styles.actions}>
-        <button type="button" style={styles.primaryButton} onClick={() => captureSystemContextSnapshotMutation.mutate()} disabled={captureSystemContextSnapshotMutation.isPending}>
+        <button type="button" style={canCaptureSnapshot ? styles.primaryButton : styles.disabledButton} onClick={() => captureSystemContextSnapshotMutation.mutate()} disabled={captureSystemContextSnapshotMutation.isPending || !canCaptureSnapshot} title={!canCaptureSnapshot ? `Requires ${TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN} permission.` : undefined}>
           Capture snapshot
         </button>
         <button type="button" style={styles.secondaryButton} onClick={() => refreshSystemContextQueries()}>

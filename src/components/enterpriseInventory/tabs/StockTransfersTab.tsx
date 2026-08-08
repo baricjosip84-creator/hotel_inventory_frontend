@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { ProductOption, StockItem, StockTransfer, StockTransferForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type StockTransferCreateMutation = {
@@ -63,6 +64,9 @@ export function StockTransfersTab({
   executeStockTransferMutation,
   cancelStockTransferMutation
 }: StockTransfersTabProps) {
+  const canCreateTransfers = hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE);
+  const canExecuteTransfers = hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE);
+  const canCancelTransfers = hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL);
   const productNames = useMemo(() => new Map(products.map((product) => [product.id, product.name])), [products]);
   const selectedQuantity = toFiniteNumber(stockTransferForm.quantity);
 
@@ -85,7 +89,7 @@ export function StockTransfersTab({
   );
   const hasValidQuantity = selectedQuantity > 0;
   const quantityWithinSourceStock = Boolean(selectedSourceStock && selectedQuantity <= selectedAvailableQuantity);
-  const canCreateTransferDraft = Boolean(
+  const canCreateTransferDraft = canCreateTransfers && Boolean(
     locationsDiffer &&
     stockTransferForm.product_id &&
     hasValidQuantity &&
@@ -97,7 +101,9 @@ export function StockTransfersTab({
     label: `${item.product_name || productNames.get(item.product_id) || item.product_id} — ${formatQuantity(item.quantity, item.product_unit)} available`
   }));
 
-  const transferValidationMessage = !hasSourceLocation
+  const transferValidationMessage = !canCreateTransfers
+    ? `Requires ${TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE} permission.`
+    : !hasSourceLocation
     ? 'Select a source location to load products with available stock.'
     : sourceStockItems.length === 0
       ? 'No stocked products are available at the selected source location.'
@@ -115,7 +121,7 @@ export function StockTransfersTab({
 
   const handleStockTransferSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canCreateTransferDraft || createStockTransferMutation.isPending) return;
+    if (!canCreateTransfers || !canCreateTransferDraft || createStockTransferMutation.isPending) return;
     createStockTransferMutation.mutate(stockTransferForm);
   };
 
@@ -137,6 +143,7 @@ export function StockTransfersTab({
   };
 
   const handleExecuteTransfer = (transfer: StockTransfer) => {
+    if (!canExecuteTransfers) return;
     const confirmed = window.confirm(
       `Execute this stock transfer from ${transfer.from_storage_location_name || transfer.from_storage_location_id} to ${transfer.to_storage_location_name || transfer.to_storage_location_id}?`
     );
@@ -146,6 +153,7 @@ export function StockTransfersTab({
   };
 
   const handleCancelTransfer = (transfer: StockTransfer) => {
+    if (!canCancelTransfers) return;
     const confirmed = window.confirm(
       `Cancel this stock transfer from ${transfer.from_storage_location_name || transfer.from_storage_location_id} to ${transfer.to_storage_location_name || transfer.to_storage_location_id}?`
     );
@@ -159,13 +167,13 @@ export function StockTransfersTab({
       <form onSubmit={handleStockTransferSubmit} style={styles.card} data-skip-global-action-feedback="true">
         <h2 style={styles.cardTitle}>Create internal stock transfer</h2>
         <p style={styles.helper}>Uses the real POST /stock-transfers route and creates a draft transfer with one product line.</p>
-        <SelectField label="From location" value={stockTransferForm.from_storage_location_id} onChange={handleFromLocationChange} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
-        <SelectField label="To location" value={stockTransferForm.to_storage_location_id} onChange={(value) => setStockTransferForm((current) => ({ ...current, to_storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
-        <SelectField label="Product" value={stockTransferForm.product_id} onChange={handleProductChange} options={productOptions} required disabled={!hasSourceLocation || productOptions.length === 0} />
-        <InputField label="Quantity" type="number" value={stockTransferForm.quantity} onChange={(value) => setStockTransferForm((current) => ({ ...current, quantity: value }))} required min="0.0001" max={selectedSourceStock ? String(selectedAvailableQuantity) : undefined} disabled={!selectedSourceStock} />
+        <SelectField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="From location" value={stockTransferForm.from_storage_location_id} onChange={handleFromLocationChange} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
+        <SelectField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="To location" value={stockTransferForm.to_storage_location_id} onChange={(value) => setStockTransferForm((current) => ({ ...current, to_storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
+        <SelectField label="Product" value={stockTransferForm.product_id} onChange={handleProductChange} options={productOptions} required disabled={!canCreateTransfers || createStockTransferMutation.isPending || !hasSourceLocation || productOptions.length === 0} />
+        <InputField label="Quantity" type="number" value={stockTransferForm.quantity} onChange={(value) => setStockTransferForm((current) => ({ ...current, quantity: value }))} required min="0.0001" max={selectedSourceStock ? String(selectedAvailableQuantity) : undefined} disabled={!canCreateTransfers || createStockTransferMutation.isPending || !selectedSourceStock} />
         {selectedSourceStock ? <p style={styles.helper}>Available at source: {formatQuantity(selectedSourceStock.quantity, selectedSourceStock.product_unit)}</p> : null}
         {transferValidationMessage ? <p style={styles.muted}>{transferValidationMessage}</p> : null}
-        <InputField label="Notes" value={stockTransferForm.notes} onChange={(value) => setStockTransferForm((current) => ({ ...current, notes: value }))} />
+        <InputField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="Notes" value={stockTransferForm.notes} onChange={(value) => setStockTransferForm((current) => ({ ...current, notes: value }))} />
         <button type="submit" disabled={createStockTransferMutation.isPending || !canCreateTransferDraft} style={createStockTransferMutation.isPending || !canCreateTransferDraft ? styles.disabledButton : styles.primaryButton}>Create transfer draft</button>
       </form>
 
@@ -204,8 +212,8 @@ export function StockTransfersTab({
                   <td style={styles.td}>
                     {transfer.status === 'draft' ? (
                       <div style={styles.actionRow} data-skip-global-action-feedback="true">
-                        <button type="button" onClick={() => handleExecuteTransfer(transfer)} disabled={executeStockTransferMutation.isPending} style={styles.smallButton}>Execute</button>
-                        <button type="button" onClick={() => handleCancelTransfer(transfer)} disabled={cancelStockTransferMutation.isPending} style={styles.dangerButton}>Cancel</button>
+                        <button type="button" onClick={() => handleExecuteTransfer(transfer)} disabled={!canExecuteTransfers || executeStockTransferMutation.isPending} title={!canExecuteTransfers ? `Requires ${TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE} permission.` : undefined} style={!canExecuteTransfers || executeStockTransferMutation.isPending ? styles.disabledButton : styles.smallButton}>Execute</button>
+                        <button type="button" onClick={() => handleCancelTransfer(transfer)} disabled={!canCancelTransfers || cancelStockTransferMutation.isPending} title={!canCancelTransfers ? `Requires ${TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL} permission.` : undefined} style={!canCancelTransfers || cancelStockTransferMutation.isPending ? styles.disabledButton : styles.dangerButton}>Cancel</button>
                       </div>
                     ) : '-'}
                   </td>

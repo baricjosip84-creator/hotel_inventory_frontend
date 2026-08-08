@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDate, formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type {
   ProductOption,
   PurchaseOrder,
@@ -123,13 +124,17 @@ export function InvoicesTab({
   supplierInvoiceForm,
   suppliers
 }: InvoicesTabProps) {
+  const canReadSupplierCatalog = hasPermission(TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ);
+  const canWriteSupplierCatalog = hasPermission(TENANT_PERMISSIONS.SUPPLIER_CATALOG_WRITE);
+  const canWriteInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
   const leadTimeDays = Number(supplierCatalogForm.lead_time_days || 0);
   const catalogNumbersValid = Number.isInteger(leadTimeDays)
     && leadTimeDays >= 0
     && validOptionalNonNegativeNumber(supplierCatalogForm.min_order_quantity)
     && validOptionalNonNegativeNumber(supplierCatalogForm.unit_cost);
   const catalogCurrencyValid = supplierCatalogForm.currency.trim().length <= 10;
-  const canSaveCatalogItem = Boolean(supplierCatalogForm.supplier_id && supplierCatalogForm.product_id)
+  const canSaveCatalogItem = canWriteSupplierCatalog
+    && Boolean(supplierCatalogForm.supplier_id && supplierCatalogForm.product_id)
     && catalogNumbersValid
     && catalogCurrencyValid
     && !createSupplierCatalogMutation.isPending;
@@ -143,7 +148,7 @@ export function InvoicesTab({
     && validRequiredNonNegativeNumber(supplierInvoiceForm.total_amount)
     && validRequiredNonNegativeNumber(supplierInvoiceForm.quantity)
     && validRequiredNonNegativeNumber(supplierInvoiceForm.unit_cost);
-  const canCreateInvoice = Boolean(
+  const canCreateInvoice = canWriteInvoices && Boolean(
     supplierInvoiceForm.supplier_id
       && supplierInvoiceForm.invoice_number.trim()
       && supplierInvoiceForm.invoice_date
@@ -171,19 +176,20 @@ export function InvoicesTab({
           data-skip-global-action-feedback="true"
         >
           <h2 style={styles.cardTitle}>Supplier catalog item</h2>
-          <SelectField label="Supplier" value={supplierCatalogForm.supplier_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_id: value }))} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} required />
-          <SelectField label="Product" value={supplierCatalogForm.product_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
-          <InputField label="Supplier SKU" value={supplierCatalogForm.supplier_sku} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_sku: value }))} />
-          <InputField label="Supplier product name" value={supplierCatalogForm.supplier_product_name} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_product_name: value }))} />
-          <InputField label="Lead time days" type="number" min="0" value={supplierCatalogForm.lead_time_days} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, lead_time_days: value }))} />
-          <InputField label="Minimum order quantity" type="number" min="0" value={supplierCatalogForm.min_order_quantity} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, min_order_quantity: value }))} />
-          <InputField label="Latest unit cost" type="number" min="0" value={supplierCatalogForm.unit_cost} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, unit_cost: value }))} />
-          <InputField label="Currency" value={supplierCatalogForm.currency} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, currency: value }))} />
-          <InputField label="Effective from" type="date" value={supplierCatalogForm.effective_from} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, effective_from: value }))} />
+          <SelectField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Supplier" value={supplierCatalogForm.supplier_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_id: value }))} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} required />
+          <SelectField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Product" value={supplierCatalogForm.product_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Supplier SKU" value={supplierCatalogForm.supplier_sku} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_sku: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Supplier product name" value={supplierCatalogForm.supplier_product_name} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_product_name: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Lead time days" type="number" min="0" value={supplierCatalogForm.lead_time_days} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, lead_time_days: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Minimum order quantity" type="number" min="0" value={supplierCatalogForm.min_order_quantity} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, min_order_quantity: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Latest unit cost" type="number" min="0" value={supplierCatalogForm.unit_cost} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, unit_cost: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Currency" value={supplierCatalogForm.currency} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, currency: value }))} />
+          <InputField disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} label="Effective from" type="date" value={supplierCatalogForm.effective_from} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, effective_from: value }))} />
           <label style={styles.checkboxRow}>
-            <input type="checkbox" checked={supplierCatalogForm.preferred} onChange={(event) => setSupplierCatalogForm((current) => ({ ...current, preferred: event.target.checked }))} />
+            <input type="checkbox" disabled={!canWriteSupplierCatalog || createSupplierCatalogMutation.isPending} checked={supplierCatalogForm.preferred} onChange={(event) => setSupplierCatalogForm((current) => ({ ...current, preferred: event.target.checked }))} />
             Preferred supplier item
           </label>
+          {!canWriteSupplierCatalog ? <p style={styles.helper}>Saving supplier catalog items requires {TENANT_PERMISSIONS.SUPPLIER_CATALOG_WRITE} permission.</p> : null}
           {!catalogNumbersValid ? <p style={styles.helper}>Lead time must be a whole number, and numeric values cannot be negative.</p> : null}
           {!catalogCurrencyValid ? <p style={styles.helper}>Currency must be 10 characters or fewer.</p> : null}
           <button
@@ -202,22 +208,24 @@ export function InvoicesTab({
         >
           <h2 style={styles.cardTitle}>Create supplier invoice</h2>
           <SelectField
+            disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending}
             label="Supplier"
             value={supplierInvoiceForm.supplier_id}
             onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, supplier_id: value }))}
             options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))}
             required
           />
-          <InputField label="Invoice number" value={supplierInvoiceForm.invoice_number} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_number: value }))} required />
-          <InputField label="Invoice date" type="date" value={supplierInvoiceForm.invoice_date} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_date: value }))} required />
-          <InputField label="Subtotal" type="number" min="0" value={supplierInvoiceForm.subtotal_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, subtotal_amount: value }))} />
-          <InputField label="Tax" type="number" min="0" value={supplierInvoiceForm.tax_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, tax_amount: value }))} />
-          <InputField label="Total" type="number" min="0" value={supplierInvoiceForm.total_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, total_amount: value }))} required />
-          <SelectField label="Invoice product" value={supplierInvoiceForm.product_id} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
-          <InputField label="Quantity" type="number" min="0" value={supplierInvoiceForm.quantity} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, quantity: value }))} required />
-          <InputField label="Unit cost" type="number" min="0" value={supplierInvoiceForm.unit_cost} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, unit_cost: value }))} required />
-          <InputField label="Expected quantity for matching" type="number" min="0" value={supplierInvoiceForm.expected_quantity} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, expected_quantity: value }))} />
-          <InputField label="Expected unit cost for matching" type="number" min="0" value={supplierInvoiceForm.expected_unit_cost} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, expected_unit_cost: value }))} />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Invoice number" value={supplierInvoiceForm.invoice_number} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_number: value }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Invoice date" type="date" value={supplierInvoiceForm.invoice_date} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, invoice_date: value }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Subtotal" type="number" min="0" value={supplierInvoiceForm.subtotal_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, subtotal_amount: value }))} />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Tax" type="number" min="0" value={supplierInvoiceForm.tax_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, tax_amount: value }))} />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Total" type="number" min="0" value={supplierInvoiceForm.total_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, total_amount: value }))} required />
+          <SelectField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Invoice product" value={supplierInvoiceForm.product_id} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Quantity" type="number" min="0" value={supplierInvoiceForm.quantity} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, quantity: value }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Unit cost" type="number" min="0" value={supplierInvoiceForm.unit_cost} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, unit_cost: value }))} required />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Expected quantity for matching" type="number" min="0" value={supplierInvoiceForm.expected_quantity} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, expected_quantity: value }))} />
+          <InputField disabled={!canWriteInvoices || createSupplierInvoiceMutation.isPending} label="Expected unit cost for matching" type="number" min="0" value={supplierInvoiceForm.expected_unit_cost} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, expected_unit_cost: value }))} />
+          {!canWriteInvoices ? <p style={styles.helper}>Creating supplier invoices requires {TENANT_PERMISSIONS.INVOICES_WRITE} permission.</p> : null}
           {!invoiceNumbersValid ? <p style={styles.helper}>Required amounts must be entered, and numeric values cannot be negative.</p> : null}
           <button
             type="submit"
@@ -233,7 +241,7 @@ export function InvoicesTab({
         <h2 style={styles.cardTitle}>Supplier catalog</h2>
         <DataTable
           loading={supplierCatalogQuery.isLoading}
-          empty="No supplier catalog items yet."
+          empty={canReadSupplierCatalog ? 'No supplier catalog items yet.' : `Requires ${TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ} permission.`}
           headers={['Supplier', 'Product', 'Supplier SKU', 'Unit cost', 'Lead time', 'Minimum order', 'Preferred']}
           rows={(supplierCatalogQuery.data ?? []).map((item) => [
             item.supplier_name || item.supplier_id,

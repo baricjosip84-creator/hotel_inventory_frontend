@@ -54,13 +54,15 @@ export function TextareaField({
   value,
   onChange,
   required = false,
-  rows = 3
+  rows = 3,
+  disabled = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   rows?: number;
+  disabled?: boolean;
 }) {
   return (
     <label style={styles.field}>
@@ -70,6 +72,7 @@ export function TextareaField({
         value={value}
         required={required}
         rows={rows}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
@@ -120,10 +123,12 @@ export function DataTable({ loading, empty, headers, rows }: { loading: boolean;
 
 export function EnterpriseInventoryHero({
   onEvaluateParLevels,
-  evaluating
+  evaluating,
+  canEvaluate
 }: {
   onEvaluateParLevels: () => void;
   evaluating: boolean;
+  canEvaluate: boolean;
 }) {
   return (
     <section style={styles.hero}>
@@ -135,14 +140,16 @@ export function EnterpriseInventoryHero({
           and other operational inventory controls from one workspace.
         </p>
       </div>
-      <button
-        type="button"
-        onClick={onEvaluateParLevels}
-        disabled={evaluating}
-        style={styles.primaryButton}
-      >
-        {evaluating ? 'Evaluating…' : 'Evaluate par levels'}
-      </button>
+      {canEvaluate ? (
+        <button
+          type="button"
+          onClick={onEvaluateParLevels}
+          disabled={evaluating}
+          style={styles.primaryButton}
+        >
+          {evaluating ? 'Evaluating…' : 'Evaluate par levels'}
+        </button>
+      ) : null}
     </section>
   );
 }

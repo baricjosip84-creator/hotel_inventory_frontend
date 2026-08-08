@@ -29,6 +29,7 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
     'supplierTrustScoresQuery'
   ],
   forecast: [
+    'tenantSubscriptionAccessQuery',
     'demandForecastQuery',
     'forecastAccuracyBacktestQuery',
     'forecastCalibrationReviewQuery',
@@ -36,17 +37,24 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
     'forecastReliabilityMatrixQuery'
   ],
   reports: [
+    'tenantSubscriptionAccessQuery',
     'inventoryValuationReportQuery',
     'stockByLocationReportQuery',
     'productMovementReportQuery',
     'procurementSummaryReportQuery'
   ],
   automation: [
+    'tenantSubscriptionAccessQuery',
     'automationTypesQuery',
     'automationSchedulesQuery',
     'automationRunnerReadinessQuery',
     'automationRunnerStatusQuery',
-    'automationRunEventsQuery'
+    'automationRunEventsQuery',
+    'automationRunnerSafetyReportQuery',
+    'automationRunnerGovernancePackQuery',
+    'automationRunnerOperationsReviewQuery',
+    'automationRunnerAccountabilityDigestQuery',
+    'automationRunnerPolicyMatrixQuery'
   ],
   execution: ['systemStatusQuery', 'executionAdaptersQuery', 'executionHardeningQuery', 'executionRequestsQuery'],
   'system-context': [
@@ -65,7 +73,11 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
     'productCostValuationSummaryQuery',
     'productCostActionSummaryQuery',
     'productCostGovernanceSummaryQuery',
-    'productCostHardeningSummaryQuery'
+    'productCostHardeningSummaryQuery',
+    'carryingCostProductionReviewQuery',
+    'deadStockProductionReviewQuery',
+    'marginAwareProductionReviewQuery',
+    'procurementSpendProductionReviewQuery'
   ],
   'stock-transfers': ['stockTransfersQuery'],
   products: ['productsQuery'],
@@ -73,7 +85,7 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
   locations: ['storageLocationsQuery'],
   alerts: ['alertsQuery'],
   audit: ['auditLogsQuery'],
-  'procurement-match': ['purchaseOrdersQuery', 'shipmentsQuery', 'invoicesQuery'],
+  'procurement-match': ['tenantSubscriptionAccessQuery', 'purchaseOrdersQuery', 'shipmentsQuery', 'invoicesQuery'],
   receiving: ['shipmentsQuery', 'shipmentItemsQuery'],
   requisitions: ['requisitionsQuery'],
   approvals: ['approvalRulesQuery'],
@@ -84,9 +96,13 @@ const TAB_QUERY_MAP: Record<string, string[]> = {
   notifications: ['notificationsQuery']
 };
 
-export function getEnterpriseInventoryLastUpdatedAt(queries: EnterpriseInventoryQueryRecord): number | null {
-  const latest = Object.values(queries).reduce((currentLatest, query) => {
-    const updatedAt = query?.dataUpdatedAt ?? 0;
+export function getEnterpriseInventoryActiveTabLastUpdatedAt(
+  activeTab: string,
+  queries: EnterpriseInventoryQueryRecord
+): number | null {
+  const queryNames = TAB_QUERY_MAP[activeTab] ?? [];
+  const latest = queryNames.reduce((currentLatest, name) => {
+    const updatedAt = queries[name]?.dataUpdatedAt ?? 0;
     return Number.isFinite(updatedAt) && updatedAt > currentLatest ? updatedAt : currentLatest;
   }, 0);
 

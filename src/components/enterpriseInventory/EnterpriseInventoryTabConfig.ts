@@ -31,3 +31,11 @@ export const enterpriseInventoryTabs = [
 
 export type EnterpriseInventoryTabKey = (typeof enterpriseInventoryTabs)[number][0];
 
+export const enterpriseInventoryReadPermissions = enterpriseInventoryTabs.map(([, , permission]) => permission);
+
+export const enterpriseInventoryTabFeatures: Partial<Record<EnterpriseInventoryTabKey, string>> = {
+  forecast: 'forecasting',
+  reports: 'reports',
+  automation: 'automation',
+  'procurement-match': 'purchase_orders'
+};

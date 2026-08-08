@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { AttachmentForm, EntityAttachment } from '../EnterpriseInventoryTypes';
 
 type AttachmentsQuery = {
@@ -28,6 +29,8 @@ export function AttachmentsTab({
   setAttachmentForm,
   onAttachmentSubmit
 }: AttachmentsTabProps) {
+  const canWriteAttachments = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE);
+
   return (
     <section style={styles.grid}>
       <form onSubmit={onAttachmentSubmit} style={styles.card}>
@@ -45,14 +48,15 @@ export function AttachmentsTab({
             { value: 'department_requisition', label: 'Department requisition' }
           ]}
           required
+          disabled={!canWriteAttachments}
         />
-        <InputField label="Entity ID" value={attachmentForm.entity_id} onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))} required />
-        <InputField label="Original filename" value={attachmentForm.original_filename} onChange={(value) => setAttachmentForm((current) => ({ ...current, original_filename: value }))} required />
-        <InputField label="Stored filename" value={attachmentForm.stored_filename} onChange={(value) => setAttachmentForm((current) => ({ ...current, stored_filename: value }))} required />
-        <InputField label="MIME type" value={attachmentForm.mime_type} onChange={(value) => setAttachmentForm((current) => ({ ...current, mime_type: value }))} />
-        <InputField label="File size bytes" type="number" value={attachmentForm.file_size_bytes} onChange={(value) => setAttachmentForm((current) => ({ ...current, file_size_bytes: value }))} />
-        <InputField label="Storage path" value={attachmentForm.storage_path} onChange={(value) => setAttachmentForm((current) => ({ ...current, storage_path: value }))} />
-        <button type="submit" disabled={createAttachmentMutation.isPending} style={styles.primaryButton}>Link attachment</button>
+        <InputField label="Entity ID" value={attachmentForm.entity_id} onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))} required disabled={!canWriteAttachments} />
+        <InputField label="Original filename" value={attachmentForm.original_filename} onChange={(value) => setAttachmentForm((current) => ({ ...current, original_filename: value }))} required disabled={!canWriteAttachments} />
+        <InputField label="Stored filename" value={attachmentForm.stored_filename} onChange={(value) => setAttachmentForm((current) => ({ ...current, stored_filename: value }))} required disabled={!canWriteAttachments} />
+        <InputField label="MIME type" value={attachmentForm.mime_type} onChange={(value) => setAttachmentForm((current) => ({ ...current, mime_type: value }))} disabled={!canWriteAttachments} />
+        <InputField label="File size bytes" type="number" value={attachmentForm.file_size_bytes} onChange={(value) => setAttachmentForm((current) => ({ ...current, file_size_bytes: value }))} disabled={!canWriteAttachments} />
+        <InputField label="Storage path" value={attachmentForm.storage_path} onChange={(value) => setAttachmentForm((current) => ({ ...current, storage_path: value }))} disabled={!canWriteAttachments} />
+        <button type="submit" disabled={createAttachmentMutation.isPending || !canWriteAttachments} style={createAttachmentMutation.isPending || !canWriteAttachments ? styles.disabledButton : styles.primaryButton} title={!canWriteAttachments ? `Requires ${TENANT_PERMISSIONS.ATTACHMENTS_WRITE} permission.` : undefined}>Link attachment</button>
       </form>
 
       <section style={styles.card}>

@@ -3,6 +3,7 @@ import { InputField, MetricCard, SelectField, TextareaField } from '../Enterpris
 import { styles } from '../EnterpriseInventoryStyles';
 import { emptyAlertFilters } from '../EnterpriseInventoryForms';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { AlertFilters, AlertForm, AlertItem, ProductOption } from '../EnterpriseInventoryTypes';
 
 const ALERT_CODE_LABELS: Record<string, string> = {
@@ -78,16 +79,19 @@ export function AlertsTab({
   onResolveAlert,
   onReopenAlert
 }: AlertsTabProps) {
+  const canWriteAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_WRITE);
+
   return (
     <section style={styles.grid}>
       <form onSubmit={onAlertSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>Create manual alert</h2>
-        <InputField label="Type" value={alertForm.type} onChange={(value) => onAlertFormChange((current) => ({ ...current, type: value }))} required />
+        <InputField label="Type" value={alertForm.type} onChange={(value) => onAlertFormChange((current) => ({ ...current, type: value }))} required disabled={!canWriteAlerts} />
         <SelectField
           label="Product"
           value={alertForm.product_id}
           onChange={(value) => onAlertFormChange((current) => ({ ...current, product_id: value }))}
           options={products.map((product) => ({ value: product.id, label: product.name }))}
+          disabled={!canWriteAlerts}
         />
         <SelectField
           label="Severity"
@@ -99,16 +103,18 @@ export function AlertsTab({
             { value: 'critical', label: 'Critical' }
           ]}
           required
+          disabled={!canWriteAlerts}
         />
-        <InputField label="Escalation level" type="number" min="0" value={alertForm.escalation_level} onChange={(value) => onAlertFormChange((current) => ({ ...current, escalation_level: value }))} />
+        <InputField label="Escalation level" type="number" min="0" value={alertForm.escalation_level} onChange={(value) => onAlertFormChange((current) => ({ ...current, escalation_level: value }))} disabled={!canWriteAlerts} />
         <TextareaField
           label="Message"
           value={alertForm.message}
           required
           rows={5}
+          disabled={!canWriteAlerts}
           onChange={(value) => onAlertFormChange((current) => ({ ...current, message: value }))}
         />
-        <button type="submit" disabled={isCreatingAlert} style={styles.primaryButton}>Create alert</button>
+        <button type="submit" disabled={isCreatingAlert || !canWriteAlerts} style={isCreatingAlert || !canWriteAlerts ? styles.disabledButton : styles.primaryButton} title={!canWriteAlerts ? `Requires ${TENANT_PERMISSIONS.ALERTS_WRITE} permission.` : undefined}>Create alert</button>
       </form>
 
       <section style={styles.stack}>
@@ -174,19 +180,20 @@ export function AlertsTab({
                       <td style={styles.td}>{formatDateTime(alert.created_at)}</td>
                       <td style={styles.td}>
                         <div style={styles.actions}>
-                          {!alert.acknowledged && !alert.resolved ? <button type="button" style={styles.smallButton} disabled={isAcknowledgingAlert} onClick={() => onAcknowledgeAlert(alert.id)}>Acknowledge</button> : null}
-                          {!alert.resolved ? <button type="button" style={styles.smallButton} disabled={isEscalatingAlert} onClick={() => onEscalateAlert(alert.id)}>Escalate</button> : null}
+                          {!alert.acknowledged && !alert.resolved ? <button type="button" style={styles.smallButton} disabled={isAcknowledgingAlert || !canWriteAlerts} onClick={() => onAcknowledgeAlert(alert.id)}>Acknowledge</button> : null}
+                          {!alert.resolved ? <button type="button" style={styles.smallButton} disabled={isEscalatingAlert || !canWriteAlerts} onClick={() => onEscalateAlert(alert.id)}>Escalate</button> : null}
                           {!alert.resolved ? (
                             <>
                               <input
                                 style={styles.inlineInput}
                                 placeholder="Resolution note"
                                 value={alertResolutionNotes[alert.id] ?? ''}
+                                disabled={!canWriteAlerts}
                                 onChange={(event) => onAlertResolutionNotesChange((current) => ({ ...current, [alert.id]: event.target.value }))}
                               />
-                              <button type="button" style={styles.smallButton} disabled={isResolvingAlert} onClick={() => onResolveAlert({ id: alert.id, resolution_note: alertResolutionNotes[alert.id] ?? '' })}>Resolve</button>
+                              <button type="button" style={styles.smallButton} disabled={isResolvingAlert || !canWriteAlerts} onClick={() => onResolveAlert({ id: alert.id, resolution_note: alertResolutionNotes[alert.id] ?? '' })}>Resolve</button>
                             </>
-                          ) : <button type="button" style={styles.secondarySmallButton} disabled={isReopeningAlert} onClick={() => onReopenAlert(alert.id)}>Reopen</button>}
+                          ) : <button type="button" style={styles.secondarySmallButton} disabled={isReopeningAlert || !canWriteAlerts} onClick={() => onReopenAlert(alert.id)}>Reopen</button>}
                         </div>
                       </td>
                     </tr>

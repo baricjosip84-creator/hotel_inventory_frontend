@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { SupplierForm, SupplierOption, SupplierPerformance, SupplierSlaBreach } from '../EnterpriseInventoryTypes';
 
 type SupplierSaveMutation = {
@@ -66,8 +67,11 @@ export function SuppliersTab({
   suppliers,
   suppliersQuery
 }: SuppliersTabProps) {
+  const canWriteSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_WRITE);
+
   const handleSupplierSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canWriteSuppliers || saveSupplierMutation.isPending) return;
     saveSupplierMutation.mutate(supplierForm);
   };
 
@@ -82,11 +86,11 @@ export function SuppliersTab({
         <form style={styles.card} onSubmit={handleSupplierSubmit}>
           <h2 style={styles.sectionTitle}>{editingSupplierId ? 'Edit supplier' : 'Create supplier'}</h2>
           <p style={styles.helper}>Create and maintain supplier contact records used by purchasing, receiving, and performance tracking.</p>
-          <InputField label="Name" value={supplierForm.name} required onChange={(value) => setSupplierForm((current) => ({ ...current, name: value }))} />
-          <InputField label="Email" value={supplierForm.email} type="email" onChange={(value) => setSupplierForm((current) => ({ ...current, email: value }))} />
-          <InputField label="Contact info" value={supplierForm.contact_info} onChange={(value) => setSupplierForm((current) => ({ ...current, contact_info: value }))} />
+          <InputField label="Name" value={supplierForm.name} required onChange={(value) => setSupplierForm((current) => ({ ...current, name: value }))} disabled={!canWriteSuppliers} />
+          <InputField label="Email" value={supplierForm.email} type="email" onChange={(value) => setSupplierForm((current) => ({ ...current, email: value }))} disabled={!canWriteSuppliers} />
+          <InputField label="Contact info" value={supplierForm.contact_info} onChange={(value) => setSupplierForm((current) => ({ ...current, contact_info: value }))} disabled={!canWriteSuppliers} />
           <div style={styles.actions}>
-            <button type="submit" style={styles.primaryButton} disabled={saveSupplierMutation.isPending}>{editingSupplierId ? 'Save supplier' : 'Create supplier'}</button>
+            <button type="submit" style={styles.primaryButton} disabled={saveSupplierMutation.isPending || !canWriteSuppliers}>{editingSupplierId ? 'Save supplier' : 'Create supplier'}</button>
             {editingSupplierId ? (
               <button type="button" style={styles.secondaryButton} onClick={() => { setEditingSupplierId(null); setSupplierForm(emptySupplierForm); }}>Cancel edit</button>
             ) : null}
@@ -135,9 +139,9 @@ export function SuppliersTab({
                       <td style={styles.td}>{supplier.contact_info || '-'}</td>
                       <td style={styles.td}>
                         <div style={styles.inlineActions}>
-                          <button type="button" style={styles.secondaryButton} onClick={() => startSupplierEdit(supplier)}>Edit</button>
+                          <button type="button" style={canWriteSuppliers ? styles.secondaryButton : styles.disabledButton} disabled={!canWriteSuppliers} title={!canWriteSuppliers ? `Requires ${TENANT_PERMISSIONS.SUPPLIERS_WRITE} permission.` : undefined} onClick={() => startSupplierEdit(supplier)}>Edit</button>
                           <button type="button" style={styles.smallButton} onClick={() => setSelectedSupplierPerformanceId(supplier.id)}>Performance</button>
-                          <button type="button" style={styles.dangerButton} disabled={deleteSupplierMutation.isPending} onClick={() => deleteSupplierMutation.mutate(supplier.id)}>Delete</button>
+                          <button type="button" style={styles.dangerButton} disabled={deleteSupplierMutation.isPending || !canWriteSuppliers} onClick={() => deleteSupplierMutation.mutate(supplier.id)}>Delete</button>
                         </div>
                       </td>
                     </tr>

@@ -2,6 +2,7 @@ import type { FormEvent } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { NotificationDeliveryForm, NotificationEvent } from '../EnterpriseInventoryTypes';
 
 type NotificationsTabProps = {
@@ -25,6 +26,8 @@ export function NotificationsTab({
   onNotificationDeliverySubmit,
   onProcessNotificationDeliveries
 }: NotificationsTabProps) {
+  const canWriteNotifications = hasPermission(TENANT_PERMISSIONS.NOTIFICATIONS_WRITE);
+
   return (
     <section style={styles.grid}>
       <form onSubmit={onNotificationDeliverySubmit} style={styles.card}>
@@ -35,6 +38,7 @@ export function NotificationsTab({
           onChange={(value) => onNotificationDeliveryFormChange((current) => ({ ...current, notification_event_id: value }))}
           options={notifications.map((event) => ({ value: event.id, label: `${event.severity}: ${event.title}` }))}
           required
+          disabled={!canWriteNotifications}
         />
         <SelectField
           label="Channel"
@@ -46,12 +50,13 @@ export function NotificationsTab({
             { value: 'webhook', label: 'Webhook' }
           ]}
           required
+          disabled={!canWriteNotifications}
         />
-        <InputField label="Recipient" value={notificationDeliveryForm.recipient} onChange={(value) => onNotificationDeliveryFormChange((current) => ({ ...current, recipient: value }))} />
-        <button type="submit" disabled={isQueueingDelivery} style={styles.primaryButton}>Queue delivery</button>
+        <InputField label="Recipient" value={notificationDeliveryForm.recipient} onChange={(value) => onNotificationDeliveryFormChange((current) => ({ ...current, recipient: value }))} disabled={!canWriteNotifications} />
+        <button type="submit" disabled={isQueueingDelivery || !canWriteNotifications} style={isQueueingDelivery || !canWriteNotifications ? styles.disabledButton : styles.primaryButton} title={!canWriteNotifications ? `Requires ${TENANT_PERMISSIONS.NOTIFICATIONS_WRITE} permission.` : undefined}>Queue delivery</button>
         <button
           type="button"
-          disabled={isProcessingDeliveries}
+          disabled={isProcessingDeliveries || !canWriteNotifications}
           style={styles.secondaryButton}
           onClick={onProcessNotificationDeliveries}
         >

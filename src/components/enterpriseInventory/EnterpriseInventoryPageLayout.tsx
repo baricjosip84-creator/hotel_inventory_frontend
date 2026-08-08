@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { TenantSubscriptionAccess } from '../../lib/tenantSubscriptionAccess';
 import {
   EnterpriseInventoryHero,
   StatusMessages,
@@ -14,6 +15,8 @@ type EnterpriseInventoryPageLayoutProps = {
   lastRefreshedAt: number | null;
   onEvaluateParLevels: () => void;
   evaluatingParLevels: boolean;
+  subscriptionAccess?: TenantSubscriptionAccess;
+  canEvaluateParLevels: boolean;
   children: ReactNode;
 };
 
@@ -25,6 +28,8 @@ export function EnterpriseInventoryPageLayout({
   lastRefreshedAt,
   onEvaluateParLevels,
   evaluatingParLevels,
+  subscriptionAccess,
+  canEvaluateParLevels,
   children,
 }: EnterpriseInventoryPageLayoutProps) {
   return (
@@ -32,6 +37,7 @@ export function EnterpriseInventoryPageLayout({
       <EnterpriseInventoryHero
         onEvaluateParLevels={onEvaluateParLevels}
         evaluating={evaluatingParLevels}
+        canEvaluate={canEvaluateParLevels}
       />
 
       <StatusMessages
@@ -46,9 +52,17 @@ export function EnterpriseInventoryPageLayout({
       <EnterpriseInventoryTabs
         activeTab={activeTab}
         onChange={onActiveTabChange}
+        subscriptionAccess={subscriptionAccess}
       />
 
-      {children}
+      {!activeTab ? (
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>No Enterprise Inventory workspace available</h2>
+          <p style={styles.helper}>
+            None of the Enterprise Inventory tabs are available with the current permission set and tenant subscription.
+          </p>
+        </section>
+      ) : children}
     </div>
   );
 }

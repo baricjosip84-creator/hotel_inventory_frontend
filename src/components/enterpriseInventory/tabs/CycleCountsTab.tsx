@@ -2,6 +2,7 @@ import type { FormEvent } from 'react';
 import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { CycleCount, CycleCountForm, ProductOption, StockAdjustmentForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type CycleCountsTabProps = {
@@ -37,28 +38,32 @@ export function CycleCountsTab({
   isReconciling,
   onReconcile
 }: CycleCountsTabProps) {
+  const canCreateCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE);
+  const canAdjustStock = hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
+  const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
+
   return (
     <section style={styles.grid}>
       <div style={styles.stack}>
         <form onSubmit={onCycleCountSubmit} style={styles.card}>
           <h2 style={styles.cardTitle}>Create cycle count</h2>
-          <SelectField label="Storage location" value={cycleCountForm.storage_location_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
-          <InputField label="Department" value={cycleCountForm.department} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, department: value }))} />
-          <InputField label="Notes" value={cycleCountForm.notes} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, notes: value }))} />
-          <SelectField label="Product" value={cycleCountForm.product_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
-          <InputField label="Expected quantity" type="number" value={cycleCountForm.expected_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, expected_quantity: value }))} required />
-          <InputField label="Counted quantity" type="number" value={cycleCountForm.counted_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, counted_quantity: value }))} />
-          <button type="submit" disabled={isCreatingCycleCount} style={styles.primaryButton}>Create cycle count</button>
+          <SelectField label="Storage location" value={cycleCountForm.storage_location_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} disabled={!canCreateCycleCounts} />
+          <InputField label="Department" value={cycleCountForm.department} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, department: value }))} disabled={!canCreateCycleCounts} />
+          <InputField label="Notes" value={cycleCountForm.notes} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, notes: value }))} disabled={!canCreateCycleCounts} />
+          <SelectField label="Product" value={cycleCountForm.product_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canCreateCycleCounts} />
+          <InputField label="Expected quantity" type="number" value={cycleCountForm.expected_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, expected_quantity: value }))} required disabled={!canCreateCycleCounts} />
+          <InputField label="Counted quantity" type="number" value={cycleCountForm.counted_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, counted_quantity: value }))} disabled={!canCreateCycleCounts} />
+          <button type="submit" disabled={isCreatingCycleCount || !canCreateCycleCounts} style={isCreatingCycleCount || !canCreateCycleCounts ? styles.disabledButton : styles.primaryButton} title={!canCreateCycleCounts ? `Requires ${TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE} permission.` : undefined}>Create cycle count</button>
         </form>
 
         <form onSubmit={onStockAdjustmentSubmit} style={styles.card}>
           <h2 style={styles.cardTitle}>Manual inventory adjustment</h2>
           <p style={styles.helper}>Posts to the existing /stock/adjust endpoint and records a stock movement.</p>
-          <SelectField label="Product" value={stockAdjustmentForm.product_id} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required />
-          <SelectField label="Storage location" value={stockAdjustmentForm.storage_location_id} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
-          <InputField label="Quantity change" type="number" value={stockAdjustmentForm.change} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, change: value }))} required />
-          <InputField label="Reason" value={stockAdjustmentForm.reason} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, reason: value }))} required />
-          <button type="submit" disabled={isAdjustingStock} style={styles.primaryButton}>Post adjustment</button>
+          <SelectField label="Product" value={stockAdjustmentForm.product_id} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canAdjustStock} />
+          <SelectField label="Storage location" value={stockAdjustmentForm.storage_location_id} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!canAdjustStock} />
+          <InputField label="Quantity change" type="number" value={stockAdjustmentForm.change} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, change: value }))} required disabled={!canAdjustStock} />
+          <InputField label="Reason" value={stockAdjustmentForm.reason} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, reason: value }))} required disabled={!canAdjustStock} />
+          <button type="submit" disabled={isAdjustingStock || !canAdjustStock} style={isAdjustingStock || !canAdjustStock ? styles.disabledButton : styles.primaryButton} title={!canAdjustStock ? `Requires ${TENANT_PERMISSIONS.STOCK_ADJUST} permission.` : undefined}>Post adjustment</button>
         </form>
       </div>
 
@@ -80,7 +85,7 @@ export function CycleCountsTab({
               </thead>
               <tbody>
                 {cycleCounts.map((item) => {
-                  const canReconcile = ['draft', 'submitted', 'approved'].includes(item.status);
+                  const canReconcile = canApproveCycleCounts && ['draft', 'submitted', 'approved'].includes(item.status);
                   return (
                     <tr key={item.id}>
                       <td style={styles.td}>{item.status}</td>
@@ -92,7 +97,7 @@ export function CycleCountsTab({
                           type="button"
                           disabled={!canReconcile || isReconciling}
                           style={canReconcile && !isReconciling ? styles.smallButton : styles.disabledButton}
-                          title={!canReconcile ? 'Only draft, submitted, or approved cycle counts can be reconciled.' : isReconciling ? 'Reconciliation is already running.' : undefined}
+                          title={!canApproveCycleCounts ? `Requires ${TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE} permission.` : !canReconcile ? 'Only draft, submitted, or approved cycle counts can be reconciled.' : isReconciling ? 'Reconciliation is already running.' : undefined}
                           onClick={() => onReconcile(item.id)}
                         >
                           Reconcile

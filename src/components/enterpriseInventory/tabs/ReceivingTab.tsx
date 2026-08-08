@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDate, formatDateTime, formatNumber, toNumber } from '../EnterpriseInventoryFormat';
+import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type {
   Shipment,
   ShipmentBarcodeLookup,
@@ -119,16 +120,21 @@ export function ReceivingTab({
   shipmentsQuery,
   storageLocations
 }: ReceivingTabProps) {
+  const canReceiveShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
+  const canFinalizeShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_FINALIZE);
+  const canReadShipmentItems = hasPermission(TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ);
   const barcodeLookupDisabledReason = !selectedReceivingShipment
     ? 'Select an active shipment before resolving a barcode.'
     : barcodeLookupMutation.isPending
       ? 'Barcode lookup is already running.'
       : '';
-  const receiptDisabledReason = !selectedReceivingShipment
-    ? 'Select an active shipment before posting a receipt.'
-    : receiveShipmentMutation.isPending
-      ? 'Receipt posting is already running.'
-      : '';
+  const receiptDisabledReason = !canReceiveShipments
+    ? `Requires ${TENANT_PERMISSIONS.SHIPMENTS_RECEIVE} permission.`
+    : !selectedReceivingShipment
+      ? 'Select an active shipment before posting a receipt.'
+      : receiveShipmentMutation.isPending
+        ? 'Receipt posting is already running.'
+        : '';
   const activeShipmentOptions = shipments
     .filter((shipment) => !['received', 'cancelled'].includes(shipment.status))
     .map((shipment) => ({ value: shipment.id, label: formatShipmentOptionLabel(shipment) }));
@@ -203,13 +209,14 @@ export function ReceivingTab({
               label: `${item.product_name || item.product_id} · ordered ${formatNumber(item.quantity)} · received ${formatNumber(item.received_quantity)}`
             }))}
             required
-            disabled={!selectedReceivingShipment || shipmentItemsQuery.isLoading}
+            disabled={!canReceiveShipments || !canReadShipmentItems || !selectedReceivingShipment || shipmentItemsQuery.isLoading}
           />
-          <SelectField label="Receive into location" value={shipmentReceivingForm.storage_location_id} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!selectedReceivingShipment} />
-          <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
-          <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
-          <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} disabled={!selectedReceivingShipment || receiveShipmentMutation.isPending} />
-          <button type="submit" disabled={receiveShipmentMutation.isPending || !selectedReceivingShipment} title={receiptDisabledReason || undefined} style={receiptDisabledReason ? styles.disabledButton : styles.primaryButton}>Post receipt</button>
+          {!canReadShipmentItems ? <p style={styles.helper}>Shipment-line selection requires {TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ} permission. Barcode lookup remains available.</p> : null}
+          <SelectField label="Receive into location" value={shipmentReceivingForm.storage_location_id} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!canReceiveShipments || !selectedReceivingShipment} />
+          <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <button type="submit" disabled={Boolean(receiptDisabledReason)} title={receiptDisabledReason || undefined} style={receiptDisabledReason ? styles.disabledButton : styles.primaryButton}>Post receipt</button>
           {receiptDisabledReason ? <p style={styles.helper}>{receiptDisabledReason}</p> : null}
         </form>
       </div>
@@ -236,7 +243,15 @@ export function ReceivingTab({
             })}
           />
           {selectedReceivingShipment && selectedReceivingShipment.status !== 'received' ? (
-            <button type="button" onClick={() => finalizeShipmentMutation.mutate(selectedReceivingShipment)} disabled={finalizeShipmentMutation.isPending} title={finalizeShipmentMutation.isPending ? 'Finalization is already running.' : undefined} style={finalizeShipmentMutation.isPending ? styles.disabledButton : styles.secondaryButton}>Finalize selected shipment</button>
+            <button
+              type="button"
+              onClick={() => { if (canFinalizeShipments) finalizeShipmentMutation.mutate(selectedReceivingShipment); }}
+              disabled={!canFinalizeShipments || finalizeShipmentMutation.isPending}
+              title={!canFinalizeShipments ? `Requires ${TENANT_PERMISSIONS.SHIPMENTS_FINALIZE} permission.` : finalizeShipmentMutation.isPending ? 'Finalization is already running.' : undefined}
+              style={!canFinalizeShipments || finalizeShipmentMutation.isPending ? styles.disabledButton : styles.secondaryButton}
+            >
+              Finalize selected shipment
+            </button>
           ) : null}
         </section>
 

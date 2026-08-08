@@ -1,4 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { TENANT_PERMISSIONS, hasPermission, type TenantPermission } from "../../lib/permissions";
 import { createEnterpriseInventoryFormSubmitHandler } from "./EnterpriseInventoryFormHandlers";
 import { createEnterpriseInventoryProductPackageEditingHandlers } from "./EnterpriseInventoryPackageEditing";
 import type {
@@ -96,24 +97,35 @@ export function createEnterpriseInventorySubmitHandlers({
   createAlertMutation,
   createAttachmentMutation,
 }: EnterpriseInventorySubmitHandlerParams) {
+  const canRun = (permission: TenantPermission): boolean => {
+    if (hasPermission(permission)) return true;
+    setStatusMessage(null);
+    setErrorMessage(`Requires ${permission} permission.`);
+    return false;
+  };
+
   const handleParLevelSubmit = createEnterpriseInventoryFormSubmitHandler(() => {
+    if (!canRun(TENANT_PERMISSIONS.PAR_LEVELS_WRITE)) return;
     createParLevelMutation.mutate(parLevelForm);
   });
 
   const handleCycleCountSubmit = createEnterpriseInventoryFormSubmitHandler(
     () => {
+      if (!canRun(TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE)) return;
       createCycleCountMutation.mutate(cycleCountForm);
     },
   );
 
   const handleStockAdjustmentSubmit = createEnterpriseInventoryFormSubmitHandler(
     () => {
+      if (!canRun(TENANT_PERMISSIONS.STOCK_ADJUST)) return;
       adjustStockMutation.mutate(stockAdjustmentForm);
     },
   );
 
   const handlePurchaseOrderShipmentSubmit =
     createEnterpriseInventoryFormSubmitHandler(() => {
+      if (!canRun(TENANT_PERMISSIONS.SHIPMENTS_WRITE)) return;
       createShipmentFromPurchaseOrderMutation.mutate(purchaseOrderShipmentForm);
     });
 
@@ -121,6 +133,13 @@ export function createEnterpriseInventorySubmitHandlers({
     purchaseOrder: PurchaseOrder,
     action: PurchaseOrderLifecycleVariables["action"],
   ) => {
+    const requiredPermission = action === "submit"
+      ? TENANT_PERMISSIONS.PURCHASE_ORDERS_SUBMIT
+      : action === "approve"
+        ? TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE
+        : TENANT_PERMISSIONS.PURCHASE_ORDERS_CANCEL;
+    if (!canRun(requiredPermission)) return;
+
     setErrorMessage(null);
     setStatusMessage(null);
     const reason =
@@ -142,6 +161,7 @@ export function createEnterpriseInventorySubmitHandlers({
 
   const handleShipmentReceivingSubmit =
     createEnterpriseInventoryFormSubmitHandler(() => {
+      if (!canRun(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE)) return;
       receiveShipmentMutation.mutate(shipmentReceivingForm);
     });
 
@@ -150,6 +170,7 @@ export function createEnterpriseInventorySubmitHandlers({
     generatedBarcodeValue?: string,
   ) => {
     event.preventDefault();
+    if (!canRun(TENANT_PERMISSIONS.BARCODE_LABELS_WRITE)) return;
     createBarcodeLabelMutation.mutate({
       ...barcodeLabelForm,
       barcode_value: generatedBarcodeValue || barcodeLabelForm.barcode_value.trim() || "",
@@ -158,6 +179,7 @@ export function createEnterpriseInventorySubmitHandlers({
 
   const handleProductPackageSubmit = createEnterpriseInventoryFormSubmitHandler(
     () => {
+      if (!canRun(TENANT_PERMISSIONS.PRODUCT_PACKAGES_WRITE)) return;
       if (editingProductPackageId) {
         updateProductPackageMutation.mutate({
           packageId: editingProductPackageId,
@@ -178,15 +200,18 @@ export function createEnterpriseInventorySubmitHandlers({
 
   const handleNotificationDeliverySubmit =
     createEnterpriseInventoryFormSubmitHandler(() => {
+      if (!canRun(TENANT_PERMISSIONS.NOTIFICATIONS_WRITE)) return;
       queueNotificationDeliveryMutation.mutate(notificationDeliveryForm);
     });
 
   const handleAlertSubmit = createEnterpriseInventoryFormSubmitHandler(() => {
+    if (!canRun(TENANT_PERMISSIONS.ALERTS_WRITE)) return;
     createAlertMutation.mutate(alertForm);
   });
 
   const handleAttachmentSubmit = createEnterpriseInventoryFormSubmitHandler(
     () => {
+      if (!canRun(TENANT_PERMISSIONS.ATTACHMENTS_WRITE)) return;
       createAttachmentMutation.mutate(attachmentForm);
     },
   );

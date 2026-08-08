@@ -143,6 +143,7 @@ export function useEnterpriseInventoryQueries({
   const reportsFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'reports');
   const automationFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'automation');
   const purchaseOrdersFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'purchase_orders');
+  const forecastingFeatureReady = Boolean(tenantSubscriptionAccessQuery.data) && isTenantFeatureAllowed(tenantSubscriptionAccessQuery.data, 'forecasting');
 
   const canReadDashboard = hasPermission(TENANT_PERMISSIONS.DASHBOARD_READ);
   const canReadProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
@@ -155,6 +156,7 @@ export function useEnterpriseInventoryQueries({
   const canReadReports = hasPermission(TENANT_PERMISSIONS.REPORTS_READ);
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canReadAutomation = hasPermission(TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW);
+  const canReadFinancialIntelligence = hasPermission(TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ);
   const canReadSystemStatus = hasPermission(TENANT_PERMISSIONS.SYSTEM_STATUS_READ);
   const canReadSystemContext = hasPermission(TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ);
   const canReadExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
@@ -229,30 +231,30 @@ export function useEnterpriseInventoryQueries({
   const productCostOperationsControlSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-control-summary'], queryFn: fetchProductCostOperationsControlSummary , enabled: canReadProducts });
   const productCostOperationsEvidenceSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-evidence-summary'], queryFn: fetchProductCostOperationsEvidenceSummary , enabled: canReadProducts });
   const productCostOperationsReadinessSummaryQuery = useQuery({ queryKey: ['enterprise-product-cost-operations-readiness-summary'], queryFn: fetchProductCostOperationsReadinessSummary , enabled: canReadProducts });
-  const carryingCostProductionReviewQuery = useQuery({ queryKey: ['enterprise-carrying-cost-production-review'], queryFn: fetchCarryingCostProductionReview , enabled: canReadProducts });
-  const deadStockProductionReviewQuery = useQuery({ queryKey: ['enterprise-dead-stock-production-review'], queryFn: fetchDeadStockProductionReview , enabled: canReadProducts });
-  const marginAwareProductionReviewQuery = useQuery({ queryKey: ['enterprise-margin-aware-production-review'], queryFn: fetchMarginAwareProductionReview , enabled: canReadProducts });
-  const procurementSpendProductionReviewQuery = useQuery({ queryKey: ['enterprise-procurement-spend-production-review'], queryFn: fetchProcurementSpendProductionReview , enabled: canReadProducts });
+  const carryingCostProductionReviewQuery = useQuery({ queryKey: ['enterprise-carrying-cost-production-review'], queryFn: fetchCarryingCostProductionReview , enabled: canReadFinancialIntelligence });
+  const deadStockProductionReviewQuery = useQuery({ queryKey: ['enterprise-dead-stock-production-review'], queryFn: fetchDeadStockProductionReview , enabled: canReadFinancialIntelligence });
+  const marginAwareProductionReviewQuery = useQuery({ queryKey: ['enterprise-margin-aware-production-review'], queryFn: fetchMarginAwareProductionReview , enabled: canReadFinancialIntelligence });
+  const procurementSpendProductionReviewQuery = useQuery({ queryKey: ['enterprise-procurement-spend-production-review'], queryFn: fetchProcurementSpendProductionReview , enabled: canReadFinancialIntelligence });
   const reorderRecommendationsQuery = useQuery({ queryKey: ['enterprise-reorder-recommendations'], queryFn: fetchReorderRecommendations , enabled: canReadInsights });
   const depletionRiskQuery = useQuery({ queryKey: ['enterprise-depletion-risk'], queryFn: fetchDepletionRisk , enabled: canReadInsights });
   const supplierTrustScoresQuery = useQuery({ queryKey: ['enterprise-supplier-trust-scores'], queryFn: fetchSupplierTrustScores , enabled: canReadInsights });
   const operationalHealthQuery = useQuery({ queryKey: ['enterprise-operational-health'], queryFn: fetchOperationalHealth , enabled: canReadInsights });
   const inventoryAnomaliesQuery = useQuery({ queryKey: ['enterprise-inventory-anomalies'], queryFn: fetchInventoryAnomalies , enabled: canReadInsights });
-  const demandForecastQuery = useQuery({ queryKey: ['enterprise-demand-forecast'], queryFn: fetchDemandForecast , enabled: canReadInsights });
-  const forecastAccuracyBacktestQuery = useQuery({ queryKey: ['enterprise-forecast-accuracy-backtest'], queryFn: fetchForecastAccuracyBacktest , enabled: canReadInsights });
-  const forecastCalibrationReviewQuery = useQuery({ queryKey: ['enterprise-forecast-calibration-review'], queryFn: fetchForecastCalibrationReview , enabled: canReadInsights });
-  const forecastDataQualityReviewQuery = useQuery({ queryKey: ['enterprise-forecast-data-quality-review'], queryFn: fetchForecastDataQualityReview , enabled: canReadInsights });
-  const forecastReliabilityMatrixQuery = useQuery({ queryKey: ['enterprise-forecast-reliability-matrix'], queryFn: fetchForecastReliabilityMatrix , enabled: canReadInsights });
+  const demandForecastQuery = useQuery({ queryKey: ['enterprise-demand-forecast'], queryFn: fetchDemandForecast , enabled: forecastingFeatureReady && canReadInsights });
+  const forecastAccuracyBacktestQuery = useQuery({ queryKey: ['enterprise-forecast-accuracy-backtest'], queryFn: fetchForecastAccuracyBacktest , enabled: forecastingFeatureReady && canReadInsights });
+  const forecastCalibrationReviewQuery = useQuery({ queryKey: ['enterprise-forecast-calibration-review'], queryFn: fetchForecastCalibrationReview , enabled: forecastingFeatureReady && canReadInsights });
+  const forecastDataQualityReviewQuery = useQuery({ queryKey: ['enterprise-forecast-data-quality-review'], queryFn: fetchForecastDataQualityReview , enabled: forecastingFeatureReady && canReadInsights });
+  const forecastReliabilityMatrixQuery = useQuery({ queryKey: ['enterprise-forecast-reliability-matrix'], queryFn: fetchForecastReliabilityMatrix , enabled: forecastingFeatureReady && canReadInsights });
   const automationTypesQuery = useQuery({ queryKey: ['enterprise-automation-types'], queryFn: fetchAutomationTypes, enabled: automationFeatureReady && canReadAutomation });
   const automationSchedulesQuery = useQuery({ queryKey: ['enterprise-automation-schedules'], queryFn: fetchAutomationSchedules, enabled: automationFeatureReady && canReadAutomation });
   const automationRunnerReadinessQuery = useQuery({ queryKey: ['enterprise-automation-runner-readiness'], queryFn: fetchAutomationRunnerReadiness, enabled: automationFeatureReady && canReadAutomation });
   const automationRunnerStatusQuery = useQuery({ queryKey: ['enterprise-automation-runner-status'], queryFn: fetchAutomationRunnerStatus, enabled: automationFeatureReady && canReadAutomation });
   const automationRunEventsQuery = useQuery({ queryKey: ['enterprise-automation-run-events'], queryFn: fetchAutomationRunEvents, enabled: automationFeatureReady && canReadAutomation });
-  const automationRunnerSafetyReportQuery = useQuery({ queryKey: ['enterprise-automation-runner-safety-report'], queryFn: fetchAutomationRunnerSafetyReport, enabled: automationFeatureReady && canReadAutomation });
-  const automationRunnerGovernancePackQuery = useQuery({ queryKey: ['enterprise-automation-runner-governance-pack'], queryFn: fetchAutomationRunnerGovernancePack, enabled: automationFeatureReady && canReadAutomation });
-  const automationRunnerOperationsReviewQuery = useQuery({ queryKey: ['enterprise-automation-runner-operations-review'], queryFn: fetchAutomationRunnerOperationsReview, enabled: automationFeatureReady && canReadAutomation });
-  const automationRunnerAccountabilityDigestQuery = useQuery({ queryKey: ['enterprise-automation-runner-accountability-digest'], queryFn: fetchAutomationRunnerAccountabilityDigest, enabled: automationFeatureReady && canReadAutomation });
-  const automationRunnerPolicyMatrixQuery = useQuery({ queryKey: ['enterprise-automation-runner-policy-matrix'], queryFn: fetchAutomationRunnerPolicyMatrix, enabled: automationFeatureReady && canReadAutomation });
+  const automationRunnerSafetyReportQuery = useQuery({ queryKey: ['enterprise-automation-runner-safety-report'], queryFn: fetchAutomationRunnerSafetyReport, enabled: automationFeatureReady && canReadAutomation && canReadExecutionRequests });
+  const automationRunnerGovernancePackQuery = useQuery({ queryKey: ['enterprise-automation-runner-governance-pack'], queryFn: fetchAutomationRunnerGovernancePack, enabled: automationFeatureReady && canReadAutomation && canReadExecutionRequests });
+  const automationRunnerOperationsReviewQuery = useQuery({ queryKey: ['enterprise-automation-runner-operations-review'], queryFn: fetchAutomationRunnerOperationsReview, enabled: automationFeatureReady && canReadAutomation && canReadExecutionRequests });
+  const automationRunnerAccountabilityDigestQuery = useQuery({ queryKey: ['enterprise-automation-runner-accountability-digest'], queryFn: fetchAutomationRunnerAccountabilityDigest, enabled: automationFeatureReady && canReadAutomation && canReadExecutionRequests });
+  const automationRunnerPolicyMatrixQuery = useQuery({ queryKey: ['enterprise-automation-runner-policy-matrix'], queryFn: fetchAutomationRunnerPolicyMatrix, enabled: automationFeatureReady && canReadAutomation && canReadExecutionRequests });
   const systemStatusQuery = useQuery({ queryKey: ['enterprise-system-status'], queryFn: fetchSystemStatus , enabled: canReadSystemStatus });
   const systemContextQuery = useQuery({ queryKey: ['enterprise-system-context'], queryFn: fetchSystemContext , enabled: canReadSystemContext });
   const systemExecutionGateQuery = useQuery({ queryKey: ['enterprise-system-execution-gate'], queryFn: fetchSystemExecutionGate, enabled: canReadSystemContext });
@@ -291,6 +293,7 @@ export function useEnterpriseInventoryQueries({
   });
 
   return {
+    tenantSubscriptionAccessQuery,
     productsQuery,
     productPackagesQuery,
     storageLocationsQuery,
