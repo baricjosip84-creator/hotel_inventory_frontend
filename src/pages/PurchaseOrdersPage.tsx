@@ -754,7 +754,9 @@ export default function PurchaseOrdersPage() {
   const capabilities = getRoleCapabilities();
 
   const [filters, setFilters] = useState<Filters>(() => filtersFromSearchParams(searchParams));
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    searchParams.get('purchaseOrderId') || searchParams.get('purchase_order_id')
+  );
   const [form, setForm] = useState<PurchaseOrderFormState>(() => emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -996,7 +998,8 @@ export default function PurchaseOrdersPage() {
   }, [currentPage, totalPages]);
 
   useEffect(() => {
-    const purchaseOrderIdFromQuery = searchParams.get('purchaseOrderId');
+    const purchaseOrderIdFromQuery =
+      searchParams.get('purchaseOrderId') || searchParams.get('purchase_order_id');
 
     if (!purchaseOrderIdFromQuery) {
       return;

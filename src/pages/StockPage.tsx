@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import {
@@ -402,6 +402,8 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const requestedProductId = searchParams.get('product_id')?.trim() || '';
   const {
     canConsumeStock,
     canCountStock: canCount,
@@ -424,10 +426,17 @@ export default function StockPage() {
 
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
 
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState(() => requestedProductId);
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
+
+  useEffect(() => {
+    setSearchText(requestedProductId);
+    setLocationFilter('all');
+    setCategoryFilter('all');
+    setStatusFilter('all');
+  }, [requestedProductId]);
 
   const locationOptions = useMemo(() => {
     const values = new Map<string, string>();
