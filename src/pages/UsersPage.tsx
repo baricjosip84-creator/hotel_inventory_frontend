@@ -20,6 +20,8 @@ type UserItem = {
   access_role_label?: string;
   email: string;
   created_at: string;
+  last_login_at?: string | null;
+  is_active: boolean;
 };
 
 type AssignableRole = {
@@ -93,6 +95,13 @@ async function updateUser(input: { id: string; values: UserFormState; preserveRo
   });
 }
 
+async function setUserActiveStatus(input: { id: string; isActive: boolean }): Promise<UserItem> {
+  return apiRequest<UserItem>(`/users/${input.id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: input.isActive })
+  });
+}
+
 async function deleteUser(id: string): Promise<void> {
   await apiRequest(`/users/${id}`, {
     method: 'DELETE'
@@ -107,6 +116,14 @@ function formatDateTime(value: string): string {
   }
 
   return date.toLocaleString();
+}
+
+function isUserActive(user: UserItem): boolean {
+  return user.is_active !== false;
+}
+
+function formatLastLogin(value?: string | null): string {
+  return value ? formatDateTime(value) : 'Never';
 }
 
 function useIsMobile(breakpoint = 960): boolean {
@@ -145,30 +162,11 @@ function StatCard(props: {
 
 export default function UsersPage() {
   /*
-    WHAT CHANGED
-    ------------
-    This file stays grounded in the UsersPage you sent.
-
-    Existing real behavior is preserved:
-    - same backend endpoints
-    - same query key
-    - same backend-aligned permission helper
-    - same create / update / delete flow
-    - same role enforcement
-    - same search filtering
-    - same field names and form state
-
-    This pass applies the shared UI foundation carefully:
-    - summary cards now align with the shared app-grid-stats layer
-    - main sections now use app-panel/app-panel--padded
-    - banners and empty state align with the shared state styles
-    - action rows align with the shared app-actions rhythm
-    - no CRUD logic was changed
-
-    WHAT PROBLEM IT SOLVES
-    ----------------------
-    Makes Users visually consistent with the rest of the polished admin/master-data
-    pages without changing contracts, permissions, or mutation behavior.
+    Users administration is tenant-scoped and permission-gated.
+    This page supports the existing built-in/custom-role assignment model plus
+    the tenant user active-status lifecycle already enforced by authentication.
+    Deactivation is the normal access-removal path; permanent deletion remains
+    available but can be rejected when historical records retain the user.
   */
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -181,6 +179,7 @@ export default function UsersPage() {
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -240,6 +239,19 @@ export default function UsersPage() {
     }
   });
 
+  const statusMutation = useMutation({
+    mutationFn: setUserActiveStatus,
+    onSuccess: async (updatedUser) => {
+      setPageError(null);
+      setPageMessage(updatedUser.is_active !== false ? 'User activated successfully.' : 'User deactivated successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to update user status.');
+    }
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: async () => {
@@ -265,18 +277,23 @@ export default function UsersPage() {
   const filteredUsers = useMemo(() => {
     const needle = search.trim().toLowerCase();
 
-    if (!needle) {
-      return users;
-    }
+    return users.filter((user) => {
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' ? isUserActive(user) : !isUserActive(user));
+      const matchesSearch = !needle ||
+        [user.name, user.email, user.access_role_label || user.custom_role_name || user.role]
+          .some((value) => value.toLowerCase().includes(needle));
 
-    return users.filter((user) =>
-      [user.name, user.email, user.access_role_label || user.custom_role_name || user.role].some((value) => value.toLowerCase().includes(needle))
-    );
-  }, [search, users]);
+      return matchesStatus && matchesSearch;
+    });
+  }, [search, statusFilter, users]);
 
   const summary = useMemo(() => {
     return {
       total: users.length,
+      active: users.filter(isUserActive).length,
+      inactive: users.filter((user) => !isUserActive(user)).length,
       admins: users.filter((user) => user.role === 'admin').length,
       managers: users.filter((user) => user.role === 'manager').length,
       staff: users.filter((user) => user.role === 'staff' && !user.custom_role_id).length,
@@ -287,6 +304,17 @@ export default function UsersPage() {
   const lastRefreshedText = usersQuery.dataUpdatedAt
     ? `Last refreshed ${formatDateTime(new Date(usersQuery.dataUpdatedAt).toISOString())}`
     : 'Not refreshed yet';
+
+  const normalizedEmail = form.email.trim();
+  const passwordReady = editingUser ? !form.password || form.password.length >= 10 : form.password.length >= 10;
+  const formReady = Boolean(
+    canWrite &&
+    form.name.trim() &&
+    normalizedEmail.includes('@') &&
+    normalizedEmail.includes('.') &&
+    passwordReady &&
+    !roleOptionsQuery.isLoading
+  );
 
   const handleRefreshUsers = async () => {
     setPageError(null);
@@ -341,6 +369,33 @@ export default function UsersPage() {
     scrollToFormSection('tenant-user-form-panel');
   };
 
+  const handleStatusChange = (user: UserItem) => {
+    if (!canWrite) {
+      return;
+    }
+
+    const currentlyActive = isUserActive(user);
+    if (currentUserId && user.id === currentUserId && currentlyActive) {
+      setPageMessage(null);
+      setPageError('You cannot deactivate your own user account.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      currentlyActive
+        ? `Deactivate user "${user.name}"? Their active sessions will be revoked and they will no longer be able to sign in.`
+        : `Activate user "${user.name}"? They will be allowed to sign in again with their existing credentials.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPageError(null);
+    setPageMessage(null);
+    statusMutation.mutate({ id: user.id, isActive: !currentlyActive });
+  };
+
   const handleDelete = (user: UserItem) => {
     if (!canWrite) {
       return;
@@ -352,7 +407,9 @@ export default function UsersPage() {
       return;
     }
 
-    const confirmed = window.confirm(`Delete user "${user.name}"?`);
+    const confirmed = window.confirm(
+      `Permanently delete user "${user.name}"? This is not the normal way to remove access. Deactivate the account instead when history must be preserved.`
+    );
 
     if (!confirmed) {
       return;
@@ -371,18 +428,18 @@ export default function UsersPage() {
   };
 
   if (usersQuery.isLoading) {
-    return <p>Loading users...</p>;
+    return <div className="app-empty-state">Loading tenant users…</div>;
   }
 
   if (usersQuery.isError) {
-    return <p>Failed to load users: {(usersQuery.error as Error).message || 'Unknown error'}</p>;
+    return <div className="app-error-state">Failed to load users: {(usersQuery.error as Error).message || 'Unknown error'}</div>;
   }
 
   return (
     <div style={styles.page}>
       <div className="app-grid-stats" style={styles.summaryGrid}>
-        <StatCard title="Users" value={summary.total} subtitle="Tenant user accounts" />
-        <StatCard title="Admins" value={summary.admins} subtitle="Full platform control" tone="warn" />
+        <StatCard title="Users" value={summary.total} subtitle={`${summary.active} active · ${summary.inactive} inactive`} />
+        <StatCard title="Admins" value={summary.admins} subtitle="Full tenant control" tone="warn" />
         <StatCard title="Managers" value={summary.managers} subtitle="Operational supervisors" />
         <StatCard title="Staff" value={summary.staff} subtitle="Built-in daily execution users" tone="good" />
         <StatCard title="Custom roles" value={summary.custom} subtitle="Specialized tenant assignments" />
@@ -401,7 +458,7 @@ export default function UsersPage() {
               <p style={styles.sectionDescription}>
                 {canWrite
                   ? 'Create and maintain tenant users with controlled roles.'
-                  : 'Managers can review users, but only admins can change access.'}
+                  : 'You can review tenant users, but only tenant admins can change accounts or access.'}
               </p>
             </div>
           </div>
@@ -502,15 +559,20 @@ export default function UsersPage() {
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 placeholder={editingUser ? 'Leave blank to keep current password' : 'Create a password'}
                 required={!editingUser}
+                minLength={10}
+                maxLength={256}
                 disabled={!canWrite}
               />
+              <small style={styles.fieldHelp}>
+                {editingUser ? 'Leave blank to keep the current password. New passwords must be at least 10 characters.' : 'Minimum 10 characters.'}
+              </small>
             </div>
 
             <div className="app-actions" style={styles.formActions}>
               <button
                 type="submit"
                 style={styles.primaryButton}
-                disabled={!canWrite || createMutation.isPending || updateMutation.isPending}
+                disabled={!formReady || createMutation.isPending || updateMutation.isPending}
               >
                 {editingUser
                   ? updateMutation.isPending
@@ -551,11 +613,22 @@ export default function UsersPage() {
 
           <div className="app-grid-toolbar" style={styles.toolbarGrid}>
             <input
+              aria-label="Search tenant users"
               style={{ ...styles.input, ...styles.searchInput }}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search users"
+              placeholder="Search name, email, or role"
             />
+            <select
+              aria-label="Filter users by status"
+              style={styles.select}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+            >
+              <option value="all">All account statuses</option>
+              <option value="active">Active accounts</option>
+              <option value="inactive">Inactive accounts</option>
+            </select>
             <span style={styles.refreshMeta}>{lastRefreshedText}</span>
           </div>
 
@@ -565,7 +638,7 @@ export default function UsersPage() {
                 ? canWrite
                   ? 'No tenant users exist yet. Create the first tenant user from the form.'
                   : 'No tenant users exist yet. Ask a tenant admin to create user accounts.'
-                : 'No users matched the current search. Clear or change the search text to see loaded users.'}
+                : 'No users matched the current search and status filters. Clear or change the filters to see loaded users.'}
             </div>
           ) : (
             <div style={styles.userList}>
@@ -577,18 +650,26 @@ export default function UsersPage() {
                       <div style={styles.userEmail}>{user.email}</div>
                     </div>
 
-                    <span
-                      style={{
-                        ...styles.roleBadge,
-                        ...(user.role === 'admin'
-                          ? styles.roleBadgeAdmin
-                          : user.role === 'manager'
-                            ? styles.roleBadgeManager
-                            : styles.roleBadgeStaff)
-                      }}
-                    >
-                      {(user.access_role_label || user.custom_role_name || user.role).toUpperCase()}
-                    </span>
+                    <div style={styles.badgeGroup}>
+                      <span
+                        style={{
+                          ...styles.roleBadge,
+                          ...(user.custom_role_id
+                            ? styles.roleBadgeCustom
+                            : user.role === 'admin'
+                              ? styles.roleBadgeAdmin
+                              : user.role === 'manager'
+                                ? styles.roleBadgeManager
+                                : styles.roleBadgeStaff)
+                        }}
+                      >
+                        {(user.access_role_label || user.custom_role_name || user.role).toUpperCase()}
+                      </span>
+                      {currentUserId && user.id === currentUserId ? <span style={styles.selfBadge}>YOU</span> : null}
+                      <span style={{ ...styles.statusBadge, ...(isUserActive(user) ? styles.statusBadgeActive : styles.statusBadgeInactive) }}>
+                        {isUserActive(user) ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    </div>
                   </div>
 
                   <div style={styles.userMetaGrid}>
@@ -598,13 +679,13 @@ export default function UsersPage() {
                     </div>
 
                     <div style={styles.metaItem}>
-                      <div style={styles.metaLabel}>Access model</div>
-                      <div style={styles.metaValue}>{user.custom_role_id ? 'Tenant custom role' : 'Built-in role'}</div>
+                      <div style={styles.metaLabel}>Last login</div>
+                      <div style={styles.metaValue}>{formatLastLogin(user.last_login_at)}</div>
                     </div>
 
                     <div style={styles.metaItem}>
-                      <div style={styles.metaLabel}>Tenant</div>
-                      <div style={styles.metaValue}>{user.tenant_id}</div>
+                      <div style={styles.metaLabel}>Access model</div>
+                      <div style={styles.metaValue}>{user.custom_role_id ? 'Tenant custom role' : 'Built-in role'}</div>
                     </div>
                   </div>
 
@@ -620,11 +701,30 @@ export default function UsersPage() {
 
                     <button
                       type="button"
+                      style={isUserActive(user) ? styles.deactivateButton : styles.activateButton}
+                      onClick={() => handleStatusChange(user)}
+                      disabled={
+                        !canWrite ||
+                        statusMutation.isPending ||
+                        Boolean(currentUserId && user.id === currentUserId && isUserActive(user))
+                      }
+                      title={currentUserId && user.id === currentUserId && isUserActive(user) ? 'You cannot deactivate your own account' : undefined}
+                    >
+                      {statusMutation.isPending && statusMutation.variables?.id === user.id
+                        ? 'Updating…'
+                        : isUserActive(user)
+                          ? 'Deactivate'
+                          : 'Activate'}
+                    </button>
+
+                    <button
+                      type="button"
                       style={styles.deleteButton}
                       onClick={() => handleDelete(user)}
-                      disabled={!canWrite || deleteMutation.isPending}
+                      disabled={!canWrite || deleteMutation.isPending || Boolean(currentUserId && user.id === currentUserId)}
+                      title={currentUserId && user.id === currentUserId ? 'You cannot delete your own account' : 'Permanently delete this account when retention constraints allow it'}
                     >
-                      {deleteMutation.isPending ? 'Working…' : 'Delete'}
+                      {deleteMutation.isPending && deleteMutation.variables === user.id ? 'Deleting…' : 'Delete'}
                     </button>
                   </div>
                 </article>
@@ -791,6 +891,24 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer'
   },
+  activateButton: {
+    border: '1px solid #86efac',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#f0fdf4',
+    color: '#047857',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
+  deactivateButton: {
+    border: '1px solid #fbbf24',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    background: '#fffbeb',
+    color: '#92400e',
+    fontWeight: 700,
+    cursor: 'pointer'
+  },
   deleteButton: {
     border: 'none',
     borderRadius: '12px',
@@ -832,7 +950,8 @@ const styles: Record<string, CSSProperties> = {
   refreshMeta: {
     color: '#64748b',
     fontSize: '13px',
-    lineHeight: 1.4
+    lineHeight: 1.4,
+    alignSelf: 'center'
   },
   emptyState: {
     margin: 0
@@ -881,13 +1000,24 @@ const styles: Record<string, CSSProperties> = {
     color: '#475569',
     wordBreak: 'break-word'
   },
+  badgeGroup: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    maxWidth: '100%'
+  },
   roleBadge: {
     padding: '8px 10px',
     borderRadius: '999px',
     fontSize: '11px',
     fontWeight: 800,
     letterSpacing: '0.06em',
-    flexShrink: 0
+    flexShrink: 0,
+    maxWidth: '100%',
+    overflowWrap: 'anywhere',
+    textAlign: 'center'
   },
   roleBadgeAdmin: {
     background: '#fee2e2',
@@ -900,6 +1030,36 @@ const styles: Record<string, CSSProperties> = {
   roleBadgeStaff: {
     background: '#dcfce7',
     color: '#047857'
+  },
+  roleBadgeCustom: {
+    background: '#dbeafe',
+    color: '#1d4ed8'
+  },
+  selfBadge: {
+    padding: '8px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    background: '#ede9fe',
+    color: '#6d28d9',
+    flexShrink: 0
+  },
+  statusBadge: {
+    padding: '8px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.06em',
+    flexShrink: 0
+  },
+  statusBadgeActive: {
+    background: '#dcfce7',
+    color: '#047857'
+  },
+  statusBadgeInactive: {
+    background: '#e2e8f0',
+    color: '#475569'
   },
   userMetaGrid: {
     display: 'grid',

@@ -71,6 +71,7 @@ export type TenantPermissionPolicyMatrix = {
   tenant_id: string;
   editable_roles: BuiltInTenantRole[];
   permission_catalog: PermissionCatalogItem<TenantPermission>[];
+  permission_dependencies: Partial<Record<TenantPermission, TenantPermission[]>>;
   custom_role_templates: CustomRoleTemplate[];
   roles: TenantRolePermissionPolicy[];
   governance: {

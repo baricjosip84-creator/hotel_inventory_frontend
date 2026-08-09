@@ -94,6 +94,13 @@ export default function PlatformPermissionsPage() {
       roles={query.data.roles}
       catalog={query.data.permission_catalog}
       selectedRole={selectedRole}
+      onDiscardDraft={() => {
+        setDraftByRole((current) => {
+          const next = { ...current };
+          delete next[selectedRole];
+          return next;
+        });
+      }}
       onSelectedRoleChange={(role) => {
         setSelectedRole(role);
         setSuccessMessage(null);

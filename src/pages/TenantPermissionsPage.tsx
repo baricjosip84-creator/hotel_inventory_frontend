@@ -53,6 +53,14 @@ export default function TenantPermissionsPage() {
     [query.data, selectedRole]
   );
   const draftPermissions = draftByRole[selectedRole] ?? activeRole?.effective_permissions ?? [];
+  const createNameValid = createName.trim().length >= 2;
+  const metadataNameValid = metadataName.trim().length >= 2;
+  const metadataDescriptionValue = metadataDescription.trim() || null;
+  const metadataDirty = activeRole?.role_kind === 'custom' && (
+    metadataName.trim() !== (activeRole.display_name || '') ||
+    metadataDescriptionValue !== (activeRole.description || null)
+  );
+  const selectedTemplate = query.data?.custom_role_templates.find((template) => template.key === createTemplateKey);
 
   const updateDraft = (permissions: TenantPermission[]) => {
     setDraftByRole((current) => ({ ...current, [selectedRole]: permissions }));
@@ -225,6 +233,11 @@ export default function TenantPermissionsPage() {
     if (!id || !activeRole || managing) return;
     const name = window.prompt('Name for the copied custom role:', `${roleName(activeRole)} Copy`);
     if (!name?.trim()) return;
+    if (name.trim().length < 2) {
+      setSuccessMessage(null);
+      setErrorMessage('Custom role name must contain at least 2 characters.');
+      return;
+    }
     if (isReservedTenantCustomRoleName(name)) {
       setSuccessMessage(null);
       setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
@@ -281,7 +294,7 @@ export default function TenantPermissionsPage() {
   if (query.isError || !query.data) {
     return (
       <div className="app-error-state">
-        Tenant permission policies could not be loaded. Check tenant-admin access and backend migrations 486 and 487.
+        Tenant permission settings could not be loaded. Check tenant administrator access and try again.
       </div>
     );
   }
@@ -314,10 +327,15 @@ export default function TenantPermissionsPage() {
             <span>Description (optional)</span>
             <input value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} maxLength={500} style={styles.input} placeholder="What this role is responsible for" />
           </label>
-          <button type="submit" style={{ ...styles.primaryButton, ...((creating || !createName.trim()) ? styles.disabled : {}) }} disabled={creating || !createName.trim()}>
+          <button type="submit" style={{ ...styles.primaryButton, ...((creating || !createNameValid) ? styles.disabled : {}) }} disabled={creating || !createNameValid}>
             {creating ? 'Creating…' : 'Create custom role'}
           </button>
         </div>
+        {selectedTemplate ? (
+          <p style={styles.templatePreview}>
+            <strong>{selectedTemplate.name}:</strong> {selectedTemplate.description}
+          </p>
+        ) : null}
         <p style={styles.safetyNote}>Custom roles cannot be named Admin, Manager, or Staff and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when operational actions depend on them.</p>
       </form>
 
@@ -334,7 +352,14 @@ export default function TenantPermissionsPage() {
             <label style={styles.field}><span>Description</span><input value={metadataDescription} onChange={(event) => setMetadataDescription(event.target.value)} maxLength={500} style={styles.input} /></label>
           </div>
           <div style={styles.actions}>
-            <button type="button" style={styles.secondaryButton} disabled={managing || !metadataName.trim()} onClick={() => void updateMetadata()}>Save details</button>
+            <button
+              type="button"
+              style={{ ...styles.secondaryButton, ...((managing || !metadataNameValid || !metadataDirty) ? styles.disabled : {}) }}
+              disabled={managing || !metadataNameValid || !metadataDirty}
+              onClick={() => void updateMetadata()}
+            >
+              Save details
+            </button>
             <button type="button" style={styles.secondaryButton} disabled={managing} onClick={() => void duplicateCustomRole()}>Duplicate</button>
             <button
               type="button"
@@ -368,7 +393,15 @@ export default function TenantPermissionsPage() {
       reservedLabel="Tenant Admin only"
       roles={query.data.roles}
       catalog={query.data.permission_catalog}
+      permissionDependencies={query.data.permission_dependencies}
       selectedRole={selectedRole}
+      onDiscardDraft={() => {
+        setDraftByRole((current) => {
+          const next = { ...current };
+          delete next[selectedRole];
+          return next;
+        });
+      }}
       onSelectedRoleChange={(role) => {
         const nextRole = query.data.roles.find((item) => item.role === role);
         setSelectedRole(role);
@@ -403,6 +436,7 @@ const styles: Record<string, CSSProperties> = {
   descriptionField: { gridColumn: 'span 1' },
   field: { display: 'grid', gap: 6, fontWeight: 700, color: '#334155' },
   input: { width: '100%', minHeight: 42, border: '1px solid #cbd5e1', borderRadius: 10, padding: '0 11px', fontSize: 14, boxSizing: 'border-box', background: '#fff' },
+  templatePreview: { margin: 0, color: '#334155', lineHeight: 1.5, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 11 },
   safetyNote: { margin: 0, color: '#475569', lineHeight: 1.5, background: '#f8fafc', borderRadius: 10, padding: 11 },
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   primaryButton: { minHeight: 42, border: 0, borderRadius: 10, background: '#2563eb', color: '#fff', padding: '0 15px', fontWeight: 800, cursor: 'pointer' },

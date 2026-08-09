@@ -7,8 +7,10 @@ export type RolePermissionEditorProps<Role extends string, Permission extends st
   description: string;
   roles: Array<RolePermissionPolicy<Role, Permission>>;
   catalog: Array<PermissionCatalogItem<Permission>>;
+  permissionDependencies?: Partial<Record<Permission, Permission[]>>;
   selectedRole: Role;
   onSelectedRoleChange: (role: Role) => void;
+  onDiscardDraft?: () => void;
   draftPermissions: Permission[];
   onDraftPermissionsChange: (permissions: Permission[]) => void;
   onSave: () => Promise<void>;
@@ -41,8 +43,10 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   description,
   roles,
   catalog,
+  permissionDependencies = {},
   selectedRole,
   onSelectedRoleChange,
+  onDiscardDraft,
   draftPermissions,
   onDraftPermissionsChange,
   onSave,
@@ -64,9 +68,35 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   const lockedSet = useMemo(() => new Set(activeRole?.locked_permissions || []), [activeRole]);
   const forbiddenSet = useMemo(() => new Set(activeRole?.forbidden_permissions || []), [activeRole]);
   const effectiveSet = useMemo(() => new Set(activeRole?.effective_permissions || []), [activeRole]);
+  const dependencyMap = useMemo(
+    () => new Map(
+      Object.entries(permissionDependencies).map(([permission, dependencies]) => [
+        permission as Permission,
+        (dependencies || []) as Permission[]
+      ])
+    ),
+    [permissionDependencies]
+  );
+  const reverseDependencyMap = useMemo(() => {
+    const reverse = new Map<Permission, Permission[]>();
+    for (const [permission, dependencies] of dependencyMap.entries()) {
+      for (const dependency of dependencies) {
+        const dependents = reverse.get(dependency) || [];
+        dependents.push(permission);
+        reverse.set(dependency, dependents);
+      }
+    }
+    return reverse;
+  }, [dependencyMap]);
   const dirty = activeRole
     ? draftSet.size !== effectiveSet.size || [...draftSet].some((permission) => !effectiveSet.has(permission))
     : false;
+  const isCustomRole = activeRole?.role_kind === 'custom';
+  const resetLabel = isCustomRole ? 'Reset to starting template' : 'Reset to defaults';
+  const baselineStatus = isCustomRole ? 'Using starting template' : 'Using hardcoded defaults';
+  const baselineHelp = isCustomRole
+    ? 'The starting template remains available if you need to restore this role.'
+    : 'Hardcoded defaults remain available if you need to restore this role.';
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -98,34 +128,72 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     return [...map.entries()].sort(([left], [right]) => left.localeCompare(right));
   }, [filteredCatalog]);
 
+  const normalizeDraft = (values: Set<Permission>, explicitlyDisabled: Permission[] = []) => {
+    const next = new Set(values);
+
+    const disableQueue = [...explicitlyDisabled];
+    const disabled = new Set(explicitlyDisabled);
+    while (disableQueue.length) {
+      const disabledPermission = disableQueue.shift() as Permission;
+      for (const dependent of reverseDependencyMap.get(disabledPermission) || []) {
+        if (disabled.has(dependent) || lockedSet.has(dependent)) continue;
+        if (next.delete(dependent)) {
+          disabled.add(dependent);
+          disableQueue.push(dependent);
+        }
+      }
+    }
+
+    const dependencyQueue = [...next];
+    while (dependencyQueue.length) {
+      const permission = dependencyQueue.shift() as Permission;
+      for (const dependency of dependencyMap.get(permission) || []) {
+        if (forbiddenSet.has(dependency) || next.has(dependency)) continue;
+        next.add(dependency);
+        dependencyQueue.push(dependency);
+      }
+    }
+
+    for (const lockedPermission of lockedSet) next.add(lockedPermission);
+    for (const forbiddenPermission of forbiddenSet) next.delete(forbiddenPermission);
+    return [...next].sort();
+  };
+
   const togglePermission = (permission: Permission, enabled: boolean) => {
     if (!activeRole?.editable || lockedSet.has(permission) || forbiddenSet.has(permission)) return;
     const next = new Set(draftSet);
     if (enabled) next.add(permission);
     else next.delete(permission);
-    for (const lockedPermission of lockedSet) next.add(lockedPermission);
-    for (const forbiddenPermission of forbiddenSet) next.delete(forbiddenPermission);
-    onDraftPermissionsChange([...next].sort());
+    onDraftPermissionsChange(normalizeDraft(next, enabled ? [] : [permission]));
   };
 
   const setGroup = (items: Array<PermissionCatalogItem<Permission>>, enabled: boolean) => {
     if (!activeRole?.editable) return;
     const next = new Set(draftSet);
+    const disabledPermissions: Permission[] = [];
     for (const item of items) {
       if (lockedSet.has(item.permission) || forbiddenSet.has(item.permission)) continue;
-      if (enabled) next.add(item.permission);
-      else next.delete(item.permission);
+      if (enabled) {
+        next.add(item.permission);
+      } else {
+        next.delete(item.permission);
+        disabledPermissions.push(item.permission);
+      }
     }
-    for (const lockedPermission of lockedSet) next.add(lockedPermission);
-    for (const forbiddenPermission of forbiddenSet) next.delete(forbiddenPermission);
-    onDraftPermissionsChange([...next].sort());
+    onDraftPermissionsChange(normalizeDraft(next, enabled ? [] : disabledPermissions));
   };
 
   const requestRoleChange = (role: Role) => {
     if (role === activeRole?.role) return;
-    if (dirty && !window.confirm('Discard unsaved permission changes and switch roles?')) return;
+    if (dirty) {
+      if (!window.confirm('Discard unsaved permission changes and switch roles?')) return;
+      onDiscardDraft?.();
+    }
+    setSearch('');
     onSelectedRoleChange(role);
   };
+
+  const filtering = search.trim().length > 0;
 
   return (
     <section style={styles.page} data-skip-global-action-feedback="true">
@@ -187,7 +255,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
       {activeRole ? (
         <>
           <div style={styles.toolbar}>
-            <div>
+            <div style={styles.toolbarCopy}>
               <h2 style={styles.roleTitle}>{activeRole.display_name || roleLabel(activeRole.role)}</h2>
               <p style={styles.roleHelp}>
                 {activeRole.editable
@@ -197,26 +265,64 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                   : 'This role is protected and cannot be edited.'}
               </p>
             </div>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search permissions"
-              aria-label="Search permissions"
-              style={styles.search}
-            />
+            <div style={styles.toolbarControls}>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search permissions"
+                aria-label="Search permissions"
+                style={styles.search}
+              />
+              <div style={styles.actionButtons}>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.secondaryButton,
+                    ...((!activeRole.editable || resetting || saving || activeRole.is_default) ? styles.buttonDisabled : {})
+                  }}
+                  disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
+                  onClick={() => void onReset()}
+                >
+                  {resetting ? 'Resetting…' : resetLabel}
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.primaryButton,
+                    ...((!activeRole.editable || !dirty || saving || resetting) ? styles.buttonDisabled : {})
+                  }}
+                  disabled={!activeRole.editable || !dirty || saving || resetting}
+                  onClick={() => void onSave()}
+                >
+                  {saving ? 'Saving…' : 'Save role permissions'}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div style={styles.summaryGrid}>
             <div style={styles.summaryCard}><strong>{draftSet.size}</strong><span>Enabled</span></div>
             <div style={styles.summaryCard}><strong>{catalog.length - draftSet.size}</strong><span>Disabled</span></div>
             <div style={styles.summaryCard}><strong>{lockedSet.size}</strong><span>Locked</span></div>
-            <div style={styles.summaryCard}><strong>{activeRole.override_count}</strong><span>Saved overrides</span></div>
+            <div style={styles.summaryCard}>
+              <strong>{activeRole.override_count}</strong>
+              <span>{isCustomRole ? 'Changes from template' : 'Saved overrides'}</span>
+            </div>
           </div>
 
           <div style={styles.groups}>
+            {grouped.length === 0 ? (
+              <div style={styles.emptySearch}>
+                <strong>No permissions match “{search.trim()}”.</strong>
+                <button type="button" style={styles.secondaryButton} onClick={() => setSearch('')}>Clear search</button>
+              </div>
+            ) : null}
             {grouped.map(([group, items]) => {
               const editableItems = items.filter((item) => !lockedSet.has(item.permission) && !forbiddenSet.has(item.permission));
               const enabledCount = items.filter((item) => draftSet.has(item.permission)).length;
+              const enabledEditableCount = editableItems.filter((item) => draftSet.has(item.permission)).length;
+              const enableDisabled = saving || resetting || enabledEditableCount === editableItems.length;
+              const disableDisabled = saving || resetting || enabledEditableCount === 0;
               return (
                 <article key={group} style={styles.groupCard}>
                   <div style={styles.groupHeader}>
@@ -228,19 +334,19 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                       <div style={styles.groupActions}>
                         <button
                           type="button"
-                          style={{ ...styles.smallButton, ...((saving || resetting) ? styles.buttonDisabled : {}) }}
-                          disabled={saving || resetting}
+                          style={{ ...styles.smallButton, ...(enableDisabled ? styles.buttonDisabled : {}) }}
+                          disabled={enableDisabled}
                           onClick={() => setGroup(items, true)}
                         >
-                          Enable group
+                          {filtering ? 'Enable shown' : 'Enable group'}
                         </button>
                         <button
                           type="button"
-                          style={{ ...styles.smallButton, ...((saving || resetting) ? styles.buttonDisabled : {}) }}
-                          disabled={saving || resetting}
+                          style={{ ...styles.smallButton, ...(disableDisabled ? styles.buttonDisabled : {}) }}
+                          disabled={disableDisabled}
                           onClick={() => setGroup(items, false)}
                         >
-                          Disable group
+                          {filtering ? 'Disable shown' : 'Disable group'}
                         </button>
                       </div>
                     ) : null}
@@ -253,7 +359,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                       const checked = draftSet.has(item.permission);
                       const differsFromDefault = checked !== defaultSet.has(item.permission);
                       return (
-                        <label key={item.permission} style={{ ...styles.permissionRow, ...(forbidden ? styles.permissionForbidden : {}) }}>
+                        <label
+                          key={item.permission}
+                          style={{ ...styles.permissionRow, ...(forbidden ? styles.permissionForbidden : {}) }}
+                          title={(dependencyMap.get(item.permission) || []).length
+                            ? `Requires: ${(dependencyMap.get(item.permission) || []).join(', ')}`
+                            : undefined}
+                        >
                           <input
                             type="checkbox"
                             checked={checked}
@@ -280,8 +392,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
           <footer style={styles.actionBar}>
             <div>
-              <strong>{dirty ? 'Unsaved permission changes' : activeRole.is_default ? 'Using hardcoded defaults' : 'Saved custom policy active'}</strong>
-              <span style={styles.actionHelp}>{activeRole.role_kind === 'custom' ? 'The starting template remains available through Reset to starting template.' : 'Hardcoded defaults remain available through Reset to defaults.'}</span>
+              <strong>{dirty ? 'Unsaved permission changes' : activeRole.is_default ? baselineStatus : 'Saved custom policy active'}</strong>
+              <span style={styles.actionHelp}>{baselineHelp}</span>
             </div>
             <div style={styles.actionButtons}>
               <button
@@ -293,7 +405,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                 onClick={() => void onReset()}
               >
-                {resetting ? 'Resetting…' : activeRole.role_kind === 'custom' ? 'Reset to starting template' : 'Reset to defaults'}
+                {resetting ? 'Resetting…' : resetLabel}
               </button>
               <button
                 type="button"
@@ -331,13 +443,16 @@ const styles: Record<string, CSSProperties> = {
   roleTab: { display: 'grid', textAlign: 'left', gap: 4, padding: 14, borderRadius: 14, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' },
   roleTabInactive: { opacity: 0.66, background: '#f8fafc' },
   roleTabActive: { borderColor: '#2563eb', boxShadow: '0 0 0 2px rgba(37,99,235,0.12)', background: '#f8fbff' },
-  toolbar: { display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'end', background: '#fff', border: '1px solid #dbe3ef', borderRadius: 16, padding: 18 },
+  toolbar: { display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'flex-end', background: '#fff', border: '1px solid #dbe3ef', borderRadius: 16, padding: 18, flexWrap: 'wrap' },
+  toolbarCopy: { minWidth: 260, flex: '1 1 360px' },
+  toolbarControls: { display: 'grid', gap: 10, justifyItems: 'end', flex: '1 1 420px' },
   roleTitle: { margin: 0, fontSize: 22 },
   roleHelp: { margin: '5px 0 0', color: '#64748b' },
   search: { width: 'min(360px, 100%)', minHeight: 42, border: '1px solid #cbd5e1', borderRadius: 10, padding: '0 12px', fontSize: 15 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 },
   summaryCard: { display: 'grid', gap: 4, background: '#fff', border: '1px solid #dbe3ef', borderRadius: 14, padding: 16 },
   groups: { display: 'grid', gap: 14 },
+  emptySearch: { display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: '#fff', border: '1px solid #dbe3ef', borderRadius: 14, padding: 16 },
   groupCard: { background: '#fff', border: '1px solid #dbe3ef', borderRadius: 16, overflow: 'hidden' },
   groupHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '16px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' },
   groupTitle: { margin: 0, fontSize: 17 },
@@ -354,7 +469,7 @@ const styles: Record<string, CSSProperties> = {
   reservedBadge: { fontStyle: 'normal', background: '#ffedd5', color: '#9a3412', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   overrideBadge: { fontStyle: 'normal', background: '#ede9fe', color: '#6d28d9', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   defaultBadge: { fontStyle: 'normal', background: '#f1f5f9', color: '#475569', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
-  actionBar: { position: 'sticky', bottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 18, background: 'rgba(255,255,255,0.97)', border: '1px solid #cbd5e1', boxShadow: '0 12px 30px rgba(15,23,42,0.12)', borderRadius: 16, padding: 16, zIndex: 5 },
+  actionBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 18, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 16, padding: 16, flexWrap: 'wrap' },
   actionHelp: { display: 'block', color: '#64748b', marginTop: 3 },
   actionButtons: { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
   primaryButton: { minHeight: 42, border: 0, borderRadius: 10, background: '#2563eb', color: '#fff', padding: '0 16px', fontWeight: 800, cursor: 'pointer' },
