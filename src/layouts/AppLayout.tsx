@@ -521,7 +521,7 @@ export default function AppLayout() {
                   <span style={styles.moduleMetaPill}>{currentModule.moduleGroupLabel}</span>
                   <span style={styles.moduleMetaPill}>Priority: {currentModule.priority}</span>
                   <span style={styles.moduleMetaPill}>Route: {currentModule.to}</span>
-                  <span style={styles.moduleMetaPill}>Access: {currentModule.permission ? 'permission-gated' : 'role-gated'}</span>
+                  <span style={styles.moduleMetaPill}>Access: {(currentModule.permission || currentModule.requiredPermissions?.length || currentModule.requiredAnyPermissions?.length) ? 'permission-gated' : currentModule.roles?.length ? 'role-gated' : 'authenticated'}</span>
                 </div>
               ) : null}
             </div>

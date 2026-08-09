@@ -24,6 +24,7 @@
     "check:report-csv-export-ui": "node scripts/check-report-csv-export-ui.mjs",
     "check:automation-resume-ui-governance": "node scripts/check-automation-resume-ui-governance.mjs",
     "check:tenant-session-route-auth-governance": "node scripts/check-tenant-session-route-auth-governance.mjs",
+    "check:sessions-page-hardening": "node scripts/check-sessions-page-hardening.mjs",
     "check:report-export-row-count-ui": "node scripts/check-report-export-row-count-ui.mjs",
     "check:report-export-feature-closure": "node scripts/check-report-export-feature-closure.mjs",
     "check:unified-ai-panel-anchor-contract": "node scripts/check-unified-ai-panel-anchor-contract.mjs",
