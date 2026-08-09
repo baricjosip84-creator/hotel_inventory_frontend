@@ -7,7 +7,11 @@ import {
   getCurrentUserRole,
   hasPermission
 } from '../lib/permissions';
-import { DEFAULT_INVENTORY_CURRENCY, normalizeCurrencyCode, setActiveTenantCurrency } from '../lib/tenantCurrency';
+import {
+  DEFAULT_INVENTORY_CURRENCY,
+  normalizeCurrencyCode,
+  setActiveTenantCurrency
+} from '../lib/tenantCurrency';
 
 type TenantSettingsRow = {
   id: string;
@@ -18,7 +22,6 @@ type TenantSettingsRow = {
   organization_type?: string | null;
   inventory_currency?: string | null;
   inventory_currency_configured_at?: string | null;
-  metadata?: Record<string, unknown> | null;
   write_locked?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
@@ -31,7 +34,6 @@ type TenantSettingsFormState = {
   season_end: string;
   organization_type: string;
   inventory_currency: string;
-  metadata: string;
 };
 
 type TenantPayload = {
@@ -42,7 +44,6 @@ type TenantPayload = {
   organization_type: string;
   inventory_currency: string;
   confirm_inventory_currency: boolean;
-  metadata: Record<string, unknown>;
 };
 
 const emptyFormState: TenantSettingsFormState = {
@@ -51,9 +52,14 @@ const emptyFormState: TenantSettingsFormState = {
   season_start: '',
   season_end: '',
   organization_type: 'facility',
-  inventory_currency: DEFAULT_INVENTORY_CURRENCY,
-  metadata: '{}'
+  inventory_currency: DEFAULT_INVENTORY_CURRENCY
 };
+
+const INVENTORY_CURRENCY_HELP =
+  'This is the tenant base currency used for product standard costs, inventory valuation, and tenant-base cost analytics. Supplier prices, invoices, and purchase orders can keep their own explicit currencies. The application does not automatically convert foreign exchange.';
+
+const LEGACY_CURRENCY_HELP =
+  'This tenant existed before currency tracking. Correct the displayed code first if needed, then confirm the currency that existing inventory standard costs already use. Changing the code also counts as confirmation. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists so historical amounts are never silently relabelled or converted.';
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) {
@@ -64,33 +70,18 @@ function readableError(error: unknown): string {
 }
 
 function normalizeDateInput(value: string | null | undefined): string {
-  if (!value) {
-    return '';
-  }
-
+  if (!value) return '';
   return String(value).slice(0, 10);
 }
 
-function formatRefreshTimestamp(timestamp: number): string {
-  if (!timestamp) {
-    return 'Not loaded yet';
-  }
-
-  return new Date(timestamp).toLocaleString();
-}
-
-function formatMetadata(metadata: Record<string, unknown> | null | undefined): string {
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return '{}';
-  }
-
-  return JSON.stringify(metadata, null, 2);
+function formatTimestamp(value: string | number | null | undefined): string {
+  if (!value) return '—';
+  const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 }
 
 function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormState {
-  if (!tenant) {
-    return emptyFormState;
-  }
+  if (!tenant) return emptyFormState;
 
   return {
     name: tenant.name ?? '',
@@ -98,22 +89,29 @@ function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormSt
     season_start: normalizeDateInput(tenant.season_start),
     season_end: normalizeDateInput(tenant.season_end),
     organization_type: tenant.organization_type ?? 'facility',
-    inventory_currency: normalizeCurrencyCode(tenant.inventory_currency),
-    metadata: formatMetadata(tenant.metadata)
+    inventory_currency: normalizeCurrencyCode(tenant.inventory_currency)
   };
 }
 
-function buildPayload(formState: TenantSettingsFormState, metadata: Record<string, unknown>): TenantPayload {
+function buildPayload(formState: TenantSettingsFormState, confirmInventoryCurrency: boolean): TenantPayload {
   return {
     name: formState.name.trim(),
     location: formState.location.trim() || null,
     season_start: formState.season_start || null,
     season_end: formState.season_end || null,
     organization_type: formState.organization_type.trim() || 'facility',
-    inventory_currency: normalizeCurrencyCode(formState.inventory_currency),
-    confirm_inventory_currency: false,
-    metadata
+    inventory_currency: formState.inventory_currency.trim().toUpperCase(),
+    confirm_inventory_currency: confirmInventoryCurrency
   };
+}
+
+function sameFormState(left: TenantSettingsFormState, right: TenantSettingsFormState): boolean {
+  return left.name === right.name
+    && left.location === right.location
+    && left.season_start === right.season_start
+    && left.season_end === right.season_end
+    && left.organization_type === right.organization_type
+    && left.inventory_currency === right.inventory_currency;
 }
 
 async function fetchTenants(): Promise<TenantSettingsRow[]> {
@@ -136,7 +134,6 @@ export default function TenantSettingsPage() {
   const canReadTenants = hasPermission(TENANT_PERMISSIONS.TENANT_READ, role);
   const canUpdateTenants = hasPermission(TENANT_PERMISSIONS.TENANT_UPDATE, role);
 
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [formState, setFormState] = useState<TenantSettingsFormState>(emptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -145,49 +142,55 @@ export default function TenantSettingsPage() {
   const tenantsQuery = useQuery({
     queryKey: ['tenants'],
     queryFn: fetchTenants,
-    enabled: canReadTenants
+    enabled: canReadTenants,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false
   });
 
-  const tenants = tenantsQuery.data ?? [];
-  const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) ?? tenants[0] ?? null;
+  const currentTenant = tenantsQuery.data?.[0] ?? null;
+  const latestFormState = useMemo(() => createFormState(currentTenant), [currentTenant]);
+
+  const dateRangeInvalid = Boolean(
+    formState.season_start
+    && formState.season_end
+    && formState.season_start > formState.season_end
+  );
+  const currencyCodeValid = /^[A-Z]{3}$/.test(formState.inventory_currency.trim().toUpperCase());
+  const formValid = Boolean(
+    formState.name.trim()
+    && formState.name.trim().length <= 160
+    && formState.location.trim().length <= 255
+    && formState.organization_type.trim()
+    && formState.organization_type.trim().length <= 80
+    && currencyCodeValid
+    && !dateRangeInvalid
+  );
+  const isDirty = Boolean(
+    currentTenant
+    && (!sameFormState(formState, latestFormState) || confirmInventoryCurrency)
+  );
 
   useEffect(() => {
-    if (!selectedTenant) {
-      setSelectedTenantId(null);
+    if (!currentTenant) {
       setFormState(emptyFormState);
+      setConfirmInventoryCurrency(false);
       return;
     }
 
-    setSelectedTenantId(selectedTenant.id);
-    setFormState(createFormState(selectedTenant));
-    setFormError(null);
-    setSuccessMessage(null);
+    setFormState(createFormState(currentTenant));
     setConfirmInventoryCurrency(false);
-  }, [selectedTenant]);
-
-  const parsedMetadata = useMemo(() => {
-    try {
-      const parsed = formState.metadata.trim() ? JSON.parse(formState.metadata) : {};
-
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return { valid: false, value: null as Record<string, unknown> | null };
-      }
-
-      return { valid: true, value: parsed as Record<string, unknown> };
-    } catch {
-      return { valid: false, value: null as Record<string, unknown> | null };
-    }
-  }, [formState.metadata]);
+    setFormError(null);
+  }, [currentTenant]);
 
   const updateMutation = useMutation({
     mutationFn: updateTenant,
-    onSuccess: async (tenant) => {
-      setSelectedTenantId(tenant.id);
+    onSuccess: (tenant) => {
+      queryClient.setQueryData<TenantSettingsRow[]>(['tenants'], [tenant]);
       setFormState(createFormState(tenant));
+      setConfirmInventoryCurrency(false);
       setFormError(null);
       setActiveTenantCurrency(tenant.inventory_currency);
-      setSuccessMessage('Tenant settings updated. Inventory currency is used for standard costs and tenant-base valuation; no automatic FX conversion is performed.');
-      await queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      setSuccessMessage('Tenant settings saved.');
     },
     onError: (error) => {
       setSuccessMessage(null);
@@ -197,23 +200,26 @@ export default function TenantSettingsPage() {
 
   const isSaving = updateMutation.isPending;
   const isRefreshing = tenantsQuery.isFetching && !tenantsQuery.isLoading;
-  const lastRefreshedLabel = formatRefreshTimestamp(tenantsQuery.dataUpdatedAt);
+  const isWriteLocked = Boolean(currentTenant?.write_locked);
+  const canEdit = canUpdateTenants && !isWriteLocked && !isSaving;
+  const lastRefreshedLabel = formatTimestamp(tenantsQuery.dataUpdatedAt);
 
   const updateField = (field: keyof TenantSettingsFormState, value: string) => {
     setFormState((current) => ({
       ...current,
       [field]: value
     }));
-  };
-
-  const selectTenant = (tenant: TenantSettingsRow) => {
-    setSelectedTenantId(tenant.id);
-    setFormState(createFormState(tenant));
     setFormError(null);
     setSuccessMessage(null);
   };
 
   const handleRefresh = async () => {
+    if (isDirty) {
+      setSuccessMessage(null);
+      setFormError('Save or reset your unsaved changes before refreshing tenant settings.');
+      return;
+    }
+
     setFormError(null);
     setSuccessMessage(null);
 
@@ -224,21 +230,21 @@ export default function TenantSettingsPage() {
       return;
     }
 
-    setSuccessMessage('Tenant settings refreshed. Use Reset to latest values to reload the form from the latest backend response.');
+    setSuccessMessage('Tenant settings refreshed.');
   };
 
   const handleResetForm = () => {
-    if (!selectedTenant) {
-      return;
-    }
+    if (!currentTenant) return;
 
-    setFormState(createFormState(selectedTenant));
+    setFormState(createFormState(currentTenant));
+    setConfirmInventoryCurrency(false);
     setFormError(null);
-    setSuccessMessage('Form reset to the latest loaded tenant settings.');
+    setSuccessMessage(null);
   };
 
   const validatePayload = (): TenantPayload | null => {
     const normalizedName = formState.name.trim();
+    const normalizedOrganizationType = formState.organization_type.trim();
 
     if (!normalizedName) {
       setSuccessMessage(null);
@@ -246,42 +252,53 @@ export default function TenantSettingsPage() {
       return null;
     }
 
-    if (!/^[A-Za-z]{3}$/.test(formState.inventory_currency.trim())) {
+    if (normalizedName.length > 160) {
+      setSuccessMessage(null);
+      setFormError('Tenant name must be 160 characters or fewer.');
+      return null;
+    }
+
+    if (formState.location.trim().length > 255) {
+      setSuccessMessage(null);
+      setFormError('Location must be 255 characters or fewer.');
+      return null;
+    }
+
+    if (!normalizedOrganizationType || normalizedOrganizationType.length > 80) {
+      setSuccessMessage(null);
+      setFormError('Organization type is required and must be 80 characters or fewer.');
+      return null;
+    }
+
+    if (!currencyCodeValid) {
       setSuccessMessage(null);
       setFormError('Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.');
       return null;
     }
 
-    if (!parsedMetadata.valid || !parsedMetadata.value) {
+    if (dateRangeInvalid) {
       setSuccessMessage(null);
-      setFormError('Metadata must be a valid JSON object.');
+      setFormError('Season start must be on or before season end.');
       return null;
     }
 
-    return {
-      ...buildPayload(
-        {
-          ...formState,
-          name: normalizedName
-        },
-        parsedMetadata.value
-      ),
-      confirm_inventory_currency: confirmInventoryCurrency
-    };
+    return buildPayload(
+      {
+        ...formState,
+        name: normalizedName,
+        organization_type: normalizedOrganizationType,
+        inventory_currency: formState.inventory_currency.trim().toUpperCase()
+      },
+      confirmInventoryCurrency
+    );
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const payload = validatePayload();
-
-    if (!payload) {
-      return;
-    }
-
-    if (!selectedTenant) {
+    if (!currentTenant) {
       setSuccessMessage(null);
-      setFormError('Select a tenant to update.');
+      setFormError('Tenant settings are not available. Refresh the page and try again.');
       return;
     }
 
@@ -291,8 +308,19 @@ export default function TenantSettingsPage() {
       return;
     }
 
+    if (isWriteLocked) {
+      setSuccessMessage(null);
+      setFormError('This tenant is write-locked by the platform. Settings cannot be changed until the lock is removed.');
+      return;
+    }
+
+    if (!isDirty) return;
+
+    const payload = validatePayload();
+    if (!payload) return;
+
     updateMutation.mutate({
-      tenantId: selectedTenant.id,
+      tenantId: currentTenant.id,
       payload
     });
   };
@@ -315,202 +343,246 @@ export default function TenantSettingsPage() {
           <p style={styles.eyebrow}>Tenant scoped</p>
           <h2 style={styles.title}>Tenant Settings</h2>
           <p style={styles.subtitle}>
-            Tenant-scoped settings for the current tenant. Creation and deletion belong to the platform tenant control plane.
+            Manage profile, operating-season, and inventory-currency settings for the current tenant. Tenant creation, deletion, locking, billing, and plan controls remain platform responsibilities.
           </p>
         </div>
         <div style={styles.headerActions}>
           <span style={styles.refreshMeta}>Last refreshed: {lastRefreshedLabel}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            style={{
+              ...styles.secondaryButton,
+              ...((tenantsQuery.isFetching || isDirty) ? styles.disabledButton : {})
+            }}
             onClick={handleRefresh}
-            disabled={tenantsQuery.isFetching}
+            disabled={tenantsQuery.isFetching || isDirty}
+            title={isDirty ? 'Save or reset your unsaved changes before refreshing.' : undefined}
           >
             {isRefreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </header>
 
-      {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenants…</div> : null}
+      {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenant settings…</div> : null}
       {tenantsQuery.error ? <div style={styles.error}>{readableError(tenantsQuery.error)}</div> : null}
       {formError ? <div style={styles.error}>{formError}</div> : null}
       {successMessage ? <div style={styles.success}>{successMessage}</div> : null}
+      {isWriteLocked ? (
+        <div style={styles.warning}>
+          <strong>Tenant write lock is active.</strong> These settings are read-only until a platform administrator removes the lock.
+        </div>
+      ) : null}
 
-      <div style={styles.twoColumn}>
-        <section style={styles.panel}>
-          <div style={styles.sectionHeader}>
-            <h3 style={styles.sectionTitle}>Tenants</h3>
-            <span style={styles.badge}>{tenants.length}</span>
-          </div>
+      {!tenantsQuery.isLoading && !tenantsQuery.error && !currentTenant ? (
+        <div style={styles.error}>The backend did not return the current tenant.</div>
+      ) : null}
 
-          {tenants.length === 0 && !tenantsQuery.isLoading ? (
-            <div style={styles.emptyState}>No tenants returned by the backend.</div>
-          ) : null}
+      {currentTenant ? (
+        <div style={styles.twoColumn}>
+          <section style={styles.panel}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}>Current Tenant</h3>
+              <span style={isWriteLocked ? styles.lockedBadge : styles.openBadge}>
+                {isWriteLocked ? 'WRITE LOCKED' : 'OPEN'}
+              </span>
+            </div>
 
-          <div style={styles.tenantList}>
-            {tenants.map((tenant) => (
+            <div style={styles.currentTenantCard}>
+              <span style={styles.tenantName}>{currentTenant.name}</span>
+              <span style={styles.tenantMeta}>{currentTenant.location || 'No location configured'}</span>
+              <span style={styles.tenantMeta}>{currentTenant.organization_type || 'facility'}</span>
+            </div>
+
+            <dl style={styles.summaryList}>
+              <div style={styles.summaryRow}>
+                <dt style={styles.summaryLabel}>Tenant ID</dt>
+                <dd style={styles.summaryValueCode}>{currentTenant.id}</dd>
+              </div>
+              <div style={styles.summaryRow}>
+                <dt style={styles.summaryLabel}>Inventory currency</dt>
+                <dd style={styles.summaryValue}>{normalizeCurrencyCode(currentTenant.inventory_currency)}</dd>
+              </div>
+              <div style={styles.summaryRow}>
+                <dt style={styles.summaryLabel}>Created</dt>
+                <dd style={styles.summaryValue}>{formatTimestamp(currentTenant.created_at)}</dd>
+              </div>
+              <div style={styles.summaryRow}>
+                <dt style={styles.summaryLabel}>Last updated</dt>
+                <dd style={styles.summaryValue}>{formatTimestamp(currentTenant.updated_at)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <form style={styles.panel} onSubmit={handleSubmit}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <h3 style={styles.sectionTitle}>Edit Tenant Settings</h3>
+                <p style={styles.sectionSubtitle}>Only tenant-owned profile and accounting context can be changed here.</p>
+              </div>
+              {isDirty ? <span style={styles.unsavedBadge}>UNSAVED CHANGES</span> : null}
+            </div>
+
+            <div style={styles.grid}>
+              <label style={styles.field}>
+                <span style={styles.label}>Name</span>
+                <input
+                  style={styles.input}
+                  value={formState.name}
+                  onChange={(event) => updateField('name', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={160}
+                  required
+                />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Location</span>
+                <input
+                  style={styles.input}
+                  value={formState.location}
+                  onChange={(event) => updateField('location', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={255}
+                  placeholder="Optional"
+                />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Organization Type</span>
+                <input
+                  style={styles.input}
+                  value={formState.organization_type}
+                  onChange={(event) => updateField('organization_type', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={80}
+                  required
+                />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.labelRow}>
+                  <span style={styles.label}>Inventory Currency</span>
+                  <span
+                    style={styles.infoIcon}
+                    title={INVENTORY_CURRENCY_HELP}
+                    aria-label={INVENTORY_CURRENCY_HELP}
+                    tabIndex={0}
+                  >
+                    i
+                  </span>
+                </span>
+                <input
+                  style={styles.input}
+                  value={formState.inventory_currency}
+                  onChange={(event) => updateField('inventory_currency', event.target.value.toUpperCase())}
+                  disabled={!canEdit}
+                  maxLength={3}
+                  pattern="[A-Za-z]{3}"
+                  placeholder={DEFAULT_INVENTORY_CURRENCY}
+                  required
+                />
+                <span style={styles.helperText}>Tenant-base costs and valuation. No automatic FX conversion.</span>
+              </label>
+
+              {!currentTenant.inventory_currency_configured_at ? (
+                <div style={{ ...styles.currencyNotice, ...styles.fullWidth }}>
+                  <div style={styles.noticeHeader}>
+                    <div>
+                      <strong>Legacy currency confirmation required</strong>
+                      <div style={styles.helperText}>Confirm which currency the tenant's existing inventory standard costs already use.</div>
+                    </div>
+                    <span
+                      style={styles.infoIcon}
+                      title={LEGACY_CURRENCY_HELP}
+                      aria-label={LEGACY_CURRENCY_HELP}
+                      tabIndex={0}
+                    >
+                      i
+                    </span>
+                  </div>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={confirmInventoryCurrency}
+                      onChange={(event) => {
+                        setConfirmInventoryCurrency(event.target.checked);
+                        setFormError(null);
+                        setSuccessMessage(null);
+                      }}
+                      disabled={!canEdit}
+                    />
+                    Confirm that <strong>{formState.inventory_currency || 'this currency'}</strong> is the currency of existing inventory standard costs
+                  </label>
+                </div>
+              ) : (
+                <div style={{ ...styles.currencyStatus, ...styles.fullWidth }}>
+                  <div>
+                    <strong>Inventory currency confirmed</strong>
+                    <div style={styles.helperText}>
+                      Confirmed {formatTimestamp(currentTenant.inventory_currency_configured_at)}. A later change is blocked if it would relabel existing currency-dependent financial evidence.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <label style={styles.field}>
+                <span style={styles.label}>Season Start</span>
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={formState.season_start}
+                  onChange={(event) => updateField('season_start', event.target.value)}
+                  disabled={!canEdit}
+                />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Season End</span>
+                <input
+                  style={{
+                    ...styles.input,
+                    ...(dateRangeInvalid ? styles.invalidInput : {})
+                  }}
+                  type="date"
+                  value={formState.season_end}
+                  onChange={(event) => updateField('season_end', event.target.value)}
+                  disabled={!canEdit}
+                  min={formState.season_start || undefined}
+                />
+                {dateRangeInvalid ? <span style={styles.fieldError}>Season end cannot be before season start.</span> : null}
+              </label>
+            </div>
+
+            <div style={styles.actions}>
               <button
-                key={tenant.id}
                 type="button"
                 style={{
-                  ...styles.tenantCard,
-                  ...(selectedTenant?.id === tenant.id ? styles.tenantCardActive : {})
+                  ...styles.secondaryButton,
+                  ...((!isDirty || isSaving) ? styles.disabledButton : {})
                 }}
-                onClick={() => selectTenant(tenant)}
+                onClick={handleResetForm}
+                disabled={!isDirty || isSaving}
               >
-                <span style={styles.tenantName}>{tenant.name}</span>
-                <span style={styles.tenantMeta}>{tenant.location || 'No location'}</span>
-                <span style={styles.tenantMeta}>
-                  {tenant.organization_type || 'facility'} · {tenant.write_locked ? 'Write locked' : 'Open'}
-                </span>
+                Reset changes
               </button>
-            ))}
-          </div>
-        </section>
+              <button
+                type="submit"
+                style={{
+                  ...styles.primaryButton,
+                  ...((!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid) ? styles.disabledPrimaryButton : {})
+                }}
+                disabled={!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid}
+              >
+                {isSaving ? 'Saving…' : 'Save tenant settings'}
+              </button>
+            </div>
 
-        <form style={styles.panel} onSubmit={handleSubmit}>
-          <div style={styles.sectionHeader}>
-            <h3 style={styles.sectionTitle}>Edit Tenant Settings</h3>
-            {selectedTenant ? <span style={styles.badge}>{selectedTenant.id}</span> : null}
-          </div>
-
-          <div style={styles.grid}>
-            <label style={styles.field}>
-              <span style={styles.label}>Tenant ID</span>
-              <input style={styles.input} value={selectedTenant?.id ?? ''} disabled />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Name</span>
-              <input
-                style={styles.input}
-                value={formState.name}
-                onChange={(event) => updateField('name', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-                required
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Location</span>
-              <input
-                style={styles.input}
-                value={formState.location}
-                onChange={(event) => updateField('location', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Organization Type</span>
-              <input
-                style={styles.input}
-                value={formState.organization_type}
-                onChange={(event) => updateField('organization_type', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Inventory Currency</span>
-              <input
-                style={styles.input}
-                value={formState.inventory_currency}
-                onChange={(event) => updateField('inventory_currency', event.target.value.toUpperCase())}
-                disabled={!canUpdateTenants || isSaving}
-                maxLength={3}
-                pattern="[A-Za-z]{3}"
-                placeholder={DEFAULT_INVENTORY_CURRENCY}
-                required
-              />
-              <span style={styles.helperText}>
-                Base ISO currency for product standard costs, inventory valuation, and tenant-base cost analytics. Supplier prices, invoices, and purchase orders can preserve their own explicit currency. The app does not automatically convert foreign exchange.
-              </span>
-            </label>
-
-            {!selectedTenant?.inventory_currency_configured_at ? (
-              <label style={{ ...styles.field, ...styles.fullWidth }}>
-                <span style={styles.label}>Legacy currency confirmation</span>
-                <span style={styles.helperText}>
-                  This tenant existed before currency tracking. You may correct the displayed default before confirming it. Changing the code is treated as confirmation. If the code is already correct, check this box to confirm it explicitly. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists because the application never silently relabels or converts historical amounts.
-                </span>
-                <span>
-                  <input
-                    type="checkbox"
-                    checked={confirmInventoryCurrency}
-                    onChange={(event) => setConfirmInventoryCurrency(event.target.checked)}
-                    disabled={!canUpdateTenants || isSaving}
-                  />{' '}
-                  Confirm that this is the currency of existing inventory standard costs
-                </span>
-              </label>
-            ) : (
-              <div style={{ ...styles.field, ...styles.fullWidth }}>
-                <span style={styles.label}>Currency status</span>
-                <span style={styles.helperText}>Confirmed. Currency changes remain possible only while there is no currency-dependent financial evidence that would be relabelled.</span>
-              </div>
-            )}
-
-            <label style={styles.field}>
-              <span style={styles.label}>Season Start</span>
-              <input
-                style={styles.input}
-                type="date"
-                value={formState.season_start}
-                onChange={(event) => updateField('season_start', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Season End</span>
-              <input
-                style={styles.input}
-                type="date"
-                value={formState.season_end}
-                onChange={(event) => updateField('season_end', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-              />
-            </label>
-
-            <label style={{ ...styles.field, ...styles.fullWidth }}>
-              <span style={styles.label}>Metadata JSON</span>
-              <textarea
-                style={styles.textarea}
-                value={formState.metadata}
-                onChange={(event) => updateField('metadata', event.target.value)}
-                disabled={!canUpdateTenants || isSaving}
-                rows={8}
-              />
-              <span style={styles.helperText}>
-                {'Metadata must be a valid JSON object, for example {"region":"coastal"}. Arrays, null, and primitive values are rejected.'}
-              </span>
-            </label>
-          </div>
-
-          <div style={styles.actions}>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={handleResetForm}
-              disabled={!selectedTenant || isSaving}
-            >
-              Reset to latest values
-            </button>
-            <button
-              type="submit"
-              style={styles.primaryButton}
-              disabled={!canUpdateTenants || isSaving || !selectedTenant}
-            >
-              {isSaving ? 'Saving…' : 'Save tenant settings'}
-            </button>
-          </div>
-
-          {!canUpdateTenants ? (
-            <p style={styles.permissionHint}>Your role can read tenant settings but cannot update them.</p>
-          ) : null}
-        </form>
-      </div>
+            {!canUpdateTenants ? (
+              <p style={styles.permissionHint}>Your role can read tenant settings but cannot update them.</p>
+            ) : null}
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -555,12 +627,12 @@ const styles: Record<string, CSSProperties> = {
   subtitle: {
     margin: '8px 0 0',
     color: '#6b7280',
-    maxWidth: '860px',
+    maxWidth: '900px',
     lineHeight: 1.5
   },
   twoColumn: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(280px, 340px) minmax(0, 1fr)',
     gap: '20px',
     alignItems: 'start'
   },
@@ -574,7 +646,7 @@ const styles: Record<string, CSSProperties> = {
   sectionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: '12px',
     marginBottom: '16px'
   },
@@ -582,33 +654,19 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: '18px'
   },
-  badge: {
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    borderRadius: '999px',
-    padding: '4px 10px',
-    fontSize: '12px',
-    fontWeight: 800,
-    maxWidth: '100%',
-    overflowWrap: 'anywhere'
+  sectionSubtitle: {
+    margin: '5px 0 0',
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.4
   },
-  tenantList: {
-    display: 'grid',
-    gap: '10px'
-  },
-  tenantCard: {
+  currentTenantCard: {
     display: 'grid',
     gap: '4px',
-    textAlign: 'left',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #bfdbfe',
     borderRadius: '14px',
-    background: '#ffffff',
-    padding: '12px',
-    cursor: 'pointer'
-  },
-  tenantCardActive: {
-    borderColor: '#2563eb',
-    background: '#eff6ff'
+    background: '#eff6ff',
+    padding: '14px'
   },
   tenantName: {
     fontWeight: 900,
@@ -618,35 +676,150 @@ const styles: Record<string, CSSProperties> = {
     color: '#64748b',
     fontSize: '13px'
   },
+  summaryList: {
+    display: 'grid',
+    gap: '0',
+    margin: '16px 0 0'
+  },
+  summaryRow: {
+    display: 'grid',
+    gap: '4px',
+    padding: '10px 0',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  summaryLabel: {
+    color: '#64748b',
+    fontSize: '12px',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
+  },
+  summaryValue: {
+    margin: 0,
+    color: '#0f172a',
+    fontWeight: 700,
+    overflowWrap: 'anywhere'
+  },
+  summaryValueCode: {
+    margin: 0,
+    color: '#334155',
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    fontSize: '12px',
+    overflowWrap: 'anywhere'
+  },
+  openBadge: {
+    background: '#dcfce7',
+    color: '#166534',
+    borderRadius: '999px',
+    padding: '5px 9px',
+    fontSize: '11px',
+    fontWeight: 900
+  },
+  lockedBadge: {
+    background: '#fee2e2',
+    color: '#991b1b',
+    borderRadius: '999px',
+    padding: '5px 9px',
+    fontSize: '11px',
+    fontWeight: 900
+  },
+  unsavedBadge: {
+    background: '#fef3c7',
+    color: '#92400e',
+    borderRadius: '999px',
+    padding: '5px 9px',
+    fontSize: '11px',
+    fontWeight: 900,
+    whiteSpace: 'nowrap'
+  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '16px'
+    gap: '16px',
+    alignItems: 'start'
   },
   field: {
     display: 'grid',
-    gap: '8px'
+    gap: '8px',
+    alignContent: 'start',
+    minWidth: 0
   },
   fullWidth: {
     gridColumn: '1 / -1'
+  },
+  labelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '7px'
   },
   label: {
     fontWeight: 800,
     color: '#334155'
   },
+  infoIcon: {
+    display: 'inline-flex',
+    width: '18px',
+    height: '18px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '999px',
+    border: '1px solid #93c5fd',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    fontSize: '12px',
+    fontWeight: 900,
+    cursor: 'help',
+    userSelect: 'none'
+  },
   input: {
+    boxSizing: 'border-box',
+    width: '100%',
+    minHeight: '46px',
     padding: '0.85rem 0.95rem',
     borderRadius: '12px',
     border: '1px solid #cbd5e1',
+    background: '#fff',
     font: 'inherit'
   },
-  textarea: {
-    padding: '0.85rem 0.95rem',
-    borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    font: 'inherit',
-    minHeight: '180px',
-    resize: 'vertical'
+  invalidInput: {
+    borderColor: '#ef4444'
+  },
+  fieldError: {
+    color: '#b91c1c',
+    fontSize: '12px',
+    fontWeight: 700
+  },
+  helperText: {
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.45
+  },
+  currencyNotice: {
+    border: '1px solid #fde68a',
+    borderRadius: '14px',
+    background: '#fffbeb',
+    padding: '14px',
+    display: 'grid',
+    gap: '12px'
+  },
+  currencyStatus: {
+    border: '1px solid #bbf7d0',
+    borderRadius: '14px',
+    background: '#f0fdf4',
+    padding: '14px'
+  },
+  noticeHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    alignItems: 'flex-start'
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '9px',
+    color: '#334155',
+    lineHeight: 1.4
   },
   actions: {
     display: 'flex',
@@ -673,14 +846,14 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 900,
     cursor: 'pointer'
   },
-  dangerButton: {
-    border: '1px solid #fecaca',
-    borderRadius: '12px',
-    padding: '0.9rem 1.1rem',
-    background: '#fee2e2',
-    color: '#991b1b',
-    fontWeight: 900,
-    cursor: 'pointer'
+  disabledButton: {
+    opacity: 0.55,
+    cursor: 'not-allowed'
+  },
+  disabledPrimaryButton: {
+    background: '#93b4f4',
+    opacity: 0.75,
+    cursor: 'not-allowed'
   },
   error: {
     background: '#fee2e2',
@@ -695,15 +868,12 @@ const styles: Record<string, CSSProperties> = {
     padding: '12px',
     fontWeight: 800
   },
-  emptyState: {
-    border: '1px dashed #cbd5e1',
-    borderRadius: '14px',
-    padding: '16px',
-    color: '#64748b'
-  },
-  helperText: {
-    color: '#64748b',
-    fontSize: '13px',
+  warning: {
+    background: '#fff7ed',
+    color: '#9a3412',
+    border: '1px solid #fed7aa',
+    borderRadius: '12px',
+    padding: '12px',
     lineHeight: 1.45
   },
   permissionHint: {

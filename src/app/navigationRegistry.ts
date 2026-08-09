@@ -371,7 +371,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/admin-system',
         label: 'Admin System',
-        description: 'Review system status, diagnostics, tenant control-plane data, and admin health signals.',
+        description: 'Review tenant operational status, integrity diagnostics, and administrative health signals.',
         section: 'Administration',
         permission: TENANT_PERMISSIONS.SYSTEM_STATUS_READ
       },
