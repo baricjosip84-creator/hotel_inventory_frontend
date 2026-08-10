@@ -172,7 +172,9 @@ export function buildProductActionHandlers({
           ? ''
           : String(product.standard_unit_cost),
       supplier_id: product.supplier_id || '',
-      barcode: product.barcode || ''
+      barcode: product.barcode || '',
+      requires_lot_tracking: Boolean(product.requires_lot_tracking),
+      requires_expiry_date: Boolean(product.requires_expiry_date)
     });
     scrollToFormSection('product-form-panel');
   };

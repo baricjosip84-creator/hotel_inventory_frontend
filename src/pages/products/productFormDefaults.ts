@@ -18,7 +18,9 @@ export function emptyProductForm(): ProductFormState {
     min_stock: '0',
     standard_unit_cost: '',
     supplier_id: '',
-    barcode: ''
+    barcode: '',
+    requires_lot_tracking: false,
+    requires_expiry_date: false
   };
 }
 

@@ -239,6 +239,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
     label: 'Execution workflow',
     items: [
       {
+        to: '/outbound',
+        label: 'Outbound',
+        description: 'Manage customers and move customer orders through picking, packing, and stock dispatch.',
+        section: 'Execution workflow',
+        permission: TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ
+      },
+      {
         to: '/inventory-usage',
         label: 'Usage Ledger',
         description: 'Track why stock leaves the business across departments, reasons, events, and locations.',

@@ -88,8 +88,8 @@ export function ProductManagementSectionsPanel({
         importType="products"
         title="Bulk Product Import"
         description="Validate a CSV first, then commit all rows atomically. Existing records are never silently overwritten."
-        templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode']}
-        templateExample={{ sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '' }}
+        templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']}
+        templateExample={{ sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '', requires_lot_tracking: 'false', requires_expiry_date: 'false' }}
         canImport={canManageProducts}
         disabledReason="Products write permission is required for bulk product import."
         onCommitted={async () => {

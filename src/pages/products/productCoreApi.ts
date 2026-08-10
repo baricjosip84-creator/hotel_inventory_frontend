@@ -13,6 +13,8 @@ export type ProductFormState = {
   standard_unit_cost: string;
   supplier_id: string;
   barcode: string;
+  requires_lot_tracking: boolean;
+  requires_expiry_date: boolean;
 };
 
 export type CostActionDetailFilterState = {
@@ -76,7 +78,9 @@ export async function createProduct(input: ProductFormState): Promise<ProductIte
       min_stock: Number(input.min_stock),
       standard_unit_cost: input.standard_unit_cost.trim() === '' ? null : Number(input.standard_unit_cost),
       supplier_id: input.supplier_id || null,
-      barcode: input.barcode.trim() || null
+      barcode: input.barcode.trim() || null,
+      requires_lot_tracking: input.requires_lot_tracking,
+      requires_expiry_date: input.requires_expiry_date
     })
   });
 }
@@ -98,7 +102,9 @@ export async function updateProduct(input: {
       min_stock: Number(input.values.min_stock),
       standard_unit_cost: input.values.standard_unit_cost.trim() === '' ? null : Number(input.values.standard_unit_cost),
       supplier_id: input.values.supplier_id || null,
-      barcode: input.values.barcode.trim() || null
+      barcode: input.values.barcode.trim() || null,
+      requires_lot_tracking: input.values.requires_lot_tracking,
+      requires_expiry_date: input.values.requires_expiry_date
     })
   });
 }

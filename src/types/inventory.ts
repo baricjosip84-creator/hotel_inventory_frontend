@@ -57,6 +57,8 @@ export interface ProductItem {
   standard_cost_updated_at?: string | null;
   standard_cost_updated_by_user_id?: string | null;
   standard_cost_updated_by_user_name?: string | null;
+  requires_lot_tracking?: boolean;
+  requires_expiry_date?: boolean;
   effective_unit_cost?: number | string | null;
   effective_cost_source?: string | null;
   effective_cost_at?: string | null;

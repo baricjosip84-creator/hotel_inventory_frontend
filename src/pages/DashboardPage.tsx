@@ -50,6 +50,13 @@ type DashboardSummaryResponse = {
   };
 };
 
+type SetupChecklistResponse = {
+  complete: boolean;
+  completed_steps: number;
+  total_steps: number;
+  steps: Array<{ key: string; label: string; done: boolean; path: string }>;
+};
+
 type LowStockRow = {
   id: string;
   product_id: string;
@@ -214,6 +221,10 @@ type AnomaliesResponse = {
 
 async function fetchDashboardSummary(): Promise<DashboardSummaryResponse> {
   return apiRequest<DashboardSummaryResponse>('/dashboard/summary');
+}
+
+async function fetchSetupChecklist(): Promise<SetupChecklistResponse> {
+  return apiRequest<SetupChecklistResponse>('/dashboard/setup-checklist');
 }
 
 async function fetchLowStock(): Promise<LowStockRow[]> {
@@ -478,6 +489,8 @@ export default function DashboardPage() {
     queryFn: fetchDashboardSummary
   });
 
+  const setupChecklistQuery = useQuery({ queryKey: ['dashboard-setup-checklist'], queryFn: fetchSetupChecklist });
+
   const lowStockQuery = useQuery({
     queryKey: ['dashboard-low-stock'],
     queryFn: fetchLowStock
@@ -574,6 +587,17 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.page}>
+      {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
+        <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div><strong>Getting started</strong><div style={{ marginTop: 4, opacity: 0.75 }}>Complete these basics first. {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} done.</div></div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #d1d5db', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
+          </div>
+        </section>
+      ) : null}
+
       <div style={styles.quickActionRow}>
         {canViewStock ? <ActionLink to="/stock" label="Open Stock" /> : null}
         {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" /> : null}

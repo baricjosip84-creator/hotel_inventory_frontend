@@ -158,6 +158,18 @@ export function ProductFormPanel({
           />
         </div>
 
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={form.requires_lot_tracking} onChange={(event) => setForm((current) => ({ ...current, requires_lot_tracking: event.target.checked }))} disabled={fieldsDisabled} />
+            Require lot / batch when stock is added
+          </label>
+          <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={form.requires_expiry_date} onChange={(event) => setForm((current) => ({ ...current, requires_expiry_date: event.target.checked }))} disabled={fieldsDisabled} />
+            Require expiry date when stock is added
+          </label>
+          <div style={styles.fieldHint}>Leave these off for products that do not need this tracking.</div>
+        </div>
+
         <div style={styles.formActions}>
           <button
             type="submit"

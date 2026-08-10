@@ -22,7 +22,7 @@ type EligibleReturnLot = {
   lot_number?: string | null;
   batch_number?: string | null;
   expiry_date?: string | null;
-  condition: 'available' | 'quarantine' | 'damaged' | 'rejected';
+  condition: 'available' | 'hold' | 'quarantine' | 'damaged' | 'rejected';
   physical_quantity: number | string;
   reserved_return_quantity: number | string;
   returnable_quantity: number | string;

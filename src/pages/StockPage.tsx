@@ -30,12 +30,15 @@ type StockItem = {
   usable_free_quantity?: number | string | null;
   expiring_soon_quantity?: number | string | null;
   expired_quantity?: number | string | null;
+  hold_quantity?: number | string | null;
   quarantine_quantity?: number | string | null;
   damaged_quantity?: number | string | null;
   rejected_quantity?: number | string | null;
   earliest_expiry_date?: string | null;
   min_quantity?: number | string | null;
   product_min_stock?: number | string | null;
+  requires_lot_tracking?: boolean;
+  requires_expiry_date?: boolean;
   updated_at?: string;
   version?: number | string;
 };
@@ -52,10 +55,11 @@ type InventoryLot = {
   batch_number?: string | null;
   expiry_date?: string | null;
   manufactured_at?: string | null;
-  condition: 'available' | 'quarantine' | 'damaged' | 'rejected' | 'expired' | string;
+  condition: 'available' | 'hold' | 'quarantine' | 'damaged' | 'rejected' | 'expired' | string;
   operational_status?: string | null;
   quantity: number | string;
   days_to_expiry?: number | string | null;
+  unit_cost?: number | string | null;
 };
 
 type StockReconciliation = {
@@ -162,6 +166,10 @@ type StockActionDraft = {
   notes: string;
   consumed_at: string;
   reservation_shortfall_acknowledged: boolean;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
+  manufactured_at: string;
 };
 
 type UsageReason =
@@ -319,7 +327,11 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       event_name: '',
       notes: '',
       consumed_at: '',
-      reservation_shortfall_acknowledged: false
+      reservation_shortfall_acknowledged: false,
+      lot_number: '',
+      batch_number: '',
+      expiry_date: '',
+      manufactured_at: ''
     };
   }
 
@@ -334,7 +346,11 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       event_name: '',
       notes: '',
       consumed_at: '',
-      reservation_shortfall_acknowledged: false
+      reservation_shortfall_acknowledged: false,
+      lot_number: '',
+      batch_number: '',
+      expiry_date: '',
+      manufactured_at: ''
     };
   }
 
@@ -348,7 +364,11 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
     event_name: '',
     notes: '',
     consumed_at: '',
-    reservation_shortfall_acknowledged: false
+    reservation_shortfall_acknowledged: false,
+    lot_number: '',
+    batch_number: '',
+    expiry_date: '',
+    manufactured_at: ''
   };
 }
 
@@ -493,11 +513,15 @@ export default function StockPage() {
 
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const inventoryLots = useMemo(() => lotsQuery.data ?? [], [lotsQuery.data]);
+  const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
+  const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
+  const expiryWindowValue = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.unit_cost || 0), 0), [expiryWindowLots]);
 
   const [searchText, setSearchText] = useState(() => requestedProductId);
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
+  const [expiryWindowDays, setExpiryWindowDays] = useState(30);
 
   useEffect(() => {
     setSearchText(requestedProductId);
@@ -695,7 +719,9 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] })
       ]);
     },
     onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to process expired stock')
@@ -710,10 +736,24 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] })
       ]);
     },
     onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release quarantined stock')
+  });
+
+  const holdLotMutation = useMutation({
+    mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    onSuccess: async () => { setOperationError(''); setOperationFeedback('Stock placed on hold and removed from usable quantity.'); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to place stock on hold')
+  });
+
+  const releaseHoldMutation = useMutation({
+    mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/release-hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    onSuccess: async () => { setOperationError(''); setOperationFeedback('Held stock released back to available stock.'); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release held stock')
   });
 
   const consumeMutation = useMutation({
@@ -770,6 +810,10 @@ export default function StockPage() {
           storage_location_id: selectedRow.storage_location_id,
           quantity: Number(draft.quantity),
           reason: draft.reason.trim() || 'inventory_count',
+          lot_number: Number(draft.quantity) > currentQuantity ? (draft.lot_number.trim() || null) : null,
+          batch_number: Number(draft.quantity) > currentQuantity ? (draft.batch_number.trim() || null) : null,
+          expiry_date: Number(draft.quantity) > currentQuantity ? (draft.expiry_date || null) : null,
+          manufactured_at: Number(draft.quantity) > currentQuantity ? (draft.manufactured_at || null) : null,
           reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
@@ -805,6 +849,10 @@ export default function StockPage() {
           storage_location_id: selectedRow.storage_location_id,
           change: Number(draft.change),
           reason: draft.reason.trim() || 'manual_adjustment',
+          lot_number: Number(draft.change) > 0 ? (draft.lot_number.trim() || null) : null,
+          batch_number: Number(draft.change) > 0 ? (draft.batch_number.trim() || null) : null,
+          expiry_date: Number(draft.change) > 0 ? (draft.expiry_date || null) : null,
+          manufactured_at: Number(draft.change) > 0 ? (draft.manufactured_at || null) : null,
           reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
@@ -872,6 +920,15 @@ export default function StockPage() {
   const createsReservationShortfall = projectedFreeAfterAction !== null
     && projectedFreeAfterAction < 0;
 
+  const actionAddsStock = Boolean(selectedRow) && (
+    (draft.action === 'count' && draft.quantity.trim() !== '' && Number(draft.quantity) > currentQuantity) ||
+    (draft.action === 'adjust' && draft.change.trim() !== '' && Number(draft.change) > 0)
+  );
+
+  const trackingDetailsNeeded = Boolean(selectedRow) && actionAddsStock && (
+    Boolean(selectedRow?.requires_lot_tracking) || Boolean(selectedRow?.requires_expiry_date)
+  );
+
   const actionInputValidation = useMemo(() => {
     if (!selectedRow) {
       return { valid: false, message: 'Select a stock position first.' };
@@ -914,6 +971,15 @@ export default function StockPage() {
         return { valid: false, message: 'Counted quantity must be zero or greater.' };
       }
 
+      if (quantity > currentQuantity) {
+        if (selectedRow.requires_lot_tracking && !draft.lot_number.trim() && !draft.batch_number.trim()) {
+          return { valid: false, message: 'This product requires a lot or batch number for added stock.' };
+        }
+        if (selectedRow.requires_expiry_date && !draft.expiry_date) {
+          return { valid: false, message: 'This product requires an expiry date for added stock.' };
+        }
+      }
+
       if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
         return {
           valid: false,
@@ -938,6 +1004,15 @@ export default function StockPage() {
       return { valid: false, message: 'Adjustment cannot result in negative stock.' };
     }
 
+    if (change > 0) {
+      if (selectedRow.requires_lot_tracking && !draft.lot_number.trim() && !draft.batch_number.trim()) {
+        return { valid: false, message: 'This product requires a lot or batch number for added stock.' };
+      }
+      if (selectedRow.requires_expiry_date && !draft.expiry_date) {
+        return { valid: false, message: 'This product requires an expiry date for added stock.' };
+      }
+    }
+
     if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
       return {
         valid: false,
@@ -954,6 +1029,9 @@ export default function StockPage() {
     draft.change,
     draft.quantity,
     draft.reservation_shortfall_acknowledged,
+    draft.lot_number,
+    draft.batch_number,
+    draft.expiry_date,
     selectedRow
   ]);
 
@@ -1212,7 +1290,7 @@ export default function StockPage() {
         <div style={styles.panelHeaderWithActions}>
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
-            <p style={styles.panelSubtitle}>Physical lot balances are now separated by lot/batch, expiry and stock condition. Expired stock is not eligible for FEFO consumption.</p>
+            <p style={styles.panelSubtitle}>See tracked stock, expiry risk, and stock that has been blocked from use. Held, quarantined, damaged, rejected, and expired stock is excluded from normal FEFO use.</p>
           </div>
           {canAdjust ? (
             <button
@@ -1228,11 +1306,19 @@ export default function StockPage() {
             </button>
           ) : null}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>Expiry overview:</label>
+          <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db' }}>
+            <option value={30}>Next 30 days</option><option value={60}>Next 60 days</option><option value={90}>Next 90 days</option><option value={180}>Next 180 days</option>
+          </select>
+        </div>
         <div className="app-grid-stats" style={styles.statsGrid}>
           <StatCard title="Tracked Lots" value={inventoryLots.length} subtitle="Lot/batch balances with remaining physical quantity" />
-          <StatCard title="Expiring Soon" value={inventoryLots.filter((lot) => lot.operational_status === 'expiring_soon').length} subtitle="Lots within the 7-day expiry window" tone={inventoryLots.some((lot) => lot.operational_status === 'expiring_soon') ? 'warn' : 'good'} />
+          <StatCard title={`Expiring ≤ ${expiryWindowDays} days`} value={expiryWindowLots.length} subtitle={`${expiryWindowQuantity} unit(s) in the selected window`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
+          <StatCard title="Expiry Value at Risk" value={expiryWindowValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} subtitle="Estimated from lot unit cost where available" tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
           <StatCard title="Expired" value={inventoryLots.filter((lot) => lot.operational_status === 'expired').length} subtitle="Expired lots requiring or already reflecting write-off status" tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
-          <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Lots held outside usable stock" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
+          <StatCard title="Blocked / Held" value={inventoryLots.filter((lot) => lot.condition === 'hold').length} subtitle="Stock manually blocked from use" tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
+          <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Stock received into quarantine" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
           <StatCard title="Ledger Mismatches" value={reconciliationQuery.data?.summary.ledger_mismatch_count ?? '-'} subtitle="Aggregate stock vs canonical movement ledger" tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
           <StatCard title="Lot Mismatches" value={reconciliationQuery.data?.summary.lot_mismatch_count ?? '-'} subtitle="Aggregate stock vs available lot balances" tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
         </div>
@@ -1252,7 +1338,7 @@ export default function StockPage() {
                     <td style={styles.td}>{lot.expiry_date ? formatDateTime(lot.expiry_date).split(',')[0] : '-'}</td>
                     <td style={styles.td}>{formatUsageReason(lot.operational_status || lot.condition)}</td>
                     <td style={styles.td}>{toNumber(lot.quantity)} {lot.product_unit || ''}</td>
-                    <td style={styles.td}>{lot.condition === 'quarantine' && canAdjust ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-'}</td>
+                    <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt('Why should this stock be blocked from use?'); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Block</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt('Why is this stock safe to use again?'); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Unblock</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-') : '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1828,6 +1914,35 @@ export default function StockPage() {
                         />
                       </div>
                     )}
+
+                    {actionAddsStock ? (
+                      <>
+                        <div style={{ gridColumn: '1 / -1', ...styles.actionInfoBox }}>
+                          <div style={styles.actionInfoTitle}>Tracking details for added stock</div>
+                          <div style={styles.actionInfoText}>
+                            {trackingDetailsNeeded
+                              ? 'This product requires the tracking details shown below before stock can be added.'
+                              : 'Optional. Use these fields when you want the added stock tied to a specific lot/batch or expiry date.'}
+                          </div>
+                        </div>
+                        <div>
+                          <label style={styles.label} htmlFor="stock-action-lot">Lot Number{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
+                          <input id="stock-action-lot" style={styles.input} type="text" maxLength={255} value={draft.lot_number} onChange={(event) => setDraft((current) => ({ ...current, lot_number: event.target.value }))} placeholder="Optional unless required" />
+                        </div>
+                        <div>
+                          <label style={styles.label} htmlFor="stock-action-batch">Batch Number{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
+                          <input id="stock-action-batch" style={styles.input} type="text" maxLength={255} value={draft.batch_number} onChange={(event) => setDraft((current) => ({ ...current, batch_number: event.target.value }))} placeholder="Lot or batch satisfies tracking" />
+                        </div>
+                        <div>
+                          <label style={styles.label} htmlFor="stock-action-expiry">Expiry Date{selectedRow?.requires_expiry_date ? ' *' : ''}</label>
+                          <input id="stock-action-expiry" style={styles.input} type="date" value={draft.expiry_date} onChange={(event) => setDraft((current) => ({ ...current, expiry_date: event.target.value }))} />
+                        </div>
+                        <div>
+                          <label style={styles.label} htmlFor="stock-action-manufactured">Manufactured Date</label>
+                          <input id="stock-action-manufactured" style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => setDraft((current) => ({ ...current, manufactured_at: event.target.value }))} />
+                        </div>
+                      </>
+                    ) : null}
 
                     {draft.action !== 'consume' ? (
                       <div>
