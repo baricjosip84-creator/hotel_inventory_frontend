@@ -266,6 +266,7 @@ function getReservationSourceIdForPayload(draft: ReservationDraft): string | und
 
 function getReservationActionState(reservation: InventoryReservation) {
   const status = String(reservation.status || '').toLowerCase();
+  const managedFromOutbound = String(reservation.source_type || '').toLowerCase() === 'outbound';
   const requestedQuantity = toNumber(reservation.requested_quantity_total);
   const reservedQuantity = toNumber(reservation.reserved_quantity_total);
   const openReservedQuantity = toNumber(reservation.open_reserved_quantity_total);
@@ -279,12 +280,13 @@ function getReservationActionState(reservation: InventoryReservation) {
   const isClosed = ['fulfilled', 'released', 'expired', 'cancelled'].includes(status);
 
   return {
-    canActivate: isDraft,
-    canAllocate: !isClosed && (isActive || isPartiallyAllocated) && remainingRequestedQuantity > 0,
-    canFulfill: (isAllocated || isPartiallyFulfilled) && openReservedQuantity > 0,
-    canRelease: !isClosed && !isDraft && (openReservedQuantity > 0 || remainingRequestedQuantity > 0),
-    canExpire: !isClosed && !isDraft && (!reservation.expires_at || new Date(String(reservation.expires_at)).getTime() <= Date.now()),
-    canCancel: isDraft || isActive || isPartiallyAllocated || isAllocated || isPartiallyFulfilled
+    managedFromOutbound,
+    canActivate: !managedFromOutbound && isDraft,
+    canAllocate: !managedFromOutbound && !isClosed && (isActive || isPartiallyAllocated) && remainingRequestedQuantity > 0,
+    canFulfill: !managedFromOutbound && (isAllocated || isPartiallyFulfilled) && openReservedQuantity > 0,
+    canRelease: !managedFromOutbound && !isClosed && !isDraft && (openReservedQuantity > 0 || remainingRequestedQuantity > 0),
+    canExpire: !managedFromOutbound && !isClosed && !isDraft && (!reservation.expires_at || new Date(String(reservation.expires_at)).getTime() <= Date.now()),
+    canCancel: !managedFromOutbound && (isDraft || isActive || isPartiallyAllocated || isAllocated || isPartiallyFulfilled)
   };
 }
 
@@ -957,6 +959,7 @@ export default function InventoryReservationsPage() {
               <option value="procurement_inbound">Procurement inbound</option>
               <option value="forecast">Forecast</option>
               <option value="system">System</option>
+              <option value="outbound">Outbound customer order</option>
             </select>
           </label>
           <label style={pageStyles.label}>Source ID (full or partial)
@@ -1061,9 +1064,9 @@ export default function InventoryReservationsPage() {
               <div><span style={pageStyles.muted}>Expires at</span><br /><strong>{formatDate(selectedReservation.expires_at)}</strong></div>
               <div style={{ gridColumn: '1 / -1' }}><span style={pageStyles.muted}>Notes</span><br /><span>{selectedReservation.notes || 'No notes recorded.'}</span></div>
             </div>
-            <label style={pageStyles.label}>Lifecycle note
+            {selectedReservation.source_type !== 'outbound' ? <label style={pageStyles.label}>Lifecycle note
               <input style={pageStyles.input} value={actionNote} onChange={(event) => setActionNote(event.target.value)} placeholder="Required for cancellation; optional context for release, expiration, or fulfillment" />
-            </label>
+            </label> : null}
             {(() => {
               const actionState = selectedActionState;
               if (!actionState) return null;
@@ -1076,7 +1079,7 @@ export default function InventoryReservationsPage() {
                 (permissions.canCancelInventoryReservations && actionState.canCancel);
 
               if (!hasVisibleAction) {
-                return <p style={pageStyles.muted}>No lifecycle actions are currently available for this reservation.</p>;
+                return <p style={pageStyles.muted}>{actionState.managedFromOutbound ? 'This stock reservation belongs to a customer order. Manage it from Outbound.' : 'No lifecycle actions are currently available for this reservation.'}</p>;
               }
 
               return (
@@ -1304,9 +1307,9 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>
                     <div style={pageStyles.buttonRow}>
                       <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>Open</button>
-                      {permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
-                      {permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Release the open protected quantity for ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>Release</button> : null}
-                      {permissions.canCancelInventoryReservations ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
+                      {row.source_type !== 'outbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
+                      {row.source_type !== 'outbound' && permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Release the open protected quantity for ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>Release</button> : null}
+                      {row.source_type !== 'outbound' && permissions.canCancelInventoryReservations ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
                     </div>
                   </td>
                 </tr>

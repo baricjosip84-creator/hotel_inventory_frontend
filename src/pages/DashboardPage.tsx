@@ -57,6 +57,14 @@ type SetupChecklistResponse = {
   steps: Array<{ key: string; label: string; done: boolean; path: string }>;
 };
 
+type OutboundSummaryResponse = {
+  open_orders: number;
+  packed_orders: number;
+  partially_dispatched_orders: number;
+  units_waiting: number;
+  pending_customer_returns: number;
+};
+
 type LowStockRow = {
   id: string;
   product_id: string;
@@ -225,6 +233,10 @@ async function fetchDashboardSummary(): Promise<DashboardSummaryResponse> {
 
 async function fetchSetupChecklist(): Promise<SetupChecklistResponse> {
   return apiRequest<SetupChecklistResponse>('/dashboard/setup-checklist');
+}
+
+async function fetchOutboundSummary(): Promise<OutboundSummaryResponse> {
+  return apiRequest<OutboundSummaryResponse>('/outbound/summary');
 }
 
 async function fetchLowStock(): Promise<LowStockRow[]> {
@@ -466,6 +478,7 @@ export default function DashboardPage() {
   const canViewProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
   const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
   const canViewLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ);
+  const canViewOutbound = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ);
 
   /*
     WHAT CHANGED
@@ -490,6 +503,7 @@ export default function DashboardPage() {
   });
 
   const setupChecklistQuery = useQuery({ queryKey: ['dashboard-setup-checklist'], queryFn: fetchSetupChecklist });
+  const outboundSummaryQuery = useQuery({ queryKey: ['dashboard-outbound-summary'], queryFn: fetchOutboundSummary, enabled: canViewOutbound });
 
   const lowStockQuery = useQuery({
     queryKey: ['dashboard-low-stock'],
@@ -607,6 +621,7 @@ export default function DashboardPage() {
         ) : null}
         {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" /> : null}
         {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" /> : null}
+        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" /> : null}
         {canOpenReports ? <ActionLink to="/reports" label="Open Reports" /> : null}
         {canViewInsights ? <ActionLink to="/insights" label="Open Insights" /> : null}
       </div>
@@ -639,6 +654,22 @@ export default function DashboardPage() {
           subtitle="Partially received"
           tone={summary.shipments.partial_shipments > 0 ? 'warn' : 'default'}
         />
+        {canViewOutbound ? (
+          <StatCard
+            title="Open Outbound Orders"
+            value={outboundSummaryQuery.data?.open_orders ?? 0}
+            subtitle={`${outboundSummaryQuery.data?.units_waiting ?? 0} unit(s) still waiting`}
+            tone={(outboundSummaryQuery.data?.packed_orders ?? 0) > 0 ? 'warn' : 'default'}
+          />
+        ) : null}
+        {canViewOutbound && (outboundSummaryQuery.data?.partially_dispatched_orders ?? 0) > 0 ? (
+          <StatCard
+            title="Partial Customer Shipments"
+            value={outboundSummaryQuery.data?.partially_dispatched_orders ?? 0}
+            subtitle="Orders with a remainder still reserved"
+            tone="warn"
+          />
+        ) : null}
         <StatCard
           title="Low Stock Rows"
           value={summary.stock.low_stock_rows}

@@ -142,6 +142,10 @@ export const TENANT_PERMISSIONS = Object.freeze({
   OUTBOUND_ORDERS_UPDATE: 'outbound_orders.update',
   OUTBOUND_ORDERS_DISPATCH: 'outbound_orders.dispatch',
   OUTBOUND_ORDERS_CANCEL: 'outbound_orders.cancel',
+  CUSTOMER_RETURNS_READ: 'customer_returns.read',
+  CUSTOMER_RETURNS_CREATE: 'customer_returns.create',
+  CUSTOMER_RETURNS_RECEIVE: 'customer_returns.receive',
+  CUSTOMER_RETURNS_CANCEL: 'customer_returns.cancel',
 } as const);
 
 export type TenantPermission = (typeof TENANT_PERMISSIONS)[keyof typeof TENANT_PERMISSIONS];

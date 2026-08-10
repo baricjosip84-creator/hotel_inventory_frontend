@@ -513,15 +513,16 @@ export default function StockPage() {
 
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const inventoryLots = useMemo(() => lotsQuery.data ?? [], [lotsQuery.data]);
-  const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
-  const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
-  const expiryWindowValue = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.unit_cost || 0), 0), [expiryWindowLots]);
 
   const [searchText, setSearchText] = useState(() => requestedProductId);
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
   const [expiryWindowDays, setExpiryWindowDays] = useState(30);
+
+  const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
+  const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
+  const expiryWindowValue = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.unit_cost || 0), 0), [expiryWindowLots]);
 
   useEffect(() => {
     setSearchText(requestedProductId);
