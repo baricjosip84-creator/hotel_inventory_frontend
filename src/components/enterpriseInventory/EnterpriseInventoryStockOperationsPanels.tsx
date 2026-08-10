@@ -45,6 +45,7 @@ export function EnterpriseInventoryStockOperationsPanels({
     handleParLevelSubmit,
     handleStockAdjustmentSubmit,
     reconcileCycleCountMutation,
+    submitCycleCountMutation,
   } = actions;
 
   return (
@@ -76,6 +77,8 @@ export function EnterpriseInventoryStockOperationsPanels({
           storageLocations={storageLocations}
           cycleCounts={cycleCountsQuery.data ?? []}
           loading={cycleCountsQuery.isLoading}
+          isSubmitting={submitCycleCountMutation.isPending}
+          onSubmit={(id) => submitCycleCountMutation.mutate(id)}
           isReconciling={reconcileCycleCountMutation.isPending}
           onReconcile={(id) => reconcileCycleCountMutation.mutate(id)}
         />

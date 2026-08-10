@@ -30,6 +30,7 @@ export function ProductFormPanel({
   setForm
 }: ProductFormPanelProps) {
   const fieldsDisabled = isSubmitting || !canManageProducts;
+  const submitDisabled = fieldsDisabled || !form.sku.trim() || !form.name.trim() || !form.unit.trim();
 
   return (
     <section id="product-form-panel" style={styles.panel}>
@@ -160,8 +161,8 @@ export function ProductFormPanel({
         <div style={styles.formActions}>
           <button
             type="submit"
-            style={fieldsDisabled ? styles.disabledButton : styles.primaryButton}
-            disabled={fieldsDisabled}
+            style={submitDisabled ? styles.disabledButton : styles.primaryButton}
+            disabled={submitDisabled}
           >
             {isSubmitting
               ? editingProduct

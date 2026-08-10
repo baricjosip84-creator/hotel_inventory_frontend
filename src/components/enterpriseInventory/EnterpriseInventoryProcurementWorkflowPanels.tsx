@@ -1,6 +1,8 @@
 import { ApprovalsTab } from "./tabs/ApprovalsTab";
 import { InvoicesTab } from "./tabs/InvoicesTab";
+import { SupplierCatalogsTab } from "./tabs/SupplierCatalogsTab";
 import { RequisitionsTab } from "./tabs/RequisitionsTab";
+import { SupplierReturnsTab } from "./tabs/SupplierReturnsTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
 
@@ -38,16 +40,26 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
   const {
     createApprovalRuleMutation,
     createRequisitionMutation,
+    submitRequisitionMutation,
     createSupplierCatalogMutation,
+    deactivateSupplierCatalogMutation,
     createSupplierInvoiceMutation,
+    updateSupplierInvoiceMutation,
+    supplierInvoiceLifecycleMutation,
     executeApprovalMutation,
   } = actions;
 
   return (
     <>
+
+      <EnterpriseInventoryTabPanel activeTab={activeTab} tab="supplier-returns">
+        <SupplierReturnsTab />
+      </EnterpriseInventoryTabPanel>
+
       <EnterpriseInventoryTabPanel activeTab={activeTab} tab="requisitions">
         <RequisitionsTab
           createRequisitionMutation={createRequisitionMutation}
+          submitRequisitionMutation={submitRequisitionMutation}
           products={products}
           requisitionForm={requisitionForm}
           requisitionsQuery={requisitionsQuery}
@@ -68,18 +80,28 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
         />
       </EnterpriseInventoryTabPanel>
 
+      <EnterpriseInventoryTabPanel activeTab={activeTab} tab="supplier-catalog">
+        <SupplierCatalogsTab
+          createSupplierCatalogMutation={createSupplierCatalogMutation}
+          deactivateSupplierCatalogMutation={deactivateSupplierCatalogMutation}
+          products={products}
+          setSupplierCatalogForm={setSupplierCatalogForm}
+          supplierCatalogForm={supplierCatalogForm}
+          supplierCatalogQuery={supplierCatalogQuery}
+          suppliers={suppliers}
+        />
+      </EnterpriseInventoryTabPanel>
+
       <EnterpriseInventoryTabPanel activeTab={activeTab} tab="invoices">
         <InvoicesTab
-          createSupplierCatalogMutation={createSupplierCatalogMutation}
           createSupplierInvoiceMutation={createSupplierInvoiceMutation}
+          updateSupplierInvoiceMutation={updateSupplierInvoiceMutation}
+          supplierInvoiceLifecycleMutation={supplierInvoiceLifecycleMutation}
           invoicesQuery={invoicesQuery}
           products={products}
           purchaseOrders={purchaseOrders}
-          setSupplierCatalogForm={setSupplierCatalogForm}
           setSupplierInvoiceForm={setSupplierInvoiceForm}
           shipments={shipments}
-          supplierCatalogForm={supplierCatalogForm}
-          supplierCatalogQuery={supplierCatalogQuery}
           supplierInvoiceForm={supplierInvoiceForm}
           suppliers={suppliers}
         />

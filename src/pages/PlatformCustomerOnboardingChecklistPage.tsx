@@ -36,6 +36,17 @@ type OnboardingChecklistPackage = {
 
 type Tenant = { id: string; name: string };
 
+const evidenceLabels: Record<string, string> = {
+  admin_user_count: 'Active admin count',
+  product_count: 'Product count',
+  storage_location_count: 'Storage location count',
+  stock_row_count: 'Stock row count',
+  shipment_count: 'Shipment count',
+  onboarding_task_count: 'Onboarding task count',
+  onboarding_task_completed_count: 'Completed onboarding tasks',
+  onboarding_task_overdue_count: 'Overdue onboarding tasks'
+};
+
 function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
@@ -44,7 +55,10 @@ function badgeStyle(value: string): CSSProperties {
   if (value.includes('blocked') || value.includes('missing') || value.includes('incomplete')) {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
-  if (value.includes('needs') || value.includes('manual')) {
+  if (value.includes('no_tenants')) {
+    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  }
+  if (value.includes('needs') || value.includes('manual') || value.includes('review')) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   }
   return { ...styles.badge, background: '#dcfce7', color: '#166534' };
@@ -63,7 +77,9 @@ export default function PlatformCustomerOnboardingChecklistPage() {
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-customer-onboarding-checklist'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const query = new URLSearchParams();
@@ -72,7 +88,9 @@ export default function PlatformCustomerOnboardingChecklistPage() {
 
   const checklist = useQuery({
     queryKey: ['platform', 'customer-onboarding-checklist', tenantId, limit],
-    queryFn: () => platformApiRequest<OnboardingChecklistPackage>(`/platform/customer-onboarding-checklist?${query.toString()}`)
+    queryFn: () => platformApiRequest<OnboardingChecklistPackage>(`/platform/customer-onboarding-checklist?${query.toString()}`),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const data = checklist.data;
@@ -102,15 +120,15 @@ export default function PlatformCustomerOnboardingChecklistPage() {
       <section style={styles.panel}>
         <div style={styles.filterGrid}>
           <div style={styles.filterControl}>
-            <label style={styles.label}>Tenant filter</label>
-            <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
+            <label style={styles.label} htmlFor="onboarding-tenant-filter">Tenant filter</label>
+            <select id="onboarding-tenant-filter" style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
               <option value="">All tenants</option>
               {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
             </select>
           </div>
           <div style={styles.filterControl}>
-            <label style={styles.label}>Tenant limit</label>
-            <select style={styles.input} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={Boolean(tenantId)}>
+            <label style={styles.label} htmlFor="onboarding-tenant-limit">Tenant limit</label>
+            <select id="onboarding-tenant-limit" style={styles.input} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={Boolean(tenantId)}>
               <option value="25">Latest 25 tenants</option>
               <option value="50">Latest 50 tenants</option>
               <option value="100">Latest 100 tenants</option>
@@ -122,10 +140,17 @@ export default function PlatformCustomerOnboardingChecklistPage() {
           </button>
         </div>
         {selectedTenantName ? <span style={styles.help}>Showing onboarding evidence for {selectedTenantName}.</span> : <span style={styles.help}>Showing the latest {limit} tenants by creation date.</span>}
+        {tenants.error ? <span style={styles.errorText}>Tenant filter options could not be loaded. The checklist can still be reviewed with its current filter.</span> : null}
       </section>
 
       {checklist.isLoading ? <section style={styles.card}>Loading onboarding checklist…</section> : null}
-      {checklist.error ? <section style={styles.card}>Unable to load onboarding checklist. <button style={styles.inlineButton} onClick={() => checklist.refetch()}>Retry</button></section> : null}
+      {checklist.error ? (
+        <section style={styles.errorCard}>
+          <strong>Unable to load onboarding checklist.</strong>
+          <span style={styles.errorText}>{checklist.error instanceof Error ? checklist.error.message : 'The platform request failed.'}</span>
+          <button style={styles.inlineButton} onClick={() => checklist.refetch()} disabled={checklist.isFetching}>Retry</button>
+        </section>
+      ) : null}
 
       {data ? (
         <>
@@ -158,7 +183,7 @@ export default function PlatformCustomerOnboardingChecklistPage() {
                 <div style={styles.evidenceGrid}>
                   {['admin_user_count', 'product_count', 'storage_location_count', 'stock_row_count', 'shipment_count', 'onboarding_task_count', 'onboarding_task_completed_count', 'onboarding_task_overdue_count'].map((key) => (
                     <div key={key} style={styles.evidenceCard}>
-                      <strong>{humanize(key)}</strong>
+                      <strong>{evidenceLabels[key] || humanize(key)}</strong>
                       <span>{formatValue(tenant.evidence[key])}</span>
                     </div>
                   ))}
@@ -196,7 +221,7 @@ export default function PlatformCustomerOnboardingChecklistPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: 20 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: 28 },
   subtitle: { margin: '6px 0 0', color: '#6b7280', maxWidth: 900 },
   badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, whiteSpace: 'nowrap', fontSize: 12, textTransform: 'capitalize' },
@@ -206,19 +231,21 @@ const styles: Record<string, CSSProperties> = {
   label: { fontWeight: 800 },
   input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', maxWidth: 420 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
+  errorText: { color: '#991b1b', fontSize: 12, lineHeight: 1.5 },
   metaCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
   note: { color: '#374151', lineHeight: 1.5 },
-  help: { color: '#6b7280', fontSize: 12 },
+  help: { color: '#6b7280', fontSize: 12, overflowWrap: 'anywhere' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   metric: { fontSize: 28, fontWeight: 900, marginTop: 8 },
   areaGrid: { display: 'grid', gap: 16 },
   tenantCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
-  areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
+  areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   areaTitle: { margin: 0, fontSize: 20 },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 },
   evidenceCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f9fafb' },
   checklistGrid: { display: 'grid', gap: 10 },
-  checklistRow: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' },
+  checklistRow: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' },
   checklistStatus: { display: 'grid', gap: 6, justifyItems: 'end' },
   nextStep: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, color: '#111827', lineHeight: 1.5 },
   secondaryButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },

@@ -1,5 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
+import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
@@ -10,6 +10,11 @@ type RequisitionCreateMutation = {
   mutate: (input: RequisitionForm) => void;
 };
 
+type RequisitionSubmitMutation = {
+  isPending: boolean;
+  mutate: (id: string) => void;
+};
+
 type RequisitionsQuery = {
   isLoading: boolean;
   data?: DepartmentRequisition[];
@@ -17,6 +22,7 @@ type RequisitionsQuery = {
 
 type RequisitionsTabProps = {
   createRequisitionMutation: RequisitionCreateMutation;
+  submitRequisitionMutation: RequisitionSubmitMutation;
   products: ProductOption[];
   requisitionForm: RequisitionForm;
   requisitionsQuery: RequisitionsQuery;
@@ -57,6 +63,7 @@ function formatRequisitionQuantity(item: DepartmentRequisition): string {
 
 export function RequisitionsTab({
   createRequisitionMutation,
+  submitRequisitionMutation,
   products,
   requisitionForm,
   requisitionsQuery,
@@ -79,26 +86,68 @@ export function RequisitionsTab({
         <SelectField label="Storage location" value={requisitionForm.storage_location_id} onChange={(value) => setRequisitionForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} disabled={!canCreateRequisitions} />
         <SelectField label="Priority" value={requisitionForm.priority} onChange={(value) => setRequisitionForm((current) => ({ ...current, priority: value }))} options={[{ value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' }]} disabled={!canCreateRequisitions} />
         <SelectField label="Product" value={requisitionForm.product_id} onChange={(value) => setRequisitionForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canCreateRequisitions} />
-        <InputField label="Requested quantity" type="number" value={requisitionForm.requested_quantity} onChange={(value) => setRequisitionForm((current) => ({ ...current, requested_quantity: value }))} required disabled={!canCreateRequisitions} />
+        <InputField label="Requested quantity" type="number" min="0.0001" value={requisitionForm.requested_quantity} onChange={(value) => setRequisitionForm((current) => ({ ...current, requested_quantity: value }))} required disabled={!canCreateRequisitions} />
         <InputField label="Notes" value={requisitionForm.notes} onChange={(value) => setRequisitionForm((current) => ({ ...current, notes: value }))} disabled={!canCreateRequisitions} />
         <button type="submit" disabled={createRequisitionMutation.isPending || !canCreateRequisitions} style={createRequisitionMutation.isPending || !canCreateRequisitions ? styles.disabledButton : styles.primaryButton} title={!canCreateRequisitions ? `Requires ${TENANT_PERMISSIONS.REQUISITIONS_CREATE} permission.` : undefined}>Create requisition</button>
       </form>
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Department requisitions</h2>
-        <DataTable
-          loading={requisitionsQuery.isLoading}
-          empty="No requisitions yet."
-          headers={['Department', 'Product', 'Quantity', 'Status', 'Priority', 'Created']}
-          rows={(requisitionsQuery.data ?? []).map((item) => [
-            item.department,
-            formatRequisitionProducts(item),
-            formatRequisitionQuantity(item),
-            formatRequisitionLabel(item.status),
-            formatRequisitionLabel(item.priority),
-            formatDateTime(item.created_at)
-          ])}
-        />
+        {requisitionsQuery.isLoading ? (
+          <p style={styles.helper}>Loading…</p>
+        ) : (requisitionsQuery.data ?? []).length ? (
+          <div style={styles.tableWrap}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Department</th>
+                  <th style={styles.th}>Product</th>
+                  <th style={styles.th}>Quantity</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Priority</th>
+                  <th style={styles.th}>Created</th>
+                  <th style={styles.th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(requisitionsQuery.data ?? []).map((item) => {
+                  const canSubmit = canCreateRequisitions && item.status === 'draft';
+                  return (
+                    <tr key={item.id}>
+                      <td style={styles.td}>{item.department}</td>
+                      <td style={styles.td}>{formatRequisitionProducts(item)}</td>
+                      <td style={styles.td}>{formatRequisitionQuantity(item)}</td>
+                      <td style={styles.td}>{formatRequisitionLabel(item.status)}</td>
+                      <td style={styles.td}>{formatRequisitionLabel(item.priority)}</td>
+                      <td style={styles.td}>{formatDateTime(item.created_at)}</td>
+                      <td style={styles.td}>
+                        {item.status === 'draft' ? (
+                          <button
+                            type="button"
+                            disabled={!canSubmit || submitRequisitionMutation.isPending}
+                            style={canSubmit && !submitRequisitionMutation.isPending ? styles.smallButton : styles.disabledButton}
+                            title={!canCreateRequisitions ? `Requires ${TENANT_PERMISSIONS.REQUISITIONS_CREATE} permission.` : undefined}
+                            onClick={() => {
+                              if (window.confirm('Submit this requisition for approval?')) submitRequisitionMutation.mutate(item.id);
+                            }}
+                          >
+                            Submit
+                          </button>
+                        ) : item.status === 'pending_approval' ? (
+                          <span style={styles.helper}>Waiting for approval</span>
+                        ) : (
+                          <span style={styles.helper}>-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p style={styles.helper}>No requisitions yet.</p>
+        )}
       </div>
     </section>
   );

@@ -3,17 +3,39 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
+type EvidenceScope = {
+  mode: string;
+  status: string;
+  review_limit: number | null;
+  evaluated_tenants: number;
+  total_tenants: number | null;
+};
+
 type CertificateControl = {
   code: string;
   domain: string;
   required_evidence: string;
   acceptance_owner: string;
   acceptance_rule: string;
+  source_key: string;
+  source_available: boolean;
+  source_posture: string;
+  source_summary: Record<string, unknown>;
+  source_validation_note: string | null;
+  source_error_code: string | null;
+  evidence_scope: EvidenceScope;
   launch_area_code: string | null;
   launch_area_status: string;
   launch_gate: string;
   evidence_status: string;
   manual_acceptance_status: string;
+};
+
+type TenantScope = {
+  available: boolean;
+  total_tenants: number | null;
+  review_limit: number;
+  error_code?: string;
 };
 
 type CommercialLaunchCertificate = {
@@ -23,7 +45,9 @@ type CommercialLaunchCertificate = {
   generated_at: string;
   summary: Record<string, number>;
   certificate_controls: CertificateControl[];
+  tenant_scope: TenantScope;
   launch_readiness_posture: string;
+  launch_readiness_registry_note: string;
   commercial_readiness_closure_posture: string;
   required_manual_acceptance: string[];
   certificate_limitations: string[];
@@ -35,14 +59,13 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
-
 function getControlReviewLink(control: CertificateControl) {
   const byCode: Record<string, string> = {
     tenant_provisioning_accepted: '/platform/tenant-provisioning-hardening',
     customer_onboarding_accepted: '/platform/customer-onboarding-checklist',
     billing_subscription_accepted: '/platform/billing-subscription-activation',
-    support_operations_accepted: '/platform/support-operations-cockpit',
-    production_monitoring_accepted: '/platform/production-monitoring-readiness',
+    support_operations_accepted: '/platform/support-cockpit',
+    production_monitoring_accepted: '/platform/monitoring-readiness',
     backup_restore_accepted: '/platform/backup-restore-validation',
     deployment_validation_accepted: '/platform/deployment-validation',
     documentation_completeness_accepted: '/platform/documentation-completeness',
@@ -69,19 +92,54 @@ function getControlReviewLabel(control: CertificateControl) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing')) {
+  const normalized = value.toLowerCase();
+  if (normalized === 'loading' || normalized.includes('no_tenants') || normalized.includes('not_limited')) {
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+  }
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('missing')
+    || normalized.includes('unavailable')
+    || normalized.includes('incomplete')
+    || normalized.includes('not_launchable')
+    || normalized.includes('failed')
+  ) {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
-  if (value.includes('manual') || value.includes('required') || value.includes('review')) {
+  if (
+    normalized.includes('manual')
+    || normalized.includes('required')
+    || normalized.includes('review')
+    || normalized.includes('external')
+    || normalized.includes('partial')
+  ) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  if (
+    normalized.includes('ready')
+    || normalized.includes('clear')
+    || normalized.includes('present')
+    || normalized.includes('full_population')
+  ) {
+    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  }
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+}
+
+function neutralBadgeStyle(): CSSProperties {
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Failed to load commercial launch certificate.';
 }
 
 export default function PlatformCommercialLaunchCertificatePage() {
   const certificate = useQuery({
     queryKey: ['platform', 'commercial-launch-certificate'],
-    queryFn: () => platformApiRequest<CommercialLaunchCertificate>('/platform/commercial-launch-certificate')
+    queryFn: () => platformApiRequest<CommercialLaunchCertificate>('/platform/commercial-launch-certificate'),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false
   });
 
   const data = certificate.data;
@@ -94,9 +152,9 @@ export default function PlatformCommercialLaunchCertificatePage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Commercial Launch Certificate Board</h1>
           <p style={styles.description}>
-            Step 217 assembles the final manual launch-certificate review across provisioning, onboarding,
-            billing, support, monitoring, backup/restore, deployment, documentation, pilot readiness, and
-            commercial readiness closure evidence. It does not automatically certify external customer proof.
+            Step 217 is an internal certificate precheck. It now evaluates the current postures from the real
+            provisioning, onboarding, billing, support, monitoring, backup/restore, deployment, documentation,
+            pilot, and commercial-closure evidence sources. It does not persist owner signoff or issue an external certificate.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -113,27 +171,41 @@ export default function PlatformCommercialLaunchCertificatePage() {
         </div>
       </section>
 
+      <section style={styles.warningCard}>
+        <strong>Internal precheck only.</strong> A green evidence source means its current technical/readiness posture is clear enough to enter manual owner acceptance. It does not mean the owner has signed, the customer has accepted launch, or a production certificate has been issued.
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting readiness pages</h2>
         <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness registry</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-readiness-verification-program">Readiness verification</Link>
           <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
           <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
           <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring</Link>
+          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring</Link>
           <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
           <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
           <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
           <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
         </div>
       </section>
 
       {certificate.isLoading ? <div style={styles.card}>Loading commercial launch certificate...</div> : null}
       {certificate.error ? (
         <div style={styles.error}>
-          Failed to load commercial launch certificate.
-          <button type="button" style={styles.errorButton} onClick={() => void certificate.refetch()}>Retry</button>
+          <strong>Unable to load Launch Certificate.</strong>
+          <span style={styles.errorDetail}>{errorMessage(certificate.error)}</span>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void certificate.refetch()}
+            disabled={certificate.isFetching}
+          >
+            {certificate.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -142,11 +214,14 @@ export default function PlatformCommercialLaunchCertificatePage() {
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
             <div style={styles.metadataGrid}>
-              <div><strong>Phase</strong><span>{data.phase}</span></div>
-              <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div style={styles.metadataItem}><strong>Phase</strong><span>{data.phase}</span></div>
+              <div style={styles.metadataItem}><strong>Step</strong><span>{data.step}</span></div>
+              <div style={styles.metadataItem}><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div style={styles.metadataItem}><strong>Tenant population</strong><span>{data.tenant_scope.total_tenants ?? 'Unavailable'}</span></div>
+              <div style={styles.metadataItem}><strong>Tenant review cap</strong><span>{data.tenant_scope.review_limit}</span></div>
+              <div style={styles.metadataItem}><strong>Tenant scope query</strong><span>{data.tenant_scope.available ? 'Available' : humanize(data.tenant_scope.error_code || 'unavailable')}</span></div>
             </div>
+            <p style={styles.validationText}>{data.validation_note}</p>
           </section>
 
           <section style={styles.grid}>
@@ -162,12 +237,14 @@ export default function PlatformCommercialLaunchCertificatePage() {
             <h2 style={styles.sectionTitle}>Certificate posture inputs</h2>
             <div style={styles.inputGrid}>
               <div style={styles.inputCard}>
-                <span style={styles.help}>Launch readiness posture</span>
+                <span style={styles.help}>Launch readiness registry posture</span>
                 <strong>{humanize(data.launch_readiness_posture)}</strong>
+                <span style={styles.help}>{data.launch_readiness_registry_note}</span>
               </div>
               <div style={styles.inputCard}>
                 <span style={styles.help}>Commercial readiness closure posture</span>
                 <strong>{humanize(data.commercial_readiness_closure_posture)}</strong>
+                <span style={styles.help}>Closure remains a separate owner/security review input; its static registry does not persist execution results.</span>
               </div>
             </div>
           </section>
@@ -178,21 +255,44 @@ export default function PlatformCommercialLaunchCertificatePage() {
               {data.certificate_controls.map((control) => (
                 <article key={control.code} style={styles.controlCard}>
                   <div style={styles.controlHeader}>
-                    <div>
+                    <div style={styles.controlTitleBlock}>
                       <strong>{humanize(control.code)}</strong>
                       <div style={styles.help}>{humanize(control.domain)} · owner: {humanize(control.acceptance_owner)}</div>
                     </div>
                     <span style={badgeStyle(control.evidence_status)}>{humanize(control.evidence_status)}</span>
                   </div>
+
                   <p style={styles.reason}>{control.acceptance_rule}</p>
+
                   <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence</span>
-                    <strong>{control.required_evidence}</strong>
+                    <span style={styles.evidenceLabel}>Current upstream posture</span>
+                    <span style={badgeStyle(control.source_posture)}>{humanize(control.source_posture)}</span>
+                    {control.source_error_code ? <span style={styles.sourceError}>Source error: {humanize(control.source_error_code)}</span> : null}
+                    {control.source_validation_note ? <span style={styles.help}>{control.source_validation_note}</span> : null}
                   </div>
+
+                  {control.evidence_scope.mode === 'tenant_population' ? (
+                    <div style={styles.evidenceBox}>
+                      <span style={styles.evidenceLabel}>Tenant evidence scope</span>
+                      <span style={badgeStyle(control.evidence_scope.status)}>{humanize(control.evidence_scope.status)}</span>
+                      <span style={styles.help}>
+                        Evaluated {control.evidence_scope.evaluated_tenants}
+                        {control.evidence_scope.total_tenants !== null ? ` of ${control.evidence_scope.total_tenants}` : ''}
+                        {control.evidence_scope.review_limit ? ` · cap ${control.evidence_scope.review_limit}` : ''}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div style={styles.evidenceBox}>
+                    <span style={styles.evidenceLabel}>Required evidence surface</span>
+                    <strong style={styles.wrapAnywhere}>{control.required_evidence}</strong>
+                  </div>
+
                   <Link style={styles.controlLink} to={getControlReviewLink(control)}>{getControlReviewLabel(control)}</Link>
+
                   <div style={styles.statusRow}>
-                    <span>Launch gate</span>
-                    <span style={badgeStyle(control.launch_gate)}>{humanize(control.launch_gate)}</span>
+                    <span>Static registry gate (context only)</span>
+                    <span style={neutralBadgeStyle()}>{humanize(control.launch_gate)}</span>
                   </div>
                   <div style={styles.statusRow}>
                     <span>Manual acceptance</span>
@@ -219,7 +319,6 @@ export default function PlatformCommercialLaunchCertificatePage() {
           </section>
 
           <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
         </>
       ) : null}
     </div>
@@ -227,39 +326,45 @@ export default function PlatformCommercialLaunchCertificatePage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  page: { display: 'grid', gap: 18, minWidth: 0 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', maxWidth: '100%', overflowWrap: 'anywhere' },
+  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#78350f', lineHeight: 1.5 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6 },
+  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6, minWidth: 0, overflowWrap: 'anywhere' },
   controlGrid: { display: 'grid', gap: 14 },
-  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
+  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12, minWidth: 0 },
+  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
+  controlTitleBlock: { minWidth: 0, overflowWrap: 'anywhere' },
   reason: { color: '#4b5563', lineHeight: 1.45, margin: 0 },
-  help: { color: '#6b7280', fontSize: 12 },
-  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4 },
+  help: { color: '#6b7280', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
+  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 6, minWidth: 0 },
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 8 },
+  sourceError: { color: '#991b1b', fontSize: 12, fontWeight: 700, overflowWrap: 'anywhere' },
+  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 8, flexWrap: 'wrap' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
+  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', lineHeight: 1.5 },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
-  errorButton: { marginLeft: 12, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  errorButton: { justifySelf: 'start', border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'grid', gap: 8 },
+  errorDetail: { fontSize: 12, overflowWrap: 'anywhere' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  metadataItem: { display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
+  validationText: { margin: '14px 0 0', color: '#4b5563', lineHeight: 1.5 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
   quickLink: { color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
   controlLink: { justifySelf: 'start', color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 }
+  wrapAnywhere: { overflowWrap: 'anywhere' }
 };

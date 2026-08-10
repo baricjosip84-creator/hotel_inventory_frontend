@@ -122,17 +122,24 @@ export default function PlatformLayout() {
               Billing activation
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? (
             <NavLink to="/platform/support-operations-cockpit" style={getPlatformLinkStyle}>
               Support cockpit
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
             <NavLink to="/platform/production-monitoring-readiness" style={getPlatformLinkStyle}>
               Monitoring readiness
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ) ? (
             <NavLink to="/platform/backup-restore-validation" style={getPlatformLinkStyle}>
               Backup restore
             </NavLink>
@@ -147,52 +154,187 @@ export default function PlatformLayout() {
               Documentation completeness
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ) ? (
             <NavLink to="/platform/pilot-customer-readiness" style={getPlatformLinkStyle}>
               Pilot readiness
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-certificate" style={getPlatformLinkStyle}>
               Launch certificate
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-acceptance-packet" style={getPlatformLinkStyle}>
               Launch acceptance
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-go-no-go-register" style={getPlatformLinkStyle}>
               Launch go/no-go
             </NavLink>
           ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-smoke-test-checklist" style={getPlatformLinkStyle}>
+              Launch smoke test
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-day-command-center" style={getPlatformLinkStyle}>
+              Launch command center
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-post-launch-observation" style={getPlatformLinkStyle}>
+              Post-launch observation
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-incident-triage" style={getPlatformLinkStyle}>
+              Incident triage
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-incident-closure" style={getPlatformLinkStyle}>
+              Incident closure
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-prevention-verification" style={getPlatformLinkStyle}>
+              Prevention verification
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-rollout-expansion-authorization" style={getPlatformLinkStyle}>
+              Rollout expansion
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+            <NavLink to="/platform/commercial-launch-expansion-health-observation" style={getPlatformLinkStyle}>
+              Expansion health
+            </NavLink>
+          ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
             <>
-              <NavLink to="/platform/commercial-launch-smoke-test-checklist" style={getPlatformLinkStyle}>
-                Launch smoke test
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-day-command-center" style={getPlatformLinkStyle}>
-                Launch command center
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-post-launch-observation" style={getPlatformLinkStyle}>
-                Post-launch observation
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-incident-triage" style={getPlatformLinkStyle}>
-                Incident triage
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-incident-closure" style={getPlatformLinkStyle}>
-                Incident closure
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-prevention-verification" style={getPlatformLinkStyle}>
-                Prevention verification
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-rollout-expansion-authorization" style={getPlatformLinkStyle}>
-                Rollout expansion
-              </NavLink>
-              <NavLink to="/platform/commercial-launch-expansion-health-observation" style={getPlatformLinkStyle}>
-                Expansion health
-              </NavLink>
               <NavLink to="/platform/commercial-launch-additional-growth-authorization" style={getPlatformLinkStyle}>
                 Additional growth
               </NavLink>
@@ -394,6 +536,11 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/provisioning" style={getPlatformLinkStyle}>
               Provisioning
+            </NavLink>
+          ) : null}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
+            <NavLink to="/platform/provisioning-presets" style={getPlatformLinkStyle}>
+              Provisioning presets
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT) ? (

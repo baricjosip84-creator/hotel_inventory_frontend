@@ -6,7 +6,11 @@ import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 type ProvisioningPreset = {
+  id: string;
   key: string;
+  preset_version: number;
+  version: number;
+  status: 'published';
   label: string;
   description: string;
   organization_type: string;
@@ -52,14 +56,14 @@ function SourceLink({ href, children }: { href: string; children: string }) {
 export default function PlatformProvisioningPage() {
   const queryClient = useQueryClient();
   const [selectedTenantId, setSelectedTenantId] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState('hotel');
+  const [selectedPreset, setSelectedPreset] = useState('');
   const [createStorageLocations, setCreateStorageLocations] = useState(true);
   const [updateEntitlements, setUpdateEntitlements] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
     name: '',
     location: '',
-    preset: 'hotel',
+    preset: '',
     plan_code: 'standard',
     initial_admin_email: '',
     initial_admin_name: '',
@@ -81,8 +85,12 @@ export default function PlatformProvisioningPage() {
   });
 
   const previewQuery = useQuery({
-    queryKey: ['platform', 'provisioning', 'preview', selectedTenantId, selectedPreset],
-    queryFn: () => platformApiRequest<ProvisioningPreview>(`/platform/provisioning/tenants/${selectedTenantId}/preview/${selectedPreset}`),
+    queryKey: ['platform', 'provisioning', 'preview', selectedTenantId, selectedPreset, (presetsQuery.data || []).find((item) => item.key === selectedPreset)?.id || ''],
+    queryFn: () => {
+      const preset = (presetsQuery.data || []).find((item) => item.key === selectedPreset);
+      const query = preset?.id ? `?preset_version_id=${encodeURIComponent(preset.id)}` : '';
+      return platformApiRequest<ProvisioningPreview>(`/platform/provisioning/tenants/${selectedTenantId}/preview/${selectedPreset}${query}`);
+    },
     enabled: Boolean(selectedTenantId && selectedPreset)
   });
 
@@ -130,6 +138,7 @@ export default function PlatformProvisioningPage() {
         name: createForm.name.trim(),
         location: trimOrNull(createForm.location),
         preset: createForm.preset,
+        preset_version_id: (presetsQuery.data || []).find((preset) => preset.key === createForm.preset)?.id,
         plan_code: createForm.plan_code.trim() || 'standard',
         create_storage_locations: true,
         initial_admin: hasCompleteAdmin ? {
@@ -145,7 +154,7 @@ export default function PlatformProvisioningPage() {
       setCreateForm({
         name: '',
         location: '',
-        preset: selectedPreset || 'hotel',
+        preset: selectedPreset || presetsQuery.data?.[0]?.key || '',
         plan_code: 'standard',
         initial_admin_email: '',
         initial_admin_name: '',
@@ -169,6 +178,7 @@ export default function PlatformProvisioningPage() {
       method: 'POST',
       body: JSON.stringify({
         preset: selectedPreset,
+        preset_version_id: selectedPresetDetails?.id,
         create_storage_locations: createStorageLocations,
         update_entitlements: updateEntitlements
       })
@@ -202,7 +212,7 @@ export default function PlatformProvisioningPage() {
       <section style={styles.metaGrid}>
         <div><strong>Snapshot source</strong><span>GET /platform/provisioning/presets, /platform/tenants, and tenant preview when selected</span></div>
         <div><strong>Selected tenant</strong><span>{selectedTenant ? `${selectedTenant.name} · ${selectedTenant.status || 'status unknown'} · ${selectedTenant.plan_code || 'no plan code'}` : 'No tenant selected'}</span></div>
-        <div><strong>Current preset</strong><span>{selectedPresetDetails ? `${selectedPresetDetails.label} · ${selectedPresetDetails.organization_type}` : selectedPreset}</span></div>
+        <div><strong>Current preset</strong><span>{selectedPresetDetails ? `${selectedPresetDetails.label} · v${selectedPresetDetails.preset_version} · ${selectedPresetDetails.organization_type}` : selectedPreset}</span></div>
         <div><strong>Tenant rows loaded</strong><span>{rowsShown} tenant records available for provisioning</span></div>
       </section>
 
@@ -213,6 +223,7 @@ export default function PlatformProvisioningPage() {
         <SourceLink href="/platform/tenant-lifecycle">Tenant Lifecycle</SourceLink>
         <SourceLink href="/platform/tenant-health">Tenant Health</SourceLink>
         <SourceLink href="/platform/audit">Platform Audit</SourceLink>
+        {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? <SourceLink href="/platform/provisioning-presets">Preset Management</SourceLink> : null}
       </section>
 
       <section style={styles.panel}>
@@ -221,6 +232,7 @@ export default function PlatformProvisioningPage() {
           {(presetsQuery.data || []).map((preset) => (
             <article key={preset.key} style={{ ...styles.card, ...(preset.key === selectedPreset ? styles.selectedCard : {}) }}>
               <h3>{preset.label}</h3>
+              <div style={styles.meta}>Published version: v{preset.preset_version}</div>
               <p style={styles.muted}>{preset.description}</p>
               <div style={styles.meta}>Type: {preset.organization_type}</div>
               <div style={styles.meta}>Locations: {preset.storage_locations.length}</div>

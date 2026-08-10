@@ -80,7 +80,10 @@ export function buildCycleCountPayload(input: CycleCountForm): Record<string, un
         product_id: input.product_id,
         storage_location_id: input.storage_location_id || null,
         expected_quantity: Number(input.expected_quantity),
-        counted_quantity: input.counted_quantity === '' ? null : Number(input.counted_quantity)
+        counted_quantity: input.counted_quantity === '' ? null : Number(input.counted_quantity),
+        lot_number: input.lot_number.trim() || null,
+        batch_number: input.batch_number.trim() || null,
+        expiry_date: input.expiry_date || null
       }
     ]
   };
@@ -91,7 +94,11 @@ export function buildStockAdjustmentPayload(input: StockAdjustmentForm): Record<
     product_id: input.product_id,
     storage_location_id: input.storage_location_id,
     change: Number(input.change),
-    reason: input.reason.trim() || 'manual_adjustment'
+    reason: input.reason.trim() || 'manual_adjustment',
+    lot_number: input.lot_number.trim() || null,
+    batch_number: input.batch_number.trim() || null,
+    expiry_date: input.expiry_date || null,
+    manufactured_at: input.manufactured_at || null
   };
 }
 
@@ -169,25 +176,34 @@ export function buildSupplierCatalogPayload(input: SupplierCatalogForm): Record<
 }
 
 export function buildSupplierInvoicePayload(input: SupplierInvoiceForm): Record<string, unknown> {
+  const items = input.items.map((item) => ({
+    product_id: item.product_id,
+    purchase_order_item_id: item.purchase_order_item_id || null,
+    shipment_item_id: item.shipment_item_id || null,
+    quantity: Number(item.quantity || 0),
+    unit_cost: Number(item.unit_cost || 0),
+    expected_quantity: item.expected_quantity === '' ? null : Number(item.expected_quantity),
+    expected_unit_cost: item.expected_unit_cost === '' ? null : Number(item.expected_unit_cost)
+  }));
+  const subtotalAmount = items.reduce(
+    (sum, item) => sum + Number(item.quantity) * Number(item.unit_cost),
+    0
+  );
+  const taxAmount = Number(input.tax_amount || 0);
+
   return {
     supplier_id: input.supplier_id,
     purchase_order_id: input.purchase_order_id || null,
     shipment_id: input.shipment_id || null,
     invoice_number: input.invoice_number.trim(),
     invoice_date: input.invoice_date,
+    due_date: input.due_date || null,
     currency: input.currency.trim().toUpperCase() || getActiveTenantCurrency(),
-    subtotal_amount: Number(input.subtotal_amount || 0),
-    tax_amount: Number(input.tax_amount || 0),
-    total_amount: Number(input.total_amount || 0),
-    items: [
-      {
-        product_id: input.product_id,
-        quantity: Number(input.quantity || 0),
-        unit_cost: Number(input.unit_cost || 0),
-        expected_quantity: input.expected_quantity === '' ? null : Number(input.expected_quantity),
-        expected_unit_cost: input.expected_unit_cost === '' ? null : Number(input.expected_unit_cost)
-      }
-    ]
+    subtotal_amount: Number(subtotalAmount.toFixed(4)),
+    tax_amount: Number(taxAmount.toFixed(4)),
+    total_amount: Number((subtotalAmount + taxAmount).toFixed(4)),
+    notes: input.notes.trim() || null,
+    items
   };
 }
 
@@ -294,7 +310,16 @@ export function buildShipmentReceivingPayload(input: ShipmentReceivingForm): Rec
       {
         product_id: input.product_id,
         storage_location_id: input.storage_location_id,
-        quantity_received: Number(input.quantity_received),
+        quantity_received: Number(input.quantity_received || 0),
+        lot_number: input.lot_number.trim() || null,
+        batch_number: input.batch_number.trim() || null,
+        expiry_date: input.expiry_date || null,
+        manufactured_at: input.manufactured_at || null,
+        shortage_quantity: Number(input.shortage_quantity || 0),
+        overage_quantity: Number(input.overage_quantity || 0),
+        damaged_quantity: Number(input.damaged_quantity || 0),
+        rejected_quantity: Number(input.rejected_quantity || 0),
+        quarantine_quantity: Number(input.quarantine_quantity || 0),
         discrepancy_reason: input.discrepancy_reason.trim() || null,
         receiving_note: input.receiving_note.trim() || null
       }

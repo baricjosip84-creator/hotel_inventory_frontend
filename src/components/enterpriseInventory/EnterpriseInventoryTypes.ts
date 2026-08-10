@@ -71,18 +71,96 @@ export type ApprovalRuleForm = {
   required_role: string;
 };
 
+
+export type SupplierReturnItem = {
+  id: string;
+  inventory_lot_id: string;
+  shipment_id?: string | null;
+  shipment_item_id?: string | null;
+  purchase_order_id?: string | null;
+  product_id?: string | null;
+  product_name?: string | null;
+  storage_location_id?: string | null;
+  storage_location_name?: string | null;
+  source_condition: string;
+  quantity: number | string;
+  unit_cost?: number | string | null;
+  line_amount: number | string;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  reason?: string | null;
+};
+
+export type SupplierReturn = {
+  id: string;
+  return_number: string;
+  supplier_id: string;
+  supplier_name: string;
+  status: string;
+  reason: string;
+  notes?: string | null;
+  currency: string;
+  total_amount: number | string;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  dispatched_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
+  created_at: string;
+  version: number;
+  items: SupplierReturnItem[];
+};
+
+export type SupplierInvoiceItem = {
+  id: string;
+  product_id: string;
+  product_name?: string | null;
+  product_sku?: string | null;
+  purchase_order_item_id?: string | null;
+  shipment_item_id?: string | null;
+  quantity: number | string;
+  unit_cost: number | string;
+  expected_quantity?: number | string | null;
+  expected_unit_cost?: number | string | null;
+  expected_unit_cost_currency?: string | null;
+  quantity_variance?: number | string | null;
+  unit_cost_variance?: number | string | null;
+  line_amount?: number | string | null;
+};
+
 export type SupplierInvoice = {
   id: string;
   supplier_id: string;
+  supplier_name?: string | null;
   purchase_order_id?: string | null;
+  po_number?: string | null;
   shipment_id?: string | null;
   invoice_number: string;
   invoice_date: string;
+  due_date?: string | null;
   currency?: string | null;
   status: string;
+  subtotal_amount: number | string;
+  tax_amount: number | string;
   total_amount: number | string;
   variance_status: string;
+  notes?: string | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  matched_at?: string | null;
+  paid_at?: string | null;
+  payment_reference?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
+  updated_at?: string | null;
+  version: number | string;
+  line_count?: number | string | null;
+  items: SupplierInvoiceItem[];
 };
 
 export type SupplierCatalogItem = {
@@ -91,6 +169,8 @@ export type SupplierCatalogItem = {
   product_id: string;
   supplier_name?: string | null;
   product_name?: string | null;
+  product_sku?: string | null;
+  product_barcode?: string | null;
   supplier_sku?: string | null;
   supplier_product_name?: string | null;
   lead_time_days?: number | string | null;
@@ -99,7 +179,11 @@ export type SupplierCatalogItem = {
   active?: boolean;
   latest_unit_cost?: number | string | null;
   latest_currency?: string | null;
+  latest_price_effective_from?: string | null;
+  deactivated_at?: string | null;
   created_at: string;
+  updated_at?: string | null;
+  version?: number | string | null;
 };
 
 export type NotificationEvent = {
@@ -117,7 +201,18 @@ export type NotificationDelivery = {
   notification_event_id: string;
   channel: string;
   recipient?: string | null;
-  status: string;
+  status: 'queued' | 'processing' | 'delivered' | 'failed' | 'cancelled' | string;
+  attempts?: number | string | null;
+  max_attempts?: number | string | null;
+  last_error?: string | null;
+  provider?: string | null;
+  response_status?: number | string | null;
+  next_attempt_at?: string | null;
+  last_attempt_at?: string | null;
+  delivered_at?: string | null;
+  event_type?: string | null;
+  severity?: string | null;
+  title?: string | null;
   created_at: string;
 };
 
@@ -182,6 +277,9 @@ export type EntityAttachment = {
   mime_type?: string | null;
   file_size_bytes?: number | string | null;
   storage_path?: string | null;
+  content_sha256?: string | null;
+  storage_backend?: 'metadata' | 'database' | string;
+  can_download?: boolean;
   created_at: string;
 };
 
@@ -205,6 +303,7 @@ export type BarcodeLabel = {
 
 export type ProductOption = {
   id: string;
+  sku?: string | null;
   name: string;
   category?: string | null;
   unit?: string | null;
@@ -1065,6 +1164,7 @@ export type PurchaseOrder = {
   supplier_id: string;
   supplier_name?: string | null;
   po_number?: string | null;
+  currency?: string | null;
   status: string;
   expected_delivery_date?: string | null;
   created_at: string;
@@ -1110,6 +1210,15 @@ export type ShipmentItem = {
   discrepancy_reason?: string | null;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
+  expiry_date?: string | null;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  manufactured_at?: string | null;
+  shortage_quantity?: number | string | null;
+  overage_quantity?: number | string | null;
+  damaged_quantity?: number | string | null;
+  rejected_quantity?: number | string | null;
+  quarantine_quantity?: number | string | null;
   last_received_at?: string | null;
   version?: number | string | null;
 };
@@ -1168,6 +1277,15 @@ export type ShipmentReceivingForm = {
   product_id: string;
   storage_location_id: string;
   quantity_received: string;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
+  manufactured_at: string;
+  shortage_quantity: string;
+  overage_quantity: string;
+  damaged_quantity: string;
+  rejected_quantity: string;
+  quarantine_quantity: string;
   discrepancy_reason: string;
   receiving_note: string;
 };
@@ -1202,6 +1320,9 @@ export type CycleCountForm = {
   product_id: string;
   expected_quantity: string;
   counted_quantity: string;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
 };
 
 export type StockAdjustmentForm = {
@@ -1209,6 +1330,10 @@ export type StockAdjustmentForm = {
   storage_location_id: string;
   change: string;
   reason: string;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
+  manufactured_at: string;
 };
 
 export type StockTransferForm = {
@@ -1274,21 +1399,27 @@ export type SupplierCatalogForm = {
   effective_from: string;
 };
 
+export type SupplierInvoiceLineForm = {
+  product_id: string;
+  purchase_order_item_id: string;
+  shipment_item_id: string;
+  quantity: string;
+  unit_cost: string;
+  expected_quantity: string;
+  expected_unit_cost: string;
+};
+
 export type SupplierInvoiceForm = {
   supplier_id: string;
   purchase_order_id: string;
   shipment_id: string;
   invoice_number: string;
   invoice_date: string;
+  due_date: string;
   currency: string;
-  subtotal_amount: string;
   tax_amount: string;
-  total_amount: string;
-  product_id: string;
-  quantity: string;
-  unit_cost: string;
-  expected_quantity: string;
-  expected_unit_cost: string;
+  notes: string;
+  items: SupplierInvoiceLineForm[];
 };
 
 export type NotificationDeliveryForm = {

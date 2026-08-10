@@ -162,6 +162,7 @@ export function buildProductActionHandlers({
     setFormMessage(null);
     setFormError(null);
     setForm({
+      sku: product.sku || '',
       name: product.name,
       category: product.category || '',
       unit: product.unit,

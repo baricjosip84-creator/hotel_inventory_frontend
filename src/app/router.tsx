@@ -85,6 +85,7 @@ import PlatformNotificationsPage from '../pages/PlatformNotificationsPage';
 import PlatformSecurityPage from '../pages/PlatformSecurityPage';
 import PlatformBillingPage from '../pages/PlatformBillingPage';
 import PlatformProvisioningPage from '../pages/PlatformProvisioningPage';
+import PlatformProvisioningPresetsPage from '../pages/PlatformProvisioningPresetsPage';
 import PlatformTenantExportsPage from '../pages/PlatformTenantExportsPage';
 import PlatformMaintenancePage from '../pages/PlatformMaintenancePage';
 import PlatformAnnouncementsPage from '../pages/PlatformAnnouncementsPage';
@@ -169,6 +170,26 @@ function LegacyAIReviewRedirect() {
   return <Navigate to={`/intelligence-review${location.search}${location.hash}`} replace />;
 }
 
+function LegacyPlatformSupportCockpitRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/platform/support-operations-cockpit${location.search}${location.hash}`} replace />;
+}
+
+function LegacyPlatformMonitoringReadinessRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/platform/production-monitoring-readiness${location.search}${location.hash}`} replace />;
+}
+
+function LegacyPlatformBackupRestoreRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/platform/backup-restore-validation${location.search}${location.hash}`} replace />;
+}
+
+function LegacyPlatformLaunchAcceptanceRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/platform/commercial-launch-acceptance-packet${location.search}${location.hash}`} replace />;
+}
+
 const router = createBrowserRouter([
   {
     path: '/login',
@@ -242,24 +263,74 @@ const router = createBrowserRouter([
       {
         path: 'support-operations-cockpit',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ
+          ]}>
             <PlatformSupportOperationsCockpitPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'support-cockpit',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ
+          ]}>
+            <LegacyPlatformSupportCockpitRedirect />
           </PlatformProtectedRoute>
         )
       },
       {
         path: 'production-monitoring-readiness',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
+          ]}>
             <PlatformProductionMonitoringReadinessPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'monitoring-readiness',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
+          ]}>
+            <LegacyPlatformMonitoringReadinessRedirect />
           </PlatformProtectedRoute>
         )
       },
       {
         path: 'backup-restore-validation',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_EXPORT]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ
+          ]}>
             <PlatformBackupRestoreValidationPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'backup-restore',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ
+          ]}>
+            <LegacyPlatformBackupRestoreRedirect />
           </PlatformProtectedRoute>
         )
       },
@@ -282,7 +353,10 @@ const router = createBrowserRouter([
       {
         path: 'pilot-customer-readiness',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ
+          ]}>
             <PlatformPilotCustomerReadinessPage />
           </PlatformProtectedRoute>
         )
@@ -290,7 +364,19 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-certificate',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchCertificatePage />
           </PlatformProtectedRoute>
         )
@@ -298,15 +384,59 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-acceptance-packet',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchAcceptancePacketPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'commercial-launch-acceptance',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
+            <LegacyPlatformLaunchAcceptanceRedirect />
           </PlatformProtectedRoute>
         )
       },
       {
         path: 'commercial-launch-go-no-go-register',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchGoNoGoRegisterPage />
           </PlatformProtectedRoute>
         )
@@ -314,7 +444,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-smoke-test-checklist',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchSmokeTestChecklistPage />
           </PlatformProtectedRoute>
         )
@@ -322,7 +465,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-day-command-center',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchDayCommandCenterPage />
           </PlatformProtectedRoute>
         )
@@ -330,7 +486,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-post-launch-observation',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchPostLaunchObservationPage />
           </PlatformProtectedRoute>
         )
@@ -338,7 +507,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-incident-triage',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchIncidentTriagePage />
           </PlatformProtectedRoute>
         )
@@ -346,7 +528,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-incident-closure',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchIncidentClosurePage />
           </PlatformProtectedRoute>
         )
@@ -354,7 +549,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-prevention-verification',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchPreventionVerificationPage />
           </PlatformProtectedRoute>
         )
@@ -362,7 +570,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-rollout-expansion-authorization',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchRolloutExpansionAuthorizationPage />
           </PlatformProtectedRoute>
         )
@@ -370,7 +591,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-expansion-health-observation',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchExpansionHealthObservationPage />
           </PlatformProtectedRoute>
         )
@@ -532,6 +766,14 @@ const router = createBrowserRouter([
         element: (
           <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
             <PlatformProvisioningPage />
+          </PlatformProtectedRoute>
+        )
+      },
+      {
+        path: 'provisioning-presets',
+        element: (
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ]}>
+            <PlatformProvisioningPresetsPage />
           </PlatformProtectedRoute>
         )
       },

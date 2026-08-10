@@ -46,6 +46,7 @@ export function ProductListTablePanel({
       <table style={styles.table}>
         <thead>
           <tr>
+            <th style={styles.th}>SKU</th>
             <th style={styles.th}>Name</th>
             <th style={styles.th}>Category</th>
             <th style={styles.th}>Unit</th>
@@ -62,13 +63,14 @@ export function ProductListTablePanel({
         <tbody>
           {products.length === 0 ? (
             <tr>
-              <td style={styles.emptyCell} colSpan={11}>
+              <td style={styles.emptyCell} colSpan={12}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             products.map((product) => (
               <tr key={product.id}>
+                <td style={styles.td}><span style={styles.barcodeValue}>{product.sku || '-'}</span></td>
                 <td style={styles.td}>
                   <div style={styles.rowTitle}>{product.name}</div>
                   <div style={styles.rowSubtle}>Product ID: {product.id}</div>

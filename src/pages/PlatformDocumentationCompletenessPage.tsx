@@ -3,13 +3,30 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
+type DocumentationEvidenceDetail = {
+  source_scope: string;
+  relative_path: string;
+  repository_available: boolean;
+  file_present: boolean | null;
+  file_size_bytes: number | null;
+  structure_complete: boolean | null;
+  required_markers_total: number;
+  required_markers_present: number | null;
+  missing_structure_markers: string[];
+  index_reference_required: boolean;
+  index_reference_present: boolean | null;
+};
+
 type DocumentationControl = {
   code: string;
   label: string;
   area: string;
   evidence_key: string;
+  source_scope: string;
+  relative_path: string;
   launch_reason: string;
-  evidence_value: boolean;
+  evidence_value: boolean | null;
+  evidence_detail: DocumentationEvidenceDetail;
   status: string;
 };
 
@@ -19,7 +36,20 @@ type DocumentationCompletenessPackage = {
   posture: string;
   generated_at: string;
   summary: Record<string, number>;
-  documentation_evidence: Record<string, boolean>;
+  repository_access: {
+    backend_repository_available: boolean;
+    frontend_repository_available: boolean;
+    frontend_repository_source: string;
+  };
+  documentation_index: {
+    relative_path: string;
+    required_references_total: number;
+    required_references_present: number;
+    missing_references: string[];
+    references_complete: boolean;
+  };
+  documentation_evidence: Record<string, boolean | null>;
+  documentation_evidence_details: Record<string, DocumentationEvidenceDetail>;
   documentation_controls: DocumentationControl[];
   required_manual_acceptance: string[];
   next_best_step: string;
@@ -31,23 +61,56 @@ function humanize(value: string) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing')) {
+  const normalized = value.toLowerCase();
+  if (normalized === 'loading') {
+    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  }
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('missing')
+    || normalized.includes('incomplete')
+    || normalized.includes('unavailable')
+  ) {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
-  if (value.includes('manual') || value.includes('acceptance')) {
+  if (
+    normalized.includes('review')
+    || normalized.includes('required')
+    || normalized.includes('manual')
+    || normalized.includes('acceptance')
+    || normalized.includes('external')
+  ) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('complete')) {
+    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  }
+  return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
 }
 
-function formatBoolean(value: boolean | undefined) {
-  return value ? 'present' : 'missing';
+function evidenceState(value: boolean | null | undefined) {
+  if (value === true) return 'present';
+  if (value === false) return 'missing or incomplete';
+  return 'external review required';
+}
+
+function yesNoReview(value: boolean | null | undefined) {
+  if (value === true) return 'yes';
+  if (value === false) return 'no';
+  return 'not inspectable here';
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown error';
 }
 
 export default function PlatformDocumentationCompletenessPage() {
   const documentation = useQuery({
     queryKey: ['platform', 'documentation-completeness'],
-    queryFn: () => platformApiRequest<DocumentationCompletenessPackage>('/platform/documentation-completeness')
+    queryFn: () => platformApiRequest<DocumentationCompletenessPackage>('/platform/documentation-completeness'),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const data = documentation.data;
@@ -60,8 +123,9 @@ export default function PlatformDocumentationCompletenessPage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Documentation Completeness Board</h1>
           <p style={styles.description}>
-            Step 215 checks whether the commercial launch documentation package exists for onboarding,
-            support, billing, backup/recovery, deployment validation, and pilot launch readiness.
+            Operator precheck only. Step 215 verifies the checked-in commercial launch documentation package by file presence,
+            expected Markdown structure, and index references. It does not prove that guidance is current, owner-approved,
+            customer-accepted, or validated in production.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -78,6 +142,11 @@ export default function PlatformDocumentationCompletenessPage() {
         </div>
       </section>
 
+      <section style={styles.notice}>
+        <strong>Static repository evidence only.</strong> A green control means the expected document is structurally present and indexed;
+        it is not launch certification. Frontend documentation is reviewed externally when the separate frontend repository is not available to the backend runtime.
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting pages</h2>
         <div style={styles.quickLinks}>
@@ -87,14 +156,22 @@ export default function PlatformDocumentationCompletenessPage() {
           <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
           <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
           <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness</Link>
         </div>
       </section>
 
       {documentation.isLoading ? <div style={styles.card}>Loading documentation completeness...</div> : null}
       {documentation.error ? (
         <div style={styles.error}>
-          Failed to load documentation completeness.
-          <button type="button" style={styles.errorButton} onClick={() => void documentation.refetch()}>Retry</button>
+          <span>Unable to load documentation completeness: {readableError(documentation.error)}</span>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void documentation.refetch()}
+            disabled={documentation.isFetching}
+          >
+            {documentation.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -105,8 +182,10 @@ export default function PlatformDocumentationCompletenessPage() {
             <div style={styles.metadataGrid}>
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
+              <div><strong>Backend repository</strong><span>{data.repository_access.backend_repository_available ? 'available' : 'unavailable'}</span></div>
+              <div><strong>Frontend repository</strong><span>{data.repository_access.frontend_repository_available ? 'available to backend precheck' : 'external review required'}</span></div>
+              <div><strong>Frontend source resolution</strong><span>{humanize(data.repository_access.frontend_repository_source)}</span></div>
             </div>
           </section>
 
@@ -120,12 +199,25 @@ export default function PlatformDocumentationCompletenessPage() {
           </section>
 
           <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Documentation index integrity</h2>
+            <div style={styles.metadataGrid}>
+              <div><strong>Index</strong><span>{data.documentation_index.relative_path}</span></div>
+              <div><strong>Required references</strong><span>{data.documentation_index.required_references_present}/{data.documentation_index.required_references_total}</span></div>
+              <div><strong>References complete</strong><span>{data.documentation_index.references_complete ? 'yes' : 'no'}</span></div>
+              <div>
+                <strong>Missing references</strong>
+                <span>{data.documentation_index.missing_references.length ? data.documentation_index.missing_references.join(', ') : 'none'}</span>
+              </div>
+            </div>
+          </section>
+
+          <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Documentation evidence</h2>
             <div style={styles.evidenceGrid}>
               {Object.entries(data.documentation_evidence).map(([key, value]) => (
                 <div key={key} style={styles.evidenceItem}>
                   <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                  <strong>{formatBoolean(value)}</strong>
+                  <strong>{evidenceState(value)}</strong>
                 </div>
               ))}
             </div>
@@ -141,9 +233,25 @@ export default function PlatformDocumentationCompletenessPage() {
                     <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
                   </div>
                   <p style={styles.reason}>{control.launch_reason}</p>
-                  <span style={styles.help}>
-                    Area: {humanize(control.area)} · Evidence: {humanize(control.evidence_key)} · {formatBoolean(control.evidence_value)}
-                  </span>
+                  <dl style={styles.detailList}>
+                    <div><dt>Source</dt><dd>{humanize(control.source_scope)}</dd></div>
+                    <div><dt>Path</dt><dd>{control.relative_path}</dd></div>
+                    <div><dt>Repository available</dt><dd>{yesNoReview(control.evidence_detail.repository_available)}</dd></div>
+                    <div><dt>File present</dt><dd>{yesNoReview(control.evidence_detail.file_present)}</dd></div>
+                    <div><dt>Structure complete</dt><dd>{yesNoReview(control.evidence_detail.structure_complete)}</dd></div>
+                    <div>
+                      <dt>Required markers</dt>
+                      <dd>{control.evidence_detail.required_markers_present ?? 'external'}/{control.evidence_detail.required_markers_total}</dd>
+                    </div>
+                    {control.evidence_detail.index_reference_required ? (
+                      <div><dt>Indexed</dt><dd>{yesNoReview(control.evidence_detail.index_reference_present)}</dd></div>
+                    ) : null}
+                  </dl>
+                  {control.evidence_detail.missing_structure_markers.length ? (
+                    <p style={styles.warningText}>
+                      Missing structure markers: {control.evidence_detail.missing_structure_markers.join(' · ')}
+                    </p>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -167,35 +275,37 @@ export default function PlatformDocumentationCompletenessPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  page: { display: 'grid', gap: 18, minWidth: 0 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 940, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  notice: { background: '#fefce8', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#854d0e', lineHeight: 1.5 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  evidenceItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 4 },
+  evidenceItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
-  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb' },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
+  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 },
+  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', minWidth: 0, overflowWrap: 'anywhere' },
+  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
   reason: { color: '#4b5563', lineHeight: 1.45, margin: '8px 0' },
-  help: { color: '#6b7280', fontSize: 12 },
+  detailList: { margin: 0, display: 'grid', gap: 5, fontSize: 12 },
+  warningText: { margin: '10px 0 0', color: '#991b1b', fontSize: 12, lineHeight: 1.4 },
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
+  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', overflowWrap: 'anywhere' },
+  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: 12 },
 };

@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 
 type StorageLocationItem = {
   id: string;
@@ -437,6 +438,17 @@ export default function StorageLocationsPage() {
           Current access role: {accessRoleLabel}. Storage locations are read-only because this role does not have storage_locations.write permission.
         </div>
       ) : null}
+
+      <InventoryCsvImportPanel
+        importType="storage_locations"
+        title="Bulk Storage Location Import"
+        description="Create storage-location master data from a validated CSV. Existing active location names are never overwritten."
+        templateColumns={['name', 'temperature_zone']}
+        templateExample={{ name: 'Main Warehouse', temperature_zone: 'Ambient' }}
+        canImport={canManageStorageLocations}
+        disabledReason="Storage-locations write permission is required for bulk location import."
+        onCommitted={invalidateLocationConsumers}
+      />
 
       <section id="storage-location-form-panel" className="app-panel app-panel--padded" style={editingLocation ? styles.editPanel : styles.panel}>
         <h3 style={styles.panelTitle}>{editingLocation ? 'Edit Storage Location' : 'Create Storage Location'}</h3>

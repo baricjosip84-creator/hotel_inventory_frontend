@@ -49,7 +49,6 @@ export function useEnterpriseInventoryPageActions({
 }: EnterpriseInventoryPageActionsParams) {
   const {
     alertForm,
-    attachmentForm,
     barcodeLabelForm,
     cycleCountForm,
     editingProductId,
@@ -158,7 +157,6 @@ export function useEnterpriseInventoryPageActions({
     productPackageForm,
     notificationDeliveryForm,
     alertForm,
-    attachmentForm,
     editingProductPackageId,
     emptyProductPackageForm,
     setErrorMessage,
@@ -182,7 +180,6 @@ export function useEnterpriseInventoryPageActions({
     queueNotificationDeliveryMutation:
       workflowMutations.queueNotificationDeliveryMutation,
     createAlertMutation: workflowMutations.createAlertMutation,
-    createAttachmentMutation: workflowMutations.createAttachmentMutation,
   });
 
   return {

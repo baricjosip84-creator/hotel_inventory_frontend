@@ -26,9 +26,9 @@ export function EnterpriseInventoryCatalogSupportPanels({
 
   const { queries, stableData, viewData } = pageData;
 
-  const { attachmentsQuery, barcodeLabelsQuery, productPackagesQuery } = queries;
+  const { attachmentsQuery, barcodeLabelsQuery, productPackagesQuery, invoicesQuery, requisitionsQuery, supplierReturnsQuery } = queries;
 
-  const { products } = stableData;
+  const { products, suppliers, purchaseOrders, shipments } = stableData;
 
   const { selectedProductPackages } = viewData;
 
@@ -36,12 +36,12 @@ export function EnterpriseInventoryCatalogSupportPanels({
     beginEditProductPackage,
     cancelEditProductPackage,
     createAttachmentMutation,
+    deleteAttachmentMutation,
     createBarcodeLabelMutation,
     recordBarcodeLabelPrintsMutation,
     deleteBarcodeLabelMutation,
     createProductPackageMutation,
     deleteProductPackageMutation,
-    handleAttachmentSubmit,
     handleBarcodeLabelSubmit,
     handleProductPackageSubmit,
     updateProductPackageMutation,
@@ -86,8 +86,15 @@ export function EnterpriseInventoryCatalogSupportPanels({
           attachmentForm={attachmentForm}
           attachmentsQuery={attachmentsQuery}
           createAttachmentMutation={createAttachmentMutation}
+          deleteAttachmentMutation={deleteAttachmentMutation}
           setAttachmentForm={setAttachmentForm}
-          onAttachmentSubmit={handleAttachmentSubmit}
+          products={products}
+          suppliers={suppliers}
+          purchaseOrders={purchaseOrders}
+          shipments={shipments}
+          invoices={invoicesQuery.data ?? []}
+          requisitions={requisitionsQuery.data ?? []}
+          supplierReturns={supplierReturnsQuery.data ?? []}
         />
       </EnterpriseInventoryTabPanel>
     </>

@@ -12,6 +12,7 @@ import type {
   StockItem,
   StockTransfer,
   SupplierInvoice,
+  SupplierReturn,
   SupplierTrustScore
 } from './EnterpriseInventoryTypes';
 
@@ -135,10 +136,11 @@ export function buildReceivingSummary(shipments: Shipment[], selectedShipmentIte
 export function buildApprovalQueue(
   requisitions: DepartmentRequisition[],
   cycleCounts: CycleCount[],
-  invoices: SupplierInvoice[]
+  invoices: SupplierInvoice[],
+  supplierReturns: SupplierReturn[]
 ) {
   const requisitionRows = requisitions
-    .filter((item) => ['draft', 'submitted', 'pending_approval'].includes(item.status))
+    .filter((item) => item.status === 'pending_approval')
     .map((item) => {
       const items = item.items ?? [];
       const requestedTotal = items.reduce((total, requisitionItem) => total + toNumber(requisitionItem.requested_quantity), 0);
@@ -160,7 +162,7 @@ export function buildApprovalQueue(
     });
 
   const cycleCountRows = cycleCounts
-    .filter((item) => ['draft', 'submitted', 'pending_approval'].includes(item.status))
+    .filter((item) => item.status === 'pending_approval')
     .map((item) => ({
       entity_type: 'cycle_count',
       entity_id: item.id,
@@ -179,6 +181,17 @@ export function buildApprovalQueue(
       created_at: item.created_at
     }));
 
-  return [...requisitionRows, ...cycleCountRows, ...invoiceRows]
+  const supplierReturnRows = supplierReturns
+    .filter((item) => item.status === 'pending_approval')
+    .map((item) => ({
+      entity_type: 'supplier_return',
+      entity_id: item.id,
+      label: `Supplier return ${item.return_number}`,
+      detail: `${item.supplier_name} · ${item.items?.length || 0} item${item.items?.length === 1 ? '' : 's'}`,
+      status: item.status,
+      created_at: item.created_at
+    }));
+
+  return [...requisitionRows, ...cycleCountRows, ...invoiceRows, ...supplierReturnRows]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }

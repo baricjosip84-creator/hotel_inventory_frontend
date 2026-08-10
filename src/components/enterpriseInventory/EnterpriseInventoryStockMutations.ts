@@ -97,6 +97,30 @@ export function useEnterpriseInventoryStockMutations(
     onError: mutationFeedback.error("Failed to create cycle count."),
   });
 
+  const submitRequisitionMutation = useMutation({
+    mutationFn: (id: string) =>
+      postEnterpriseInventoryRequest<DepartmentRequisition>(
+        `/enterprise-inventory/department-requisitions/${id}/submit`,
+      ),
+    onSuccess: mutationFeedback.invalidating(
+      "Requisition submitted successfully.",
+      ["enterprise-requisitions", "enterprise-notifications"],
+    ),
+    onError: mutationFeedback.error("Failed to submit requisition."),
+  });
+
+  const submitCycleCountMutation = useMutation({
+    mutationFn: (id: string) =>
+      postEnterpriseInventoryRequest<CycleCount>(
+        `/enterprise-inventory/cycle-counts/${id}/submit`,
+      ),
+    onSuccess: mutationFeedback.invalidating(
+      "Cycle count submitted successfully.",
+      ["enterprise-cycle-counts", "enterprise-notifications"],
+    ),
+    onError: mutationFeedback.error("Failed to submit cycle count."),
+  });
+
   const reconcileCycleCountMutation = useMutation({
     mutationFn: (id: string) =>
       postEnterpriseInventoryRequest<{ message: string; id: string }>(
@@ -178,7 +202,9 @@ export function useEnterpriseInventoryStockMutations(
     createParLevelMutation,
     evaluateParLevelsMutation,
     createRequisitionMutation,
+    submitRequisitionMutation,
     createCycleCountMutation,
+    submitCycleCountMutation,
     reconcileCycleCountMutation,
     adjustStockMutation,
     createStockTransferMutation,

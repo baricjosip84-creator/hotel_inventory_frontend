@@ -38,6 +38,7 @@ export interface ProductPackageItem {
 export interface ProductItem {
   id: string;
   tenant_id: string;
+  sku?: string;
   name: string;
   category: string | null;
   unit: string;

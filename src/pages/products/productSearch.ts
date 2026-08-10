@@ -6,6 +6,7 @@ const wordStartsWith = (value: string, term: string): boolean =>
   value.split(/\s+/).some((word) => word.startsWith(term));
 
 const productSearchFields = (product: ProductItem): string[] => [
+  normalize(product.sku),
   normalize(product.name),
   normalize(product.category),
   normalize(product.unit),
@@ -15,6 +16,7 @@ const productSearchFields = (product: ProductItem): string[] => [
 ].filter(Boolean);
 
 const productSearchRank = (product: ProductItem, search: string): number => {
+  const sku = normalize(product.sku);
   const name = normalize(product.name);
   const category = normalize(product.category);
   const supplier = normalize(product.supplier_name);
@@ -24,15 +26,17 @@ const productSearchRank = (product: ProductItem, search: string): number => {
       ...(product.package_barcodes ?? []).map(normalize)
   ].filter(Boolean);
 
-  if (barcodes.some((barcode) => barcode === search)) return 0;
-  if (name === search) return 1;
-  if (name.startsWith(search)) return 2;
-  if (wordStartsWith(name, search)) return 3;
-  if (name.includes(search)) return 4;
-  if (category.startsWith(search) || supplier.startsWith(search)) return 5;
-  if (unit.startsWith(search)) return 6;
-  if (barcodes.some((barcode) => barcode.startsWith(search))) return 7;
-  return 8;
+  if (sku === search) return 0;
+  if (barcodes.some((barcode) => barcode === search)) return 1;
+  if (sku.startsWith(search)) return 2;
+  if (name === search) return 3;
+  if (name.startsWith(search)) return 4;
+  if (wordStartsWith(name, search)) return 5;
+  if (name.includes(search)) return 6;
+  if (category.startsWith(search) || supplier.startsWith(search)) return 7;
+  if (unit.startsWith(search)) return 8;
+  if (barcodes.some((barcode) => barcode.startsWith(search))) return 9;
+  return 10;
 };
 
 export function filterProductsBySearch(products: ProductItem[], rawSearch: string): ProductItem[] {

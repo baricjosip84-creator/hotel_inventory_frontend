@@ -44,7 +44,7 @@ const entityTypeLabels: Record<string, string> = {
   supplier_invoice: 'Supplier invoice',
   department_requisition: 'Department requisition',
   cycle_count: 'Cycle count',
-  shipment: 'Shipment'
+  supplier_return: 'Supplier return'
 };
 
 const statusLabels: Record<string, string> = {
@@ -81,6 +81,8 @@ export function ApprovalsTab({
     && minimumAmount >= 0
     && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount));
   const currencyValid = /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
+  const entitySupportsScope = ['department_requisition', 'cycle_count'].includes(approvalRuleForm.entity_type);
+  const entityUsesAmount = ['purchase_order', 'supplier_invoice', 'supplier_return'].includes(approvalRuleForm.entity_type);
   const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid)
     && !createApprovalRuleMutation.isPending;
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
@@ -106,20 +108,25 @@ export function ApprovalsTab({
           disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
           label="Entity type"
           value={approvalRuleForm.entity_type}
-          onChange={(value) => setApprovalRuleForm((current) => ({ ...current, entity_type: value }))}
+          onChange={(value) => setApprovalRuleForm((current) => ({
+            ...current,
+            entity_type: value,
+            ...(!['department_requisition', 'cycle_count'].includes(value) ? { department: '', storage_location_id: '' } : {}),
+            ...(['department_requisition', 'cycle_count'].includes(value) ? { min_amount: '0', max_amount: '' } : {})
+          }))}
           options={[
             { value: 'purchase_order', label: 'Purchase order' },
             { value: 'supplier_invoice', label: 'Supplier invoice' },
             { value: 'department_requisition', label: 'Department requisition' },
             { value: 'cycle_count', label: 'Cycle count' },
-            { value: 'shipment', label: 'Shipment' }
+            { value: 'supplier_return', label: 'Supplier return' }
           ]}
           required
         />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
-        <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entitySupportsScope} label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
+        <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entitySupportsScope} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entityUsesAmount} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
+        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entityUsesAmount} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
         <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Currency" value={approvalRuleForm.currency} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
         <SelectField
           disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
@@ -133,6 +140,8 @@ export function ApprovalsTab({
           required
         />
         {!canWriteApprovalRules ? <p style={styles.helper}>Creating approval rules requires {TENANT_PERMISSIONS.APPROVAL_RULES_WRITE} permission.</p> : null}
+        {!entitySupportsScope ? <p style={styles.helper}>Purchase-order, supplier-invoice, and supplier-return approvals are amount/role based and apply tenant-wide.</p> : null}
+        {!entityUsesAmount ? <p style={styles.helper}>Department-requisition and cycle-count approvals use department/location scope and role; amount thresholds do not apply.</p> : null}
         {!amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
         {!currencyValid ? <p style={styles.helper}>Currency must be a three-letter ISO code.</p> : null}
         <button type="submit" disabled={!canSaveRule} style={canSaveRule ? styles.primaryButton : styles.disabledButton}>

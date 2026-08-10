@@ -62,6 +62,7 @@ export function useEnterpriseInventoryPageData(params: EnterpriseInventoryQuerie
     stockTransfers: stableData.stockTransfers,
     suppliers: stableData.suppliers,
     supplierTrustScores: stableData.supplierTrustScores,
+    supplierReturns: queries.supplierReturnsQuery.data ?? [],
   });
 
   return {

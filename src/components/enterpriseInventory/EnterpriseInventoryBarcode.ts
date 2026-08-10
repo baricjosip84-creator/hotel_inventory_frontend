@@ -25,6 +25,9 @@ export function createShipmentBarcodeLookupSuccessHandler(
       product_id: result.product_id,
       storage_location_id: result.storage_location_id || current.storage_location_id,
       quantity_received: String(receivedUnits),
+      lot_number: result.label?.lot_number || current.lot_number,
+      batch_number: result.label?.batch_number || current.batch_number,
+      expiry_date: result.label?.expiry_date ? String(result.label.expiry_date).slice(0, 10) : current.expiry_date,
       discrepancy_reason: result.discrepancy_reason || current.discrepancy_reason
     }));
     const matchType = result.match_source === 'label' || result.label

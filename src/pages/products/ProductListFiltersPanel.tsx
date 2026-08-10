@@ -72,7 +72,7 @@ export function ProductListFiltersPanel({
               role="searchbox"
               inputMode="search"
               autoComplete="off"
-              placeholder="Name, category, unit, supplier, or barcode"
+              placeholder="SKU, name, category, unit, supplier, or barcode"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               style={styles.productSearchInput}

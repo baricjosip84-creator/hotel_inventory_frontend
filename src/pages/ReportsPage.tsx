@@ -30,18 +30,19 @@ const REPORT_TABS: Array<{ key: ReportTab; label: string }> = [
   { key: 'forecast', label: 'Forecast' }
 ];
 
-const REPORT_LABELS: Record<Exclude<ReportTab, 'forecast'>, string> = {
+const REPORT_LABELS: Record<ReportTab, string> = {
   'inventory-valuation': 'Inventory valuation report',
   'stock-by-location': 'Stock by location report',
   'product-movements': 'Product movements report',
-  'procurement-summary': 'Procurement summary report'
+  'procurement-summary': 'Procurement summary report',
+  forecast: 'Demand forecast report'
 };
 
-function getReportLabel(report: Exclude<ReportTab, 'forecast'>): string {
+function getReportLabel(report: ReportTab): string {
   return REPORT_LABELS[report] || report;
 }
 
-function getReportFilename(report: Exclude<ReportTab, 'forecast'>): string {
+function getReportFilename(report: ReportTab): string {
   return `${getReportLabel(report).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}.csv`;
 }
 
@@ -76,7 +77,7 @@ function getReportFilterHint(value: string): string {
 }
 
 function getExportButtonLabel(
-  report: Exclude<ReportTab, 'forecast'>,
+  report: ReportTab,
   downloadingReport: ReportTab | null
 ): string {
   if (downloadingReport === report) {
@@ -91,14 +92,14 @@ function getExportButtonLabel(
 }
 
 function getExportButtonTitle(
-  report: Exclude<ReportTab, 'forecast'>,
+  report: ReportTab,
   downloadingReport: ReportTab | null
 ): string {
   if (downloadingReport === report) {
     return `${getReportLabel(report)} is being exported.`;
   }
 
-  if (downloadingReport !== null && downloadingReport !== 'forecast') {
+  if (downloadingReport !== null) {
     return `Wait for ${getReportLabel(downloadingReport)} to finish exporting.`;
   }
 
@@ -106,14 +107,14 @@ function getExportButtonTitle(
 }
 
 function getExportButtonAriaLabel(
-  report: Exclude<ReportTab, 'forecast'>,
+  report: ReportTab,
   downloadingReport: ReportTab | null
 ): string {
   if (downloadingReport === report) {
     return `Exporting ${getReportLabel(report)} as CSV.`;
   }
 
-  if (downloadingReport !== null && downloadingReport !== 'forecast') {
+  if (downloadingReport !== null) {
     return `CSV export unavailable while ${getReportLabel(downloadingReport)} is exporting.`;
   }
 
@@ -121,7 +122,7 @@ function getExportButtonAriaLabel(
 }
 
 function getClearDownloadStatusAriaLabel(
-  downloadInfo: { report: Exclude<ReportTab, 'forecast'>; metadata: ApiDownloadMetadata } | null,
+  downloadInfo: { report: ReportTab; metadata: ApiDownloadMetadata } | null,
   downloadError: string | null
 ): string {
   if (downloadError) {
@@ -458,7 +459,7 @@ export default function ReportsPage() {
   const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
   const [movementLimit, setMovementLimit] = useState(50);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloadInfo, setDownloadInfo] = useState<{ report: Exclude<ReportTab, 'forecast'>; metadata: ApiDownloadMetadata } | null>(null);
+  const [downloadInfo, setDownloadInfo] = useState<{ report: ReportTab; metadata: ApiDownloadMetadata } | null>(null);
   const [downloadingReport, setDownloadingReport] = useState<ReportTab | null>(null);
   const normalizedLocationCategoryFilter = useMemo(
     () => getNormalizedCategoryFilter(locationCategoryFilter),
@@ -640,12 +641,12 @@ export default function ReportsPage() {
     setMovementLimit(value);
   };
 
-  const downloadReportCsv = async (report: Exclude<ReportTab, 'forecast'>) => {
+  const downloadReportCsv = async (report: ReportTab) => {
     setDownloadError(null);
     setDownloadInfo(null);
     setDownloadingReport(report);
 
-    const paths: Record<Exclude<ReportTab, 'forecast'>, string> = {
+    const paths: Record<ReportTab, string> = {
       'inventory-valuation': '/reports/inventory-valuation?format=csv',
       'stock-by-location': `/reports/stock-by-location${buildQueryString({
         category: normalizedLocationCategoryFilter,
@@ -655,7 +656,8 @@ export default function ReportsPage() {
         limit: movementLimit,
         format: 'csv'
       })}`,
-      'procurement-summary': '/reports/procurement-summary?format=csv'
+      'procurement-summary': '/reports/procurement-summary?format=csv',
+      forecast: '/reports/forecast?format=csv'
     };
 
     try {
@@ -932,7 +934,7 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
-        {downloadingReport !== null && downloadingReport !== 'forecast' ? (
+        {downloadingReport !== null ? (
           <p id={REPORT_TAB_LOCK_HINT_ID} style={styles.tabLockHint}>
             Report tabs are locked while {getReportLabel(downloadingReport)} is exporting.
           </p>
@@ -1414,20 +1416,33 @@ export default function ReportsPage() {
           title="Demand Forecast"
           subtitle="Usage-based demand forecast from recent negative stock movements over the last 30 days."
           actions={
-            <RefreshReportButton
-              label="forecast report"
-              isRefreshing={forecastQuery.isFetching}
-              disabled={downloadingReport !== null || !forecastFeatureReady}
-              disabledReason={
-                forecastUnavailableReason ||
-                (downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined)
-              }
-              onRefresh={() => refreshReport('forecast')}
-            />
+            <>
+              <RefreshReportButton
+                label="forecast report"
+                isRefreshing={forecastQuery.isFetching}
+                disabled={downloadingReport !== null || !forecastFeatureReady}
+                disabledReason={
+                  forecastUnavailableReason ||
+                  (downloadingReport !== null ? 'Wait for the current CSV export to finish before refreshing.' : undefined)
+                }
+                onRefresh={() => refreshReport('forecast')}
+              />
+              <button
+                type="button"
+                onClick={() => downloadReportCsv('forecast')}
+                disabled={downloadingReport !== null || !forecastFeatureReady}
+                aria-disabled={downloadingReport !== null || !forecastFeatureReady}
+                title={forecastUnavailableReason || getExportButtonTitle('forecast', downloadingReport)}
+                aria-label={getExportButtonAriaLabel('forecast', downloadingReport)}
+                style={styles.secondaryButton}
+              >
+                {getExportButtonLabel('forecast', downloadingReport)}
+              </button>
+            </>
           }
         >
           <p id={FORECAST_ACCESS_NOTE_ID} style={styles.infoNote}>
-            Forecast is read-only, has no CSV export, and requires Forecasting subscription access plus the Insights - Read permission.
+            Forecast is read-only for inventory changes and supports CSV export. Access requires Forecasting subscription access plus Reports - Read and Insights - Read permissions.
           </p>
           {forecastUnavailableReason ? (
             <ErrorState message={forecastUnavailableReason} />

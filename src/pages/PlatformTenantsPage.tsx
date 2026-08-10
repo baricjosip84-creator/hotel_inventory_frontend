@@ -17,6 +17,8 @@ type SupportPolicy = {
   allowed_access_levels?: string[];
 };
 
+type ProvisioningPreset = { id: string; key: string; label: string; preset_version: number };
+
 type TenantRow = {
   id: string;
   name: string;
@@ -63,7 +65,7 @@ export default function PlatformTenantsPage() {
   const [form, setForm] = useState({
     name: '',
     location: '',
-    preset: 'hotel',
+    preset: '',
     plan_code: 'standard',
     inventory_currency: DEFAULT_INVENTORY_CURRENCY,
     initial_admin_email: '',
@@ -102,6 +104,19 @@ export default function PlatformTenantsPage() {
     queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants')
   });
 
+  const provisioningPresetsQuery = useQuery({
+    queryKey: ['platform', 'provisioning', 'presets'],
+    queryFn: () => platformApiRequest<ProvisioningPreset[]>('/platform/provisioning/presets')
+  });
+
+  useEffect(() => {
+    const presets = provisioningPresetsQuery.data || [];
+    if (!presets.length) return;
+    if (!presets.some((preset) => preset.key === form.preset)) {
+      setForm((current) => ({ ...current, preset: presets[0].key }));
+    }
+  }, [provisioningPresetsQuery.data, form.preset]);
+
   const detailsQuery = useQuery({
     queryKey: ['platform', 'tenants', selected],
     queryFn: () => platformApiRequest<TenantDetails>(`/platform/tenants/${selected}`),
@@ -137,6 +152,7 @@ export default function PlatformTenantsPage() {
         name: form.name.trim(),
         location: form.location.trim(),
         preset: form.preset,
+        preset_version_id: (provisioningPresetsQuery.data || []).find((preset) => preset.key === form.preset)?.id,
         plan_code: form.plan_code,
         inventory_currency: form.inventory_currency.trim().toUpperCase(),
         initial_admin: hasCompleteInitialAdmin ? {
@@ -151,7 +167,7 @@ export default function PlatformTenantsPage() {
       setForm({
         name: '',
         location: '',
-        preset: 'hotel',
+        preset: provisioningPresetsQuery.data?.[0]?.key || '',
         plan_code: 'standard',
         inventory_currency: DEFAULT_INVENTORY_CURRENCY,
         initial_admin_email: '',
@@ -271,6 +287,8 @@ const lock = useMutation({
   const hasValidInitialAdminPassword = !hasAnyInitialAdminValue || form.initial_admin_password.length >= 10;
   const createTenantBlockedReason = !form.name.trim()
     ? 'Enter a tenant name before creating a tenant.'
+    : !(provisioningPresetsQuery.data || []).some((preset) => preset.key === form.preset)
+      ? 'Select a currently published provisioning preset.'
     : !/^[A-Za-z]{3}$/.test(form.inventory_currency.trim())
       ? 'Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.'
     : hasAnyInitialAdminValue && !hasCompleteInitialAdmin
@@ -337,11 +355,10 @@ const lock = useMutation({
           <div style={styles.form}>
             <input style={styles.input} placeholder="Tenant name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             <input style={styles.input} placeholder="Location" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} />
-            <select style={styles.input} value={form.preset} onChange={(event) => setForm({ ...form, preset: event.target.value })}>
-              <option>hotel</option>
-              <option>restaurant</option>
-              <option>warehouse</option>
-              <option>facility</option>
+            <select style={styles.input} value={form.preset} onChange={(event) => setForm({ ...form, preset: event.target.value })} disabled={provisioningPresetsQuery.isLoading || !(provisioningPresetsQuery.data || []).length}>
+              {(provisioningPresetsQuery.data || []).map((preset) => (
+                <option key={preset.id} value={preset.key}>{preset.label} · v{preset.preset_version}</option>
+              ))}
             </select>
             <select
               style={styles.input}

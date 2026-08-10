@@ -54,14 +54,21 @@ export const emptyCycleCountForm: CycleCountForm = {
   notes: '',
   product_id: '',
   expected_quantity: '',
-  counted_quantity: ''
+  counted_quantity: '',
+  lot_number: '',
+  batch_number: '',
+  expiry_date: ''
 };
 
 export const emptyStockAdjustmentForm: StockAdjustmentForm = {
   product_id: '',
   storage_location_id: '',
   change: '',
-  reason: 'manual_adjustment'
+  reason: 'manual_adjustment',
+  lot_number: '',
+  batch_number: '',
+  expiry_date: '',
+  manufactured_at: ''
 };
 
 export const emptyStockTransferForm: StockTransferForm = {
@@ -113,6 +120,15 @@ export const emptyShipmentReceivingForm: ShipmentReceivingForm = {
   product_id: '',
   storage_location_id: '',
   quantity_received: '',
+  lot_number: '',
+  batch_number: '',
+  expiry_date: '',
+  manufactured_at: '',
+  shortage_quantity: '0',
+  overage_quantity: '0',
+  damaged_quantity: '0',
+  rejected_quantity: '0',
+  quarantine_quantity: '0',
   discrepancy_reason: '',
   receiving_note: ''
 };
@@ -171,15 +187,21 @@ export const emptySupplierInvoiceForm: SupplierInvoiceForm = {
   shipment_id: '',
   invoice_number: '',
   invoice_date: new Date().toISOString().slice(0, 10),
+  due_date: '',
   currency: getActiveTenantCurrency(),
-  subtotal_amount: '',
   tax_amount: '0',
-  total_amount: '',
-  product_id: '',
-  quantity: '',
-  unit_cost: '',
-  expected_quantity: '',
-  expected_unit_cost: ''
+  notes: '',
+  items: [
+    {
+      product_id: '',
+      purchase_order_item_id: '',
+      shipment_item_id: '',
+      quantity: '',
+      unit_cost: '',
+      expected_quantity: '',
+      expected_unit_cost: ''
+    }
+  ]
 };
 
 export const emptyNotificationDeliveryForm: NotificationDeliveryForm = {

@@ -25,6 +25,7 @@ import type {
   StockTransfer,
   SupplierInvoice,
   SupplierOption,
+  SupplierReturn,
   SupplierTrustScore
 } from './EnterpriseInventoryTypes';
 
@@ -46,6 +47,7 @@ type EnterpriseInventoryViewDataInput = {
   stockTransfers: StockTransfer[];
   suppliers: SupplierOption[];
   supplierTrustScores: SupplierTrustScore[];
+  supplierReturns: SupplierReturn[];
 };
 
 export function useEnterpriseInventoryViewData({
@@ -65,7 +67,8 @@ export function useEnterpriseInventoryViewData({
   shipments,
   stockTransfers,
   suppliers,
-  supplierTrustScores
+  supplierTrustScores,
+  supplierReturns
 }: EnterpriseInventoryViewDataInput) {
   const operationsDashboardSummary = useMemo(
     () => buildOperationsDashboardSummary(dashboardSummary),
@@ -110,8 +113,8 @@ export function useEnterpriseInventoryViewData({
   }, [invoices, suppliers]);
 
   const approvalQueue = useMemo(
-    () => buildApprovalQueue(requisitions, cycleCounts, invoices),
-    [requisitions, cycleCounts, invoices]
+    () => buildApprovalQueue(requisitions, cycleCounts, invoices, supplierReturns),
+    [requisitions, cycleCounts, invoices, supplierReturns]
   );
 
   return {

@@ -3,19 +3,43 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
+type EvidenceScope = {
+  mode: string;
+  status: string;
+  review_limit: number | null;
+  evaluated_tenants: number;
+  total_tenants: number | null;
+};
+
 type GoNoGoRow = {
   code: string;
   source_packet: string;
   source_control: string;
+  source_key: string | null;
   domain: string;
   decision_owner: string;
   required_evidence: string;
+  evidence_status: string | null;
+  source_available: boolean;
+  source_posture: string;
+  source_summary: Record<string, unknown>;
+  source_validation_note: string | null;
+  source_error_code: string | null;
+  evidence_scope: EvidenceScope | null;
+  launch_area_status: string;
+  launch_gate: string;
+  launch_gate_context_only: boolean;
   acceptance_artifact: string;
+  acceptance_artifact_storage: string;
+  acceptance_statement: string | null;
   packet_status: string;
   default_decision: string;
   allowed_decisions: string[];
+  decision_artifact: string;
+  decision_artifact_storage: string;
   required_decision_fields: string[];
   conditional_go_extra_fields: string[];
+  no_go_extra_fields: string[];
   register_status: string;
 };
 
@@ -27,8 +51,25 @@ type CommercialLaunchGoNoGoRegister = {
   summary: Record<string, number>;
   go_no_go_register: GoNoGoRow[];
   acceptance_packet_posture: string;
+  acceptance_summary: Record<string, unknown>;
+  acceptance_persistence: {
+    stored_in_application: boolean;
+    external_records_observable: boolean;
+    interpretation: string;
+  } | null;
   certificate_posture: string;
   launch_readiness_posture: string;
+  tenant_scope: {
+    available: boolean;
+    total_tenants: number | null;
+    review_limit: number;
+    error_code?: string;
+  } | null;
+  decision_persistence: {
+    stored_in_application: boolean;
+    external_records_observable: boolean;
+    interpretation: string;
+  };
   decision_requirements: string[];
   launch_limitations: string[];
   next_best_step: string;
@@ -39,21 +80,25 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  return 'Unknown API error';
+}
 
 function getDecisionEvidenceLink(row: GoNoGoRow) {
   const bySourceControl: Record<string, string> = {
     tenant_provisioning_accepted: '/platform/tenant-provisioning-hardening',
     customer_onboarding_accepted: '/platform/customer-onboarding-checklist',
     billing_subscription_accepted: '/platform/billing-subscription-activation',
-    support_operations_accepted: '/platform/support-operations-cockpit',
-    production_monitoring_accepted: '/platform/production-monitoring-readiness',
+    support_operations_accepted: '/platform/support-cockpit',
+    production_monitoring_accepted: '/platform/monitoring-readiness',
     backup_restore_accepted: '/platform/backup-restore-validation',
     deployment_validation_accepted: '/platform/deployment-validation',
     documentation_completeness_accepted: '/platform/documentation-completeness',
     pilot_customer_readiness_accepted: '/platform/pilot-customer-readiness',
     commercial_readiness_closure_accepted: '/platform/commercial-readiness-verification-program'
   };
-  return bySourceControl[row.source_control] || '/platform/commercial-launch-acceptance-packet';
+  return bySourceControl[row.source_control] || '/platform/commercial-launch-acceptance';
 }
 
 function getDecisionEvidenceLabel(row: GoNoGoRow) {
@@ -73,15 +118,44 @@ function getDecisionEvidenceLabel(row: GoNoGoRow) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('no_go')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('manual') || value.includes('conditional') || value.includes('ready') || value.includes('not_recorded')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  const normalized = value.toLowerCase();
+  if (normalized === 'loading' || normalized.includes('context_only') || normalized.includes('not_recorded')) {
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+  }
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('no_go')
+    || normalized.includes('missing')
+    || normalized.includes('unavailable')
+    || normalized.includes('failed')
+  ) {
+    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  }
+  if (
+    normalized.includes('manual')
+    || normalized.includes('required')
+    || normalized.includes('review')
+    || normalized.includes('conditional')
+    || normalized.includes('external')
+  ) {
+    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  }
+  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('present')) {
+    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  }
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+}
+
+function neutralBadgeStyle(): CSSProperties {
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
 }
 
 export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
   const register = useQuery({
     queryKey: ['platform', 'commercial-launch-go-no-go-register'],
-    queryFn: () => platformApiRequest<CommercialLaunchGoNoGoRegister>('/platform/commercial-launch-go-no-go-register')
+    queryFn: () => platformApiRequest<CommercialLaunchGoNoGoRegister>('/platform/commercial-launch-go-no-go-register'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const data = register.data;
@@ -94,9 +168,9 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Commercial Launch Go/No-Go Register</h1>
           <p style={styles.description}>
-            Step 219 converts owner acceptance packets into final go/no-go decision rows. It shows exactly
-            which owners must record launch decisions, what evidence is required, and which conditional-go
-            fields are mandatory. It remains read-only and does not activate tenants, billing, or production launch.
+            Step 219 prepares final go/no-go decision rows from the current Launch Acceptance packets. It preserves
+            ready, review-required, and blocked evidence states and carries the current upstream posture and scope into
+            each owner decision row. Final decisions remain external to this application.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -113,29 +187,46 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
         </div>
       </section>
 
+      <section style={styles.warningCard}>
+        <strong>Decision-preparation only.</strong>
+        <span>
+          A row marked ready means its current acceptance evidence is ready for an authorized owner to make and record
+          a decision externally. This page cannot observe external decisions, cannot approve launch, and does not start deployment.
+        </span>
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting launch pages</h2>
         <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance">Launch acceptance</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness</Link>
           <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
           <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
           <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring</Link>
+          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring</Link>
           <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
           <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
           <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
           <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
         </div>
       </section>
 
       {register.isLoading ? <div style={styles.card}>Loading commercial launch go/no-go register...</div> : null}
       {register.error ? (
         <div style={styles.error}>
-          Failed to load commercial launch go/no-go register.
-          <button type="button" style={styles.errorButton} onClick={() => void register.refetch()}>Retry</button>
+          <div><strong>Failed to load commercial launch go/no-go register.</strong></div>
+          <div style={styles.errorDetail}>{errorMessage(register.error)}</div>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void register.refetch()}
+            disabled={register.isFetching}
+          >
+            {register.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -146,7 +237,7 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
             <div style={styles.metadataGrid}>
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
               <div><strong>Validation</strong><span>{data.validation_note}</span></div>
             </div>
           </section>
@@ -161,11 +252,31 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
           </section>
 
           <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
+            <h2 style={styles.sectionTitle}>Decision context</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Launch readiness</span><strong>{humanize(data.launch_readiness_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-readiness">Open Launch Readiness</Link></div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Current Launch Acceptance posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.acceptance_packet_posture)}</strong>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Current Launch Certificate posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.certificate_posture)}</strong>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Static Launch Readiness registry posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.launch_readiness_posture)}</strong>
+                <span style={styles.help}>Context only — current acceptance evidence controls decision readiness.</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Tenant evidence population</span>
+                <strong>{data.tenant_scope?.total_tenants == null ? 'Unavailable' : `${data.tenant_scope.total_tenants} tenants`}</strong>
+                <span style={styles.help}>Tenant-scoped sources review up to {data.tenant_scope?.review_limit ?? 300} tenants per board.</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Decision persistence</span>
+                <strong>{data.decision_persistence.stored_in_application ? 'Stored in application' : 'External only'}</strong>
+                <span style={styles.help}>{data.decision_persistence.interpretation}</span>
+              </div>
             </div>
           </section>
 
@@ -175,19 +286,70 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
               {data.go_no_go_register.map((row) => (
                 <article key={row.code} style={styles.registerCard}>
                   <div style={styles.rowHeader}>
-                    <div>
+                    <div style={styles.wrapAnywhere}>
                       <strong>{humanize(row.source_control)}</strong>
                       <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.decision_owner)}</div>
                     </div>
                     <span style={badgeStyle(row.register_status)}>{humanize(row.register_status)}</span>
                   </div>
+
+                  <div style={styles.statusGrid}>
+                    <div style={styles.inputCard}>
+                      <span style={styles.help}>Current acceptance packet</span>
+                      <span style={badgeStyle(row.packet_status)}>{humanize(row.packet_status)}</span>
+                    </div>
+                    <div style={styles.inputCard}>
+                      <span style={styles.help}>Current certificate evidence</span>
+                      <span style={badgeStyle(row.evidence_status || 'unknown')}>{humanize(row.evidence_status || 'unknown')}</span>
+                    </div>
+                    <div style={styles.inputCard}>
+                      <span style={styles.help}>Current upstream posture</span>
+                      <strong style={styles.wrapAnywhere}>{humanize(row.source_posture)}</strong>
+                    </div>
+                    <div style={styles.inputCard}>
+                      <span style={styles.help}>Evidence scope</span>
+                      <strong>{row.evidence_scope ? humanize(row.evidence_scope.status) : 'Not scope-limited'}</strong>
+                      {row.evidence_scope ? (
+                        <span style={styles.help}>
+                          Evaluated {row.evidence_scope.evaluated_tenants}
+                          {row.evidence_scope.total_tenants == null ? '' : ` of ${row.evidence_scope.total_tenants}`} tenants
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={styles.inputCard}>
+                      <span style={styles.help}>Static registry gate</span>
+                      <span style={neutralBadgeStyle()}>{humanize(row.launch_gate)}</span>
+                      <span style={styles.help}>Context only</span>
+                    </div>
+                  </div>
+
+                  {row.source_error_code ? <div style={styles.sourceError}>Evidence source error: {row.source_error_code}</div> : null}
+                  {row.source_validation_note ? <div style={styles.sourceNote}>{row.source_validation_note}</div> : null}
+
                   <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence</span>
-                    <strong>{row.required_evidence}</strong>
+                    <span style={styles.evidenceLabel}>Required evidence endpoint</span>
+                    <strong style={styles.wrapAnywhere}>{row.required_evidence}</strong>
                   </div>
                   <Link style={styles.packetLink} to={getDecisionEvidenceLink(row)}>{getDecisionEvidenceLabel(row)}</Link>
-                  <div style={styles.statusRow}><span>Default decision</span><span style={badgeStyle(row.default_decision)}>{humanize(row.default_decision)}</span></div>
-                  <div style={styles.statusRow}><span>Acceptance packet</span><span style={badgeStyle(row.packet_status)}>{humanize(row.packet_status)}</span></div>
+
+                  <div style={styles.evidenceBox}>
+                    <span style={styles.evidenceLabel}>External acceptance artifact</span>
+                    <strong>{row.acceptance_artifact}</strong>
+                    {row.acceptance_statement ? <p style={styles.reason}>{row.acceptance_statement}</p> : null}
+                    <span style={styles.help}>Storage: {humanize(row.acceptance_artifact_storage)}</span>
+                  </div>
+
+                  <div style={styles.evidenceBox}>
+                    <span style={styles.evidenceLabel}>External go/no-go decision artifact</span>
+                    <strong>{row.decision_artifact}</strong>
+                    <span style={styles.help}>Storage: {humanize(row.decision_artifact_storage)}</span>
+                    <span style={styles.help}>The default template state is not proof that no external decision exists.</span>
+                  </div>
+
+                  <div style={styles.statusRow}>
+                    <span>Decision template state</span>
+                    <span style={badgeStyle(row.default_decision)}>{humanize(row.default_decision)}</span>
+                  </div>
                   <div>
                     <span style={styles.evidenceLabel}>Allowed decisions</span>
                     <div style={styles.chips}>{row.allowed_decisions.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
@@ -199,6 +361,10 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
                   <div>
                     <span style={styles.evidenceLabel}>Conditional-go extra fields</span>
                     <div style={styles.chips}>{row.conditional_go_extra_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
+                  </div>
+                  <div>
+                    <span style={styles.evidenceLabel}>No-go extra fields</span>
+                    <div style={styles.chips}>{row.no_go_extra_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
                   </div>
                 </article>
               ))}
@@ -226,40 +392,46 @@ export default function PlatformCommercialLaunchGoNoGoRegisterPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
+  warningCard: { display: 'grid', gap: 5, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 14, padding: 14 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6 },
+  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6, minWidth: 0, overflowWrap: 'anywhere' },
+  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
   registerGrid: { display: 'grid', gap: 14 },
-  registerCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
-  help: { color: '#6b7280', fontSize: 12 },
-  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4 },
+  registerCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12, minWidth: 0 },
+  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
+  help: { color: '#6b7280', fontSize: 12, lineHeight: 1.45 },
+  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
+  reason: { margin: 0, color: '#475569', fontSize: 13, lineHeight: 1.5 },
   chips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151' },
+  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151', flexWrap: 'wrap' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
   list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.6 },
   nextStep: { background: '#eef2ff', border: '1px solid #c7d2fe', color: '#3730a3', borderRadius: 14, padding: 14 },
   note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14 },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
-  errorButton: { marginLeft: 12, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer', justifySelf: 'start' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
   quickLink: { color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
   packetLink: { justifySelf: 'start', color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
-  sourceLink: { justifySelf: 'start', color: '#1d4ed8', textDecoration: 'none', fontSize: 13, fontWeight: 800 },
-  error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 }
+  sourceError: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, padding: 10, overflowWrap: 'anywhere' },
+  sourceNote: { background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 10, padding: 10, lineHeight: 1.45 },
+  error: { display: 'grid', gap: 8, background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 },
+  errorDetail: { fontSize: 13, overflowWrap: 'anywhere' },
+  wrapAnywhere: { overflowWrap: 'anywhere', minWidth: 0 }
 };

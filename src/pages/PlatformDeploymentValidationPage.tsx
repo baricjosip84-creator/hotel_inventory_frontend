@@ -7,6 +7,7 @@ type DeploymentControl = {
   code: string;
   label: string;
   evidence_key: string;
+  evidence_scope: string;
   launch_reason: string;
   evidence_value: number;
   status: string;
@@ -20,7 +21,8 @@ type DeploymentValidationPackage = {
   summary: Record<string, number>;
   platform_evidence: Record<string, string | number | boolean | null>;
   deployment_validation_controls: DeploymentControl[];
-  required_manual_smoke_test: string[];
+  automatic_runtime_gate_coverage: string[];
+  operator_follow_up: string[];
   next_best_step: string;
   validation_note: string;
 };
@@ -30,26 +32,48 @@ function humanize(value: string) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing')) {
+  const normalized = value.toLowerCase();
+  if (normalized === 'loading') {
+    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  }
+  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('unsafe')) {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
-  if (value.includes('manual') || value.includes('required') || value.includes('test')) {
+  if (
+    normalized.includes('review')
+    || normalized.includes('required')
+    || normalized.includes('external')
+    || normalized.includes('waived')
+  ) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('safe')) {
+    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  }
+  return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
 }
 
 function formatValue(value: string | number | boolean | null | undefined) {
-  if (value === null || value === undefined || value === '') return '-';
+  if (value === null || value === undefined || value === '') return 'not available on this surface';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'string' && value.includes('T')) return new Date(value).toLocaleString();
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString();
+  }
   return String(value);
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown error';
 }
 
 export default function PlatformDeploymentValidationPage() {
   const validation = useQuery({
     queryKey: ['platform', 'deployment-validation'],
-    queryFn: () => platformApiRequest<DeploymentValidationPackage>('/platform/deployment-validation')
+    queryFn: () => platformApiRequest<DeploymentValidationPackage>('/platform/deployment-validation'),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const data = validation.data;
@@ -60,10 +84,11 @@ export default function PlatformDeploymentValidationPage() {
       <section style={styles.header}>
         <div>
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Deployment Validation Gate</h1>
+          <h1 style={styles.title}>Deployment Validation</h1>
           <p style={styles.description}>
-            Step 214 joins Render/backend configuration, frontend managed-build guards, migration checks,
-            health checks, CORS/rate-limit posture, and required live smoke-test evidence into one read-only deployment gate.
+            Operator precheck only. This page reviews backend deployment foundations and the running backend configuration,
+            then points operators to the frontend-owned automatic Deployment Readiness Gate for live Render/Vercel evidence.
+            It does not deploy services or certify a production release by itself.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -80,12 +105,18 @@ export default function PlatformDeploymentValidationPage() {
         </div>
       </section>
 
+      <section style={styles.notice}>
+        <strong>Live evidence is external.</strong> The canonical post-release gate runs from the frontend GitHub Actions workflow.
+        This application does not query or persist that HTML/JSON artifact, so an amber external-evidence state is not the same as a failed deployment.
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting pages</h2>
         <div style={styles.quickLinks}>
           <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring readiness</Link>
           <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
-          <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
+          <Link style={styles.quickLink} to="/platform/releases">Releases</Link>
+          <Link style={styles.quickLink} to="/platform/change-management">Change management</Link>
           <Link style={styles.quickLink} to="/platform/runbooks?category=deployment">Deployment runbooks</Link>
           <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
         </div>
@@ -94,8 +125,15 @@ export default function PlatformDeploymentValidationPage() {
       {validation.isLoading ? <div style={styles.card}>Loading deployment validation...</div> : null}
       {validation.error ? (
         <div style={styles.error}>
-          Failed to load deployment validation.
-          <button type="button" style={styles.errorButton} onClick={() => void validation.refetch()}>Retry</button>
+          <span>Unable to load deployment validation: {readableError(validation.error)}</span>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void validation.refetch()}
+            disabled={validation.isFetching}
+          >
+            {validation.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -107,7 +145,7 @@ export default function PlatformDeploymentValidationPage() {
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
               <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div><strong>Validation boundary</strong><span>{data.validation_note}</span></div>
             </div>
           </section>
 
@@ -122,11 +160,14 @@ export default function PlatformDeploymentValidationPage() {
 
           <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Platform evidence</h2>
+            <p style={styles.helpText}>
+              Runtime evidence exposes status/counts only. Configured CORS origins, tokens, secrets, and external artifact contents are not returned.
+            </p>
             <div style={styles.evidenceGrid}>
               {Object.entries(data.platform_evidence).map(([key, value]) => (
                 <div key={key} style={styles.evidenceItem}>
                   <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                  <strong>{formatValue(value)}</strong>
+                  <strong style={styles.wrap}>{formatValue(value)}</strong>
                 </div>
               ))}
             </div>
@@ -138,23 +179,43 @@ export default function PlatformDeploymentValidationPage() {
               {data.deployment_validation_controls.map((control) => (
                 <article key={control.code} style={styles.controlCard}>
                   <div style={styles.controlHeader}>
-                    <strong>{control.label}</strong>
+                    <strong style={styles.wrap}>{control.label}</strong>
                     <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
                   </div>
                   <p style={styles.reason}>{control.launch_reason}</p>
-                  <span style={styles.help}>Evidence: {humanize(control.evidence_key)} · value {control.evidence_value}</span>
+                  <div style={styles.controlMeta}>
+                    <span>Scope: {humanize(control.evidence_scope)}</span>
+                    <span>Evidence: {humanize(control.evidence_key)} · value {control.evidence_value}</span>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Required manual live smoke test</h2>
-            <ul style={styles.list}>
-              {data.required_manual_smoke_test.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+          <section style={styles.twoColumn}>
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Automatic runtime gate coverage</h2>
+              <p style={styles.helpText}>
+                These are the repeatable checks already owned by the current frontend Deployment Readiness Gate.
+              </p>
+              <ul style={styles.list}>
+                {data.automatic_runtime_gate_coverage.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Operator follow-up</h2>
+              <p style={styles.helpText}>
+                The automatic workflow is the normal release path. Manual execution is a fallback, not an unconditional requirement.
+              </p>
+              <ul style={styles.list}>
+                {data.operator_follow_up.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
           </section>
 
           <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
@@ -166,35 +227,39 @@ export default function PlatformDeploymentValidationPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  page: { display: 'grid', gap: 18, minWidth: 0 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
-  description: { margin: 0, color: '#4b5563', maxWidth: 940, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  description: { margin: 0, color: '#4b5563', maxWidth: 980, lineHeight: 1.5 },
+  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
   generated: { color: '#6b7280', fontSize: 12 },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  notice: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', lineHeight: 1.5 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  evidenceItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 4 },
-  evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
+  evidenceItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 4, minWidth: 0 },
+  evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb' },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
-  reason: { color: '#4b5563', lineHeight: 1.45, margin: '8px 0' },
-  help: { color: '#6b7280', fontSize: 12 },
+  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', minWidth: 0 },
+  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
+  controlMeta: { color: '#6b7280', fontSize: 12, display: 'grid', gap: 4, overflowWrap: 'anywhere' },
+  reason: { color: '#4b5563', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
+  helpText: { color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' },
   list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
+  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', overflowWrap: 'anywhere' },
+  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
+  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
+  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
+  wrap: { overflowWrap: 'anywhere', minWidth: 0 }
 };

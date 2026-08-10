@@ -11,10 +11,19 @@ type SmokeTestRow = {
   failure_policy: string;
   source_register_posture: string;
   source_acceptance_packet_posture: string;
+  manual_precondition: string;
   required_result_fields: string[];
   allowed_results: string[];
   default_result: string;
+  result_artifact: string;
+  result_artifact_storage: string;
   smoke_test_status: string;
+};
+
+type ExternalPersistence = {
+  stored_in_application: boolean;
+  external_records_observable: boolean;
+  interpretation: string;
 };
 
 type CommercialLaunchSmokeTestChecklist = {
@@ -25,8 +34,11 @@ type CommercialLaunchSmokeTestChecklist = {
   summary: Record<string, number>;
   smoke_tests: SmokeTestRow[];
   go_no_go_register_posture: string;
+  go_no_go_register_summary: Record<string, number>;
+  go_no_go_decision_persistence: ExternalPersistence | null;
   acceptance_packet_posture: string;
   certificate_posture: string;
+  result_persistence: ExternalPersistence;
   execution_rules: string[];
   launch_limitations: string[];
   next_best_step: string;
@@ -37,6 +49,10 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  return 'Unknown API error';
+}
 
 function getSmokeTestEvidenceLink(row: SmokeTestRow) {
   const byCode: Record<string, string> = {
@@ -44,26 +60,14 @@ function getSmokeTestEvidenceLink(row: SmokeTestRow) {
     pilot_tenant_access_smoke_test: '/platform/pilot-customer-readiness',
     product_stock_and_report_smoke_test: '/platform/customer-onboarding-checklist',
     shipment_receiving_smoke_test: '/platform/customer-onboarding-checklist',
-    platform_support_cockpit_smoke_test: '/platform/support-operations-cockpit',
+    platform_support_cockpit_smoke_test: '/platform/support-cockpit',
     billing_subscription_visibility_smoke_test: '/platform/billing-subscription-activation',
-    monitoring_incident_smoke_test: '/platform/production-monitoring-readiness',
+    monitoring_incident_smoke_test: '/platform/monitoring-readiness',
     backup_restore_evidence_smoke_test: '/platform/backup-restore-validation',
     documentation_support_handover_smoke_test: '/platform/documentation-completeness',
     rollback_decision_path_smoke_test: '/platform/deployment-validation'
   };
-  const byDomain: Record<string, string> = {
-    authentication: '/platform/sessions',
-    tenant_access: '/platform/pilot-customer-readiness',
-    inventory_core: '/platform/customer-onboarding-checklist',
-    receiving_workflow: '/platform/customer-onboarding-checklist',
-    platform_operations: '/platform/support-operations-cockpit',
-    billing_visibility: '/platform/billing-subscription-activation',
-    monitoring_incidents: '/platform/production-monitoring-readiness',
-    backup_recovery: '/platform/backup-restore-validation',
-    documentation_support: '/platform/documentation-completeness',
-    rollback_readiness: '/platform/deployment-validation'
-  };
-  return byCode[row.code] || byDomain[row.domain] || '/platform/commercial-launch-go-no-go-register';
+  return byCode[row.code] || '/platform/commercial-launch-go-no-go-register';
 }
 
 function getSmokeTestEvidenceLabel(row: SmokeTestRow) {
@@ -83,15 +87,40 @@ function getSmokeTestEvidenceLabel(row: SmokeTestRow) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('fail')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('waiting') || value.includes('manual') || value.includes('ready') || value.includes('not_run') || value.includes('conditional')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  const normalized = value.toLowerCase();
+  if (normalized === 'loading' || normalized.includes('not_run') || normalized.includes('external_not_persisted')) {
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+  }
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('fail')
+    || normalized.includes('missing')
+    || normalized.includes('unavailable')
+  ) {
+    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  }
+  if (
+    normalized.includes('review')
+    || normalized.includes('waiting')
+    || normalized.includes('required')
+    || normalized.includes('manual')
+    || normalized.includes('conditional')
+    || normalized.includes('external')
+  ) {
+    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  }
+  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('pass')) {
+    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  }
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
 }
 
 export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
   const checklist = useQuery({
     queryKey: ['platform', 'commercial-launch-smoke-test-checklist'],
-    queryFn: () => platformApiRequest<CommercialLaunchSmokeTestChecklist>('/platform/commercial-launch-smoke-test-checklist')
+    queryFn: () => platformApiRequest<CommercialLaunchSmokeTestChecklist>('/platform/commercial-launch-smoke-test-checklist'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const data = checklist.data;
@@ -104,9 +133,9 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Commercial Launch Smoke Test Checklist</h1>
           <p style={styles.description}>
-            Step 220 converts the final go/no-go register into manual live smoke-test rows for the target launch
-            environment. It defines the exact owner, evidence, result fields, and failure policy for each launch smoke
-            test, but remains read-only and does not run tests, persist approvals, activate tenants, or activate billing.
+            Step 220 prepares the manual live smoke-test rows for the exact launch environment. It preserves the current
+            Go/No-Go prerequisite posture and defines owners, evidence, failure policy, and external result fields, but it
+            cannot observe external go/no-go decisions or smoke-test execution records.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -123,27 +152,45 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
         </div>
       </section>
 
+      <section style={styles.warningCard}>
+        <strong>Execution-preparation only.</strong>
+        <span>
+          This application does not store or observe final external Go/No-Go decisions or smoke-test results. Before any
+          row is executed, the launch operator must independently confirm the external decision record and keep the
+          smoke-test result evidence outside this read-only board.
+        </span>
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting launch pages</h2>
         <div style={styles.quickLinks}>
           <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance">Launch acceptance</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
           <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
-          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
           <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring readiness</Link>
+          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring readiness</Link>
           <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
           <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
           <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
         </div>
       </section>
 
       {checklist.isLoading ? <div style={styles.card}>Loading commercial launch smoke-test checklist...</div> : null}
       {checklist.error ? (
         <div style={styles.error}>
-          Failed to load commercial launch smoke-test checklist.
-          <button type="button" style={styles.errorButton} onClick={() => void checklist.refetch()}>Retry</button>
+          <div><strong>Failed to load commercial launch smoke-test checklist.</strong></div>
+          <div style={styles.errorDetail}>{errorMessage(checklist.error)}</div>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void checklist.refetch()}
+            disabled={checklist.isFetching}
+          >
+            {checklist.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -154,8 +201,8 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
             <div style={styles.metadataGrid}>
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
+              <div><strong>Validation</strong><span style={styles.wrapAnywhere}>{data.validation_note}</span></div>
             </div>
           </section>
 
@@ -169,11 +216,38 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
           </section>
 
           <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
+            <h2 style={styles.sectionTitle}>Execution prerequisite context</h2>
             <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Go/no-go register posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.go_no_go_register_posture)}</strong>
+                <Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Acceptance packet posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.acceptance_packet_posture)}</strong>
+                <Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance">Open Launch Acceptance</Link>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Certificate posture</span>
+                <strong style={styles.wrapAnywhere}>{humanize(data.certificate_posture)}</strong>
+                <Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Go/no-go decision persistence</span>
+                <strong>{data.go_no_go_decision_persistence?.stored_in_application ? 'Stored in application' : 'External only'}</strong>
+                <span style={styles.help}>{data.go_no_go_decision_persistence?.interpretation || 'External decision records are not observable by this page.'}</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Smoke-test result persistence</span>
+                <strong>{data.result_persistence.stored_in_application ? 'Stored in application' : 'External only'}</strong>
+                <span style={styles.help}>{data.result_persistence.interpretation}</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Go/no-go decision rows</span>
+                <strong>{data.go_no_go_register_summary.decisions_required ?? data.go_no_go_register_summary.register_rows_total ?? 0}</strong>
+                <span style={styles.help}>This count describes required decision rows, not observed external decisions.</span>
+              </div>
             </div>
           </section>
 
@@ -183,25 +257,42 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
               {data.smoke_tests.map((row) => (
                 <article key={row.code} style={styles.checkCard}>
                   <div style={styles.rowHeader}>
-                    <div>
+                    <div style={styles.wrapAnywhere}>
                       <strong>{humanize(row.code)}</strong>
                       <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
                     </div>
                     <span style={badgeStyle(row.smoke_test_status)}>{humanize(row.smoke_test_status)}</span>
                   </div>
+
                   <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence</span>
-                    <strong>{row.required_evidence}</strong>
+                    <span style={styles.evidenceLabel}>Required live evidence</span>
+                    <strong style={styles.wrapAnywhere}>{row.required_evidence}</strong>
                   </div>
                   <Link style={styles.packetLink} to={getSmokeTestEvidenceLink(row)}>{getSmokeTestEvidenceLabel(row)}</Link>
-                  <div style={styles.statusRow}><span>Default result</span><span style={badgeStyle(row.default_result)}>{humanize(row.default_result)}</span></div>
-                  <div style={styles.statusRow}><span>Failure policy</span><strong>{humanize(row.failure_policy)}</strong></div>
+
+                  <div style={styles.preconditionBox}>
+                    <span style={styles.evidenceLabel}>Manual precondition</span>
+                    <strong>{row.manual_precondition}</strong>
+                  </div>
+
+                  <div style={styles.statusRow}>
+                    <span>Template default result</span>
+                    <span style={badgeStyle(row.default_result)}>{humanize(row.default_result)}</span>
+                  </div>
+                  <div style={styles.statusRow}><span>Failure policy</span><strong style={styles.wrapAnywhere}>{humanize(row.failure_policy)}</strong></div>
+                  <div style={styles.statusRow}><span>Result storage</span><strong>{humanize(row.result_artifact_storage)}</strong></div>
+
+                  <div style={styles.evidenceBox}>
+                    <span style={styles.evidenceLabel}>External result artifact</span>
+                    <strong>{row.result_artifact}</strong>
+                  </div>
+
                   <div>
                     <span style={styles.evidenceLabel}>Allowed results</span>
                     <div style={styles.chips}>{row.allowed_results.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
                   </div>
                   <div>
-                    <span style={styles.evidenceLabel}>Required result fields</span>
+                    <span style={styles.evidenceLabel}>Required external result fields</span>
                     <div style={styles.chips}>{row.required_result_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
                   </div>
                 </article>
@@ -229,42 +320,45 @@ export default function PlatformCommercialLaunchSmokeTestChecklistPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  page: { display: 'grid', gap: 18, minWidth: 0 },
+  header: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
+  warningCard: { display: 'grid', gap: 5, background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
   quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginTop: 8, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorDetail: { marginTop: 6, fontSize: 12, overflowWrap: 'anywhere' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6 },
+  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6, minWidth: 0 },
   checkGrid: { display: 'grid', gap: 14 },
-  checkCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
-  help: { color: '#6b7280', fontSize: 12 },
-  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4 },
+  checkCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12, minWidth: 0 },
+  rowHeader: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
+  help: { color: '#6b7280', fontSize: 12, overflowWrap: 'anywhere' },
+  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, minWidth: 0 },
+  preconditionBox: { border: '1px solid #fde68a', borderRadius: 12, padding: 10, background: '#fffbeb', display: 'grid', gap: 4 },
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
   chips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151' },
+  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  statusRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
   list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.6 },
   nextStep: { background: '#eef2ff', border: '1px solid #c7d2fe', color: '#3730a3', borderRadius: 14, padding: 14 },
   note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14 },
-  error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 }
+  error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 },
+  wrapAnywhere: { overflowWrap: 'anywhere', wordBreak: 'break-word', minWidth: 0 }
 };

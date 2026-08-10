@@ -68,6 +68,7 @@ export function exportStandardCostHistoryCsv(
 export function exportProductsCsv(products: ProductItem[]) {
   const rows = products.map((product) => withTenantCurrency({
     id: product.id,
+    sku: product.sku,
     name: product.name,
     category: product.category || '',
     unit: product.unit,

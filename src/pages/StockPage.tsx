@@ -9,6 +9,7 @@ import {
   hasPermission,
   TENANT_PERMISSIONS
 } from '../lib/permissions';
+import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import './StockPage.css';
 
 type StockItem = {
@@ -24,10 +25,56 @@ type StockItem = {
   reserved_quantity?: number | string | null;
   allocated_quantity?: number | string | null;
   projected_free_quantity?: number | string | null;
+  available_lot_quantity?: number | string | null;
+  usable_lot_quantity?: number | string | null;
+  usable_free_quantity?: number | string | null;
+  expiring_soon_quantity?: number | string | null;
+  expired_quantity?: number | string | null;
+  quarantine_quantity?: number | string | null;
+  damaged_quantity?: number | string | null;
+  rejected_quantity?: number | string | null;
+  earliest_expiry_date?: string | null;
   min_quantity?: number | string | null;
   product_min_stock?: number | string | null;
   updated_at?: string;
   version?: number | string;
+};
+
+
+type InventoryLot = {
+  id: string;
+  product_id: string;
+  product_name?: string | null;
+  product_unit?: string | null;
+  storage_location_id: string;
+  storage_location_name?: string | null;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  manufactured_at?: string | null;
+  condition: 'available' | 'quarantine' | 'damaged' | 'rejected' | 'expired' | string;
+  operational_status?: string | null;
+  quantity: number | string;
+  days_to_expiry?: number | string | null;
+};
+
+type StockReconciliation = {
+  summary: {
+    row_count: number;
+    ledger_mismatch_count: number;
+    lot_mismatch_count: number;
+    expired_still_available_count: number;
+  };
+  rows: Array<{
+    stock_id: string;
+    product_name?: string | null;
+    storage_location_name?: string | null;
+    stock_quantity: number | string;
+    ledger_expected_quantity: number | string;
+    ledger_variance: number | string;
+    lot_available_quantity: number | string;
+    lot_variance: number | string;
+  }>;
 };
 
 type StockMovement = {
@@ -140,6 +187,14 @@ async function fetchStock(): Promise<StockItem[]> {
   return apiRequest<StockItem[]>('/stock');
 }
 
+async function fetchInventoryLots(): Promise<InventoryLot[]> {
+  return apiRequest<InventoryLot[]>('/stock/lots');
+}
+
+async function fetchStockReconciliation(): Promise<StockReconciliation> {
+  return apiRequest<StockReconciliation>('/stock/reconciliation');
+}
+
 async function fetchStockMovements(productId: string): Promise<StockMovement[]> {
   const params = new URLSearchParams();
 
@@ -240,6 +295,9 @@ function getProjectedFreeQuantity(item: StockItem): number {
   const quantity = toNumber(item.quantity);
   const reservedQuantity = toNumber(item.reserved_quantity);
 
+  if (item.usable_free_quantity !== undefined && item.usable_free_quantity !== null) {
+    return toNumber(item.usable_free_quantity);
+  }
   return item.projected_free_quantity === undefined
     ? quantity - reservedQuantity
     : toNumber(item.projected_free_quantity);
@@ -424,7 +482,17 @@ export default function StockPage() {
     queryFn: fetchStock
   });
 
+  const lotsQuery = useQuery({
+    queryKey: ['inventory-lots'],
+    queryFn: fetchInventoryLots
+  });
+  const reconciliationQuery = useQuery({
+    queryKey: ['stock-reconciliation'],
+    queryFn: fetchStockReconciliation
+  });
+
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
+  const inventoryLots = useMemo(() => lotsQuery.data ?? [], [lotsQuery.data]);
 
   const [searchText, setSearchText] = useState(() => requestedProductId);
   const [locationFilter, setLocationFilter] = useState('all');
@@ -617,6 +685,36 @@ export default function StockPage() {
   const selectedOverReserved = Boolean(selectedRow) && currentProjectedFreeQuantity < 0;
   const selectedLowAvailable =
     Boolean(selectedRow) && !selectedLowStock && currentProjectedFreeQuantity < currentMinimum;
+
+  const processExpiredLotsMutation = useMutation({
+    mutationFn: () => apiRequest<{ processed_lot_count: number; processed_quantity: number }>('/stock/lots/expire-due', { method: 'POST', body: '{}' }),
+    onSuccess: async (response) => {
+      setOperationError('');
+      setOperationFeedback(`Expired stock processed: ${response.processed_lot_count} lot(s), ${response.processed_quantity} unit(s) written off.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+      ]);
+    },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to process expired stock')
+  });
+
+  const releaseQuarantineMutation = useMutation({
+    mutationFn: (lotId: string) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/release-quarantine`, { method: 'POST', body: '{}' }),
+    onSuccess: async () => {
+      setOperationError('');
+      setOperationFeedback('Quarantined lot released to available stock.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+      ]);
+    },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release quarantined stock')
+  });
 
   const consumeMutation = useMutation({
     mutationFn: async () => {
@@ -1041,6 +1139,26 @@ export default function StockPage() {
         </div>
       </div>
 
+      <InventoryCsvImportPanel
+        importType="opening_stock"
+        title="Opening Stock Import"
+        description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
+        templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
+        templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
+        canImport={canAdjust}
+        disabledReason="Stock-adjust permission is required for opening-stock import."
+        onCommitted={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['stock'] }),
+            queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+            queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+            queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+            queryClient.invalidateQueries({ queryKey: ['products'] })
+          ]);
+        }}
+      />
+
       <section style={styles.workflowGuideGrid}>
         {stockWorkflowSteps.map((step) => (
           <article
@@ -1089,6 +1207,59 @@ export default function StockPage() {
           tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
         />
       </div>
+
+      <section className="app-panel app-panel--padded" style={styles.panel}>
+        <div style={styles.panelHeaderWithActions}>
+          <div style={styles.panelHeaderText}>
+            <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
+            <p style={styles.panelSubtitle}>Physical lot balances are now separated by lot/batch, expiry and stock condition. Expired stock is not eligible for FEFO consumption.</p>
+          </div>
+          {canAdjust ? (
+            <button
+              type="button"
+              style={processExpiredLotsMutation.isPending ? styles.secondaryButtonDisabled : styles.secondaryButton}
+              disabled={processExpiredLotsMutation.isPending}
+              onClick={() => {
+                if (!window.confirm('Process all expired available lots now? This removes their quantities from usable stock and records expiry write-off movements.')) return;
+                processExpiredLotsMutation.mutate();
+              }}
+            >
+              {processExpiredLotsMutation.isPending ? 'Processing...' : 'Process Expired Stock'}
+            </button>
+          ) : null}
+        </div>
+        <div className="app-grid-stats" style={styles.statsGrid}>
+          <StatCard title="Tracked Lots" value={inventoryLots.length} subtitle="Lot/batch balances with remaining physical quantity" />
+          <StatCard title="Expiring Soon" value={inventoryLots.filter((lot) => lot.operational_status === 'expiring_soon').length} subtitle="Lots within the 7-day expiry window" tone={inventoryLots.some((lot) => lot.operational_status === 'expiring_soon') ? 'warn' : 'good'} />
+          <StatCard title="Expired" value={inventoryLots.filter((lot) => lot.operational_status === 'expired').length} subtitle="Expired lots requiring or already reflecting write-off status" tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
+          <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Lots held outside usable stock" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
+          <StatCard title="Ledger Mismatches" value={reconciliationQuery.data?.summary.ledger_mismatch_count ?? '-'} subtitle="Aggregate stock vs canonical movement ledger" tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+          <StatCard title="Lot Mismatches" value={reconciliationQuery.data?.summary.lot_mismatch_count ?? '-'} subtitle="Aggregate stock vs available lot balances" tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+        </div>
+        {lotsQuery.isError || reconciliationQuery.isError ? (
+          <div className="app-error-state">Lot or reconciliation data could not be loaded. Refresh after the inventory-integrity migration is applied.</div>
+        ) : null}
+        {inventoryLots.length > 0 ? (
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead><tr><th style={styles.th}>Product</th><th style={styles.th}>Location</th><th style={styles.th}>Lot / Batch</th><th style={styles.th}>Expiry</th><th style={styles.th}>Condition</th><th style={styles.th}>Quantity</th><th style={styles.th}>Action</th></tr></thead>
+              <tbody>
+                {inventoryLots.slice(0, 100).map((lot) => (
+                  <tr key={lot.id}>
+                    <td style={styles.td}>{lot.product_name || lot.product_id}</td>
+                    <td style={styles.td}>{lot.storage_location_name || lot.storage_location_id}</td>
+                    <td style={styles.td}>{[lot.lot_number ? `Lot ${lot.lot_number}` : '', lot.batch_number ? `Batch ${lot.batch_number}` : ''].filter(Boolean).join(' · ') || 'Untracked'}</td>
+                    <td style={styles.td}>{lot.expiry_date ? formatDateTime(lot.expiry_date).split(',')[0] : '-'}</td>
+                    <td style={styles.td}>{formatUsageReason(lot.operational_status || lot.condition)}</td>
+                    <td style={styles.td}>{toNumber(lot.quantity)} {lot.product_unit || ''}</td>
+                    <td style={styles.td}>{lot.condition === 'quarantine' && canAdjust ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeaderWithActions}>

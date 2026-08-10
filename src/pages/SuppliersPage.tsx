@@ -6,6 +6,7 @@ import { apiRequest, ApiError } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
+import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 
 type SupplierFormState = {
   name: string;
@@ -515,6 +516,24 @@ export default function SuppliersPage() {
           Current access role: {accessRoleLabel}. Suppliers are read-only because this role does not have suppliers.write permission.
         </div>
       ) : null}
+
+      <InventoryCsvImportPanel
+        importType="suppliers"
+        title="Bulk Supplier Import"
+        description="Validate supplier master-data rows before committing them. Duplicate active supplier names are rejected instead of overwritten."
+        templateColumns={['name', 'email', 'contact_info']}
+        templateExample={{ name: 'Metro Wholesale', email: 'orders@example.com', contact_info: 'Account 12345' }}
+        canImport={canManageSuppliers}
+        disabledReason="Suppliers write permission is required for bulk supplier import."
+        onCommitted={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
+            queryClient.invalidateQueries({ queryKey: ['suppliers-available'] }),
+            queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+          ]);
+        }}
+      />
 
       <section id="supplier-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
         <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>

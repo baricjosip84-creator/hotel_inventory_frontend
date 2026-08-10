@@ -7,14 +7,19 @@ import {
   buildAlertResolvePayload,
   buildApprovalExecutionPayload,
   buildApprovalRulePayload,
-  buildAttachmentPayload,
   buildBarcodeLabelPayload,
   buildNotificationDeliveryPayload,
   buildSupplierCatalogPayload,
   buildSupplierInvoicePayload,
 } from "./EnterpriseInventoryPayloads";
 import { refreshSystemContextQueries } from "./EnterpriseInventoryRefresh";
-import { deleteEnterpriseInventoryRequest, postEnterpriseInventoryRequest } from "./EnterpriseInventoryRequests";
+import {
+  deleteEnterpriseInventoryRequest,
+  patchEnterpriseInventoryRequest,
+  postEnterpriseInventoryBinaryRequest,
+  postEnterpriseInventoryRequest,
+  postEnterpriseInventoryVersionedRequest,
+} from "./EnterpriseInventoryRequests";
 import type {
   AlertForm,
   AlertItem,
@@ -45,6 +50,27 @@ type ApprovalExecutionInput = {
 type AlertResolveInput = {
   id: string;
   resolution_note: string;
+};
+
+type SupplierInvoiceUpdateInput = {
+  invoice: SupplierInvoice;
+  form: SupplierInvoiceForm;
+  afterSuccess?: () => void;
+};
+
+type SupplierInvoiceLifecycleAction = "submit" | "match" | "pay" | "cancel" | "revise";
+
+type SupplierInvoiceLifecycleInput = {
+  invoice: SupplierInvoice;
+  action: SupplierInvoiceLifecycleAction;
+  reason?: string;
+  paymentReference?: string;
+};
+
+type AttachmentUploadInput = {
+  form: AttachmentForm;
+  file: File;
+  afterSuccess?: () => void;
 };
 
 type UseEnterpriseInventoryWorkflowMutationsOptions = {
@@ -112,6 +138,8 @@ export function useEnterpriseInventoryWorkflowMutations({
         "enterprise-requisitions",
         "enterprise-cycle-counts",
         "enterprise-invoices",
+        "enterprise-supplier-returns",
+        "enterprise-supplier-return-eligible-lots",
         "enterprise-notifications",
       ],
     ),
@@ -132,6 +160,19 @@ export function useEnterpriseInventoryWorkflowMutations({
     onError: mutationFeedback.error("Failed to save supplier catalog item."),
   });
 
+  const deactivateSupplierCatalogMutation = useMutation({
+    mutationFn: (item: SupplierCatalogItem) =>
+      postEnterpriseInventoryVersionedRequest<SupplierCatalogItem>(
+        `/enterprise-inventory/supplier-catalog/${item.id}/deactivate`,
+        item.version ?? 1,
+      ),
+    onSuccess: mutationFeedback.invalidating(
+      "Supplier catalog item deactivated successfully.",
+      ["enterprise-supplier-catalog", "enterprise-reorder-recommendations"],
+    ),
+    onError: mutationFeedback.error("Failed to deactivate supplier catalog item."),
+  });
+
   const createSupplierInvoiceMutation = useMutation({
     mutationFn: (input: SupplierInvoiceForm) =>
       postEnterpriseInventoryRequest<SupplierInvoice>(
@@ -139,11 +180,55 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildSupplierInvoicePayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Supplier invoice created successfully.",
+      "Supplier invoice draft created successfully.",
       ["enterprise-invoices", "enterprise-notifications"],
       resetSupplierInvoiceForm,
     ),
     onError: mutationFeedback.error("Failed to create supplier invoice."),
+  });
+
+  const updateSupplierInvoiceMutation = useMutation({
+    mutationFn: ({ invoice, form }: SupplierInvoiceUpdateInput) =>
+      patchEnterpriseInventoryRequest<SupplierInvoice>(
+        `/enterprise-inventory/supplier-invoices/${invoice.id}`,
+        buildSupplierInvoicePayload(form),
+        invoice.version,
+      ),
+    onSuccess: mutationFeedback.custom<SupplierInvoice, SupplierInvoiceUpdateInput>(
+      "Supplier invoice draft updated successfully.",
+      ["enterprise-invoices"],
+      (_result, input) => {
+        resetSupplierInvoiceForm();
+        input.afterSuccess?.();
+      },
+    ),
+    onError: mutationFeedback.error("Failed to update supplier invoice."),
+  });
+
+  const supplierInvoiceLifecycleMutation = useMutation({
+    mutationFn: ({ invoice, action, reason, paymentReference }: SupplierInvoiceLifecycleInput) => {
+      const body = action === "cancel"
+        ? { reason: reason || "Cancelled from supplier invoice workspace" }
+        : action === "pay"
+          ? { payment_reference: paymentReference?.trim() || null }
+          : undefined;
+      return postEnterpriseInventoryVersionedRequest<SupplierInvoice>(
+        `/enterprise-inventory/supplier-invoices/${invoice.id}/${action}`,
+        invoice.version,
+        body,
+      );
+    },
+    onSuccess: mutationFeedback.variable<SupplierInvoiceLifecycleInput>(
+      (input) => {
+        if (input.action === "submit") return "Supplier invoice submitted successfully.";
+        if (input.action === "match") return "Supplier invoice marked matched.";
+        if (input.action === "pay") return "Supplier invoice marked paid.";
+        if (input.action === "cancel") return "Supplier invoice cancelled.";
+        return "Supplier invoice returned to draft for revision.";
+      },
+      ["enterprise-invoices", "enterprise-notifications", "enterprise-approval-rules"],
+    ),
+    onError: mutationFeedback.error("Failed to update supplier invoice lifecycle."),
   });
 
   const createBarcodeLabelMutation = useMutation({
@@ -201,7 +286,7 @@ export function useEnterpriseInventoryWorkflowMutations({
       ),
     onSuccess: mutationFeedback.resetting(
       "Notification delivery queued.",
-      ["enterprise-notifications"],
+      ["enterprise-notifications", "enterprise-notification-deliveries"],
       resetNotificationDeliveryForm,
     ),
     onError: mutationFeedback.error("Failed to queue notification delivery."),
@@ -215,7 +300,7 @@ export function useEnterpriseInventoryWorkflowMutations({
     onSuccess: mutationFeedback.result(
       (result: { processed: number }) =>
         `${result.processed} notification deliver${result.processed === 1 ? "y" : "ies"} processed.`,
-      ["enterprise-notifications"],
+      ["enterprise-notifications", "enterprise-notification-deliveries"],
     ),
     onError: mutationFeedback.error(
       "Failed to process notification deliveries.",
@@ -282,27 +367,43 @@ export function useEnterpriseInventoryWorkflowMutations({
   });
 
   const createAttachmentMutation = useMutation({
-    mutationFn: (input: AttachmentForm) =>
-      postEnterpriseInventoryRequest<EntityAttachment>(
-        "/enterprise-inventory/attachments",
-        buildAttachmentPayload(input),
-      ),
-    onSuccess: mutationFeedback.custom<EntityAttachment, AttachmentForm>(
-      "Attachment linked.",
+    mutationFn: ({ form, file }: AttachmentUploadInput) => {
+      const params = new URLSearchParams({
+        entity_type: form.entity_type,
+        entity_id: form.entity_id,
+        original_filename: file.name,
+      });
+      if (file.type) params.set("mime_type", file.type);
+      return postEnterpriseInventoryBinaryRequest<EntityAttachment>(
+        `/enterprise-inventory/attachments/upload?${params.toString()}`,
+        file,
+      );
+    },
+    onSuccess: mutationFeedback.custom<EntityAttachment, AttachmentUploadInput>(
+      "File uploaded and attached successfully.",
       ["enterprise-attachments", "enterprise-notifications"],
-      (attachment) =>
+      (attachment, input) => {
         setAttachmentForm((current) => ({
           ...current,
           entity_type: attachment.entity_type,
           entity_id: attachment.entity_id,
-          original_filename: "",
-          stored_filename: "",
-          mime_type: "",
-          file_size_bytes: "0",
-          storage_path: "",
-        })),
+        }));
+        input.afterSuccess?.();
+      },
     ),
-    onError: mutationFeedback.error("Failed to link attachment."),
+    onError: mutationFeedback.error("Failed to upload attachment."),
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) =>
+      deleteEnterpriseInventoryRequest<{ message: string }>(
+        `/enterprise-inventory/attachments/${attachmentId}`,
+      ),
+    onSuccess: mutationFeedback.invalidating(
+      "Attachment deleted successfully.",
+      ["enterprise-attachments"],
+    ),
+    onError: mutationFeedback.error("Failed to delete attachment."),
   });
 
   return {
@@ -310,7 +411,10 @@ export function useEnterpriseInventoryWorkflowMutations({
     createApprovalRuleMutation,
     executeApprovalMutation,
     createSupplierCatalogMutation,
+    deactivateSupplierCatalogMutation,
     createSupplierInvoiceMutation,
+    updateSupplierInvoiceMutation,
+    supplierInvoiceLifecycleMutation,
     createBarcodeLabelMutation,
     recordBarcodeLabelPrintsMutation,
     deleteBarcodeLabelMutation,
@@ -322,5 +426,6 @@ export function useEnterpriseInventoryWorkflowMutations({
     reopenAlertMutation,
     escalateAlertMutation,
     createAttachmentMutation,
+    deleteAttachmentMutation,
   };
 }

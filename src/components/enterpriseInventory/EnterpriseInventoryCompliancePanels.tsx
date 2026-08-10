@@ -25,7 +25,7 @@ export function EnterpriseInventoryCompliancePanels({
 
   const { queries, stableData, viewData } = pageData;
 
-  const { alertsQuery, auditLogsQuery, notificationsQuery } = queries;
+  const { alertsQuery, auditLogsQuery, notificationsQuery, notificationDeliveriesQuery } = queries;
 
   const { alerts, auditLogs, products } = stableData;
 
@@ -83,7 +83,9 @@ export function EnterpriseInventoryCompliancePanels({
         <NotificationsTab
           notificationDeliveryForm={notificationDeliveryForm}
           notifications={notificationsQuery.data ?? []}
+          deliveries={notificationDeliveriesQuery.data ?? []}
           isLoading={notificationsQuery.isLoading}
+          deliveriesLoading={notificationDeliveriesQuery.isLoading}
           isQueueingDelivery={queueNotificationDeliveryMutation.isPending}
           isProcessingDeliveries={
             processNotificationDeliveriesMutation.isPending

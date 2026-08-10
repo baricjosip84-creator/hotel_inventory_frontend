@@ -1,4 +1,4 @@
-import { apiMutationRequest } from '../../lib/api';
+import { apiDownloadFile, apiMutationRequest } from '../../lib/api';
 
 export function postEnterpriseInventoryRequest<TResponse>(path: string, body?: unknown): Promise<TResponse> {
   return apiMutationRequest<TResponse>(path, {
@@ -45,4 +45,17 @@ export function deleteEnterpriseInventoryVersionedRequest<TResponse>(
     method: 'DELETE',
     version
   });
+}
+
+export function postEnterpriseInventoryBinaryRequest<TResponse>(path: string, body: Blob): Promise<TResponse> {
+  return apiMutationRequest<TResponse>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body,
+    skipMutationFeedback: true
+  });
+}
+
+export function downloadEnterpriseInventoryFile(path: string, filename: string) {
+  return apiDownloadFile(path, filename);
 }

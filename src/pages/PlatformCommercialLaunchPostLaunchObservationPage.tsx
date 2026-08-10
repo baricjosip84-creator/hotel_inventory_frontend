@@ -3,6 +3,12 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
+type ExternalPersistence = {
+  stored_in_application: boolean;
+  external_records_observable: boolean;
+  interpretation: string;
+};
+
 type ObservationRow = {
   code: string;
   domain: string;
@@ -12,11 +18,15 @@ type ObservationRow = {
   source_command_center_posture: string;
   source_checkpoints_total: number;
   source_checkpoints_blocked: number;
-  source_checkpoints_waiting_for_go_no_go_decisions: number;
-  source_not_reviewed_decisions: number;
+  source_checkpoints_requiring_evidence_review: number;
+  source_checkpoints_awaiting_external_go_no_go_confirmation: number;
+  source_checkpoints_awaiting_external_smoke_test_confirmation: number;
+  manual_precondition: string;
   required_observation_fields: string[];
   allowed_observation_statuses: string[];
   default_observation_status: string;
+  observation_artifact: string;
+  observation_artifact_storage: string;
   observation_status: string;
 };
 
@@ -28,10 +38,14 @@ type PostLaunchObservation = {
   summary: Record<string, number>;
   observation_rows: ObservationRow[];
   command_center_posture: string;
+  command_center_decision_persistence: ExternalPersistence | null;
   smoke_test_posture: string;
+  smoke_test_result_persistence: ExternalPersistence | null;
   go_no_go_register_posture: string;
+  go_no_go_decision_persistence: ExternalPersistence | null;
   acceptance_packet_posture: string;
   certificate_posture: string;
+  observation_persistence: ExternalPersistence;
   post_launch_rules: string[];
   observation_limitations: string[];
   next_best_step: string;
@@ -42,35 +56,29 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unable to load the commercial launch post-launch observation board.';
+}
 
 function getObservationEvidenceLink(row: ObservationRow) {
   const byCode: Record<string, string> = {
     service_health_observation_recorded: '/platform/system-health',
-    customer_feedback_window_opened: '/platform/communications',
-    support_intake_reviewed: '/platform/support-operations-cockpit',
+    customer_feedback_window_opened: '/platform/tenant-communications',
+    support_intake_reviewed: '/platform/support-cockpit',
     billing_activation_confirmed_or_held: '/platform/billing-subscription-activation',
     incident_review_completed: '/platform/incidents',
     rollback_readiness_reconfirmed: '/platform/deployment-validation',
     first_adoption_signal_reviewed: '/platform/pilot-customer-readiness',
     launch_handoff_closure_prepared: '/platform/commercial-launch-day-command-center'
   };
-  const byDomain: Record<string, string> = {
-    'Service health': '/platform/system-health',
-    'Customer feedback': '/platform/communications',
-    'Support intake': '/platform/support-operations-cockpit',
-    'Billing confirmation': '/platform/billing-subscription-activation',
-    'Incident review': '/platform/incidents',
-    'Rollback readiness': '/platform/deployment-validation',
-    'Adoption signal': '/platform/pilot-customer-readiness',
-    'Handoff closure': '/platform/commercial-launch-day-command-center'
-  };
-  return byCode[row.code] || byDomain[row.domain] || '/platform/commercial-launch-day-command-center';
+  return byCode[row.code] || '/platform/commercial-launch-day-command-center';
 }
 
 function getObservationEvidenceLabel(row: ObservationRow) {
   const byCode: Record<string, string> = {
     service_health_observation_recorded: 'Open system health',
-    customer_feedback_window_opened: 'Open communications',
+    customer_feedback_window_opened: 'Open tenant communications',
     support_intake_reviewed: 'Open support cockpit',
     billing_activation_confirmed_or_held: 'Open billing activation',
     incident_review_completed: 'Open incidents',
@@ -82,15 +90,39 @@ function getObservationEvidenceLabel(row: ObservationRow) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing') || value.includes('degradation')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('waiting') || value.includes('manual') || value.includes('watch') || value.includes('not_reviewed')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  const normalized = value.toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('degradation')) {
+    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  }
+  if (
+    normalized.includes('review')
+    || normalized.includes('waiting')
+    || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('watch')
+    || normalized.includes('not_reviewed')
+  ) {
+    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  }
+  if (normalized.includes('loading') || normalized.includes('unknown') || normalized.includes('preparation')) {
+    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  }
   return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+}
+
+function persistenceLabel(value: ExternalPersistence | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence';
 }
 
 export default function PlatformCommercialLaunchPostLaunchObservationPage() {
   const observation = useQuery({
     queryKey: ['platform', 'commercial-launch-post-launch-observation'],
-    queryFn: () => platformApiRequest<PostLaunchObservation>('/platform/commercial-launch-post-launch-observation')
+    queryFn: () => platformApiRequest<PostLaunchObservation>('/platform/commercial-launch-post-launch-observation'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const data = observation.data;
@@ -103,9 +135,10 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Commercial Launch Post-Launch Observation</h1>
           <p style={styles.description}>
-            Step 222 converts the launch-day command center into a first-production observation board. It tracks service
-            health, customer feedback, support intake, billing state, incident review, rollback readiness, adoption signal,
-            and handoff evidence without mutating launch, tenant, billing, ticket, or notification state.
+            <strong>Observation preparation only.</strong> Step 222 prepares the evidence record for first-production
+            observation after the real launch window. This application cannot observe external go/no-go decisions,
+            smoke-test results, launch-window checkpoint decisions, or post-launch observation outcomes, so it does not
+            infer that launch occurred or that any observation result has been recorded.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -122,27 +155,42 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
         </div>
       </section>
 
+      <section style={styles.notice}>
+        <strong>External confirmation boundary.</strong> Before recording post-launch observations, an operator must
+        independently confirm the external launch-window decision record and the real production launch. This read-only
+        board stores none of those decisions or observation outcomes.
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting launch and observation pages</h2>
         <div style={styles.quickLinks}>
           <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance">Launch acceptance</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
+          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring readiness</Link>
           <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
           <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
+          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/tenant-communications">Tenant communications</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-incident-triage">Incident triage</Link>
         </div>
       </section>
 
       {observation.isLoading ? <div style={styles.card}>Loading commercial launch post-launch observation board...</div> : null}
       {observation.error ? (
         <div style={styles.error}>
-          Failed to load commercial launch post-launch observation board.
-          <button type="button" style={styles.errorButton} onClick={() => void observation.refetch()}>Retry</button>
+          <div><strong>Failed to load commercial launch post-launch observation board.</strong></div>
+          <div style={styles.errorDetail}>{errorMessage(observation.error)}</div>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void observation.refetch()}
+            disabled={observation.isFetching}
+          >
+            {observation.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -168,23 +216,49 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
           </section>
 
           <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>External evidence persistence</h2>
+            <div style={styles.inputGrid}>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Command-center decision persistence</span>
+                <strong>{persistenceLabel(data.command_center_decision_persistence)}</strong>
+                <span style={styles.help}>{data.command_center_decision_persistence?.interpretation || 'No persistence statement reported.'}</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Smoke-test result persistence</span>
+                <strong>{persistenceLabel(data.smoke_test_result_persistence)}</strong>
+                <span style={styles.help}>{data.smoke_test_result_persistence?.interpretation || 'No persistence statement reported.'}</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Go/no-go decision persistence</span>
+                <strong>{persistenceLabel(data.go_no_go_decision_persistence)}</strong>
+                <span style={styles.help}>{data.go_no_go_decision_persistence?.interpretation || 'No persistence statement reported.'}</span>
+              </div>
+              <div style={styles.inputCard}>
+                <span style={styles.help}>Post-launch observation persistence</span>
+                <strong>{persistenceLabel(data.observation_persistence)}</strong>
+                <span style={styles.help}>{data.observation_persistence.interpretation}</span>
+              </div>
+            </div>
+          </section>
+
+          <section style={styles.card}>
             <h2 style={styles.sectionTitle}>Source launch postures</h2>
             <div style={styles.inputGrid}>
               <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
               <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
               <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance">Open Launch Acceptance</Link></div>
               <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
             </div>
           </section>
 
           <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Observation checks</h2>
+            <h2 style={styles.sectionTitle}>Observation preparation checks</h2>
             <div style={styles.checkGrid}>
               {data.observation_rows.map((row) => (
                 <article key={row.code} style={styles.checkCard}>
                   <div style={styles.rowHeader}>
-                    <div>
+                    <div style={styles.wrap}>
                       <strong>{humanize(row.code)}</strong>
                       <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
                     </div>
@@ -194,16 +268,30 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
                     <span style={styles.evidenceLabel}>Required evidence</span>
                     <strong>{row.required_evidence}</strong>
                   </div>
+                  <div style={styles.preconditionBox}>
+                    <span style={styles.evidenceLabel}>Manual precondition</span>
+                    <strong>{row.manual_precondition}</strong>
+                  </div>
                   <Link style={styles.packetLink} to={getObservationEvidenceLink(row)}>{getObservationEvidenceLabel(row)}</Link>
-                  <div style={styles.statusRow}><span>Default observation</span><span style={badgeStyle(row.default_observation_status)}>{humanize(row.default_observation_status)}</span></div>
+                  <div style={styles.statusRow}><span>External observation artifact</span><strong>{row.observation_artifact}</strong></div>
+                  <div style={styles.statusRow}><span>Artifact storage</span><strong>{humanize(row.observation_artifact_storage)}</strong></div>
+                  <div style={styles.statusRow}><span>Template default observation result</span><span style={badgeStyle(row.default_observation_status)}>{humanize(row.default_observation_status)}</span></div>
                   <div style={styles.statusRow}><span>Escalation trigger</span><strong>{humanize(row.escalation_trigger)}</strong></div>
-                  <div style={styles.statusRow}><span>Source checkpoints</span><strong>{row.source_checkpoints_total} total · {row.source_checkpoints_blocked} blocked · {row.source_checkpoints_waiting_for_go_no_go_decisions} waiting · {row.source_not_reviewed_decisions} not reviewed</strong></div>
+                  <div style={styles.statusRow}>
+                    <span>Source checkpoints</span>
+                    <strong>
+                      {row.source_checkpoints_total} total · {row.source_checkpoints_blocked} blocked ·{' '}
+                      {row.source_checkpoints_requiring_evidence_review} review ·{' '}
+                      {row.source_checkpoints_awaiting_external_go_no_go_confirmation} go/no-go confirmation ·{' '}
+                      {row.source_checkpoints_awaiting_external_smoke_test_confirmation} smoke confirmation
+                    </strong>
+                  </div>
                   <div>
-                    <span style={styles.evidenceLabel}>Allowed observation statuses</span>
+                    <span style={styles.evidenceLabel}>Allowed external observation statuses</span>
                     <div style={styles.chips}>{row.allowed_observation_statuses.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
                   </div>
                   <div>
-                    <span style={styles.evidenceLabel}>Required observation fields</span>
+                    <span style={styles.evidenceLabel}>Required external observation fields</span>
                     <div style={styles.chips}>{row.required_observation_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
                   </div>
                 </article>
@@ -232,40 +320,44 @@ export default function PlatformCommercialLaunchPostLaunchObservationPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { margin: '4px 0', fontSize: 28 },
   description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center' },
+  notice: { background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.5 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
   quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { marginTop: 10, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorDetail: { marginTop: 6, fontSize: 12, overflowWrap: 'anywhere' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 18 },
+  metricLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 18, minWidth: 0 },
   sectionTitle: { margin: '0 0 12px', fontSize: 18 },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
-  inputCard: { display: 'grid', gap: 6, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb' },
+  inputCard: { display: 'grid', gap: 6, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', minWidth: 0, overflowWrap: 'anywhere' },
   checkGrid: { display: 'grid', gap: 12 },
-  checkCard: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, display: 'grid', gap: 12 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  help: { color: '#6b7280', fontSize: 12 },
-  evidenceBox: { display: 'grid', gap: 4, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12 },
+  checkCard: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, display: 'grid', gap: 12, minWidth: 0 },
+  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
+  wrap: { minWidth: 0, overflowWrap: 'anywhere' },
+  help: { color: '#6b7280', fontSize: 12, overflowWrap: 'anywhere' },
+  evidenceBox: { display: 'grid', gap: 4, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
+  preconditionBox: { display: 'grid', gap: 4, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 12, color: '#78350f', overflowWrap: 'anywhere' },
   evidenceLabel: { color: '#6b7280', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #f3f4f6', paddingTop: 10 },
+  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', borderTop: '1px solid #f3f4f6', paddingTop: 10, flexWrap: 'wrap', overflowWrap: 'anywhere' },
   chips: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 },
-  chip: { background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '5px 8px', fontSize: 12, fontWeight: 700, textTransform: 'capitalize' },
+  chip: { background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '5px 8px', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
   list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.55 },
-  nextStep: { background: '#ecfeff', border: '1px solid #a5f3fc', color: '#155e75', borderRadius: 14, padding: 14 },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13 },
+  nextStep: { background: '#ecfeff', border: '1px solid #a5f3fc', color: '#155e75', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
+  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13, overflowWrap: 'anywhere' },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 14 }
 };

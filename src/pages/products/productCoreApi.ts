@@ -5,6 +5,7 @@ import type {
 } from '../../types/inventory';
 
 export type ProductFormState = {
+  sku: string;
   name: string;
   category: string;
   unit: string;
@@ -68,6 +69,7 @@ export async function createProduct(input: ProductFormState): Promise<ProductIte
   return apiRequest<ProductItem>('/products', {
     method: 'POST',
     body: JSON.stringify({
+      sku: input.sku.trim(),
       name: input.name.trim(),
       category: input.category.trim() || null,
       unit: input.unit.trim(),
@@ -89,6 +91,7 @@ export async function updateProduct(input: {
       'If-Match-Version': String(input.product.version)
     },
     body: JSON.stringify({
+      sku: input.values.sku.trim(),
       name: input.values.name.trim(),
       category: input.values.category.trim() || null,
       unit: input.values.unit.trim(),

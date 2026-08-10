@@ -4,7 +4,6 @@ import { createEnterpriseInventoryFormSubmitHandler } from "./EnterpriseInventor
 import { createEnterpriseInventoryProductPackageEditingHandlers } from "./EnterpriseInventoryPackageEditing";
 import type {
   AlertForm,
-  AttachmentForm,
   BarcodeLabelForm,
   CycleCountForm,
   NotificationDeliveryForm,
@@ -43,7 +42,6 @@ type EnterpriseInventorySubmitHandlerParams = {
   productPackageForm: ProductPackageForm;
   notificationDeliveryForm: NotificationDeliveryForm;
   alertForm: AlertForm;
-  attachmentForm: AttachmentForm;
   editingProductPackageId: string | null;
   emptyProductPackageForm: ProductPackageForm;
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
@@ -62,7 +60,6 @@ type EnterpriseInventorySubmitHandlerParams = {
   updateProductPackageMutation: MutateOnly<ProductPackageUpdateVariables>;
   queueNotificationDeliveryMutation: MutateOnly<NotificationDeliveryForm>;
   createAlertMutation: MutateOnly<AlertForm>;
-  createAttachmentMutation: MutateOnly<AttachmentForm>;
 };
 
 export function createEnterpriseInventorySubmitHandlers({
@@ -76,7 +73,6 @@ export function createEnterpriseInventorySubmitHandlers({
   productPackageForm,
   notificationDeliveryForm,
   alertForm,
-  attachmentForm,
   editingProductPackageId,
   emptyProductPackageForm,
   setErrorMessage,
@@ -95,7 +91,6 @@ export function createEnterpriseInventorySubmitHandlers({
   updateProductPackageMutation,
   queueNotificationDeliveryMutation,
   createAlertMutation,
-  createAttachmentMutation,
 }: EnterpriseInventorySubmitHandlerParams) {
   const canRun = (permission: TenantPermission): boolean => {
     if (hasPermission(permission)) return true;
@@ -209,18 +204,12 @@ export function createEnterpriseInventorySubmitHandlers({
     createAlertMutation.mutate(alertForm);
   });
 
-  const handleAttachmentSubmit = createEnterpriseInventoryFormSubmitHandler(
-    () => {
-      if (!canRun(TENANT_PERMISSIONS.ATTACHMENTS_WRITE)) return;
-      createAttachmentMutation.mutate(attachmentForm);
-    },
-  );
+
 
   return {
     beginEditProductPackage,
     cancelEditProductPackage,
     handleAlertSubmit,
-    handleAttachmentSubmit,
     handleBarcodeLabelSubmit,
     handleCycleCountSubmit,
     handleNotificationDeliverySubmit,

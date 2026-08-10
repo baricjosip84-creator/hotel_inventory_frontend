@@ -56,6 +56,15 @@ type ShipmentItem = {
   storage_location_id?: string | null;
   storage_location_name?: string | null;
   storage_location_retired?: boolean;
+  expiry_date?: string | null;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  manufactured_at?: string | null;
+  shortage_quantity?: number | string | null;
+  overage_quantity?: number | string | null;
+  damaged_quantity?: number | string | null;
+  rejected_quantity?: number | string | null;
+  quarantine_quantity?: number | string | null;
   unit_cost?: number | string | null;
   unit_cost_currency?: string | null;
   version?: number;
@@ -110,11 +119,25 @@ type ItemFormState = {
   product_id: string;
   quantity: string;
   unit_cost: string;
+  storage_location_id: string;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
+  manufactured_at: string;
 };
 
 type ReceiveDraft = {
   quantity_received: string;
   storage_location_id: string;
+  lot_number: string;
+  batch_number: string;
+  expiry_date: string;
+  manufactured_at: string;
+  shortage_quantity: string;
+  overage_quantity: string;
+  damaged_quantity: string;
+  rejected_quantity: string;
+  quarantine_quantity: string;
   discrepancy_reason: string;
   receiving_note: string;
 };
@@ -125,6 +148,15 @@ type ReceiveShipmentLineItemPayload = {
   package_id?: string;
   package_count_received?: number;
   storage_location_id: string;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  manufactured_at?: string | null;
+  shortage_quantity?: number;
+  overage_quantity?: number;
+  damaged_quantity?: number;
+  rejected_quantity?: number;
+  quarantine_quantity?: number;
   discrepancy_reason?: string | null;
   receiving_note?: string | null;
 };
@@ -246,6 +278,11 @@ async function addShipmentItem(input: {
   product_id: string;
   quantity: number;
   unit_cost?: number | null;
+  storage_location_id?: string | null;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  manufactured_at?: string | null;
 }): Promise<ShipmentItem> {
   return apiRequest<ShipmentItem>('/shipment-items', {
     method: 'POST',
@@ -253,7 +290,12 @@ async function addShipmentItem(input: {
       shipment_id: input.shipment_id,
       product_id: input.product_id,
       quantity: input.quantity,
-      unit_cost: input.unit_cost ?? null
+      unit_cost: input.unit_cost ?? null,
+      storage_location_id: input.storage_location_id || null,
+      lot_number: input.lot_number || null,
+      batch_number: input.batch_number || null,
+      expiry_date: input.expiry_date || null,
+      manufactured_at: input.manufactured_at || null
     })
   });
 }
@@ -384,7 +426,12 @@ function emptyItemForm(): ItemFormState {
   return {
     product_id: '',
     quantity: '1',
-    unit_cost: ''
+    unit_cost: '',
+    storage_location_id: '',
+    lot_number: '',
+    batch_number: '',
+    expiry_date: '',
+    manufactured_at: ''
   };
 }
 
@@ -394,8 +441,17 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
   const remaining = Math.max(ordered - received, 0);
 
   return {
-    quantity_received: remaining > 0 ? String(remaining) : '1',
+    quantity_received: remaining > 0 ? String(remaining) : '0',
     storage_location_id: item.storage_location_id || '',
+    lot_number: item.lot_number || '',
+    batch_number: item.batch_number || '',
+    expiry_date: item.expiry_date ? String(item.expiry_date).slice(0, 10) : '',
+    manufactured_at: item.manufactured_at ? String(item.manufactured_at).slice(0, 10) : '',
+    shortage_quantity: String(item.shortage_quantity || 0),
+    overage_quantity: String(item.overage_quantity || 0),
+    damaged_quantity: '0',
+    rejected_quantity: '0',
+    quarantine_quantity: '0',
     discrepancy_reason: item.discrepancy_reason || '',
     receiving_note: ''
   };
@@ -1289,7 +1345,10 @@ export default function ShipmentsPage() {
       [matchedItem.id]: {
         ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
         quantity_received: String(baseQuantityToReceive),
-        storage_location_id: safeStorageLocationId
+        storage_location_id: safeStorageLocationId,
+        lot_number: pendingAutoReceive.labelLot || current[matchedItem.id]?.lot_number || matchedItem.lot_number || '',
+        batch_number: pendingAutoReceive.labelBatch || current[matchedItem.id]?.batch_number || matchedItem.batch_number || '',
+        expiry_date: pendingAutoReceive.labelExpiry ? String(pendingAutoReceive.labelExpiry).slice(0, 10) : (current[matchedItem.id]?.expiry_date || (matchedItem.expiry_date ? String(matchedItem.expiry_date).slice(0, 10) : ''))
       }
     }));
 
@@ -1315,6 +1374,10 @@ export default function ShipmentsPage() {
             package_id: pendingAutoReceive.packageId,
             package_count_received: 1,
             storage_location_id: safeStorageLocationId,
+            lot_number: pendingAutoReceive.labelLot || draft.lot_number || null,
+            batch_number: pendingAutoReceive.labelBatch || draft.batch_number || null,
+            expiry_date: pendingAutoReceive.labelExpiry || draft.expiry_date || null,
+            manufactured_at: draft.manufactured_at || null,
             discrepancy_reason: draft.discrepancy_reason.trim() || null,
             receiving_note: draft.receiving_note.trim() || null
           }
@@ -1322,6 +1385,10 @@ export default function ShipmentsPage() {
             product_id: matchedItem.product_id,
             quantity_received: baseQuantityToReceive,
             storage_location_id: safeStorageLocationId,
+            lot_number: pendingAutoReceive.labelLot || draft.lot_number || null,
+            batch_number: pendingAutoReceive.labelBatch || draft.batch_number || null,
+            expiry_date: pendingAutoReceive.labelExpiry || draft.expiry_date || null,
+            manufactured_at: draft.manufactured_at || null,
             discrepancy_reason: draft.discrepancy_reason.trim() || null,
             receiving_note: draft.receiving_note.trim() || null
           }
@@ -1620,7 +1687,12 @@ export default function ShipmentsPage() {
       shipment_id: selectedShipmentId,
       product_id: itemForm.product_id,
       quantity,
-      unit_cost: parsedUnitCost
+      unit_cost: parsedUnitCost,
+      storage_location_id: itemForm.storage_location_id || null,
+      lot_number: itemForm.lot_number.trim() || null,
+      batch_number: itemForm.batch_number.trim() || null,
+      expiry_date: itemForm.expiry_date || null,
+      manufactured_at: itemForm.manufactured_at || null
     });
   };
 
@@ -1635,10 +1707,14 @@ export default function ShipmentsPage() {
     const ordered = toNumber(item.quantity);
     const received = toNumber(item.received_quantity);
     const remaining = Math.max(ordered - received, 0);
-    const draftQuantity = Number(draft.quantity_received);
-    const quantityReceived = Number.isFinite(draftQuantity) && draftQuantity > 0
+    const draftQuantity = Number(draft.quantity_received || 0);
+    const quantityReceived = Number.isFinite(draftQuantity) && draftQuantity >= 0
       ? Math.min(draftQuantity, remaining || draftQuantity)
-      : remaining;
+      : 0;
+    const damagedQuantity = Math.max(Number(draft.damaged_quantity || 0), 0);
+    const rejectedQuantity = Math.max(Number(draft.rejected_quantity || 0), 0);
+    const quarantineQuantity = Math.max(Number(draft.quarantine_quantity || 0), 0);
+    const hasPhysicalReceipt = quantityReceived > 0 || damagedQuantity > 0 || rejectedQuantity > 0 || quarantineQuantity > 0;
 
     setPageError(null);
     setPageMessage(`Receive click detected at ${clickedAt}. Preparing backend request...`);
@@ -1661,8 +1737,8 @@ export default function ShipmentsPage() {
       return;
     }
 
-    if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-      setPageError('Receive click detected, but the receive quantity is not valid. Refresh the shipment and retry.');
+    if (!Number.isFinite(quantityReceived) || quantityReceived < 0 || !hasPhysicalReceipt) {
+      setPageError('Enter a usable, damaged, rejected, or quarantine quantity before receiving this line.');
       setPageMessage(null);
       return;
     }
@@ -1692,6 +1768,15 @@ export default function ShipmentsPage() {
         product_id: item.product_id,
         quantity_received: quantityReceived,
         storage_location_id: safeStorageLocationId,
+        lot_number: draft.lot_number.trim() || null,
+        batch_number: draft.batch_number.trim() || null,
+        expiry_date: draft.expiry_date || null,
+        manufactured_at: draft.manufactured_at || null,
+        shortage_quantity: Math.max(Number(draft.shortage_quantity || 0), 0),
+        overage_quantity: Math.max(Number(draft.overage_quantity || 0), 0),
+        damaged_quantity: damagedQuantity,
+        rejected_quantity: rejectedQuantity,
+        quarantine_quantity: quarantineQuantity,
         discrepancy_reason: draft.discrepancy_reason.trim() || null,
         receiving_note: draft.receiving_note.trim() || null
       }
@@ -2616,6 +2701,30 @@ export default function ShipmentsPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label style={styles.label}>Planned Storage Location</label>
+                  <select style={styles.input} value={itemForm.storage_location_id} onChange={(event) => setItemForm((current) => ({ ...current, storage_location_id: event.target.value }))}>
+                    <option value="">Set when receiving</option>
+                    {storageLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Lot Number</label>
+                  <input style={styles.input} value={itemForm.lot_number} onChange={(event) => setItemForm((current) => ({ ...current, lot_number: event.target.value }))} placeholder="Optional; can be confirmed at receipt" />
+                </div>
+                <div>
+                  <label style={styles.label}>Batch Number</label>
+                  <input style={styles.input} value={itemForm.batch_number} onChange={(event) => setItemForm((current) => ({ ...current, batch_number: event.target.value }))} placeholder="Optional; can be confirmed at receipt" />
+                </div>
+                <div>
+                  <label style={styles.label}>Manufactured Date</label>
+                  <input style={styles.input} type="date" value={itemForm.manufactured_at} onChange={(event) => setItemForm((current) => ({ ...current, manufactured_at: event.target.value }))} />
+                </div>
+                <div>
+                  <label style={styles.label}>Expiry Date</label>
+                  <input style={styles.input} type="date" value={itemForm.expiry_date} onChange={(event) => setItemForm((current) => ({ ...current, expiry_date: event.target.value }))} />
+                </div>
+
                 <div style={styles.formActionRow}>
                   <button
                     type="submit"
@@ -2786,11 +2895,16 @@ export default function ShipmentsPage() {
                       selectedScannerLocationId ||
                       item.storage_location_id ||
                       (storageLocations.length === 1 ? storageLocations[0].id : '');
-                    const parsedReceiveQuantity = Number(draft.quantity_received);
+                    const parsedReceiveQuantity = Number(draft.quantity_received || 0);
+                    const exceptionalReceiveQuantity =
+                      Math.max(Number(draft.damaged_quantity || 0), 0) +
+                      Math.max(Number(draft.rejected_quantity || 0), 0) +
+                      Math.max(Number(draft.quarantine_quantity || 0), 0);
                     const receiveQuantityIsValid =
                       Number.isFinite(parsedReceiveQuantity) &&
-                      parsedReceiveQuantity > 0 &&
-                      parsedReceiveQuantity <= remaining;
+                      parsedReceiveQuantity >= 0 &&
+                      parsedReceiveQuantity <= remaining &&
+                      (parsedReceiveQuantity > 0 || exceptionalReceiveQuantity > 0);
                     const canSubmitReceiveLine =
                       canReceiveShipments &&
                       remaining > 0 &&
@@ -2807,7 +2921,7 @@ export default function ShipmentsPage() {
                           : !effectiveReceiveLocationId
                             ? 'Select a storage location before receiving this line.'
                             : !receiveQuantityIsValid
-                              ? `Receive quantity must be greater than zero and no more than ${formatQuantity(remaining)}.`
+                              ? `Enter usable quantity up to ${formatQuantity(remaining)}, or record damaged, rejected, or quarantine quantity.`
                               : null;
 
                     return (
@@ -2865,6 +2979,18 @@ export default function ShipmentsPage() {
                               {item.storage_location_name || item.storage_location_id || '-'}
                               {item.storage_location_retired ? ' (retired)' : ''}
                             </div>
+                          </div>
+                          <div>
+                            <strong>Lot / Batch</strong>
+                            <div>{[item.lot_number ? `Lot ${item.lot_number}` : '', item.batch_number ? `Batch ${item.batch_number}` : ''].filter(Boolean).join(' · ') || '-'}</div>
+                          </div>
+                          <div>
+                            <strong>Expiry</strong>
+                            <div>{item.expiry_date ? formatDate(item.expiry_date) : '-'}</div>
+                          </div>
+                          <div>
+                            <strong>Receiving Exceptions</strong>
+                            <div>Short {formatQuantity(toNumber(item.shortage_quantity))} · Over {formatQuantity(toNumber(item.overage_quantity))} · Damaged {formatQuantity(toNumber(item.damaged_quantity))} · Rejected {formatQuantity(toNumber(item.rejected_quantity))} · Quarantine {formatQuantity(toNumber(item.quarantine_quantity))}</div>
                           </div>
                           <div>
                             <strong>Product ID</strong>
@@ -2937,11 +3063,11 @@ export default function ShipmentsPage() {
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Receive Quantity</label>
+                              <label style={styles.label}>Usable Quantity Received</label>
                               <input
                                 style={styles.input}
                                 type="number"
-                                min="0.01"
+                                min="0"
                                 step="0.01"
                                 value={draft.quantity_received}
                                 onChange={(event) =>
@@ -2951,6 +3077,43 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               />
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Lot Number</label>
+                              <input style={styles.input} value={draft.lot_number} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, lot_number: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Batch Number</label>
+                              <input style={styles.input} value={draft.batch_number} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, batch_number: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Manufactured Date</label>
+                              <input style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, manufactured_at: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Expiry Date</label>
+                              <input style={styles.input} type="date" value={draft.expiry_date} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, expiry_date: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Shortage Quantity</label>
+                              <input style={styles.input} type="number" min="0" step="0.01" value={draft.shortage_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, shortage_quantity: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Overage Quantity</label>
+                              <input style={styles.input} type="number" min="0" step="0.01" value={draft.overage_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, overage_quantity: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Damaged Quantity</label>
+                              <input style={styles.input} type="number" min="0" step="0.01" value={draft.damaged_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, damaged_quantity: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Rejected Quantity</label>
+                              <input style={styles.input} type="number" min="0" step="0.01" value={draft.rejected_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, rejected_quantity: event.target.value }))} />
+                            </div>
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Quarantine Quantity</label>
+                              <input style={styles.input} type="number" min="0" step="0.01" value={draft.quarantine_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, quarantine_quantity: event.target.value }))} />
                             </div>
 
                             <div style={styles.receiveLineField}>

@@ -13,9 +13,11 @@ import {
   fetchCycleCounts,
   fetchDepartmentRequisitions,
   fetchApprovalRules,
+  fetchSupplierReturns,
   fetchSupplierInvoices,
   fetchSupplierCatalog,
   fetchNotifications,
+  fetchNotificationDeliveries,
   fetchAlerts,
   fetchAuditLogs,
   fetchBarcodeLabels,
@@ -167,6 +169,7 @@ export function useEnterpriseInventoryQueries({
   const canReadCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_READ);
   const canReadRequisitions = hasPermission(TENANT_PERMISSIONS.REQUISITIONS_READ);
   const canReadApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_READ);
+  const canReadSupplierReturns = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ);
   const canReadInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_READ);
   const canReadSupplierCatalog = hasPermission(TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ);
   const canReadAttachments = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
@@ -280,9 +283,11 @@ export function useEnterpriseInventoryQueries({
   const cycleCountsQuery = useQuery({ queryKey: ['enterprise-cycle-counts'], queryFn: fetchCycleCounts , enabled: canReadCycleCounts });
   const requisitionsQuery = useQuery({ queryKey: ['enterprise-requisitions'], queryFn: fetchDepartmentRequisitions , enabled: canReadRequisitions });
   const approvalRulesQuery = useQuery({ queryKey: ['enterprise-approval-rules'], queryFn: fetchApprovalRules , enabled: canReadApprovalRules });
+  const supplierReturnsQuery = useQuery({ queryKey: ['enterprise-supplier-returns'], queryFn: fetchSupplierReturns, enabled: canReadSupplierReturns });
   const invoicesQuery = useQuery({ queryKey: ['enterprise-invoices'], queryFn: fetchSupplierInvoices , enabled: canReadInvoices });
   const supplierCatalogQuery = useQuery({ queryKey: ['enterprise-supplier-catalog'], queryFn: fetchSupplierCatalog , enabled: canReadSupplierCatalog });
   const notificationsQuery = useQuery({ queryKey: ['enterprise-notifications'], queryFn: fetchNotifications , enabled: canReadNotifications });
+  const notificationDeliveriesQuery = useQuery({ queryKey: ['enterprise-notification-deliveries'], queryFn: fetchNotificationDeliveries, enabled: canReadNotifications });
   const alertsQuery = useQuery({ queryKey: ['enterprise-alerts', alertFilters], queryFn: () => fetchAlerts(alertFilters) , enabled: canReadAlerts });
   const auditLogsQuery = useQuery({ queryKey: ['enterprise-audit-logs', auditFilters], queryFn: () => fetchAuditLogs(auditFilters) , enabled: canReadAudit });
   const barcodeLabelsQuery = useQuery({ queryKey: ['enterprise-barcode-labels'], queryFn: fetchBarcodeLabels , enabled: canReadBarcodeLabels });
@@ -387,9 +392,11 @@ export function useEnterpriseInventoryQueries({
     cycleCountsQuery,
     requisitionsQuery,
     approvalRulesQuery,
+    supplierReturnsQuery,
     invoicesQuery,
     supplierCatalogQuery,
     notificationsQuery,
+    notificationDeliveriesQuery,
     alertsQuery,
     auditLogsQuery,
     barcodeLabelsQuery,

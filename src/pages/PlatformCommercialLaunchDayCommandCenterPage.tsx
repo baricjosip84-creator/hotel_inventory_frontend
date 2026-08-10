@@ -3,6 +3,12 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 
+type ExternalPersistence = {
+  stored_in_application: boolean;
+  external_records_observable: boolean;
+  interpretation: string;
+};
+
 type CommandCenterCheckpoint = {
   code: string;
   domain: string;
@@ -11,11 +17,15 @@ type CommandCenterCheckpoint = {
   hold_trigger: string;
   source_smoke_test_posture: string;
   source_smoke_tests_total: number;
+  source_smoke_tests_requiring_evidence_review: number;
+  source_smoke_tests_awaiting_external_go_no_go_confirmation: number;
   source_smoke_tests_blocked: number;
-  source_smoke_tests_waiting_for_decisions: number;
+  manual_precondition: string;
   required_decision_fields: string[];
   allowed_decision_statuses: string[];
   default_decision_status: string;
+  decision_artifact: string;
+  decision_artifact_storage: string;
   command_center_status: string;
 };
 
@@ -27,9 +37,13 @@ type CommercialLaunchDayCommandCenter = {
   summary: Record<string, number>;
   checkpoints: CommandCenterCheckpoint[];
   smoke_test_posture: string;
+  smoke_test_summary: Record<string, number>;
+  smoke_test_result_persistence: ExternalPersistence | null;
   go_no_go_register_posture: string;
+  go_no_go_decision_persistence: ExternalPersistence | null;
   acceptance_packet_posture: string;
   certificate_posture: string;
+  decision_persistence: ExternalPersistence;
   command_center_rules: string[];
   launch_day_limitations: string[];
   next_best_step: string;
@@ -40,29 +54,23 @@ function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unable to load the commercial launch day command center.';
+}
 
 function getCheckpointEvidenceLink(row: CommandCenterCheckpoint) {
   const byCode: Record<string, string> = {
     launch_window_owner_confirmed: '/platform/commercial-launch-go-no-go-register',
     smoke_test_runner_confirmed: '/platform/commercial-launch-smoke-test-checklist',
     customer_success_launch_contact_confirmed: '/platform/pilot-customer-readiness',
-    support_escalation_path_confirmed: '/platform/support-operations-cockpit',
+    support_escalation_path_confirmed: '/platform/support-cockpit',
     billing_activation_hold_confirmed: '/platform/billing-subscription-activation',
     incident_commander_confirmed: '/platform/incidents',
     rollback_decision_owner_confirmed: '/platform/deployment-validation',
-    post_launch_observation_window_confirmed: '/platform/production-monitoring-readiness'
+    post_launch_observation_window_confirmed: '/platform/monitoring-readiness'
   };
-  const byDomain: Record<string, string> = {
-    launch_window_control: '/platform/commercial-launch-go-no-go-register',
-    smoke_test_execution: '/platform/commercial-launch-smoke-test-checklist',
-    customer_communication: '/platform/pilot-customer-readiness',
-    support_readiness: '/platform/support-operations-cockpit',
-    billing_activation_control: '/platform/billing-subscription-activation',
-    incident_response: '/platform/incidents',
-    rollback_control: '/platform/deployment-validation',
-    post_launch_observation: '/platform/production-monitoring-readiness'
-  };
-  return byCode[row.code] || byDomain[row.domain] || '/platform/commercial-launch-smoke-test-checklist';
+  return byCode[row.code] || '/platform/commercial-launch-smoke-test-checklist';
 }
 
 function getCheckpointEvidenceLabel(row: CommandCenterCheckpoint) {
@@ -80,15 +88,33 @@ function getCheckpointEvidenceLabel(row: CommandCenterCheckpoint) {
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('hold') || value.includes('missing')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('waiting') || value.includes('manual') || value.includes('ready') || value.includes('not_reviewed') || value.includes('conditional')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  const normalized = value.toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('hold') || normalized.includes('missing')) {
+    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  }
+  if (
+    normalized.includes('review')
+    || normalized.includes('waiting')
+    || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('conditional')
+    || normalized.includes('not reviewed')
+    || normalized.includes('not_reviewed')
+  ) {
+    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  }
+  if (normalized.includes('loading') || normalized.includes('unknown') || normalized.includes('preparation')) {
+    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  }
   return { ...styles.badge, background: '#dcfce7', color: '#166534' };
 }
 
 export default function PlatformCommercialLaunchDayCommandCenterPage() {
   const commandCenter = useQuery({
     queryKey: ['platform', 'commercial-launch-day-command-center'],
-    queryFn: () => platformApiRequest<CommercialLaunchDayCommandCenter>('/platform/commercial-launch-day-command-center')
+    queryFn: () => platformApiRequest<CommercialLaunchDayCommandCenter>('/platform/commercial-launch-day-command-center'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const data = commandCenter.data;
@@ -97,13 +123,13 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
   return (
     <div style={styles.page}>
       <section style={styles.header}>
-        <div>
+        <div style={styles.headerCopy}>
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Commercial Launch Day Command Center</h1>
           <p style={styles.description}>
-            Step 221 converts the launch smoke-test checklist into a launch-window command center. It defines owners,
-            communication checkpoints, incident response, billing hold, rollback controls, and post-launch observation
-            evidence, while staying read-only and avoiding any automatic launch, billing, tenant, or notification action.
+            Step 221 is a launch-window preparation board. It organizes owners, communication checkpoints, incident
+            response, billing holds, rollback controls, and post-launch observation evidence without executing launch
+            actions or claiming that external decisions or smoke-test results exist.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -120,17 +146,23 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
         </div>
       </section>
 
+      <section style={styles.warningCard}>
+        <strong>Preparation only.</strong> This application cannot observe external go/no-go decisions, smoke-test
+        execution records, or launch-window command-center decisions. A checkpoint row is a record template, not proof
+        that the launch prerequisite or decision has been completed.
+      </section>
+
       <section style={styles.card}>
         <h2 style={styles.sectionTitle}>Supporting launch pages</h2>
         <div style={styles.quickLinks}>
           <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance">Launch acceptance</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
-          <Link style={styles.quickLink} to="/platform/support-operations-cockpit">Support cockpit</Link>
+          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
           <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
           <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring readiness</Link>
+          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring readiness</Link>
           <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
           <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
         </div>
@@ -139,8 +171,10 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
       {commandCenter.isLoading ? <div style={styles.card}>Loading commercial launch day command center...</div> : null}
       {commandCenter.error ? (
         <div style={styles.error}>
-          Failed to load commercial launch day command center.
-          <button type="button" style={styles.errorButton} onClick={() => void commandCenter.refetch()}>Retry</button>
+          <div><strong>Failed to load commercial launch day command center.</strong><div style={styles.errorDetail}>{errorMessage(commandCenter.error)}</div></div>
+          <button type="button" style={styles.errorButton} onClick={() => void commandCenter.refetch()} disabled={commandCenter.isFetching}>
+            {commandCenter.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -151,7 +185,7 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
             <div style={styles.metadataGrid}>
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
+              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
               <div><strong>Validation</strong><span>{data.validation_note}</span></div>
             </div>
           </section>
@@ -166,12 +200,15 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
           </section>
 
           <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source launch postures</h2>
+            <h2 style={styles.sectionTitle}>Source launch postures and external persistence</h2>
             <div style={styles.inputGrid}>
               <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
               <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance-packet">Open Launch Acceptance</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance">Open Launch Acceptance</Link></div>
               <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
+              <div style={styles.inputCard}><span style={styles.help}>Go/no-go decision persistence</span><strong>{data.go_no_go_decision_persistence?.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.go_no_go_decision_persistence?.interpretation || 'No persistence metadata returned.'}</span></div>
+              <div style={styles.inputCard}><span style={styles.help}>Smoke-test result persistence</span><strong>{data.smoke_test_result_persistence?.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.smoke_test_result_persistence?.interpretation || 'No persistence metadata returned.'}</span></div>
+              <div style={styles.inputCard}><span style={styles.help}>Command-center decision persistence</span><strong>{data.decision_persistence.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.decision_persistence.interpretation}</span></div>
             </div>
           </section>
 
@@ -181,26 +218,38 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
               {data.checkpoints.map((row) => (
                 <article key={row.code} style={styles.checkCard}>
                   <div style={styles.rowHeader}>
-                    <div>
+                    <div style={styles.rowHeaderCopy}>
                       <strong>{humanize(row.code)}</strong>
                       <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
                     </div>
                     <span style={badgeStyle(row.command_center_status)}>{humanize(row.command_center_status)}</span>
                   </div>
                   <div style={styles.evidenceBox}>
+                    <span style={styles.evidenceLabel}>Manual precondition</span>
+                    <strong>{row.manual_precondition}</strong>
+                  </div>
+                  <div style={styles.evidenceBox}>
                     <span style={styles.evidenceLabel}>Required evidence</span>
                     <strong>{row.required_evidence}</strong>
                   </div>
                   <Link style={styles.packetLink} to={getCheckpointEvidenceLink(row)}>{getCheckpointEvidenceLabel(row)}</Link>
-                  <div style={styles.statusRow}><span>Default decision</span><span style={badgeStyle(row.default_decision_status)}>{humanize(row.default_decision_status)}</span></div>
+                  <div style={styles.statusRow}><span>Template default decision</span><span style={badgeStyle(row.default_decision_status)}>{humanize(row.default_decision_status)}</span></div>
                   <div style={styles.statusRow}><span>Hold trigger</span><strong>{humanize(row.hold_trigger)}</strong></div>
-                  <div style={styles.statusRow}><span>Source smoke tests</span><strong>{row.source_smoke_tests_total} total · {row.source_smoke_tests_blocked} blocked · {row.source_smoke_tests_waiting_for_decisions} waiting</strong></div>
+                  <div style={styles.statusRow}><span>External decision artifact</span><strong>{row.decision_artifact}</strong></div>
+                  <div style={styles.statusRow}><span>Artifact storage</span><strong>{humanize(row.decision_artifact_storage)}</strong></div>
+                  <div style={styles.statusRow}>
+                    <span>Source smoke tests</span>
+                    <strong>
+                      {row.source_smoke_tests_total} total · {row.source_smoke_tests_requiring_evidence_review} review ·{' '}
+                      {row.source_smoke_tests_awaiting_external_go_no_go_confirmation} external confirmation · {row.source_smoke_tests_blocked} blocked
+                    </strong>
+                  </div>
                   <div>
-                    <span style={styles.evidenceLabel}>Allowed decision statuses</span>
+                    <span style={styles.evidenceLabel}>Allowed external decision statuses</span>
                     <div style={styles.chips}>{row.allowed_decision_statuses.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
                   </div>
                   <div>
-                    <span style={styles.evidenceLabel}>Required decision fields</span>
+                    <span style={styles.evidenceLabel}>Required external decision fields</span>
                     <div style={styles.chips}>{row.required_decision_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
                   </div>
                 </article>
@@ -228,42 +277,45 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
+  page: { display: 'grid', gap: 18, minWidth: 0 },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
+  headerCopy: { minWidth: 0, flex: '1 1 620px' },
   eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28 },
-  description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
+  title: { margin: '4px 0', fontSize: 28, overflowWrap: 'anywhere' },
+  description: { margin: 0, color: '#4b5563', maxWidth: 1000, lineHeight: 1.5, overflowWrap: 'anywhere' },
+  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
   generated: { color: '#6b7280', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-
+  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center' },
+  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.5, overflowWrap: 'anywhere' },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
+  quickLink: { border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '7px 11px', fontSize: 12, fontWeight: 800, textDecoration: 'none', overflowWrap: 'anywhere' },
   secondaryButton: { border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  errorButton: { marginLeft: 12, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  errorDetail: { marginTop: 4, fontSize: 12, overflowWrap: 'anywhere' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
   sourceLink: { marginTop: 4, color: '#2563eb', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   packetLink: { justifySelf: 'start', border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16 },
+  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
   metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18 },
+  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  sectionTitle: { margin: '0 0 12px', fontSize: 18, overflowWrap: 'anywhere' },
   inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6 },
+  inputCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 6, minWidth: 0, overflowWrap: 'anywhere' },
   checkGrid: { display: 'grid', gap: 14 },
-  checkCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
+  checkCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, background: '#f9fafb', display: 'grid', gap: 12, minWidth: 0 },
+  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
+  rowHeaderCopy: { minWidth: 0, flex: '1 1 360px', overflowWrap: 'anywhere' },
   help: { color: '#6b7280', fontSize: 12 },
-  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4 },
+  evidenceBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, overflowWrap: 'anywhere' },
   evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize' },
   chips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
-  list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.6 },
-  nextStep: { background: '#eef2ff', border: '1px solid #c7d2fe', color: '#3730a3', borderRadius: 14, padding: 14 },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14 },
-  error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14 }
+  chip: { border: '1px solid #d1d5db', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#374151', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: 10, color: '#374151', flexWrap: 'wrap', overflowWrap: 'anywhere' },
+  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 },
+  list: { margin: 0, paddingLeft: 20, color: '#374151', lineHeight: 1.6, overflowWrap: 'anywhere' },
+  nextStep: { background: '#eef2ff', border: '1px solid #c7d2fe', color: '#3730a3', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
+  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
+  error: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
 };

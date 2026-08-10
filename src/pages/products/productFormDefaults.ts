@@ -11,6 +11,7 @@ import type {
 
 export function emptyProductForm(): ProductFormState {
   return {
+    sku: '',
     name: '',
     category: '',
     unit: '',

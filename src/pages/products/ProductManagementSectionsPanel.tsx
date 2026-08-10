@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import type { useProductPageViewModel } from './useProductPageViewModel';
 import { getCurrentAccessRoleLabel } from '../../lib/permissions';
 import { styles } from './productStyles';
@@ -5,6 +6,7 @@ import { ProductFormPanel } from './ProductFormPanel';
 import { ProductPackagesPanel } from './ProductPackagesPanel';
 import { ProductCostHistoryPanel } from './ProductCostHistoryPanel';
 import { ProductListPanel } from './ProductListPanel';
+import { InventoryCsvImportPanel } from '../../components/imports/InventoryCsvImportPanel';
 
 type ProductManagementSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
@@ -72,6 +74,8 @@ export function ProductManagementSectionsPanel({
   handleStartEdit,
   handleDelete
 }: ProductManagementSectionsPanelProps) {
+  const queryClient = useQueryClient();
+
   return (
     <>
       {!canManageProducts ? (
@@ -79,6 +83,22 @@ export function ProductManagementSectionsPanel({
           Current access role: {getCurrentAccessRoleLabel() || role}. Products are read-only because this role does not have products.write permission.
         </div>
       ) : null}
+
+      <InventoryCsvImportPanel
+        importType="products"
+        title="Bulk Product Import"
+        description="Validate a CSV first, then commit all rows atomically. Existing records are never silently overwritten."
+        templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode']}
+        templateExample={{ sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '' }}
+        canImport={canManageProducts}
+        disabledReason="Products write permission is required for bulk product import."
+        onCommitted={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['products'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+          ]);
+        }}
+      />
 
       <ProductFormPanel
         editingProduct={editingProduct}

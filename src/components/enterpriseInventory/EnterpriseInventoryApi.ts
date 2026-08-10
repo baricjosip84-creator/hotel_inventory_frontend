@@ -32,6 +32,7 @@ import type {
   ExecutionRequestsResponse,
   InventoryAnomaliesResponse,
   InventoryValuationReport,
+  NotificationDelivery,
   NotificationEvent,
   OperationalHealthResponse,
   ParLevel,
@@ -58,6 +59,7 @@ import type {
   SupplierCatalogItem,
   SupplierInvoice,
   SupplierOption,
+  SupplierReturn,
   SupplierPerformance,
   SupplierSlaBreach,
   SupplierTrustScoresResponse,
@@ -84,6 +86,10 @@ export async function fetchApprovalRules(): Promise<ApprovalRule[]> {
   return apiRequest<ApprovalRule[]>('/enterprise-inventory/approval-rules');
 }
 
+export async function fetchSupplierReturns(): Promise<SupplierReturn[]> {
+  return apiRequest<SupplierReturn[]>('/enterprise-inventory/supplier-returns');
+}
+
 export async function fetchSupplierInvoices(): Promise<SupplierInvoice[]> {
   return apiRequest<SupplierInvoice[]>('/enterprise-inventory/supplier-invoices');
 }
@@ -94,6 +100,10 @@ export async function fetchSupplierCatalog(): Promise<SupplierCatalogItem[]> {
 
 export async function fetchNotifications(): Promise<NotificationEvent[]> {
   return apiRequest<NotificationEvent[]>('/enterprise-inventory/notifications');
+}
+
+export async function fetchNotificationDeliveries(): Promise<NotificationDelivery[]> {
+  return apiRequest<NotificationDelivery[]>('/enterprise-inventory/notifications/deliveries');
 }
 
 export async function fetchAlerts(filters: AlertFilters): Promise<AlertItem[]> {

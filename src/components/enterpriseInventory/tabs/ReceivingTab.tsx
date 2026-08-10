@@ -182,6 +182,15 @@ export function ReceivingTab({
                 shipment_id: value,
                 product_id: '',
                 quantity_received: '',
+                lot_number: '',
+                batch_number: '',
+                expiry_date: '',
+                manufactured_at: '',
+                shortage_quantity: '0',
+                overage_quantity: '0',
+                damaged_quantity: '0',
+                rejected_quantity: '0',
+                quarantine_quantity: '0',
                 discrepancy_reason: '',
                 receiving_note: ''
               }));
@@ -201,7 +210,11 @@ export function ReceivingTab({
               setShipmentReceivingForm((current) => ({
                 ...current,
                 product_id: value,
-                storage_location_id: item?.storage_location_id || current.storage_location_id
+                storage_location_id: item?.storage_location_id || current.storage_location_id,
+                lot_number: item?.lot_number || '',
+                batch_number: item?.batch_number || '',
+                expiry_date: item?.expiry_date ? String(item.expiry_date).slice(0, 10) : '',
+                manufactured_at: item?.manufactured_at ? String(item.manufactured_at).slice(0, 10) : ''
               }));
             }}
             options={selectedShipmentItems.map((item) => ({
@@ -213,7 +226,17 @@ export function ReceivingTab({
           />
           {!canReadShipmentItems ? <p style={styles.helper}>Shipment-line selection requires {TENANT_PERMISSIONS.SHIPMENT_ITEMS_READ} permission. Barcode lookup remains available.</p> : null}
           <SelectField label="Receive into location" value={shipmentReceivingForm.storage_location_id} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!canReceiveShipments || !selectedReceivingShipment} />
-          <InputField label="Quantity received" type="number" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Usable quantity received" type="number" min="0" value={shipmentReceivingForm.quantity_received} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quantity_received: value }))} required disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <p style={styles.helper}>Usable quantity is added to available stock. Damaged, rejected and quarantined quantities are tracked separately and are not usable stock.</p>
+          <InputField label="Lot number" value={shipmentReceivingForm.lot_number} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, lot_number: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Batch number" value={shipmentReceivingForm.batch_number} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, batch_number: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Manufactured date" type="date" value={shipmentReceivingForm.manufactured_at} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, manufactured_at: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Expiry date" type="date" value={shipmentReceivingForm.expiry_date} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, expiry_date: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Shortage quantity" type="number" min="0" value={shipmentReceivingForm.shortage_quantity} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, shortage_quantity: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Overage quantity" type="number" min="0" value={shipmentReceivingForm.overage_quantity} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, overage_quantity: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Damaged quantity" type="number" min="0" value={shipmentReceivingForm.damaged_quantity} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, damaged_quantity: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Rejected quantity" type="number" min="0" value={shipmentReceivingForm.rejected_quantity} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, rejected_quantity: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
+          <InputField label="Quarantine quantity" type="number" min="0" value={shipmentReceivingForm.quarantine_quantity} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, quarantine_quantity: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
           <InputField label="Discrepancy reason" value={shipmentReceivingForm.discrepancy_reason} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, discrepancy_reason: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
           <InputField label="Receiving note" value={shipmentReceivingForm.receiving_note} onChange={(value) => setShipmentReceivingForm((current) => ({ ...current, receiving_note: value }))} disabled={!canReceiveShipments || !selectedReceivingShipment || receiveShipmentMutation.isPending} />
           <button type="submit" disabled={Boolean(receiptDisabledReason)} title={receiptDisabledReason || undefined} style={receiptDisabledReason ? styles.disabledButton : styles.primaryButton}>Post receipt</button>
@@ -227,7 +250,7 @@ export function ReceivingTab({
           <DataTable
             loading={shipmentItemsQuery.isLoading}
             empty={shipmentReceivingForm.shipment_id ? 'No shipment items found.' : 'Select a shipment to load its items.'}
-            headers={['Product', 'Ordered', 'Received', 'Remaining', 'Discrepancy', 'Reason', 'Last received']}
+            headers={['Product', 'Ordered', 'Received', 'Remaining', 'Lot / batch / expiry', 'Exceptions', 'Discrepancy', 'Reason', 'Last received']}
             rows={selectedShipmentItems.map((item) => {
               const ordered = toNumber(item.quantity);
               const received = toNumber(item.received_quantity);
@@ -236,6 +259,8 @@ export function ReceivingTab({
                 formatNumber(item.quantity),
                 formatNumber(item.received_quantity),
                 formatNumber(Math.max(ordered - received, 0)),
+                [item.lot_number ? `Lot ${item.lot_number}` : '', item.batch_number ? `Batch ${item.batch_number}` : '', item.expiry_date ? `Exp ${formatDate(item.expiry_date)}` : ''].filter(Boolean).join(' · ') || '-',
+                `Short ${formatNumber(item.shortage_quantity)} · Over ${formatNumber(item.overage_quantity)} · Damaged ${formatNumber(item.damaged_quantity)} · Rejected ${formatNumber(item.rejected_quantity)} · Quarantine ${formatNumber(item.quarantine_quantity)}`,
                 formatNumber(item.discrepancy),
                 item.discrepancy_reason || '-',
                 formatDateTime(item.last_received_at)

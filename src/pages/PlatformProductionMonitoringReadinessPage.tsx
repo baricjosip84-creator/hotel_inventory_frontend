@@ -30,24 +30,29 @@ type MonitoringPackage = {
   posture: string;
   generated_at: string;
   summary: Record<string, number>;
-  platform_evidence: Record<string, number>;
+  platform_evidence: Record<string, number | string>;
   monitoring_controls: MonitoringControl[];
   tenants: MonitoringTenantRow[];
   validation_note: string;
 };
 
-type Tenant = { id: string; name: string };
+type SystemHealthPackage = {
+  tenants: Array<{ tenant_id: string; tenant_name: string }>;
+};
 
 function humanize(value: string) {
   return value.replaceAll('_', ' ');
 }
 
 function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing') || value.includes('required')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  if (value.includes('no_tenants') || value.includes('not_required') || value === 'loading') {
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
   }
-  if (value.includes('review') || value.includes('loading')) {
+  if (value.includes('review') || value.includes('customer_status_update_required')) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  }
+  if (value.includes('blocked') || value.includes('missing') || value.includes('not_launchable')) {
+    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
   return { ...styles.badge, background: '#dcfce7', color: '#166534' };
 }
@@ -58,18 +63,25 @@ function formatValue(value: number | string | boolean | null | undefined) {
   return String(value);
 }
 
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown error';
+}
+
 function tenantIncidentLink(tenantId: string) {
   const params = new URLSearchParams({ scope: 'tenant', tenant_id: tenantId, include_resolved: 'false' });
   return `/platform/incidents?${params.toString()}`;
 }
 
 export default function PlatformProductionMonitoringReadinessPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
 
-  const tenants = useQuery({
-    queryKey: ['platform', 'tenants', 'for-production-monitoring-readiness'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+  const tenantOptions = useQuery({
+    queryKey: ['platform', 'system-health', 'for-production-monitoring-readiness'],
+    queryFn: () => platformApiRequest<SystemHealthPackage>('/platform/system-health'),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const query = new URLSearchParams();
@@ -80,12 +92,22 @@ export default function PlatformProductionMonitoringReadinessPage() {
     queryFn: () => {
       const queryString = query.toString();
       return platformApiRequest<MonitoringPackage>(`/platform/production-monitoring-readiness${queryString ? `?${queryString}` : ''}`);
-    }
+    },
+    refetchOnWindowFocus: false,
+    staleTime: 60_000
   });
 
   const data = monitoring.data;
   const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
   const platformEvidence = useMemo(() => Object.entries(data?.platform_evidence || {}), [data?.platform_evidence]);
+
+  function changeTenant(nextTenantId: string) {
+    setTenantId(nextTenantId);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextTenantId) nextParams.set('tenant_id', nextTenantId);
+    else nextParams.delete('tenant_id');
+    setSearchParams(nextParams, { replace: true });
+  }
 
   return (
     <div style={styles.page}>
@@ -94,8 +116,8 @@ export default function PlatformProductionMonitoringReadinessPage() {
           <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
           <h1 style={styles.title}>Production Monitoring Readiness</h1>
           <p style={styles.description}>
-            Step 212 joins tenant system-health signals, platform incidents, service dependencies, and integration
-            monitoring evidence into one read-only launch monitoring board.
+            Step 212 combines tenant system-health signals, incident communication coverage, service dependencies, and the
+            canonical Integration Monitoring posture into one read-only technical monitoring precheck.
           </p>
         </div>
         <div style={styles.headerMeta}>
@@ -104,29 +126,49 @@ export default function PlatformProductionMonitoringReadinessPage() {
           <button
             type="button"
             style={styles.secondaryButton}
-            onClick={() => { void tenants.refetch(); void monitoring.refetch(); }}
-            disabled={tenants.isFetching || monitoring.isFetching}
+            onClick={() => { void tenantOptions.refetch(); void monitoring.refetch(); }}
+            disabled={tenantOptions.isFetching || monitoring.isFetching}
           >
-            {tenants.isFetching || monitoring.isFetching ? 'Refreshing...' : 'Refresh'}
+            {tenantOptions.isFetching || monitoring.isFetching ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
       </section>
 
+      <section style={styles.notice}>
+        <strong>Operator precheck only.</strong> A clear result means the currently implemented monitoring evidence is technically clear enough for the next review. It does not prove real-world uptime, alert delivery, public-status publication, or final production-monitoring sign-off.
+      </section>
+
       <section style={styles.card}>
-        <label style={styles.label} htmlFor="tenant-filter">Tenant filter</label>
-        <select id="tenant-filter" value={tenantId} onChange={(event) => setTenantId(event.target.value)} style={styles.select}>
+        <label style={styles.label} htmlFor="monitoring-readiness-tenant-filter">Tenant filter</label>
+        <select
+          id="monitoring-readiness-tenant-filter"
+          value={tenantId}
+          onChange={(event) => changeTenant(event.target.value)}
+          style={styles.select}
+          disabled={tenantOptions.isLoading}
+        >
           <option value="">All tenants</option>
-          {(tenants.data || []).map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
+          {(tenantOptions.data?.tenants || []).map((tenant) => (
+            <option key={tenant.tenant_id} value={tenant.tenant_id}>{tenant.tenant_name}</option>
           ))}
         </select>
+        {tenantOptions.error ? (
+          <p style={styles.inlineError}>Tenant filter options could not be loaded: {readableError(tenantOptions.error)}</p>
+        ) : null}
       </section>
 
       {monitoring.isLoading ? <div style={styles.card}>Loading production monitoring readiness...</div> : null}
       {monitoring.error ? (
         <div style={styles.error}>
-          Failed to load production monitoring readiness.
-          <button type="button" style={styles.errorButton} onClick={() => void monitoring.refetch()}>Retry</button>
+          <span>Unable to load production monitoring readiness: {readableError(monitoring.error)}</span>
+          <button
+            type="button"
+            style={styles.errorButton}
+            onClick={() => void monitoring.refetch()}
+            disabled={monitoring.isFetching}
+          >
+            {monitoring.isFetching ? 'Retrying...' : 'Retry'}
+          </button>
         </div>
       ) : null}
 
@@ -156,8 +198,8 @@ export default function PlatformProductionMonitoringReadinessPage() {
             <div style={styles.platformGrid}>
               {platformEvidence.map(([key, value]) => (
                 <div key={key} style={styles.platformItem}>
-                  <strong>{formatValue(value)}</strong>
-                  <span>{humanize(key)}</span>
+                  <strong style={styles.breakAnywhere}>{formatValue(value)}</strong>
+                  <span style={styles.breakAnywhere}>{humanize(key)}</span>
                 </div>
               ))}
             </div>
@@ -191,13 +233,18 @@ export default function PlatformProductionMonitoringReadinessPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.tenants.map((tenant) => (
+                  {data.tenants.length === 0 ? (
+                    <tr>
+                      <td style={styles.emptyRow} colSpan={6}>No tenants match the current monitoring-readiness filter.</td>
+                    </tr>
+                  ) : data.tenants.map((tenant) => (
                     <tr key={tenant.tenant_id}>
                       <td style={styles.td}>
                         <strong>{tenant.tenant_name}</strong><br />
-                        <span style={styles.muted}>{tenant.tenant_status}</span>
+                        <span style={styles.muted}>Lifecycle: {humanize(tenant.tenant_status)}</span><br />
+                        <span style={styles.muted}>Launchable: {tenant.evidence.tenant_status_launchable ? 'yes' : 'no'}</span>
                         <div style={styles.quickLinks}>
-                          <Link style={styles.quickLink} to={`/platform/system-health?tenant_id=${tenant.tenant_id}`}>System health</Link>
+                          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
                           <Link style={styles.quickLink} to={tenantIncidentLink(tenant.tenant_id)}>Incidents</Link>
                           <Link style={styles.quickLink} to="/platform/service-dependencies?only_attention=true">Dependencies</Link>
                           <Link style={styles.quickLink} to="/platform/integration-monitoring">Integrations</Link>
@@ -212,11 +259,16 @@ export default function PlatformProductionMonitoringReadinessPage() {
                       </td>
                       <td style={styles.td}>
                         Open: {formatValue(tenant.evidence.open_incidents)}<br />
-                        Public updates: {formatValue(tenant.evidence.incidents_with_public_updates)}
+                        Customer-impacting: {formatValue(tenant.evidence.customer_impacting_open_incidents)}<br />
+                        With public updates: {formatValue(tenant.evidence.customer_impacting_incidents_with_public_updates)}<br />
+                        Missing public updates: {formatValue(tenant.evidence.open_incidents_missing_public_updates)}
                       </td>
                       <td style={styles.td}>
                         Unhealthy dependencies: {formatValue(tenant.evidence.unhealthy_dependencies)}<br />
-                        Integration failures: {formatValue(tenant.evidence.integration_failures)}
+                        Critical unhealthy: {formatValue(tenant.evidence.critical_unhealthy_dependencies)}<br />
+                        Integration blockers: {formatValue(tenant.evidence.integration_blockers)}<br />
+                        Integration review required: {formatValue(tenant.evidence.integration_review_required)}<br />
+                        Integrations requiring review: {formatValue(tenant.evidence.integrations_requiring_review)}
                       </td>
                       <td style={styles.td}>{tenant.next_best_step}</td>
                     </tr>
@@ -238,36 +290,40 @@ export default function PlatformProductionMonitoringReadinessPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { padding: '24px', display: 'grid', gap: '20px' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap' },
   eyebrow: { margin: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' },
   title: { margin: '4px 0', fontSize: '30px', color: '#0f172a' },
   description: { margin: 0, color: '#475569', maxWidth: '880px', lineHeight: 1.5 },
   headerMeta: { display: 'grid', gap: '8px', justifyItems: 'end' },
   generated: { color: '#64748b', fontSize: '13px' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' },
+  notice: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '14px', color: '#334155', lineHeight: 1.5 },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', minWidth: 0 },
   label: { display: 'block', fontWeight: 700, marginBottom: '8px', color: '#334155' },
-  select: { minWidth: '280px', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px' },
+  select: { width: 'min(100%, 420px)', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' },
+  inlineError: { color: '#991b1b', margin: '10px 0 0', fontSize: '13px' },
+  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px' },
-  metricValue: { fontSize: '26px', fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', fontSize: '13px', textTransform: 'capitalize' },
+  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px', minWidth: 0 },
+  metricValue: { fontSize: '26px', fontWeight: 800, color: '#0f172a', overflowWrap: 'anywhere' },
+  metricLabel: { color: '#64748b', fontSize: '13px', textTransform: 'capitalize', overflowWrap: 'anywhere' },
   sectionTitle: { margin: '0 0 14px', fontSize: '20px', color: '#0f172a' },
   platformGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' },
-  platformItem: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', display: 'grid', gap: '4px', color: '#475569' },
+  platformItem: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', display: 'grid', gap: '4px', color: '#475569', minWidth: 0 },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' },
-  controlCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', background: '#f8fafc' },
+  controlCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', background: '#f8fafc', minWidth: 0 },
   controlTitle: { margin: '0 0 8px', fontSize: '16px', color: '#0f172a' },
-  muted: { color: '#64748b', margin: 0, lineHeight: 1.5, fontSize: '13px' },
-  code: { display: 'inline-block', marginTop: '10px', background: '#e2e8f0', padding: '4px 8px', borderRadius: '8px', fontSize: '12px' },
+  muted: { color: '#64748b', margin: 0, lineHeight: 1.5, fontSize: '13px', overflowWrap: 'anywhere' },
+  code: { display: 'inline-block', marginTop: '10px', background: '#e2e8f0', padding: '4px 8px', borderRadius: '8px', fontSize: '12px', maxWidth: '100%', overflowWrap: 'anywhere' },
   tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1080px' },
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px', color: '#334155', fontSize: '13px' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '10px', verticalAlign: 'top', color: '#334155', fontSize: '13px', lineHeight: 1.45 },
-  badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block' },
+  td: { borderBottom: '1px solid #f1f5f9', padding: '10px', verticalAlign: 'top', color: '#334155', fontSize: '13px', lineHeight: 1.45, overflowWrap: 'anywhere' },
+  emptyRow: { borderBottom: '1px solid #f1f5f9', padding: '18px', color: '#64748b', fontSize: '13px', textAlign: 'center' },
+  badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block', overflowWrap: 'anywhere' },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: '10px', padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  errorButton: { marginLeft: '12px', border: '1px solid #fca5a5', background: '#fff', color: '#991b1b', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
+  errorButton: { border: '1px solid #fca5a5', background: '#fff', color: '#991b1b', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 }
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontSize: '12px', fontWeight: 700 },
+  breakAnywhere: { overflowWrap: 'anywhere' }
 };
