@@ -12,6 +12,9 @@ type SupplierFormState = {
   name: string;
   email: string;
   contact_info: string;
+  address: string;
+  phone: string;
+  tax_id: string;
 };
 
 type SupplierSlaBreachesResponse = {
@@ -80,7 +83,10 @@ async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
     body: JSON.stringify({
       name: input.name.trim(),
       email: input.email.trim() || null,
-      contact_info: input.contact_info.trim() || null
+      contact_info: input.contact_info.trim() || null,
+      address: input.address.trim() || null,
+      phone: input.phone.trim() || null,
+      tax_id: input.tax_id.trim() || null
     })
   });
 }
@@ -94,7 +100,10 @@ async function updateSupplier(input: {
     body: JSON.stringify({
       name: input.values.name.trim(),
       email: input.values.email.trim() || null,
-      contact_info: input.values.contact_info.trim() || null
+      contact_info: input.values.contact_info.trim() || null,
+      address: input.values.address.trim() || null,
+      phone: input.values.phone.trim() || null,
+      tax_id: input.values.tax_id.trim() || null
     })
   });
 }
@@ -109,7 +118,10 @@ function emptyForm(): SupplierFormState {
   return {
     name: '',
     email: '',
-    contact_info: ''
+    contact_info: '',
+    address: '',
+    phone: '',
+    tax_id: ''
   };
 }
 
@@ -214,12 +226,18 @@ function getSupplierSearchRank(supplier: SupplierItem, normalizedSearch: string)
   const name = supplier.name.toLocaleLowerCase();
   const email = (supplier.email || '').toLocaleLowerCase();
   const contactInfo = (supplier.contact_info || '').toLocaleLowerCase();
+  const address = (supplier.address || '').toLocaleLowerCase();
+  const phone = (supplier.phone || '').toLocaleLowerCase();
+  const taxId = (supplier.tax_id || '').toLocaleLowerCase();
 
   if (name.startsWith(normalizedSearch)) return 0;
   if (name.includes(normalizedSearch)) return 1;
   if (email.startsWith(normalizedSearch)) return 2;
   if (email.includes(normalizedSearch)) return 3;
   if (contactInfo.includes(normalizedSearch)) return 4;
+  if (address.includes(normalizedSearch)) return 5;
+  if (phone.includes(normalizedSearch)) return 6;
+  if (taxId.includes(normalizedSearch)) return 7;
   return Number.POSITIVE_INFINITY;
 }
 
@@ -448,7 +466,10 @@ export default function SuppliersPage() {
     setForm({
       name: supplier.name,
       email: supplier.email || '',
-      contact_info: supplier.contact_info || ''
+      contact_info: supplier.contact_info || '',
+      address: supplier.address || '',
+      phone: supplier.phone || '',
+      tax_id: supplier.tax_id || ''
     });
     scrollToFormSection('supplier-form-panel');
   };
@@ -592,6 +613,21 @@ export default function SuppliersPage() {
             />
           </div>
 
+          <div>
+            <label htmlFor="supplier-phone" style={styles.label}>Phone</label>
+            <input id="supplier-phone" style={inputDisabled ? styles.disabledInput : styles.input} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Supplier phone" maxLength={100} disabled={inputDisabled} />
+          </div>
+
+          <div>
+            <label htmlFor="supplier-tax-id" style={styles.label}>Tax / VAT ID</label>
+            <input id="supplier-tax-id" style={inputDisabled ? styles.disabledInput : styles.input} value={form.tax_id} onChange={(event) => setForm((current) => ({ ...current, tax_id: event.target.value }))} placeholder="Optional" maxLength={100} disabled={inputDisabled} />
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label htmlFor="supplier-address" style={styles.label}>Supplier Address</label>
+            <textarea id="supplier-address" style={{ ...(inputDisabled ? styles.disabledInput : styles.input), minHeight: 78, resize: 'vertical' }} value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} placeholder="Street, postal code, city, country" maxLength={2000} disabled={inputDisabled} />
+          </div>
+
           <div className="app-actions" style={styles.formActions}>
             <button
               type="submit"
@@ -642,7 +678,7 @@ export default function SuppliersPage() {
               <input
                 id="supplier-search"
                 type="search"
-                placeholder="Supplier name, email, or contact info"
+                placeholder="Supplier name, email, address, phone, tax ID, or contact info"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 style={styles.searchInput}
@@ -684,6 +720,7 @@ export default function SuppliersPage() {
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Email</th>
                   <th style={styles.th}>Contact Info</th>
+                  <th style={styles.th}>Address / Tax</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Actions</th>
                 </tr>
@@ -691,7 +728,7 @@ export default function SuppliersPage() {
               <tbody>
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={5}>
+                    <td style={styles.emptyCell} colSpan={6}>
                       {search.trim()
                         ? 'No suppliers match the current search.'
                         : 'No suppliers have been created yet.'}
@@ -713,6 +750,10 @@ export default function SuppliersPage() {
                       </td>
                       <td style={styles.td}>
                         {supplier.contact_info || <span style={styles.missingValue}>No contact info</span>}
+                      </td>
+                      <td style={styles.td}>
+                        <div>{supplier.address || <span style={styles.missingValue}>No address</span>}</div>
+                        <div style={styles.rowSubtle}>{supplier.phone || 'No phone'}{supplier.tax_id ? ` · Tax/VAT: ${supplier.tax_id}` : ''}</div>
                       </td>
                       <td style={styles.td}>
                         <span style={styles.badgeActive}>Active</span>
@@ -792,6 +833,9 @@ export default function SuppliersPage() {
               <span style={styles.identityLabel}>Contact info</span>
               <span style={styles.identityValue}>{selectedPerformanceSupplier.contact_info || 'Not recorded'}</span>
             </div>
+            <div style={styles.identityItem}><span style={styles.identityLabel}>Address</span><span style={styles.identityValue}>{selectedPerformanceSupplier.address || 'Not recorded'}</span></div>
+            <div style={styles.identityItem}><span style={styles.identityLabel}>Phone</span><span style={styles.identityValue}>{selectedPerformanceSupplier.phone || 'Not recorded'}</span></div>
+            <div style={styles.identityItem}><span style={styles.identityLabel}>Tax / VAT ID</span><span style={styles.identityValue}>{selectedPerformanceSupplier.tax_id || 'Not recorded'}</span></div>
           </div>
 
           {supplierPerformanceQuery.isLoading ? (

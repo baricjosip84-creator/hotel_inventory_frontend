@@ -20,6 +20,12 @@ type TenantSettingsRow = {
   season_start?: string | null;
   season_end?: string | null;
   organization_type?: string | null;
+  legal_name?: string | null;
+  business_address?: string | null;
+  business_email?: string | null;
+  business_phone?: string | null;
+  tax_id?: string | null;
+  default_purchase_order_payment_terms?: string | null;
   inventory_currency?: string | null;
   inventory_currency_configured_at?: string | null;
   write_locked?: boolean;
@@ -33,6 +39,12 @@ type TenantSettingsFormState = {
   season_start: string;
   season_end: string;
   organization_type: string;
+  legal_name: string;
+  business_address: string;
+  business_email: string;
+  business_phone: string;
+  tax_id: string;
+  default_purchase_order_payment_terms: string;
   inventory_currency: string;
 };
 
@@ -42,6 +54,12 @@ type TenantPayload = {
   season_start: string | null;
   season_end: string | null;
   organization_type: string;
+  legal_name: string | null;
+  business_address: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  tax_id: string | null;
+  default_purchase_order_payment_terms: string | null;
   inventory_currency: string;
   confirm_inventory_currency: boolean;
 };
@@ -52,6 +70,12 @@ const emptyFormState: TenantSettingsFormState = {
   season_start: '',
   season_end: '',
   organization_type: 'facility',
+  legal_name: '',
+  business_address: '',
+  business_email: '',
+  business_phone: '',
+  tax_id: '',
+  default_purchase_order_payment_terms: '',
   inventory_currency: DEFAULT_INVENTORY_CURRENCY
 };
 
@@ -89,6 +113,12 @@ function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormSt
     season_start: normalizeDateInput(tenant.season_start),
     season_end: normalizeDateInput(tenant.season_end),
     organization_type: tenant.organization_type ?? 'facility',
+    legal_name: tenant.legal_name ?? '',
+    business_address: tenant.business_address ?? '',
+    business_email: tenant.business_email ?? '',
+    business_phone: tenant.business_phone ?? '',
+    tax_id: tenant.tax_id ?? '',
+    default_purchase_order_payment_terms: tenant.default_purchase_order_payment_terms ?? '',
     inventory_currency: normalizeCurrencyCode(tenant.inventory_currency)
   };
 }
@@ -100,6 +130,12 @@ function buildPayload(formState: TenantSettingsFormState, confirmInventoryCurren
     season_start: formState.season_start || null,
     season_end: formState.season_end || null,
     organization_type: formState.organization_type.trim() || 'facility',
+    legal_name: formState.legal_name.trim() || null,
+    business_address: formState.business_address.trim() || null,
+    business_email: formState.business_email.trim() || null,
+    business_phone: formState.business_phone.trim() || null,
+    tax_id: formState.tax_id.trim() || null,
+    default_purchase_order_payment_terms: formState.default_purchase_order_payment_terms.trim() || null,
     inventory_currency: formState.inventory_currency.trim().toUpperCase(),
     confirm_inventory_currency: confirmInventoryCurrency
   };
@@ -111,6 +147,12 @@ function sameFormState(left: TenantSettingsFormState, right: TenantSettingsFormS
     && left.season_start === right.season_start
     && left.season_end === right.season_end
     && left.organization_type === right.organization_type
+    && left.legal_name === right.legal_name
+    && left.business_address === right.business_address
+    && left.business_email === right.business_email
+    && left.business_phone === right.business_phone
+    && left.tax_id === right.tax_id
+    && left.default_purchase_order_payment_terms === right.default_purchase_order_payment_terms
     && left.inventory_currency === right.inventory_currency;
 }
 
@@ -162,6 +204,13 @@ export default function TenantSettingsPage() {
     && formState.location.trim().length <= 255
     && formState.organization_type.trim()
     && formState.organization_type.trim().length <= 80
+    && formState.legal_name.trim().length <= 255
+    && formState.business_address.trim().length <= 2000
+    && formState.business_email.trim().length <= 255
+    && (!formState.business_email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.business_email.trim()))
+    && formState.business_phone.trim().length <= 100
+    && formState.tax_id.trim().length <= 100
+    && formState.default_purchase_order_payment_terms.trim().length <= 1000
     && currencyCodeValid
     && !dateRangeInvalid
   );
@@ -459,6 +508,41 @@ export default function TenantSettingsPage() {
                 />
               </label>
 
+              <div style={{ ...styles.fullWidth, ...styles.documentDetailsHeader }}>
+                <strong>Supplier document details</strong>
+                <span style={styles.helperText}>Used on Purchase Order / Receiving Reference PDFs and supplier emails.</span>
+              </div>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Legal / Company Name</span>
+                <input style={styles.input} value={formState.legal_name} onChange={(event) => updateField('legal_name', event.target.value)} disabled={!canEdit} maxLength={255} placeholder="Optional; tenant name is used as fallback" />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Business Email</span>
+                <input style={styles.input} type="email" value={formState.business_email} onChange={(event) => updateField('business_email', event.target.value)} disabled={!canEdit} maxLength={255} placeholder="purchasing@company.com" />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Business Phone</span>
+                <input style={styles.input} value={formState.business_phone} onChange={(event) => updateField('business_phone', event.target.value)} disabled={!canEdit} maxLength={100} placeholder="Optional" />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Tax / VAT ID</span>
+                <input style={styles.input} value={formState.tax_id} onChange={(event) => updateField('tax_id', event.target.value)} disabled={!canEdit} maxLength={100} placeholder="Optional" />
+              </label>
+
+              <label style={{ ...styles.field, ...styles.fullWidth }}>
+                <span style={styles.label}>Business / Delivery Address</span>
+                <textarea style={{ ...styles.input, minHeight: 82, resize: 'vertical' }} value={formState.business_address} onChange={(event) => updateField('business_address', event.target.value)} disabled={!canEdit} maxLength={2000} placeholder="Street, postal code, city, country" />
+              </label>
+
+              <label style={{ ...styles.field, ...styles.fullWidth }}>
+                <span style={styles.label}>Default Purchase Order Payment Terms</span>
+                <textarea style={{ ...styles.input, minHeight: 68, resize: 'vertical' }} value={formState.default_purchase_order_payment_terms} onChange={(event) => updateField('default_purchase_order_payment_terms', event.target.value)} disabled={!canEdit} maxLength={1000} placeholder="Example: Net 30 days from invoice date" />
+              </label>
+
               <label style={styles.field}>
                 <span style={styles.labelRow}>
                   <span style={styles.label}>Inventory Currency</span>
@@ -744,6 +828,7 @@ const styles: Record<string, CSSProperties> = {
     alignContent: 'start',
     minWidth: 0
   },
+  documentDetailsHeader: { display: 'grid', gap: 4, paddingTop: 8, borderTop: '1px solid #e5e7eb' },
   fullWidth: {
     gridColumn: '1 / -1'
   },

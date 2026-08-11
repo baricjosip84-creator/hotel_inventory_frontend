@@ -205,6 +205,43 @@ type SendShipmentToSupplierResponse = {
   }>;
 };
 
+type SupplierEmailPreview = {
+  recipient_email: string;
+  subject: string;
+  message?: string | null;
+  qr_image_data_uri?: string | null;
+  document: {
+    document_title: string;
+    shipment_id: string;
+    linked_purchase_order_id?: string | null;
+    po_number?: string | null;
+    issue_date?: string | null;
+    expected_delivery_date?: string | null;
+    delivery_address?: string | null;
+    payment_terms?: string | null;
+    notes?: string | null;
+    approved_by?: string | null;
+    currency?: string | null;
+    pricing_complete?: boolean;
+    subtotal?: number | null;
+    qr_code: string;
+    qr_purpose: string;
+    pdf_filename: string;
+    buyer: { name: string; address?: string | null; email?: string | null; phone?: string | null; tax_id?: string | null };
+    supplier: { name: string; address?: string | null; email?: string | null; phone?: string | null; tax_id?: string | null };
+    items: Array<{
+      product_id: string;
+      product_name: string;
+      sku?: string | null;
+      supplier_sku?: string | null;
+      quantity: number | string;
+      unit: string;
+      unit_price?: number | null;
+      line_total?: number | null;
+    }>;
+  };
+};
+
 type PendingAutoReceive = {
   itemId: string;
   scannedBarcode: string | null;
@@ -387,13 +424,34 @@ async function finalizeShipment(input: {
   });
 }
 
+async function previewShipmentSupplierEmail(input: {
+  shipmentId: string;
+  recipientEmail?: string;
+  message?: string;
+}): Promise<SupplierEmailPreview> {
+  return apiRequest<SupplierEmailPreview>(`/shipments/${input.shipmentId}/supplier-email-preview`, {
+    method: 'POST',
+    body: JSON.stringify({
+      recipient_email: input.recipientEmail?.trim() || null,
+      message: input.message?.trim() || null
+    })
+  });
+}
+
 async function sendShipmentToSupplier(input: {
   shipmentId: string;
+  recipientEmail: string;
+  message?: string;
 }): Promise<SendShipmentToSupplierResponse> {
   return apiRequest<SendShipmentToSupplierResponse>(
     `/shipments/${input.shipmentId}/send-to-supplier`,
     {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({
+        recipient_email: input.recipientEmail.trim(),
+        message: input.message?.trim() || null,
+        confirmed: true
+      })
     }
   );
 }
@@ -553,6 +611,9 @@ export default function ShipmentsPage() {
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [supplierEmailPreview, setSupplierEmailPreview] = useState<SupplierEmailPreview | null>(null);
+  const [supplierEmailRecipient, setSupplierEmailRecipient] = useState('');
+  const [supplierEmailMessage, setSupplierEmailMessage] = useState('');
 
   const shipmentsQuery = useQuery({
     queryKey: ['shipments'],
@@ -792,6 +853,22 @@ export default function ShipmentsPage() {
     }
   });
 
+  const previewShipmentSupplierEmailMutation = useMutation({
+    mutationFn: previewShipmentSupplierEmail,
+    onSuccess: (preview) => {
+      setSupplierEmailPreview(preview);
+      setSupplierEmailRecipient(preview.recipient_email || '');
+      setSupplierEmailMessage(preview.message || '');
+      setPageError(null);
+      setPageMessage(null);
+    },
+    onError: (error) => {
+      setSupplierEmailPreview(null);
+      setPageMessage(null);
+      setPageError(error instanceof ApiError ? error.message : 'Failed to prepare supplier email preview.');
+    }
+  });
+
   const sendShipmentToSupplierMutation = useMutation({
     mutationFn: sendShipmentToSupplier,
     onSuccess: async (data) => {
@@ -806,11 +883,14 @@ export default function ShipmentsPage() {
         ? ` Attachments: ${attachmentNames.join(', ')}.`
         : ' QR information was included by the backend when available.';
       const fallbackMessage = data.sandbox_capture
-        ? `✔ Shipment test email${poLabel} captured in Mailtrap Sandbox for ${recipientEmail}.${attachmentLabel}`
-        : `✔ Shipment${poLabel} emailed to ${recipientEmail}.${attachmentLabel}`;
+        ? `✔ Purchase order test email${poLabel} captured in Mailtrap Sandbox for ${recipientEmail}.${attachmentLabel}`
+        : `✔ Purchase order${poLabel} emailed to ${recipientEmail}.${attachmentLabel}`;
 
       setPageError(null);
       setPageMessage(data.message || fallbackMessage);
+      setSupplierEmailPreview(null);
+      setSupplierEmailRecipient('');
+      setSupplierEmailMessage('');
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
     },
@@ -1840,7 +1920,7 @@ export default function ShipmentsPage() {
 
   const handleSendShipmentToSupplier = () => {
     if (!canSendShipments) {
-      setPageError('Your current role does not have the shipments.send permission required to email shipments to suppliers.');
+      setPageError('Your current role does not have the shipments.send permission required to email suppliers.');
       return;
     }
 
@@ -1853,13 +1933,34 @@ export default function ShipmentsPage() {
     }
 
     if (shipmentItems.length === 0) {
-      setPageError('Add at least one shipment item before emailing shipment details and QR information to the supplier.');
+      setPageError('Add at least one shipment item before preparing the supplier Purchase Order / Receiving Reference.');
       return;
     }
 
+    previewShipmentSupplierEmailMutation.mutate({ shipmentId: selectedShipment.id });
+  };
+
+  const handleConfirmSupplierEmailSend = () => {
+    if (!selectedShipment || !supplierEmailPreview) return;
+    const recipient = supplierEmailRecipient.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      setPageError('Enter a valid supplier email address before sending.');
+      return;
+    }
+
+    setPageError(null);
     sendShipmentToSupplierMutation.mutate({
-      shipmentId: selectedShipment.id
+      shipmentId: selectedShipment.id,
+      recipientEmail: recipient,
+      message: supplierEmailMessage
     });
+  };
+
+  const closeSupplierEmailPreview = () => {
+    if (sendShipmentToSupplierMutation.isPending) return;
+    setSupplierEmailPreview(null);
+    setSupplierEmailRecipient('');
+    setSupplierEmailMessage('');
   };
 
   const selectShipment = (shipmentId: string) => {
@@ -2828,6 +2929,7 @@ export default function ShipmentsPage() {
                       }}
                       onClick={handleSendShipmentToSupplier}
                       disabled={
+                        previewShipmentSupplierEmailMutation.isPending ||
                         sendShipmentToSupplierMutation.isPending ||
                         !canSendShipments ||
                         shipmentItems.length === 0
@@ -2837,16 +2939,18 @@ export default function ShipmentsPage() {
                           ? 'Shipments send permission required'
                           : shipmentItems.length === 0
                             ? 'Add at least one shipment item before emailing the supplier'
-                            : 'Send through the configured backend email provider. Mailtrap Sandbox captures the test message without delivering it to the supplier.'
+                            : 'Open a supplier email and Purchase Order / Receiving Reference preview. Nothing is sent until you confirm in the preview.'
                       }
                     >
-                      {sendShipmentToSupplierMutation.isPending
-                        ? 'Sending...'
-                        : 'Send Shipment Email to Supplier'}
+                      {previewShipmentSupplierEmailMutation.isPending
+                        ? 'Preparing Preview...'
+                        : selectedShipment.purchase_order_id
+                          ? 'Preview & Send Purchase Order'
+                          : 'Preview & Send Supplier Shipment Request'}
                     </button>
 
                     <div style={styles.emailSupplierHint}>
-                      Sends through the configured backend provider. Mailtrap Sandbox captures test messages without opening Gmail or delivering to the supplier.
+                      Opens a confirmation preview first. The PDF includes buyer/supplier details, item prices when recorded, and the Receiving QR used to identify this shipment on arrival.
                     </div>
                   </div>
 
@@ -3228,11 +3332,138 @@ export default function ShipmentsPage() {
           )}
         </div>
       </section>
+
+      {supplierEmailPreview ? (
+        <div style={styles.emailPreviewOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSupplierEmailPreview(); }}>
+          <section style={styles.emailPreviewModal} role="dialog" aria-modal="true" aria-labelledby="supplier-email-preview-title">
+            <div style={styles.emailPreviewHeader}>
+              <div>
+                <h3 id="supplier-email-preview-title" style={styles.emailPreviewTitle}>Supplier Email Preview</h3>
+                <div style={styles.inlineHint}>Review the recipient, message, Purchase Order / Receiving Reference, and Receiving QR. Nothing has been sent yet.</div>
+              </div>
+              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>Close</button>
+            </div>
+
+            <div style={styles.emailPreviewFields}>
+              <label style={styles.field}>
+                <span style={styles.label}>To</span>
+                <input type="email" style={styles.input} value={supplierEmailRecipient} onChange={(event) => setSupplierEmailRecipient(event.target.value)} disabled={sendShipmentToSupplierMutation.isPending} />
+              </label>
+              <label style={styles.field}>
+                <span style={styles.label}>Subject</span>
+                <input style={{ ...styles.input, background: '#f9fafb' }} value={supplierEmailPreview.subject} readOnly />
+              </label>
+              <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
+                <span style={styles.label}>Optional email message</span>
+                <textarea style={{ ...styles.input, minHeight: 78, resize: 'vertical' }} value={supplierEmailMessage} onChange={(event) => setSupplierEmailMessage(event.target.value)} maxLength={4000} disabled={sendShipmentToSupplierMutation.isPending} placeholder="Optional message to supplier" />
+              </label>
+            </div>
+
+            <div style={styles.documentPreview}>
+              <div style={styles.documentPreviewHeader}>
+                <div>
+                  <div style={styles.documentTitle}>{supplierEmailPreview.document.document_title}</div>
+                  <div style={styles.inlineHint}>PO / Reference: {supplierEmailPreview.document.po_number || '-'}</div>
+                </div>
+                {supplierEmailPreview.qr_image_data_uri ? (
+                  <img src={supplierEmailPreview.qr_image_data_uri} alt="Receiving QR code" style={styles.previewQr} />
+                ) : null}
+              </div>
+
+              <div style={styles.documentPartyGrid}>
+                <div style={styles.documentPartyCard}>
+                  <strong>Buyer / Delivery To</strong>
+                  <span>{supplierEmailPreview.document.buyer.name}</span>
+                  <span>{supplierEmailPreview.document.buyer.address || 'Business address not recorded'}</span>
+                  <span>{supplierEmailPreview.document.buyer.email || 'Business email not recorded'}</span>
+                  <span>{supplierEmailPreview.document.buyer.phone || 'Business phone not recorded'}</span>
+                  {supplierEmailPreview.document.buyer.tax_id ? <span>Tax / VAT ID: {supplierEmailPreview.document.buyer.tax_id}</span> : null}
+                </div>
+                <div style={styles.documentPartyCard}>
+                  <strong>Supplier</strong>
+                  <span>{supplierEmailPreview.document.supplier.name}</span>
+                  <span>{supplierEmailPreview.document.supplier.address || 'Supplier address not recorded'}</span>
+                  <span>{supplierEmailPreview.document.supplier.email || supplierEmailRecipient}</span>
+                  <span>{supplierEmailPreview.document.supplier.phone || 'Supplier phone not recorded'}</span>
+                  {supplierEmailPreview.document.supplier.tax_id ? <span>Tax / VAT ID: {supplierEmailPreview.document.supplier.tax_id}</span> : null}
+                </div>
+              </div>
+
+              <div style={styles.documentMetaGrid}>
+                <span><strong>Issue:</strong> {supplierEmailPreview.document.issue_date ? String(supplierEmailPreview.document.issue_date).slice(0, 10) : '-'}</span>
+                <span><strong>Expected delivery:</strong> {supplierEmailPreview.document.expected_delivery_date ? String(supplierEmailPreview.document.expected_delivery_date).slice(0, 10) : '-'}</span>
+                <span><strong>Delivery address:</strong> {supplierEmailPreview.document.delivery_address || '-'}</span>
+                <span><strong>Payment terms:</strong> {supplierEmailPreview.document.payment_terms || '-'}</span>
+                <span><strong>Approved by:</strong> {supplierEmailPreview.document.approved_by || '-'}</span>
+                <span><strong>Currency:</strong> {supplierEmailPreview.document.currency || '-'}</span>
+              </div>
+              {supplierEmailPreview.document.notes ? <div style={styles.documentNotes}><strong>PO notes:</strong> {supplierEmailPreview.document.notes}</div> : null}
+
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead><tr><th style={styles.th}>SKU</th><th style={styles.th}>Product</th><th style={styles.th}>Qty</th><th style={styles.th}>UoM</th><th style={styles.th}>Unit price</th><th style={styles.th}>Line total</th></tr></thead>
+                  <tbody>
+                    {supplierEmailPreview.document.items.map((item) => (
+                      <tr key={item.product_id}>
+                        <td style={styles.td}>{item.supplier_sku || item.sku || '-'}</td>
+                        <td style={styles.td}>{item.product_name}</td>
+                        <td style={styles.td}>{formatQuantity(toNumber(item.quantity))}</td>
+                        <td style={styles.td}>{item.unit}</td>
+                        <td style={styles.td}>{item.unit_price == null ? '-' : formatCurrency(item.unit_price, supplierEmailPreview.document.currency)}</td>
+                        <td style={styles.td}>{item.line_total == null ? '-' : formatCurrency(item.line_total, supplierEmailPreview.document.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={styles.documentTotal}>
+                <strong>Order subtotal:</strong> {supplierEmailPreview.document.subtotal == null ? 'Price data incomplete' : formatCurrency(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}
+              </div>
+              {!supplierEmailPreview.document.pricing_complete ? <div style={styles.emailPreviewWarning}>One or more lines do not have a recorded unit price. The document shows those prices as “-” rather than inventing a value.</div> : null}
+              <div style={styles.qrPurposeBox}>
+                <strong>Receiving QR Code</strong>
+                <span>{supplierEmailPreview.document.qr_code}</span>
+                <span>{supplierEmailPreview.document.qr_purpose}</span>
+              </div>
+              <div style={styles.attachmentLine}>PDF attachment: <strong>{supplierEmailPreview.document.pdf_filename}</strong></div>
+            </div>
+
+            <div style={styles.emailConfirmationBox}>
+              This email and attached {supplierEmailPreview.document.document_title} will be sent to <strong>{supplierEmailRecipient || 'the entered recipient'}</strong>.
+            </div>
+            <div style={styles.emailPreviewActions}>
+              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>Cancel</button>
+              <button type="button" style={styles.emailSupplierButton} onClick={handleConfirmSupplierEmailSend} disabled={sendShipmentToSupplierMutation.isPending || !supplierEmailRecipient.trim()}>
+                {sendShipmentToSupplierMutation.isPending ? 'Sending...' : 'Confirm & Send Email'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
+  emailPreviewOverlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15, 23, 42, 0.58)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  emailPreviewModal: { width: 'min(1080px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#ffffff', borderRadius: 16, boxShadow: '0 24px 70px rgba(15,23,42,0.35)', padding: 22, display: 'grid', gap: 18 },
+  emailPreviewHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  emailPreviewTitle: { margin: 0, fontSize: 22 },
+  emailPreviewFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
+  documentPreview: { border: '1px solid #d1d5db', borderRadius: 12, padding: 18, display: 'grid', gap: 15, background: '#ffffff' },
+  documentPreviewHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18 },
+  documentTitle: { fontSize: 20, fontWeight: 800 },
+  previewQr: { width: 128, height: 128, objectFit: 'contain', border: '1px solid #e5e7eb', padding: 5, background: '#fff' },
+  documentPartyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
+  documentPartyCard: { border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, display: 'grid', gap: 4, whiteSpace: 'pre-line' },
+  documentMetaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, fontSize: 13 },
+  documentNotes: { padding: 10, background: '#f8fafc', borderRadius: 8, whiteSpace: 'pre-wrap' },
+  documentTotal: { textAlign: 'right', fontSize: 16 },
+  emailPreviewWarning: { padding: 10, borderRadius: 8, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' },
+  qrPurposeBox: { display: 'grid', gap: 5, padding: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', wordBreak: 'break-word' },
+  attachmentLine: { fontSize: 13, color: '#475569' },
+  emailConfirmationBox: { padding: 12, borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a' },
+  emailPreviewActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
   header: {
     marginBottom: 20,
     display: 'flex',
