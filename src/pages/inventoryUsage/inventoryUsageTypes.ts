@@ -314,6 +314,7 @@ export type InventoryUsageBarcodeRequest = {
   storage_location_id: string;
   package_count?: number | string;
   quantity?: number | string;
+  serial_numbers?: string[];
   consumption_reason?: string;
   department?: string;
   event_name?: string;
@@ -377,6 +378,9 @@ export type InventoryUsageBarcodePreviewResponse = {
     has_evidence_metadata?: boolean;
     package_count?: number | string | null;
     quantity_to_consume?: number | string | null;
+    serial_tracking_enabled?: boolean;
+    serial_required_on_issue?: boolean;
+    serial_numbers?: string[];
     current_quantity?: number | string | null;
     reserved_quantity?: number | string | null;
     resulting_quantity?: number | string | null;

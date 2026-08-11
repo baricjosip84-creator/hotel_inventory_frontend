@@ -67,6 +67,7 @@ import ExecutionRequestsPage from '../pages/ExecutionRequestsPage';
 import ExecutionTasksPage from '../pages/ExecutionTasksPage';
 import AutomationSchedulesPage from '../pages/AutomationSchedulesPage';
 import EnterpriseInventoryPage from '../pages/EnterpriseInventoryPage';
+import InventoryCapabilitiesPage from '../pages/InventoryCapabilitiesPage';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { TENANT_PERMISSIONS } from '../lib/permissions';
 import { enterpriseInventoryReadPermissions } from '../components/enterpriseInventory/EnterpriseInventoryTabConfig';
@@ -1407,6 +1408,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ]}>
             <StorageLocationsPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'inventory-capabilities',
+        element: (
+          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PRODUCTS_READ]}>
+            <InventoryCapabilitiesPage />
           </ProtectedRoute>
         )
       },

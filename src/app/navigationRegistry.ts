@@ -63,7 +63,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/mobile-execution',
         label: 'Mobile Execution',
-        description: 'Touch-first mobile execution queue sourced from the backend read-only mobile execution platform foundation.',
+        description: 'Touch-first execution queue with offline action queuing and audited replay when connectivity returns.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
         requiredPermissions: [
@@ -224,6 +224,13 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         description: 'Maintain storage areas used for inventory receiving and allocation.',
         section: 'Inventory operations',
         permission: TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ
+      },
+      {
+        to: '/inventory-capabilities',
+        label: 'Advanced Inventory',
+        description: 'Manage integrations, serials, UoM, custom fields, landed cost, variants, hierarchy, BOMs, and offline mobile foundations.',
+        section: 'Inventory operations',
+        permission: TENANT_PERMISSIONS.PRODUCTS_READ
       },
       {
         to: '/scanner',

@@ -26,3 +26,12 @@ root.render(
     </RuntimeErrorBoundary>
   </React.StrictMode>
 );
+
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {
+      // App remains usable online if service-worker registration is unavailable.
+    });
+  });
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Inventory Operations",
+  "short_name": "Inventory",
+  "description": "Installable inventory and warehouse execution workspace.",
+  "start_url": "/mobile-execution",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

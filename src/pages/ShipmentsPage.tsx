@@ -128,6 +128,8 @@ type ItemFormState = {
 
 type ReceiveDraft = {
   quantity_received: string;
+  uom_code: string;
+  serial_numbers: string;
   storage_location_id: string;
   lot_number: string;
   batch_number: string;
@@ -145,6 +147,8 @@ type ReceiveDraft = {
 type ReceiveShipmentLineItemPayload = {
   product_id: string;
   quantity_received?: number;
+  uom_code?: string;
+  serial_numbers?: string[];
   package_id?: string;
   package_count_received?: number;
   storage_location_id: string;
@@ -442,6 +446,8 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
 
   return {
     quantity_received: remaining > 0 ? String(remaining) : '0',
+    uom_code: '',
+    serial_numbers: '',
     storage_location_id: item.storage_location_id || '',
     lot_number: item.lot_number || '',
     batch_number: item.batch_number || '',
@@ -1767,6 +1773,8 @@ export default function ShipmentsPage() {
       item: {
         product_id: item.product_id,
         quantity_received: quantityReceived,
+        uom_code: draft.uom_code.trim() || undefined,
+        serial_numbers: draft.serial_numbers.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean),
         storage_location_id: safeStorageLocationId,
         lot_number: draft.lot_number.trim() || null,
         batch_number: draft.batch_number.trim() || null,
@@ -3076,6 +3084,26 @@ export default function ShipmentsPage() {
                                     quantity_received: event.target.value
                                   }))
                                 }
+                              />
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Unit of Measure</label>
+                              <input
+                                style={styles.input}
+                                value={draft.uom_code}
+                                placeholder="Leave blank for base unit; e.g. CASE"
+                                onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, uom_code: event.target.value }))}
+                              />
+                            </div>
+
+                            <div style={styles.receiveLineField}>
+                              <label style={styles.label}>Serial Numbers</label>
+                              <textarea
+                                style={{ ...styles.input, minHeight: 72, resize: 'vertical' }}
+                                value={draft.serial_numbers}
+                                placeholder="One serial per received unit when serial tracking requires it"
+                                onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, serial_numbers: event.target.value }))}
                               />
                             </div>
 

@@ -207,6 +207,7 @@ const defaultDraft: InventoryUsageBarcodeRequest = {
   barcode: '',
   storage_location_id: '',
   package_count: 1,
+  serial_numbers: [],
   consumption_reason: 'internal_use',
   department: '',
   event_name: '',
@@ -329,6 +330,8 @@ export function InventoryUsageQuickConsumePanel({
   const previewEvidenceStillMatchesDraft = previewResult?.preview?.has_evidence_metadata === undefined
     ? true
     : Boolean(previewResult.preview.has_evidence_metadata) === hasEvidenceMetadata;
+  const draftSerialNumbers = (draft.serial_numbers || []).map((value) => value.trim()).filter(Boolean);
+  const previewSerialsStillMatchDraft = JSON.stringify(previewResult?.preview?.serial_numbers || []) === JSON.stringify(draftSerialNumbers);
 
   const previewMatchesDraft = Boolean(
     previewResult?.barcode_match?.barcode
@@ -339,6 +342,7 @@ export function InventoryUsageQuickConsumePanel({
       && consumedAtStillMatchesPreview
       && previewReasonStillMatchesDraft
       && previewEvidenceStillMatchesDraft
+      && previewSerialsStillMatchDraft
   );
   const requiresFreshPreview = Boolean(onPreviewBarcodeUsage);
   const hasStalePreview = Boolean(previewResult?.preview && !previewMatchesDraft);
@@ -461,6 +465,7 @@ export function InventoryUsageQuickConsumePanel({
     barcode: draft.barcode.trim(),
     storage_location_id: draft.storage_location_id.trim(),
     package_count: packageCount,
+    serial_numbers: draftSerialNumbers.length ? draftSerialNumbers : undefined,
     consumption_reason: draft.consumption_reason || undefined,
     department: draft.department?.trim() || undefined,
     event_name: draft.event_name?.trim() || undefined,
@@ -606,6 +611,19 @@ export function InventoryUsageQuickConsumePanel({
             style={styles.input}
             value={draft.package_count ?? 1}
             onChange={(event) => updateDraft({ package_count: event.target.value })}
+            disabled={recording}
+          />
+        </label>
+
+        <label style={styles.fieldLabel}>
+          Serial numbers
+          <textarea
+            style={{ ...styles.input, minHeight: 82, resize: 'vertical' }}
+            value={(draft.serial_numbers || []).join('\n')}
+            onChange={(event) => updateDraft({
+              serial_numbers: event.target.value.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean)
+            })}
+            placeholder="One serial per unit; required only for products configured to require serials"
             disabled={recording}
           />
         </label>
