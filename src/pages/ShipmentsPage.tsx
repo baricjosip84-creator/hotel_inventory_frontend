@@ -222,7 +222,8 @@ type SupplierEmailPreview = {
     notes?: string | null;
     approved_by?: string | null;
     currency?: string | null;
-    pricing_complete?: boolean;
+    show_pricing?: boolean;
+    pricing_complete?: boolean | null;
     subtotal?: number | null;
     qr_code: string;
     qr_purpose: string;
@@ -3339,7 +3340,7 @@ export default function ShipmentsPage() {
             <div style={styles.emailPreviewHeader}>
               <div>
                 <h3 id="supplier-email-preview-title" style={styles.emailPreviewTitle}>Supplier Email Preview</h3>
-                <div style={styles.inlineHint}>Review the recipient, message, Purchase Order / Receiving Reference, and Receiving QR. Nothing has been sent yet.</div>
+                <div style={styles.inlineHint}>Review the recipient, message, {supplierEmailPreview.document.document_title}, and Receiving QR. Nothing has been sent yet.</div>
               </div>
               <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>Close</button>
             </div>
@@ -3363,7 +3364,9 @@ export default function ShipmentsPage() {
               <div style={styles.documentPreviewHeader}>
                 <div>
                   <div style={styles.documentTitle}>{supplierEmailPreview.document.document_title}</div>
-                  <div style={styles.inlineHint}>PO / Reference: {supplierEmailPreview.document.po_number || '-'}</div>
+                  <div style={styles.inlineHint}>
+                    {supplierEmailPreview.document.linked_purchase_order_id ? 'PO / Reference' : 'Shipment reference'}: {supplierEmailPreview.document.po_number || supplierEmailPreview.document.shipment_id}
+                  </div>
                 </div>
                 {supplierEmailPreview.qr_image_data_uri ? (
                   <img src={supplierEmailPreview.qr_image_data_uri} alt="Receiving QR code" style={styles.previewQr} />
@@ -3390,36 +3393,61 @@ export default function ShipmentsPage() {
               </div>
 
               <div style={styles.documentMetaGrid}>
-                <span><strong>Issue:</strong> {supplierEmailPreview.document.issue_date ? String(supplierEmailPreview.document.issue_date).slice(0, 10) : '-'}</span>
-                <span><strong>Expected delivery:</strong> {supplierEmailPreview.document.expected_delivery_date ? String(supplierEmailPreview.document.expected_delivery_date).slice(0, 10) : '-'}</span>
-                <span><strong>Delivery address:</strong> {supplierEmailPreview.document.delivery_address || '-'}</span>
-                <span><strong>Payment terms:</strong> {supplierEmailPreview.document.payment_terms || '-'}</span>
-                <span><strong>Approved by:</strong> {supplierEmailPreview.document.approved_by || '-'}</span>
-                <span><strong>Currency:</strong> {supplierEmailPreview.document.currency || '-'}</span>
+                <span><strong>Issue:</strong> {formatDate(supplierEmailPreview.document.issue_date)}</span>
+                <span><strong>Expected delivery:</strong> {formatDate(supplierEmailPreview.document.expected_delivery_date)}</span>
+                <span><strong>Delivery address:</strong> {supplierEmailPreview.document.delivery_address || 'Not specified'}</span>
+                {supplierEmailPreview.document.show_pricing ? (
+                  <>
+                    <span><strong>Payment terms:</strong> {supplierEmailPreview.document.payment_terms || 'Not specified'}</span>
+                    <span><strong>Approved by:</strong> {supplierEmailPreview.document.approved_by || 'Not specified'}</span>
+                    <span><strong>Currency:</strong> {supplierEmailPreview.document.currency || 'Not specified'}</span>
+                  </>
+                ) : null}
               </div>
-              {supplierEmailPreview.document.notes ? <div style={styles.documentNotes}><strong>PO notes:</strong> {supplierEmailPreview.document.notes}</div> : null}
+              {supplierEmailPreview.document.notes ? (
+                <div style={styles.documentNotes}>
+                  <strong>{supplierEmailPreview.document.linked_purchase_order_id ? 'PO notes' : 'Shipment instructions'}:</strong> {supplierEmailPreview.document.notes}
+                </div>
+              ) : null}
 
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th style={styles.th}>SKU</th><th style={styles.th}>Product</th><th style={styles.th}>Qty</th><th style={styles.th}>UoM</th><th style={styles.th}>Unit price</th><th style={styles.th}>Line total</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>SKU</th>
+                      <th style={styles.th}>Product</th>
+                      <th style={styles.th}>Qty</th>
+                      <th style={styles.th}>UoM</th>
+                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>Unit price</th> : null}
+                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>Line total</th> : null}
+                    </tr>
+                  </thead>
                   <tbody>
                     {supplierEmailPreview.document.items.map((item) => (
                       <tr key={item.product_id}>
-                        <td style={styles.td}>{item.supplier_sku || item.sku || '-'}</td>
+                        <td style={styles.td}>{item.supplier_sku || item.sku || 'Not specified'}</td>
                         <td style={styles.td}>{item.product_name}</td>
                         <td style={styles.td}>{formatQuantity(toNumber(item.quantity))}</td>
-                        <td style={styles.td}>{item.unit}</td>
-                        <td style={styles.td}>{item.unit_price == null ? '-' : formatCurrency(item.unit_price, supplierEmailPreview.document.currency)}</td>
-                        <td style={styles.td}>{item.line_total == null ? '-' : formatCurrency(item.line_total, supplierEmailPreview.document.currency)}</td>
+                        <td style={styles.td}>{item.unit || 'Not specified'}</td>
+                        {supplierEmailPreview.document.show_pricing ? (
+                          <td style={styles.td}>{item.unit_price == null ? 'Not specified' : formatCurrency(item.unit_price, supplierEmailPreview.document.currency)}</td>
+                        ) : null}
+                        {supplierEmailPreview.document.show_pricing ? (
+                          <td style={styles.td}>{item.line_total == null ? 'Not specified' : formatCurrency(item.line_total, supplierEmailPreview.document.currency)}</td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div style={styles.documentTotal}>
-                <strong>Order subtotal:</strong> {supplierEmailPreview.document.subtotal == null ? 'Price data incomplete' : formatCurrency(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}
-              </div>
-              {!supplierEmailPreview.document.pricing_complete ? <div style={styles.emailPreviewWarning}>One or more lines do not have a recorded unit price. The document shows those prices as “-” rather than inventing a value.</div> : null}
+              {supplierEmailPreview.document.show_pricing ? (
+                <div style={styles.documentTotal}>
+                  <strong>Order subtotal:</strong> {supplierEmailPreview.document.subtotal == null ? 'Not specified' : formatCurrency(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}
+                </div>
+              ) : null}
+              {supplierEmailPreview.document.show_pricing && supplierEmailPreview.document.pricing_complete === false ? (
+                <div style={styles.emailPreviewWarning}>One or more lines do not have a recorded unit price. The document shows “Not specified” rather than inventing a value.</div>
+              ) : null}
               <div style={styles.qrPurposeBox}>
                 <strong>Receiving QR Code</strong>
                 <span>{supplierEmailPreview.document.qr_code}</span>
