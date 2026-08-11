@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -89,8 +90,10 @@ type MobileSyncResponse = {
   }>;
 };
 
-const CACHE_KEY = 'inventory-mobile-execution-snapshot-v1';
-const PENDING_KEY = 'inventory-mobile-execution-pending-v1';
+const CACHE_KEY_PREFIX = 'inventory-mobile-execution-snapshot-v2';
+const PENDING_KEY_PREFIX = 'inventory-mobile-execution-pending-v2';
+const LEGACY_CACHE_KEY = 'inventory-mobile-execution-snapshot-v1';
+const LEGACY_PENDING_KEY = 'inventory-mobile-execution-pending-v1';
 const DEVICE_KEY = 'inventory-mobile-execution-device-v1';
 
 const URGENCY_FILTERS: Array<{ value: 'all' | ActionUrgency; label: string }> = [
@@ -142,13 +145,32 @@ function makeId(prefix: string): string {
   return `${prefix}-${suffix}`;
 }
 
-function readStored<T>(key: string, fallback: T): T {
+function readStored<T>(key: string | null, fallback: T): T {
+  if (!key) return fallback;
   try {
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) as T : fallback;
   } catch {
     return fallback;
   }
+}
+
+type MobileStorageKeys = { cache: string; pending: string };
+
+function getMobileStorageKeys(): MobileStorageKeys | null {
+  const identity = getTenantObservabilityIdentity(getAccessToken());
+  if (!identity?.tenantId) return null;
+
+  const supportSession = getSupportSessionInfo();
+  const actorId = identity.userId || supportSession.supportSessionId;
+  if (!actorId) return null;
+
+  const actorType = identity.supportSession ? 'support' : 'tenant';
+  const scope = `${identity.tenantId}:${actorType}:${actorId}`;
+  return {
+    cache: `${CACHE_KEY_PREFIX}:${scope}`,
+    pending: `${PENDING_KEY_PREFIX}:${scope}`
+  };
 }
 
 function getDeviceId(): string {
@@ -182,11 +204,12 @@ async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency, sourc
 }
 
 export default function MobileExecutionPage() {
+  const storageKeys = useMemo(() => getMobileStorageKeys(), []);
   const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
   const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
   const [online, setOnline] = useState(() => navigator.onLine);
-  const [cachedResponse, setCachedResponse] = useState<MobileExecutionResponse | null>(() => readStored<MobileExecutionResponse | null>(CACHE_KEY, null));
-  const [pending, setPending] = useState<OfflineOperation[]>(() => readStored<OfflineOperation[]>(PENDING_KEY, []));
+  const [cachedResponse, setCachedResponse] = useState<MobileExecutionResponse | null>(() => readStored<MobileExecutionResponse | null>(storageKeys?.cache || null, null));
+  const [pending, setPending] = useState<OfflineOperation[]>(() => readStored<OfflineOperation[]>(storageKeys?.pending || null, []));
   const [syncing, setSyncing] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -211,14 +234,21 @@ export default function MobileExecutionPage() {
   }, []);
 
   useEffect(() => {
+    // v1 used browser-wide keys. Remove those unscoped caches so an account
+    // switch on a shared device cannot expose another tenant/user's queue.
+    localStorage.removeItem(LEGACY_CACHE_KEY);
+    localStorage.removeItem(LEGACY_PENDING_KEY);
+  }, []);
+
+  useEffect(() => {
     if (!mobileExecutionQuery.data) return;
     setCachedResponse(mobileExecutionQuery.data);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(mobileExecutionQuery.data));
-  }, [mobileExecutionQuery.data]);
+    if (storageKeys) localStorage.setItem(storageKeys.cache, JSON.stringify(mobileExecutionQuery.data));
+  }, [mobileExecutionQuery.data, storageKeys]);
 
   const persistPending = (operations: OfflineOperation[]) => {
     setPending(operations);
-    localStorage.setItem(PENDING_KEY, JSON.stringify(operations));
+    if (storageKeys) localStorage.setItem(storageKeys.pending, JSON.stringify(operations));
   };
 
   const response = mobileExecutionQuery.data || cachedResponse || undefined;
