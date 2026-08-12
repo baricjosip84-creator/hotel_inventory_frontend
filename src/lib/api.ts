@@ -80,6 +80,7 @@ async function withApiRequestSlot<T>(operation: () => Promise<T>): Promise<T> {
   at the same time.
 */
 let refreshPromise: Promise<string | null> | null = null;
+let tenantSessionRecoveryFailed = false;
 
 type ApiFetchResult = {
   response: Response;
@@ -567,6 +568,7 @@ async function performTenantRefresh(expectedAccessToken: string | null): Promise
 
   const tokens = await parseResponse<AuthTokens>(response);
   saveAuthTokens(tokens);
+  tenantSessionRecoveryFailed = false;
   return tokens.accessToken;
 }
 
@@ -585,6 +587,7 @@ async function refreshAccessToken(expectedAccessToken: string | null = getAccess
       } catch (error) {
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
           clearAuthTokens();
+          tenantSessionRecoveryFailed = true;
         }
         return null;
       } finally {
@@ -745,9 +748,16 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
   const isRefreshRequest = isAuthRefreshRequest(path);
   const isCsrfRequest = isAuthCsrfRequest(path);
   const currentAccessToken = getAccessToken();
+  if (currentAccessToken && !isAccessTokenExpired(currentAccessToken)) tenantSessionRecoveryFailed = false;
 
   if (!isLoginRequest && !isRefreshRequest && !isCsrfRequest && isAccessTokenExpired(currentAccessToken)) {
-    await refreshAccessToken(currentAccessToken);
+    const recovered = tenantSessionRecoveryFailed ? null : await refreshAccessToken(currentAccessToken);
+    if (!recovered) {
+      clearAuthTokens();
+      tenantSessionRecoveryFailed = true;
+      redirectToLoginAfterExpiredSession();
+      throw new ApiError('Your session has expired. Please sign in again.', 401, 'SESSION_EXPIRED');
+    }
   }
 
   let response: Response;
@@ -884,13 +894,20 @@ export async function apiRequest<T>(
     !isRefreshRequest &&
     !isCsrfRequest;
   const currentAccessToken = getAccessToken();
+  if (currentAccessToken && !isAccessTokenExpired(currentAccessToken)) tenantSessionRecoveryFailed = false;
 
   /*
     If the access token is already expired before the request starts, try a
     silent refresh first for authenticated routes. This reduces avoidable 401s.
   */
   if (!isLoginRequest && !isRefreshRequest && !isCsrfRequest && isAccessTokenExpired(currentAccessToken)) {
-    await refreshAccessToken(currentAccessToken);
+    const recovered = tenantSessionRecoveryFailed ? null : await refreshAccessToken(currentAccessToken);
+    if (!recovered) {
+      clearAuthTokens();
+      tenantSessionRecoveryFailed = true;
+      redirectToLoginAfterExpiredSession();
+      throw new ApiError('Your session has expired. Please sign in again.', 401, 'SESSION_EXPIRED');
+    }
   }
 
   let response: Response;

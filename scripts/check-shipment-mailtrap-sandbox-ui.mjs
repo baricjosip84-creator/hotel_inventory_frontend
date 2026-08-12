@@ -6,7 +6,7 @@ const source = fs.readFileSync(file, 'utf8');
 
 const required = [
   'sandbox_capture?: boolean',
-  'Mailtrap Sandbox captures',
+  'captured in Mailtrap Sandbox',
   "? 'Sending...'"
 ];
 

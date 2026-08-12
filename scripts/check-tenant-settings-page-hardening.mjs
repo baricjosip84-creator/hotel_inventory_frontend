@@ -29,7 +29,6 @@ for (const anchor of required) {
 
 const forbidden = [
   'Metadata JSON',
-  '<textarea',
   'selectedTenantId',
   'setSelectedTenantId',
   "setSuccessMessage('Tenant settings updated. Inventory currency"

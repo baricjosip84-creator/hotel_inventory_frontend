@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import ProductUomSelect from '../components/inventory/ProductUomSelect';
 
 type Customer = {
   id: string;
@@ -23,6 +24,8 @@ type OrderItem = {
   storage_location_id: string;
   storage_location_name: string;
   quantity: number | string;
+  entered_quantity?: number | string;
+  uom_code?: string | null;
   dispatched_quantity: number | string;
   remaining_quantity: number | string;
   picked_quantity: number | string;
@@ -41,7 +44,7 @@ type Order = {
   items: OrderItem[];
   version: number;
 };
-type Line = { product_id: string; storage_location_id: string; quantity: string };
+type Line = { product_id: string; storage_location_id: string; quantity: string; uom_code: string };
 type PickLot = {
   id: string;
   lot_number?: string | null;
@@ -51,6 +54,9 @@ type PickLot = {
 };
 type PickItem = OrderItem & {
   requires_lot_tracking: boolean;
+  serial_tracking_enabled?: boolean;
+  require_serial_on_issue?: boolean;
+  available_serials?: Array<{ id: string; serial_number: string; inventory_lot_id?: string | null }>;
   requires_expiry_date: boolean;
   lots: PickLot[];
 };
@@ -73,6 +79,7 @@ type TraceRow = {
   claimed_return_quantity: number | string;
   returned_quantity: number | string;
   returnable_quantity: number | string;
+  serial_numbers?: string[];
 };
 type ReturnItem = { id: string; quantity: number | string; condition: string; storage_location_id: string; storage_location_name: string; product_name: string; product_unit: string; lot_number?: string | null; batch_number?: string | null };
 type CustomerReturn = { id: string; return_number: string; order_number: string; customer_name: string; status: string; reason: string; items: ReturnItem[]; version: number };
@@ -92,7 +99,7 @@ type CustomerForm = { name: string; email: string; phone: string; address: strin
 type OrderForm = { customer_id: string; requested_date: string; notes: string; items: Line[] };
 
 const emptyCustomer: CustomerForm = { name: '', email: '', phone: '', address: '', notes: '' };
-const emptyOrder: OrderForm = { customer_id: '', requested_date: '', notes: '', items: [{ product_id: '', storage_location_id: '', quantity: '1' }] };
+const emptyOrder: OrderForm = { customer_id: '', requested_date: '', notes: '', items: [{ product_id: '', storage_location_id: '', quantity: '1', uom_code: '' }] };
 const box = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 18, marginBottom: 16 } as const;
 const input = { padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: 8, width: '100%', boxSizing: 'border-box' } as const;
 const button = { padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff' } as const;
@@ -114,8 +121,8 @@ export default function OutboundPage() {
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrder);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [pickOrderId, setPickOrderId] = useState<string>('');
-  const [pickDrafts, setPickDrafts] = useState<Record<string, { quantity: string; inventory_lot_id: string }>>({});
-  const [returnForm, setReturnForm] = useState({ allocation_id: '', storage_location_id: '', quantity: '1', condition: 'available', reason: '', notes: '' });
+  const [pickDrafts, setPickDrafts] = useState<Record<string, { quantity: string; inventory_lot_id: string; serial_numbers: string[] }>>({});
+  const [returnForm, setReturnForm] = useState({ allocation_id: '', storage_location_id: '', quantity: '1', condition: 'available', reason: '', notes: '', serial_numbers: [] as string[] });
 
   const canCustomerWrite = hasPermission(TENANT_PERMISSIONS.CUSTOMERS_WRITE);
   const canCreate = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_CREATE);
@@ -150,7 +157,7 @@ export default function OutboundPage() {
       for (const item of pickOptions.data.items) {
         if (!next[item.id]) {
           const unpicked = Math.max(toNumber(item.remaining_quantity) - toNumber(item.open_picked_quantity), 0);
-          next[item.id] = { quantity: String(unpicked || 1), inventory_lot_id: '' };
+          next[item.id] = { quantity: String(unpicked || 1), inventory_lot_id: '', serial_numbers: [] };
         }
       }
       return next;
@@ -200,7 +207,7 @@ export default function OutboundPage() {
   const selectedReturnTrace = useMemo(() => returnableTrace.find((row) => row.allocation_id === returnForm.allocation_id) ?? null, [returnableTrace, returnForm.allocation_id]);
   const chooseReturnAllocation = (allocationId: string) => {
     const selected = returnableTrace.find((row) => row.allocation_id === allocationId);
-    setReturnForm((current) => ({ ...current, allocation_id: allocationId, storage_location_id: selected?.storage_location_id ?? '' }));
+    setReturnForm((current) => ({ ...current, allocation_id: allocationId, storage_location_id: selected?.storage_location_id ?? '', serial_numbers: [] }));
   };
 
   const saveCustomer = () => {
@@ -217,7 +224,7 @@ export default function OutboundPage() {
     setCustomerForm({ name: customer.name, email: customer.email ?? '', phone: customer.phone ?? '', address: customer.address ?? '', notes: customer.notes ?? '' });
   };
 
-  const cleanOrderItems = (form: OrderForm) => form.items.filter((line) => line.product_id && line.storage_location_id && Number(line.quantity) > 0).map((line) => ({ ...line, quantity: Number(line.quantity) }));
+  const cleanOrderItems = (form: OrderForm) => form.items.filter((line) => line.product_id && line.storage_location_id && Number(line.quantity) > 0).map((line) => ({ ...line, quantity: Number(line.quantity), uom_code: line.uom_code || null }));
   const saveOrder = () => {
     const items = cleanOrderItems(orderForm);
     if (!orderForm.customer_id || !items.length) { setError('Choose a customer and at least one complete order line.'); return; }
@@ -230,7 +237,7 @@ export default function OutboundPage() {
 
   const beginOrderEdit = (order: Order) => {
     setEditingOrder(order);
-    setOrderForm({ customer_id: order.customer_id, requested_date: order.requested_date ? String(order.requested_date).slice(0, 10) : '', notes: order.notes ?? '', items: order.items.map((item) => ({ product_id: item.product_id, storage_location_id: item.storage_location_id, quantity: String(item.quantity) })) });
+    setOrderForm({ customer_id: order.customer_id, requested_date: order.requested_date ? String(order.requested_date).slice(0, 10) : '', notes: order.notes ?? '', items: order.items.map((item) => ({ product_id: item.product_id, storage_location_id: item.storage_location_id, quantity: String(item.entered_quantity ?? item.quantity), uom_code: item.uom_code || '' })) });
   };
 
   const startPicking = (order: Order) => {
@@ -239,14 +246,16 @@ export default function OutboundPage() {
 
   const recordPick = (item: PickItem) => {
     if (!pickOptions.data) return;
-    const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '' };
+    const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '', serial_numbers: [] };
     const quantity = Number(draft.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) { setError('Enter a picked quantity greater than zero.'); return; }
-    if (item.requires_lot_tracking && !draft.inventory_lot_id) { setError('Choose the lot/batch that was physically picked for this product.'); return; }
+    if (item.serial_tracking_enabled) {
+      if (!Number.isInteger(quantity) || draft.serial_numbers.length !== quantity) { setError(`Select exactly ${Number.isInteger(quantity) ? quantity : 'one serial per whole'} serial number(s) for this serial-tracked pick.`); return; }
+    } else if (item.requires_lot_tracking && !draft.inventory_lot_id) { setError('Choose the lot/batch that was physically picked for this product.'); return; }
     mutation.mutate({
       path: `/outbound/orders/${pickOptions.data.order.id}/pick`,
       version: Number(pickOptions.data.order.version),
-      body: { items: [{ order_item_id: item.id, quantity, inventory_lot_id: draft.inventory_lot_id || null }] }
+      body: { items: [{ order_item_id: item.id, quantity, inventory_lot_id: item.serial_tracking_enabled ? null : draft.inventory_lot_id || null, serial_numbers: draft.serial_numbers }] }
     });
   };
 
@@ -255,9 +264,9 @@ export default function OutboundPage() {
     if (!returnForm.allocation_id || !returnForm.storage_location_id || !returnForm.reason.trim() || !Number.isFinite(quantity) || quantity <= 0) { setError('Choose dispatched stock, a return location, a quantity, and give the return reason.'); return; }
     mutation.mutate({
       path: '/outbound/returns',
-      body: { reason: returnForm.reason.trim(), notes: returnForm.notes || null, items: [{ outbound_order_lot_allocation_id: returnForm.allocation_id, storage_location_id: returnForm.storage_location_id, quantity, condition: returnForm.condition }] }
+      body: { reason: returnForm.reason.trim(), notes: returnForm.notes || null, items: [{ outbound_order_lot_allocation_id: returnForm.allocation_id, storage_location_id: returnForm.storage_location_id, quantity, condition: returnForm.condition, serial_numbers: returnForm.serial_numbers }] }
     });
-    setReturnForm({ allocation_id: '', storage_location_id: '', quantity: '1', condition: 'available', reason: '', notes: '' });
+    setReturnForm({ allocation_id: '', storage_location_id: '', quantity: '1', condition: 'available', reason: '', notes: '', serial_numbers: [] });
   };
 
   return <div style={{ display: 'grid', gap: 16 }}>
@@ -309,12 +318,13 @@ export default function OutboundPage() {
         <input style={input} placeholder="Notes" value={orderForm.notes} onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })} />
       </div>
       {orderForm.items.map((line, index) => <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: 8, marginTop: 10 }}>
-        <select style={input} value={line.product_id} onChange={(e) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, i) => i === index ? { ...current, product_id: e.target.value } : current) })}><option value="">Product</option>{productOptions.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
+        <select style={input} value={line.product_id} onChange={(e) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, i) => i === index ? { ...current, product_id: e.target.value, uom_code: '' } : current) })}><option value="">Product</option>{productOptions.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
         <select style={input} value={line.storage_location_id} onChange={(e) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, i) => i === index ? { ...current, storage_location_id: e.target.value } : current) })}><option value="">Location</option>{locationOptions.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select>
         <input style={input} type="number" min="0.0001" step="0.0001" value={line.quantity} onChange={(e) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, i) => i === index ? { ...current, quantity: e.target.value } : current) })} />
+        <ProductUomSelect productId={line.product_id} value={line.uom_code} purpose="issue" onChange={(value) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, i) => i === index ? { ...current, uom_code: value } : current) })} style={input} ariaLabel={`Unit of measure for outbound line ${index + 1}`} />
         <button style={button} disabled={orderForm.items.length === 1} onClick={() => setOrderForm({ ...orderForm, items: orderForm.items.filter((_, i) => i !== index) })}>Remove</button>
       </div>)}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button style={button} onClick={() => setOrderForm({ ...orderForm, items: [...orderForm.items, { product_id: '', storage_location_id: '', quantity: '1' }] })}>Add line</button><button style={button} disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || mutation.isPending} onClick={saveOrder}>{editingOrder ? 'Save Draft' : 'Create Order'}</button>{editingOrder ? <button style={button} onClick={() => { setEditingOrder(null); setOrderForm(emptyOrder); }}>Cancel Edit</button> : null}</div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button style={button} onClick={() => setOrderForm({ ...orderForm, items: [...orderForm.items, { product_id: '', storage_location_id: '', quantity: '1', uom_code: '' }] })}>Add line</button><button style={button} disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || mutation.isPending} onClick={saveOrder}>{editingOrder ? 'Save Draft' : 'Create Order'}</button>{editingOrder ? <button style={button} onClick={() => { setEditingOrder(null); setOrderForm(emptyOrder); }}>Cancel Edit</button> : null}</div>
     </section> : null}
 
     <section style={box}>
@@ -345,15 +355,18 @@ export default function OutboundPage() {
     {pickOrderId ? <section style={box}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><h3 style={{ margin: 0 }}>Picking workbench</h3><div style={muted}>Record what the warehouse worker physically picked. You can pick only part of the remaining order and dispatch that part first.</div></div><button style={button} onClick={() => setPickOrderId('')}>Close</button></div>
       {pickOptions.isLoading ? <p>Loading pick options...</p> : pickOptions.isError || !pickOptions.data ? <p>Unable to load picking details.</p> : pickOptions.data.items.map((item) => {
-        const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '' };
+        const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '', serial_numbers: [] };
         const unpickedRemaining = Math.max(toNumber(item.remaining_quantity) - toNumber(item.open_picked_quantity), 0);
         return <div key={item.id} style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12, marginTop: 12 }}>
           <strong>{item.product_name} · {item.storage_location_name}</strong>
           <div style={{ ...muted, marginTop: 4 }}>Ordered {item.quantity} · Already dispatched {item.dispatched_quantity} · Currently picked {item.open_picked_quantity} · Still unpicked {unpickedRemaining}</div>
-          {unpickedRemaining > 0 ? <div style={{ display: 'grid', gridTemplateColumns: item.requires_lot_tracking ? '1fr 2fr auto' : '1fr auto', gap: 8, marginTop: 9 }}>
-            <input style={input} type="number" min="0.0001" max={unpickedRemaining} step="0.0001" value={draft.quantity} onChange={(e) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, quantity: e.target.value } })} />
-            {item.requires_lot_tracking ? <select style={input} value={draft.inventory_lot_id} onChange={(e) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, inventory_lot_id: e.target.value } })}><option value="">Choose physically picked lot/batch</option>{item.lots.filter((lot) => lot.available_to_pick > 0).map((lot) => <option key={lot.id} value={lot.id}>{formatLot(lot)} · {lot.available_to_pick} available</option>)}</select> : null}
-            <button style={button} disabled={mutation.isPending || !draft.quantity || (item.requires_lot_tracking && !draft.inventory_lot_id)} onClick={() => recordPick(item)}>Record Pick</button>
+          {unpickedRemaining > 0 ? <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: item.serial_tracking_enabled ? '1fr auto' : item.requires_lot_tracking ? '1fr 2fr auto' : '1fr auto', gap: 8 }}>
+              <input style={input} type="number" min="0.0001" max={unpickedRemaining} step="0.0001" value={draft.quantity} onChange={(e) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, quantity: e.target.value, serial_numbers: [] } })} />
+              {!item.serial_tracking_enabled && item.requires_lot_tracking ? <select style={input} value={draft.inventory_lot_id} onChange={(e) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, inventory_lot_id: e.target.value } })}><option value="">Choose physically picked lot/batch</option>{item.lots.filter((lot) => lot.available_to_pick > 0).map((lot) => <option key={lot.id} value={lot.id}>{formatLot(lot)} · {lot.available_to_pick} available</option>)}</select> : null}
+              <button style={button} disabled={mutation.isPending || !draft.quantity || (!item.serial_tracking_enabled && item.requires_lot_tracking && !draft.inventory_lot_id) || (Boolean(item.serial_tracking_enabled) && (!Number.isInteger(Number(draft.quantity)) || draft.serial_numbers.length !== Number(draft.quantity)))} onClick={() => recordPick(item)}>Record Pick</button>
+            </div>
+            {item.serial_tracking_enabled ? <div><div style={muted}>Select the exact physical serials picked ({draft.serial_numbers.length}/{Number.isInteger(Number(draft.quantity)) ? Number(draft.quantity) : '?'})</div><div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, marginTop: 5 }}>{(item.available_serials || []).map((serial) => { const checked = draft.serial_numbers.includes(serial.serial_number); return <label key={serial.id} style={{ display: 'block', marginBottom: 4 }}><input type="checkbox" checked={checked} onChange={(event) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, serial_numbers: event.target.checked ? [...draft.serial_numbers, serial.serial_number] : draft.serial_numbers.filter((value) => value !== serial.serial_number) } })} /> {serial.serial_number}</label>; })}{!(item.available_serials || []).length ? <span style={muted}>No available serials found at this location.</span> : null}</div></div> : null}
           </div> : <div style={{ ...muted, marginTop: 8 }}>Nothing else to pick on this line.</div>}
         </div>;
       })}
@@ -370,9 +383,10 @@ export default function OutboundPage() {
       {canReturnCreate ? <div style={{ display: 'grid', gap: 9, marginBottom: 16 }}>
         <select style={input} value={returnForm.allocation_id} onChange={(e) => chooseReturnAllocation(e.target.value)}><option value="">Choose stock previously dispatched to a customer</option>{returnableTrace.map((row) => <option key={row.allocation_id} value={row.allocation_id}>{row.order_number} · {row.customer_name} · {row.product_name} · {formatLot(row)} · {row.returnable_quantity} returnable</option>)}</select>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><select style={input} value={returnForm.storage_location_id} onChange={(e) => setReturnForm({ ...returnForm, storage_location_id: e.target.value })}><option value="">Return to location</option>{locationOptions.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><input style={input} type="number" min="0.0001" max={selectedReturnTrace ? toNumber(selectedReturnTrace.returnable_quantity) : undefined} step="0.0001" value={returnForm.quantity} onChange={(e) => setReturnForm({ ...returnForm, quantity: e.target.value })} /></div>
+        {selectedReturnTrace?.serial_numbers?.length ? <div><div style={muted}>Select the exact serials physically returned ({returnForm.serial_numbers.length}/{Number.isInteger(Number(returnForm.quantity)) ? Number(returnForm.quantity) : '?'})</div><div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, marginTop: 5 }}>{selectedReturnTrace.serial_numbers.map((serial) => { const checked = returnForm.serial_numbers.includes(serial); return <label key={serial} style={{ display: 'block', marginBottom: 4 }}><input type="checkbox" checked={checked} onChange={(event) => setReturnForm({ ...returnForm, serial_numbers: event.target.checked ? [...returnForm.serial_numbers, serial] : returnForm.serial_numbers.filter((value) => value !== serial) })} /> {serial}</label>; })}</div></div> : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><select style={input} value={returnForm.condition} onChange={(e) => setReturnForm({ ...returnForm, condition: e.target.value })}><option value="available">Return to usable stock</option><option value="hold">Hold / inspect first</option><option value="damaged">Damaged</option><option value="rejected">Rejected</option><option value="quarantine">Quarantine</option></select><input style={input} placeholder="Why is the customer returning it?" value={returnForm.reason} onChange={(e) => setReturnForm({ ...returnForm, reason: e.target.value })} /></div>
         <input style={input} placeholder="Optional return notes" value={returnForm.notes} onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })} />
-        <div><button style={button} disabled={!returnForm.allocation_id || !returnForm.storage_location_id || !returnForm.reason.trim() || mutation.isPending} onClick={createReturn}>Create Customer Return</button></div>
+        <div><button style={button} disabled={!returnForm.allocation_id || !returnForm.storage_location_id || !returnForm.reason.trim() || mutation.isPending || Boolean(selectedReturnTrace?.serial_numbers?.length && (!Number.isInteger(Number(returnForm.quantity)) || returnForm.serial_numbers.length !== Number(returnForm.quantity)))} onClick={createReturn}>Create Customer Return</button></div>
       </div> : null}
       {returnRows.length === 0 ? <p>No customer returns yet.</p> : returnRows.map((row) => <div key={row.id} style={{ borderTop: '1px solid #e5e7eb', padding: '10px 0' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}><strong>{row.return_number} · {row.customer_name} · {row.order_number}</strong><span>{row.status}</span></div><div style={{ ...muted, marginTop: 4 }}>{row.reason}</div><div style={{ marginTop: 5, fontSize: 14 }}>{row.items.map((item) => `${item.product_name} ${item.quantity} ${item.product_unit} → ${item.condition} @ ${item.storage_location_name}`).join(' · ')}</div>{row.status === 'draft' ? <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>{canReturnReceive ? <button style={button} onClick={() => { if (window.confirm('Receive this customer return into inventory now?')) mutation.mutate({ path: `/outbound/returns/${row.id}/receive`, version: Number(row.version) }); }}>Receive Return</button> : null}{canReturnCancel ? <button style={button} onClick={() => { const reason = window.prompt('Return cancellation reason'); if (reason && reason.trim().length >= 3) mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: reason.trim() } }); }}>Cancel Return</button> : null}</div> : null}</div>)}
     </section> : null}

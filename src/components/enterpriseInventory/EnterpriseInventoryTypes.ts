@@ -1311,6 +1311,7 @@ export type RequisitionForm = {
   notes: string;
   product_id: string;
   requested_quantity: string;
+  uom_code: string;
 };
 
 export type CycleCountForm = {
@@ -1323,6 +1324,7 @@ export type CycleCountForm = {
   lot_number: string;
   batch_number: string;
   expiry_date: string;
+  serial_numbers: string;
 };
 
 export type StockAdjustmentForm = {
@@ -1334,6 +1336,7 @@ export type StockAdjustmentForm = {
   batch_number: string;
   expiry_date: string;
   manufactured_at: string;
+  serial_numbers: string;
 };
 
 export type StockTransferForm = {
@@ -1341,6 +1344,8 @@ export type StockTransferForm = {
   to_storage_location_id: string;
   product_id: string;
   quantity: string;
+  uom_code: string;
+  serial_numbers: string[];
   notes: string;
 };
 

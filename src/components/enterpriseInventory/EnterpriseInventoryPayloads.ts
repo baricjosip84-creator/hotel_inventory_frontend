@@ -1,4 +1,5 @@
 import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
+import { parseSerialNumbersInput } from '../inventory/serialNumbers';
 import type {
   AlertForm,
   ApprovalRuleForm,
@@ -64,7 +65,8 @@ export function buildRequisitionPayload(input: RequisitionForm): Record<string, 
     items: [
       {
         product_id: input.product_id,
-        requested_quantity: Number(input.requested_quantity)
+        requested_quantity: Number(input.requested_quantity),
+        uom_code: input.uom_code || null
       }
     ]
   };
@@ -83,7 +85,8 @@ export function buildCycleCountPayload(input: CycleCountForm): Record<string, un
         counted_quantity: input.counted_quantity === '' ? null : Number(input.counted_quantity),
         lot_number: input.lot_number.trim() || null,
         batch_number: input.batch_number.trim() || null,
-        expiry_date: input.expiry_date || null
+        expiry_date: input.expiry_date || null,
+        serial_numbers: parseSerialNumbersInput(input.serial_numbers)
       }
     ]
   };
@@ -98,7 +101,8 @@ export function buildStockAdjustmentPayload(input: StockAdjustmentForm): Record<
     lot_number: input.lot_number.trim() || null,
     batch_number: input.batch_number.trim() || null,
     expiry_date: input.expiry_date || null,
-    manufactured_at: input.manufactured_at || null
+    manufactured_at: input.manufactured_at || null,
+    serial_numbers: parseSerialNumbersInput(input.serial_numbers)
   };
 }
 
@@ -110,7 +114,9 @@ export function buildStockTransferPayload(input: StockTransferForm): Record<stri
     items: [
       {
         product_id: input.product_id,
-        quantity: Number(input.quantity)
+        quantity: Number(input.quantity),
+        uom_code: input.uom_code || null,
+        serial_numbers: input.serial_numbers
       }
     ]
   };

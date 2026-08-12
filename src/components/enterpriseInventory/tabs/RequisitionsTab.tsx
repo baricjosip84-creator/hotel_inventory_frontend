@@ -4,6 +4,7 @@ import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import type { DepartmentRequisition, ProductOption, RequisitionForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
+import ProductUomSelect from '../../inventory/ProductUomSelect';
 
 type RequisitionCreateMutation = {
   isPending: boolean;
@@ -85,8 +86,9 @@ export function RequisitionsTab({
         <InputField label="Department" value={requisitionForm.department} onChange={(value) => setRequisitionForm((current) => ({ ...current, department: value }))} required disabled={!canCreateRequisitions} />
         <SelectField label="Storage location" value={requisitionForm.storage_location_id} onChange={(value) => setRequisitionForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} disabled={!canCreateRequisitions} />
         <SelectField label="Priority" value={requisitionForm.priority} onChange={(value) => setRequisitionForm((current) => ({ ...current, priority: value }))} options={[{ value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' }]} disabled={!canCreateRequisitions} />
-        <SelectField label="Product" value={requisitionForm.product_id} onChange={(value) => setRequisitionForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canCreateRequisitions} />
+        <SelectField label="Product" value={requisitionForm.product_id} onChange={(value) => setRequisitionForm((current) => ({ ...current, product_id: value, uom_code: '' }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canCreateRequisitions} />
         <InputField label="Requested quantity" type="number" min="0.0001" value={requisitionForm.requested_quantity} onChange={(value) => setRequisitionForm((current) => ({ ...current, requested_quantity: value }))} required disabled={!canCreateRequisitions} />
+        <label style={styles.field}><span style={styles.label}>Unit of measure</span><ProductUomSelect productId={requisitionForm.product_id} value={requisitionForm.uom_code} purpose="issue" onChange={(value) => setRequisitionForm((current) => ({ ...current, uom_code: value }))} disabled={!canCreateRequisitions} style={styles.input} ariaLabel="Requisition unit of measure" /></label>
         <InputField label="Notes" value={requisitionForm.notes} onChange={(value) => setRequisitionForm((current) => ({ ...current, notes: value }))} disabled={!canCreateRequisitions} />
         <button type="submit" disabled={createRequisitionMutation.isPending || !canCreateRequisitions} style={createRequisitionMutation.isPending || !canCreateRequisitions ? styles.disabledButton : styles.primaryButton} title={!canCreateRequisitions ? `Requires ${TENANT_PERMISSIONS.REQUISITIONS_CREATE} permission.` : undefined}>Create requisition</button>
       </form>

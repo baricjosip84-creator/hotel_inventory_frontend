@@ -9,6 +9,7 @@ import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import ProductUomSelect from '../components/inventory/ProductUomSelect';
 
 type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | string;
 
@@ -74,6 +75,8 @@ type PurchaseOrderDetailItem = {
   product_unit: string;
   product_category?: string | null;
   quantity: number | string;
+  entered_quantity?: number | string;
+  uom_code?: string | null;
   received_quantity?: number | string;
   remaining_quantity?: number | string;
   receiving_status?: string;
@@ -81,6 +84,7 @@ type PurchaseOrderDetailItem = {
   variance_status?: string;
   quantity_variance?: number | string;
   estimated_cost_variance?: number | string;
+  base_unit_cost?: number | string | null;
   unit_cost?: number | string | null;
   estimated_line_total?: number | string;
   received_estimated_cost?: number | string;
@@ -144,6 +148,7 @@ type InboundReservationResponse = {
 type PurchaseOrderFormItem = {
   product_id: string;
   quantity: string;
+  uom_code: string;
   unit_cost: string;
   notes: string;
 };
@@ -306,7 +311,7 @@ function emptyForm(): PurchaseOrderFormState {
     po_number: '',
     expected_delivery_date: '',
     notes: '',
-    items: [{ product_id: '', quantity: '', unit_cost: '', notes: '' }]
+    items: [{ product_id: '', quantity: '', uom_code: '', unit_cost: '', notes: '' }]
   };
 }
 
@@ -675,6 +680,7 @@ function buildPayload(input: PurchaseOrderFormState) {
     items: input.items.map((item) => ({
       product_id: item.product_id,
       quantity: Number(item.quantity),
+      uom_code: item.uom_code || null,
       unit_cost: item.unit_cost === '' ? null : Number(item.unit_cost),
       notes: item.notes.trim() || null
     }))
@@ -740,7 +746,8 @@ function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
     notes: detail.notes || '',
     items: detail.items.map((item) => ({
       product_id: item.product_id,
-      quantity: String(item.quantity ?? ''),
+      quantity: String(item.entered_quantity ?? item.quantity ?? ''),
+      uom_code: item.uom_code || '',
       unit_cost: item.unit_cost === null || item.unit_cost === undefined ? '' : String(item.unit_cost),
       notes: item.notes || ''
     }))
@@ -1298,9 +1305,11 @@ export default function PurchaseOrdersPage() {
       ['Notes', selectedDetail.notes ?? ''],
       [],
       ['Items'],
-      ['Product', 'Unit', 'Quantity', 'Received', 'Remaining', 'Receiving Status', 'Receiving Percent', 'Variance Status', 'Quantity Variance', 'Estimated Cost Variance', 'Unit Cost', 'Estimated Total', 'Received Value', 'Remaining Value', 'Notes'],
+      ['Product', 'Ordered Unit', 'Ordered Quantity', 'Base Unit', 'Base Quantity', 'Received (Base)', 'Remaining (Base)', 'Receiving Status', 'Receiving Percent', 'Variance Status', 'Quantity Variance', 'Estimated Cost Variance', 'Cost / Ordered Unit', 'Base Unit Cost', 'Estimated Total', 'Received Value', 'Remaining Value', 'Notes'],
       ...selectedDetail.items.map((item) => [
         item.product_name,
+        item.uom_code || item.product_unit,
+        item.entered_quantity ?? item.quantity,
         item.product_unit,
         item.quantity,
         item.received_quantity ?? '',
@@ -1311,6 +1320,7 @@ export default function PurchaseOrdersPage() {
         item.quantity_variance ?? '',
         item.estimated_cost_variance ?? '',
         item.unit_cost ?? '',
+        item.base_unit_cost ?? '',
         item.estimated_line_total ?? '',
         item.received_estimated_cost ?? '',
         item.remaining_estimated_cost ?? '',
@@ -1379,6 +1389,7 @@ export default function PurchaseOrdersPage() {
             table { width: 100%; border-collapse: collapse; margin-top: 16px; }
             th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; font-size: 12px; vertical-align: top; }
             th { color: #475569; }
+            .subtle { color: #64748b; font-size: 10px; }
             @media print { button { display: none; } body { margin: 18px; } }
           </style>
         </head>
@@ -1420,11 +1431,11 @@ export default function PurchaseOrdersPage() {
     const itemRows = selectedDetail.items.map((item) => `
       <tr>
         <td>${escapeHtml(item.product_name)}</td>
-        <td>${escapeHtml(formatNumber(item.quantity))} ${escapeHtml(item.product_unit)}</td>
+        <td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity))} ${escapeHtml(item.uom_code || item.product_unit)}${String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? `<br /><span class="subtle">${escapeHtml(formatNumber(item.quantity))} ${escapeHtml(item.product_unit)} base</span>` : ''}</td>
         <td>${escapeHtml(formatNumber(item.received_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(formatNumber(item.remaining_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(receivingStatusLabel(item.receiving_status))} (${escapeHtml(formatPercent(item.receiving_percent))})</td>
-        <td>${escapeHtml(formatMoney(item.unit_cost, selectedDetail?.currency))}</td>
+        <td>${escapeHtml(formatMoney(item.unit_cost, selectedDetail?.currency))} / ${escapeHtml(item.uom_code || item.product_unit)}</td>
         <td>${escapeHtml(formatMoney(item.estimated_line_total, selectedDetail?.currency))}</td>
         <td>${escapeHtml(formatMoney(item.received_estimated_cost, selectedDetail?.currency))}</td>
         <td>${escapeHtml(formatMoney(item.remaining_estimated_cost, selectedDetail?.currency))}</td>
@@ -1465,6 +1476,7 @@ export default function PurchaseOrdersPage() {
             table { width: 100%; border-collapse: collapse; margin-top: 12px; }
             th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; font-size: 13px; vertical-align: top; }
             th { color: #475569; }
+            .subtle { color: #64748b; font-size: 10px; }
             .notes { margin-top: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; white-space: pre-wrap; }
             @media print { button { display: none; } body { margin: 20px; } }
           </style>
@@ -1558,7 +1570,7 @@ export default function PurchaseOrdersPage() {
   const addItem = () => {
     setForm((current) => ({
       ...current,
-      items: [...current.items, { product_id: '', quantity: '', unit_cost: '', notes: '' }]
+      items: [...current.items, { product_id: '', quantity: '', uom_code: '', unit_cost: '', notes: '' }]
     }));
   };
 
@@ -2207,7 +2219,7 @@ export default function PurchaseOrdersPage() {
               <select
                 style={styles.input}
                 value={item.product_id}
-                onChange={(event) => updateItem(index, { product_id: event.target.value })}
+                onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })}
               >
                 <option value="">Select product</option>
                 {(productsQuery.data || []).map((product) => (
@@ -2224,12 +2236,20 @@ export default function PurchaseOrdersPage() {
                   value={item.quantity}
                   onChange={(event) => updateItem(index, { quantity: event.target.value })}
                 />
+                <ProductUomSelect
+                  productId={item.product_id}
+                  value={item.uom_code}
+                  purpose="purchase"
+                  onChange={(value) => updateItem(index, { uom_code: value })}
+                  style={styles.input}
+                  ariaLabel={`Unit of measure for purchase order line ${index + 1}`}
+                />
                 <input
                   style={styles.input}
                   type="number"
                   min="0"
                   step="any"
-                  placeholder="Unit cost optional"
+                  placeholder="Cost per selected unit (optional)"
                   value={item.unit_cost}
                   onChange={(event) => updateItem(index, { unit_cost: event.target.value })}
                 />
@@ -2383,7 +2403,7 @@ export default function PurchaseOrdersPage() {
                       <th style={styles.th}>Remaining</th>
                       <th style={styles.th}>Status</th>
                       <th style={styles.th}>Variance</th>
-                      <th style={styles.th}>Unit Cost</th>
+                      <th style={styles.th}>Cost / Ordered Unit</th>
                       <th style={styles.th}>Total</th>
                       <th style={styles.th}>Received Value</th>
                       <th style={styles.th}>Remaining Value</th>
@@ -2393,7 +2413,12 @@ export default function PurchaseOrdersPage() {
                     {selectedDetail.items.map((item) => (
                       <tr key={item.id}>
                         <td style={styles.td}>{item.product_name}</td>
-                        <td style={styles.td}>{formatNumber(item.quantity)} {item.product_unit}</td>
+                        <td style={styles.td}>
+                          {formatNumber(item.entered_quantity ?? item.quantity)} {item.uom_code || item.product_unit}
+                          {String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? (
+                            <div style={styles.smallMuted}>{formatNumber(item.quantity)} {item.product_unit} base</div>
+                          ) : null}
+                        </td>
                         <td style={styles.td}>{formatNumber(item.received_quantity)} {item.product_unit}</td>
                         <td style={styles.td}>{formatNumber(item.remaining_quantity)} {item.product_unit}</td>
                         <td style={styles.td}>
@@ -2408,7 +2433,10 @@ export default function PurchaseOrdersPage() {
                           </span>
                           <div style={styles.smallMuted}>{formatNumber(item.quantity_variance)}</div>
                         </td>
-                        <td style={styles.td}>{formatMoney(item.unit_cost, selectedDetail?.currency)}</td>
+                        <td style={styles.td}>
+                          {formatMoney(item.unit_cost, selectedDetail?.currency)}
+                          <div style={styles.smallMuted}>per {item.uom_code || item.product_unit}</div>
+                        </td>
                         <td style={styles.td}>{formatMoney(item.estimated_line_total, selectedDetail?.currency)}</td>
                         <td style={styles.td}>{formatMoney(item.received_estimated_cost, selectedDetail?.currency)}</td>
                         <td style={styles.td}>{formatMoney(item.remaining_estimated_cost, selectedDetail?.currency)}</td>

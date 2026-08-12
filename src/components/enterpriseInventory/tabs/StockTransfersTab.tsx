@@ -1,10 +1,21 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { InputField, MetricCard, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatDateTime, formatNumber } from '../EnterpriseInventoryFormat';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
+import { apiRequest } from '../../../lib/api';
+import ProductUomSelect from '../../inventory/ProductUomSelect';
 import type { ProductOption, StockItem, StockTransfer, StockTransferForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
+
+type UomResponse = {
+  base_uom: string;
+  conversions: Array<{ uom_code: string; factor_to_base: number | string }>;
+};
+
+type SerialRow = { id: string; serial_number: string; storage_location_id?: string | null; status: string };
+type TrackingSettings = { serial_tracking_enabled: boolean };
 
 type StockTransferCreateMutation = {
   isPending: boolean;
@@ -69,6 +80,21 @@ export function StockTransfersTab({
   const canCancelTransfers = hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL);
   const productNames = useMemo(() => new Map(products.map((product) => [product.id, product.name])), [products]);
   const selectedQuantity = toFiniteNumber(stockTransferForm.quantity);
+  const uomQuery = useQuery({
+    queryKey: ['stock-transfer-uom', stockTransferForm.product_id],
+    enabled: Boolean(stockTransferForm.product_id),
+    queryFn: () => apiRequest<UomResponse>(`/inventory-capabilities/products/${stockTransferForm.product_id}/uom`)
+  });
+  const trackingQuery = useQuery({
+    queryKey: ['stock-transfer-tracking', stockTransferForm.product_id],
+    enabled: Boolean(stockTransferForm.product_id),
+    queryFn: () => apiRequest<TrackingSettings>(`/inventory-capabilities/products/${stockTransferForm.product_id}/serial-tracking`)
+  });
+  const serialQuery = useQuery({
+    queryKey: ['stock-transfer-serials', stockTransferForm.product_id, stockTransferForm.from_storage_location_id],
+    enabled: Boolean(stockTransferForm.product_id && stockTransferForm.from_storage_location_id && trackingQuery.data?.serial_tracking_enabled),
+    queryFn: () => apiRequest<SerialRow[]>(`/inventory-capabilities/serials?product_id=${encodeURIComponent(stockTransferForm.product_id)}&status=available&storage_location_id=${encodeURIComponent(stockTransferForm.from_storage_location_id)}`)
+  });
 
   const sourceStockItems = useMemo(
     () => stockItems.filter((item) => (
@@ -88,12 +114,21 @@ export function StockTransfersTab({
     stockTransferForm.from_storage_location_id !== stockTransferForm.to_storage_location_id
   );
   const hasValidQuantity = selectedQuantity > 0;
-  const quantityWithinSourceStock = Boolean(selectedSourceStock && selectedQuantity <= selectedAvailableQuantity);
+  const selectedUomCode = stockTransferForm.uom_code.trim().toUpperCase();
+  const uomFactor = selectedUomCode
+    ? Number(uomQuery.data?.conversions.find((row) => row.uom_code.toUpperCase() === selectedUomCode)?.factor_to_base ?? (uomQuery.data?.base_uom?.toUpperCase() === selectedUomCode ? 1 : NaN))
+    : 1;
+  const selectedBaseQuantity = Number.isFinite(uomFactor) ? selectedQuantity * uomFactor : NaN;
+  const quantityWithinSourceStock = Boolean(selectedSourceStock && Number.isFinite(selectedBaseQuantity) && selectedBaseQuantity <= selectedAvailableQuantity + 0.0000001);
+  const serialTrackingEnabled = Boolean(trackingQuery.data?.serial_tracking_enabled);
+  const expectedSerialCount = Number.isInteger(selectedBaseQuantity) ? selectedBaseQuantity : -1;
+  const serialSelectionValid = !serialTrackingEnabled || (expectedSerialCount >= 0 && stockTransferForm.serial_numbers.length === expectedSerialCount);
   const canCreateTransferDraft = canCreateTransfers && Boolean(
     locationsDiffer &&
     stockTransferForm.product_id &&
     hasValidQuantity &&
-    quantityWithinSourceStock
+    quantityWithinSourceStock &&
+    serialSelectionValid
   );
 
   const productOptions = sourceStockItems.map((item) => ({
@@ -116,8 +151,10 @@ export function StockTransfersTab({
             : !hasValidQuantity
               ? 'Enter a transfer quantity greater than zero.'
               : !quantityWithinSourceStock
-                ? `Only ${formatQuantity(selectedAvailableQuantity, selectedSourceStock?.product_unit)} is available at the selected source location.`
-                : null;
+                ? `The converted quantity exceeds the ${formatQuantity(selectedAvailableQuantity, selectedSourceStock?.product_unit)} available at the selected source location.`
+                : !serialSelectionValid
+                  ? `Select exactly ${expectedSerialCount >= 0 ? expectedSerialCount : 'a whole-number quantity of'} serial number${expectedSerialCount === 1 ? '' : 's'} for this serial-tracked transfer.`
+                  : null;
 
   const handleStockTransferSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -130,7 +167,9 @@ export function StockTransfersTab({
       ...current,
       from_storage_location_id: value,
       product_id: '',
-      quantity: ''
+      quantity: '',
+      uom_code: '',
+      serial_numbers: []
     }));
   };
 
@@ -138,7 +177,9 @@ export function StockTransfersTab({
     setStockTransferForm((current) => ({
       ...current,
       product_id: value,
-      quantity: ''
+      quantity: '',
+      uom_code: '',
+      serial_numbers: []
     }));
   };
 
@@ -170,7 +211,9 @@ export function StockTransfersTab({
         <SelectField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="From location" value={stockTransferForm.from_storage_location_id} onChange={handleFromLocationChange} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
         <SelectField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="To location" value={stockTransferForm.to_storage_location_id} onChange={(value) => setStockTransferForm((current) => ({ ...current, to_storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required />
         <SelectField label="Product" value={stockTransferForm.product_id} onChange={handleProductChange} options={productOptions} required disabled={!canCreateTransfers || createStockTransferMutation.isPending || !hasSourceLocation || productOptions.length === 0} />
-        <InputField label="Quantity" type="number" value={stockTransferForm.quantity} onChange={(value) => setStockTransferForm((current) => ({ ...current, quantity: value }))} required min="0.0001" max={selectedSourceStock ? String(selectedAvailableQuantity) : undefined} disabled={!canCreateTransfers || createStockTransferMutation.isPending || !selectedSourceStock} />
+        <InputField label="Quantity" type="number" value={stockTransferForm.quantity} onChange={(value) => setStockTransferForm((current) => ({ ...current, quantity: value }))} required min="0.0001" disabled={!canCreateTransfers || createStockTransferMutation.isPending || !selectedSourceStock} />
+        <label style={styles.label}>Unit of measure<ProductUomSelect productId={stockTransferForm.product_id} value={stockTransferForm.uom_code} purpose="issue" onChange={(value) => setStockTransferForm((current) => ({ ...current, uom_code: value, serial_numbers: [] }))} disabled={!canCreateTransfers || createStockTransferMutation.isPending} style={styles.input} ariaLabel="Transfer unit of measure" /></label>
+        {serialTrackingEnabled ? <div style={styles.field}><div style={styles.label}>Serial numbers ({stockTransferForm.serial_numbers.length}/{expectedSerialCount >= 0 ? expectedSerialCount : '?'})</div><div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #d8dee9', borderRadius: 8, padding: 8 }}>{(serialQuery.data || []).map((serial) => { const checked = stockTransferForm.serial_numbers.includes(serial.serial_number); return <label key={serial.id} style={{ display: 'block', marginBottom: 4 }}><input type="checkbox" checked={checked} onChange={(event) => setStockTransferForm((current) => ({ ...current, serial_numbers: event.target.checked ? [...current.serial_numbers, serial.serial_number] : current.serial_numbers.filter((value) => value !== serial.serial_number) }))} /> {serial.serial_number}</label>; })}{serialQuery.isLoading ? <span style={styles.helper}>Loading available serials…</span> : null}{!serialQuery.isLoading && !(serialQuery.data || []).length ? <span style={styles.helper}>No available serials found at this source location.</span> : null}</div></div> : null}
         {selectedSourceStock ? <p style={styles.helper}>Available at source: {formatQuantity(selectedSourceStock.quantity, selectedSourceStock.product_unit)}</p> : null}
         {transferValidationMessage ? <p style={styles.muted}>{transferValidationMessage}</p> : null}
         <InputField disabled={!canCreateTransfers || createStockTransferMutation.isPending} label="Notes" value={stockTransferForm.notes} onChange={(value) => setStockTransferForm((current) => ({ ...current, notes: value }))} />

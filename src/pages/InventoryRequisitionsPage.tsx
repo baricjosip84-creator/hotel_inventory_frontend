@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import ProductUomSelect from '../components/inventory/ProductUomSelect';
 
 type RequisitionProductOption = {
   id: string;
@@ -127,6 +128,7 @@ type InventoryRequisition = {
 type RequisitionFormItem = {
   product_id: string;
   requested_quantity: string;
+  uom_code: string;
   notes: string;
 };
 
@@ -1054,7 +1056,7 @@ const emptyForm = (): RequisitionFormState => ({
   priority: 'normal',
   needed_by: '',
   notes: '',
-  items: [{ product_id: '', requested_quantity: '', notes: '' }]
+  items: [{ product_id: '', requested_quantity: '', uom_code: '', notes: '' }]
 });
 
 function formatDateTime(value: string | null | undefined): string {
@@ -1388,6 +1390,7 @@ function buildCreatePayload(form: RequisitionFormState) {
       .map((item) => ({
         product_id: item.product_id,
         requested_quantity: Number(item.requested_quantity),
+        uom_code: item.uom_code || null,
         notes: item.notes.trim() || null
       }))
   };
@@ -1406,10 +1409,11 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
     items: requisition.items?.length
       ? requisition.items.map((item) => ({
         product_id: item.product_id,
-        requested_quantity: String(item.requested_quantity || ''),
+        requested_quantity: String((item.entered_quantity ?? item.requested_quantity) || ''),
+        uom_code: item.uom_code || '',
         notes: item.notes || ''
       }))
-      : [{ product_id: '', requested_quantity: '', notes: '' }]
+      : [{ product_id: '', requested_quantity: '', uom_code: '', notes: '' }]
   };
 }
 
@@ -2115,7 +2119,7 @@ export default function InventoryRequisitionsPage() {
   const addFormLine = () => {
     setForm((current) => ({
       ...current,
-      items: [...current.items, { product_id: '', requested_quantity: '', notes: '' }]
+      items: [...current.items, { product_id: '', requested_quantity: '', uom_code: '', notes: '' }]
     }));
   };
 
@@ -3158,7 +3162,7 @@ export default function InventoryRequisitionsPage() {
               <select
                 style={styles.lineProductInput}
                 value={item.product_id}
-                onChange={(event) => updateFormLine(index, 'product_id', event.target.value)}
+                onChange={(event) => { updateFormLine(index, 'product_id', event.target.value); updateFormLine(index, 'uom_code', ''); }}
                 required
               >
                 <option value="">Select product</option>
@@ -3175,6 +3179,14 @@ export default function InventoryRequisitionsPage() {
                 value={item.requested_quantity}
                 onChange={(event) => updateFormLine(index, 'requested_quantity', event.target.value)}
                 required
+              />
+              <ProductUomSelect
+                productId={item.product_id}
+                value={item.uom_code}
+                purpose="issue"
+                onChange={(value) => updateFormLine(index, 'uom_code', value)}
+                style={styles.lineQuantityInput}
+                ariaLabel={`Unit of measure for requisition line ${index + 1}`}
               />
               <input
                 style={styles.lineNotesInput}

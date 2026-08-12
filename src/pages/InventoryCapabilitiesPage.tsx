@@ -9,7 +9,9 @@ type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cos
 
 type Product = { id: string; sku: string; name: string; unit: string; barcode?: string | null; parent_product_id?: string | null };
 type Location = { id: string; name: string; parent_location_id?: string | null; location_type?: string; location_code?: string | null; path?: string; depth?: number; is_pickable?: boolean };
-type Shipment = { id: string; po_number?: string | null; status?: string };
+type Shipment = { id: string; po_number?: string | null; status?: string; qr_code?: string | null };
+type SupplierRef = { id: string; name: string; email?: string | null };
+type PurchaseOrderRef = { id: string; po_number?: string | null; status?: string };
 type Overview = { counts?: Record<string, number>; priorities?: string[] };
 type ApiClient = { id: string; name: string; description?: string | null; key_prefix: string; scopes: string[]; status: string; last_used_at?: string | null; created_at?: string };
 type Connection = { id: string; system_name: string; system_type: string; base_url?: string | null; direction: string; status: string; credential_reference?: string | null };
@@ -37,7 +39,7 @@ const TABS: Array<{ key: TabKey; label: string; number: number; countKey: string
   { key: 'variants', label: 'Variants', number: 6, countKey: 'variants' },
   { key: 'hierarchy', label: 'Location hierarchy', number: 7, countKey: 'hierarchical_locations' },
   { key: 'bom', label: 'BOM & assemblies', number: 8, countKey: 'active_boms' },
-  { key: 'mobile', label: 'Offline mobile', number: 9, countKey: 'mobile_sync_batches' }
+  { key: 'mobile', label: 'Offline task mode', number: 9, countKey: 'mobile_sync_batches' }
 ];
 
 const panelStyle: CSSProperties = { display: 'grid', gap: 16 };
@@ -76,14 +78,19 @@ export default function InventoryCapabilitiesPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabKey>('integrations');
   const canWriteProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_WRITE);
-  const canGovernIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN);
+  const canWriteSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_WRITE);
   const canWriteLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE);
+  const canWriteShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_WRITE);
+  const canWritePurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_UPDATE);
+  const canGovernIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN);
   const canAdjustStock = hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
 
   const overviewQuery = useQuery({ queryKey: ['inventory-capabilities-overview'], queryFn: () => apiRequest<Overview>('/inventory-capabilities/overview') });
   const productsQuery = useQuery({ queryKey: ['inventory-capabilities-products'], queryFn: () => apiRequest<Product[]>('/products') });
   const locationsQuery = useQuery({ queryKey: ['inventory-capabilities-locations'], queryFn: () => apiRequest<Location[]>('/storage-locations') });
   const shipmentsQuery = useQuery({ queryKey: ['inventory-capabilities-shipments'], queryFn: () => apiRequest<Shipment[]>('/shipments') });
+  const suppliersQuery = useQuery({ queryKey: ['inventory-capabilities-suppliers'], enabled: hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ), queryFn: () => apiRequest<SupplierRef[]>('/suppliers') });
+  const purchaseOrdersQuery = useQuery({ queryKey: ['inventory-capabilities-purchase-orders'], enabled: hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ), queryFn: () => apiRequest<PurchaseOrderRef[]>('/purchase-orders') });
 
   const counts = overviewQuery.data?.counts || {};
 
@@ -118,7 +125,14 @@ export default function InventoryCapabilitiesPage() {
       {tab === 'integrations' && <IntegrationsPanel canWrite={canGovernIntegrations} />}
       {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'uom' && <UomPanel products={productsQuery.data || []} canWrite={canWriteProducts} />}
-      {tab === 'custom-fields' && <CustomFieldsPanel products={productsQuery.data || []} canWrite={canWriteProducts} />}
+      {tab === 'custom-fields' && <CustomFieldsPanel
+        products={productsQuery.data || []}
+        suppliers={suppliersQuery.data || []}
+        locations={locationsQuery.data || []}
+        shipments={shipmentsQuery.data || []}
+        purchaseOrders={purchaseOrdersQuery.data || []}
+        writePermissions={{ product: canWriteProducts, supplier: canWriteSuppliers, storage_location: canWriteLocations, shipment: canWriteShipments, purchase_order: canWritePurchaseOrders }}
+      />}
       {tab === 'landed-cost' && <LandedCostPanel shipments={shipmentsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'variants' && <VariantsPanel products={productsQuery.data || []} canWrite={canWriteProducts} onChanged={() => queryClient.invalidateQueries({ queryKey: ['inventory-capabilities-products'] })} />}
       {tab === 'hierarchy' && <HierarchyPanel locations={locationsQuery.data || []} canWrite={canWriteLocations} />}
@@ -128,10 +142,24 @@ export default function InventoryCapabilitiesPage() {
   );
 }
 
+const API_SCOPE_OPTIONS = [
+  { value: 'products:read', label: 'Read products' },
+  { value: 'products:write', label: 'Create products' },
+  { value: 'stock:read', label: 'Read stock' },
+  { value: 'suppliers:read', label: 'Read suppliers' },
+  { value: 'suppliers:write', label: 'Create suppliers' },
+  { value: 'purchase_orders:read', label: 'Read purchase orders' },
+  { value: 'purchase_orders:write', label: 'Create purchase orders' },
+  { value: 'shipments:write', label: 'Create shipments' },
+  { value: 'events:write', label: 'Submit integration events' }
+] as const;
+const DEFAULT_API_SCOPES = ['products:read', 'stock:read'];
+
 function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [apiScopes, setApiScopes] = useState<string[]>(DEFAULT_API_SCOPES);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [systemName, setSystemName] = useState('');
   const [systemType, setSystemType] = useState('custom');
@@ -150,8 +178,8 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const webhooks = useQuery({ queryKey: ['inventory-webhooks'], queryFn: () => apiRequest<WebhookSubscription[]>('/inventory-capabilities/webhooks') });
   const deliveries = useQuery({ queryKey: ['inventory-webhook-deliveries'], queryFn: () => apiRequest<WebhookDelivery[]>('/inventory-capabilities/webhook-deliveries?limit=25') });
   const createClient = useMutation({
-    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: ['products:read', 'stock:read', 'suppliers:read', 'purchase_orders:read', 'events:write'] }) }),
-    onSuccess: (data) => { setRevealedKey(data.api_key); setName(''); setDescription(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: apiScopes }) }),
+    onSuccess: (data) => { setRevealedKey(data.api_key); setName(''); setDescription(''); setApiScopes(DEFAULT_API_SCOPES); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, 'Unable to create API client.'))
   });
   const revokeClient = useMutation({
@@ -212,7 +240,12 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <form onSubmit={(e) => { e.preventDefault(); createClient.mutate(); }} style={formGridStyle}>
           <label>Connection name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Company ERP" disabled={!canWrite} /></label>
           <label>Description<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Used by head-office integration" disabled={!canWrite} /></label>
-          <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !name.trim() || createClient.isPending}>Create API key</button></div>
+          <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #d1d5db', borderRadius: 10, padding: 12 }} disabled={!canWrite}>
+            <legend>API permissions</legend>
+            <p className="card__subtext">Starts read-only. Enable write permissions only for systems that genuinely need them.</p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{API_SCOPE_OPTIONS.map((scope) => <label key={scope.value} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={apiScopes.includes(scope.value)} onChange={(event) => setApiScopes((current) => event.target.checked ? Array.from(new Set([...current, scope.value])) : current.filter((value) => value !== scope.value))} />{scope.label}</label>)}</div>
+          </fieldset>
+          <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !name.trim() || apiScopes.length === 0 || createClient.isPending}>Create API key</button></div>
         </form>
         <div style={tableWrapStyle}>
           <table><thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Last used</th><th>Status</th><th /></tr></thead><tbody>
@@ -312,22 +345,157 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
   return <section className="section" style={panelStyle}><div className="section__title">Priority #3 — Unit-of-measure conversion</div><div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={(id) => { setProductId(id); setFromUom(''); setToUom(''); }} /><label>UoM code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CASE" /></label><label>Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Case" /></label><label>Units in base unit<input type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="24" /></label><label><input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} /> Purchasing unit</label><label><input type="checkbox" checked={issue} onChange={(e) => setIssue(e.target.checked)} /> Issue/selling unit</label><button className="button" type="button" disabled={!canWrite || !productId || !code || asNumber(factor) <= 0} onClick={() => save.mutate()}>Save conversion</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card"><h3>Conversion test</h3><div style={formGridStyle}><input type="number" step="any" value={convertQty} onChange={(e) => setConvertQty(e.target.value)} /><select value={fromUom} onChange={(e) => setFromUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><select value={toUom} onChange={(e) => setToUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><button className="button button--secondary" type="button" disabled={!productId || !fromUom || !toUom} onClick={() => convert.mutate()}>Convert</button>{converted !== null ? <strong>Result: {converted} {toUom}</strong> : null}</div></div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Unit</th><th>Factor to base</th><th>Purchase</th><th>Issue</th></tr></thead><tbody><tr><td>{query.data?.base_uom || '-'}</td><td>1</td><td>-</td><td>-</td></tr>{(query.data?.conversions || []).map((row) => <tr key={row.id}><td>{row.uom_code} {row.uom_name ? `— ${row.uom_name}` : ''}</td><td>{String(row.factor_to_base)}</td><td>{row.purchase_uom ? 'Yes' : 'No'}</td><td>{row.issue_uom ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
 }
 
-function CustomFieldsPanel({ products, canWrite }: { products: Product[]; canWrite: boolean }) {
+function CustomFieldsPanel({
+  products,
+  suppliers,
+  locations,
+  shipments,
+  purchaseOrders,
+  writePermissions
+}: {
+  products: Product[];
+  suppliers: SupplierRef[];
+  locations: Location[];
+  shipments: Shipment[];
+  purchaseOrders: PurchaseOrderRef[];
+  writePermissions: Record<'product' | 'supplier' | 'storage_location' | 'shipment' | 'purchase_order', boolean>;
+}) {
+  type EntityType = keyof typeof writePermissions;
   const qc = useQueryClient();
+  const [entityType, setEntityType] = useState<EntityType>('product');
   const [fieldKey, setFieldKey] = useState('');
   const [label, setLabel] = useState('');
   const [dataType, setDataType] = useState('text');
   const [options, setOptions] = useState('');
   const [required, setRequired] = useState(false);
-  const [productId, setProductId] = useState('');
+  const [entityId, setEntityId] = useState('');
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  const definitions = useQuery({ queryKey: ['custom-field-definitions'], queryFn: () => apiRequest<CustomDefinition[]>('/inventory-capabilities/custom-fields?entity_type=product') });
-  const entityValues = useQuery({ queryKey: ['custom-field-values', productId], enabled: Boolean(productId), queryFn: () => apiRequest<CustomValueRow[]>(`/inventory-capabilities/custom-fields/product/${productId}`) });
-  useEffect(() => { if (entityValues.data) { const next: Record<string, string | boolean> = {}; entityValues.data.forEach((row) => { next[row.field_key] = row.value === null || row.value === undefined ? '' : row.data_type === 'boolean' ? row.value === true : String(row.value); }); setValues(next); } }, [entityValues.data]);
-  const saveDefinition = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/custom-fields', { method: 'POST', body: JSON.stringify({ entity_type: 'product', field_key: fieldKey, label, data_type: dataType, is_required: required, options: options.split(',').map((v) => v.trim()).filter(Boolean) }) }), onSuccess: () => { setFieldKey(''); setLabel(''); setOptions(''); setError(null); void qc.invalidateQueries({ queryKey: ['custom-field-definitions'] }); }, onError: (e) => setError(messageFrom(e, 'Unable to save custom field.')) });
-  const saveValues = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/custom-fields/product/${productId}`, { method: 'PUT', body: JSON.stringify({ values }) }), onSuccess: () => { setError(null); void qc.invalidateQueries({ queryKey: ['custom-field-values', productId] }); }, onError: (e) => setError(messageFrom(e, 'Unable to save custom values.')) });
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #4 — Tenant-configurable custom fields</div><div className="card"><h3>Create a product field</h3><div style={formGridStyle}><label>Field key<input value={fieldKey} onChange={(e) => setFieldKey(e.target.value)} placeholder="country_of_origin" /></label><label>Label<input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Country of origin" /></label><label>Type<select value={dataType} onChange={(e) => setDataType(e.target.value)}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes/No</option><option value="date">Date</option><option value="select">Select list</option></select></label>{dataType === 'select' ? <label>Options<input value={options} onChange={(e) => setOptions(e.target.value)} placeholder="Croatia, Italy, Germany" /></label> : null}<label><input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} /> Required</label><button className="button" type="button" disabled={!canWrite || !fieldKey.trim() || !label.trim()} onClick={() => saveDefinition.mutate()}>Save field</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card"><h3>Use fields on a product</h3><ProductSelect products={products} value={productId} onChange={setProductId} />{(entityValues.data || []).map((row) => <label key={row.definition_id} style={{ display: 'block', marginTop: 12 }}>{row.label}{row.is_required ? ' *' : ''}{row.data_type === 'boolean' ? <input type="checkbox" checked={values[row.field_key] === true} onChange={(e) => setValues({ ...values, [row.field_key]: e.target.checked })} /> : row.data_type === 'select' ? <select value={String(values[row.field_key] || '')} onChange={(e) => setValues({ ...values, [row.field_key]: e.target.value })}><option value="">Select…</option>{(row.options || []).map((opt) => <option key={opt}>{opt}</option>)}</select> : <input type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(e) => setValues({ ...values, [row.field_key]: e.target.value })} />}</label>)}<button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !productId} onClick={() => saveValues.mutate()}>Save product custom fields</button></div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Required</th></tr></thead><tbody>{(definitions.data || []).map((d) => <tr key={d.id}><td>{d.field_key}</td><td>{d.label}</td><td>{d.data_type}</td><td>{d.is_required ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
+
+  const entityConfigs: Record<EntityType, { label: string; plural: string; rows: Array<{ id: string; label: string }> }> = {
+    product: { label: 'Product', plural: 'products', rows: products.map((row) => ({ id: row.id, label: `${row.sku} — ${row.name}` })) },
+    supplier: { label: 'Supplier', plural: 'suppliers', rows: suppliers.map((row) => ({ id: row.id, label: row.name })) },
+    storage_location: { label: 'Storage location', plural: 'storage locations', rows: locations.map((row) => ({ id: row.id, label: row.path || row.name })) },
+    shipment: { label: 'Shipment', plural: 'shipments', rows: shipments.map((row) => ({ id: row.id, label: row.po_number || row.qr_code || row.id.slice(0, 8) })) },
+    purchase_order: { label: 'Purchase order', plural: 'purchase orders', rows: purchaseOrders.map((row) => ({ id: row.id, label: row.po_number || row.id.slice(0, 8) })) }
+  };
+  const config = entityConfigs[entityType];
+  const canWrite = writePermissions[entityType];
+
+  const definitions = useQuery({
+    queryKey: ['custom-field-definitions', entityType],
+    queryFn: () => apiRequest<CustomDefinition[]>(`/inventory-capabilities/custom-fields?entity_type=${entityType}`)
+  });
+  const entityValues = useQuery({
+    queryKey: ['custom-field-values', entityType, entityId],
+    enabled: Boolean(entityId),
+    queryFn: () => apiRequest<CustomValueRow[]>(`/inventory-capabilities/custom-fields/${entityType}/${entityId}`)
+  });
+
+  useEffect(() => {
+    setEntityId('');
+    setValues({});
+    setError(null);
+  }, [entityType]);
+
+  useEffect(() => {
+    if (!entityValues.data) return;
+    const next: Record<string, string | boolean> = {};
+    entityValues.data.forEach((row) => {
+      next[row.field_key] = row.value === null || row.value === undefined
+        ? ''
+        : row.data_type === 'boolean'
+          ? row.value === true
+          : String(row.value);
+    });
+    setValues(next);
+  }, [entityValues.data]);
+
+  const saveDefinition = useMutation({
+    mutationFn: () => apiRequest('/inventory-capabilities/custom-fields', {
+      method: 'POST',
+      body: JSON.stringify({
+        entity_type: entityType,
+        field_key: fieldKey,
+        label,
+        data_type: dataType,
+        is_required: required,
+        options: options.split(',').map((value) => value.trim()).filter(Boolean)
+      })
+    }),
+    onSuccess: () => {
+      setFieldKey('');
+      setLabel('');
+      setOptions('');
+      setError(null);
+      void qc.invalidateQueries({ queryKey: ['custom-field-definitions', entityType] });
+      if (entityId) void qc.invalidateQueries({ queryKey: ['custom-field-values', entityType, entityId] });
+    },
+    onError: (errorValue) => setError(messageFrom(errorValue, 'Unable to save custom field.'))
+  });
+
+  const saveValues = useMutation({
+    mutationFn: () => apiRequest(`/inventory-capabilities/custom-fields/${entityType}/${entityId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ values })
+    }),
+    onSuccess: () => {
+      setError(null);
+      void qc.invalidateQueries({ queryKey: ['custom-field-values', entityType, entityId] });
+    },
+    onError: (errorValue) => setError(messageFrom(errorValue, 'Unable to save custom values.'))
+  });
+
+  return (
+    <section className="section" style={panelStyle}>
+      <div className="section__title">Priority #4 — Tenant-configurable custom fields</div>
+      <div className="card">
+        <label>
+          Entity type
+          <select value={entityType} onChange={(event) => setEntityType(event.target.value as EntityType)}>
+            {(Object.keys(entityConfigs) as EntityType[]).map((key) => <option key={key} value={key}>{entityConfigs[key].label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="card">
+        <h3>Create a {config.label.toLowerCase()} field</h3>
+        <div style={formGridStyle}>
+          <label>Field key<input value={fieldKey} onChange={(event) => setFieldKey(event.target.value)} placeholder="country_of_origin" /></label>
+          <label>Label<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Country of origin" /></label>
+          <label>Type<select value={dataType} onChange={(event) => setDataType(event.target.value)}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes/No</option><option value="date">Date</option><option value="select">Select list</option></select></label>
+          {dataType === 'select' ? <label>Options<input value={options} onChange={(event) => setOptions(event.target.value)} placeholder="Croatia, Italy, Germany" /></label> : null}
+          <label><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label>
+          <button className="button" type="button" disabled={!canWrite || !fieldKey.trim() || !label.trim()} onClick={() => saveDefinition.mutate()}>Save field</button>
+        </div>
+        {!canWrite ? <div className="card__subtext">You have read access to these fields but not permission to change this entity type.</div> : null}
+        {error ? <div className="form-error">{error}</div> : null}
+      </div>
+      <div className="card">
+        <h3>Use fields on {config.plural}</h3>
+        <label>
+          {config.label}
+          <select value={entityId} onChange={(event) => setEntityId(event.target.value)}>
+            <option value="">Select…</option>
+            {config.rows.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+          </select>
+        </label>
+        {(entityValues.data || []).map((row) => (
+          <label key={row.definition_id} style={{ display: 'block', marginTop: 12 }}>
+            {row.label}{row.is_required ? ' *' : ''}
+            {row.data_type === 'boolean'
+              ? <input type="checkbox" checked={values[row.field_key] === true} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.checked })} />
+              : row.data_type === 'select'
+                ? <select value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })}><option value="">Select…</option>{(row.options || []).map((option) => <option key={option}>{option}</option>)}</select>
+                : <input type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
+          </label>
+        ))}
+        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId} onClick={() => saveValues.mutate()}>Save {config.label.toLowerCase()} custom fields</button>
+      </div>
+      <div className="card" style={tableWrapStyle}>
+        <table><thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Required</th></tr></thead><tbody>{(definitions.data || []).map((definition) => <tr key={definition.id}><td>{definition.field_key}</td><td>{definition.label}</td><td>{definition.data_type}</td><td>{definition.is_required ? 'Yes' : 'No'}</td></tr>)}</tbody></table>
+      </div>
+    </section>
+  );
 }
 
 function LandedCostPanel({ shipments, canWrite }: { shipments: Shipment[]; canWrite: boolean }) {
@@ -397,5 +565,5 @@ function BomPanel({ products, locations, canWrite, canExecute }: { products: Pro
 }
 
 function MobilePanel() {
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #9 — Offline mobile warehouse execution</div><div className="card"><div className="card__label">Operational mobile mode</div><h3>Mobile Execution now keeps a local task snapshot and queues task actions when offline.</h3><p className="card__subtext">Operators can start, complete, block or unblock execution tasks while disconnected. When the device is online again, queued actions are replayed through the normal backend task permissions and audit trail.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link className="button" to="/mobile-execution">Open Mobile Execution</Link><Link className="button button--secondary" to="/scanner">Open scanner</Link></div></div><div className="card"><div className="card__label">Installable web app foundation</div><p className="card__subtext">The web application also registers an offline service worker and application manifest, so supported phones/tablets can install it from the browser. Native Android/iOS store wrappers can use the same mobile workflow later without changing the inventory backend.</p><span style={badgeStyle}>Offline queue + server replay</span></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">Priority #9 — Offline mobile task execution</div><div className="card"><div className="card__label">Operational mobile mode</div><h3>Mobile Execution now keeps a local task snapshot and queues task actions when offline.</h3><p className="card__subtext">Operators can start, complete, block or unblock execution tasks while disconnected. When the device is online again, queued actions are replayed through the normal backend task permissions and audit trail. Stock-changing work such as receiving, transfers, counts and dispatch still requires connectivity so the app does not create conflicting offline inventory ledgers.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link className="button" to="/mobile-execution">Open Mobile Execution</Link><Link className="button button--secondary" to="/scanner">Open scanner</Link></div></div><div className="card"><div className="card__label">Installable web app foundation</div><p className="card__subtext">The web application also registers an offline service worker and application manifest, so supported phones/tablets can install it from the browser. Native Android/iOS store wrappers can use the same mobile workflow later without changing the inventory backend.</p><span style={badgeStyle}>Offline queue + server replay</span></div></section>;
 }

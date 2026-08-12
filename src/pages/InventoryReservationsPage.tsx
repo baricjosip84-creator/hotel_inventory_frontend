@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
+import ProductUomSelect from '../components/inventory/ProductUomSelect';
 
 
 type ReservationProductOption = Pick<ProductItem, 'id' | 'name' | 'unit' | 'barcode'> & {
@@ -151,6 +152,7 @@ type ReservationDraftLine = {
   product_id: string;
   storage_location_id: string;
   requested_quantity: string;
+  uom_code: string;
   allocation_strategy: string;
   allocation_note: string;
 };
@@ -205,6 +207,7 @@ const emptyLine = (): ReservationDraftLine => ({
   product_id: '',
   storage_location_id: '',
   requested_quantity: '',
+  uom_code: '',
   allocation_strategy: 'any_location',
   allocation_note: ''
 });
@@ -398,7 +401,8 @@ function buildDraftFromReservation(reservation: InventoryReservation): Reservati
   const items = (reservation.items || []).map((item) => ({
     product_id: item.product_id || '',
     storage_location_id: item.storage_location_id || '',
-    requested_quantity: String(item.requested_quantity ?? ''),
+    requested_quantity: String(item.entered_quantity ?? item.requested_quantity ?? ''),
+    uom_code: item.uom_code || '',
     allocation_strategy: item.allocation_strategy || (item.storage_location_id ? 'specific_location' : 'any_location'),
     allocation_note: item.allocation_note || ''
   }));
@@ -435,6 +439,7 @@ function buildCreatePayload(draft: ReservationDraft) {
         product_id: item.product_id.trim(),
         storage_location_id: item.storage_location_id.trim() || undefined,
         requested_quantity: Number(item.requested_quantity),
+        uom_code: item.uom_code || undefined,
         allocation_strategy: item.allocation_strategy,
         allocation_note: item.allocation_note.trim() || undefined
       }))
@@ -882,7 +887,7 @@ export default function InventoryReservationsPage() {
                 {draft.items.map((item, index) => (
                   <tr key={index}>
                     <td style={pageStyles.td}>
-                      <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateDraftLine(index, { product_id: event.target.value })}>
+                      <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateDraftLine(index, { product_id: event.target.value, uom_code: '' })}>
                         <option value="">{optionsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
                         {activeProducts.map((product) => (
                           <option key={product.id} value={product.id}>{getSelectedProductLabel(product)}</option>
@@ -898,6 +903,7 @@ export default function InventoryReservationsPage() {
                       </select>
                     </td>
                     <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateDraftLine(index, { requested_quantity: event.target.value })} /></td>
+                    <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`Unit of measure for reservation line ${index + 1}`} /></td>
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
                         <option value="specific_location">Specific location</option>
@@ -1146,7 +1152,7 @@ export default function InventoryReservationsPage() {
                       {editDraft.items.map((item, index) => (
                         <tr key={index}>
                           <td style={pageStyles.td}>
-                            <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateEditDraftLine(index, { product_id: event.target.value })}>
+                            <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateEditDraftLine(index, { product_id: event.target.value, uom_code: '' })}>
                               <option value="">{optionsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
                               {allProducts.map((product) => (
                                 <option key={product.id} value={product.id} disabled={!product.is_active && product.id !== item.product_id}>{getSelectedProductLabel(product)}</option>
@@ -1164,6 +1170,7 @@ export default function InventoryReservationsPage() {
                             {item.storage_location_id && !locationById.has(item.storage_location_id) ? <p style={pageStyles.muted}>Current location ID: {item.storage_location_id}</p> : null}
                           </td>
                           <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateEditDraftLine(index, { requested_quantity: event.target.value })} /></td>
+                          <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateEditDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`Unit of measure for reservation edit line ${index + 1}`} /></td>
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateEditDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
                               <option value="specific_location">Specific location</option>

@@ -60,6 +60,7 @@ export function CycleCountsTab({
           <InputField label="Lot number" value={cycleCountForm.lot_number} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, lot_number: value }))} disabled={!canCreateCycleCounts} />
           <InputField label="Batch number" value={cycleCountForm.batch_number} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, batch_number: value }))} disabled={!canCreateCycleCounts} />
           <InputField label="Expiry date" type="date" value={cycleCountForm.expiry_date} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, expiry_date: value }))} disabled={!canCreateCycleCounts} />
+          <label style={styles.label}>Serial numbers counted<textarea style={{ ...styles.input, minHeight: 90 }} value={cycleCountForm.serial_numbers} onChange={(event) => onCycleCountFormChange((current) => ({ ...current, serial_numbers: event.target.value }))} placeholder="One serial per line (required for serial-tracked counted stock)" disabled={!canCreateCycleCounts} /></label>
           <button type="submit" disabled={isCreatingCycleCount || !canCreateCycleCounts} style={isCreatingCycleCount || !canCreateCycleCounts ? styles.disabledButton : styles.primaryButton} title={!canCreateCycleCounts ? `Requires ${TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE} permission.` : undefined}>Create cycle count</button>
         </form>
 
@@ -74,6 +75,7 @@ export function CycleCountsTab({
           <InputField label="Batch number" value={stockAdjustmentForm.batch_number} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, batch_number: value }))} disabled={!canAdjustStock} />
           <InputField label="Manufactured date" type="date" value={stockAdjustmentForm.manufactured_at} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, manufactured_at: value }))} disabled={!canAdjustStock} />
           <InputField label="Expiry date" type="date" value={stockAdjustmentForm.expiry_date} onChange={(value) => onStockAdjustmentFormChange((current) => ({ ...current, expiry_date: value }))} disabled={!canAdjustStock} />
+          <label style={styles.label}>Serial numbers<textarea style={{ ...styles.input, minHeight: 90 }} value={stockAdjustmentForm.serial_numbers} onChange={(event) => onStockAdjustmentFormChange((current) => ({ ...current, serial_numbers: event.target.value }))} placeholder="One serial per line for serial-tracked adjustments" disabled={!canAdjustStock} /></label>
           <button type="submit" disabled={isAdjustingStock || !canAdjustStock} style={isAdjustingStock || !canAdjustStock ? styles.disabledButton : styles.primaryButton} title={!canAdjustStock ? `Requires ${TENANT_PERMISSIONS.STOCK_ADJUST} permission.` : undefined}>Post adjustment</button>
         </form>
       </div>

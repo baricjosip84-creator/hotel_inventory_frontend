@@ -45,7 +45,8 @@ export const emptyRequisitionForm: RequisitionForm = {
   priority: 'normal',
   notes: '',
   product_id: '',
-  requested_quantity: ''
+  requested_quantity: '',
+  uom_code: ''
 };
 
 export const emptyCycleCountForm: CycleCountForm = {
@@ -57,7 +58,8 @@ export const emptyCycleCountForm: CycleCountForm = {
   counted_quantity: '',
   lot_number: '',
   batch_number: '',
-  expiry_date: ''
+  expiry_date: '',
+  serial_numbers: ''
 };
 
 export const emptyStockAdjustmentForm: StockAdjustmentForm = {
@@ -68,7 +70,8 @@ export const emptyStockAdjustmentForm: StockAdjustmentForm = {
   lot_number: '',
   batch_number: '',
   expiry_date: '',
-  manufactured_at: ''
+  manufactured_at: '',
+  serial_numbers: ''
 };
 
 export const emptyStockTransferForm: StockTransferForm = {
@@ -76,6 +79,8 @@ export const emptyStockTransferForm: StockTransferForm = {
   to_storage_location_id: '',
   product_id: '',
   quantity: '',
+  uom_code: '',
+  serial_numbers: [],
   notes: ''
 };
 
