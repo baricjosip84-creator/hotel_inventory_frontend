@@ -11,6 +11,10 @@
     "src/pages/ReplenishmentPlanningPage.tsx",
     "src/pages/ProcurementRecommendationsPage.tsx",
     "src/pages/StockTransfersPage.tsx",
-    "src/pages/PurchaseOrdersPage.tsx"
+    "src/pages/PurchaseOrdersPage.tsx",
+    "src/pages/InventoryRequisitionsPage.tsx",
+    "src/pages/InventoryReservationsPage.tsx",
+    "src/pages/InventoryCapabilitiesPage.tsx",
+    "src/components/enterpriseInventory/tabs/RequisitionsTab.tsx"
   ]
 }

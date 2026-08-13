@@ -50,16 +50,24 @@ function formatRequisitionProducts(item: DepartmentRequisition): string {
 }
 
 function formatRequisitionQuantity(item: DepartmentRequisition): string {
+  const lines = item.items ?? [];
+  if (lines.length) {
+    return lines
+      .map((line) => {
+        const quantity = line.entered_quantity ?? line.requested_quantity;
+        if (quantity === null || quantity === undefined || quantity === '') return null;
+        const uom = line.uom_code || line.product_unit || '';
+        return `${formatNumber(quantity)}${uom ? ` ${uom}` : ''}`;
+      })
+      .filter((value): value is string => Boolean(value))
+      .join(', ') || '-';
+  }
+
   if (item.requested_quantity !== null && item.requested_quantity !== undefined && item.requested_quantity !== '') {
     return formatNumber(item.requested_quantity);
   }
 
-  const total = (item.items ?? []).reduce((sum, line) => {
-    const parsed = Number(line.requested_quantity ?? 0);
-    return Number.isFinite(parsed) ? sum + parsed : sum;
-  }, 0);
-
-  return total > 0 ? formatNumber(total) : '-';
+  return '-';
 }
 
 export function RequisitionsTab({

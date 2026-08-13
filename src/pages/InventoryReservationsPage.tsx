@@ -64,6 +64,8 @@ type ReservationItem = {
   storage_location_id?: string | null;
   storage_location_name?: string | null;
   requested_quantity?: number | string;
+  entered_quantity?: number | string | null;
+  uom_code?: string | null;
   reserved_quantity?: number | string;
   fulfilled_quantity?: number | string;
   released_quantity?: number | string;

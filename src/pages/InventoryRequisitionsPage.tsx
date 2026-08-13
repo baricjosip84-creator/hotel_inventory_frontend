@@ -59,6 +59,8 @@ type RequisitionItem = {
   requested_estimated_value?: number | string | null;
   remaining_estimated_value?: number | string | null;
   requested_quantity: number | string;
+  entered_quantity?: number | string | null;
+  uom_code?: string | null;
   fulfilled_quantity: number | string;
   remaining_quantity?: number | string;
   notes?: string | null;

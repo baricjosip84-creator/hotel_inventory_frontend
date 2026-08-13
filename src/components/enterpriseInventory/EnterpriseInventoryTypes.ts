@@ -31,7 +31,10 @@ export type DepartmentRequisitionItem = {
   id?: string;
   product_id?: string | null;
   product_name?: string | null;
+  product_unit?: string | null;
   requested_quantity?: number | string | null;
+  entered_quantity?: number | string | null;
+  uom_code?: string | null;
   approved_quantity?: number | string | null;
   fulfilled_quantity?: number | string | null;
 };
