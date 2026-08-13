@@ -18,7 +18,8 @@ type Connection = { id: string; system_name: string; system_type: string; base_u
 type WebhookSubscription = { id: string; subscription_key: string; display_name: string; event_types: string[]; destination_reference: string; signing_secret_prefix?: string | null; status: string; updated_at?: string };
 type WebhookDelivery = { id: string; subscription_id: string; subscription_name?: string | null; event_type: string; event_status: string; attempt_count: number; response_status?: number | null; error_message?: string | null; created_at: string; completed_at?: string | null };
 type TrackingSettings = { serial_tracking_enabled: boolean; serial_uniqueness_scope: 'product' | 'tenant'; require_serial_on_receipt: boolean; require_serial_on_issue: boolean };
-type SerialRecord = { id: string; serial_number: string; status: string; product_name: string; product_sku: string; storage_location_name?: string | null; updated_at?: string };
+type SerialRecord = { id: string; serial_number: string; status: string; product_name: string; product_sku: string; storage_location_name?: string | null; inventory_lot_id?: string | null; lot_number?: string | null; batch_number?: string | null; updated_at?: string };
+type SerialRegistrationLot = { id: string; product_id: string; storage_location_id: string; quantity: number | string; condition: string; lot_number?: string | null; batch_number?: string | null; expiry_date?: string | null };
 type UomRow = { id: string; uom_code: string; uom_name?: string | null; factor_to_base: number | string; rounding_scale: number; purchase_uom: boolean; issue_uom: boolean; barcode?: string | null };
 type UomResponse = { base_uom: string; conversions: UomRow[] };
 type CustomDefinition = { id: string; entity_type: string; field_key: string; label: string; data_type: string; is_required: boolean; options: string[]; is_active: boolean };
@@ -84,6 +85,7 @@ export default function InventoryCapabilitiesPage() {
   const canWritePurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_UPDATE);
   const canGovernIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN);
   const canAdjustStock = hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
+  const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
 
   const overviewQuery = useQuery({ queryKey: ['inventory-capabilities-overview'], queryFn: () => apiRequest<Overview>('/inventory-capabilities/overview') });
   const productsQuery = useQuery({ queryKey: ['inventory-capabilities-products'], queryFn: () => apiRequest<Product[]>('/products') });
@@ -123,7 +125,7 @@ export default function InventoryCapabilitiesPage() {
       </div>
 
       {tab === 'integrations' && <IntegrationsPanel canWrite={canGovernIntegrations} />}
-      {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} />}
+      {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWriteTracking={canWriteProducts} canReadStock={canReadStock} canRegisterSerial={canWriteProducts && canAdjustStock} />}
       {tab === 'uom' && <UomPanel products={productsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'custom-fields' && <CustomFieldsPanel
         products={productsQuery.data || []}
@@ -297,30 +299,58 @@ function ProductSelect({ products, value, onChange, label = 'Product' }: { produ
   return <label>{label}<select value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select…</option>{products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}</select></label>;
 }
 
-function SerialsPanel({ products, locations, canWrite }: { products: Product[]; locations: Location[]; canWrite: boolean }) {
+function SerialsPanel({ products, locations, canWriteTracking, canReadStock, canRegisterSerial }: { products: Product[]; locations: Location[]; canWriteTracking: boolean; canReadStock: boolean; canRegisterSerial: boolean }) {
   const qc = useQueryClient();
   const [productId, setProductId] = useState('');
   const [settings, setSettings] = useState<TrackingSettings>({ serial_tracking_enabled: false, serial_uniqueness_scope: 'product', require_serial_on_receipt: false, require_serial_on_issue: false });
   const [serialNumber, setSerialNumber] = useState('');
   const [locationId, setLocationId] = useState('');
-  const [status, setStatus] = useState('available');
+  const [inventoryLotId, setInventoryLotId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const settingsQuery = useQuery({ queryKey: ['tracking-settings', productId], enabled: Boolean(productId), queryFn: () => apiRequest<TrackingSettings>(`/inventory-capabilities/products/${productId}/tracking`) });
   useEffect(() => { if (settingsQuery.data) setSettings(settingsQuery.data); }, [settingsQuery.data]);
-  const serialsQuery = useQuery({ queryKey: ['inventory-serials', productId], queryFn: () => apiRequest<SerialRecord[]>(`/inventory-capabilities/serials${productId ? `?product_id=${encodeURIComponent(productId)}` : ''}`) });
+  const serialsQuery = useQuery({ queryKey: ['inventory-serials', productId], enabled: canReadStock, queryFn: () => apiRequest<SerialRecord[]>(`/inventory-capabilities/serials${productId ? `?product_id=${encodeURIComponent(productId)}` : ''}`) });
+  const lotsQuery = useQuery({
+    queryKey: ['serial-registration-lots', productId, locationId],
+    enabled: Boolean(canReadStock && productId && locationId && settings.serial_tracking_enabled),
+    queryFn: () => apiRequest<SerialRegistrationLot[]>(`/stock/lots?product_id=${encodeURIComponent(productId)}&storage_location_id=${encodeURIComponent(locationId)}&condition=available`)
+  });
   const saveSettings = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/products/${productId}/tracking`, { method: 'PUT', body: JSON.stringify(settings) }), onSuccess: () => { setError(null); void qc.invalidateQueries({ queryKey: ['tracking-settings', productId] }); }, onError: (e) => setError(messageFrom(e, 'Unable to save tracking settings.')) });
-  const addSerial = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/serials', { method: 'POST', body: JSON.stringify({ product_id: productId, serial_number: serialNumber, storage_location_id: locationId || null, status }) }), onSuccess: () => { setSerialNumber(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-serials'] }); }, onError: (e) => setError(messageFrom(e, 'Unable to create serial.')) });
+  const addSerial = useMutation({
+    mutationFn: () => apiRequest('/inventory-capabilities/serials', { method: 'POST', body: JSON.stringify({ product_id: productId, serial_number: serialNumber, storage_location_id: locationId, inventory_lot_id: inventoryLotId, status: 'available' }) }),
+    onSuccess: () => { setSerialNumber(''); setError(null); void Promise.all([qc.invalidateQueries({ queryKey: ['inventory-serials'] }), qc.invalidateQueries({ queryKey: ['serial-registration-lots'] })]); },
+    onError: (e) => setError(messageFrom(e, 'Unable to register serial against existing stock.'))
+  });
+
+  const changeProduct = (value: string) => {
+    setProductId(value);
+    setLocationId('');
+    setInventoryLotId('');
+  };
+  const changeLocation = (value: string) => {
+    setLocationId(value);
+    setInventoryLotId('');
+  };
+  const lotLabel = (lot: SerialRegistrationLot) => {
+    const identity = [lot.lot_number ? `Lot ${lot.lot_number}` : null, lot.batch_number ? `Batch ${lot.batch_number}` : null].filter(Boolean).join(' · ') || 'Unnumbered lot';
+    return `${identity} — ${Number(lot.quantity).toLocaleString()} on hand`;
+  };
 
   return <section className="section" style={panelStyle}><div className="section__title">Priority #2 — Optional serial-number tracking</div>
-    <div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={setProductId} />
-      <label><input type="checkbox" checked={settings.serial_tracking_enabled} onChange={(e) => setSettings({ ...settings, serial_tracking_enabled: e.target.checked })} disabled={!canWrite || !productId} /> Enable serial tracking</label>
-      <label>Uniqueness<select value={settings.serial_uniqueness_scope} onChange={(e) => setSettings({ ...settings, serial_uniqueness_scope: e.target.value as 'product' | 'tenant' })} disabled={!canWrite || !productId}><option value="product">Unique within product</option><option value="tenant">Unique across tenant</option></select></label>
-      <label><input type="checkbox" checked={settings.require_serial_on_receipt} onChange={(e) => setSettings({ ...settings, require_serial_on_receipt: e.target.checked })} disabled={!canWrite || !productId} /> Require on receipt</label>
-      <label><input type="checkbox" checked={settings.require_serial_on_issue} onChange={(e) => setSettings({ ...settings, require_serial_on_issue: e.target.checked })} disabled={!canWrite || !productId} /> Require on issue</label>
-      <div style={{ alignSelf: 'end' }}><button className="button" type="button" disabled={!canWrite || !productId} onClick={() => saveSettings.mutate()}>Save tracking</button></div>
+    <div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={changeProduct} />
+      <label><input type="checkbox" checked={settings.serial_tracking_enabled} onChange={(e) => setSettings({ ...settings, serial_tracking_enabled: e.target.checked })} disabled={!canWriteTracking || !productId} /> Enable serial tracking</label>
+      <label>Uniqueness<select value={settings.serial_uniqueness_scope} onChange={(e) => setSettings({ ...settings, serial_uniqueness_scope: e.target.value as 'product' | 'tenant' })} disabled={!canWriteTracking || !productId}><option value="product">Unique within product</option><option value="tenant">Unique across tenant</option></select></label>
+      <label><input type="checkbox" checked={settings.require_serial_on_receipt} onChange={(e) => setSettings({ ...settings, require_serial_on_receipt: e.target.checked })} disabled={!canWriteTracking || !productId} /> Require on receipt</label>
+      <label><input type="checkbox" checked={settings.require_serial_on_issue} onChange={(e) => setSettings({ ...settings, require_serial_on_issue: e.target.checked })} disabled={!canWriteTracking || !productId} /> Require on issue</label>
+      <div style={{ alignSelf: 'end' }}><button className="button" type="button" disabled={!canWriteTracking || !productId} onClick={() => saveSettings.mutate()}>Save tracking</button></div>
     </div>{error ? <div className="form-error">{error}</div> : null}</div>
-    <div className="card"><h3>Add serial</h3><form onSubmit={(e) => { e.preventDefault(); addSerial.mutate(); }} style={formGridStyle}><input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Serial number" disabled={!canWrite} /><select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">No location</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="available">Available</option><option value="reserved">Reserved</option><option value="quarantine">Quarantine</option><option value="damaged">Damaged</option><option value="issued">Issued</option></select><button className="button" disabled={!canWrite || !productId || !serialNumber.trim() || !settings.serial_tracking_enabled}>Add serial</button></form></div>
-    <div className="card" style={tableWrapStyle}><table><thead><tr><th>Serial</th><th>Product</th><th>Status</th><th>Location</th><th>Updated</th></tr></thead><tbody>{(serialsQuery.data || []).map((s) => <tr key={s.id}><td>{s.serial_number}</td><td>{s.product_sku} — {s.product_name}</td><td>{s.status}</td><td>{s.storage_location_name || '-'}</td><td>{formatDate(s.updated_at)}</td></tr>)}</tbody></table></div>
+    <div className="card"><h3>Register serial for existing stock</h3><p className="muted">This assigns a serial identity to an item that is already on hand. Choose the exact location and inventory lot. Reservation, issue, damage, quarantine and return states are changed only by their real inventory workflows.</p>{!canReadStock ? <div className="form-error">Stock read permission is required to view serial inventory.</div> : null}{canReadStock && !canRegisterSerial ? <div className="form-error">Product write and stock adjust permissions are required to register a serial against existing inventory.</div> : null}<form onSubmit={(e) => { e.preventDefault(); addSerial.mutate(); }} style={formGridStyle}>
+      <input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Serial number" disabled={!canRegisterSerial} />
+      <select value={locationId} onChange={(e) => changeLocation(e.target.value)} disabled={!canRegisterSerial || !productId}><option value="">Select stock location…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+      <select value={inventoryLotId} onChange={(e) => setInventoryLotId(e.target.value)} disabled={!canRegisterSerial || !locationId || lotsQuery.isLoading}><option value="">Select inventory lot…</option>{(lotsQuery.data || []).map((lot) => <option key={lot.id} value={lot.id}>{lotLabel(lot)}</option>)}</select>
+      <button className="button" disabled={!canRegisterSerial || !productId || !serialNumber.trim() || !locationId || !inventoryLotId || !settings.serial_tracking_enabled || addSerial.isPending}>{addSerial.isPending ? 'Registering…' : 'Register serial'}</button>
+    </form>{lotsQuery.isError ? <div className="form-error">{messageFrom(lotsQuery.error, 'Unable to load eligible inventory lots.')}</div> : null}{canReadStock && locationId && !lotsQuery.isLoading && !lotsQuery.isError && !(lotsQuery.data || []).length ? <div className="muted">No available on-hand lot exists at this location. Receive or count stock first; serial registration never creates quantity.</div> : null}</div>
+    {canReadStock ? <div className="card" style={tableWrapStyle}><table><thead><tr><th>Serial</th><th>Product</th><th>Status</th><th>Location</th><th>Lot / batch</th><th>Updated</th></tr></thead><tbody>{(serialsQuery.data || []).map((serial) => <tr key={serial.id}><td>{serial.serial_number}</td><td>{serial.product_sku} — {serial.product_name}</td><td>{serial.status}</td><td>{serial.storage_location_name || '-'}</td><td>{[serial.lot_number ? `Lot ${serial.lot_number}` : null, serial.batch_number ? `Batch ${serial.batch_number}` : null].filter(Boolean).join(' · ') || '-'}</td><td>{formatDate(serial.updated_at)}</td></tr>)}</tbody></table></div> : null}
   </section>;
 }
 
