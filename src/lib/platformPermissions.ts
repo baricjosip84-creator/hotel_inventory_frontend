@@ -468,17 +468,45 @@ export function clearPlatformPermissionSnapshot(): void {
   }
 }
 
+function isKnownPlatformRole(role: unknown): role is Exclude<PlatformRole, 'unknown'> {
+  return role === 'superadmin' || role === 'support' || role === 'platform_viewer' || role === 'support_l1' || role === 'support_l2' || role === 'security' || role === 'billing' || role === 'ops' || role === 'tenant_success' || role === 'readonly_audit';
+}
+
+function snapshotMatchesCurrentPlatformIdentity(snapshot: PlatformPermissionSnapshot | null): snapshot is PlatformPermissionSnapshot {
+  if (!snapshot) return false;
+  const payload = decodeJwtPayload(getPlatformAccessToken());
+  if (payload?.typ !== 'platform' || typeof payload.id !== 'string') return false;
+  return payload.id === snapshot.platform_user_id;
+}
+
 function cachedPlatformPermissions(role: PlatformRole): readonly PlatformPermission[] | null {
   if (role === 'unknown') return null;
-  const payload = decodeJwtPayload(getPlatformAccessToken());
   const snapshot = getPlatformPermissionSnapshot();
-  if (!snapshot || payload?.typ !== 'platform' || payload.role !== role || snapshot.role !== role) return null;
-  if (typeof payload.id === 'string' && payload.id !== snapshot.platform_user_id) return null;
+  if (!snapshotMatchesCurrentPlatformIdentity(snapshot) || snapshot.role !== role) return null;
   return snapshot.permissions;
 }
 
-export function getCurrentPlatformRoleFromToken(): PlatformRole { const payload = decodeJwtPayload(getPlatformAccessToken()); const role = payload?.role; if (payload?.typ !== 'platform') return 'unknown'; if (role === 'superadmin' || role === 'support' || role === 'platform_viewer' || role === 'support_l1' || role === 'support_l2' || role === 'security' || role === 'billing' || role === 'ops' || role === 'tenant_success' || role === 'readonly_audit') return role; return 'unknown'; }
-export function platformPermissionsForRole(role: PlatformRole = getCurrentPlatformRoleFromToken()): readonly PlatformPermission[] { if (role === 'unknown') return []; return cachedPlatformPermissions(role) || [...new Set(PLATFORM_ROLE_PERMISSIONS[role] || [])]; }
+export function getCurrentPlatformRoleFromToken(): PlatformRole {
+  const snapshot = getPlatformPermissionSnapshot();
+  if (snapshotMatchesCurrentPlatformIdentity(snapshot) && isKnownPlatformRole(snapshot.role)) {
+    return snapshot.role;
+  }
+
+  const payload = decodeJwtPayload(getPlatformAccessToken());
+  if (payload?.typ !== 'platform') return 'unknown';
+  return isKnownPlatformRole(payload.role) ? payload.role : 'unknown';
+}
+
+export function platformPermissionsForRole(role: PlatformRole = getCurrentPlatformRoleFromToken()): readonly PlatformPermission[] {
+  if (role === 'unknown') return [];
+  const cached = cachedPlatformPermissions(role);
+  if (cached) return cached;
+
+  const payload = decodeJwtPayload(getPlatformAccessToken());
+  if (payload?.typ === 'platform' && typeof payload.id === 'string') return [];
+
+  return [...new Set(PLATFORM_ROLE_PERMISSIONS[role] || [])];
+}
 export function hasPlatformPermission(permission: PlatformPermission, role: PlatformRole = getCurrentPlatformRoleFromToken()): boolean { return platformPermissionsForRole(role).includes(permission); }
 export function hasAllPlatformPermissions(permissions: PlatformPermission[], role: PlatformRole = getCurrentPlatformRoleFromToken()): boolean { return permissions.every((permission) => hasPlatformPermission(permission, role)); }
 export function hasAnyPlatformPermission(permissions: PlatformPermission[], role: PlatformRole = getCurrentPlatformRoleFromToken()): boolean { return permissions.some((permission) => hasPlatformPermission(permission, role)); }

@@ -328,7 +328,7 @@ export default function RoleAwareWorkspacePage() {
     defaultValue: 'all',
     allowedValues: URGENCY_FILTER_VALUES
   });
-  const accessRoleLabel = useMemo(() => getCurrentAccessRoleLabel(), []);
+  const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
   const canViewExecutionTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);

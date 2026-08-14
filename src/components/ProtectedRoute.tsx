@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { cloneElement, isValidElement, useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import type { TenantPermission, UserRole } from '../lib/permissions';
@@ -28,8 +28,8 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions, re
       }
 
       try {
-        await refreshTenantPermissionSnapshot();
-        if (isMounted) setStatus('allowed');
+        const permissionSnapshot = await refreshTenantPermissionSnapshot();
+        if (isMounted) setStatus(permissionSnapshot ? 'allowed' : 'denied');
       } catch {
         if (isMounted) setStatus('denied');
       }
@@ -67,5 +67,5 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions, re
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <>{children}</>;
+  return isValidElement(children) ? cloneElement(children) : <>{children}</>;
 }

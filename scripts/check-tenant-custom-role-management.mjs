@@ -192,7 +192,7 @@ assertIncludes(usersPage, [
 assertIncludes(permissionSnapshot, [
   'custom_role_id?: string | null',
   'access_role_label?: string | null',
-  'if (identity.customRoleId) return []',
+  'if (identity.tenantId || identity.userId) return []',
   'export function getCurrentAccessRoleLabel()'
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');

@@ -33,8 +33,9 @@ type ApiErrorResponse = {
 type PlatformMutationSafetyOptions = {
   /**
    * Reuse this when the UI owns a stable operation key for a logical mutation.
-   * When omitted, a fresh key is generated per platformApiRequest call and then
-   * reused for any internal auth-refresh retry of that same call.
+   * When omitted, the shared API layer keeps one key for identical in-flight
+   * writes and briefly retains it after an uncertain network outcome so a
+   * manual retry cannot repeat a committed platform operation.
    */
   idempotencyKey?: string;
   /**
@@ -81,6 +82,110 @@ function createIdempotencyKey(): string {
   }
 
   return `platform-idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/*
+  Platform logical-mutation idempotency.
+
+  The backend already accepts Idempotency-Key, but a fresh platformApiRequest
+  call used to generate a fresh key. If an admin repeated an action after the
+  network dropped after the server committed it, the retry could therefore be
+  treated as a new write. Identical JSON writes now share one key while they are
+  in flight and retain it only after an uncertain network-level outcome. Any
+  completed HTTP response clears the retained key so a later intentional repeat
+  remains a new operation.
+*/
+const PLATFORM_MUTATION_UNCERTAINTY_TTL_MS = 10 * 60 * 1000;
+
+type PlatformMutationKeyState = {
+  key: string;
+  count: number;
+};
+
+type PlatformUncertainMutationKeyState = {
+  key: string;
+  expiresAt: number;
+};
+
+const inFlightPlatformMutationKeys = new Map<string, PlatformMutationKeyState>();
+const uncertainPlatformMutationKeys = new Map<string, PlatformUncertainMutationKeyState>();
+
+function platformMutationRequestFingerprint(
+  path: string,
+  options: SafePlatformMutationRequestInit
+): string | null {
+  if (!isWriteRequest(options) || options.skipIdempotencyKey) return null;
+  if (isPlatformLoginRequest(path) || isPlatformRefreshRequest(path)) return null;
+
+  const headers = new Headers(options.headers || {});
+  if (options.idempotencyKey || headers.has('Idempotency-Key')) return null;
+
+  // Platform writes are JSON today. Do not guess for FormData/Blob/streams.
+  if (options.body !== undefined && typeof options.body !== 'string') return null;
+
+  const method = String(options.method || 'GET').toUpperCase();
+  const version = options.version !== undefined
+    ? String(options.version)
+    : (headers.get('If-Match-Version') || '');
+
+  return `${method}\n${path}\n${version}\n${typeof options.body === 'string' ? options.body : ''}`;
+}
+
+function pruneUncertainPlatformMutationKeys(now = Date.now()): void {
+  for (const [fingerprint, state] of uncertainPlatformMutationKeys.entries()) {
+    if (state.expiresAt <= now) uncertainPlatformMutationKeys.delete(fingerprint);
+  }
+}
+
+function preparePlatformLogicalMutationKey(
+  path: string,
+  options: SafePlatformMutationRequestInit
+): { options: SafePlatformMutationRequestInit; fingerprint: string | null; key: string | null } {
+  const fingerprint = platformMutationRequestFingerprint(path, options);
+  if (!fingerprint) return { options, fingerprint: null, key: null };
+
+  pruneUncertainPlatformMutationKeys();
+
+  const inFlight = inFlightPlatformMutationKeys.get(fingerprint);
+  const uncertain = uncertainPlatformMutationKeys.get(fingerprint);
+  const key = inFlight?.key || uncertain?.key || createIdempotencyKey();
+
+  if (inFlight) {
+    inFlight.count += 1;
+  } else {
+    inFlightPlatformMutationKeys.set(fingerprint, { key, count: 1 });
+  }
+
+  return {
+    options: { ...options, idempotencyKey: key },
+    fingerprint,
+    key
+  };
+}
+
+function releaseInFlightPlatformMutationKey(fingerprint: string | null, key: string | null): void {
+  if (!fingerprint || !key) return;
+  const current = inFlightPlatformMutationKeys.get(fingerprint);
+  if (!current || current.key !== key) return;
+
+  current.count -= 1;
+  if (current.count <= 0) inFlightPlatformMutationKeys.delete(fingerprint);
+}
+
+function markPlatformMutationOutcomeDefinite(fingerprint: string | null, key: string | null): void {
+  releaseInFlightPlatformMutationKey(fingerprint, key);
+  if (!fingerprint || !key) return;
+  const uncertain = uncertainPlatformMutationKeys.get(fingerprint);
+  if (uncertain?.key === key) uncertainPlatformMutationKeys.delete(fingerprint);
+}
+
+function markPlatformMutationOutcomeUncertain(fingerprint: string | null, key: string | null): void {
+  releaseInFlightPlatformMutationKey(fingerprint, key);
+  if (!fingerprint || !key) return;
+  uncertainPlatformMutationKeys.set(fingerprint, {
+    key,
+    expiresAt: Date.now() + PLATFORM_MUTATION_UNCERTAINTY_TTL_MS
+  });
 }
 
 function platformMutationActionLabel(path: string, method: string): string {
@@ -390,7 +495,8 @@ export async function platformApiRequest<T>(
   const isLoginRequest = isPlatformLoginRequest(path);
   const isRefreshRequest = isPlatformRefreshRequest(path);
   const isCsrfRequest = isPlatformCsrfRequest(path);
-  const requestOptions = withPlatformMutationSafetyHeaders(path, options);
+  const logicalMutation = preparePlatformLogicalMutationKey(path, options);
+  const requestOptions = withPlatformMutationSafetyHeaders(path, logicalMutation.options);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
   const shouldShowMutationFeedback = isWriteRequest(requestOptions) && !isLoginRequest && !isRefreshRequest && !isCsrfRequest && !options.skipMutationFeedback;
 
@@ -411,6 +517,7 @@ export async function platformApiRequest<T>(
   try {
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: unknown) {
+    markPlatformMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
     const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
     captureApiFailure({ area: 'platform', path, method, status: 0, error });
     if (shouldShowMutationFeedback) {
@@ -426,6 +533,7 @@ export async function platformApiRequest<T>(
       try {
         ({ response } = await performRequest(path, requestOptions));
       } catch (error: unknown) {
+        markPlatformMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
         const message = platformNetworkErrorMessage(error, 'Network error while contacting backend');
         if (shouldShowMutationFeedback) {
           dispatchPlatformMutationFeedback({ type: 'error', message });
@@ -437,11 +545,18 @@ export async function platformApiRequest<T>(
 
   try {
     const result = await parseResponse<T>(response);
+    markPlatformMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
     if (shouldShowMutationFeedback) {
       dispatchPlatformMutationFeedback({ type: 'success', message: platformMutationSuccessMessage(path, method) });
     }
     return result;
   } catch (error) {
+    if (error instanceof ApiError) {
+      markPlatformMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
+    } else {
+      markPlatformMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
+    }
+
     captureApiFailure({
       area: 'platform',
       path,

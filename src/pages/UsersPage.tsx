@@ -7,7 +7,7 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 
 type UserRole = 'admin' | 'manager' | 'staff';
-type RoleSelection = UserRole | `custom:${string}`;
+type RoleSelection = '' | UserRole | `custom:${string}`;
 
 type UserItem = {
   id: string;
@@ -51,12 +51,15 @@ function emptyForm(): UserFormState {
   return {
     name: '',
     email: '',
-    roleSelection: 'staff',
+    roleSelection: '',
     password: ''
   };
 }
 
 function rolePayload(selection: RoleSelection): { role: UserRole; custom_role_id: string | null } {
+  if (!selection) {
+    throw new Error('Role selection is required');
+  }
   if (selection.startsWith('custom:')) {
     return { role: 'staff', custom_role_id: selection.slice('custom:'.length) };
   }
@@ -313,6 +316,7 @@ export default function UsersPage() {
     normalizedEmail.includes('@') &&
     normalizedEmail.includes('.') &&
     passwordReady &&
+    form.roleSelection &&
     !roleOptionsQuery.isLoading
   );
 
@@ -526,6 +530,7 @@ export default function UsersPage() {
                 }
                 disabled={!canWrite || roleOptionsQuery.isLoading || Boolean(editingUser && currentUserId && editingUser.id === currentUserId)}
               >
+                {!editingUser ? <option value="">Select a role…</option> : null}
                 <optgroup label="Built-in roles">
                   {(roleOptionsQuery.data?.built_in_roles || [
                     { key: 'staff', role: 'staff', label: 'Staff', kind: 'built_in' as const },
@@ -544,6 +549,7 @@ export default function UsersPage() {
                 ) : null}
               </select>
               {editingUser && currentUserId && editingUser.id === currentUserId ? <small style={styles.fieldHelp}>Your own role assignment cannot be changed from this form.</small> : null}
+              {!editingUser ? <small style={styles.fieldHelp}>Choose access deliberately. Use a custom role when this employee needs narrower job-specific access than the built-in Staff role.</small> : null}
               {roleOptionsQuery.isError ? <small style={styles.fieldHelp}>Custom roles could not be loaded. Built-in roles remain available.</small> : null}
             </div>
 

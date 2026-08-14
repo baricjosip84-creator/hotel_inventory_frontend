@@ -42,13 +42,15 @@ export const TENANT_PERMISSIONS = Object.freeze({
   INVENTORY_REQUISITIONS_SUBMIT: 'inventory_requisitions.submit',
   INVENTORY_REQUISITIONS_APPROVE: 'inventory_requisitions.approve',
   INVENTORY_REQUISITIONS_FULFILL: 'inventory_requisitions.fulfill',
-  INVENTORY_REQUISITIONS_CANCEL: 'inventory_requisitions.cancel',
+  INVENTORY_REQUISITIONS_CANCEL_OWN: 'inventory_requisitions.cancel_own',
+  INVENTORY_REQUISITIONS_CANCEL_ANY: 'inventory_requisitions.cancel_any',
   INVENTORY_RESERVATIONS_READ: 'inventory_reservations.read',
   INVENTORY_RESERVATIONS_CREATE: 'inventory_reservations.create',
   INVENTORY_RESERVATIONS_ALLOCATE: 'inventory_reservations.allocate',
   INVENTORY_RESERVATIONS_FULFILL: 'inventory_reservations.fulfill',
   INVENTORY_RESERVATIONS_RELEASE: 'inventory_reservations.release',
-  INVENTORY_RESERVATIONS_CANCEL: 'inventory_reservations.cancel',
+  INVENTORY_RESERVATIONS_CANCEL_OWN: 'inventory_reservations.cancel_own',
+  INVENTORY_RESERVATIONS_CANCEL_ANY: 'inventory_reservations.cancel_any',
   INVENTORY_RESERVATIONS_EXPIRE: 'inventory_reservations.expire',
   PURCHASE_ORDERS_READ: 'purchase_orders.read',
   PURCHASE_ORDERS_CREATE: 'purchase_orders.create',
@@ -206,7 +208,6 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'unknown'>, readonly Ten
     TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ,
     TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE,
     TENANT_PERMISSIONS.STOCK_READ,
-    TENANT_PERMISSIONS.STOCK_CONSUME,
     TENANT_PERMISSIONS.STOCK_COUNT,
     TENANT_PERMISSIONS.STOCK_ADJUST,
     TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ,
@@ -216,8 +217,6 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'unknown'>, readonly Ten
     TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE,
     TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL,
     TENANT_PERMISSIONS.INVENTORY_USAGE_READ,
-    TENANT_PERMISSIONS.INVENTORY_USAGE_RECORD,
-    TENANT_PERMISSIONS.INVENTORY_USAGE_BULK_RECORD,
     TENANT_PERMISSIONS.INVENTORY_USAGE_REVERSE,
     TENANT_PERMISSIONS.INVENTORY_USAGE_REVIEW,
     TENANT_PERMISSIONS.INVENTORY_USAGE_CLOSE_PERIOD,
@@ -228,13 +227,15 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'unknown'>, readonly Ten
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_SUBMIT,
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_APPROVE,
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_FULFILL,
-    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL,
+    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_OWN,
+    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CREATE,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_ALLOCATE,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_FULFILL,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_RELEASE,
-    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL,
+    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_OWN,
+    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_EXPIRE,
     TENANT_PERMISSIONS.PURCHASE_ORDERS_READ,
     TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE,
@@ -377,13 +378,15 @@ export const ROLE_PERMISSIONS: Record<Exclude<UserRole, 'unknown'>, readonly Ten
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_SUBMIT,
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_APPROVE,
     TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_FULFILL,
-    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL,
+    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_OWN,
+    TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CREATE,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_ALLOCATE,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_FULFILL,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_RELEASE,
-    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL,
+    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_OWN,
+    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY,
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_EXPIRE,
     TENANT_PERMISSIONS.PURCHASE_ORDERS_READ,
     TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE,
@@ -701,17 +704,35 @@ export function clearTenantPermissionSnapshot(): void {
   }
 }
 
-function cachedPermissionsForCurrentRole(role: UserRole): readonly TenantPermission[] | null {
+function snapshotMatchesCurrentTenantIdentity(snapshot: TenantPermissionSnapshot | null): snapshot is TenantPermissionSnapshot {
+  if (!snapshot) return false;
   const identity = currentTenantIdentity();
+  if (!identity.tenantId || identity.tenantId !== snapshot.tenant_id) return false;
+  if (identity.userId && snapshot.user_id && identity.userId !== snapshot.user_id) return false;
+  return true;
+}
+
+function cachedPermissionsForCurrentRole(role: UserRole): readonly TenantPermission[] | null {
   const snapshot = getTenantPermissionSnapshot();
-  if (!snapshot || role === 'unknown') return null;
-  if (identity.role !== role || identity.tenantId !== snapshot.tenant_id || snapshot.role !== role) return null;
-  if ((snapshot.custom_role_id || null) !== identity.customRoleId) return null;
-  if (identity.userId && snapshot.user_id && identity.userId !== snapshot.user_id) return null;
+  if (!snapshotMatchesCurrentTenantIdentity(snapshot) || role === 'unknown') return null;
+
+  /*
+    The permission snapshot comes from /permissions/me after backend auth has
+    reloaded the user's current database role/custom role. The JWT can therefore
+    be older than the current role until the next access-token refresh. Do not
+    reject the authoritative snapshot merely because those token claims are
+    stale; tenant + user identity is the stable boundary that must match.
+  */
+  if (snapshot.role !== role) return null;
   return snapshot.permissions;
 }
 
 export function getCurrentUserRole(): UserRole {
+  const snapshot = getTenantPermissionSnapshot();
+  if (snapshotMatchesCurrentTenantIdentity(snapshot) && isKnownUserRole(snapshot.role)) {
+    return snapshot.role;
+  }
+
   const payload = decodeJwtPayload(getAccessToken());
   const role = payload?.role;
 
@@ -721,12 +742,14 @@ export function getCurrentUserRole(): UserRole {
 export function getCurrentAccessRoleLabel(): string {
   const snapshot = getTenantPermissionSnapshot();
 
-  if (snapshot?.access_role_label?.trim()) {
-    return snapshot.access_role_label.trim();
-  }
+  if (snapshotMatchesCurrentTenantIdentity(snapshot)) {
+    if (snapshot.access_role_label?.trim()) {
+      return snapshot.access_role_label.trim();
+    }
 
-  if (snapshot?.custom_role_name?.trim()) {
-    return snapshot.custom_role_name.trim();
+    if (snapshot.custom_role_name?.trim()) {
+      return snapshot.custom_role_name.trim();
+    }
   }
 
   const payload = decodeJwtPayload(getAccessToken());
@@ -742,8 +765,17 @@ export function permissionsForRole(role: UserRole = getCurrentUserRole()): reado
   if (isKnownUserRole(role)) {
     const cached = cachedPermissionsForCurrentRole(role);
     if (cached) return cached;
+
+    /*
+      Once an authenticated tenant identity exists, effective permissions must
+      come from /permissions/me. Falling back to built-in role defaults after a
+      transient snapshot failure can make the UI appear more permissive than
+      the backend's current database policy. Fail closed until the authoritative
+      snapshot is available again.
+    */
     const identity = currentTenantIdentity();
-    if (identity.customRoleId) return [];
+    if (identity.tenantId || identity.userId) return [];
+
     return [...new Set(ROLE_PERMISSIONS[role])];
   }
 
@@ -817,13 +849,17 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canSubmitInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_SUBMIT),
     canApproveInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_APPROVE),
     canFulfillInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_FULFILL),
-    canCancelInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL),
+    canCancelOwnInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_OWN),
+    canCancelAnyInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY),
+    canCancelInventoryRequisitions: can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_OWN) || can(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY),
     canViewInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ),
     canCreateInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CREATE),
     canAllocateInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_ALLOCATE),
     canFulfillInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_FULFILL),
     canReleaseInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_RELEASE),
-    canCancelInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL),
+    canCancelOwnInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_OWN),
+    canCancelAnyInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY),
+    canCancelInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_OWN) || can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY),
     canExpireInventoryReservations: can(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_EXPIRE),
     canViewStockTransfers: can(TENANT_PERMISSIONS.STOCK_TRANSFERS_READ),
     canCreateStockTransfers: can(TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE),

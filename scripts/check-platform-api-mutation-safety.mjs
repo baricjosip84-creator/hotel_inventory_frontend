@@ -13,7 +13,8 @@ const requiredSnippets = [
   "headers.set('Idempotency-Key', idempotencyKey || createIdempotencyKey());",
   'export async function platformApiMutationRequest',
   "'platformApiMutationRequest requires POST, PUT, PATCH, or DELETE.'",
-  'const requestOptions = withPlatformMutationSafetyHeaders(path, options);',
+  'const logicalMutation = preparePlatformLogicalMutationKey(path, options);',
+  'const requestOptions = withPlatformMutationSafetyHeaders(path, logicalMutation.options);',
   '({ response, accessTokenUsed } = await performRequest(path, requestOptions));'
 ];
 

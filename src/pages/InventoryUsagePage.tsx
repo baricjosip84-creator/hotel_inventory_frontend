@@ -915,8 +915,8 @@ export default function InventoryUsagePage() {
     usageOptionsQuery,
   ].some((query) => query.isFetching);
 
-  const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;
-  const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
+  const canRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canRecordInventoryUsage;
+  const canBulkRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
 
   return (
     <InventoryUsageDashboard

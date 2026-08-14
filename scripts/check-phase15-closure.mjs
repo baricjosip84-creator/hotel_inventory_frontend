@@ -72,9 +72,9 @@ const requiredLayoutSignals = [
   'getTenantModuleForPathname',
   'getTenantPageMeta',
   'getTenantAccessSnapshot',
-  'moduleMetaRow',
-  'Permission-aware workspace',
-  'Tenant access'
+  'Inventory Operations',
+  "tenantSubscriptionAccess?.tenant.name || 'Company workspace'",
+  'getCurrentAccessRoleLabel'
 ];
 
 for (const signal of requiredLayoutSignals) {

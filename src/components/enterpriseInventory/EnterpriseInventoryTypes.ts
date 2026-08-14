@@ -1170,6 +1170,8 @@ export type PurchaseOrder = {
   currency?: string | null;
   status: string;
   expected_delivery_date?: string | null;
+  created_by_user_id?: string | null;
+  require_separate_purchase_order_approver?: boolean;
   created_at: string;
   version: number | string;
   item_count?: number | string | null;

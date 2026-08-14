@@ -290,7 +290,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/automation-schedules',
         label: 'Automation Schedules',
-        description: 'Configure future scheduled checks. Runner is disabled and nothing executes automatically yet.',
+        description: 'Configure governed scheduled checks, review runner readiness, and manage manual or enabled execution safely.',
         section: 'Execution workflow',
         permission: TENANT_PERMISSIONS.AUTOMATION_SCHEDULES_VIEW
       }
@@ -444,7 +444,7 @@ export function searchTenantModules(query: string): TenantModuleRegistryEntry[] 
 
 const defaultPageMeta: TenantPageMeta = {
   title: 'Inventory Management',
-  subtitle: 'Frontend connected to your production-ready backend'
+  subtitle: 'Manage your company inventory and day-to-day operations.'
 };
 
 export function getTenantPageMeta(pathname: string): TenantPageMeta {

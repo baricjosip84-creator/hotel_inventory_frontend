@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
 import CopyrightNotice from '../components/CopyrightNotice';
+import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
@@ -15,6 +16,33 @@ export default function PlatformLayout() {
     const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
     window.addEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
     return () => window.removeEventListener(PLATFORM_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+  }, []);
+
+
+  useEffect(() => {
+    const refreshPermissions = () => {
+      void refreshPlatformPermissionSnapshot();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshPermissions();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.key === 'inventory_platform_effective_permissions' ||
+        event.key === 'inventory_platform_access_token'
+      ) {
+        refreshPermissions();
+      }
+    };
+
+    window.addEventListener('focus', refreshPermissions);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', refreshPermissions);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   const forcePageScrollTop = () => {

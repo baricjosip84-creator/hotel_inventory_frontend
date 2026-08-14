@@ -31,16 +31,16 @@ type Variant = { id: string; parent_product_id: string; parent_product_name: str
 type BomComponent = { id?: string; component_product_id?: string; product_id?: string; component_name?: string; component_sku?: string; quantity: number | string; waste_percent?: number | string };
 type Bom = { id: string; product_id: string; product_name: string; product_sku: string; name: string; output_quantity: number | string; is_active: boolean; components: BomComponent[] };
 
-const TABS: Array<{ key: TabKey; label: string; number: number; countKey: string }> = [
-  { key: 'integrations', label: 'APIs & integrations', number: 1, countKey: 'api_clients' },
-  { key: 'serials', label: 'Serial tracking', number: 2, countKey: 'active_serials' },
-  { key: 'uom', label: 'Units of measure', number: 3, countKey: 'uom_conversions' },
-  { key: 'custom-fields', label: 'Custom fields', number: 4, countKey: 'custom_fields' },
-  { key: 'landed-cost', label: 'Landed cost', number: 5, countKey: 'landed_cost_documents' },
-  { key: 'variants', label: 'Variants', number: 6, countKey: 'variants' },
-  { key: 'hierarchy', label: 'Location hierarchy', number: 7, countKey: 'hierarchical_locations' },
-  { key: 'bom', label: 'BOM & assemblies', number: 8, countKey: 'active_boms' },
-  { key: 'mobile', label: 'Offline task mode', number: 9, countKey: 'mobile_sync_batches' }
+const TABS: Array<{ key: TabKey; label: string; countKey: string }> = [
+  { key: 'integrations', label: 'APIs & integrations', countKey: 'api_clients' },
+  { key: 'serials', label: 'Serial tracking', countKey: 'active_serials' },
+  { key: 'uom', label: 'Units of measure', countKey: 'uom_conversions' },
+  { key: 'custom-fields', label: 'Custom fields', countKey: 'custom_fields' },
+  { key: 'landed-cost', label: 'Landed cost', countKey: 'landed_cost_documents' },
+  { key: 'variants', label: 'Variants', countKey: 'variants' },
+  { key: 'hierarchy', label: 'Location hierarchy', countKey: 'hierarchical_locations' },
+  { key: 'bom', label: 'BOM & assemblies', countKey: 'active_boms' },
+  { key: 'mobile', label: 'Offline task mode', countKey: 'mobile_sync_batches' }
 ];
 
 const panelStyle: CSSProperties = { display: 'grid', gap: 16 };
@@ -77,39 +77,62 @@ function asNumber(value: string): number {
 
 export default function InventoryCapabilitiesPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<TabKey>('integrations');
+  const [tab, setTab] = useState<TabKey>('serials');
+
   const canWriteProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_WRITE);
+  const canReadSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
   const canWriteSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_WRITE);
+  const canReadLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ);
   const canWriteLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE);
+  const canReadShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
   const canWriteShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_WRITE);
+  const canReadPurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ);
   const canWritePurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_UPDATE);
+  const canReadIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_READ);
   const canGovernIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN);
   const canAdjustStock = hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
   const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
+  const canUseMobileExecution = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+  const canOpenScanner = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
+
+  const visibleTabs = useMemo(() => TABS.filter((item) => {
+    if (item.key === 'integrations') return canReadIntegrations;
+    if (item.key === 'landed-cost') return canReadShipments;
+    if (item.key === 'hierarchy') return canReadLocations;
+    if (item.key === 'mobile') return canUseMobileExecution;
+    return true;
+  }), [canReadIntegrations, canReadLocations, canReadShipments, canUseMobileExecution]);
+
+  useEffect(() => {
+    if (!visibleTabs.some((item) => item.key === tab)) {
+      setTab(visibleTabs[0]?.key || 'serials');
+    }
+  }, [tab, visibleTabs]);
 
   const overviewQuery = useQuery({ queryKey: ['inventory-capabilities-overview'], queryFn: () => apiRequest<Overview>('/inventory-capabilities/overview') });
   const productsQuery = useQuery({ queryKey: ['inventory-capabilities-products'], queryFn: () => apiRequest<Product[]>('/products') });
-  const locationsQuery = useQuery({ queryKey: ['inventory-capabilities-locations'], queryFn: () => apiRequest<Location[]>('/storage-locations') });
-  const shipmentsQuery = useQuery({ queryKey: ['inventory-capabilities-shipments'], queryFn: () => apiRequest<Shipment[]>('/shipments') });
-  const suppliersQuery = useQuery({ queryKey: ['inventory-capabilities-suppliers'], enabled: hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ), queryFn: () => apiRequest<SupplierRef[]>('/suppliers') });
-  const purchaseOrdersQuery = useQuery({ queryKey: ['inventory-capabilities-purchase-orders'], enabled: hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ), queryFn: () => apiRequest<PurchaseOrderRef[]>('/purchase-orders') });
+  const locationsQuery = useQuery({ queryKey: ['inventory-capabilities-locations'], enabled: canReadLocations, queryFn: () => apiRequest<Location[]>('/storage-locations') });
+  const shipmentsQuery = useQuery({ queryKey: ['inventory-capabilities-shipments'], enabled: canReadShipments, queryFn: () => apiRequest<Shipment[]>('/shipments') });
+  const suppliersQuery = useQuery({ queryKey: ['inventory-capabilities-suppliers'], enabled: canReadSuppliers, queryFn: () => apiRequest<SupplierRef[]>('/suppliers') });
+  const purchaseOrdersQuery = useQuery({ queryKey: ['inventory-capabilities-purchase-orders'], enabled: canReadPurchaseOrders, queryFn: () => apiRequest<PurchaseOrderRef[]>('/purchase-orders') });
 
   const counts = overviewQuery.data?.counts || {};
 
   return (
     <div style={panelStyle}>
       <section className="section">
-        <div className="section__title">Advanced inventory capabilities</div>
+        <div className="section__title">Advanced inventory</div>
         <div className="card">
           <p className="card__subtext" style={{ marginTop: 0 }}>
-            These are the nine enterprise inventory capabilities added on top of the existing Products, Stock, Shipments, Purchasing and Execution workflows.
+            Configure the advanced inventory features available to your role. Sections you cannot access are hidden automatically.
           </p>
           <div className="card-grid">
-            {TABS.map((item) => (
+            {visibleTabs.map((item) => (
               <button key={item.key} type="button" className="card" onClick={() => setTab(item.key)} style={{ textAlign: 'left', cursor: 'pointer' }}>
-                <div className="card__label">Priority #{item.number}</div>
-                <div className="card__value" style={{ fontSize: 19 }}>{item.label}</div>
-                <div className="card__subtext">{`${String(counts[item.countKey] ?? 0)} configured / recorded`}</div>
+                <div className="card__label">{item.label}</div>
+                <div className="card__value" style={{ fontSize: 19 }}>{String(counts[item.countKey] ?? 0)}</div>
+                <div className="card__subtext">Configured / recorded</div>
               </button>
             ))}
           </div>
@@ -117,15 +140,15 @@ export default function InventoryCapabilitiesPage() {
       </section>
 
       <div style={tabRowStyle}>
-        {TABS.map((item) => (
+        {visibleTabs.map((item) => (
           <button key={item.key} className={tab === item.key ? 'button' : 'button button--secondary'} type="button" onClick={() => setTab(item.key)}>
-            {item.number}. {item.label}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {tab === 'integrations' && <IntegrationsPanel canWrite={canGovernIntegrations} />}
-      {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWriteTracking={canWriteProducts} canReadStock={canReadStock} canRegisterSerial={canWriteProducts && canAdjustStock} />}
+      {tab === 'integrations' && canReadIntegrations && <IntegrationsPanel canWrite={canGovernIntegrations} />}
+      {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWriteTracking={canWriteProducts} canReadStock={canReadStock} canRegisterSerial={canWriteProducts && canAdjustStock && canReadLocations} />}
       {tab === 'uom' && <UomPanel products={productsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'custom-fields' && <CustomFieldsPanel
         products={productsQuery.data || []}
@@ -133,13 +156,14 @@ export default function InventoryCapabilitiesPage() {
         locations={locationsQuery.data || []}
         shipments={shipmentsQuery.data || []}
         purchaseOrders={purchaseOrdersQuery.data || []}
+        readPermissions={{ product: true, supplier: canReadSuppliers, storage_location: canReadLocations, shipment: canReadShipments, purchase_order: canReadPurchaseOrders }}
         writePermissions={{ product: canWriteProducts, supplier: canWriteSuppliers, storage_location: canWriteLocations, shipment: canWriteShipments, purchase_order: canWritePurchaseOrders }}
       />}
-      {tab === 'landed-cost' && <LandedCostPanel shipments={shipmentsQuery.data || []} canWrite={canWriteProducts} />}
+      {tab === 'landed-cost' && canReadShipments && <LandedCostPanel shipments={shipmentsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'variants' && <VariantsPanel products={productsQuery.data || []} canWrite={canWriteProducts} onChanged={() => queryClient.invalidateQueries({ queryKey: ['inventory-capabilities-products'] })} />}
-      {tab === 'hierarchy' && <HierarchyPanel locations={locationsQuery.data || []} canWrite={canWriteLocations} />}
-      {tab === 'bom' && <BomPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} canExecute={canAdjustStock} />}
-      {tab === 'mobile' && <MobilePanel />}
+      {tab === 'hierarchy' && canReadLocations && <HierarchyPanel locations={locationsQuery.data || []} canWrite={canWriteLocations} />}
+      {tab === 'bom' && <BomPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} canExecute={canAdjustStock && canReadLocations} />}
+      {tab === 'mobile' && canUseMobileExecution && <MobilePanel canOpenScanner={canOpenScanner} />}
     </div>
   );
 }
@@ -230,7 +254,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
 
   return (
     <section className="section" style={panelStyle}>
-      <div className="section__title">Priority #1 — APIs & integrations</div>
+      <div className="section__title">APIs & integrations</div>
       <div className="card">
         <div className="card__label">Public API</div>
         <h3>Let another system talk to this inventory app</h3>
@@ -251,7 +275,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         </form>
         <div style={tableWrapStyle}>
           <table><thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Last used</th><th>Status</th><th /></tr></thead><tbody>
-            {(clients.data || []).map((client) => <tr key={client.id}><td>{client.name}</td><td>{client.key_prefix}</td><td>{client.scopes?.join(', ')}</td><td>{formatDate(client.last_used_at)}</td><td>{client.status}</td><td>{client.status === 'active' && canWrite ? <button className="button button--secondary" type="button" onClick={() => revokeClient.mutate(client.id)}>Revoke</button> : null}</td></tr>)}
+            {(clients.data || []).map((client) => <tr key={client.id}><td>{client.name}</td><td>{client.key_prefix}</td><td>{client.scopes?.join(', ')}</td><td>{formatDate(client.last_used_at)}</td><td>{client.status}</td><td>{client.status === 'active' && canWrite ? <button className="button button--secondary" type="button" disabled={revokeClient.isPending} onClick={() => revokeClient.mutate(client.id)}>{revokeClient.isPending ? 'Revoking…' : 'Revoke'}</button> : null}</td></tr>)}
           </tbody></table>
         </div>
       </div>
@@ -259,7 +283,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
       <div className="card">
         <div className="card__label">Automatic outbound notifications</div>
         <h3>Webhooks</h3>
-        <p className="card__subtext">Another system can give this app an HTTPS address. When a subscribed inventory action happens, the backend queues a signed notification and retries failed deliveries automatically. Use exact audit event names, or <strong>*</strong> for every tenant audit event.</p>
+        <p className="card__subtext">Another system can give this app an HTTPS address. When a subscribed inventory action happens, the app queues a signed notification and retries failed deliveries automatically. Use exact audit event names, or <strong>*</strong> for every tenant audit event.</p>
         {revealedWebhookSecret ? <div className="form-success"><strong>Copy this signing secret now. It is only shown once:</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedWebhookSecret}</code></div> : null}
         {webhookMessage ? <div className="form-success">{webhookMessage}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); createWebhook.mutate(); }} style={formGridStyle}>
@@ -269,7 +293,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
           <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !webhookName.trim() || !webhookUrl.trim() || !webhookEvents.trim() || createWebhook.isPending}>Create webhook</button></div>
         </form>
         <div style={tableWrapStyle}><table><thead><tr><th>Name</th><th>Destination</th><th>Events</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-          {(webhooks.data || []).map((row) => <tr key={row.id}><td>{row.display_name}</td><td style={{ maxWidth: 320, wordBreak: 'break-all' }}>{row.destination_reference}</td><td>{row.event_types.join(', ')}</td><td>{row.status}</td><td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canWrite ? <><button className="button button--secondary" type="button" onClick={() => testWebhook.mutate(row.id)}>Test</button><button className="button button--secondary" type="button" onClick={() => rotateWebhook.mutate(row.id)}>Rotate secret</button><button className="button button--secondary" type="button" onClick={() => changeWebhookStatus.mutate({ id: row.id, status: row.status === 'configured' ? 'disabled' : 'configured' })}>{row.status === 'configured' ? 'Disable' : 'Enable'}</button></> : null}</div></td></tr>)}
+          {(webhooks.data || []).map((row) => <tr key={row.id}><td>{row.display_name}</td><td style={{ maxWidth: 320, wordBreak: 'break-all' }}>{row.destination_reference}</td><td>{row.event_types.join(', ')}</td><td>{row.status}</td><td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canWrite ? <><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending} onClick={() => testWebhook.mutate(row.id)}>{testWebhook.isPending ? 'Testing…' : 'Test'}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending} onClick={() => rotateWebhook.mutate(row.id)}>{rotateWebhook.isPending ? 'Rotating…' : 'Rotate secret'}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending} onClick={() => changeWebhookStatus.mutate({ id: row.id, status: row.status === 'configured' ? 'disabled' : 'configured' })}>{changeWebhookStatus.isPending ? 'Saving…' : row.status === 'configured' ? 'Disable' : 'Enable'}</button></> : null}</div></td></tr>)}
         </tbody></table></div>
         <h4>Recent delivery attempts</h4>
         <div style={tableWrapStyle}><table><thead><tr><th>Webhook</th><th>Event</th><th>Status</th><th>Attempts</th><th>HTTP</th><th>Created</th></tr></thead><tbody>
@@ -336,13 +360,13 @@ function SerialsPanel({ products, locations, canWriteTracking, canReadStock, can
     return `${identity} — ${Number(lot.quantity).toLocaleString()} on hand`;
   };
 
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #2 — Optional serial-number tracking</div>
+  return <section className="section" style={panelStyle}><div className="section__title">Serial-number tracking</div>
     <div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={changeProduct} />
       <label><input type="checkbox" checked={settings.serial_tracking_enabled} onChange={(e) => setSettings({ ...settings, serial_tracking_enabled: e.target.checked })} disabled={!canWriteTracking || !productId} /> Enable serial tracking</label>
       <label>Uniqueness<select value={settings.serial_uniqueness_scope} onChange={(e) => setSettings({ ...settings, serial_uniqueness_scope: e.target.value as 'product' | 'tenant' })} disabled={!canWriteTracking || !productId}><option value="product">Unique within product</option><option value="tenant">Unique across tenant</option></select></label>
       <label><input type="checkbox" checked={settings.require_serial_on_receipt} onChange={(e) => setSettings({ ...settings, require_serial_on_receipt: e.target.checked })} disabled={!canWriteTracking || !productId} /> Require on receipt</label>
       <label><input type="checkbox" checked={settings.require_serial_on_issue} onChange={(e) => setSettings({ ...settings, require_serial_on_issue: e.target.checked })} disabled={!canWriteTracking || !productId} /> Require on issue</label>
-      <div style={{ alignSelf: 'end' }}><button className="button" type="button" disabled={!canWriteTracking || !productId} onClick={() => saveSettings.mutate()}>Save tracking</button></div>
+      <div style={{ alignSelf: 'end' }}><button className="button" type="button" disabled={!canWriteTracking || !productId || saveSettings.isPending} onClick={() => saveSettings.mutate()}>{saveSettings.isPending ? 'Saving…' : 'Save tracking'}</button></div>
     </div>{error ? <div className="form-error">{error}</div> : null}</div>
     <div className="card"><h3>Register serial for existing stock</h3><p className="muted">This assigns a serial identity to an item that is already on hand. Choose the exact location and inventory lot. Reservation, issue, damage, quarantine and return states are changed only by their real inventory workflows.</p>{!canReadStock ? <div className="form-error">Stock read permission is required to view serial inventory.</div> : null}{canReadStock && !canRegisterSerial ? <div className="form-error">Product write and stock adjust permissions are required to register a serial against existing inventory.</div> : null}<form onSubmit={(e) => { e.preventDefault(); addSerial.mutate(); }} style={formGridStyle}>
       <input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Serial number" disabled={!canRegisterSerial} />
@@ -372,7 +396,7 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
   const convert = useMutation({ mutationFn: () => apiRequest<{ converted_quantity: number }>(`/inventory-capabilities/products/${productId}/uom/convert`, { method: 'POST', body: JSON.stringify({ from_uom: fromUom, to_uom: toUom, quantity: Number(convertQty) }) }), onSuccess: (data) => setConverted(String(data.converted_quantity)), onError: (e) => setError(messageFrom(e, 'Unable to convert quantity.')) });
   const units = useMemo(() => productId && query.data ? [query.data.base_uom, ...query.data.conversions.map((r) => r.uom_code)] : [], [productId, query.data]);
   useEffect(() => { if (units.length && !fromUom) { setFromUom(units[0]); setToUom(units[1] || units[0]); } }, [units, fromUom]);
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #3 — Unit-of-measure conversion</div><div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={(id) => { setProductId(id); setFromUom(''); setToUom(''); }} /><label>UoM code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CASE" /></label><label>Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Case" /></label><label>Units in base unit<input type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="24" /></label><label><input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} /> Purchasing unit</label><label><input type="checkbox" checked={issue} onChange={(e) => setIssue(e.target.checked)} /> Issue/selling unit</label><button className="button" type="button" disabled={!canWrite || !productId || !code || asNumber(factor) <= 0} onClick={() => save.mutate()}>Save conversion</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card"><h3>Conversion test</h3><div style={formGridStyle}><input type="number" step="any" value={convertQty} onChange={(e) => setConvertQty(e.target.value)} /><select value={fromUom} onChange={(e) => setFromUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><select value={toUom} onChange={(e) => setToUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><button className="button button--secondary" type="button" disabled={!productId || !fromUom || !toUom} onClick={() => convert.mutate()}>Convert</button>{converted !== null ? <strong>Result: {converted} {toUom}</strong> : null}</div></div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Unit</th><th>Factor to base</th><th>Purchase</th><th>Issue</th></tr></thead><tbody><tr><td>{query.data?.base_uom || '-'}</td><td>1</td><td>-</td><td>-</td></tr>{(query.data?.conversions || []).map((row) => <tr key={row.id}><td>{row.uom_code} {row.uom_name ? `— ${row.uom_name}` : ''}</td><td>{String(row.factor_to_base)}</td><td>{row.purchase_uom ? 'Yes' : 'No'}</td><td>{row.issue_uom ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">Units of measure</div><div className="card"><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={(id) => { setProductId(id); setFromUom(''); setToUom(''); }} /><label>UoM code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CASE" /></label><label>Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Case" /></label><label>Units in base unit<input type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="24" /></label><label><input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} /> Purchasing unit</label><label><input type="checkbox" checked={issue} onChange={(e) => setIssue(e.target.checked)} /> Issue/selling unit</label><button className="button" type="button" disabled={!canWrite || !productId || !code || asNumber(factor) <= 0 || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : 'Save conversion'}</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card"><h3>Conversion test</h3><div style={formGridStyle}><input type="number" step="any" value={convertQty} onChange={(e) => setConvertQty(e.target.value)} /><select value={fromUom} onChange={(e) => setFromUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><select value={toUom} onChange={(e) => setToUom(e.target.value)}>{units.map((u) => <option key={u}>{u}</option>)}</select><button className="button button--secondary" type="button" disabled={!productId || !fromUom || !toUom || convert.isPending} onClick={() => convert.mutate()}>{convert.isPending ? 'Converting…' : 'Convert'}</button>{converted !== null ? <strong>Result: {converted} {toUom}</strong> : null}</div></div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Unit</th><th>Factor to base</th><th>Purchase</th><th>Issue</th></tr></thead><tbody><tr><td>{query.data?.base_uom || '-'}</td><td>1</td><td>-</td><td>-</td></tr>{(query.data?.conversions || []).map((row) => <tr key={row.id}><td>{row.uom_code} {row.uom_name ? `— ${row.uom_name}` : ''}</td><td>{String(row.factor_to_base)}</td><td>{row.purchase_uom ? 'Yes' : 'No'}</td><td>{row.issue_uom ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
 }
 
 function CustomFieldsPanel({
@@ -381,6 +405,7 @@ function CustomFieldsPanel({
   locations,
   shipments,
   purchaseOrders,
+  readPermissions,
   writePermissions
 }: {
   products: Product[];
@@ -388,6 +413,7 @@ function CustomFieldsPanel({
   locations: Location[];
   shipments: Shipment[];
   purchaseOrders: PurchaseOrderRef[];
+  readPermissions: Record<'product' | 'supplier' | 'storage_location' | 'shipment' | 'purchase_order', boolean>;
   writePermissions: Record<'product' | 'supplier' | 'storage_location' | 'shipment' | 'purchase_order', boolean>;
 }) {
   type EntityType = keyof typeof writePermissions;
@@ -409,24 +435,42 @@ function CustomFieldsPanel({
     shipment: { label: 'Shipment', plural: 'shipments', rows: shipments.map((row) => ({ id: row.id, label: row.po_number || row.qr_code || row.id.slice(0, 8) })) },
     purchase_order: { label: 'Purchase order', plural: 'purchase orders', rows: purchaseOrders.map((row) => ({ id: row.id, label: row.po_number || row.id.slice(0, 8) })) }
   };
+  const canReadProductFields = readPermissions.product;
+  const canReadSupplierFields = readPermissions.supplier;
+  const canReadLocationFields = readPermissions.storage_location;
+  const canReadShipmentFields = readPermissions.shipment;
+  const canReadPurchaseOrderFields = readPermissions.purchase_order;
+  const readableEntityTypes = useMemo<EntityType[]>(() => [
+    ...(canReadProductFields ? ['product' as EntityType] : []),
+    ...(canReadSupplierFields ? ['supplier' as EntityType] : []),
+    ...(canReadLocationFields ? ['storage_location' as EntityType] : []),
+    ...(canReadShipmentFields ? ['shipment' as EntityType] : []),
+    ...(canReadPurchaseOrderFields ? ['purchase_order' as EntityType] : [])
+  ], [canReadLocationFields, canReadProductFields, canReadPurchaseOrderFields, canReadShipmentFields, canReadSupplierFields]);
   const config = entityConfigs[entityType];
-  const canWrite = writePermissions[entityType];
+  const canRead = readPermissions[entityType];
+  const canWrite = canRead && writePermissions[entityType];
 
   const definitions = useQuery({
     queryKey: ['custom-field-definitions', entityType],
+    enabled: canRead,
     queryFn: () => apiRequest<CustomDefinition[]>(`/inventory-capabilities/custom-fields?entity_type=${entityType}`)
   });
   const entityValues = useQuery({
     queryKey: ['custom-field-values', entityType, entityId],
-    enabled: Boolean(entityId),
+    enabled: Boolean(canRead && entityId),
     queryFn: () => apiRequest<CustomValueRow[]>(`/inventory-capabilities/custom-fields/${entityType}/${entityId}`)
   });
 
   useEffect(() => {
+    if (!canRead) {
+      setEntityType(readableEntityTypes[0] || 'product');
+      return;
+    }
     setEntityId('');
     setValues({});
     setError(null);
-  }, [entityType]);
+  }, [canRead, entityType, readableEntityTypes]);
 
   useEffect(() => {
     if (!entityValues.data) return;
@@ -478,12 +522,12 @@ function CustomFieldsPanel({
 
   return (
     <section className="section" style={panelStyle}>
-      <div className="section__title">Priority #4 — Tenant-configurable custom fields</div>
+      <div className="section__title">Custom fields</div>
       <div className="card">
         <label>
           Entity type
           <select value={entityType} onChange={(event) => setEntityType(event.target.value as EntityType)}>
-            {(Object.keys(entityConfigs) as EntityType[]).map((key) => <option key={key} value={key}>{entityConfigs[key].label}</option>)}
+            {readableEntityTypes.map((key) => <option key={key} value={key}>{entityConfigs[key].label}</option>)}
           </select>
         </label>
       </div>
@@ -495,7 +539,7 @@ function CustomFieldsPanel({
           <label>Type<select value={dataType} onChange={(event) => setDataType(event.target.value)}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes/No</option><option value="date">Date</option><option value="select">Select list</option></select></label>
           {dataType === 'select' ? <label>Options<input value={options} onChange={(event) => setOptions(event.target.value)} placeholder="Croatia, Italy, Germany" /></label> : null}
           <label><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label>
-          <button className="button" type="button" disabled={!canWrite || !fieldKey.trim() || !label.trim()} onClick={() => saveDefinition.mutate()}>Save field</button>
+          <button className="button" type="button" disabled={!canWrite || !fieldKey.trim() || !label.trim() || saveDefinition.isPending} onClick={() => saveDefinition.mutate()}>{saveDefinition.isPending ? 'Saving…' : 'Save field'}</button>
         </div>
         {!canWrite ? <div className="card__subtext">You have read access to these fields but not permission to change this entity type.</div> : null}
         {error ? <div className="form-error">{error}</div> : null}
@@ -519,7 +563,7 @@ function CustomFieldsPanel({
                 : <input type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
           </label>
         ))}
-        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId} onClick={() => saveValues.mutate()}>Save {config.label.toLowerCase()} custom fields</button>
+        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || saveValues.isPending} onClick={() => saveValues.mutate()}>{saveValues.isPending ? 'Saving…' : `Save ${config.label.toLowerCase()} custom fields`}</button>
       </div>
       <div className="card" style={tableWrapStyle}>
         <table><thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Required</th></tr></thead><tbody>{(definitions.data || []).map((definition) => <tr key={definition.id}><td>{definition.field_key}</td><td>{definition.label}</td><td>{definition.data_type}</td><td>{definition.is_required ? 'Yes' : 'No'}</td></tr>)}</tbody></table>
@@ -544,7 +588,7 @@ function LandedCostPanel({ shipments, canWrite }: { shipments: Shipment[]; canWr
   const previewMutation = useMutation({ mutationFn: () => apiRequest<LandedPreview>('/inventory-capabilities/landed-costs/preview', { method: 'POST', body: JSON.stringify(body()) }), onSuccess: (data) => { setPreview(data); setError(null); }, onError: (e) => setError(messageFrom(e, 'Unable to preview landed cost.')) });
   const finalizeMutation = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/landed-costs/finalize', { method: 'POST', body: JSON.stringify(body()) }), onSuccess: () => { setPreview(null); setFreight(''); setCustoms(''); setInsurance(''); setError(null); void qc.invalidateQueries({ queryKey: ['landed-cost-history'] }); void qc.invalidateQueries({ queryKey: ['inventory-capabilities-products'] }); }, onError: (e) => setError(messageFrom(e, 'Unable to finalize landed cost.')) });
   const total = asNumber(freight) + asNumber(customs) + asNumber(insurance);
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #5 — True landed-cost allocation</div><div className="card"><h3>Add freight, customs and insurance to received inventory cost</h3><div style={formGridStyle}><label>Shipment<select value={shipmentId} onChange={(e) => { setShipmentId(e.target.value); setPreview(null); }}><option value="">Select…</option>{shipments.map((s) => <option key={s.id} value={s.id}>{s.po_number || s.id.slice(0, 8)} — {s.status}</option>)}</select></label><label>Allocation<select value={method} onChange={(e) => setMethod(e.target.value)}><option value="value">By item value</option><option value="quantity">By quantity</option><option value="equal">Equal per line</option></select></label><label>Freight<input type="number" min="0" step="0.01" value={freight} onChange={(e) => setFreight(e.target.value)} /></label><label>Customs<input type="number" min="0" step="0.01" value={customs} onChange={(e) => setCustoms(e.target.value)} /></label><label>Insurance<input type="number" min="0" step="0.01" value={insurance} onChange={(e) => setInsurance(e.target.value)} /></label><div><strong>Extra cost: {total.toFixed(2)}</strong><div style={{ display: 'flex', gap: 8, marginTop: 8 }}><button className="button button--secondary" type="button" disabled={!shipmentId || total <= 0} onClick={() => previewMutation.mutate()}>Preview</button><button className="button" type="button" disabled={!canWrite || !shipmentId || total <= 0 || !preview} onClick={() => finalizeMutation.mutate()}>Finalize cost</button></div></div></div>{error ? <div className="form-error">{error}</div> : null}</div>{preview ? <div className="card" style={tableWrapStyle}><h3>Allocation preview — {preview.currency} {preview.total_extra_cost}</h3><table><thead><tr><th>Product</th><th>Qty</th><th>Base unit cost</th><th>Extra allocated</th><th>Landed unit cost</th></tr></thead><tbody>{preview.allocations.map((a) => <tr key={a.shipment_item_id}><td>{a.product_name}</td><td>{a.received_quantity}</td><td>{a.base_unit_cost}</td><td>{a.allocated_extra_cost}</td><td><strong>{a.landed_unit_cost}</strong></td></tr>)}</tbody></table></div> : null}<div className="card" style={tableWrapStyle}><h3>Finalized landed costs</h3><table><thead><tr><th>PO</th><th>Method</th><th>Extra cost</th><th>Finalized</th></tr></thead><tbody>{(history.data || []).map((row) => <tr key={row.id}><td>{row.po_number || row.shipment_id.slice(0, 8)}</td><td>{row.allocation_method}</td><td>{row.currency} {String(row.total_extra_cost)}</td><td>{formatDate(row.finalized_at)}</td></tr>)}</tbody></table></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">Landed-cost allocation</div><div className="card"><h3>Add freight, customs and insurance to received inventory cost</h3><div style={formGridStyle}><label>Shipment<select value={shipmentId} onChange={(e) => { setShipmentId(e.target.value); setPreview(null); }}><option value="">Select…</option>{shipments.map((s) => <option key={s.id} value={s.id}>{s.po_number || s.id.slice(0, 8)} — {s.status}</option>)}</select></label><label>Allocation<select value={method} onChange={(e) => setMethod(e.target.value)}><option value="value">By item value</option><option value="quantity">By quantity</option><option value="equal">Equal per line</option></select></label><label>Freight<input type="number" min="0" step="0.01" value={freight} onChange={(e) => setFreight(e.target.value)} /></label><label>Customs<input type="number" min="0" step="0.01" value={customs} onChange={(e) => setCustoms(e.target.value)} /></label><label>Insurance<input type="number" min="0" step="0.01" value={insurance} onChange={(e) => setInsurance(e.target.value)} /></label><div><strong>Extra cost: {total.toFixed(2)}</strong><div style={{ display: 'flex', gap: 8, marginTop: 8 }}><button className="button button--secondary" type="button" disabled={!shipmentId || total <= 0 || previewMutation.isPending || finalizeMutation.isPending} onClick={() => previewMutation.mutate()}>{previewMutation.isPending ? 'Previewing…' : 'Preview'}</button><button className="button" type="button" disabled={!canWrite || !shipmentId || total <= 0 || !preview || previewMutation.isPending || finalizeMutation.isPending} onClick={() => finalizeMutation.mutate()}>{finalizeMutation.isPending ? 'Finalizing…' : 'Finalize cost'}</button></div></div></div>{error ? <div className="form-error">{error}</div> : null}</div>{preview ? <div className="card" style={tableWrapStyle}><h3>Allocation preview — {preview.currency} {preview.total_extra_cost}</h3><table><thead><tr><th>Product</th><th>Qty</th><th>Base unit cost</th><th>Extra allocated</th><th>Landed unit cost</th></tr></thead><tbody>{preview.allocations.map((a) => <tr key={a.shipment_item_id}><td>{a.product_name}</td><td>{a.received_quantity}</td><td>{a.base_unit_cost}</td><td>{a.allocated_extra_cost}</td><td><strong>{a.landed_unit_cost}</strong></td></tr>)}</tbody></table></div> : null}<div className="card" style={tableWrapStyle}><h3>Finalized landed costs</h3><table><thead><tr><th>PO</th><th>Method</th><th>Extra cost</th><th>Finalized</th></tr></thead><tbody>{(history.data || []).map((row) => <tr key={row.id}><td>{row.po_number || row.shipment_id.slice(0, 8)}</td><td>{row.allocation_method}</td><td>{row.currency} {String(row.total_extra_cost)}</td><td>{formatDate(row.finalized_at)}</td></tr>)}</tbody></table></div></section>;
 }
 
 function VariantsPanel({ products, canWrite, onChanged }: { products: Product[]; canWrite: boolean; onChanged: () => void }) {
@@ -558,7 +602,7 @@ function VariantsPanel({ products, canWrite, onChanged }: { products: Product[];
   const variants = useQuery({ queryKey: ['product-variants'], queryFn: () => apiRequest<Variant[]>('/inventory-capabilities/variants') });
   const create = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/products/${parentId}/variants`, { method: 'POST', body: JSON.stringify({ sku, name, barcode: barcode || null, attributes: parseAttributes(attributes) }) }), onSuccess: () => { setSku(''); setName(''); setBarcode(''); setAttributes(''); setError(null); void qc.invalidateQueries({ queryKey: ['product-variants'] }); onChanged(); }, onError: (e) => setError(messageFrom(e, 'Unable to create variant.')) });
   const parents = products.filter((p) => !p.parent_product_id);
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #6 — Product variants</div><div className="card"><p className="card__subtext">A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.</p><form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} style={formGridStyle}><ProductSelect products={parents} value={parentId} onChange={setParentId} label="Parent product" /><label>Variant SKU<input value={sku} onChange={(e) => setSku(e.target.value)} /></label><label>Variant name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="T-shirt / Red / M" /></label><label>Barcode<input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></label><label>Attributes<input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder="Color=Red, Size=M" /></label><button className="button" disabled={!canWrite || !parentId || !sku.trim() || !name.trim()}>Create variant</button></form>{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Parent</th><th>SKU</th><th>Variant</th><th>Attributes</th><th>Stock</th></tr></thead><tbody>{(variants.data || []).map((v) => <tr key={v.id}><td>{v.parent_product_name}</td><td>{v.sku}</td><td>{v.name}</td><td>{Object.entries(v.variant_attributes || {}).map(([k,val]) => `${k}: ${String(val)}`).join(', ') || '-'}</td><td>{String(v.current_stock_quantity ?? 0)}</td></tr>)}</tbody></table></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">Product variants</div><div className="card"><p className="card__subtext">A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.</p><form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} style={formGridStyle}><ProductSelect products={parents} value={parentId} onChange={setParentId} label="Parent product" /><label>Variant SKU<input value={sku} onChange={(e) => setSku(e.target.value)} /></label><label>Variant name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="T-shirt / Red / M" /></label><label>Barcode<input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></label><label>Attributes<input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder="Color=Red, Size=M" /></label><button className="button" disabled={!canWrite || !parentId || !sku.trim() || !name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create variant'}</button></form>{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Parent</th><th>SKU</th><th>Variant</th><th>Attributes</th><th>Stock</th></tr></thead><tbody>{(variants.data || []).map((v) => <tr key={v.id}><td>{v.parent_product_name}</td><td>{v.sku}</td><td>{v.name}</td><td>{Object.entries(v.variant_attributes || {}).map(([k,val]) => `${k}: ${String(val)}`).join(', ') || '-'}</td><td>{String(v.current_stock_quantity ?? 0)}</td></tr>)}</tbody></table></div></section>;
 }
 
 function HierarchyPanel({ locations, canWrite }: { locations: Location[]; canWrite: boolean }) {
@@ -573,7 +617,7 @@ function HierarchyPanel({ locations, canWrite }: { locations: Location[]; canWri
   const save = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/location-hierarchy/${locationId}`, { method: 'PATCH', body: JSON.stringify({ parent_location_id: parentId || null, location_type: type, location_code: code || null, is_pickable: pickable }) }), onSuccess: () => { setError(null); void qc.invalidateQueries({ queryKey: ['location-hierarchy'] }); void qc.invalidateQueries({ queryKey: ['inventory-capabilities-locations'] }); }, onError: (e) => setError(messageFrom(e, 'Unable to save hierarchy.')) });
   const selected = (hierarchy.data || []).find((l) => l.id === locationId);
   useEffect(() => { if (selected) { setParentId(selected.parent_location_id || ''); setType(selected.location_type || 'storage'); setCode(selected.location_code || ''); setPickable(selected.is_pickable !== false); } }, [selected]);
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #7 — Warehouse / zone / aisle / rack / shelf / bin hierarchy</div><div className="card"><div style={formGridStyle}><label>Location<select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">Select…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Parent<select value={parentId} onChange={(e) => setParentId(e.target.value)}><option value="">Top level</option>{locations.filter((l) => l.id !== locationId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Type<select value={type} onChange={(e) => setType(e.target.value)}><option value="warehouse">Warehouse</option><option value="zone">Zone</option><option value="aisle">Aisle</option><option value="rack">Rack</option><option value="shelf">Shelf</option><option value="bin">Bin</option><option value="storage">Storage</option></select></label><label>Code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="WH1-A03-R02-B04" /></label><label><input type="checkbox" checked={pickable} onChange={(e) => setPickable(e.target.checked)} /> Pickable location</label><button className="button" type="button" disabled={!canWrite || !locationId} onClick={() => save.mutate()}>Save hierarchy</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Path</th><th>Type</th><th>Code</th><th>Pickable</th></tr></thead><tbody>{(hierarchy.data || []).map((l) => <tr key={l.id}><td style={{ paddingLeft: 12 + Number(l.depth || 0) * 12 }}>{l.path || l.name}</td><td>{l.location_type}</td><td>{l.location_code || '-'}</td><td>{l.is_pickable ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">Location hierarchy</div><div className="card"><div style={formGridStyle}><label>Location<select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">Select…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Parent<select value={parentId} onChange={(e) => setParentId(e.target.value)}><option value="">Top level</option>{locations.filter((l) => l.id !== locationId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Type<select value={type} onChange={(e) => setType(e.target.value)}><option value="warehouse">Warehouse</option><option value="zone">Zone</option><option value="aisle">Aisle</option><option value="rack">Rack</option><option value="shelf">Shelf</option><option value="bin">Bin</option><option value="storage">Storage</option></select></label><label>Code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="WH1-A03-R02-B04" /></label><label><input type="checkbox" checked={pickable} onChange={(e) => setPickable(e.target.checked)} /> Pickable location</label><button className="button" type="button" disabled={!canWrite || !locationId || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : 'Save hierarchy'}</button></div>{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Path</th><th>Type</th><th>Code</th><th>Pickable</th></tr></thead><tbody>{(hierarchy.data || []).map((l) => <tr key={l.id}><td style={{ paddingLeft: 12 + Number(l.depth || 0) * 12 }}>{l.path || l.name}</td><td>{l.location_type}</td><td>{l.location_code || '-'}</td><td>{l.is_pickable ? 'Yes' : 'No'}</td></tr>)}</tbody></table></div></section>;
 }
 
 function BomPanel({ products, locations, canWrite, canExecute }: { products: Product[]; locations: Location[]; canWrite: boolean; canExecute: boolean }) {
@@ -591,9 +635,9 @@ function BomPanel({ products, locations, canWrite, canExecute }: { products: Pro
   const boms = useQuery({ queryKey: ['inventory-boms'], queryFn: () => apiRequest<Bom[]>('/inventory-capabilities/boms') });
   const create = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/boms', { method: 'POST', body: JSON.stringify({ product_id: outputProductId, name, output_quantity: Number(outputQty), components: components.filter((c) => c.product_id).map((c) => ({ product_id: c.product_id, quantity: Number(c.quantity), waste_percent: Number(c.waste_percent || 0) })) }) }), onSuccess: () => { setMessage('BOM created successfully.'); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-boms'] }); }, onError: (e) => { setMessage(null); setError(messageFrom(e, 'Unable to create BOM.')); } });
   const execute = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/boms/${executeBomId}/execute`, { method: 'POST', body: JSON.stringify({ direction, storage_location_id: executeLocationId, output_quantity: Number(executeQty), reservation_shortfall_acknowledged: false }) }), onSuccess: () => { setMessage(`${direction === 'assemble' ? 'Assembly' : 'Disassembly'} completed and stock movements recorded.`); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-capabilities-products'] }); }, onError: (e) => { setMessage(null); setError(messageFrom(e, 'Unable to execute BOM.')); } });
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #8 — BOM, kits, assembly and disassembly</div><div className="card"><h3>Create BOM</h3><div style={formGridStyle}><ProductSelect products={products} value={outputProductId} onChange={setOutputProductId} label="Finished product / kit" /><label>BOM name<input value={name} onChange={(e) => setName(e.target.value)} /></label><label>Output quantity<input type="number" min="0.000001" step="any" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} /></label></div><h4>Components</h4>{components.map((component, index) => <div key={index} style={{ ...formGridStyle, marginBottom: 8 }}><ProductSelect products={products.filter((p) => p.id !== outputProductId)} value={component.product_id} onChange={(id) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, product_id: id } : r))} label={`Component ${index + 1}`} /><label>Quantity<input type="number" step="any" min="0" value={component.quantity} onChange={(e) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, quantity: e.target.value } : r))} /></label><label>Waste %<input type="number" step="any" min="0" max="100" value={component.waste_percent} onChange={(e) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, waste_percent: e.target.value } : r))} /></label>{components.length > 1 ? <button className="button button--secondary" type="button" onClick={() => setComponents((rows) => rows.filter((_,i) => i !== index))}>Remove</button> : null}</div>)}<div style={{ display: 'flex', gap: 8 }}><button className="button button--secondary" type="button" onClick={() => setComponents((rows) => [...rows, { product_id: '', quantity: '1', waste_percent: '0' }])}>Add component</button><button className="button" type="button" disabled={!canWrite || !outputProductId || components.every((c) => !c.product_id)} onClick={() => create.mutate()}>Create BOM</button></div></div><div className="card"><h3>Assemble / disassemble</h3><div style={formGridStyle}><label>BOM<select value={executeBomId} onChange={(e) => setExecuteBomId(e.target.value)}><option value="">Select…</option>{(boms.data || []).map((b) => <option key={b.id} value={b.id}>{b.product_sku} — {b.name}</option>)}</select></label><label>Location<select value={executeLocationId} onChange={(e) => setExecuteLocationId(e.target.value)}><option value="">Select…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Action<select value={direction} onChange={(e) => setDirection(e.target.value)}><option value="assemble">Assemble</option><option value="disassemble">Disassemble</option></select></label><label>Finished quantity<input type="number" min="0.000001" step="any" value={executeQty} onChange={(e) => setExecuteQty(e.target.value)} /></label><button className="button" type="button" disabled={!canExecute || !executeBomId || !executeLocationId || asNumber(executeQty) <= 0} onClick={() => execute.mutate()}>{direction === 'assemble' ? 'Assemble stock' : 'Disassemble stock'}</button></div>{message ? <div className="form-success">{message}</div> : null}{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Output</th><th>BOM</th><th>Output qty</th><th>Components</th></tr></thead><tbody>{(boms.data || []).map((b) => <tr key={b.id}><td>{b.product_sku} — {b.product_name}</td><td>{b.name}</td><td>{String(b.output_quantity)}</td><td>{b.components.map((c) => `${c.component_sku || ''} ${c.component_name || ''} × ${String(c.quantity)}`).join('; ')}</td></tr>)}</tbody></table></div></section>;
+  return <section className="section" style={panelStyle}><div className="section__title">BOM, kits, assembly and disassembly</div><div className="card"><h3>Create BOM</h3><div style={formGridStyle}><ProductSelect products={products} value={outputProductId} onChange={setOutputProductId} label="Finished product / kit" /><label>BOM name<input value={name} onChange={(e) => setName(e.target.value)} /></label><label>Output quantity<input type="number" min="0.000001" step="any" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} /></label></div><h4>Components</h4>{components.map((component, index) => <div key={index} style={{ ...formGridStyle, marginBottom: 8 }}><ProductSelect products={products.filter((p) => p.id !== outputProductId)} value={component.product_id} onChange={(id) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, product_id: id } : r))} label={`Component ${index + 1}`} /><label>Quantity<input type="number" step="any" min="0" value={component.quantity} onChange={(e) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, quantity: e.target.value } : r))} /></label><label>Waste %<input type="number" step="any" min="0" max="100" value={component.waste_percent} onChange={(e) => setComponents((rows) => rows.map((r,i) => i === index ? { ...r, waste_percent: e.target.value } : r))} /></label>{components.length > 1 ? <button className="button button--secondary" type="button" onClick={() => setComponents((rows) => rows.filter((_,i) => i !== index))}>Remove</button> : null}</div>)}<div style={{ display: 'flex', gap: 8 }}><button className="button button--secondary" type="button" onClick={() => setComponents((rows) => [...rows, { product_id: '', quantity: '1', waste_percent: '0' }])}>Add component</button><button className="button" type="button" disabled={!canWrite || !outputProductId || components.every((c) => !c.product_id) || create.isPending || execute.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Creating…' : 'Create BOM'}</button></div></div><div className="card"><h3>Assemble / disassemble</h3><div style={formGridStyle}><label>BOM<select value={executeBomId} onChange={(e) => setExecuteBomId(e.target.value)}><option value="">Select…</option>{(boms.data || []).map((b) => <option key={b.id} value={b.id}>{b.product_sku} — {b.name}</option>)}</select></label><label>Location<select value={executeLocationId} onChange={(e) => setExecuteLocationId(e.target.value)}><option value="">Select…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label><label>Action<select value={direction} onChange={(e) => setDirection(e.target.value)}><option value="assemble">Assemble</option><option value="disassemble">Disassemble</option></select></label><label>Finished quantity<input type="number" min="0.000001" step="any" value={executeQty} onChange={(e) => setExecuteQty(e.target.value)} /></label><button className="button" type="button" disabled={!canExecute || !executeBomId || !executeLocationId || asNumber(executeQty) <= 0 || create.isPending || execute.isPending} onClick={() => execute.mutate()}>{execute.isPending ? (direction === 'assemble' ? 'Assembling…' : 'Disassembling…') : direction === 'assemble' ? 'Assemble stock' : 'Disassemble stock'}</button></div>{message ? <div className="form-success">{message}</div> : null}{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}><table><thead><tr><th>Output</th><th>BOM</th><th>Output qty</th><th>Components</th></tr></thead><tbody>{(boms.data || []).map((b) => <tr key={b.id}><td>{b.product_sku} — {b.product_name}</td><td>{b.name}</td><td>{String(b.output_quantity)}</td><td>{b.components.map((c) => `${c.component_sku || ''} ${c.component_name || ''} × ${String(c.quantity)}`).join('; ')}</td></tr>)}</tbody></table></div></section>;
 }
 
-function MobilePanel() {
-  return <section className="section" style={panelStyle}><div className="section__title">Priority #9 — Offline mobile task execution</div><div className="card"><div className="card__label">Operational mobile mode</div><h3>Mobile Execution now keeps a local task snapshot and queues task actions when offline.</h3><p className="card__subtext">Operators can start, complete, block or unblock execution tasks while disconnected. When the device is online again, queued actions are replayed through the normal backend task permissions and audit trail. Stock-changing work such as receiving, transfers, counts and dispatch still requires connectivity so the app does not create conflicting offline inventory ledgers.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link className="button" to="/mobile-execution">Open Mobile Execution</Link><Link className="button button--secondary" to="/scanner">Open scanner</Link></div></div><div className="card"><div className="card__label">Installable web app foundation</div><p className="card__subtext">The web application also registers an offline service worker and application manifest, so supported phones/tablets can install it from the browser. Native Android/iOS store wrappers can use the same mobile workflow later without changing the inventory backend.</p><span style={badgeStyle}>Offline queue + server replay</span></div></section>;
+function MobilePanel({ canOpenScanner }: { canOpenScanner: boolean }) {
+  return <section className="section" style={panelStyle}><div className="section__title">Offline mobile task execution</div><div className="card"><div className="card__label">Operational mobile mode</div><h3>Mobile Execution now keeps a local task snapshot and queues task actions when offline.</h3><p className="card__subtext">Operators can start, complete, block or unblock execution tasks while disconnected. When the device is online again, queued actions are replayed through the normal task permissions and audit trail. Stock-changing work such as receiving, transfers, counts and dispatch still requires connectivity so the app does not create conflicting offline inventory ledgers.</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Link className="button" to="/mobile-execution">Open Mobile Execution</Link>{canOpenScanner ? <Link className="button button--secondary" to="/scanner">Open scanner</Link> : null}</div></div><div className="card"><div className="card__label">Installable web app foundation</div><p className="card__subtext">On supported phones and tablets, the app can be installed from the browser for quicker access to the mobile workflow.</p><span style={badgeStyle}>Offline queue + server replay</span></div></section>;
 }

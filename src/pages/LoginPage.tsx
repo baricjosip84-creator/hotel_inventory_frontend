@@ -128,7 +128,7 @@ export function LoginPage() {
             ...(isCompact ? styles.brandPanelCompact : {})
           }}
         >
-          <div style={styles.brandBadge}>HOTEL INVENTORY PLATFORM</div>
+          <div style={styles.brandBadge}>INVENTORY OPERATIONS PLATFORM</div>
 
           <div style={styles.brandBlock}>
             <h1
@@ -216,7 +216,7 @@ export function LoginPage() {
                 <input
                   id="login-email"
                   type="email"
-                  placeholder="you@hotel.com"
+                  placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={styles.input}

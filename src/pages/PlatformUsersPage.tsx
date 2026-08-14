@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import { getPlatformPermissionSnapshot } from '../lib/platformPermissions';
 
 type PlatformUser = {
   id: string;
@@ -31,6 +32,7 @@ export default function PlatformUsersPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState({ email: '', name: '', role: 'platform_viewer', password: '' });
   const q = useQuery({ queryKey: ['platform', 'users'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users') });
+  const currentPlatformUserId = getPlatformPermissionSnapshot()?.platform_user_id || null;
 
   const create = useMutation({
     mutationFn: () => platformApiRequest('/platform/users', {
@@ -71,7 +73,7 @@ export default function PlatformUsersPage() {
   return (
     <div style={styles.page}>
       <h1>Platform users</h1>
-      <p style={styles.muted}>Manage HLA/platform staff accounts, roles, activation, and sessions.</p>
+      <p style={styles.muted}>Manage platform staff accounts, roles, activation, and sessions.</p>
 
       <section style={styles.panel}>
         <h2>Create platform user</h2>
@@ -146,26 +148,44 @@ export default function PlatformUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {(q.data || []).map((user) => (
-                <tr key={user.id}>
-                  <td style={styles.td}>{user.name}</td>
-                  <td style={styles.td}>{user.email}</td>
-                  <td style={styles.td}>
-                    <select value={user.role} onChange={(event) => patch.mutate({ id: user.id, body: { role: event.target.value } })}>
-                      {roles.map((role) => <option key={role}>{role}</option>)}
-                    </select>
-                  </td>
-                  <td style={styles.td}>{user.is_active ? 'Active' : 'Disabled'}</td>
-                  <td style={styles.td}>{user.mfa_enabled ? 'MFA on' : 'MFA off'}{user.locked_until ? ` / locked until ${user.locked_until}` : ''}</td>
-                  <td style={styles.td}>
-                    <button style={styles.button} onClick={() => patch.mutate({ id: user.id, body: { is_active: !user.is_active } })}>{user.is_active ? 'Disable' : 'Activate'}</button>{' '}
-                    <button style={styles.button} onClick={() => revoke.mutate(user.id)}>Revoke sessions</button>
-                  </td>
-                </tr>
-              ))}
+              {(q.data || []).map((user) => {
+                const isCurrentUser = currentPlatformUserId === user.id;
+                const selfDeactivateBlocked = isCurrentUser && user.is_active;
+
+                return (
+                  <tr key={user.id}>
+                    <td style={styles.td}>{user.name}{isCurrentUser ? ' (you)' : ''}</td>
+                    <td style={styles.td}>{user.email}</td>
+                    <td style={styles.td}>
+                      <select
+                        value={user.role}
+                        disabled={patch.isPending}
+                        onChange={(event) => patch.mutate({ id: user.id, body: { role: event.target.value } })}
+                      >
+                        {roles.map((role) => <option key={role}>{role}</option>)}
+                      </select>
+                    </td>
+                    <td style={styles.td}>{user.is_active ? 'Active' : 'Disabled'}</td>
+                    <td style={styles.td}>{user.mfa_enabled ? 'MFA on' : 'MFA off'}{user.locked_until ? ` / locked until ${user.locked_until}` : ''}</td>
+                    <td style={styles.td}>
+                      <button
+                        style={{ ...styles.button, ...(selfDeactivateBlocked || patch.isPending ? styles.disabledButton : null) }}
+                        disabled={selfDeactivateBlocked || patch.isPending}
+                        title={selfDeactivateBlocked ? 'You cannot deactivate your own platform account.' : undefined}
+                        onClick={() => patch.mutate({ id: user.id, body: { is_active: !user.is_active } })}
+                      >
+                        {user.is_active ? 'Disable' : 'Activate'}
+                      </button>{' '}
+                      <button style={styles.button} disabled={revoke.isPending} onClick={() => revoke.mutate(user.id)}>Revoke sessions</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
+        {patch.error ? <div style={styles.error}>{patch.error instanceof Error ? patch.error.message : 'Platform user update failed'}</div> : null}
+        {revoke.error ? <div style={styles.error}>{revoke.error instanceof Error ? revoke.error.message : 'Session revocation failed'}</div> : null}
       </section>
     </div>
   );

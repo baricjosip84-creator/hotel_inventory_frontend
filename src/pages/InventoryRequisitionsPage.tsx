@@ -4,6 +4,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 
@@ -87,6 +88,7 @@ type InventoryRequisition = {
   fulfilled_quantity_total?: number | string;
   requested_estimated_value_total?: number | string | null;
   remaining_estimated_value_total?: number | string | null;
+  created_by_user_id?: string | null;
   created_by_user_name?: string | null;
   submitted_by_user_name?: string | null;
   submitted_at?: string | null;
@@ -1421,7 +1423,8 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
 
 export default function InventoryRequisitionsPage() {
   const queryClient = useQueryClient();
-  const capabilities = useMemo(() => getRoleCapabilities(), []);
+  const capabilities = getRoleCapabilities();
+  const currentUserId = getCurrentTenantUserId();
   const [status, setStatus] = useState('');
   const [dueState, setDueState] = useState('');
   const [fulfillmentState, setFulfillmentState] = useState('');
@@ -2307,14 +2310,21 @@ export default function InventoryRequisitionsPage() {
     : selectedFulfillmentLineEntries.every(([requisitionItemId]) => !approvalThresholdNotesRequired || (fulfillmentLineNotes[requisitionItemId]?.trim().length || 0) >= selectedApprovalThresholdNoteMinLength);
   const canApprove = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canReject = selected?.status === 'submitted' && capabilities.canApproveInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
-  const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && capabilities.canCancelInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canCancelSelectedByOwnership = Boolean(
+    selected
+    && (
+      capabilities.canCancelAnyInventoryRequisitions
+      || (capabilities.canCancelOwnInventoryRequisitions && currentUserId && selected.created_by_user_id === currentUserId)
+    )
+  );
+  const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && canCancelSelectedByOwnership && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && capabilities.canCreateInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
   const selectedStatus = String(selected?.status || '');
   const showSubmitAction = selectedStatus === 'draft' && capabilities.canSubmitInventoryRequisitions;
   const showApproveAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
   const showRejectAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
-  const showCancelAction = ['draft', 'submitted', 'approved'].includes(selectedStatus) && capabilities.canCancelInventoryRequisitions;
+  const showCancelAction = ['draft', 'submitted', 'approved'].includes(selectedStatus) && canCancelSelectedByOwnership;
   const showReopenAction = ['rejected', 'cancelled'].includes(selectedStatus) && capabilities.canCreateInventoryRequisitions;
   const showWorkflowActions = showSubmitAction || showApproveAction || showRejectAction || showCancelAction || showReopenAction;
   const approvalThresholdApiRequirements = Array.isArray(selected?.approval_threshold_action_requirements)

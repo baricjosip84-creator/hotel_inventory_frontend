@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
@@ -35,7 +36,9 @@ type PurchaseOrderListItem = {
   status: PurchaseOrderStatus;
   expected_delivery_date?: string | null;
   notes?: string | null;
+  created_by_user_id?: string | null;
   created_by_user_name?: string | null;
+  require_separate_purchase_order_approver?: boolean;
   submitted_by_user_name?: string | null;
   submitted_at?: string | null;
   approved_by_user_name?: string | null;
@@ -759,6 +762,7 @@ export default function PurchaseOrdersPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const capabilities = getRoleCapabilities();
+  const currentUserId = getCurrentTenantUserId();
 
   const [filters, setFilters] = useState<Filters>(() => filtersFromSearchParams(searchParams));
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -1597,6 +1601,7 @@ export default function PurchaseOrdersPage() {
   const selectedIsLocked = isPurchaseOrderLocked(selectedDetail?.status);
   const selectedCanSubmit = selectedDetail?.status === 'draft';
   const selectedCanApprove = selectedDetail?.status === 'submitted';
+  const selectedSelfApprovalBlocked = Boolean(selectedDetail?.require_separate_purchase_order_approver !== false && currentUserId && selectedDetail?.created_by_user_id === currentUserId);
   const selectedCanCancel = selectedDetail?.status === 'draft' || selectedDetail?.status === 'submitted';
   const selectedCanClose = selectedDetail?.status === 'approved' && Number(selectedDetail?.receiving_summary?.open_linked_shipment_count || 0) === 0;
   const selectedRemainingQuantity = Number(selectedDetail?.receiving_summary?.remaining_quantity || 0);
@@ -2518,13 +2523,13 @@ export default function PurchaseOrdersPage() {
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
                   <button
                     type="button"
-                    style={selectedCostIssue ? styles.blockedActionButton : styles.primaryButton}
-                    disabled={actionMutation.isPending}
-                    aria-disabled={Boolean(selectedCostIssue)}
-                    title={selectedCostIssue || 'Approve this purchase order'}
+                    style={selectedCostIssue || selectedSelfApprovalBlocked ? styles.blockedActionButton : styles.primaryButton}
+                    disabled={actionMutation.isPending || selectedSelfApprovalBlocked}
+                    aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)}
+                    title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')}
                     onClick={approveSelectedPurchaseOrder}
                   >
-                    {actionMutation.isPending ? 'Approving...' : selectedCostIssue ? 'Approve blocked' : 'Approve'}
+                    {actionMutation.isPending ? 'Approving...' : selectedCostIssue ? 'Approve blocked' : selectedSelfApprovalBlocked ? 'Different approver required' : 'Approve'}
                   </button>
                 ) : null}
               </div>

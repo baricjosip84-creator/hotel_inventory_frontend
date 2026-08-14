@@ -133,7 +133,7 @@ const permissionGuard = read('src/utils/permissionGuard.js', backendRoot);
 const tenantController = read('src/controllers/enterpriseInventoryController.js', backendRoot);
 
 for (const [source, values, label] of [
-  [backendIndex, ["router.use('/permissions', require('./permissions'))"], 'tenant route mount'],
+  [backendIndex, ["router.use('/permissions', operationalIdempotency, require('./permissions'))"], 'tenant route mount'],
   [platformIndex, ["router.use('/permissions', require('./permissions'))"], 'platform route mount'],
   [tenantRoute, ["router.get(\n  '/me'", 'ROLE_PERMISSIONS_READ', 'ROLE_PERMISSIONS_WRITE', 'replaceTenantRolePolicy', 'resetTenantRolePolicy'], 'tenant permission routes'],
   [platformRoute, ["router.get('/me'", 'PLATFORM_ROLE_PERMISSIONS_READ', 'PLATFORM_ROLE_PERMISSIONS_WRITE', 'replacePlatformRolePolicy', 'resetPlatformRolePolicy'], 'platform permission routes'],

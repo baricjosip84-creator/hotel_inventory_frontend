@@ -100,7 +100,7 @@ function PresetEditor({ form, onChange, includeKey, disabled = false }: {
     <div style={styles.formStack}>
       {includeKey ? (
         <label style={styles.label}>Preset key
-          <input style={styles.input} value={form.key} disabled={disabled} placeholder="hotel-premium" onChange={(event) => onChange({ ...form, key: event.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })} />
+          <input style={styles.input} value={form.key} disabled={disabled} placeholder="warehouse-standard" onChange={(event) => onChange({ ...form, key: event.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })} />
         </label>
       ) : null}
       <div style={styles.twoColumn}>

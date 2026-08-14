@@ -26,6 +26,7 @@ type TenantSettingsRow = {
   business_phone?: string | null;
   tax_id?: string | null;
   default_purchase_order_payment_terms?: string | null;
+  require_separate_purchase_order_approver?: boolean | null;
   inventory_currency?: string | null;
   inventory_currency_configured_at?: string | null;
   write_locked?: boolean;
@@ -45,6 +46,7 @@ type TenantSettingsFormState = {
   business_phone: string;
   tax_id: string;
   default_purchase_order_payment_terms: string;
+  require_separate_purchase_order_approver: boolean;
   inventory_currency: string;
 };
 
@@ -60,6 +62,7 @@ type TenantPayload = {
   business_phone: string | null;
   tax_id: string | null;
   default_purchase_order_payment_terms: string | null;
+  require_separate_purchase_order_approver: boolean;
   inventory_currency: string;
   confirm_inventory_currency: boolean;
 };
@@ -76,6 +79,7 @@ const emptyFormState: TenantSettingsFormState = {
   business_phone: '',
   tax_id: '',
   default_purchase_order_payment_terms: '',
+  require_separate_purchase_order_approver: true,
   inventory_currency: DEFAULT_INVENTORY_CURRENCY
 };
 
@@ -119,6 +123,7 @@ function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormSt
     business_phone: tenant.business_phone ?? '',
     tax_id: tenant.tax_id ?? '',
     default_purchase_order_payment_terms: tenant.default_purchase_order_payment_terms ?? '',
+    require_separate_purchase_order_approver: tenant.require_separate_purchase_order_approver !== false,
     inventory_currency: normalizeCurrencyCode(tenant.inventory_currency)
   };
 }
@@ -136,6 +141,7 @@ function buildPayload(formState: TenantSettingsFormState, confirmInventoryCurren
     business_phone: formState.business_phone.trim() || null,
     tax_id: formState.tax_id.trim() || null,
     default_purchase_order_payment_terms: formState.default_purchase_order_payment_terms.trim() || null,
+    require_separate_purchase_order_approver: formState.require_separate_purchase_order_approver,
     inventory_currency: formState.inventory_currency.trim().toUpperCase(),
     confirm_inventory_currency: confirmInventoryCurrency
   };
@@ -153,6 +159,7 @@ function sameFormState(left: TenantSettingsFormState, right: TenantSettingsFormS
     && left.business_phone === right.business_phone
     && left.tax_id === right.tax_id
     && left.default_purchase_order_payment_terms === right.default_purchase_order_payment_terms
+    && left.require_separate_purchase_order_approver === right.require_separate_purchase_order_approver
     && left.inventory_currency === right.inventory_currency;
 }
 
@@ -253,7 +260,7 @@ export default function TenantSettingsPage() {
   const canEdit = canUpdateTenants && !isWriteLocked && !isSaving;
   const lastRefreshedLabel = formatTimestamp(tenantsQuery.dataUpdatedAt);
 
-  const updateField = (field: keyof TenantSettingsFormState, value: string) => {
+  const updateField = <K extends keyof TenantSettingsFormState>(field: K, value: TenantSettingsFormState[K]) => {
     setFormState((current) => ({
       ...current,
       [field]: value
@@ -542,6 +549,20 @@ export default function TenantSettingsPage() {
                 <span style={styles.label}>Default Purchase Order Payment Terms</span>
                 <textarea style={{ ...styles.input, minHeight: 68, resize: 'vertical' }} value={formState.default_purchase_order_payment_terms} onChange={(event) => updateField('default_purchase_order_payment_terms', event.target.value)} disabled={!canEdit} maxLength={1000} placeholder="Example: Net 30 days from invoice date" />
               </label>
+
+              <div style={{ ...styles.field, ...styles.fullWidth }}>
+                <span style={styles.label}>Purchase order approval separation</span>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <input
+                    type="checkbox"
+                    checked={formState.require_separate_purchase_order_approver}
+                    onChange={(event) => updateField('require_separate_purchase_order_approver', event.target.checked)}
+                    disabled={!canEdit}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span style={styles.fieldHelp}>Require a different employee to approve a purchase order than the employee who created it. Recommended and enabled by default; turn this off only when a small team must allow self-approval.</span>
+                </label>
+              </div>
 
               <label style={styles.field}>
                 <span style={styles.labelRow}>

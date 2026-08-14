@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
@@ -48,6 +49,7 @@ type InventoryReservation = {
   needed_by?: string | null;
   expires_at?: string | null;
   notes?: string | null;
+  created_by_user_id?: string | null;
   line_count?: number | string;
   requested_quantity_total?: number | string;
   reserved_quantity_total?: number | string;
@@ -124,6 +126,7 @@ type ReservationConflict = {
   priority?: string | null;
   source_type?: string | null;
   needed_by?: string | null;
+  created_by_user_id?: string | null;
   product_id: string;
   product_name?: string | null;
   storage_location_id?: string | null;
@@ -495,6 +498,7 @@ export default function InventoryReservationsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const permissions = getRoleCapabilities();
+  const currentUserId = getCurrentTenantUserId();
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedReservationId, setSelectedReservationId] = useState('');
   const [draft, setDraft] = useState<ReservationDraft>(defaultDraft);
@@ -1084,7 +1088,7 @@ export default function InventoryReservationsPage() {
                 (permissions.canFulfillInventoryReservations && actionState.canFulfill) ||
                 (permissions.canReleaseInventoryReservations && actionState.canRelease) ||
                 (permissions.canExpireInventoryReservations && actionState.canExpire) ||
-                (permissions.canCancelInventoryReservations && actionState.canCancel);
+                ((permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && selectedReservation?.created_by_user_id === currentUserId)) && actionState.canCancel);
 
               if (!hasVisibleAction) {
                 return <p style={pageStyles.muted}>{actionState.managedFromOutbound ? 'This stock reservation belongs to a customer order. Manage it from Outbound.' : 'No lifecycle actions are currently available for this reservation.'}</p>;
@@ -1097,7 +1101,7 @@ export default function InventoryReservationsPage() {
                   {permissions.canFulfillInventoryReservations && actionState.canFulfill ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('fulfill')}>Fulfill all reserved</button> : null}
                   {permissions.canReleaseInventoryReservations && actionState.canRelease ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('release')}>Release remaining</button> : null}
                   {permissions.canExpireInventoryReservations && actionState.canExpire ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('expire')}>{selectedReservation.expires_at ? 'Expire due reservation' : 'Expire manually'}</button> : null}
-                  {permissions.canCancelInventoryReservations && actionState.canCancel ? <button type="button" style={pageStyles.dangerButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending || !actionNote.trim()} onClick={() => runLifecycleAction('cancel')}>Cancel</button> : null}
+                  {(permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && selectedReservation?.created_by_user_id === currentUserId)) && actionState.canCancel ? <button type="button" style={pageStyles.dangerButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending || !actionNote.trim()} onClick={() => runLifecycleAction('cancel')}>Cancel</button> : null}
                 </div>
               );
             })()}
@@ -1318,7 +1322,7 @@ export default function InventoryReservationsPage() {
                       <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>Open</button>
                       {row.source_type !== 'outbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
                       {row.source_type !== 'outbound' && permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Release the open protected quantity for ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>Release</button> : null}
-                      {row.source_type !== 'outbound' && permissions.canCancelInventoryReservations ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
+                      {row.source_type !== 'outbound' && (permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && row.created_by_user_id === currentUserId)) ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
                     </div>
                   </td>
                 </tr>

@@ -3,62 +3,21 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { CSSProperties, MouseEvent } from 'react';
 import {
   clearSupportSessionAccessToken,
-  getAccessToken,
   getSupportSessionInfo
 } from '../lib/auth';
 import { logoutTenantSession } from '../lib/api';
+import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/supportContext';
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
-import { getTenantPermissionSnapshot, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getCurrentUserRole, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
 import CopyrightNotice from '../components/CopyrightNotice';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
-
-type UserRole = 'admin' | 'manager' | 'staff' | null;
-
-function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
-
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    return JSON.parse(atob(padded)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function getCurrentUserRole(): UserRole {
-  const payload = decodeJwtPayload(getAccessToken());
-  const role = payload?.role;
-
-  if (role === 'admin' || role === 'manager' || role === 'staff') {
-    return role;
-  }
-
-  return null;
-}
-
-function getCurrentAccessRoleLabel(): string | null {
-  const payload = decodeJwtPayload(getAccessToken());
-  if (typeof payload?.custom_role_name === 'string' && payload.custom_role_name.trim()) {
-    return payload.custom_role_name.trim();
-  }
-  const role = payload?.role;
-  return typeof role === 'string' && role ? role : null;
-}
 
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
@@ -76,10 +35,9 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
-  const role = useMemo(() => getCurrentUserRole(), []);
   const [, setPermissionRevision] = useState(0);
-  const permissionSnapshot = getTenantPermissionSnapshot();
-  const accessRoleLabel = permissionSnapshot?.access_role_label || permissionSnapshot?.custom_role_name || getCurrentAccessRoleLabel();
+  const role = getCurrentUserRole();
+  const accessRoleLabel = getCurrentAccessRoleLabel();
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
 
@@ -154,8 +112,30 @@ export default function AppLayout() {
 
   useEffect(() => {
     const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
+    const refreshPermissions = () => {
+      if (document.visibilityState === 'hidden') return;
+      void refreshTenantPermissionSnapshot();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshPermissions();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'inventory_tenant_effective_permissions' || event.key === 'inventory_access_token') {
+        setPermissionRevision((value) => value + 1);
+        refreshPermissions();
+      }
+    };
+
     window.addEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
-    return () => window.removeEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+    window.addEventListener('focus', refreshPermissions);
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener(TENANT_PERMISSION_SNAPSHOT_EVENT, onPermissionsChanged);
+      window.removeEventListener('focus', refreshPermissions);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   const visibleNavSections = tenantNavigationSections
@@ -414,22 +394,13 @@ export default function AppLayout() {
         }}
       >
         <div style={styles.brandBlock}>
-          <div style={styles.brandTitle}>Inventory Platform</div>
-          <div style={styles.brandSubtitle}>Multi-tenant control center</div>
+          <div style={styles.brandTitle}>Inventory Operations</div>
+          <div style={styles.brandSubtitle}>{tenantSubscriptionAccess?.tenant.name || 'Company workspace'}</div>
           {accessRoleLabel ? <div style={styles.rolePill}>ROLE: {accessRoleLabel.toUpperCase()}</div> : null}
 
-        {supportSession.isSupportSession ? (
+          {supportSession.isSupportSession ? (
             <div style={styles.supportPill}>SUPPORT MODE</div>
           ) : null}
-          <div style={styles.accessSummaryCard}>
-            <div style={styles.accessSummaryLabel}>Tenant access</div>
-            <div style={styles.accessSummaryValue}>
-              {tenantAccess.permittedModuleCount}/{tenantAccess.totalModuleCount} modules visible
-            </div>
-            <div style={styles.accessSummaryMeta}>
-              Tenant: {tenantAccess.tenantId || 'unavailable'}
-            </div>
-          </div>
         </div>
 
         <div style={styles.navScrollArea}>
@@ -517,14 +488,6 @@ export default function AppLayout() {
               >
                 {pageMeta.subtitle}
               </p>
-              {currentModule ? (
-                <div style={styles.moduleMetaRow}>
-                  <span style={styles.moduleMetaPill}>{currentModule.moduleGroupLabel}</span>
-                  <span style={styles.moduleMetaPill}>Priority: {currentModule.priority}</span>
-                  <span style={styles.moduleMetaPill}>Route: {currentModule.to}</span>
-                  <span style={styles.moduleMetaPill}>Access: {(currentModule.permission || currentModule.requiredPermissions?.length || currentModule.requiredAnyPermissions?.length) ? 'permission-gated' : currentModule.roles?.length ? 'role-gated' : 'authenticated'}</span>
-                </div>
-              ) : null}
             </div>
           </div>
         </header>
@@ -532,11 +495,7 @@ export default function AppLayout() {
 
         {!tenantAccess.hasTenantContext ? (
           <div style={styles.tenantAccessBanner}>
-            <strong>Tenant context unavailable.</strong> The session token did not expose a tenant identifier, so tenant-safe API requests may fail until the user signs in again.
-          </div>
-        ) : tenantAccess.hiddenModuleCount > 0 ? (
-          <div style={styles.tenantAccessNotice}>
-            <strong>Permission-aware workspace.</strong> This role can access {tenantAccess.permittedModuleCount} of {tenantAccess.totalModuleCount} registered tenant modules. Hidden modules remain unavailable in navigation and protected routes.
+            <strong>Company context unavailable.</strong> Please sign in again before continuing inventory work.
           </div>
         ) : null}
 

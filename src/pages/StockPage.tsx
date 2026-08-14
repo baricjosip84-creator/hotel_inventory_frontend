@@ -483,18 +483,16 @@ export default function StockPage() {
   const [searchParams] = useSearchParams();
   const requestedProductId = searchParams.get('product_id')?.trim() || '';
   const {
+    isAdmin,
     canConsumeStock,
     canCountStock: canCount,
     canAdjustStock: canAdjust,
     canViewInventoryUsage,
     canRecordInventoryUsage
-  } = useMemo(() => getRoleCapabilities(), []);
-  const canViewMovements = useMemo(
-    () => hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ),
-    []
-  );
-  const canConsume = canConsumeStock && canRecordInventoryUsage;
-  const accessRoleLabel = useMemo(() => getCurrentAccessRoleLabel(), []);
+  } = getRoleCapabilities();
+  const canViewMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
+  const canConsume = !isAdmin && canConsumeStock && canRecordInventoryUsage;
+  const accessRoleLabel = getCurrentAccessRoleLabel();
   const selectedDetailsRef = useRef<HTMLElement | null>(null);
 
   const stockQuery = useQuery({

@@ -3,6 +3,7 @@ import { InputField, MetricCard, SelectField } from '../EnterpriseInventoryShare
 import { styles } from '../EnterpriseInventoryStyles';
 import { formatCurrency, formatDate, formatNumber } from '../EnterpriseInventoryFormat';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
+import { getCurrentTenantUserId } from '../../../lib/auth';
 import type { PurchaseOrder, PurchaseOrderShipmentForm } from '../EnterpriseInventoryTypes';
 
 type ProcurementSummary = {
@@ -116,6 +117,7 @@ export function ProcurementMatchTab({
   setPurchaseOrderShipmentForm,
   shipmentsQuery
 }: ProcurementMatchTabProps) {
+  const currentUserId = getCurrentTenantUserId();
   const canCreateShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_WRITE);
   const canSubmitPurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_SUBMIT);
   const canApprovePurchaseOrders = hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE);
@@ -202,7 +204,13 @@ export function ProcurementMatchTab({
                       <td style={styles.td}>
                         <div style={styles.actions}>
                           {purchaseOrder.status === 'draft' ? <button type="button" style={canSubmitPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canSubmitPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'submit')}>Submit</button> : null}
-                          {purchaseOrder.status === 'submitted' ? <button type="button" style={canApprovePurchaseOrders ? styles.smallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canApprovePurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'approve')}>Approve</button> : null}
+                          {purchaseOrder.status === 'submitted' ? (() => {
+                            const selfApprovalBlocked = purchaseOrder.require_separate_purchase_order_approver !== false
+                              && Boolean(currentUserId)
+                              && purchaseOrder.created_by_user_id === currentUserId;
+                            const approveEnabled = canApprovePurchaseOrders && !selfApprovalBlocked && !purchaseOrderLifecycleMutation.isPending;
+                            return <button type="button" style={approveEnabled ? styles.smallButton : styles.disabledButton} disabled={!approveEnabled} title={selfApprovalBlocked ? 'A different employee must approve this purchase order.' : undefined} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'approve')}>{selfApprovalBlocked ? 'Different approver required' : 'Approve'}</button>;
+                          })() : null}
                           {['approved', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={canCancelPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'close')}>Close</button> : null}
                           {purchaseOrder.status === 'cancelled' ? <button type="button" style={canCancelPurchaseOrders ? styles.secondarySmallButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'reopen')}>Reopen</button> : null}
                           {!['cancelled', 'completed'].includes(purchaseOrder.status) ? <button type="button" style={canCancelPurchaseOrders ? styles.dangerButton : styles.disabledButton} disabled={purchaseOrderLifecycleMutation.isPending || !canCancelPurchaseOrders} onClick={() => handlePurchaseOrderLifecycleAction(purchaseOrder, 'cancel')}>Cancel</button> : null}

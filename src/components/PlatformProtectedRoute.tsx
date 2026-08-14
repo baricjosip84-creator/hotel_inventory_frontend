@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
-import { hasAnyPlatformRole } from '../lib/platformAuth';
 import type { PlatformIdentity, PlatformRole } from '../lib/platformAuth';
 import type { PlatformPermission } from '../lib/platformPermissions';
-import { hasAllPlatformPermissions, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
+import { getCurrentPlatformRoleFromToken, hasAllPlatformPermissions, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
 import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
 
 type PlatformProtectedRouteProps = PropsWithChildren<{
@@ -30,8 +29,8 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
 
       try {
         const identity = await platformApiRequest<PlatformIdentity>('/platform/auth/me');
-        await refreshPlatformPermissionSnapshot();
-        if (isMounted) setStatus(identity?.id ? 'allowed' : 'denied');
+        const permissionSnapshot = await refreshPlatformPermissionSnapshot();
+        if (isMounted) setStatus(identity?.id && permissionSnapshot ? 'allowed' : 'denied');
       } catch {
         if (isMounted) setStatus('denied');
       }
@@ -57,7 +56,7 @@ export function PlatformProtectedRoute({ children, allowedRoles, requiredPermiss
     return <Navigate to="/platform/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (allowedRoles && !hasAnyPlatformRole(allowedRoles)) {
+  if (allowedRoles && !allowedRoles.includes(getCurrentPlatformRoleFromToken())) {
     return <Navigate to="/platform" replace />;
   }
 

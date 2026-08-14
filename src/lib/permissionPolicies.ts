@@ -1,7 +1,8 @@
-import { apiRequest } from './api';
+import { ApiError, apiRequest } from './api';
 import { platformApiRequest } from './platformApi';
 import {
   clearTenantPermissionSnapshot,
+  getTenantPermissionSnapshot,
   setTenantPermissionSnapshot,
   type TenantPermission,
   type TenantPermissionSnapshot,
@@ -9,6 +10,7 @@ import {
 } from './permissions';
 import {
   clearPlatformPermissionSnapshot,
+  getPlatformPermissionSnapshot,
   setPlatformPermissionSnapshot,
   type PlatformPermission,
   type PlatformPermissionSnapshot
@@ -122,9 +124,14 @@ export async function refreshTenantPermissionSnapshot(): Promise<TenantPermissio
       setTenantPermissionSnapshot(snapshot);
       return snapshot;
     })
-    .catch(() => {
-      clearTenantPermissionSnapshot();
-      return null;
+    .catch((error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        clearTenantPermissionSnapshot();
+        return null;
+      }
+
+      // Preserve the last authoritative snapshot during transient/network errors.
+      return getTenantPermissionSnapshot();
     })
     .finally(() => {
       tenantRefreshPromise = null;
@@ -147,9 +154,14 @@ export async function refreshPlatformPermissionSnapshot(): Promise<PlatformPermi
       setPlatformPermissionSnapshot(snapshot);
       return snapshot;
     })
-    .catch(() => {
-      clearPlatformPermissionSnapshot();
-      return null;
+    .catch((error) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        clearPlatformPermissionSnapshot();
+        return null;
+      }
+
+      // Preserve the last authoritative snapshot during transient/network errors.
+      return getPlatformPermissionSnapshot();
     })
     .finally(() => {
       platformRefreshPromise = null;

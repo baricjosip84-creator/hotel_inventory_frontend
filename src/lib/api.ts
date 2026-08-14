@@ -394,6 +394,112 @@ function createIdempotencyKey(): string {
   return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/*
+  Browser-side logical-mutation idempotency.
+
+  A generated Idempotency-Key already protects the backend from an internal
+  auth-refresh retry of one apiRequest call. The remaining operational gap was
+  a user double-clicking the same write or manually retrying after the network
+  dropped after the server may already have committed the change. A brand-new
+  apiRequest call previously generated a brand-new key, so the backend could not
+  recognize that retry as the same logical operation.
+
+  We now reuse one key for identical JSON writes while they are in flight and
+  retain it briefly only after a network-level uncertain outcome. Any completed
+  HTTP response clears the retained key, so a later intentional repeat remains a
+  new operation. Explicit caller-provided idempotency keys still take priority.
+*/
+const MUTATION_UNCERTAINTY_TTL_MS = 10 * 60 * 1000;
+
+type MutationKeyState = {
+  key: string;
+  count: number;
+};
+
+type UncertainMutationKeyState = {
+  key: string;
+  expiresAt: number;
+};
+
+const inFlightMutationKeys = new Map<string, MutationKeyState>();
+const uncertainMutationKeys = new Map<string, UncertainMutationKeyState>();
+
+function mutationRequestFingerprint(path: string, options: SafeMutationRequestInit): string | null {
+  if (!isWriteRequest(options) || options.skipIdempotencyKey) return null;
+  if (isAuthLoginRequest(path) || isAuthRefreshRequest(path)) return null;
+
+  const headers = new Headers(options.headers || {});
+  if (options.idempotencyKey || headers.has('Idempotency-Key')) return null;
+
+  // JSON writes are the operational path used throughout the tenant app.
+  // Do not guess a fingerprint for FormData, Blob, streams, or other bodies.
+  if (options.body !== undefined && typeof options.body !== 'string') return null;
+
+  const method = String(options.method || 'GET').toUpperCase();
+  const version = options.version !== undefined
+    ? String(options.version)
+    : (headers.get('If-Match-Version') || '');
+
+  return `${method}\n${path}\n${version}\n${typeof options.body === 'string' ? options.body : ''}`;
+}
+
+function pruneUncertainMutationKeys(now = Date.now()): void {
+  for (const [fingerprint, state] of uncertainMutationKeys.entries()) {
+    if (state.expiresAt <= now) uncertainMutationKeys.delete(fingerprint);
+  }
+}
+
+function prepareLogicalMutationKey(
+  path: string,
+  options: SafeMutationRequestInit
+): { options: SafeMutationRequestInit; fingerprint: string | null; key: string | null } {
+  const fingerprint = mutationRequestFingerprint(path, options);
+  if (!fingerprint) return { options, fingerprint: null, key: null };
+
+  pruneUncertainMutationKeys();
+
+  const inFlight = inFlightMutationKeys.get(fingerprint);
+  const uncertain = uncertainMutationKeys.get(fingerprint);
+  const key = inFlight?.key || uncertain?.key || createIdempotencyKey();
+
+  if (inFlight) {
+    inFlight.count += 1;
+  } else {
+    inFlightMutationKeys.set(fingerprint, { key, count: 1 });
+  }
+
+  return {
+    options: { ...options, idempotencyKey: key },
+    fingerprint,
+    key
+  };
+}
+
+function releaseInFlightMutationKey(fingerprint: string | null, key: string | null): void {
+  if (!fingerprint || !key) return;
+  const current = inFlightMutationKeys.get(fingerprint);
+  if (!current || current.key !== key) return;
+
+  current.count -= 1;
+  if (current.count <= 0) inFlightMutationKeys.delete(fingerprint);
+}
+
+function markMutationOutcomeDefinite(fingerprint: string | null, key: string | null): void {
+  releaseInFlightMutationKey(fingerprint, key);
+  if (!fingerprint || !key) return;
+  const uncertain = uncertainMutationKeys.get(fingerprint);
+  if (uncertain?.key === key) uncertainMutationKeys.delete(fingerprint);
+}
+
+function markMutationOutcomeUncertain(fingerprint: string | null, key: string | null): void {
+  releaseInFlightMutationKey(fingerprint, key);
+  if (!fingerprint || !key) return;
+  uncertainMutationKeys.set(fingerprint, {
+    key,
+    expiresAt: Date.now() + MUTATION_UNCERTAINTY_TTL_MS
+  });
+}
+
 function withMutationSafetyHeaders(path: string, options: SafeMutationRequestInit = {}): RequestInit {
   const {
     idempotencyKey,
@@ -885,7 +991,8 @@ export async function apiRequest<T>(
   const isLoginRequest = isAuthLoginRequest(path);
   const isRefreshRequest = isAuthRefreshRequest(path);
   const isCsrfRequest = isAuthCsrfRequest(path);
-  const requestOptions = withMutationSafetyHeaders(path, options as SafeMutationRequestInit);
+  const logicalMutation = prepareLogicalMutationKey(path, options as SafeMutationRequestInit);
+  const requestOptions = withMutationSafetyHeaders(path, logicalMutation.options);
   const method = String(requestOptions.method || options.method || 'GET').toUpperCase();
   const shouldShowMutationFeedback =
     isWriteRequest(requestOptions) &&
@@ -903,6 +1010,7 @@ export async function apiRequest<T>(
   if (!isLoginRequest && !isRefreshRequest && !isCsrfRequest && isAccessTokenExpired(currentAccessToken)) {
     const recovered = tenantSessionRecoveryFailed ? null : await refreshAccessToken(currentAccessToken);
     if (!recovered) {
+      markMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
       clearAuthTokens();
       tenantSessionRecoveryFailed = true;
       redirectToLoginAfterExpiredSession();
@@ -916,6 +1024,7 @@ export async function apiRequest<T>(
   try {
     ({ response, accessTokenUsed } = await performRequest(path, requestOptions));
   } catch (error: unknown) {
+    markMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
     const message = error instanceof Error ? error.message : 'Network error while contacting backend';
     captureApiFailure({ area: 'tenant', path, method, status: 0, error });
     if (shouldShowMutationFeedback) {
@@ -936,6 +1045,7 @@ export async function apiRequest<T>(
       try {
         ({ response } = await performRequest(path, requestOptions));
       } catch (error: unknown) {
+        markMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
         const message = error instanceof Error ? error.message : 'Network error while contacting backend';
         if (shouldShowMutationFeedback) {
           dispatchTenantMutationFeedback({ type: 'error', message });
@@ -947,11 +1057,18 @@ export async function apiRequest<T>(
 
   try {
     const result = await parseResponse<T>(response);
+    markMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
     if (shouldShowMutationFeedback) {
       dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body) });
     }
     return result;
   } catch (error) {
+    if (error instanceof ApiError) {
+      markMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
+    } else {
+      markMutationOutcomeUncertain(logicalMutation.fingerprint, logicalMutation.key);
+    }
+
     captureApiFailure({
       area: 'tenant',
       path,
