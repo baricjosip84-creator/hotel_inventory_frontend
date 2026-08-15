@@ -271,10 +271,18 @@ function getReservationSourceIdForPayload(draft: ReservationDraft): string | und
   return value || undefined;
 }
 
+const PROTECTED_LINKED_RESERVATION_SOURCE_TYPES = new Set(['requisition', 'procurement_inbound', 'system', 'outbound']);
+
+function isProtectedLinkedReservationSource(sourceType?: string | null): boolean {
+  return PROTECTED_LINKED_RESERVATION_SOURCE_TYPES.has(String(sourceType || '').toLowerCase());
+}
+
 
 function getReservationActionState(reservation: InventoryReservation) {
   const status = String(reservation.status || '').toLowerCase();
   const managedFromOutbound = String(reservation.source_type || '').toLowerCase() === 'outbound';
+  const fulfillFromRequisition = String(reservation.source_type || '').toLowerCase() === 'requisition';
+  const procurementInboundTracking = String(reservation.source_type || '').toLowerCase() === 'procurement_inbound';
   const requestedQuantity = toNumber(reservation.requested_quantity_total);
   const reservedQuantity = toNumber(reservation.reserved_quantity_total);
   const openReservedQuantity = toNumber(reservation.open_reserved_quantity_total);
@@ -289,9 +297,11 @@ function getReservationActionState(reservation: InventoryReservation) {
 
   return {
     managedFromOutbound,
+    fulfillFromRequisition,
+    procurementInboundTracking,
     canActivate: !managedFromOutbound && isDraft,
-    canAllocate: !managedFromOutbound && !isClosed && (isActive || isPartiallyAllocated) && remainingRequestedQuantity > 0,
-    canFulfill: !managedFromOutbound && (isAllocated || isPartiallyFulfilled) && openReservedQuantity > 0,
+    canAllocate: !managedFromOutbound && !procurementInboundTracking && !isClosed && (isActive || isPartiallyAllocated) && remainingRequestedQuantity > 0,
+    canFulfill: !managedFromOutbound && !fulfillFromRequisition && !procurementInboundTracking && (isAllocated || isPartiallyFulfilled) && openReservedQuantity > 0,
     canRelease: !managedFromOutbound && !isClosed && !isDraft && (openReservedQuantity > 0 || remainingRequestedQuantity > 0),
     canExpire: !managedFromOutbound && !isClosed && !isDraft && (!reservation.expires_at || new Date(String(reservation.expires_at)).getTime() <= Date.now()),
     canCancel: !managedFromOutbound && (isDraft || isActive || isPartiallyAllocated || isAllocated || isPartiallyFulfilled)
@@ -843,13 +853,12 @@ export default function InventoryReservationsPage() {
             <label style={pageStyles.label}>Source type
               <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : draft.source_id })}>
                 <option value="manual">Manual</option>
-                <option value="requisition">Requisition</option>
                 <option value="event">Event</option>
                 <option value="department">Department</option>
-                <option value="procurement_inbound">Procurement inbound</option>
                 <option value="forecast">Forecast</option>
               </select>
             </label>
+            <p style={{ ...pageStyles.muted, gridColumn: '1 / -1', margin: 0 }}>Requisition and purchase-order reservations are created from their source workflow so quantities and ownership stay validated.</p>
             {draft.source_type !== 'manual' ? (
               <label style={pageStyles.label}>Linked source ID (UUID)
                 <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} placeholder="Required UUID for linked source" />
@@ -1063,7 +1072,7 @@ export default function InventoryReservationsPage() {
               <strong>{selectedReservation.reservation_number}</strong>
               <span style={pageStyles.pill}>{formatCode(selectedReservation.status)}</span>
               <span style={pageStyles.muted}>Open reserved: {formatNumber(selectedReservation.open_reserved_quantity_total)}</span>
-              {permissions.canCreateInventoryReservations && selectedReservation.status === 'draft' && !editDraft ? (
+              {permissions.canCreateInventoryReservations && !isProtectedLinkedReservationSource(selectedReservation.source_type) && (permissions.canCancelAnyInventoryReservations || (currentUserId && selectedReservation.created_by_user_id === currentUserId)) && selectedReservation.status === 'draft' && !editDraft ? (
                 <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(buildDraftFromReservation(selectedReservation))}>Edit draft</button>
               ) : null}
             </div>
@@ -1076,6 +1085,12 @@ export default function InventoryReservationsPage() {
               <div><span style={pageStyles.muted}>Expires at</span><br /><strong>{formatDate(selectedReservation.expires_at)}</strong></div>
               <div style={{ gridColumn: '1 / -1' }}><span style={pageStyles.muted}>Notes</span><br /><span>{selectedReservation.notes || 'No notes recorded.'}</span></div>
             </div>
+            {selectedReservation.source_type === 'requisition' ? (
+              <p style={pageStyles.muted}>Fulfill this linked demand from the Requisitions page. Allocation and release stay here; fulfillment is recorded from the requisition so both records remain synchronized.</p>
+            ) : null}
+            {selectedReservation.source_type === 'procurement_inbound' ? (
+              <p style={pageStyles.muted}>This is a tracking-only inbound commitment from a purchase order. Receive stock through Shipments; current on-hand stock cannot be allocated or fulfilled from this reservation.</p>
+            ) : null}
             {selectedReservation.source_type !== 'outbound' ? <label style={pageStyles.label}>Lifecycle note
               <input style={pageStyles.input} value={actionNote} onChange={(event) => setActionNote(event.target.value)} placeholder="Required for cancellation; optional context for release, expiration, or fulfillment" />
             </label> : null}
@@ -1108,17 +1123,15 @@ export default function InventoryReservationsPage() {
             {selectedReservation.expires_at && new Date(selectedReservation.expires_at).getTime() > Date.now() && !['fulfilled', 'released', 'expired', 'cancelled'].includes(String(selectedReservation.status)) ? (
               <p style={pageStyles.muted}>This reservation cannot be expired manually until {formatDate(selectedReservation.expires_at)}.</p>
             ) : null}
-            {editDraft && selectedReservation.status === 'draft' ? (
+            {editDraft && selectedReservation.status === 'draft' && (permissions.canCancelAnyInventoryReservations || (currentUserId && selectedReservation.created_by_user_id === currentUserId)) ? (
               <div style={pageStyles.card}>
                 <h3 style={pageStyles.sectionTitle}>Edit draft reservation</h3>
                 <div style={pageStyles.formGrid}>
                   <label style={pageStyles.label}>Source type
                     <select style={pageStyles.input} value={editDraft.source_type} onChange={(event) => setEditDraft({ ...editDraft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : editDraft.source_id })}>
                       <option value="manual">Manual</option>
-                      <option value="requisition">Requisition</option>
                       <option value="event">Event</option>
                       <option value="department">Department</option>
-                      <option value="procurement_inbound">Procurement inbound</option>
                       <option value="forecast">Forecast</option>
                     </select>
                   </label>
@@ -1320,7 +1333,7 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>
                     <div style={pageStyles.buttonRow}>
                       <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>Open</button>
-                      {row.source_type !== 'outbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
+                      {row.source_type !== 'outbound' && row.source_type !== 'procurement_inbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
                       {row.source_type !== 'outbound' && permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Release the open protected quantity for ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>Release</button> : null}
                       {row.source_type !== 'outbound' && (permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && row.created_by_user_id === currentUserId)) ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
                     </div>

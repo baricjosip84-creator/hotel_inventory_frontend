@@ -318,6 +318,12 @@ type RequisitionExportRow = {
   requisition_notes?: string | null;
 };
 
+type LinkedReservationResult = {
+  id: string;
+  reservation_number: string;
+  status: string;
+};
+
 type RequisitionSummary = {
   status_counts?: Record<string, {
     count: number;
@@ -1737,6 +1743,18 @@ export default function InventoryRequisitionsPage() {
     }
   });
 
+  const createLinkedReservationMutation = useMutation({
+    mutationFn: ({ id, activate }: { id: string; activate: boolean }) => apiMutationRequest<LinkedReservationResult>(`/inventory-reservations/from-requisition/${id}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        activate,
+        allocate: false,
+        allow_partial: true,
+        linkage_note: 'Protect open requisition quantity'
+      })
+    })
+  });
+
   const fulfillMutation = useMutation({
     mutationFn: () => {
       if (!selected?.id) throw new Error('Select a requisition first.');
@@ -2294,12 +2312,20 @@ export default function InventoryRequisitionsPage() {
     return Boolean(item.product_id) && Number.isFinite(quantity) && quantity > 0;
   });
   const draftDepartmentValid = Boolean(form.requesting_department.trim());
+  const canManageSelectedDraftByOwnership = Boolean(
+    selected
+      && (
+        capabilities.canCancelAnyInventoryRequisitions
+        || (currentUserId && selected.created_by_user_id === currentUserId)
+      )
+  );
   const canSaveDraft = capabilities.canCreateInventoryRequisitions
+    && (!editingDraftId || canManageSelectedDraftByOwnership)
     && draftDepartmentValid
     && draftItemsValid
     && !draftHasDuplicateProducts
     && (!draftSaveThresholdGoverned || (editedDraftNotesMeetThresholdDepth && editedDraftLineNotesMeetThresholdDepth));
-  const canSubmit = selected?.status === 'draft' && capabilities.canSubmitInventoryRequisitions && (!approvalThresholdNotesRequired || (draftNotesMeetThresholdDepth && selectedDraftLineNotesMeetThresholdDepth));
+  const canSubmit = selected?.status === 'draft' && capabilities.canSubmitInventoryRequisitions && canManageSelectedDraftByOwnership && (!approvalThresholdNotesRequired || (draftNotesMeetThresholdDepth && selectedDraftLineNotesMeetThresholdDepth));
   const workflowNotesLength = workflowNotes.trim().length;
   const workflowNotesMeetThresholdDepth = workflowNotesLength >= selectedApprovalThresholdNoteMinLength;
   const selectedFulfillmentLineEntries = Object.entries(fulfillmentLines).filter(([, quantity]) => quantity && Number(quantity) > 0);
@@ -2318,14 +2344,28 @@ export default function InventoryRequisitionsPage() {
     )
   );
   const canCancel = ['draft', 'submitted', 'approved'].includes(String(selected?.status)) && canCancelSelectedByOwnership && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
-  const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && capabilities.canCreateInventoryRequisitions && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canReopenSelected = Boolean(
+    selected
+      && capabilities.canCreateInventoryRequisitions
+      && (
+        capabilities.canCancelAnyInventoryRequisitions
+        || (currentUserId && selected.created_by_user_id === currentUserId)
+      )
+  );
+  const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && canReopenSelected && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const canCreateLinkedReservation = Boolean(
+    selected
+      && capabilities.canCreateInventoryReservations
+      && ['submitted', 'approved', 'partially_fulfilled'].includes(String(selected.status))
+      && (capabilities.canCancelAnyInventoryRequisitions || (currentUserId && selected.created_by_user_id === currentUserId))
+  );
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
   const selectedStatus = String(selected?.status || '');
-  const showSubmitAction = selectedStatus === 'draft' && capabilities.canSubmitInventoryRequisitions;
+  const showSubmitAction = selectedStatus === 'draft' && capabilities.canSubmitInventoryRequisitions && canManageSelectedDraftByOwnership;
   const showApproveAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
   const showRejectAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
   const showCancelAction = ['draft', 'submitted', 'approved'].includes(selectedStatus) && canCancelSelectedByOwnership;
-  const showReopenAction = ['rejected', 'cancelled'].includes(selectedStatus) && capabilities.canCreateInventoryRequisitions;
+  const showReopenAction = ['rejected', 'cancelled'].includes(selectedStatus) && canReopenSelected;
   const showWorkflowActions = showSubmitAction || showApproveAction || showRejectAction || showCancelAction || showReopenAction;
   const approvalThresholdApiRequirements = Array.isArray(selected?.approval_threshold_action_requirements)
     ? selected.approval_threshold_action_requirements.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
@@ -2347,7 +2387,7 @@ export default function InventoryRequisitionsPage() {
       ].filter((item): item is string => Boolean(item))
     : [];
   const queryError = summaryQuery.error || requisitionsQuery.error || optionsQuery.error || detailQuery.error || fulfillmentHistoryQuery.error || activityQuery.error || readinessQuery.error;
-  const mutationError = saveDraftMutation.error || workflowMutation.error || fulfillMutation.error || bulkFulfillmentMutation.error || bulkReadinessQuery.error || commentMutation.error;
+  const mutationError = saveDraftMutation.error || workflowMutation.error || createLinkedReservationMutation.error || fulfillMutation.error || bulkFulfillmentMutation.error || bulkReadinessQuery.error || commentMutation.error;
 
   return (
     <div style={styles.page}>
@@ -2386,6 +2426,9 @@ export default function InventoryRequisitionsPage() {
 
       {queryError && <div style={styles.errorBox}>Some requisition data could not be loaded: {errorMessage(queryError)}</div>}
       {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError)}</div>}
+      {createLinkedReservationMutation.data && (
+        <div style={styles.successBox}>Linked reservation {createLinkedReservationMutation.data.reservation_number} created with status {humanizeCode(createLinkedReservationMutation.data.status)}.</div>
+      )}
       {bulkFulfillmentMutation.data && (
         <div style={styles.successBox}>
           <div>
@@ -3607,9 +3650,25 @@ export default function InventoryRequisitionsPage() {
               <div><strong>Estimated value</strong><br />Requested: {formatMoney(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatMoney(selected.remaining_estimated_value_total)}</span></div>
               <div><strong>Updated</strong><br />{formatDateTime(selected.updated_at)}</div>
             </div>
-            {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && (
+            {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && canManageSelectedDraftByOwnership && (
               <div style={styles.actionsRow}>
                 <button type="button" style={styles.secondaryButton} onClick={loadSelectedDraftForEditing}>Edit draft details</button>
+              </div>
+            )}
+            {canCreateLinkedReservation && (
+              <div style={styles.actionsRow}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={createLinkedReservationMutation.isPending}
+                  onClick={() => createLinkedReservationMutation.mutate({
+                    id: selected.id,
+                    activate: capabilities.canAllocateInventoryReservations
+                  })}
+                >
+                  {createLinkedReservationMutation.isPending ? 'Creating linked reservation…' : 'Create linked reservation'}
+                </button>
+                <span style={styles.muted}>Creates the reservation from this request so source ownership and open quantities stay validated.</span>
               </div>
             )}
             {selected.status === 'draft' && approvalThresholdNotesRequired && !draftNotesMeetThresholdDepth && (

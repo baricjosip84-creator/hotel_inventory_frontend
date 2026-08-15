@@ -2568,7 +2568,7 @@ export default function PurchaseOrdersPage() {
                 <div style={styles.bridgeBox}>
                   <div>
                     <h4 style={styles.h4}>Create inbound reservation from this PO</h4>
-                    <p style={styles.muted}>Protects the open inbound purchase order quantity as a procurement inbound reservation without deducting stock.</p>
+                    <p style={styles.muted}>Tracks the open inbound purchase order quantity without deducting or reserving current on-hand stock. Receive the actual stock through Shipments.</p>
                   </div>
                   <button
                     type="button"
