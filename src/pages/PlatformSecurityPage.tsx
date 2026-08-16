@@ -163,7 +163,7 @@ export default function PlatformSecurityPage() {
           </div>
         </div>
         <div style={styles.headerActions}>
-          <button style={styles.button} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>{q.isFetching || admin.isFetching ? 'Refreshing…' : 'Refresh'}</button>
+          <button style={styles.secondaryButton} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>{q.isFetching || admin.isFetching ? 'Refreshing…' : 'Refresh'}</button>
         </div>
       </header>
 
@@ -173,7 +173,7 @@ export default function PlatformSecurityPage() {
         <section style={styles.errorCard}>
           <strong>Unable to load all platform security data.</strong>
           <p style={styles.muted}>Check your platform session, platform.security.read access, and backend availability, then retry.</p>
-          <button style={styles.button} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>Retry</button>
+          <button style={styles.secondaryButton} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>Retry</button>
         </section>
       ) : null}
 
@@ -228,7 +228,7 @@ export default function PlatformSecurityPage() {
       <section style={styles.panel}>
         <h2>MFA</h2>
         <button style={styles.button} onClick={() => setupMfa.mutate()} disabled={setupMfa.isPending}>{setupMfa.isPending ? 'Starting…' : 'Start MFA setup'}</button>{' '}
-        <button style={styles.button} onClick={() => window.confirm('Disable MFA for your own platform account?') && disable.mutate()} disabled={disable.isPending || !mfaEnabled}>{disable.isPending ? 'Disabling…' : mfaEnabled ? 'Disable MFA' : 'MFA already disabled'}</button>
+        <button style={styles.dangerButton} onClick={() => window.confirm('Disable MFA for your own platform account?') && disable.mutate()} disabled={disable.isPending || !mfaEnabled}>{disable.isPending ? 'Disabling…' : mfaEnabled ? 'Disable MFA' : 'MFA already disabled'}</button>
         {setup ? (
           <div style={styles.mfaSetup}>
             <div>
@@ -277,8 +277,8 @@ export default function PlatformSecurityPage() {
                       <td style={styles.td}>{user.active_sessions}</td>
                       <td style={styles.td}><a href={`/platform/system-audit?search=${encodeURIComponent(user.email)}`} style={styles.sourceLink}>Audit evidence</a></td>
                       <td style={styles.td}>
-                        <button style={styles.button} disabled={!canWriteAdminSecurity || unlock.isPending} onClick={() => window.confirm(`Unlock platform user ${user.email}?`) && unlock.mutate(user.id)}>Unlock</button>{' '}
-                        <button style={styles.button} disabled={!canWriteAdminSecurity || clearMfa.isPending || !user.mfa_enabled} onClick={() => window.confirm(`Clear MFA for ${user.email}? This revokes that user's active platform sessions.`) && clearMfa.mutate(user.id)}>{user.mfa_enabled ? 'Clear MFA' : 'MFA already clear'}</button>
+                        <button style={styles.secondaryButton} disabled={!canWriteAdminSecurity || unlock.isPending} onClick={() => window.confirm(`Unlock platform user ${user.email}?`) && unlock.mutate(user.id)}>Unlock</button>{' '}
+                        <button style={styles.dangerButton} disabled={!canWriteAdminSecurity || clearMfa.isPending || !user.mfa_enabled} onClick={() => window.confirm(`Clear MFA for ${user.email}? This revokes that user's active platform sessions.`) && clearMfa.mutate(user.id)}>{user.mfa_enabled ? 'Clear MFA' : 'MFA already clear'}</button>
                       </td>
                     </tr>
                   ))}
@@ -315,34 +315,36 @@ export default function PlatformSecurityPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
-  title: { margin: 0, fontSize: 28 },
+  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
   headerActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  muted: { color: '#6b7280' },
-  panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 12px 36px rgba(15,23,42,.08)', overflowX: 'auto' },
-  errorCard: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 18 },
+  muted: { color: '#64748b', lineHeight: 1.5 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
+  errorCard: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 14 },
   cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 },
-  card: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fafafa' },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginTop: 10 },
-  input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
-  button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
-  notice: { background: '#eef2ff', padding: 12, borderRadius: 12, marginTop: 10 },
+  card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: '#334155' },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginTop: 10, alignItems: 'end' },
+  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', cursor: 'pointer', background: '#2563eb', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
+  dangerButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #dc2626', cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 700 },
+  notice: { background: '#eff6ff', color: '#1e3a8a', border: '1px solid #bfdbfe', padding: 12, borderRadius: 10, marginTop: 10 },
   metaRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  metaPill: { background: '#f3f4f6', color: '#374151', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
+  metaPill: { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  flag: { background: '#eef2ff', color: '#3730a3', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  flag: { background: '#e2e8f0', color: '#475569', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
   linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  sourceLink: { color: '#2563eb', fontWeight: 700, textDecoration: 'none' },
-  mfaSetup: { background: '#eef2ff', padding: 16, borderRadius: 12, marginTop: 10, display: 'grid', gridTemplateColumns: 'minmax(180px, 260px) 1fr', gap: 16, alignItems: 'start' },
-  mfaTitle: { margin: '0 0 6px' },
-  qrCode: { width: 220, height: 220, border: '1px solid #d1d5db', borderRadius: 12, background: '#fff', padding: 8 },
+  sourceLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
+  mfaSetup: { background: '#eff6ff', border: '1px solid #bfdbfe', padding: 16, borderRadius: 12, marginTop: 10, display: 'grid', gridTemplateColumns: 'minmax(180px, 260px) 1fr', gap: 16, alignItems: 'start' },
+  mfaTitle: { margin: '0 0 6px', color: '#0f172a' },
+  qrCode: { width: 220, height: 220, border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', padding: 8 },
   secretBox: { display: 'flex', flexDirection: 'column', gap: 8 },
-  secretCode: { display: 'block', padding: 10, borderRadius: 10, background: '#fff', border: '1px solid #d1d5db', wordBreak: 'break-all' },
-  success: { background: '#dcfce7', color: '#166534', borderRadius: 12, padding: 12 },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 },
-  table: { width: '100%', borderCollapse: 'collapse', marginTop: 12 },
-  th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb' },
-  td: { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' },
+  secretCode: { display: 'block', padding: 10, borderRadius: 10, background: '#fff', border: '1px solid #cbd5e1', color: '#0f172a', wordBreak: 'break-all' },
+  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
+  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
+  table: { width: '100%', borderCollapse: 'collapse', marginTop: 12, color: '#334155' },
+  th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
+  td: { padding: '12px 8px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', color: '#334155' },
   wrap: { overflowWrap: 'anywhere' }
 };

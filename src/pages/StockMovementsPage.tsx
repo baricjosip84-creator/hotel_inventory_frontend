@@ -396,7 +396,7 @@ export default function StockMovementsPage() {
   const options = filterOptionsQuery.data ?? {};
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-stock-movements-page" style={styles.page}>
       <header style={styles.header}>
         <div>
           <h2 style={styles.title}>Stock Movements</h2>
@@ -539,23 +539,23 @@ export default function StockMovementsPage() {
 const styles: Record<string, CSSProperties> = {
   page: { width: '100%', minWidth: 0 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 20 },
-  title: { margin: 0, fontSize: 28, fontWeight: 700 },
-  description: { margin: '8px 0 0', color: '#6b7280', lineHeight: 1.5, maxWidth: 900 },
+  title: { margin: 0, fontSize: 28, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em' },
+  description: { margin: '8px 0 0', color: '#64748b', lineHeight: 1.5, maxWidth: 900 },
   panel: { minWidth: 0 },
   sectionHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 16 },
-  panelTitle: { margin: 0, fontSize: 20, fontWeight: 700 },
-  sectionDescription: { margin: '6px 0 0', color: '#6b7280', lineHeight: 1.45 },
-  summaryCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, minWidth: 0 },
-  summaryLabel: { fontSize: 13, color: '#6b7280', fontWeight: 600, marginBottom: 8 },
-  summaryValue: { fontSize: 28, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' },
-  summaryHelper: { fontSize: 12, color: '#6b7280', lineHeight: 1.4, marginTop: 8 },
-  tableWrapper: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, overflowX: 'auto', minWidth: 0 },
+  panelTitle: { margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' },
+  sectionDescription: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.45 },
+  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18, minWidth: 0, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)' },
+  summaryLabel: { fontSize: 12, color: '#64748b', fontWeight: 700, marginBottom: 8 },
+  summaryValue: { fontSize: 28, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere', color: '#0f172a' },
+  summaryHelper: { fontSize: 12, color: '#64748b', lineHeight: 1.4, marginTop: 8 },
+  tableWrapper: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflowX: 'auto', minWidth: 0 },
   table: { width: '100%', borderCollapse: 'collapse', minWidth: 1380 },
-  th: { textAlign: 'left', padding: 14, background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
-  td: { padding: 14, borderBottom: '1px solid #f3f4f6', fontSize: 14, verticalAlign: 'top', overflowWrap: 'anywhere' },
+  th: { textAlign: 'left', padding: 14, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' },
+  td: { padding: 14, borderBottom: '1px solid #f1f5f9', fontSize: 14, color: '#0f172a', verticalAlign: 'top', overflowWrap: 'anywhere' },
   badge: { display: 'inline-block', padding: '6px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' },
-  rowTitle: { fontWeight: 700, marginBottom: 5 },
-  rowSubtle: { fontSize: 12, color: '#6b7280', lineHeight: 1.4, marginTop: 4 },
+  rowTitle: { fontWeight: 700, color: '#0f172a', marginBottom: 5 },
+  rowSubtle: { fontSize: 12, color: '#64748b', lineHeight: 1.4, marginTop: 4 },
   note: { fontSize: 12, color: '#374151', lineHeight: 1.4, marginTop: 7 },
   auditId: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }
 };

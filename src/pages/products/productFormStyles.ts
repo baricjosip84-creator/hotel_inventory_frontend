@@ -25,7 +25,7 @@ export const productFormStyles: Record<string, CSSProperties> = {
     width: '100%',
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     outline: 'none'
   },
@@ -47,17 +47,17 @@ export const productFormStyles: Record<string, CSSProperties> = {
   disabledButton: {
     padding: '10px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#e5e7eb',
-    color: '#6b7280',
+    border: '1px solid #cbd5e1',
+    background: '#e2e8f0',
+    color: '#64748b',
     cursor: 'not-allowed'
   },
   secondaryButton: {
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     borderRadius: '10px',
     padding: '10px 14px',
     background: '#ffffff',
-    color: '#111827',
+    color: '#0f172a',
     fontWeight: 600,
     cursor: 'pointer'
   },
@@ -84,7 +84,7 @@ export const productFormStyles: Record<string, CSSProperties> = {
     width: '100%',
     padding: '12px 44px 12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     outline: 'none',
     fontSize: '14px',
     background: '#ffffff'
@@ -125,7 +125,7 @@ export const productFormStyles: Record<string, CSSProperties> = {
     marginBottom: '16px'
   },
   filterResultText: {
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: '13px',
     lineHeight: 1.4
   },
@@ -133,7 +133,7 @@ export const productFormStyles: Record<string, CSSProperties> = {
     width: '100%',
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     outline: 'none',
     fontSize: '14px',
     background: '#ffffff'

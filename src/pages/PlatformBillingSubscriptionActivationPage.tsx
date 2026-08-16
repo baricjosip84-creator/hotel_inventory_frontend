@@ -106,7 +106,7 @@ function displaySummaryKey(value: string) {
 
 function badgeStyle(value: string): CSSProperties {
   if (value.includes('not_required') || value.includes('no_tenants')) {
-    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
   }
   if (value.includes('review')) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -353,44 +353,44 @@ export default function PlatformBillingSubscriptionActivationPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 },
+  page: { display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, color: '#0f172a' },
   header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28 },
-  subtitle: { margin: '6px 0 0', color: '#6b7280', maxWidth: 920, lineHeight: 1.5 },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 920, lineHeight: 1.5 },
   badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, display: 'grid', gap: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 8, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
   filterControl: { display: 'grid', gap: 8, minWidth: 0 },
   label: { fontWeight: 800 },
-  input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', maxWidth: 420, width: '100%' },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', maxWidth: 420, width: '100%' },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'grid', gap: 10 },
   errorText: { color: '#991b1b', fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  metaCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, minWidth: 0 },
-  note: { color: '#374151', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  help: { color: '#6b7280', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
+  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, minWidth: 0 },
+  note: { color: '#334155', lineHeight: 1.5, overflowWrap: 'anywhere' },
+  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
   reviewNotice: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { fontSize: 28, fontWeight: 900, marginTop: 8 },
+  metric: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
   upstreamGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 },
   smallGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 14 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 20 },
+  sectionTitle: { margin: '0 0 12px', fontSize: 20, letterSpacing: '-.015em', color: '#0f172a' },
   sectionAction: { marginTop: 12, display: 'flex', flexWrap: 'wrap' },
   areaGrid: { display: 'grid', gap: 16 },
-  tenantCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  tenantCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   tenantIdentity: { minWidth: 0 },
   areaTitle: { margin: 0, fontSize: 20, overflowWrap: 'anywhere' },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 },
-  evidenceCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f9fafb', minWidth: 0 },
+  evidenceCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f8fafc', minWidth: 0 },
   evidenceValue: { overflowWrap: 'anywhere', minWidth: 0 },
   checklistGrid: { display: 'grid', gap: 10 },
-  checklistRow: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', minWidth: 0 },
+  checklistRow: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', minWidth: 0 },
   checklistCopy: { flex: '1 1 320px', minWidth: 0 },
   checklistStatus: { display: 'grid', gap: 6, justifyItems: 'end', minWidth: 0 },
-  nextStep: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, color: '#111827', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  inlineButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer', justifySelf: 'start' },
+  nextStep: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#0f172a', lineHeight: 1.5, overflowWrap: 'anywhere' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
+  inlineButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 700, cursor: 'pointer', justifySelf: 'start' },
   actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  linkButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '8px 12px', fontWeight: 800, color: '#111827', textDecoration: 'none', overflowWrap: 'anywhere' }
+  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '8px 12px', fontWeight: 800, color: '#1d4ed8', textDecoration: 'none', overflowWrap: 'anywhere' }
 };

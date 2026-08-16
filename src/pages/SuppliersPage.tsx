@@ -505,7 +505,7 @@ export default function SuppliersPage() {
   const supplierWord = summary.slaBreachSuppliers === 1 ? 'supplier' : 'suppliers';
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-suppliers-page" style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Active Suppliers"
@@ -986,7 +986,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '18px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
@@ -995,7 +995,7 @@ const styles: Record<string, CSSProperties> = {
   statTitle: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '10px'
   },
   statValue: {
@@ -1027,7 +1027,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statSubtitle: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4
   },
   panel: {
@@ -1045,7 +1045,7 @@ const styles: Record<string, CSSProperties> = {
   panelSubtitle: {
     marginTop: 0,
     marginBottom: '16px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
@@ -1074,7 +1074,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     outline: 'none',
     boxSizing: 'border-box'
@@ -1084,9 +1084,9 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#f3f4f6',
-    color: '#6b7280',
+    border: '1px solid #cbd5e1',
+    background: '#f1f5f9',
+    color: '#64748b',
     outline: 'none',
     boxSizing: 'border-box',
     cursor: 'not-allowed'
@@ -1106,17 +1106,17 @@ const styles: Record<string, CSSProperties> = {
   disabledButton: {
     padding: '10px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
-    background: '#e5e7eb',
-    color: '#6b7280',
+    border: '1px solid #cbd5e1',
+    background: '#e2e8f0',
+    color: '#64748b',
     cursor: 'not-allowed'
   },
   secondaryButton: {
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     borderRadius: '10px',
     padding: '10px 14px',
     background: '#ffffff',
-    color: '#111827',
+    color: '#0f172a',
     fontWeight: 600,
     cursor: 'pointer'
   },
@@ -1147,7 +1147,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     outline: 'none',
     fontSize: '14px',
     background: '#ffffff',
@@ -1155,12 +1155,12 @@ const styles: Record<string, CSSProperties> = {
   },
   resultCount: {
     marginBottom: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: '13px'
   },
   tableWrapper: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     overflow: 'hidden',
     overflowX: 'auto',
@@ -1179,14 +1179,14 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
     fontSize: '13px',
-    color: '#6b7280'
+    color: '#64748b'
   },
   td: {
     padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f1f5f9',
     fontSize: '14px',
     verticalAlign: 'top',
     wordBreak: 'break-word'
@@ -1194,7 +1194,7 @@ const styles: Record<string, CSSProperties> = {
   emptyCell: {
     padding: '24px',
     textAlign: 'center',
-    color: '#6b7280'
+    color: '#64748b'
   },
   rowTitle: {
     fontWeight: 700,
@@ -1203,7 +1203,7 @@ const styles: Record<string, CSSProperties> = {
   },
   rowSubtle: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4,
     wordBreak: 'break-all'
   },
@@ -1215,7 +1215,7 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: 'none'
   },
   missingValue: {
-    color: '#9ca3af',
+    color: '#94a3b8',
     fontStyle: 'italic'
   },
   badgeActive: {
@@ -1250,7 +1250,7 @@ const styles: Record<string, CSSProperties> = {
   },
   note: {
     marginTop: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: '13px',
     lineHeight: 1.4
   },
@@ -1268,15 +1268,15 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '16px'
   },
   identityItem: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '12px 14px',
-    background: '#f9fafb',
+    background: '#f8fafc',
     minWidth: 0
   },
   identityLabel: {
     display: 'block',
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: '12px',
     marginBottom: '4px'
   },

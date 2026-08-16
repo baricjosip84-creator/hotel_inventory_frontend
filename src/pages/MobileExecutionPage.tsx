@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import './OperationalExperiencePages.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
 type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment' | 'execution_request';
@@ -120,8 +121,8 @@ const SOURCE_FILTERS: Array<{ value: 'all' | ExecutionTaskSourceType; label: str
 const gridStyle: CSSProperties = { gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' };
 const mobileQueueStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 };
 const toolbarStyle: CSSProperties = { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 };
-const selectStyle: CSSProperties = { border: '1px solid var(--color-border)', borderRadius: 10, padding: '10px 12px', background: 'white', minWidth: 180 };
-const badgeStyle: CSSProperties = { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', background: '#f3f4f6', color: '#374151', fontSize: 12, fontWeight: 700, textTransform: 'capitalize' };
+const selectStyle: CSSProperties = { border: '1px solid #cbd5e1', borderRadius: 12, padding: '10px 12px', background: '#ffffff', color: '#0f172a', minHeight: 44, minWidth: 180 };
+const badgeStyle: CSSProperties = { display: 'inline-flex', borderRadius: 999, padding: '5px 9px', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize' };
 
 function numberValue(value: unknown): number {
   const parsed = Number(value);
@@ -333,7 +334,7 @@ export default function MobileExecutionPage() {
   const usingOfflineSnapshot = !mobileExecutionQuery.data && Boolean(cachedResponse);
 
   return (
-    <div>
+    <div className="mobile-execution-page">
       <div className="card-grid" style={gridStyle}>
         <div className="card"><div className="card__label">Mobile queue</div><div className="card__value">{numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}</div><div className="card__subtext">Execution tasks prepared for touch-first warehouse work.</div></div>
         <div className="card"><div className="card__label">Critical tasks</div><div className="card__value">{numberValue(summary.critical_mobile_tasks)}</div><div className="card__subtext">Highest urgency items requiring operator attention.</div></div>

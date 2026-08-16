@@ -2056,9 +2056,10 @@ const styles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '16px',
+    border: '1px solid #dbe4ef',
+    borderRadius: '12px',
     padding: '18px',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     minWidth: 0
   },
   statTitle: {
@@ -2159,16 +2160,16 @@ const styles: Record<string, CSSProperties> = {
   },
   select: {
     border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    padding: '12px 14px',
+    borderRadius: '10px',
+    padding: '10px 12px',
     fontSize: '0.95rem',
     minWidth: '180px',
     maxWidth: '100%'
   },
   input: {
     border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    padding: '12px 14px',
+    borderRadius: '10px',
+    padding: '10px 12px',
     fontSize: '0.95rem',
     minWidth: '240px',
     maxWidth: '100%'
@@ -2177,9 +2178,9 @@ const styles: Record<string, CSSProperties> = {
     alignSelf: 'end',
     whiteSpace: 'nowrap',
     border: '1px solid #cbd5e1',
-    background: '#f8fafc',
+    background: '#ffffff',
     color: '#0f172a',
-    borderRadius: '9px',
+    borderRadius: '10px',
     padding: '9px 12px',
     minHeight: '38px',
     fontWeight: 700,
@@ -2199,7 +2200,7 @@ const styles: Record<string, CSSProperties> = {
   actionCardBad: {
     border: '1px solid #fecaca',
     background: '#fef2f2',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '10px',
@@ -2208,7 +2209,7 @@ const styles: Record<string, CSSProperties> = {
   actionCardWarn: {
     border: '1px solid #fde68a',
     background: '#fffbeb',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '10px',
@@ -2217,7 +2218,7 @@ const styles: Record<string, CSSProperties> = {
   actionCardGood: {
     border: '1px solid #bbf7d0',
     background: '#f0fdf4',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '10px',
@@ -2239,8 +2240,8 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: 'none'
   },
   itemCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
+    border: '1px solid #dbe4ef',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '8px',
@@ -2313,7 +2314,7 @@ const styles: Record<string, CSSProperties> = {
   supplierDetailPanel: {
     border: '1px solid #bfdbfe',
     background: '#eff6ff',
-    borderRadius: '16px',
+    borderRadius: '12px',
     padding: '16px',
     display: 'grid',
     gap: '14px',
@@ -2336,7 +2337,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '10px',
     background: '#fff',
     border: '1px solid #dbeafe',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     minWidth: 0
   },
@@ -2389,7 +2390,7 @@ const styles: Record<string, CSSProperties> = {
   supplierBreakdownPanel: {
     border: '1px solid #e5e7eb',
     background: '#f8fafc',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '12px',
@@ -2430,7 +2431,7 @@ const styles: Record<string, CSSProperties> = {
   supplierActionSummaryPanel: {
     border: '1px solid #dbeafe',
     background: '#eff6ff',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     display: 'grid',
     gap: '12px',
@@ -2473,7 +2474,7 @@ const styles: Record<string, CSSProperties> = {
     gap: '10px',
     background: '#fff',
     border: '1px solid #dbeafe',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '14px',
     minWidth: 0
   },

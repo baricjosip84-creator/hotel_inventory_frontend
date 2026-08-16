@@ -419,8 +419,8 @@ function reasonBadgeStyle(reason: string): CSSProperties {
 
   return {
     ...styles.badgeBase,
-    background: '#e5e7eb',
-    color: '#374151'
+    background: '#e2e8f0',
+    color: '#334155'
   };
 }
 
@@ -443,8 +443,8 @@ function changeBadgeStyle(value: number): CSSProperties {
 
   return {
     ...styles.badgeBase,
-    background: '#e5e7eb',
-    color: '#374151'
+    background: '#e2e8f0',
+    color: '#334155'
   };
 }
 
@@ -1205,7 +1205,7 @@ export default function StockPage() {
   }
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-stock-page" style={styles.page}>
       <div style={styles.header}>
         <div style={styles.headerTextBlock}>
           <h2 style={styles.title}>Stock Operations</h2>
@@ -1307,7 +1307,7 @@ export default function StockPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
           <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>Expiry overview:</label>
-          <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db' }}>
+          <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
             <option value={30}>Next 30 days</option><option value={60}>Next 60 days</option><option value={90}>Next 90 days</option><option value={180}>Next 180 days</option>
           </select>
         </div>
@@ -2415,12 +2415,12 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: '28px',
     fontWeight: 800,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   description: {
     margin: '8px 0 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.6,
     maxWidth: '820px',
     wordBreak: 'break-word'
@@ -2473,7 +2473,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '18px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
@@ -2482,7 +2482,7 @@ const styles: Record<string, CSSProperties> = {
   statTitle: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '10px'
   },
   statValue: {
@@ -2507,7 +2507,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statSubtitle: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4
   },
   panel: {
@@ -2534,7 +2534,7 @@ const styles: Record<string, CSSProperties> = {
   },
   panelSubtitle: {
     margin: '8px 0 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     maxWidth: '880px',
     wordBreak: 'break-word'
@@ -2551,8 +2551,8 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     background: '#ffffff',
-    color: '#111827',
-    border: '1px solid #d1d5db',
+    color: '#0f172a',
+    border: '1px solid #cbd5e1',
     borderRadius: '12px',
     padding: '12px 16px',
     fontSize: '14px',
@@ -2564,9 +2564,9 @@ const styles: Record<string, CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f3f4f6',
-    color: '#6b7280',
-    border: '1px solid #d1d5db',
+    background: '#f1f5f9',
+    color: '#64748b',
+    border: '1px solid #cbd5e1',
     borderRadius: '12px',
     padding: '12px 16px',
     fontSize: '14px',
@@ -2581,8 +2581,8 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     textDecoration: 'none',
     background: '#ffffff',
-    color: '#111827',
-    border: '1px solid #d1d5db',
+    color: '#0f172a',
+    border: '1px solid #cbd5e1',
     borderRadius: '12px',
     padding: '12px 16px',
     fontSize: '14px',
@@ -2598,33 +2598,33 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   roleCard: {
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '16px',
     minWidth: 0
   },
   roleCardTitle: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     fontWeight: 600,
     marginBottom: '8px'
   },
   roleCardValue: {
     fontSize: '24px',
     fontWeight: 800,
-    color: '#111827',
+    color: '#0f172a',
     marginBottom: '6px',
     wordBreak: 'break-word'
   },
   roleCardSubtitle: {
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     fontSize: '13px'
   },
   permissionCard: {
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '16px',
     display: 'grid',
@@ -2649,14 +2649,14 @@ const styles: Record<string, CSSProperties> = {
   },
   emptyPanel: {
     padding: '18px',
-    border: '1px dashed #d1d5db',
+    border: '1px dashed #cbd5e1',
     borderRadius: '14px',
-    background: '#f9fafb',
-    color: '#4b5563',
+    background: '#f8fafc',
+    color: '#475569',
     lineHeight: 1.6
   },
   selectorPanel: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     background: '#ffffff',
     padding: '16px',
@@ -2697,7 +2697,7 @@ const styles: Record<string, CSSProperties> = {
   },
   stockCardButton: {
     appearance: 'none',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     background: '#ffffff',
     borderRadius: '14px',
     padding: '16px',
@@ -2733,21 +2733,21 @@ const styles: Record<string, CSSProperties> = {
     gap: '10px'
   },
   stockMetricItem: {
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '10px',
     minWidth: 0
   },
   stockMetricLabel: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '4px'
   },
   stockMetricValue: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   workbenchGrid: {
@@ -2766,7 +2766,7 @@ const styles: Record<string, CSSProperties> = {
   },
   innerPanel: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '16px',
     minWidth: 0,
@@ -2776,12 +2776,12 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   sectionDescription: {
     margin: '8px 0 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
@@ -2803,7 +2803,7 @@ const styles: Record<string, CSSProperties> = {
   selectedTitle: {
     fontSize: '18px',
     fontWeight: 800,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   selectionGrid: {
@@ -2814,21 +2814,21 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   selectionItem: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '12px',
-    background: '#f9fafb',
+    background: '#f8fafc',
     minWidth: 0
   },
   selectionLabel: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '6px'
   },
   selectionValue: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   usageReasonGrid: {
@@ -2839,7 +2839,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   usageReasonCard: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     background: '#f8fafc',
     padding: '12px',
@@ -2867,7 +2867,7 @@ const styles: Record<string, CSSProperties> = {
   actionTypeButton: {
     minHeight: '46px',
     borderRadius: '12px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     fontWeight: 700,
     cursor: 'pointer'
@@ -2883,20 +2883,20 @@ const styles: Record<string, CSSProperties> = {
   },
   actionInfoBox: {
     borderRadius: '12px',
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     padding: '14px',
     marginBottom: '14px'
   },
   actionInfoTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     marginBottom: '6px',
     wordBreak: 'break-word'
   },
   actionInfoText: {
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     fontSize: '14px',
     wordBreak: 'break-word'
@@ -2918,14 +2918,14 @@ const styles: Record<string, CSSProperties> = {
     display: 'block',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#374151',
+    color: '#334155',
     marginBottom: '6px'
   },
   input: {
     width: '100%',
     minHeight: '46px',
     borderRadius: '12px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     padding: '12px 14px',
     fontSize: '14px',
     boxSizing: 'border-box'
@@ -2934,7 +2934,7 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     minHeight: '92px',
     borderRadius: '12px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     padding: '12px 14px',
     fontSize: '14px',
     lineHeight: 1.5,
@@ -2953,8 +2953,8 @@ const styles: Record<string, CSSProperties> = {
   previewBox: {
     marginTop: '14px',
     borderRadius: '12px',
-    border: '1px solid #e5e7eb',
-    background: '#f9fafb',
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
     padding: '14px',
     display: 'grid',
     gap: '10px',
@@ -2965,7 +2965,7 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'center',
-    color: '#374151',
+    color: '#334155',
     flexWrap: 'wrap'
   },
   riskWarning: {
@@ -2983,9 +2983,9 @@ const styles: Record<string, CSSProperties> = {
   },
   primaryButton: {
     minHeight: '48px',
-    borderRadius: '12px',
-    border: 'none',
-    background: '#111827',
+    borderRadius: '10px',
+    border: '1px solid #2563eb',
+    background: '#2563eb',
     color: '#ffffff',
     padding: '0 18px',
     fontSize: '14px',
@@ -2995,9 +2995,9 @@ const styles: Record<string, CSSProperties> = {
   primaryButtonDisabled: {
     minHeight: '48px',
     borderRadius: '12px',
-    border: '1px solid #d1d5db',
-    background: '#e5e7eb',
-    color: '#6b7280',
+    border: '1px solid #cbd5e1',
+    background: '#e2e8f0',
+    color: '#64748b',
     padding: '0 18px',
     fontSize: '14px',
     fontWeight: 700,
@@ -3025,7 +3025,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   movementCard: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '14px',
     background: '#ffffff',
@@ -3046,7 +3046,7 @@ const styles: Record<string, CSSProperties> = {
   movementTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   movementMetaRow: {
@@ -3062,7 +3062,7 @@ const styles: Record<string, CSSProperties> = {
   },
   tableWrapper: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     overflow: 'hidden',
     overflowX: 'auto',
@@ -3076,16 +3076,16 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
     fontSize: '13px',
-    color: '#6b7280'
+    color: '#64748b'
   },
   td: {
     padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f1f5f9',
     verticalAlign: 'top',
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   selectedRow: {
@@ -3094,19 +3094,19 @@ const styles: Record<string, CSSProperties> = {
   rowTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   rowSubtle: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     marginTop: '4px',
     wordBreak: 'break-word'
   },
   rowActionButton: {
     minHeight: '38px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     padding: '0 12px',
     fontSize: '13px',

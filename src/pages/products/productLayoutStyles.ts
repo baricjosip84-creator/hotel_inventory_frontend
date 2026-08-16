@@ -15,7 +15,7 @@ export const productLayoutStyles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '18px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
@@ -23,7 +23,7 @@ export const productLayoutStyles: Record<string, CSSProperties> = {
   statTitle: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '10px'
   },
   statValue: {
@@ -59,12 +59,12 @@ export const productLayoutStyles: Record<string, CSSProperties> = {
   },
   statSubtitle: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4
   },
   panel: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '18px',
     marginBottom: '20px',
@@ -79,7 +79,7 @@ export const productLayoutStyles: Record<string, CSSProperties> = {
   panelSubtitle: {
     marginTop: 0,
     marginBottom: '16px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5
   },
   sectionTitle: {

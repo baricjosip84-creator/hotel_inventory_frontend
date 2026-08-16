@@ -757,7 +757,8 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
     borderRadius: '16px',
-    padding: '16px'
+    padding: '16px',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   statTitle: {
     fontSize: '12px',
@@ -970,7 +971,8 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e2e8f0',
     borderRadius: '16px',
     padding: '16px',
-    background: '#f8fafc',
+    background: '#ffffff',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     minWidth: 0
   },
   userCardTop: {

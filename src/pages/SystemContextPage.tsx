@@ -544,7 +544,7 @@ export default function SystemContextPage() {
 
 
   return (
-    <div style={styles.page}>
+    <div className="io-system-context-page" style={styles.page}>
       <header style={styles.pageHeader}>
         <div style={styles.headerCopy}>
           <p style={styles.eyebrow}>Decision Intelligence</p>
@@ -3239,14 +3239,14 @@ export default function SystemContextPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: '20px', width: '100%', minWidth: 0 },
-  pageHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', padding: '22px', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #dbe3f0', borderRadius: '20px', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)', minWidth: 0 },
+  pageHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px', padding: '22px', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #dbe3f0', borderRadius: '16px', boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)', minWidth: 0 },
   headerCopy: { flex: '1 1 620px', minWidth: 0 },
   headerActions: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', minWidth: 0 },
   eyebrow: { margin: 0, color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase' },
   pageTitle: { margin: '4px 0 0', color: '#0f172a', fontSize: 'clamp(1.75rem, 2.7vw, 2.25rem)', lineHeight: 1.15 },
   pageSubtitle: { maxWidth: '820px', margin: '10px 0 0', color: '#64748b', lineHeight: 1.65, overflowWrap: 'anywhere' },
   statsGrid: { width: '100%', minWidth: 0 },
-  statCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '18px', minWidth: 0 },
+  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', minWidth: 0, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)' },
   statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { marginTop: '10px', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' },
   statValueWarn: { marginTop: '10px', fontSize: '1.6rem', fontWeight: 800, color: '#b45309', textTransform: 'capitalize' },
@@ -3261,15 +3261,15 @@ const styles: Record<string, CSSProperties> = {
   keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 },
   errorNotice: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' },
   errorEndpoint: { padding: '0.2rem 0.45rem', borderRadius: '0.45rem', background: '#fff', border: '1px solid #fecaca', color: '#7f1d1d' },
-  itemCard: { border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '8px', minWidth: 0 },
+  itemCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', display: 'grid', gap: '8px', minWidth: 0, background: '#f8fafc' },
   itemTitle: { fontWeight: 800, color: '#0f172a', textTransform: 'capitalize', wordBreak: 'break-word' },
   itemText: { color: '#334155', lineHeight: 1.5, wordBreak: 'break-word' },
   itemMeta: { color: '#64748b', fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word' },
   visualizationGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '12px', minWidth: 0 },
-  visualizationCard: { border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', display: 'grid', gap: '10px', minWidth: 0, background: '#ffffff' },
+  visualizationCard: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', display: 'grid', gap: '10px', minWidth: 0, background: '#ffffff' },
   barGroup: { display: 'grid', gap: '6px', minWidth: 0 },
   barLabel: { display: 'flex', justifyContent: 'space-between', gap: '10px', color: '#475569', fontSize: '0.86rem', fontWeight: 700 },
-  barTrack: { height: '8px', borderRadius: '999px', background: '#e5e7eb', overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: '999px', background: '#475569' },
-  note: { color: '#334155', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '10px', lineHeight: 1.45 }
+  barTrack: { height: '8px', borderRadius: '999px', background: '#e2e8f0', overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: '999px', background: '#2563eb' },
+  note: { color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px', lineHeight: 1.45 }
 };

@@ -17,6 +17,8 @@ import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
 import CopyrightNotice from '../components/CopyrightNotice';
+import { InventoryBrand } from '../components/brand/InventoryBrand';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
 function useIsMobile(breakpoint = 960): boolean {
@@ -394,13 +396,9 @@ export default function AppLayout() {
         }}
       >
         <div style={styles.brandBlock}>
-          <div style={styles.brandTitle}>Inventory Operations</div>
-          <div style={styles.brandSubtitle}>{tenantSubscriptionAccess?.tenant.name || 'Company workspace'}</div>
-          {accessRoleLabel ? <div style={styles.rolePill}>ROLE: {accessRoleLabel.toUpperCase()}</div> : null}
-
-          {supportSession.isSupportSession ? (
-            <div style={styles.supportPill}>SUPPORT MODE</div>
-          ) : null}
+          <InventoryBrand compact tone="dark" />
+          <div style={styles.brandWorkspace}><div style={styles.brandWorkspaceLabel}>Workspace</div><div style={styles.brandSubtitle}>{tenantSubscriptionAccess?.tenant.name || 'Company workspace'}</div></div>
+          {supportSession.isSupportSession ? <div style={styles.supportPill}>SUPPORT MODE</div> : null}
         </div>
 
         <div style={styles.navScrollArea}>
@@ -419,7 +417,7 @@ export default function AppLayout() {
                       ...(isActive ? styles.navItemActive : {})
                     })}
                   >
-                    {item.label}
+                    <span style={styles.navItemIcon}><TenantNavIcon path={item.to} /></span><span style={styles.navItemLabel}>{item.label}</span>
                   </NavLink>
                 ))}
               </div>
@@ -428,14 +426,8 @@ export default function AppLayout() {
         </div>
 
         <div style={styles.sidebarFooter}>
-          <button
-            type="button"
-            style={styles.logoutButton}
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? 'Logging out…' : supportSession.isSupportSession ? 'Exit support mode' : 'Log out'}
-          </button>
+          <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || 'Tenant workspace'}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || 'Tenant user'}</div></div></div>
+          <button type="button" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? 'Logging out…' : supportSession.isSupportSession ? 'Exit support mode' : 'Log out'}</span></button>
         </div>
       </aside>
 
@@ -490,6 +482,7 @@ export default function AppLayout() {
               </p>
             </div>
           </div>
+          {!isMobile ? <div style={styles.headerContext}><div style={styles.headerContextAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.headerContextText}><div style={styles.headerContextRole}>{accessRoleLabel || 'Tenant user'}</div><div style={styles.headerContextTenant}>{tenantSubscriptionAccess?.tenant.name || 'Tenant workspace'}</div></div></div> : null}
         </header>
 
 
@@ -688,33 +681,13 @@ const styles: Record<string, CSSProperties> = {
     padding: '12px 16px'
   },
   shell: {
-    minHeight: '100dvh',
-    height: '100dvh',
-    display: 'flex',
-    background: '#f5f7fb',
-    color: '#1f2937',
-    position: 'relative',
-    overflow: 'hidden',
-    width: '100%',
-    minWidth: 0
+    minHeight: '100dvh', height: '100dvh', display: 'flex', background: '#f8fafc', color: '#0f172a', position: 'relative', overflow: 'hidden', width: '100%', minWidth: 0
   },
   sidebar: {
-    background: '#0f172a',
-    color: '#ffffff',
-    padding: '24px 16px',
-    display: 'flex',
-    flexDirection: 'column',
-    zIndex: 40,
-    overflow: 'hidden',
-    minWidth: 0
+    background: 'linear-gradient(180deg,#0f2749 0%,#0b1b32 48%,#081220 100%)', color: '#fff', padding: '18px 12px 14px', display: 'flex', flexDirection: 'column', zIndex: 40, overflow: 'hidden', minWidth: 0
   },
   sidebarDesktop: {
-    width: '272px',
-    minWidth: '272px',
-    height: '100dvh',
-    position: 'sticky',
-    top: 0,
-    borderRight: '1px solid rgba(255,255,255,0.06)'
+    width: '244px', minWidth: '244px', height: '100dvh', position: 'sticky', top: 0, borderRight: '1px solid rgba(148,163,184,.12)', boxShadow: '8px 0 24px rgba(15,23,42,.05)'
   },
   sidebarMobile: {
     width: '280px',
@@ -741,11 +714,7 @@ const styles: Record<string, CSSProperties> = {
     zIndex: 30
   },
   brandBlock: {
-    marginBottom: '16px',
-    paddingBottom: '16px',
-    borderBottom: '1px solid rgba(255,255,255,0.10)',
-    flexShrink: 0,
-    minWidth: 0
+    marginBottom: '12px', padding: '5px 8px 16px', borderBottom: '1px solid rgba(255,255,255,.10)', flexShrink: 0, minWidth: 0
   },
   brandTitle: {
     fontSize: '22px',
@@ -754,11 +723,7 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   brandSubtitle: {
-    fontSize: '13px',
-    color: 'rgba(255,255,255,0.72)',
-    marginBottom: '12px',
-    lineHeight: 1.45,
-    wordBreak: 'break-word'
+    fontSize: '12.5px', color: 'rgba(255,255,255,.78)', lineHeight: 1.4, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
   },
   rolePill: {
     display: 'inline-flex',
@@ -772,6 +737,11 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: '100%',
     wordBreak: 'break-word'
   },
+  brandWorkspace: { marginTop: '14px', padding: '10px 11px', borderRadius: '8px', background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.08)' },
+  brandWorkspaceLabel: { color: 'rgba(255,255,255,.38)', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '3px' },
+  navItemIcon: { width: '19px', height: '19px', flex: '0 0 19px', display: 'grid', placeItems: 'center' }, navItemLabel: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sidebarIdentity: { display: 'grid', gridTemplateColumns: '32px minmax(0,1fr)', alignItems: 'center', gap: '9px', marginBottom: '10px' }, sidebarAvatar: { width: '32px', height: '32px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#2563eb', color: '#fff', fontSize: '12px', fontWeight: 800 }, sidebarIdentityText: { minWidth: 0 }, sidebarIdentityName: { color: '#fff', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, sidebarIdentityRole: { color: 'rgba(255,255,255,.5)', fontSize: '11px', marginTop: '2px' },
+  headerContext: { display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0, paddingTop: '2px' }, headerContextAvatar: { width: '34px', height: '34px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '12px', fontWeight: 800 }, headerContextText: { textAlign: 'right', minWidth: 0 }, headerContextRole: { color: '#0f172a', fontSize: '12.5px', fontWeight: 800 }, headerContextTenant: { color: '#64748b', fontSize: '11px', marginTop: '1px', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   supportPill: {
     display: 'inline-flex',
     marginTop: '8px',
@@ -810,79 +780,37 @@ const styles: Record<string, CSSProperties> = {
     wordBreak: 'break-word'
   },
   navScrollArea: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    paddingRight: '4px'
+    flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: '3px', paddingBottom: '6px'
   },
   nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-    minWidth: 0
+    display: 'flex', flexDirection: 'column', gap: '13px', minWidth: 0
   },
   navSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    minWidth: 0
+    display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0
   },
   navSectionTitle: {
-    color: 'rgba(255,255,255,0.46)',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    padding: '4px 12px 2px'
+    color: 'rgba(255,255,255,.38)', fontSize: '10px', fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', padding: '5px 10px 4px'
   },
   navItem: {
-    color: 'rgba(255,255,255,0.82)',
-    textDecoration: 'none',
-    padding: '12px 14px',
-    borderRadius: '12px',
-    fontWeight: 600,
-    fontSize: '15px',
-    wordBreak: 'break-word'
+    color: 'rgba(255,255,255,.78)', textDecoration: 'none', padding: '8px 10px', borderRadius: '8px', fontWeight: 650, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '10px', minHeight: '36px', transition: 'background-color .16s ease,color .16s ease,box-shadow .16s ease'
   },
   navItemActive: {
-    background: 'rgba(59,130,246,0.34)',
-    color: '#ffffff',
-    boxShadow: 'inset 4px 0 0 #60a5fa, 0 0 0 1px rgba(96,165,250,0.18)'
+    background: 'linear-gradient(90deg,rgba(37,99,235,.92),rgba(29,78,216,.82))', color: '#fff', boxShadow: '0 7px 18px rgba(37,99,235,.18)'
   },
   sidebarFooter: {
-    paddingTop: '16px',
-    marginTop: '16px',
-    borderTop: '1px solid rgba(255,255,255,0.10)',
-    flexShrink: 0,
-    background: '#0f172a'
+    padding: '13px 7px 0', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,.10)', flexShrink: 0
   },
   logoutButton: {
-    width: '100%',
-    border: 'none',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    background: '#ef4444',
-    color: '#ffffff',
-    fontWeight: 700,
-    cursor: 'pointer'
+    width: '100%', border: '1px solid rgba(255,255,255,.10)', borderRadius: '8px', padding: '9px 10px', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.78)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
   },
   mainArea: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 0,
-    height: '100dvh',
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column'
+    flex: 1, minWidth: 0, minHeight: 0, height: '100dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#f8fafc'
   },
   header: {
-    padding: '24px 24px 16px 24px',
-    flexShrink: 0,
-    minWidth: 0
+    padding: '18px 24px 15px', flexShrink: 0, minWidth: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '24px', background: '#fff', borderBottom: '1px solid #e2e8f0'
   },
   headerMobile: {
-    padding: '18px 14px 12px 14px'
+    padding: '14px 12px', alignItems: 'flex-start'
   },
   headerLeft: {
     display: 'flex',
@@ -894,45 +822,25 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px'
   },
   menuButton: {
-    border: '1px solid #dbe3f0',
-    background: '#ffffff',
-    borderRadius: '12px',
-    width: '44px',
-    height: '44px',
-    fontSize: '20px',
-    cursor: 'pointer',
-    flexShrink: 0
+    border: '1px solid #e2e8f0', background: '#fff', borderRadius: '8px', width: '40px', height: '40px', fontSize: '18px', color: '#0f172a', cursor: 'pointer', flexShrink: 0, boxShadow: '0 1px 2px rgba(15,23,42,.04)'
   },
   headerTextBlock: {
     minWidth: 0
   },
   breadcrumb: {
-    fontSize: '12px',
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color: '#64748b',
-    marginBottom: '8px',
-    wordBreak: 'break-word'
+    fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.09em', color: '#94a3b8', marginBottom: '6px', wordBreak: 'break-word'
   },
   breadcrumbMobile: {
     marginBottom: '6px'
   },
   headerTitle: {
-    margin: 0,
-    fontSize: '32px',
-    lineHeight: 1.1,
-    wordBreak: 'break-word'
+    margin: 0, fontSize: '26px', lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a', wordBreak: 'break-word'
   },
   headerTitleMobile: {
-    fontSize: '28px'
+    fontSize: '22px'
   },
   headerText: {
-    margin: '10px 0 0 0',
-    color: '#475569',
-    maxWidth: '760px',
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
+    margin: '6px 0 0', color: '#64748b', maxWidth: '760px', lineHeight: 1.45, fontSize: '13px', wordBreak: 'break-word'
   },
   headerTextMobile: {
     marginTop: '8px',
@@ -1024,9 +932,9 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   contentDesktop: {
-    padding: '24px'
+    padding: '20px 22px 26px'
   },
   contentMobile: {
-    padding: '14px 12px 22px 12px'
+    padding: '14px 12px 22px'
   }
 };

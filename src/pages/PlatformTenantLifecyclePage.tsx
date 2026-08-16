@@ -211,23 +211,23 @@ export default function PlatformTenantLifecyclePage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
+  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
   headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  muted: { color: '#6b7280' },
-  panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 12px 36px rgba(15,23,42,.08)', overflowX: 'auto' },
+  muted: { color: '#64748b', lineHeight: 1.5 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, margin: '12px 0' },
   cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 },
-  card: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fafafa' },
+  card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: '#334155' },
   sourceList: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  code: { border: '1px solid #e5e7eb', borderRadius: 10, padding: '6px 8px', background: '#f9fafb' },
-  codeLink: { border: '1px solid #dbeafe', borderRadius: 10, padding: '6px 8px', background: '#eff6ff', color: '#1d4ed8', textDecoration: 'none', fontFamily: 'monospace' },
-  button: { border: '1px solid #2563eb', borderRadius: 10, padding: '8px 12px', background: '#2563eb', color: '#fff', cursor: 'pointer' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' },
-  errorButton: { border: '1px solid #991b1b', borderRadius: 8, padding: '6px 10px', background: '#fff', color: '#991b1b', cursor: 'pointer' },
+  code: { border: '1px solid #e2e8f0', borderRadius: 9, padding: '6px 8px', background: '#f8fafc', color: '#334155' },
+  codeLink: { border: '1px solid #bfdbfe', borderRadius: 9, padding: '6px 8px', background: '#eff6ff', color: '#1d4ed8', textDecoration: 'none', fontFamily: 'monospace' },
+  button: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' },
+  errorButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
   table: { width: '100%', borderCollapse: 'collapse', marginTop: 12 },
-  th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb' },
-  td: { padding: 10, borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' },
-  linkButton: { border: '1px solid #dbeafe', borderRadius: 10, padding: '6px 10px', background: '#eff6ff', color: '#1d4ed8', textDecoration: 'none' },
+  th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  td: { padding: 10, borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', color: '#334155' },
+  linkButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '6px 10px', background: '#fff', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700 },
   evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  inlineLink: { color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }
+  inlineLink: { color: '#1d4ed8', textDecoration: 'none', fontWeight: 700 }
 };

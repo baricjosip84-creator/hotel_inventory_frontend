@@ -142,20 +142,20 @@ export default function PlatformAuditRetentionPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
-  title: { margin: 0, fontSize: 28 },
-  subtitle: { margin: '6px 0 0', color: '#6b7280' },
-  badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap' },
+  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
+  badge: { padding: '5px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', border: '1px solid transparent' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
-  metric: { fontSize: 28, fontWeight: 800, marginTop: 8 },
-  cardTitle: { margin: '0 0 10px', fontSize: 18 },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
+  metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
+  cardTitle: { margin: '0 0 10px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: '#eef2ff', color: '#3730a3', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  help: { color: '#6b7280', fontSize: 12 },
+  flag: { background: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  help: { color: '#64748b', fontSize: 12 },
   tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e5e7eb', padding: '10px 8px', color: '#374151', fontSize: 13 },
-  td: { borderBottom: '1px solid #f3f4f6', padding: '12px 8px', verticalAlign: 'top' }
+  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
+  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em' },
+  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' }
 };

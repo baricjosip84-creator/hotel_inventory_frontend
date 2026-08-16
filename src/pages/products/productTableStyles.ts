@@ -3,14 +3,14 @@ import type { CSSProperties } from 'react';
 export const productTableStyles: Record<string, CSSProperties> = {
   tableWrapper: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     overflow: 'hidden',
     overflowX: 'auto'
   },
   tableWrapperCompact: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     overflow: 'hidden',
     overflowX: 'auto'
@@ -33,21 +33,21 @@ export const productTableStyles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
     fontSize: '13px',
-    color: '#6b7280'
+    color: '#64748b'
   },
   td: {
     padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f1f5f9',
     fontSize: '14px',
     verticalAlign: 'top'
   },
   emptyCell: {
     padding: '24px',
     textAlign: 'center',
-    color: '#6b7280'
+    color: '#64748b'
   },
   rowTitle: {
     fontWeight: 700,
@@ -55,14 +55,14 @@ export const productTableStyles: Record<string, CSSProperties> = {
   },
   rowSubtle: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4,
     wordBreak: 'break-all'
   },
   fieldHint: {
     marginTop: '6px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4
   },
   barcodeValue: {

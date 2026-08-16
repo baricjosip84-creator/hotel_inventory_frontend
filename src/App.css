@@ -23,6 +23,20 @@
   - compact-screen rhythm
 */
 
+:root {
+  --io-primary: #2563eb;
+  --io-primary-dark: #1d4ed8;
+  --io-navy: #0f172a;
+  --io-slate: #64748b;
+  --io-surface: #ffffff;
+  --io-background: #f8fafc;
+  --io-border: #e2e8f0;
+  --io-success: #16a34a;
+  --io-info: #0ea5e9;
+  --io-warning: #f59e0b;
+  --io-danger: #ef4444;
+}
+
 /* ==========================================================================
    Global polish foundation
    ========================================================================== */
@@ -349,6 +363,61 @@ kbd {
   word-break: break-all;
 }
 
+/* Approved Inventory Operations component primitives */
+.app-button {
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+}
+
+.app-button--primary {
+  background: var(--io-primary);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.18);
+}
+
+.app-button--primary:hover:not(:disabled) { background: var(--io-primary-dark); }
+
+.app-button--secondary {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: var(--io-navy);
+}
+
+.app-button--secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.app-button--danger {
+  background: #fff;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.app-button:disabled {
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  box-shadow: none;
+}
+
+.app-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .app-grid-2 { grid-template-columns: 1fr; }
+}
+
 /* ==========================================================================
    Compact screen adjustments
    ========================================================================== */
@@ -384,4 +453,292 @@ kbd {
   .app-actions {
     gap: 8px;
   }
+}
+
+/* ==========================================================================
+   Inventory Operations visual system — operational page rollout
+   Scope: real tenant Dashboard, Products, Suppliers, and Stock pages.
+   This layer is presentation-only and intentionally does not alter workflows.
+   ========================================================================== */
+
+.io-operational-page {
+  width: 100%;
+  min-width: 0;
+  color: #0f172a;
+}
+
+.io-operational-page .app-panel,
+.io-operational-page .app-surface {
+  border-color: #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035);
+}
+
+.io-operational-page input:not([type='checkbox']):not([type='radio']),
+.io-operational-page select,
+.io-operational-page textarea {
+  border-color: #cbd5e1 !important;
+  color: #0f172a;
+  background-color: #ffffff;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+.io-operational-page input:not([type='checkbox']):not([type='radio']):focus,
+.io-operational-page select:focus,
+.io-operational-page textarea:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+  outline: none;
+}
+
+.io-operational-page button,
+.io-operational-page a {
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+}
+
+.io-operational-page button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.io-operational-page table thead th {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 700 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.io-operational-page table tbody td {
+  border-bottom-color: #f1f5f9 !important;
+}
+
+.io-operational-page table tbody tr:last-child td {
+  border-bottom-color: transparent !important;
+}
+
+.io-operational-page .app-empty-state {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.io-operational-page .app-error-state,
+.io-operational-page .app-warning-state,
+.io-operational-page .app-success-state {
+  border-radius: 10px;
+}
+
+.io-dashboard-page > .app-grid-stats:first-of-type,
+.io-products-page > div:first-child,
+.io-suppliers-page > .app-grid-stats:first-child,
+.io-stock-page > .app-grid-stats {
+  position: relative;
+}
+
+@media (hover: hover) {
+  .io-operational-page .app-panel:hover {
+    border-color: #d7e0ec;
+  }
+}
+
+
+/* Inventory Operations visual system — second operational page rollout */
+.io-stock-movements-page,
+.io-stock-transfers-page,
+.io-storage-locations-page,
+.io-shipments-page {
+  color: var(--io-navy);
+}
+
+.io-stock-movements-page .app-panel,
+.io-stock-transfers-page .app-panel,
+.io-storage-locations-page .app-panel,
+.io-shipments-page .app-panel {
+  border-color: var(--io-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.03);
+}
+
+.io-stock-transfers-page .app-grid-stats > *,
+.io-storage-locations-page .app-grid-stats > *,
+.io-stock-movements-page .stock-movements-summary-grid > * {
+  border-color: var(--io-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+
+.io-stock-movements-page input,
+.io-stock-movements-page select,
+.io-stock-transfers-page input,
+.io-stock-transfers-page select,
+.io-stock-transfers-page textarea,
+.io-storage-locations-page input,
+.io-storage-locations-page select,
+.io-storage-locations-page textarea,
+.io-shipments-page input,
+.io-shipments-page select,
+.io-shipments-page textarea {
+  border-color: #cbd5e1 !important;
+  color: var(--io-navy);
+  background-color: #fff;
+}
+
+.io-stock-movements-page input:focus,
+.io-stock-movements-page select:focus,
+.io-stock-transfers-page input:focus,
+.io-stock-transfers-page select:focus,
+.io-stock-transfers-page textarea:focus,
+.io-storage-locations-page input:focus,
+.io-storage-locations-page select:focus,
+.io-storage-locations-page textarea:focus,
+.io-shipments-page input:focus,
+.io-shipments-page select:focus,
+.io-shipments-page textarea:focus {
+  border-color: var(--io-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+  outline: none;
+}
+
+.io-stock-movements-page table thead th,
+.io-stock-transfers-page table thead th,
+.io-storage-locations-page table thead th,
+.io-shipments-page table thead th {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border-bottom-color: var(--io-border) !important;
+}
+
+.io-stock-movements-page table tbody td,
+.io-stock-transfers-page table tbody td,
+.io-storage-locations-page table tbody td,
+.io-shipments-page table tbody td {
+  border-bottom-color: #f1f5f9 !important;
+}
+
+@media (hover: hover) {
+  .io-stock-transfers-page button:not(:disabled),
+  .io-storage-locations-page button:not(:disabled),
+  .io-shipments-page button:not(:disabled) {
+    transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+  }
+  .io-stock-transfers-page button:not(:disabled):active,
+  .io-storage-locations-page button:not(:disabled):active,
+  .io-shipments-page button:not(:disabled):active { transform: translateY(1px); }
+}
+
+
+
+/* ==========================================================================
+   Visual system: System Context, Execution Requests, Scanner
+   Presentation-only scope added in v3.46.24.
+   ========================================================================== */
+
+.io-system-context-page .app-panel,
+.io-scanner-page .app-panel {
+  border-color: var(--io-border);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.035);
+}
+
+.io-system-context-page .button--secondary {
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 13px;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.io-system-context-page .button--secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.io-execution-requests-page .btn {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.io-execution-requests-page .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.io-execution-requests-page .btn-primary {
+  border-color: var(--io-primary);
+  background: var(--io-primary);
+  color: #fff;
+}
+
+.io-execution-requests-page .btn-primary:hover:not(:disabled) {
+  border-color: var(--io-primary-dark);
+  background: var(--io-primary-dark);
+}
+
+.io-execution-requests-page .btn-secondary {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+
+.io-execution-requests-page .btn-secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.io-execution-requests-page .btn-danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.io-execution-requests-page input,
+.io-execution-requests-page select,
+.io-execution-requests-page textarea {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.io-execution-requests-page textarea {
+  min-height: 88px;
+}
+
+.io-execution-requests-page table th,
+.io-execution-requests-page table td {
+  padding: 10px;
+  border-bottom: 1px solid #e8edf4;
+  text-align: left;
+  vertical-align: top;
+}
+
+.io-execution-requests-page table th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.io-scanner-page button {
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.io-scanner-page input:focus-visible,
+.io-execution-requests-page input:focus-visible,
+.io-execution-requests-page select:focus-visible,
+.io-execution-requests-page textarea:focus-visible {
+  border-color: var(--io-primary);
+  outline: 2px solid rgba(37, 99, 235, 0.16);
+  outline-offset: 1px;
 }

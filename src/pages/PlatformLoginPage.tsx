@@ -1,5 +1,6 @@
 
 import { fetchCurrentPlatformIdentity } from '../lib/platformAuth';
+import { InventoryMark } from '../components/brand/InventoryBrand';
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
@@ -70,43 +71,70 @@ export default function PlatformLoginPage() {
 
   return (
     <main style={styles.page}>
-      <form onSubmit={handleSubmit} style={styles.card}>
-        <div>
-          <div style={styles.eyebrow}>Platform access</div>
-          <h1 style={styles.title}>Superadmin login</h1>
-          <p style={styles.subtitle}>Use a platform account, not a tenant user account.</p>
-        </div>
+      <div style={styles.shell}>
+        <section style={styles.brandPanel} aria-label="Inventory Operations platform administration">
+          <div style={styles.brandRow}>
+            <InventoryMark size={42} tone="dark" />
+            <div>
+              <div style={styles.brandName}>Inventory Operations</div>
+              <div style={styles.brandCaption}>PLATFORM ADMINISTRATION</div>
+            </div>
+          </div>
+          <div>
+            <div style={styles.kicker}>Secure operator access</div>
+            <h1 style={styles.hero}>Control the platform without mixing tenant access.</h1>
+            <p style={styles.heroText}>Platform accounts manage tenants, support, reliability, billing, security, readiness, and operational governance from a separate administrative surface.</p>
+          </div>
+          <div style={styles.features}>
+            <div style={styles.feature}><span style={styles.featureIcon}>□</span><div><strong>Tenant governance</strong><span style={styles.featureText}>Provisioning, lifecycle, plans, access and account attention.</span></div></div>
+            <div style={styles.feature}><span style={styles.featureIcon}>↔</span><div><strong>Support & reliability</strong><span style={styles.featureText}>Support sessions, incidents, monitoring, runbooks and platform health.</span></div></div>
+            <div style={styles.feature}><span style={styles.featureIcon}>✓</span><div><strong>Launch control</strong><span style={styles.featureText}>Readiness evidence, deployment validation and commercial launch checks.</span></div></div>
+          </div>
+          <div style={styles.brandFooter}>Platform operators only</div>
+        </section>
 
-        {errorMessage ? <div style={styles.error}>{errorMessage}</div> : null}
+        <section style={styles.loginPanel}>
+          <form onSubmit={handleSubmit} style={styles.card} data-auth-form="true">
+            <div>
+              <div style={styles.eyebrow}>Platform access</div>
+              <h2 style={styles.title}>Sign in to administration</h2>
+              <p style={styles.subtitle}>Use a platform account. Tenant user credentials belong on the tenant sign-in page.</p>
+            </div>
 
-        <label style={styles.field}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            style={styles.input}
-            autoComplete="email"
-            required
-          />
-        </label>
+            {errorMessage ? <div role="alert" style={styles.error}><strong>Unable to sign in.</strong><span>{errorMessage}</span></div> : null}
 
-        <label style={styles.field}>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            style={styles.input}
-            autoComplete="current-password"
-            required
-          />
-        </label>
+            <label style={styles.field}>
+              <span style={styles.label}>Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                style={styles.input}
+                placeholder="operator@company.com"
+                autoComplete="email"
+                required
+              />
+            </label>
 
-        <button type="submit" disabled={isSubmitting} style={styles.button}>
-          {isSubmitting ? 'Logging in…' : 'Login'}
-        </button>
-      </form>
+            <label style={styles.field}>
+              <span style={styles.label}>Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                style={styles.input}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+
+            <button type="submit" disabled={isSubmitting} style={{ ...styles.button, ...(isSubmitting ? styles.buttonDisabled : {}) }}>
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        </section>
+      </div>
     </main>
   );
 }
@@ -116,58 +144,50 @@ const styles: Record<string, CSSProperties> = {
     minHeight: '100dvh',
     display: 'grid',
     placeItems: 'center',
-    background: '#f7f7f8',
-    padding: '24px'
+    padding: 24,
+    background: 'linear-gradient(145deg,#eef4ff 0%,#f8fafc 46%,#fff 100%)',
+    color: '#0f172a'
   },
-  card: {
+  shell: {
     width: '100%',
-    maxWidth: '420px',
+    maxWidth: 1120,
+    minHeight: 650,
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0,.95fr) minmax(400px,.78fr)',
+    border: '1px solid #e2e8f0',
+    borderRadius: 18,
+    overflow: 'hidden',
     background: '#fff',
-    borderRadius: '18px',
-    padding: '28px',
-    boxShadow: '0 20px 60px rgba(15,23,42,0.12)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '18px'
+    boxShadow: '0 28px 70px rgba(15,23,42,.12)'
   },
-  eyebrow: {
-    color: '#6b7280',
-    fontSize: '13px',
-    fontWeight: 700,
-    textTransform: 'uppercase'
-  },
-  title: {
-    margin: '6px 0',
-    fontSize: '28px'
-  },
-  subtitle: {
-    margin: 0,
-    color: '#6b7280'
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    fontWeight: 700
-  },
-  input: {
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: '1px solid #d1d5db'
-  },
-  button: {
-    padding: '12px 14px',
-    borderRadius: '10px',
-    border: 0,
-    background: '#111827',
+  brandPanel: {
+    padding: '42px 46px',
     color: '#fff',
-    fontWeight: 800,
-    cursor: 'pointer'
+    background: 'radial-gradient(circle at 12% 18%,rgba(37,99,235,.28),transparent 30%),linear-gradient(155deg,#081220 0%,#0f2749 52%,#0b1b32 100%)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 42
   },
-  error: {
-    padding: '10px 12px',
-    borderRadius: '10px',
-    background: '#fee2e2',
-    color: '#991b1b'
-  }
+  brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  brandName: { fontWeight: 800, fontSize: 20, lineHeight: 1.05, letterSpacing: '-.02em' },
+  brandCaption: { color: 'rgba(191,219,254,.66)', fontSize: 10, marginTop: 4, fontWeight: 800, letterSpacing: '.08em' },
+  kicker: { color: '#93c5fd', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 },
+  hero: { margin: 0, fontSize: 36, lineHeight: 1.1, letterSpacing: '-.035em', fontWeight: 800, maxWidth: 500 },
+  heroText: { margin: '16px 0 0', color: 'rgba(255,255,255,.72)', fontSize: 15, lineHeight: 1.7, maxWidth: 520 },
+  features: { display: 'grid', gap: 16 },
+  feature: { display: 'grid', gridTemplateColumns: '42px 1fr', gap: 13, alignItems: 'start', fontSize: 14 },
+  featureIcon: { width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', color: '#bfdbfe', border: '1px solid rgba(147,197,253,.25)', background: 'rgba(37,99,235,.14)', fontSize: 19, fontWeight: 800 },
+  featureText: { display: 'block', marginTop: 4, color: 'rgba(255,255,255,.60)', fontSize: 13, lineHeight: 1.55 },
+  brandFooter: { marginTop: 'auto', color: 'rgba(255,255,255,.42)', fontSize: 12, fontWeight: 650 },
+  loginPanel: { display: 'grid', placeItems: 'center', padding: 48, background: '#fff' },
+  card: { width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 17 },
+  eyebrow: { color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em' },
+  subtitle: { margin: '10px 0 8px', color: '#64748b', fontSize: 14, lineHeight: 1.55 },
+  field: { display: 'flex', flexDirection: 'column', gap: 7 },
+  label: { color: '#334155', fontSize: 13, fontWeight: 700 },
+  input: { width: '100%', height: 44, padding: '0 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', outline: 'none' },
+  button: { width: '100%', height: 44, marginTop: 2, padding: '0 14px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 18px rgba(37,99,235,.18)' },
+  buttonDisabled: { opacity: .58, cursor: 'not-allowed' },
+  error: { padding: '12px 13px', borderRadius: 9, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', fontSize: 13, display: 'grid', gap: 3 }
 };

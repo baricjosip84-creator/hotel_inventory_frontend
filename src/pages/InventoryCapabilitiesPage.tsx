@@ -43,11 +43,11 @@ const TABS: Array<{ key: TabKey; label: string; countKey: string }> = [
   { key: 'mobile', label: 'Offline task mode', countKey: 'mobile_sync_batches' }
 ];
 
-const panelStyle: CSSProperties = { display: 'grid', gap: 16 };
-const formGridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 };
-const tableWrapStyle: CSSProperties = { overflowX: 'auto' };
-const badgeStyle: CSSProperties = { display: 'inline-flex', padding: '4px 9px', borderRadius: 999, background: '#f3f4f6', fontSize: 12, fontWeight: 700 };
-const tabRowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 };
+const panelStyle: CSSProperties = { display: 'grid', gap: 18 };
+const formGridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' };
+const tableWrapStyle: CSSProperties = { overflowX: 'auto', borderRadius: 12 };
+const badgeStyle: CSSProperties = { display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 800 };
+const tabRowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18, padding: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 14, width: 'fit-content', maxWidth: '100%' };
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
@@ -120,16 +120,16 @@ export default function InventoryCapabilitiesPage() {
   const counts = overviewQuery.data?.counts || {};
 
   return (
-    <div style={panelStyle}>
-      <section className="section">
-        <div className="section__title">Advanced inventory</div>
-        <div className="card">
-          <p className="card__subtext" style={{ marginTop: 0 }}>
+    <div style={{ ...panelStyle, color: '#0f172a' }}>
+      <section className="section" style={{ marginTop: 0 }}>
+        <div className="section__title" style={{ fontSize: 24, letterSpacing: '-0.02em', marginBottom: 10 }}>Advanced inventory</div>
+        <div className="card" style={{ boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 10px 28px rgba(15,23,42,.04)' }}>
+          <p className="card__subtext" style={{ marginTop: 0, maxWidth: 860 }}>
             Configure the advanced inventory features available to your role. Sections you cannot access are hidden automatically.
           </p>
           <div className="card-grid">
             {visibleTabs.map((item) => (
-              <button key={item.key} type="button" className="card" onClick={() => setTab(item.key)} style={{ textAlign: 'left', cursor: 'pointer' }}>
+              <button key={item.key} type="button" className="card" onClick={() => setTab(item.key)} style={{ textAlign: 'left', cursor: 'pointer', borderColor: tab === item.key ? '#93c5fd' : '#e2e8f0', background: tab === item.key ? '#eff6ff' : '#ffffff', boxShadow: tab === item.key ? '0 0 0 1px rgba(37,99,235,.08)' : 'none', transition: 'border-color 120ms ease, background 120ms ease, box-shadow 120ms ease' }}>
                 <div className="card__label">{item.label}</div>
                 <div className="card__value" style={{ fontSize: 19 }}>{String(counts[item.countKey] ?? 0)}</div>
                 <div className="card__subtext">Configured / recorded</div>
@@ -266,7 +266,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <form onSubmit={(e) => { e.preventDefault(); createClient.mutate(); }} style={formGridStyle}>
           <label>Connection name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Company ERP" disabled={!canWrite} /></label>
           <label>Description<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Used by head-office integration" disabled={!canWrite} /></label>
-          <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #d1d5db', borderRadius: 10, padding: 12 }} disabled={!canWrite}>
+          <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }} disabled={!canWrite}>
             <legend>API permissions</legend>
             <p className="card__subtext">Starts read-only. Enable write permissions only for systems that genuinely need them.</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{API_SCOPE_OPTIONS.map((scope) => <label key={scope.value} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={apiScopes.includes(scope.value)} onChange={(event) => setApiScopes((current) => event.target.checked ? Array.from(new Set([...current, scope.value])) : current.filter((value) => value !== scope.value))} />{scope.label}</label>)}</div>

@@ -727,11 +727,12 @@ const styles: Record<string, CSSProperties> = {
   },
   title: {
     margin: '4px 0 0',
-    fontSize: '30px'
+    fontSize: '30px',
+    color: '#0f172a'
   },
   subtitle: {
     margin: '8px 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     maxWidth: '900px',
     lineHeight: 1.5
   },
@@ -743,9 +744,10 @@ const styles: Record<string, CSSProperties> = {
   },
   panel: {
     background: '#fff',
+    border: '1px solid #e2e8f0',
     borderRadius: '16px',
     padding: '20px',
-    boxShadow: '0 12px 36px rgba(15,23,42,0.08)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     minWidth: 0
   },
   sectionHeader: {
@@ -849,7 +851,7 @@ const styles: Record<string, CSSProperties> = {
     alignContent: 'start',
     minWidth: 0
   },
-  documentDetailsHeader: { display: 'grid', gap: 4, paddingTop: 8, borderTop: '1px solid #e5e7eb' },
+  documentDetailsHeader: { display: 'grid', gap: 4, paddingTop: 8, borderTop: '1px solid #e2e8f0' },
   fullWidth: {
     gridColumn: '1 / -1'
   },

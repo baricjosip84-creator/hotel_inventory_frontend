@@ -7,7 +7,7 @@ type ProductPageContentProps = ReturnType<typeof useProductPageViewModel>;
 
 export function ProductPageContent(props: ProductPageContentProps) {
   return (
-    <div>
+    <div className="io-operational-page io-products-page">
       <ProductSummaryStatsPanel summary={props.summary} />
       <ProductManagementSectionsPanel {...props} />
       <ProductCostAnalyticsSectionsPanel {...props} />

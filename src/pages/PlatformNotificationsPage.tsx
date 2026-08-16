@@ -285,7 +285,7 @@ export default function PlatformNotificationsPage() {
         <h1 style={styles.title}>Platform notifications</h1>
         <p style={styles.muted}>Manual and operational platform alerts for HLA staff.</p>
       </div>
-      <button style={styles.button} onClick={refreshAll} disabled={q.isFetching || summary.isFetching}>Refresh</button>
+      <button style={styles.secondaryButton} onClick={refreshAll} disabled={q.isFetching || summary.isFetching}>Refresh</button>
     </header>
 
     <section style={styles.metaPanel}>
@@ -296,11 +296,11 @@ export default function PlatformNotificationsPage() {
     </section>
 
     <nav style={styles.linkBar} aria-label="Supporting platform pages">
-      <a href="/platform/system-audit">System audit</a>
-      <a href="/platform/integration-monitoring">Integration monitoring</a>
-      <a href="/platform/support-sessions">Support sessions</a>
-      <a href="/platform/billing">Billing</a>
-      <a href="/platform/tenant-health">Tenant health</a>
+      <a href="/platform/system-audit" style={styles.supportLink}>System audit</a>
+      <a href="/platform/integration-monitoring" style={styles.supportLink}>Integration monitoring</a>
+      <a href="/platform/support-sessions" style={styles.supportLink}>Support sessions</a>
+      <a href="/platform/billing" style={styles.supportLink}>Billing</a>
+      <a href="/platform/tenant-health" style={styles.supportLink}>Tenant health</a>
     </nav>
 
     {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
@@ -345,7 +345,7 @@ export default function PlatformNotificationsPage() {
       <p style={styles.muted}>Deletes old resolved/dismissed notifications. Open and acknowledged notifications are never cleaned by this action.</p>
       <div style={styles.form}>
         <input style={styles.input} type="number" min="7" max="3650" value={cleanupDays} onChange={(e) => setCleanupDays(e.target.value)} />
-        <button style={styles.button} onClick={() => confirmAction(`Delete closed notifications older than ${parsedCleanupDays} days?`) && cleanup.mutate()} disabled={cleanup.isPending || !cleanupDaysValid}>Clean closed notifications</button>
+        <button style={styles.dangerButton} onClick={() => confirmAction(`Delete closed notifications older than ${parsedCleanupDays} days?`) && cleanup.mutate()} disabled={cleanup.isPending || !cleanupDaysValid}>Clean closed notifications</button>
       </div>
       {!cleanupDaysValid ? <div style={styles.notice}>Cleanup age must be a whole number between 7 and 3650 days.</div> : null}
       {lastCleanup ? <div style={styles.scanResult}>Deleted {lastCleanup.deleted_count} closed notifications older than {lastCleanup.older_than_days} days.</div> : null}
@@ -365,7 +365,7 @@ export default function PlatformNotificationsPage() {
     {canWrite ? <section style={styles.panel}>
       <h2>Bulk actions</h2>
       <div style={styles.form}>
-        <button style={styles.button} onClick={toggleAllVisible}>{allVisibleSelected ? 'Clear visible selection' : 'Select visible notifications'}</button>
+        <button style={styles.secondaryButton} onClick={toggleAllVisible}>{allVisibleSelected ? 'Clear visible selection' : 'Select visible notifications'}</button>
         <select style={styles.input} value={bulkAction} onChange={(e) => setBulkAction(e.target.value as NotificationAction)}><option value="acknowledge">Acknowledge</option><option value="resolve">Resolve</option><option value="dismiss">Dismiss</option><option value="reopen">Reopen</option></select>
         <button style={styles.button} onClick={() => confirmAction(`${actionLabel(bulkAction)} ${selectedIds.length} selected notification(s)?`) && bulk.mutate()} disabled={bulk.isPending || selectedIds.length === 0 || selectedLimitExceeded}>{actionLabel(bulkAction)} selected ({selectedIds.length})</button>
       </div>
@@ -452,28 +452,31 @@ function actionsForStatus(status: NotificationStatus): NotificationAction[] {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  title: { margin: 0 },
-  muted: { color: '#6b7280' },
-  panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 12px 36px rgba(15,23,42,.08)' },
-  metaPanel: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 16, padding: 12, display: 'grid', gap: 6, color: '#475569' },
-  linkBar: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 12px 36px rgba(15,23,42,.08)' },
+  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
+  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  muted: { color: '#64748b', lineHeight: 1.5 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
+  metaPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, color: '#475569', fontSize: 13 },
+  linkBar: { display: 'flex', gap: 8, flexWrap: 'wrap', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 },
+  supportLink: { color: '#1d4ed8', background: '#fff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '6px 10px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 },
-  summaryCard: { background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 12px 36px rgba(15,23,42,.08)', display: 'flex', justifyContent: 'space-between', gap: 12 },
-  notice: { background: '#fef3c7', color: '#92400e', borderRadius: 12, padding: 12 },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 },
-  input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10 },
-  button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer', background: '#fff' },
+  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, color: '#334155' },
+  notice: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 10, padding: 10 },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, alignItems: 'end' },
+  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit', minWidth: 0 },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', cursor: 'pointer', background: '#2563eb', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
+  dangerButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #dc2626', cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 700 },
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  item: { borderBottom: '1px solid #eee', padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 },
-  itemHeader: { display: 'flex', alignItems: 'center', gap: 8 },
-  routingMeta: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 10, color: '#475569' },
-  routingBox: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
-  message: { margin: 0 },
-  scanResult: { marginTop: 10, color: '#166534' },
-  empty: { color: '#6b7280', padding: '10px 0' },
-  error: { marginTop: 10, background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12 },
-  success: { background: '#dcfce7', color: '#166534', borderRadius: 12, padding: 12 },
-  evidenceLinks: { display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 13 }
+  item: { borderBottom: '1px solid #f1f5f9', padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 6 },
+  itemHeader: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  routingMeta: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, color: '#475569' },
+  routingBox: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
+  message: { margin: 0, color: '#334155', lineHeight: 1.5 },
+  scanResult: { marginTop: 10, color: '#166534', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
+  empty: { color: '#64748b', padding: '14px 0' },
+  error: { marginTop: 10, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
+  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
+  evidenceLinks: { display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 13, color: '#1d4ed8' }
 };

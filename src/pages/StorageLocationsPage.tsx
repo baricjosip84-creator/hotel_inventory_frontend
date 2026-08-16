@@ -406,7 +406,7 @@ export default function StorageLocationsPage() {
   };
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-storage-locations-page" style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Active Locations"
@@ -700,14 +700,14 @@ const styles: Record<string, CSSProperties> = {
   statCard: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
-    borderRadius: '14px',
+    borderRadius: '12px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)'
   },
   statTitle: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '10px'
   },
   statValue: {
@@ -750,8 +750,9 @@ const styles: Record<string, CSSProperties> = {
   panelTitle: {
     marginTop: 0,
     marginBottom: '8px',
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: 700,
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   panelSubtitle: {
@@ -792,7 +793,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
     outline: 'none',
     boxSizing: 'border-box'
@@ -823,7 +824,7 @@ const styles: Record<string, CSSProperties> = {
   },
   primaryButton: {
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: '8px',
     padding: '12px 16px',
     background: '#2563eb',
     color: '#ffffff',
@@ -876,7 +877,7 @@ const styles: Record<string, CSSProperties> = {
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e5e7eb',
-    borderRadius: '14px',
+    borderRadius: '12px',
     overflow: 'hidden',
     overflowX: 'auto',
     minWidth: 0
@@ -889,14 +890,15 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
-    fontSize: '13px',
-    color: '#6b7280'
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#475569'
   },
   td: {
     padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f1f5f9',
     fontSize: '14px',
     verticalAlign: 'top',
     wordBreak: 'break-word'

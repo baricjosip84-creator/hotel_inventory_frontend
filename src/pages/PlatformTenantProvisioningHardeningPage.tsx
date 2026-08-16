@@ -71,7 +71,7 @@ function badgeStyle(value: string): CSSProperties {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   }
   if (value.includes('no_tenants')) {
-    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
   }
   if (value.includes('needs') || value.includes('ready_for_onboarding_task') || value.includes('review')) {
     return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
@@ -269,42 +269,42 @@ export default function PlatformTenantProvisioningHardeningPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20 },
+  page: { display: 'flex', flexDirection: 'column', gap: 20, color: '#0f172a' },
   header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28 },
-  subtitle: { margin: '6px 0 0', color: '#6b7280', maxWidth: 900 },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 900 },
   badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, whiteSpace: 'nowrap', fontSize: 12, textTransform: 'capitalize' },
-  panel: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, display: 'grid', gap: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 8, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
   filterControl: { display: 'grid', gap: 8 },
   label: { fontWeight: 800 },
-  input: { border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 12px', maxWidth: 420 },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', maxWidth: 420 },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
   errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   errorText: { color: '#991b1b', fontSize: 12, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  metaCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  note: { color: '#374151', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  help: { color: '#6b7280', fontSize: 12, overflowWrap: 'anywhere' },
+  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
+  note: { color: '#334155', lineHeight: 1.5, overflowWrap: 'anywhere' },
+  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { fontSize: 28, fontWeight: 900, marginTop: 8 },
-  sectionTitle: { margin: '0 0 8px', fontSize: 20 },
-  sectionHelp: { margin: '0 0 14px', color: '#6b7280', fontSize: 13, lineHeight: 1.5, maxWidth: 980 },
+  metric: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
+  sectionTitle: { margin: '0 0 8px', fontSize: 20, letterSpacing: '-.015em', color: '#0f172a' },
+  sectionHelp: { margin: '0 0 14px', color: '#64748b', fontSize: 13, lineHeight: 1.5, maxWidth: 980 },
   presetGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  presetCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 6, background: '#f9fafb', minWidth: 0 },
+  presetCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, background: '#f8fafc', minWidth: 0 },
   areaGrid: { display: 'grid', gap: 16 },
-  tenantCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  tenantCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   areaTitle: { margin: 0, fontSize: 20 },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 },
-  evidenceCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f9fafb', minWidth: 0 },
+  evidenceCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f8fafc', minWidth: 0 },
   evidenceValue: { overflowWrap: 'anywhere' },
   checklistGrid: { display: 'grid', gap: 10 },
-  checklistRow: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' },
+  checklistRow: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' },
   checklistCopy: { flex: '1 1 360px', minWidth: 0 },
   checklistStatus: { display: 'grid', gap: 6, justifyItems: 'end' },
-  nextStep: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, color: '#111827', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  secondaryButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  inlineButton: { marginLeft: 10, border: '1px solid #d1d5db', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
+  nextStep: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#0f172a', lineHeight: 1.5, overflowWrap: 'anywhere' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
+  inlineButton: { marginLeft: 10, border: '1px solid #cbd5e1', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
   actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  linkButton: { border: '1px solid #d1d5db', background: '#fff', borderRadius: 10, padding: '8px 12px', fontWeight: 800, color: '#111827', textDecoration: 'none' }
+  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '8px 12px', fontWeight: 800, color: '#1d4ed8', textDecoration: 'none' }
 };

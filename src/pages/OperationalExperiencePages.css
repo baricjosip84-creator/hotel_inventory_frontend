@@ -1,0 +1,85 @@
+/*
+  Shared conservative visual polish for tenant operational pages.
+  Presentation only: no routing, permissions, API, or workflow behavior lives here.
+*/
+
+.alerts-page,
+.operational-action-center-page,
+.mobile-execution-page {
+  min-width: 0;
+}
+
+.alerts-page {
+  gap: 20px;
+}
+
+.alerts-page .app-panel,
+.operational-action-center-page .card,
+.mobile-execution-page .card {
+  border-color: var(--io-border, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.operational-action-center-page .section,
+.mobile-execution-page .section {
+  margin-top: 26px;
+}
+
+.operational-action-center-page .section__title,
+.mobile-execution-page .section__title {
+  color: var(--io-navy, #0f172a);
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.operational-action-center-page .button,
+.mobile-execution-page .button {
+  min-height: 42px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.operational-action-center-page .button--secondary,
+.mobile-execution-page .button--secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.operational-action-center-page .button--secondary:hover,
+.mobile-execution-page .button--secondary:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.operational-action-center-page select,
+.mobile-execution-page select,
+.alerts-page input,
+.alerts-page select,
+.alerts-page textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.operational-action-center-page select:focus-visible,
+.mobile-execution-page select:focus-visible,
+.alerts-page input:focus-visible,
+.alerts-page select:focus-visible,
+.alerts-page textarea:focus-visible {
+  border-color: var(--io-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.mobile-execution-page article.card,
+.operational-action-center-page article.card {
+  background: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .operational-action-center-page .button,
+  .mobile-execution-page .button {
+    min-height: 44px;
+  }
+}

@@ -9,13 +9,13 @@ export const productRiskStyles: Record<string, CSSProperties> = {
   },
   riskCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '14px'
   },
   riskListCard: {
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '16px',
     marginTop: '14px'
@@ -30,7 +30,7 @@ export const productRiskStyles: Record<string, CSSProperties> = {
     gap: '12px',
     alignItems: 'flex-start',
     padding: '10px 0',
-    borderTop: '1px solid #e5e7eb'
+    borderTop: '1px solid #e2e8f0'
   },
   summaryGrid: {
     display: 'grid',
@@ -52,9 +52,9 @@ export const productRiskStyles: Record<string, CSSProperties> = {
     flexShrink: 0,
     padding: '5px 9px',
     borderRadius: '999px',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     background: '#ffffff',
-    color: '#374151',
+    color: '#334155',
     fontSize: '12px',
     fontWeight: 700,
     lineHeight: 1.2,
@@ -82,7 +82,7 @@ export const productRiskStyles: Record<string, CSSProperties> = {
   },
   rowMeta: {
     marginTop: '4px',
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: '11px',
     fontWeight: 600,
     lineHeight: 1.35,
@@ -91,7 +91,7 @@ export const productRiskStyles: Record<string, CSSProperties> = {
   noteList: {
     margin: '14px 0 0',
     paddingLeft: '20px',
-    color: '#374151',
+    color: '#334155',
     lineHeight: 1.55
   },
   errorText: {

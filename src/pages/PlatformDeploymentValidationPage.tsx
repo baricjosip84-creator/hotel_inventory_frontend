@@ -34,7 +34,7 @@ function humanize(value: string) {
 function badgeStyle(value: string): CSSProperties {
   const normalized = value.toLowerCase();
   if (normalized === 'loading') {
-    return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
   }
   if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('unsafe')) {
     return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
@@ -50,7 +50,7 @@ function badgeStyle(value: string): CSSProperties {
   if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('safe')) {
     return { ...styles.badge, background: '#dcfce7', color: '#166534' };
   }
-  return { ...styles.badge, background: '#f3f4f6', color: '#4b5563' };
+  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
 }
 
 function formatValue(value: string | number | boolean | null | undefined) {
@@ -227,39 +227,39 @@ export default function PlatformDeploymentValidationPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0 },
+  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
   header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#6b7280', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28 },
-  description: { margin: 0, color: '#4b5563', maxWidth: 980, lineHeight: 1.5 },
+  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
+  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  description: { margin: 0, color: '#64748b', maxWidth: 980, lineHeight: 1.5 },
   headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
-  generated: { color: '#6b7280', fontSize: 12 },
+  generated: { color: '#64748b', fontSize: 12 },
   badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.04)', minWidth: 0 },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   notice: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', lineHeight: 1.5 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 16, minWidth: 0 },
-  metricValue: { fontSize: 26, fontWeight: 900 },
-  metricLabel: { color: '#6b7280', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18 },
+  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
+  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
+  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
+  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  evidenceItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', display: 'grid', gap: 4, minWidth: 0 },
-  evidenceLabel: { color: '#6b7280', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
+  evidenceItem: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'grid', gap: 4, minWidth: 0 },
+  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#f9fafb', minWidth: 0 },
+  controlCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0 },
   controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  controlMeta: { color: '#6b7280', fontSize: 12, display: 'grid', gap: 4, overflowWrap: 'anywhere' },
-  reason: { color: '#4b5563', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
-  helpText: { color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' },
-  list: { margin: 0, paddingLeft: 22, color: '#374151', lineHeight: 1.7 },
+  controlMeta: { color: '#64748b', fontSize: 12, display: 'grid', gap: 4, overflowWrap: 'anywhere' },
+  reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
+  helpText: { color: '#64748b', fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' },
+  list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
   nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', overflowWrap: 'anywhere' },
   note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' },
+  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: '#0f766e', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
   wrap: { overflowWrap: 'anywhere', minWidth: 0 }
 };

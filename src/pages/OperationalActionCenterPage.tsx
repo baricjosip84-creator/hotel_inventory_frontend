@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
+import './OperationalExperiencePages.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
 type ActionDomain = 'all' | 'alerts' | 'execution' | 'control_tower' | 'decision_intelligence' | 'ai_governance' | 'multi_domain';
@@ -257,9 +258,11 @@ const toolbarStyle: CSSProperties = {
 
 const selectStyle: CSSProperties = {
   border: '1px solid var(--color-border)',
-  borderRadius: 10,
+  borderRadius: 12,
   padding: '10px 12px',
-  background: 'white',
+  background: '#ffffff',
+  color: '#0f172a',
+  minHeight: 44,
   minWidth: 190
 };
 
@@ -272,8 +275,8 @@ const badgeStyle: CSSProperties = {
   display: 'inline-flex',
   borderRadius: 999,
   padding: '4px 9px',
-  background: '#f3f4f6',
-  color: '#374151',
+  background: '#f1f5f9',
+  color: '#334155',
   fontSize: 12,
   fontWeight: 700,
   textTransform: 'capitalize'
@@ -281,8 +284,8 @@ const badgeStyle: CSSProperties = {
 
 const detailsStyle: CSSProperties = {
   border: '1px solid var(--color-border)',
-  borderRadius: 14,
-  background: 'var(--color-surface)',
+  borderRadius: 16,
+  background: '#f8fafc',
   padding: '14px 16px'
 };
 
@@ -496,7 +499,7 @@ export default function OperationalActionCenterPage() {
   }
 
   return (
-    <div>
+    <div className="operational-action-center-page">
       <div className="card-grid" style={cardGridStyle}>
         <div className="card">
           <div className="card__label">Open actions shown</div>

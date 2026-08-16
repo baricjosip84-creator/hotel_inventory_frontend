@@ -79,7 +79,7 @@ export default function PlatformPermissionsPage() {
   if (query.isLoading) return <div className="app-loading-state">Loading platform permission policies…</div>;
   if (query.isError || !query.data) {
     return (
-      <div style={{ padding: 24, background: '#fff1f2', border: '1px solid #fda4af', borderRadius: 12 }}>
+      <div style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, boxShadow: '0 1px 2px rgba(15,23,42,.03)' }}>
         Platform permission policies could not be loaded. Superadmin access and backend migration 486 are required.
       </div>
     );

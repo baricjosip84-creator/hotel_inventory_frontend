@@ -707,7 +707,7 @@ export default function ExecutionRequestsPage() {
   const canGoNext = offset + requests.length < total;
 
   return (
-    <div style={styles.page}>
+    <div className="io-execution-requests-page" style={styles.page}>
       <section style={styles.hero}>
         <div>
           <h1 style={styles.title}>Controlled execution requests</h1>
@@ -1305,21 +1305,21 @@ function executionTone(status?: string | null) {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  hero: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: '1.75rem' },
+  hero: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '20px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)' },
+  title: { margin: 0, fontSize: '1.75rem', color: '#0f172a', lineHeight: 1.2 },
   subtitle: { margin: '0.35rem 0 0', color: '#64748b', maxWidth: '760px' },
   error: { marginBottom: 0 },
   warning: { padding: '0.75rem 0.9rem', border: '1px solid #facc15', borderRadius: '12px', background: '#fefce8', color: '#854d0e' },
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
-  summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
+  summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
-  summaryTile: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 },
+  summaryTile: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0, padding: '0.8rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' },
   summaryLabel: { color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' },
   badgeRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' },
   badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize', fontSize: '0.75rem', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
-  filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff' },
-  field: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#475569', fontSize: '0.85rem' },
-  fieldWide: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#475569', fontSize: '0.85rem' },
+  filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
+  field: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
+  fieldWide: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
   optional: { color: '#94a3b8', fontWeight: 400 },
   createGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' },
   createFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginTop: '0.85rem' },
@@ -1334,13 +1334,14 @@ const styles: Record<string, CSSProperties> = {
   checkList: { display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.5rem' },
   checkItem: { display: 'flex', gap: '0.65rem', alignItems: 'flex-start', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' },
   layout: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem', alignItems: 'start' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '1rem', minWidth: 0 },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', minWidth: 0, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
   detailCard: {
     background: '#fff',
     border: '1px solid #e2e8f0',
     borderRadius: '16px',
     padding: '1rem',
     minWidth: 0,
+    boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)',
     alignSelf: 'start'
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.75rem' },

@@ -356,7 +356,7 @@ function changeBadgeStyle(value: number): CSSProperties {
     return { ...styles.badgeBase, background: '#fee2e2', color: '#991b1b' };
   }
 
-  return { ...styles.badgeBase, background: '#e5e7eb', color: '#374151' };
+  return { ...styles.badgeBase, background: '#e2e8f0', color: '#334155' };
 }
 
 function changeDisplay(value: number): string {
@@ -583,7 +583,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isLoading) {
     return (
-      <div style={styles.page}>
+      <div className="io-operational-page io-dashboard-page" style={styles.page}>
         <div className="app-panel app-panel--padded">Loading dashboard...</div>
       </div>
     );
@@ -591,7 +591,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isError || !summary) {
     return (
-      <div style={styles.page}>
+      <div className="io-operational-page io-dashboard-page" style={styles.page}>
         <SectionError
           message={`Failed to load dashboard summary: ${(summaryQuery.error as Error)?.message || 'Unknown error'}`}
         />
@@ -600,14 +600,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-dashboard-page" style={styles.page}>
       {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
         <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div><strong>Getting started</strong><div style={{ marginTop: 4, opacity: 0.75 }}>Complete these basics first. {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} done.</div></div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #d1d5db', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
+            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #cbd5e1', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
           </div>
         </section>
       ) : null}
@@ -1284,7 +1284,7 @@ const styles: Record<string, CSSProperties> = {
   },
   description: {
     marginTop: '8px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
@@ -1295,7 +1295,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     padding: '18px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
@@ -1304,7 +1304,7 @@ const styles: Record<string, CSSProperties> = {
   statTitle: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '10px'
   },
   statValue: {
@@ -1340,7 +1340,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statSubtitle: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4
   },
   healthCard: {
@@ -1364,7 +1364,7 @@ const styles: Record<string, CSSProperties> = {
   },
   healthSubtitle: {
     fontSize: '14px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     maxWidth: '700px',
     wordBreak: 'break-word'
@@ -1378,7 +1378,7 @@ const styles: Record<string, CSSProperties> = {
   healthScoreScale: {
     fontSize: '20px',
     fontWeight: 700,
-    color: '#6b7280'
+    color: '#64748b'
   },
   healthMetricsGrid: {
     display: 'grid',
@@ -1387,15 +1387,15 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   healthMetric: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '14px',
-    background: '#fafafa',
+    background: '#f8fafc',
     minWidth: 0
   },
   healthMetricLabel: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
     marginBottom: '8px',
     fontWeight: 600
   },
@@ -1435,16 +1435,16 @@ const styles: Record<string, CSSProperties> = {
   },
   sectionSubtitle: {
     margin: '8px 0 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
   sectionHint: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#6b7280',
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
+    color: '#64748b',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '999px',
     padding: '6px 10px',
     whiteSpace: 'nowrap'
@@ -1455,10 +1455,10 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   listCard: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     padding: '14px',
-    background: '#fafafa',
+    background: '#f8fafc',
     minWidth: 0
   },
   listCardHeader: {
@@ -1481,12 +1481,12 @@ const styles: Record<string, CSSProperties> = {
   },
   listCardMeta: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4,
     wordBreak: 'break-word'
   },
   cardText: {
-    color: '#374151',
+    color: '#334155',
     lineHeight: 1.6,
     marginBottom: '12px',
     wordBreak: 'break-word'
@@ -1499,11 +1499,11 @@ const styles: Record<string, CSSProperties> = {
     gap: '12px',
     fontSize: '14px',
     padding: '6px 0',
-    borderTop: '1px solid #f3f4f6'
+    borderTop: '1px solid #f1f5f9'
   },
   tableWrapper: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: '14px',
     overflow: 'hidden',
     overflowX: 'auto',
@@ -1517,14 +1517,14 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
     fontSize: '13px',
-    color: '#6b7280'
+    color: '#64748b'
   },
   td: {
     padding: '14px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f1f5f9',
     fontSize: '14px',
     verticalAlign: 'top',
     wordBreak: 'break-word'
@@ -1532,7 +1532,7 @@ const styles: Record<string, CSSProperties> = {
   emptyCell: {
     padding: '24px',
     textAlign: 'center',
-    color: '#6b7280'
+    color: '#64748b'
   },
   badgeBase: {
     display: 'inline-block',
@@ -1549,7 +1549,7 @@ const styles: Record<string, CSSProperties> = {
   },
   rowSubtle: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.4,
     wordBreak: 'break-word'
   },

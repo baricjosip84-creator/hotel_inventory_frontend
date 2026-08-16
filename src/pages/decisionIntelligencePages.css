@@ -1202,3 +1202,108 @@
     flex-direction: column;
   }
 }
+
+/* v3.46.26 approved visual-system alignment */
+.decision-intelligence-page {
+  gap: 20px;
+  color: var(--io-navy, #0f172a);
+}
+
+.decision-intelligence-page .page-header,
+.decision-intelligence-page .card,
+.decision-intelligence-page .stat-card,
+.decision-intelligence-page .adaptive-policy-metric,
+.decision-intelligence-page .forecast-metric,
+.decision-intelligence-page .adaptive-policy-check-card {
+  border-color: var(--io-border, #e2e8f0);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.decision-intelligence-page .page-header {
+  padding: 20px;
+  background: #ffffff;
+}
+
+.decision-intelligence-page .input,
+.decision-intelligence-page .adaptive-policy-filter-grid select,
+.decision-intelligence-page .forecast-filter-grid select {
+  min-height: 44px;
+  border-color: #cbd5e1;
+  border-radius: 12px;
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
+.decision-intelligence-page .input:focus,
+.decision-intelligence-page .input:focus-visible,
+.decision-intelligence-page .adaptive-policy-filter-grid select:focus-visible,
+.decision-intelligence-page .forecast-filter-grid select:focus-visible {
+  border-color: var(--io-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.decision-intelligence-page .button {
+  border-radius: 10px;
+  background: var(--io-primary, #2563eb);
+}
+
+.decision-intelligence-page .button:hover:not(:disabled) {
+  background: var(--io-primary-dark, #1d4ed8);
+}
+
+.decision-intelligence-page .button--secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.decision-intelligence-page .button--secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.decision-intelligence-page .learning-feedback-view-switch,
+.decision-intelligence-page .adaptive-policy-view-switch,
+.decision-intelligence-page .forecast-view-switch {
+  border-color: var(--io-border, #e2e8f0);
+  border-radius: 16px;
+  background: #f8fafc;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.decision-intelligence-page .learning-feedback-view-switch button.is-active,
+.decision-intelligence-page .adaptive-policy-view-switch__button.is-active,
+.decision-intelligence-page .forecast-view-switch__button.is-active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: none;
+}
+
+.decision-intelligence-page .adaptive-policy-view-switch__button:hover,
+.decision-intelligence-page .forecast-view-switch__button:hover,
+.decision-intelligence-page .adaptive-policy-view-switch__button:focus-visible,
+.decision-intelligence-page .forecast-view-switch__button:focus-visible {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.decision-intelligence-page .table-wrap,
+.decision-intelligence-page .adaptive-policy-table-wrap,
+.decision-intelligence-page .forecast-table-wrap {
+  border-color: var(--io-border, #e2e8f0);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.decision-intelligence-page .adaptive-policy-check-item,
+.decision-intelligence-page .adaptive-policy-decision,
+.decision-intelligence-page .forecast-check-item,
+.decision-intelligence-page .forecast-decision {
+  border-color: #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}

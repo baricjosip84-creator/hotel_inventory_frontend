@@ -13,8 +13,9 @@ export const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap',
     padding: '1.25rem',
     border: '1px solid #dbe4ef',
-    borderRadius: '1rem',
-    background: '#f8fafc'
+    borderRadius: '0.75rem',
+    background: '#ffffff',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   eyebrow: {
     margin: 0,
@@ -43,7 +44,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   primaryButton: {
     border: 0,
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     background: '#2563eb',
     color: 'white',
     padding: '0.75rem 1rem',
@@ -53,7 +54,7 @@ export const styles: Record<string, CSSProperties> = {
   dangerButton: {
     background: '#fee2e2',
     border: '1px solid #fecaca',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     color: '#991b1b',
     cursor: 'pointer',
     fontWeight: 700,
@@ -61,7 +62,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   secondaryButton: {
     border: '1px solid #cbd5e1',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     background: 'white',
     color: '#0f172a',
     padding: '0.75rem 1rem',
@@ -79,8 +80,9 @@ export const styles: Record<string, CSSProperties> = {
   filterCard: {
     padding: '1rem',
     border: '1px solid #dbe4ef',
-    borderRadius: '1rem',
-    background: 'white'
+    borderRadius: '0.75rem',
+    background: 'white',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   sectionHeader: {
     display: 'flex',
@@ -161,7 +163,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   input: {
     border: '1px solid #cbd5e1',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     padding: '0.7rem 0.8rem',
     font: 'inherit',
     color: '#0f172a',
@@ -175,8 +177,9 @@ export const styles: Record<string, CSSProperties> = {
   statCard: {
     padding: '1rem',
     border: '1px solid #dbe4ef',
-    borderRadius: '1rem',
-    background: 'white'
+    borderRadius: '0.75rem',
+    background: 'white',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   statLabel: {
     display: 'block',
@@ -206,15 +209,17 @@ export const styles: Record<string, CSSProperties> = {
   card: {
     padding: '1rem',
     border: '1px solid #dbe4ef',
-    borderRadius: '1rem',
-    background: 'white'
+    borderRadius: '0.75rem',
+    background: 'white',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   cardWide: {
     gridColumn: '1 / -1',
     padding: '1rem',
     border: '1px solid #dbe4ef',
-    borderRadius: '1rem',
-    background: 'white'
+    borderRadius: '0.75rem',
+    background: 'white',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
   },
   breakdownList: {
     display: 'flex',
@@ -229,7 +234,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     padding: '0.75rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     color: '#0f172a'
   },
   breakdownRowStacked: {
@@ -239,7 +244,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     padding: '0.75rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     color: '#0f172a'
   },
   trendList: {
@@ -254,8 +259,8 @@ export const styles: Record<string, CSSProperties> = {
     gap: '0.25rem',
     padding: '0.85rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
-    background: '#f8fafc',
+    borderRadius: '0.625rem',
+    background: '#ffffff',
     color: '#0f172a'
   },
   tableWrap: {
@@ -305,7 +310,7 @@ export const styles: Record<string, CSSProperties> = {
     color: '#64748b',
     background: '#f8fafc',
     border: '1px dashed #cbd5e1',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     padding: '0.85rem'
   },
   governanceGrid: {
@@ -320,7 +325,7 @@ export const styles: Record<string, CSSProperties> = {
     gap: '0.35rem',
     padding: '0.85rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: '#f8fafc',
     color: '#334155'
   },
@@ -331,7 +336,7 @@ export const styles: Record<string, CSSProperties> = {
     gridColumn: '1 / -1',
     padding: '0.85rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: '#f8fafc',
     color: '#334155'
   },
@@ -339,7 +344,7 @@ export const styles: Record<string, CSSProperties> = {
     color: '#b91c1c',
     background: '#fef2f2',
     border: '1px solid #fecaca',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     padding: '0.85rem'
   },
   importPanel: {
@@ -349,12 +354,12 @@ export const styles: Record<string, CSSProperties> = {
     marginTop: '1rem',
     padding: '0.85rem',
     border: '1px dashed #cbd5e1',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: '#f8fafc'
   },
   textarea: {
     border: '1px solid #cbd5e1',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     padding: '0.7rem 0.8rem',
     font: 'inherit',
     color: '#0f172a',
@@ -391,13 +396,13 @@ export const styles: Record<string, CSSProperties> = {
   templateBuilderCard: {
     padding: '1rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: '#f8fafc'
   },
   templateListCard: {
     padding: '1rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: 'white'
   },
   templateList: {
@@ -412,7 +417,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: 'flex-start',
     padding: '0.85rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
+    borderRadius: '0.625rem',
     background: '#f8fafc'
   },
   templateMetrics: {
@@ -440,7 +445,7 @@ export const styles: Record<string, CSSProperties> = {
     color: '#166534',
     background: '#f0fdf4',
     border: '1px solid #86efac',
-    borderRadius: '0.75rem',
+    borderRadius: '0.625rem',
     padding: '0.85rem',
     fontWeight: 800
   },
@@ -485,8 +490,8 @@ export const styles: Record<string, CSSProperties> = {
     gap: '0.35rem',
     padding: '0.85rem',
     border: '1px solid #e2e8f0',
-    borderRadius: '0.85rem',
-    background: '#f8fafc',
+    borderRadius: '0.625rem',
+    background: '#ffffff',
     color: '#0f172a'
   },
   metricLabel: {

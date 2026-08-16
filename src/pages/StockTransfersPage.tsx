@@ -891,7 +891,7 @@ export default function StockTransfersPage() {
   );
 
   return (
-    <div style={styles.page}>
+    <div className="io-operational-page io-stock-transfers-page" style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard title="Transfers" value={summary.transfer_count} subtitle="Matching the current filters" />
         <StatCard title="Drafts" value={summary.draft_count} subtitle="Waiting for execution or cancellation" />
@@ -1399,13 +1399,13 @@ export default function StockTransfersPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: '18px' },
+  page: { display: 'flex', flexDirection: 'column', gap: '18px', width: '100%', minWidth: 0 },
   statsGrid: { marginBottom: 0 },
-  statCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 18, padding: 18, boxShadow: '0 10px 24px rgba(15, 23, 42, 0.06)' },
+  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)' },
   statTitle: { fontSize: 13, color: '#64748b', fontWeight: 700, marginBottom: 8 },
   statValue: { fontSize: 28, fontWeight: 800, color: '#0f172a' },
   statSubtitle: { marginTop: 6, fontSize: 13, color: '#64748b', lineHeight: 1.35 },
-  panel: { display: 'flex', flexDirection: 'column', gap: 14, scrollMarginTop: 24 },
+  panel: { display: 'flex', flexDirection: 'column', gap: 14, scrollMarginTop: 24, borderRadius: 12 },
   panelTitle: { margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' },
   panelSubtitle: { margin: '4px 0 0', color: '#64748b', fontSize: 14, lineHeight: 1.45 },
   sectionHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
@@ -1413,29 +1413,29 @@ const styles: Record<string, CSSProperties> = {
   formStack: { display: 'flex', flexDirection: 'column', gap: 16 },
   formGrid: { gap: 14 },
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 },
-  input: { width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 12, padding: '11px 12px', fontSize: 14, color: '#0f172a', background: '#fff', fontFamily: 'inherit' },
+  input: { width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, padding: '11px 12px', fontSize: 14, color: '#0f172a', background: '#fff', fontFamily: 'inherit' },
   fieldHint: { marginTop: 5, color: '#64748b', fontSize: 12 },
   itemHeaderRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
   itemTitle: { margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' },
   itemRows: { display: 'flex', flexDirection: 'column', gap: 12 },
-  itemRow: { padding: 14, border: '1px solid #e5e7eb', borderRadius: 16, background: '#f8fafc' },
+  itemRow: { padding: 14, border: '1px solid #e2e8f0', borderRadius: 12, background: '#f8fafc' },
   quantityRow: { display: 'flex', gap: 10, alignItems: 'flex-end' },
   availabilitySummary: { marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: '8px 18px', padding: '10px 12px', borderRadius: 12, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a', fontSize: 13 },
   availabilityWarning: { marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: '8px 18px', padding: '10px 12px', borderRadius: 12, background: '#fff7ed', border: '1px solid #fdba74', color: '#9a3412', fontSize: 13 },
   actionsRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  primaryButton: { border: 0, borderRadius: 12, background: '#2563eb', color: '#fff', padding: '11px 16px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#0f172a', padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  dangerButton: { border: '1px solid #fecaca', borderRadius: 12, background: '#fff1f2', color: '#b91c1c', padding: '11px 12px', fontWeight: 800, cursor: 'pointer' },
+  primaryButton: { border: 0, borderRadius: 8, background: '#2563eb', color: '#fff', padding: '11px 16px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(37, 99, 235, 0.18)' },
+  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff', color: '#0f172a', padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
+  dangerButton: { border: '1px solid #fecaca', borderRadius: 8, background: '#fff', color: '#dc2626', padding: '11px 12px', fontWeight: 700, cursor: 'pointer' },
   listHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   filterGrid: { gap: 14, alignItems: 'end' },
   filterActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   resultsToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', paddingTop: 2 },
   resultCount: { color: '#64748b', fontSize: 13 },
   rowsLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 13, fontWeight: 700 },
-  compactSelect: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '7px 9px', background: '#fff', color: '#0f172a' },
+  compactSelect: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 9px', background: '#fff', color: '#0f172a' },
   transferList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  transferCard: { textAlign: 'left', border: '1px solid #e5e7eb', borderRadius: 16, background: '#fff', padding: 14, cursor: 'pointer', color: '#0f172a', minWidth: 0 },
-  transferCardActive: { borderColor: '#2563eb', boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.12)' },
+  transferCard: { textAlign: 'left', border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', padding: 14, cursor: 'pointer', color: '#0f172a', minWidth: 0, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)' },
+  transferCardActive: { borderColor: '#2563eb', boxShadow: '0 0 0 2px rgba(37, 99, 235, 0.12)' },
   transferCardTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' },
   transferMeta: { marginTop: 8, fontSize: 13, color: '#64748b', lineHeight: 1.45, overflowWrap: 'anywhere' },
   transferNotes: { marginTop: 8, fontSize: 13, color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
@@ -1449,13 +1449,13 @@ const styles: Record<string, CSSProperties> = {
   detailHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   detailHeaderActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
   detailRoute: { fontSize: 20, fontWeight: 900, color: '#0f172a' },
-  detailNotes: { margin: 0, padding: 12, borderRadius: 12, background: '#f8fafc', color: '#334155', whiteSpace: 'pre-wrap' },
+  detailNotes: { margin: 0, padding: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#334155', whiteSpace: 'pre-wrap' },
   cancellationBox: { padding: 12, borderRadius: 12, background: '#fff1f2', border: '1px solid #fecaca', color: '#9f1239' },
-  tableWrapper: { overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 14 },
+  tableWrapper: { overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse', minWidth: 680 },
-  th: { textAlign: 'left', fontSize: 12, color: '#64748b', borderBottom: '1px solid #e5e7eb', padding: 10, background: '#f8fafc', whiteSpace: 'nowrap' },
+  th: { textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#475569', borderBottom: '1px solid #e2e8f0', padding: 10, background: '#f8fafc', whiteSpace: 'nowrap' },
   td: { borderBottom: '1px solid #f1f5f9', padding: 10, fontSize: 13, color: '#0f172a', verticalAlign: 'top' },
-  availabilityBlock: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4, padding: 14, border: '1px solid #e5e7eb', borderRadius: 14, background: '#f8fafc' },
+  availabilityBlock: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4, padding: 14, border: '1px solid #e2e8f0', borderRadius: 12, background: '#f8fafc' },
   movementBlock: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 },
   readyBadge: { display: 'inline-flex', borderRadius: 999, padding: '4px 8px', background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 800 },
   notReadyBadge: { display: 'inline-flex', borderRadius: 999, padding: '4px 8px', background: '#fee2e2', color: '#991b1b', fontSize: 11, fontWeight: 800 },
@@ -1463,8 +1463,8 @@ const styles: Record<string, CSSProperties> = {
   outBadge: { display: 'inline-flex', borderRadius: 999, padding: '4px 8px', background: '#fee2e2', color: '#991b1b', fontSize: 11, fontWeight: 800 },
   auditHint: { marginTop: 4, color: '#94a3b8', fontSize: 11 },
   draftActionsBlock: { display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 2 },
-  cancelArea: { padding: 14, border: '1px solid #fecaca', borderRadius: 14, background: '#fff7f7' },
-  cancelReasonInput: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #fecaca', borderRadius: 12, background: '#fff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical' },
+  cancelArea: { padding: 14, border: '1px solid #fecaca', borderRadius: 12, background: '#fff7f7' },
+  cancelReasonInput: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #fecaca', borderRadius: 10, background: '#fff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical' },
   cancelFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 8 },
   permissionHint: { fontSize: 13, color: '#64748b' }
 };

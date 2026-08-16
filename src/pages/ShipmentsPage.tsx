@@ -2018,7 +2018,7 @@ export default function ShipmentsPage() {
   };
 
   return (
-    <div>
+    <div className="io-operational-page io-shipments-page">
       <div style={styles.header}>
         <div>
           <h2 style={styles.title}>Inbound Receiving</h2>
@@ -3474,7 +3474,7 @@ export default function ShipmentsPage() {
 
 const styles: Record<string, CSSProperties> = {
   emailPreviewOverlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15, 23, 42, 0.58)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  emailPreviewModal: { width: 'min(1080px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#ffffff', borderRadius: 16, boxShadow: '0 24px 70px rgba(15,23,42,0.35)', padding: 22, display: 'grid', gap: 18 },
+  emailPreviewModal: { width: 'min(1080px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 24px 70px rgba(15,23,42,0.28)', padding: 22, display: 'grid', gap: 18 },
   emailPreviewHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
   emailPreviewTitle: { margin: 0, fontSize: 22 },
   emailPreviewFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
@@ -3523,28 +3523,29 @@ const styles: Record<string, CSSProperties> = {
   title: {
     margin: 0,
     fontSize: 28,
-    fontWeight: 800,
-    color: '#111827'
+    fontWeight: 700,
+    color: '#0f172a',
+    letterSpacing: '-0.02em'
   },
   description: {
     marginTop: 8,
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.6,
     maxWidth: 860
   },
   panel: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 16,
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
     padding: 20,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    boxShadow: '0 1px 2px rgba(15,23,42,0.03), 0 8px 24px rgba(15,23,42,0.03)',
     marginBottom: 20,
     minWidth: 0
   },
   advancedPanel: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
+    border: '1px solid #e2e8f0',
+    borderRadius: 10,
     padding: '12px 14px',
     marginBottom: 20
   },
@@ -3565,11 +3566,11 @@ const styles: Record<string, CSSProperties> = {
     margin: 0,
     fontSize: 18,
     fontWeight: 700,
-    color: '#111827'
+    color: '#0f172a'
   },
   panelSubtitle: {
     marginTop: 6,
-    color: '#6b7280',
+    color: '#64748b',
     fontSize: 14,
     lineHeight: 1.5
   },
@@ -3636,7 +3637,7 @@ const styles: Record<string, CSSProperties> = {
   input: {
     width: '100%',
     boxSizing: 'border-box',
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     borderRadius: 10,
     padding: '10px 12px',
     fontSize: 14,
@@ -3655,7 +3656,7 @@ const styles: Record<string, CSSProperties> = {
   },
   primaryButton: {
     border: 'none',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: '12px 16px',
     background: '#2563eb',
     color: '#ffffff',
@@ -3668,8 +3669,8 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'not-allowed'
   },
   secondaryButton: {
-    border: '1px solid #d1d5db',
-    borderRadius: 10,
+    border: '1px solid #cbd5e1',
+    borderRadius: 8,
     padding: '10px 14px',
     background: '#ffffff',
     color: '#111827',
@@ -3682,10 +3683,10 @@ const styles: Record<string, CSSProperties> = {
   },
   dangerButton: {
     border: '1px solid #fecaca',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: '10px 14px',
-    background: '#fef2f2',
-    color: '#991b1b',
+    background: '#ffffff',
+    color: '#dc2626',
     fontWeight: 700,
     cursor: 'pointer'
   },
@@ -3695,9 +3696,9 @@ const styles: Record<string, CSSProperties> = {
   },
   finalizeButton: {
     border: 'none',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: '12px 16px',
-    background: '#059669',
+    background: '#2563eb',
     color: '#ffffff',
     fontWeight: 700,
     cursor: 'pointer',
@@ -3707,7 +3708,7 @@ const styles: Record<string, CSSProperties> = {
   },
   scannerButton: {
     border: 'none',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: '12px 16px',
     background: '#2563eb',
     color: '#ffffff',
@@ -3722,11 +3723,11 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'not-allowed'
   },
   emailSupplierButton: {
-    border: 'none',
-    borderRadius: 10,
+    border: '1px solid #bfdbfe',
+    borderRadius: 8,
     padding: '12px 16px',
-    background: '#7c3aed',
-    color: '#ffffff',
+    background: '#ffffff',
+    color: '#1d4ed8',
     fontWeight: 700,
     cursor: 'pointer',
     whiteSpace: 'normal',
@@ -3841,8 +3842,8 @@ const styles: Record<string, CSSProperties> = {
   },
   shipmentCard: {
     textAlign: 'left',
-    border: '1px solid #e5e7eb',
-    borderRadius: 14,
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
     padding: 14,
     background: '#ffffff',
     cursor: 'pointer',
@@ -3850,7 +3851,7 @@ const styles: Record<string, CSSProperties> = {
   },
   shipmentCardSelected: {
     border: '1px solid #2563eb',
-    boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.12)'
+    boxShadow: '0 0 0 2px rgba(37, 99, 235, 0.12)'
   },
   shipmentCardTop: {
     display: 'flex',
@@ -3888,10 +3889,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700
   },
   selectedShipmentBox: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 14,
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
     padding: 16,
-    background: '#f9fafb',
+    background: '#f8fafc',
     minWidth: 0,
     marginTop: 16
   },
@@ -3904,14 +3905,14 @@ const styles: Record<string, CSSProperties> = {
   },
   sectionDivider: {
     height: 1,
-    background: '#e5e7eb',
+    background: '#e2e8f0',
     margin: '20px 0'
   },
   sectionTitle: {
     margin: '0 0 14px',
     fontSize: 16,
     fontWeight: 700,
-    color: '#111827'
+    color: '#0f172a'
   },
   itemsHeaderRow: {
     display: 'flex',
@@ -3958,9 +3959,10 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '12px 10px',
-    borderBottom: '1px solid #e5e7eb',
-    color: '#6b7280',
+    borderBottom: '1px solid #e2e8f0',
+    color: '#475569',
     fontSize: 12,
+    fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
     background: '#f9fafb'
@@ -4003,8 +4005,8 @@ const styles: Record<string, CSSProperties> = {
     gap: 14
   },
   mobileItemCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 14,
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
     padding: 14,
     background: '#ffffff'
   },
@@ -4177,7 +4179,7 @@ const styles: Record<string, CSSProperties> = {
   },
   workflowStepCard: {
     border: '1px solid #e2e8f0',
-    borderRadius: 16,
+    borderRadius: 12,
     background: '#ffffff',
     padding: 14,
     display: 'grid',
@@ -4185,7 +4187,7 @@ const styles: Record<string, CSSProperties> = {
   },
   workflowStepCardComplete: {
     border: '1px solid #bbf7d0',
-    borderRadius: 16,
+    borderRadius: 12,
     background: '#f0fdf4',
     padding: 14,
     display: 'grid',
@@ -4207,8 +4209,8 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 16
   },
   readinessCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 16,
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
     padding: 16,
     background: '#ffffff'
   },
@@ -4244,10 +4246,10 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 12
   },
   progressMetricBox: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
+    border: '1px solid #e2e8f0',
+    borderRadius: 10,
     padding: 10,
-    background: '#f9fafb'
+    background: '#f8fafc'
   },
   progressBarTrack: {
     height: 10,

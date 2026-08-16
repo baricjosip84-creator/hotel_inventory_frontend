@@ -1557,10 +1557,10 @@ const styles: Record<string, CSSProperties> = {
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
+    border: '1px solid #dbe4ef',
+    borderRadius: '12px',
     padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     minWidth: 0
   },
   statTitle: {
@@ -1652,14 +1652,14 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: 'nowrap'
   },
   tabButtonActive: {
-    background: '#0f172a',
-    borderColor: '#0f172a',
+    background: '#2563eb',
+    borderColor: '#1d4ed8',
     color: '#ffffff'
   },
   tableWrapper: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '14px',
+    border: '1px solid #dbe4ef',
+    borderRadius: '12px',
     overflow: 'hidden',
     overflowX: 'auto',
     minWidth: 0
@@ -1672,7 +1672,7 @@ const styles: Record<string, CSSProperties> = {
   th: {
     textAlign: 'left',
     padding: '14px',
-    background: '#f9fafb',
+    background: '#f8fafc',
     borderBottom: '1px solid #e5e7eb',
     fontSize: '13px',
     color: '#6b7280'
@@ -1703,7 +1703,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   mobileCard: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dbe4ef',
     borderRadius: '12px',
     padding: '14px',
     background: '#ffffff',
@@ -1794,8 +1794,8 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45
   },
   actionButton: {
-    border: '1px solid #0f172a',
-    background: '#0f172a',
+    border: '1px solid #1d4ed8',
+    background: '#2563eb',
     color: '#ffffff',
     borderRadius: '10px',
     padding: '10px 14px',

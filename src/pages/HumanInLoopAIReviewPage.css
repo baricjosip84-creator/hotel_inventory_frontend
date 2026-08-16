@@ -94,3 +94,58 @@
 .ai-review-page__readiness-note {
   line-height: 1.5;
 }
+
+/* v3.46.26 approved visual-system alignment */
+.ai-review-page .card,
+.ai-review-page [data-ai-contract-panel] {
+  border-color: var(--io-border, #e2e8f0);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.ai-review-page .button--secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.ai-review-page .button--secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.ai-review-page .button--primary,
+.ai-review-page .button:not(.button--secondary) {
+  background: var(--io-primary, #2563eb);
+}
+
+.ai-review-page .button--primary:hover:not(:disabled),
+.ai-review-page .button:not(.button--secondary):hover:not(:disabled) {
+  background: var(--io-primary-dark, #1d4ed8);
+}
+
+.ai-review-page textarea,
+.ai-review-page select,
+.ai-review-page input {
+  min-height: 44px;
+  border-color: #cbd5e1;
+  border-radius: 12px;
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
+.ai-review-page textarea:focus-visible,
+.ai-review-page select:focus-visible,
+.ai-review-page input:focus-visible {
+  border-color: var(--io-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.ai-review-page__view-switch {
+  border-radius: 16px;
+  background: #f8fafc;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}

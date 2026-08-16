@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import './OperationalExperiencePages.css';
 import {
   TENANT_PERMISSIONS,
   getCurrentAccessRoleLabel,
@@ -461,7 +462,7 @@ export default function AlertsPage() {
   }
 
   return (
-    <div style={styles.page}>
+    <div className="alerts-page" style={styles.page}>
       <section className="app-panel app-panel--padded" style={styles.workflowPanel}>
         <div style={styles.workflowHeader}>
           <div style={styles.headerTextBlock}>

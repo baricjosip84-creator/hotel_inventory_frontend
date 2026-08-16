@@ -28,17 +28,33 @@ type TimelineResponse = {
 };
 
 
-const sourceVisuals: Record<string, { icon: string; accent: string; label: string }> = {
-  audit: { icon: '🧾', accent: '#6366f1', label: 'Audit' },
-  support_session: { icon: '🎧', accent: '#0ea5e9', label: 'Support session' },
-  incident: { icon: '⚠️', accent: '#dc2626', label: 'Incident' },
-  maintenance: { icon: '🛠️', accent: '#f97316', label: 'Maintenance' },
-  tenant_task: { icon: '📝', accent: '#7c3aed', label: 'Task' },
-  tenant_communication: { icon: '📧', accent: '#0891b2', label: 'Communication' },
-  billing_event: { icon: '💰', accent: '#16a34a', label: 'Billing' },
-  data_retention: { icon: '🗄️', accent: '#475569', label: 'Retention' },
-  offboarding: { icon: '🚪', accent: '#be123c', label: 'Offboarding' }
+type TimelineIconName = 'audit' | 'support' | 'incident' | 'maintenance' | 'task' | 'communication' | 'billing' | 'retention' | 'offboarding' | 'default';
+
+const sourceVisuals: Record<string, { icon: TimelineIconName; accent: string; label: string }> = {
+  audit: { icon: 'audit', accent: '#2563eb', label: 'Audit' },
+  support_session: { icon: 'support', accent: '#0284c7', label: 'Support session' },
+  incident: { icon: 'incident', accent: '#dc2626', label: 'Incident' },
+  maintenance: { icon: 'maintenance', accent: '#d97706', label: 'Maintenance' },
+  tenant_task: { icon: 'task', accent: '#2563eb', label: 'Task' },
+  tenant_communication: { icon: 'communication', accent: '#0284c7', label: 'Communication' },
+  billing_event: { icon: 'billing', accent: '#16a34a', label: 'Billing' },
+  data_retention: { icon: 'retention', accent: '#64748b', label: 'Retention' },
+  offboarding: { icon: 'offboarding', accent: '#b91c1c', label: 'Offboarding' }
 };
+
+function TimelineSourceIcon({ name }: { name: TimelineIconName }) {
+  const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+  if (name === 'audit') return <svg {...common}><path d="M7 3h10v4H7z" /><path d="M6 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1" /><path d="M8 12h8M8 16h5" /></svg>;
+  if (name === 'support') return <svg {...common}><path d="M4 13v-2a8 8 0 0 1 16 0v2" /><path d="M4 13h3v6H5a1 1 0 0 1-1-1zM20 13h-3v6h2a1 1 0 0 0 1-1z" /><path d="M17 19c0 1.1-.9 2-2 2h-3" /></svg>;
+  if (name === 'incident') return <svg {...common}><path d="M12 3 2.8 19h18.4z" /><path d="M12 9v4M12 17h.01" /></svg>;
+  if (name === 'maintenance') return <svg {...common}><path d="M14.7 6.3a4 4 0 0 0-5.5 5.5L3 18l3 3 6.2-6.2a4 4 0 0 0 5.5-5.5l-2.4 2.4-3-3z" /></svg>;
+  if (name === 'task') return <svg {...common}><path d="M9 4h6l1 2h3v15H5V6h3z" /><path d="m8 13 2 2 5-5" /></svg>;
+  if (name === 'communication') return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>;
+  if (name === 'billing') return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18M7 15h3" /></svg>;
+  if (name === 'retention') return <svg {...common}><path d="M4 7h16v14H4zM3 3h18v4H3z" /><path d="M9 11h6" /></svg>;
+  if (name === 'offboarding') return <svg {...common}><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9" /></svg>;
+  return <svg {...common}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>;
+}
 
 const eventTitleMap: Record<string, string> = {
   create: 'Tenant created',
@@ -272,14 +288,14 @@ export default function PlatformTenantTimelinePage() {
         <div style={styles.eventList}>
           {visibleEvents.map((event) => {
             const metadata = importantMetadata(event.metadata);
-            const visual = sourceVisuals[event.source] || { icon: '•', accent: '#64748b', label: readableSource(event.source) };
+            const visual = sourceVisuals[event.source] || { icon: 'default' as TimelineIconName, accent: '#64748b', label: readableSource(event.source) };
             const displayTitle = friendlyEventTitle(event);
             const relative = relativeTime(event.happened_at);
             return (
               <article key={event.id} style={{ ...styles.eventCard, borderLeftColor: visual.accent }}>
                 <div style={styles.eventHeader}>
                   <div style={styles.eventTitleWrap}>
-                    <span style={styles.eventIcon} aria-hidden="true">{visual.icon}</span>
+                    <span style={{ ...styles.eventIcon, color: visual.accent }}><TimelineSourceIcon name={visual.icon} /></span>
                     <div>
                       <div style={styles.eventTitle}>{displayTitle}</div>
                       <div style={styles.muted}>{event.tenant_name} · {visual.label} · {formatDate(event.happened_at)}{relative ? ` · ${relative}` : ''}</div>
@@ -304,33 +320,33 @@ export default function PlatformTenantTimelinePage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 20 },
+  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
   headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28 },
-  muted: { color: '#6b7280', margin: '4px 0' },
-  panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)' },
-  sectionTitle: { marginTop: 0 },
+  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
+  muted: { color: '#64748b', margin: '4px 0', lineHeight: 1.5 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
+  sectionTitle: { marginTop: 0, color: '#0f172a', fontSize: 18, letterSpacing: '-.015em' },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' },
-  input: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff' },
-  button: { padding: '10px 14px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' },
-  secondaryButton: { padding: '10px 14px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: '#111827', cursor: 'pointer' },
-  retryButton: { padding: '8px 12px', borderRadius: 10, border: '1px solid #fecaca', background: '#fff', color: '#991b1b', cursor: 'pointer' },
-  metadataPanel: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, color: '#475569', fontSize: 13 },
+  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', minWidth: 0 },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
+  retryButton: { padding: '8px 12px', borderRadius: 9, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
+  metadataPanel: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#475569', fontSize: 13 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 },
-  summaryCard: { background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 4 },
-  summaryLabel: { color: '#6b7280', fontSize: 13 },
-  error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b' },
-  errorAction: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gap: 4 },
+  summaryLabel: { color: '#64748b', fontSize: 13 },
+  error: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' },
+  errorAction: { padding: 14, borderRadius: 12, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   eventList: { display: 'grid', gap: 12 },
-  eventCard: { border: '1px solid #e5e7eb', borderLeft: '5px solid #64748b', borderRadius: 14, padding: 14, background: '#fff' },
+  eventCard: { border: '1px solid #e2e8f0', borderLeft: '4px solid #64748b', borderRadius: 12, padding: 14, background: '#fff', boxShadow: '0 1px 2px rgba(15,23,42,.025)' },
   eventHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
   eventTitleWrap: { display: 'flex', gap: 10, alignItems: 'flex-start' },
-  eventIcon: { width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 999, background: '#f8fafc', fontSize: 16, flex: '0 0 auto' },
-  eventTitle: { fontWeight: 800, fontSize: 16 },
+  eventIcon: { width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 16, flex: '0 0 auto' },
+  eventTitle: { fontWeight: 800, fontSize: 16, color: '#0f172a' },
   rawEventKey: { marginTop: 3, color: '#94a3b8', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' },
-  details: { margin: '10px 0', color: '#374151' },
-  metaLine: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  details: { margin: '10px 0', color: '#334155', lineHeight: 1.5 },
+  metaLine: { fontSize: 13, color: '#64748b', marginTop: 4 },
   badgeGroup: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
-  badge: { fontSize: 12, padding: '4px 8px', borderRadius: 999, background: '#eef2ff', color: '#3730a3' },
-  badgeStrong: { fontSize: 12, padding: '4px 8px', borderRadius: 999, background: '#fff7ed', color: '#9a3412' }
+  badge: { fontSize: 12, padding: '4px 9px', borderRadius: 999, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', fontWeight: 700 },
+  badgeStrong: { fontSize: 12, padding: '4px 9px', borderRadius: 999, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontWeight: 700 }
 };

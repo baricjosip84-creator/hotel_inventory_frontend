@@ -594,7 +594,7 @@ export default function ScannerPage() {
   }, []);
 
   return (
-    <div style={styles.page}>
+    <div className="io-scanner-page" style={styles.page}>
       <section className="app-panel app-panel--padded" style={styles.heroPanel}>
         <div style={styles.heroHeader}>
           <div style={styles.heroTextBlock}>
@@ -928,12 +928,13 @@ const styles: Record<string, CSSProperties> = {
   title: {
     margin: 0,
     fontSize: '28px',
-    fontWeight: 700,
+    fontWeight: 800,
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   description: {
     margin: '8px 0 0 0',
-    color: '#4b5563',
+    color: '#64748b',
     lineHeight: 1.6,
     wordBreak: 'break-word'
   },
@@ -1086,19 +1087,19 @@ const styles: Record<string, CSSProperties> = {
   },
   primaryButton: {
     border: 'none',
-    borderRadius: '12px',
-    padding: '12px 16px',
+    borderRadius: '10px',
+    padding: '11px 14px',
     background: '#2563eb',
     color: '#ffffff',
     fontWeight: 700,
     cursor: 'pointer'
   },
   secondaryButton: {
-    border: '1px solid #d1d5db',
-    borderRadius: '12px',
-    padding: '12px 16px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '10px',
+    padding: '11px 14px',
     background: '#ffffff',
-    color: '#111827',
+    color: '#0f172a',
     fontWeight: 700,
     cursor: 'pointer'
   },
@@ -1138,7 +1139,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     overflow: 'hidden',
     borderRadius: '14px',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     background: '#f8fafc'
   },
   scannerContainerWide: {
@@ -1171,7 +1172,7 @@ const styles: Record<string, CSSProperties> = {
   },
   panelSubtitle: {
     margin: '8px 0 0 0',
-    color: '#6b7280',
+    color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
@@ -1199,15 +1200,15 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     maxWidth: '100%',
     boxSizing: 'border-box',
-    border: '1px solid #d1d5db',
-    borderRadius: '12px',
-    padding: '12px 14px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '10px',
+    padding: '11px 12px',
     fontSize: '14px',
     background: '#ffffff'
   },
   disabledInput: {
     background: '#f3f4f6',
-    color: '#6b7280',
+    color: '#64748b',
     cursor: 'not-allowed'
   },
   formActions: {
@@ -1220,7 +1221,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   resultCard: {
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     background: '#f8fafc',
     borderRadius: '12px',
     padding: '14px',

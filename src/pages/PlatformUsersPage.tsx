@@ -205,17 +205,17 @@ function getCreateValidation(form: { email: string; name: string; password: stri
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  muted: { color: '#6b7280' },
-  panel: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 12px 36px rgba(15,23,42,.08)', overflowX: 'auto' },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, alignItems: 'end' },
-  field: { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 700 },
-  input: { padding: 10, border: '1px solid #d1d5db', borderRadius: 10, width: '100%', boxSizing: 'border-box' },
-  button: { padding: '8px 10px', borderRadius: 10, border: '1px solid #d1d5db', cursor: 'pointer' },
-  disabledButton: { cursor: 'not-allowed', opacity: 0.6 },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e5e7eb' },
-  td: { padding: 10, borderBottom: '1px solid #f3f4f6' },
-  warning: { background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', borderRadius: 12, padding: 12, marginTop: 10 },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, marginTop: 10 }
+  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
+  muted: { color: '#64748b', margin: '4px 0', lineHeight: 1.5 },
+  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, alignItems: 'end' },
+  field: { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 700, color: '#334155', fontSize: 13 },
+  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, width: '100%', boxSizing: 'border-box', background: '#fff', color: '#0f172a' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  disabledButton: { cursor: 'not-allowed', opacity: 0.55, background: '#e2e8f0', borderColor: '#cbd5e1', color: '#64748b', boxShadow: 'none' },
+  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
+  th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
+  td: { padding: '12px 8px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
+  warning: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 10, padding: 12, marginTop: 10 },
+  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 12, marginTop: 10 }
 };

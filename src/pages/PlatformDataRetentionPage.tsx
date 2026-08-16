@@ -305,24 +305,24 @@ export default function PlatformDataRetentionPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) { return <div style={{ background: '#f9fafb', borderRadius: 12, padding: 16 }}><div style={{ color: '#6b7280' }}>{label}</div><div style={{ fontSize: 28, fontWeight: 700 }}>{value}</div></div>; }
-function Th({ children }: { children: ReactNode }) { return <th style={{ textAlign: 'left', padding: 10 }}>{children}</th>; }
-function Td({ children, colSpan }: { children: ReactNode; colSpan?: number }) { return <td colSpan={colSpan} style={{ padding: 10, verticalAlign: 'top' }}>{children}</td>; }
+function Metric({ label, value }: { label: string; value: number }) { return <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155' }}><div style={{ color: '#64748b', fontSize: 13 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{value}</div></div>; }
+function Th({ children }: { children: ReactNode }) { return <th style={{ textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12 }}>{children}</th>; }
+function Td({ children, colSpan }: { children: ReactNode; colSpan?: number }) { return <td colSpan={colSpan} style={{ padding: '11px 8px', verticalAlign: 'top', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>{children}</td>; }
 
-const cardStyle: CSSProperties = { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' };
-const headerStyle: CSSProperties = { ...cardStyle, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' };
-const titleStyle: CSSProperties = { margin: 0 };
-const subtitleStyle: CSSProperties = { color: '#6b7280', marginTop: 6 };
-const helpStyle: CSSProperties = { color: '#6b7280', fontSize: 13 };
+const cardStyle: CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 };
+const headerStyle: CSSProperties = { ...cardStyle, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' };
+const titleStyle: CSSProperties = { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' };
+const subtitleStyle: CSSProperties = { color: '#64748b', marginTop: 6, fontSize: 13, lineHeight: 1.5 };
+const helpStyle: CSSProperties = { color: '#64748b', fontSize: 13 };
 const metaRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 };
-const metaPillStyle: CSSProperties = { border: '1px solid #d1d5db', borderRadius: 999, padding: '4px 8px', fontSize: 12, color: '#374151', background: '#f9fafb' };
+const metaPillStyle: CSSProperties = { border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 9px', fontSize: 12, color: '#475569', background: '#f8fafc', fontWeight: 700 };
 const linkRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 };
-const sourceLinkStyle: CSSProperties = { color: '#1d4ed8', textDecoration: 'none', fontSize: 13, fontWeight: 600 };
-const inputStyle: CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db', marginTop: 6 };
-const buttonStyle: CSSProperties = { padding: '10px 14px', borderRadius: 10, border: 0, background: '#111827', color: '#fff', cursor: 'pointer' };
-const disabledButtonStyle: CSSProperties = { ...buttonStyle, background: '#9ca3af', cursor: 'not-allowed' };
-const secondaryButtonStyle: CSSProperties = { ...buttonStyle, background: '#6b7280' };
-const smallButtonStyle: CSSProperties = { padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' };
-const warningTextStyle: CSSProperties = { color: '#b45309', fontSize: 13 };
-const successStyle: CSSProperties = { ...cardStyle, color: '#065f46', background: '#ecfdf5' };
-const errorStyle: CSSProperties = { ...cardStyle, color: '#991b1b', background: '#fef2f2' };
+const sourceLinkStyle: CSSProperties = { color: '#1d4ed8', textDecoration: 'none', fontSize: 13, fontWeight: 700 };
+const inputStyle: CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #cbd5e1', marginTop: 6, background: '#fff', color: '#0f172a', font: 'inherit', boxSizing: 'border-box' };
+const buttonStyle: CSSProperties = { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' };
+const disabledButtonStyle: CSSProperties = { ...buttonStyle, borderColor: '#cbd5e1', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', boxShadow: 'none' };
+const secondaryButtonStyle: CSSProperties = { ...buttonStyle, borderColor: '#cbd5e1', background: '#fff', color: '#0f172a', boxShadow: 'none' };
+const smallButtonStyle: CSSProperties = { padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 };
+const warningTextStyle: CSSProperties = { color: '#92400e', fontSize: 13 };
+const successStyle: CSSProperties = { ...cardStyle, color: '#166534', background: '#f0fdf4', borderColor: '#bbf7d0', boxShadow: 'none' };
+const errorStyle: CSSProperties = { ...cardStyle, color: '#991b1b', background: '#fef2f2', borderColor: '#fecaca', boxShadow: 'none' };
