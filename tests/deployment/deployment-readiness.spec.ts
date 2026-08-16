@@ -264,7 +264,7 @@ test.describe('deployed service readiness', () => {
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await page.getByLabel(/^Email$/i).fill(requiredValue('E2E_EMAIL'));
     await page.getByLabel(/^Password$/i).fill(requiredValue('E2E_PASSWORD'));
-    await page.getByRole('button', { name: /login/i }).click();
+    await page.getByRole('button', { name: /^(sign in|login)$/i }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
 
     await assertPageHasNoRuntimeFailure(page, '/dashboard', /^Dashboard$/i);

@@ -8,6 +8,7 @@ const read = (path) => readFileSync(join(root, path), 'utf8');
 const registry = read('src/app/navigationRegistry.ts');
 const router = read('src/app/router.tsx');
 const layout = read('src/layouts/AppLayout.tsx');
+const brand = read('src/components/brand/InventoryBrand.tsx');
 const tenantAccess = read('src/lib/tenantAccess.ts');
 const routeQueryState = read('src/lib/useRouteQueryState.ts');
 const shellCheck = read('scripts/check-commercial-shell-regression.mjs');
@@ -72,7 +73,7 @@ const requiredLayoutSignals = [
   'getTenantModuleForPathname',
   'getTenantPageMeta',
   'getTenantAccessSnapshot',
-  'Inventory Operations',
+  'InventoryBrand',
   "tenantSubscriptionAccess?.tenant.name || 'Company workspace'",
   'getCurrentAccessRoleLabel'
 ];
@@ -81,6 +82,14 @@ for (const signal of requiredLayoutSignals) {
   if (!layout.includes(signal)) {
     failures.push(`AppLayout missing closure shell signal: ${signal}`);
   }
+}
+
+if (!layout.includes('<InventoryBrand')) {
+  failures.push('AppLayout missing shared InventoryBrand shell component.');
+}
+
+if (!brand.includes('Inventory Operations')) {
+  failures.push('InventoryBrand missing Inventory Operations product identity.');
 }
 
 const requiredTenantAccessSignals = [
