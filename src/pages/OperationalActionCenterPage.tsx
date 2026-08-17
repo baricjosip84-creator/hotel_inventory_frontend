@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './OperationalExperiencePages.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -346,6 +347,21 @@ function actionTitleLabel(action: OperationalAction): string {
   return title;
 }
 
+function actionDomainIconPath(domain?: string | null): string {
+  if (domain === 'alerts') return '/alerts';
+  if (domain === 'execution') return '/execution-tasks';
+  if (domain === 'control_tower') return '/reliability-command';
+  if (domain === 'decision_intelligence') return '/intelligence-review';
+  if (domain === 'ai_governance') return '/ai-copilot';
+  return '/action-center';
+}
+
+function urgencyToneClass(urgency?: string | null): string {
+  if (urgency === 'critical') return 'action-center-icon--danger';
+  if (urgency === 'high' || urgency === 'medium') return 'action-center-icon--warning';
+  return 'action-center-icon--blue';
+}
+
 function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) {
     return null;
@@ -500,51 +516,75 @@ export default function OperationalActionCenterPage() {
 
   return (
     <div className="operational-action-center-page">
-      <div className="card-grid" style={cardGridStyle}>
-        <div className="card">
-          <div className="card__label">Open actions shown</div>
-          <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
-          <div className="card__subtext">The highest-priority actions currently returned for your access.</div>
+      <div className="action-center-summary-grid">
+        <div className="card action-center-summary-card">
+          <span className="action-center-icon action-center-icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
+          <div className="action-center-summary-copy">
+            <div className="card__label">Open actions shown</div>
+            <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
+            <div className="card__subtext">The highest-priority actions currently returned for your access.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Highest urgency</div>
-          <div className="card__value" style={{ textTransform: 'capitalize' }}>{summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}</div>
-          <div className="card__subtext">The most urgent level among the actions shown.</div>
+        <div className="card action-center-summary-card">
+          <span className={`action-center-icon ${urgencyToneClass(summary.highest_urgency)}`}><TenantNavIcon path="/alerts" size={18} /></span>
+          <div className="action-center-summary-copy">
+            <div className="card__label">Highest urgency</div>
+            <div className="card__value action-center-summary-text-value">{summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}</div>
+            <div className="card__subtext">The most urgent level among the actions shown.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Approval gated</div>
-          <div className="card__value">{numberValue(summary.approval_required_count)}</div>
-          <div className="card__subtext">Items requiring human governance review.</div>
+        <div className="card action-center-summary-card">
+          <span className="action-center-icon action-center-icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span>
+          <div className="action-center-summary-copy">
+            <div className="card__label">Approval gated</div>
+            <div className="card__value">{numberValue(summary.approval_required_count)}</div>
+            <div className="card__subtext">Items requiring human governance review.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Execution mode</div>
-          <div className="card__value" style={{ fontSize: 18 }}>{executionModeLabel(response?.definition?.execution_mode)}</div>
-          <div className="card__subtext">This page guides people to source workflows but does not change records itself.</div>
+        <div className="card action-center-summary-card">
+          <span className="action-center-icon action-center-icon--green"><TenantNavIcon path="/execution-tasks" size={18} /></span>
+          <div className="action-center-summary-copy">
+            <div className="card__label">Execution mode</div>
+            <div className="card__value action-center-summary-text-value">{executionModeLabel(response?.definition?.execution_mode)}</div>
+            <div className="card__subtext">This page guides people to source workflows but does not change records itself.</div>
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 800 }}>How this page works</div>
-        <p className="card__subtext" style={{ marginBottom: 0 }}>
-          The Action Center combines work from several parts of the tenant account. It is advisory and read-only: use the source-workflow button on an item to review or complete the real work.
-        </p>
+      <div className="card action-center-info-card">
+        <span className="action-center-icon action-center-icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
+        <div>
+          <div className="action-center-info-title">How this page works</div>
+          <p className="card__subtext">
+            The Action Center combines work from several parts of the tenant account. It is advisory and read-only: use the source-workflow button on an item to review or complete the real work.
+          </p>
+        </div>
       </div>
 
-      <section className="section">
-        <div className="section__title">Action inbox</div>
-        <div className="card">
-          <div style={toolbarStyle}>
-            <select aria-label="Filter by action domain" style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
-              {availableDomains.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select aria-label="Filter by urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
-              {URGENCY_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <button className="button button--secondary" type="button" onClick={() => actionCenterQuery.refetch()} disabled={actionCenterQuery.isFetching}>
+      <section className="section action-center-inbox-section">
+        <div className="section__title action-center-section-title">
+          <span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span>
+          <span>Action inbox</span>
+        </div>
+        <div className="card action-center-inbox-shell">
+          <div style={toolbarStyle} className="action-center-toolbar">
+            <label className="action-center-filter-field">
+              <span>Domain</span>
+              <select aria-label="Filter by action domain" style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
+                {availableDomains.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="action-center-filter-field">
+              <span>Urgency</span>
+              <select aria-label="Filter by urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
+                {URGENCY_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <button className="button button--secondary action-center-refresh" type="button" onClick={() => actionCenterQuery.refetch()} disabled={actionCenterQuery.isFetching}>
               {actionCenterQuery.isFetching ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
@@ -568,37 +608,41 @@ export default function OperationalActionCenterPage() {
                   <article
                     id={`action-${action.action_id}`}
                     key={action.action_id}
-                    className="card"
+                    className={`card action-center-action-card action-center-action-card--${String(action.urgency || 'low')}`}
                     style={{
-                      background: 'var(--color-surface-soft)',
                       outline: sourceActionId === action.action_id ? '3px solid var(--color-primary)' : undefined,
                       outlineOffset: sourceActionId === action.action_id ? 2 : undefined
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div>
-                        <div style={{ fontWeight: 800 }}>{actionTitleLabel(action)}</div>
-                        <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                    <div className="action-center-action-header">
+                      <div className="action-center-action-lead">
+                        <span className={`action-center-icon ${urgencyToneClass(action.urgency)}`}><TenantNavIcon path={actionDomainIconPath(action.action_domain)} size={17} /></span>
+                        <div className="action-center-action-title-copy">
+                          <div className="action-center-action-title">{actionTitleLabel(action)}</div>
+                          <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div className="action-center-badge-row">
                         <span style={urgencyBadgeStyle(action.urgency)}>{formatLabel(action.urgency)}</span>
                         <span style={badgeStyle}>{formatLabel(action.action_domain)}</span>
                         <span style={badgeStyle}>{formatLabel(action.action_status)}</span>
                       </div>
                     </div>
 
-                    <div className="card__subtext">
-                      Recommended next step: {action.recommended_next_step || 'Review source workflow before acting.'}
+                    <div className="action-center-action-guidance">
+                      <span className="action-center-action-guidance-label">Recommended next step</span>
+                      <span>{action.recommended_next_step || 'Review source workflow before acting.'}</span>
                     </div>
-                    <div className="card__subtext">
-                      Updated: {formatDateTime(action.updated_at || action.created_at)}
+                    <div className="action-center-action-footer">
+                      <span className="card__subtext">Updated: {formatDateTime(action.updated_at || action.created_at)}</span>
+                      {sourceLink ? (
+                        <Link className="button button--secondary action-center-source-button" to={sourceLink.to}>
+                          <TenantNavIcon path={sourceLink.to.split('?')[0]} size={15} />
+                          <span>{sourceLink.label}</span>
+                        </Link>
+                      ) : null}
                     </div>
-                    {sourceLink ? (
-                      <div style={{ marginTop: 10 }}>
-                        <Link className="button button--secondary" to={sourceLink.to}>{sourceLink.label}</Link>
-                      </div>
-                    ) : null}
-                    <details style={actionMetadataStyle}>
+                    <details style={actionMetadataStyle} className="action-center-technical-details">
                       <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Technical details</summary>
                       <div className="card__subtext">Priority score: {numberValue(action.priority_score)}</div>
                       <div className="card__subtext">
@@ -620,7 +664,7 @@ export default function OperationalActionCenterPage() {
 
 
       {canViewGovernanceReadiness ? (
-      <details style={{ ...detailsStyle, marginTop: 16 }}>
+      <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
         <summary style={detailsSummaryStyle}>Governance readiness details</summary>
         <p className="card__subtext">
           Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe workflow readiness, not the tenant's overall operational health.
@@ -867,7 +911,7 @@ export default function OperationalActionCenterPage() {
       ) : null}
 
       {canViewTenantDiagnostics ? (
-        <details style={{ ...detailsStyle, marginTop: 16 }}>
+        <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
           <summary style={detailsSummaryStyle}>Technical contract diagnostics</summary>
           <p className="card__subtext">
             Advanced checks shown only to users with tenant diagnostics access, confirming that the page and backend still agree about the information this screen requires.
@@ -990,7 +1034,7 @@ export default function OperationalActionCenterPage() {
       ) : null}
 
       <section className="section">
-        <div className="section__title">Read-only safety guarantees</div>
+        <div className="section__title action-center-section-title"><span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span><span>Read-only safety guarantees</span></div>
         <div className="card-grid" style={cardGridStyle}>
           {safetyEntries.filter(([key]) => USER_FACING_SAFETY_KEYS.has(key)).map(([key]) => (
             <div className="card" key={key}>
