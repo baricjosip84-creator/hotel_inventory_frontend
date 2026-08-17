@@ -3,30 +3,143 @@
   min-width: 0;
 }
 
+.workflow-composer-page--refined {
+  color: #0f172a;
+}
+
+.workflow-composer-page--refined .card {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.workflow-composer-page--refined .card__label {
+  margin-bottom: 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workflow-composer-page--refined .card__value {
+  color: #0f172a;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
+.workflow-composer-page--refined .card__subtext {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .workflow-composer-page__summary-grid,
 .workflow-composer-page__guidance-grid,
 .workflow-composer-page__safety-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .workflow-composer-page__summary-card,
-.workflow-composer-page__blueprint-card,
 .workflow-composer-page__guidance-card,
-.workflow-composer-page__safety-card,
-.workflow-composer-page__plan-panel {
+.workflow-composer-page__safety-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
   overflow-wrap: anywhere;
 }
 
+.workflow-composer-page__summary-card {
+  min-height: 122px;
+  padding: 16px 17px;
+}
+
+.workflow-composer-page__summary-copy,
+.workflow-composer-page__guidance-copy,
+.workflow-composer-page__safety-copy,
+.workflow-composer-page__blueprint-title-copy,
+.workflow-composer-page__state-copy {
+  min-width: 0;
+  flex: 1;
+}
+
 .workflow-composer-page__mode-value {
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: 19px !important;
+  line-height: 1.24 !important;
+  letter-spacing: -0.015em !important;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.workflow-composer-page__icon,
+.workflow-composer-page__section-icon,
+.workflow-composer-page__intro-icon,
+.workflow-composer-page__blueprint-icon,
+.workflow-composer-page__plan-icon,
+.workflow-composer-page__routing-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+}
+
+.workflow-composer-page__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+}
+
+.workflow-composer-page__section-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+}
+
+.workflow-composer-page__intro-icon,
+.workflow-composer-page__blueprint-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.workflow-composer-page__plan-icon,
+.workflow-composer-page__routing-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.workflow-composer-page__icon--blue { color: #2563eb; border-color: #dbeafe; background: #eff6ff; }
+.workflow-composer-page__icon--violet { color: #7c3aed; border-color: #ede9fe; background: #f5f3ff; }
+.workflow-composer-page__icon--green { color: #15803d; border-color: #dcfce7; background: #f0fdf4; }
+.workflow-composer-page__icon--amber { color: #b45309; border-color: #fef3c7; background: #fffbeb; }
+.workflow-composer-page__intro-icon--danger { color: #dc2626; border-color: #fee2e2; background: #fef2f2; }
+.workflow-composer-page__plan-icon--violet { color: #7c3aed; border-color: #ede9fe; background: #f5f3ff; }
+
+.workflow-composer-page__section {
+  margin-top: 23px !important;
+}
+
+.workflow-composer-page__section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  color: #0f172a !important;
+  font-size: 1.05rem !important;
+  font-weight: 800;
 }
 
 .workflow-composer-page__controls-card {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  padding: 16px;
 }
 
 .workflow-composer-page__toolbar {
@@ -34,58 +147,95 @@
   flex-wrap: wrap;
   align-items: end;
   gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .workflow-composer-page__field {
   display: grid;
   gap: 6px;
-  color: var(--color-text-soft);
-  font-size: 13px;
+  color: #475569;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .workflow-composer-page__select {
   min-width: 205px;
-  min-height: 44px;
+  min-height: 42px;
   max-width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 10px 38px 10px 12px;
+  padding: 9px 38px 9px 12px;
   background: #fff;
-  color: var(--color-text);
+  color: #0f172a;
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workflow-composer-page__select:focus-visible {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
 }
 
 .workflow-composer-page__toolbar-action,
-.workflow-composer-page__actions .button {
-  min-height: 44px;
-  display: inline-flex;
+.workflow-composer-page__actions .button,
+.workflow-composer-page__inline-button,
+.workflow-composer-page__source-button {
+  min-height: 42px;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   text-align: center;
 }
 
+.workflow-composer-page .button--secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.workflow-composer-page .button--secondary:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
 .workflow-composer-page__intro,
-.workflow-composer-page__state,
-.workflow-composer-page__routing-note,
-.workflow-composer-page__plan-panel {
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  padding: 14px;
-  background: var(--color-surface-soft);
+.workflow-composer-page__state {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 13px;
+  padding: 13px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
-.workflow-composer-page__intro p,
-.workflow-composer-page__routing-note,
-.workflow-composer-page__generated,
-.workflow-composer-page__updated {
-  margin: 0;
-}
-
+.workflow-composer-page__intro strong,
 .workflow-composer-page__state-title,
 .workflow-composer-page__plan-title,
 .workflow-composer-page__safety-title {
+  color: #0f172a;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.workflow-composer-page__intro p,
+.workflow-composer-page__state p,
+.workflow-composer-page__generated,
+.workflow-composer-page__updated {
+  margin: 3px 0 0;
+}
+
+.workflow-composer-page__state[role='alert'] {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.workflow-composer-page__inline-button {
+  margin-top: 8px;
 }
 
 .workflow-composer-page__blueprint-list {
@@ -94,11 +244,27 @@
 }
 
 .workflow-composer-page__blueprint-card {
+  position: relative;
   display: grid;
-  gap: 14px;
-  box-shadow: none;
-  border: 1px solid var(--color-border);
+  gap: 13px;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 7px 20px rgba(15, 23, 42, 0.035) !important;
 }
+
+.workflow-composer-page__blueprint-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: #16a34a;
+}
+
+.workflow-composer-page__blueprint-card--critical::before { background: #dc2626; }
+.workflow-composer-page__blueprint-card--high::before { background: #ea580c; }
+.workflow-composer-page__blueprint-card--medium::before { background: #d97706; }
+.workflow-composer-page__blueprint-card--low::before { background: #16a34a; }
 
 .workflow-composer-page__blueprint-header {
   display: flex;
@@ -111,17 +277,30 @@
   flex: 1 1 360px;
 }
 
+.workflow-composer-page__blueprint-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .workflow-composer-page__blueprint-title {
-  margin: 8px 0 0;
-  font-size: 18px;
-  line-height: 1.35;
+  margin: 7px 0 0;
+  color: #0f172a;
+  font-size: 17px;
+  line-height: 1.32;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
 .workflow-composer-page__blueprint-summary {
-  margin: 0;
+  margin: 0 0 0 44px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.workflow-composer-page__updated {
+  margin-left: 44px;
+  color: #64748b;
 }
 
 .workflow-composer-page__badge-row,
@@ -129,7 +308,7 @@
 .workflow-composer-page__technical-safety-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .workflow-composer-page__badge {
@@ -137,57 +316,71 @@
   align-items: center;
   width: fit-content;
   max-width: 100%;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 800;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-.workflow-composer-page__badge--critical {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.workflow-composer-page__badge--high {
-  background: #ffedd5;
-  color: #9a3412;
-}
-
-.workflow-composer-page__badge--medium {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.workflow-composer-page__badge--low {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.workflow-composer-page__badge--neutral {
-  background: #f1f5f9;
-  color: #334155;
-}
+.workflow-composer-page__badge--critical { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.workflow-composer-page__badge--high { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.workflow-composer-page__badge--medium { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+.workflow-composer-page__badge--low { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.workflow-composer-page__badge--neutral { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
 
 .workflow-composer-page__plan-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
+}
+
+.workflow-composer-page__plan-panel {
+  min-height: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 13px 14px;
+  background: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.workflow-composer-page__plan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .workflow-composer-page__step-list {
   margin: 10px 0 0;
   padding-left: 22px;
+  color: #334155;
+  font-size: 12.5px;
+  line-height: 1.55;
 }
 
 .workflow-composer-page__step-list li + li {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .workflow-composer-page__routing-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 12px;
   line-height: 1.5;
+}
+
+.workflow-composer-page__routing-note strong {
+  color: #0f172a;
 }
 
 .workflow-composer-page__actions {
@@ -196,57 +389,97 @@
 
 .workflow-composer-page__details,
 .workflow-composer-page__technical-safety {
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 12px;
-  background: var(--color-surface-soft);
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: #f8fafc;
 }
 
 .workflow-composer-page__details summary,
 .workflow-composer-page__technical-safety summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   cursor: pointer;
-  font-weight: 700;
+  color: #0f172a;
+  font-size: 12.5px;
+  font-weight: 800;
 }
 
 .workflow-composer-page__details-grid {
   display: grid;
   grid-template-columns: minmax(145px, auto) minmax(0, 1fr);
-  gap: 6px 12px;
+  gap: 7px 12px;
   margin: 12px 0 0;
-  font-size: 13px;
+  padding-top: 11px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
 }
 
 .workflow-composer-page__details-grid dt {
-  color: var(--color-text-soft);
+  color: #64748b;
+  font-weight: 700;
 }
 
 .workflow-composer-page__details-grid dd {
   margin: 0;
+  color: #334155;
   overflow-wrap: anywhere;
   word-break: break-all;
 }
 
+.workflow-composer-page__generated {
+  padding-top: 3px;
+  color: #64748b;
+}
+
+.workflow-composer-page__guidance-card,
+.workflow-composer-page__safety-card {
+  min-height: 118px;
+  padding: 15px 16px;
+}
+
 .workflow-composer-page__guidance-value {
-  margin-top: 6px;
-  font-size: 18px;
+  margin: 5px 0 3px;
+  color: #0f172a;
+  font-size: 17px;
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.workflow-composer-page__safety-title {
+  margin-top: 1px;
+  font-size: 13px;
+}
+
+.workflow-composer-page__safety-card .card__subtext {
+  margin: 4px 0 0;
 }
 
 .workflow-composer-page__technical-safety {
   margin-top: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 .workflow-composer-page__technical-safety-grid {
   margin: 12px 0;
 }
 
+.workflow-composer-page__technical-safety > .card__subtext {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .workflow-composer-page__plan-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 720px) {
   .workflow-composer-page__summary-grid,
   .workflow-composer-page__guidance-grid,
-  .workflow-composer-page__safety-grid,
-  .workflow-composer-page__plan-grid {
+  .workflow-composer-page__safety-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -265,52 +498,16 @@
     flex-direction: column;
   }
 
+  .workflow-composer-page__blueprint-summary,
+  .workflow-composer-page__updated {
+    margin-left: 0;
+  }
+
   .workflow-composer-page__details-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .workflow-composer-page__details-grid dt {
-    font-weight: 700;
+    font-weight: 800;
   }
-}
-
-/* v3.46.25 approved visual-system alignment */
-.workflow-composer-page .card {
-  border-color: var(--io-border, #e2e8f0);
-  border-radius: 16px;
-  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
-}
-
-.workflow-composer-page__select {
-  border-color: #cbd5e1;
-  border-radius: 12px;
-  color: #0f172a;
-}
-
-.workflow-composer-page__select:focus-visible {
-  border-color: var(--io-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  outline: none;
-}
-
-.workflow-composer-page .button--secondary {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
-}
-
-.workflow-composer-page .button--secondary:hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.workflow-composer-page__intro,
-.workflow-composer-page__state,
-.workflow-composer-page__routing-note,
-.workflow-composer-page__plan-panel,
-.workflow-composer-page__details,
-.workflow-composer-page__technical-safety {
-  border-color: #e2e8f0;
-  background: #f8fafc;
 }
