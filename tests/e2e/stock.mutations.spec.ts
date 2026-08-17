@@ -50,7 +50,11 @@ async function findActionButton(
   ];
 
   for (const candidate of candidates) {
-    if ((await candidate.locator.count()) > 0 && (await candidate.locator.isVisible())) {
+    if (
+      (await candidate.locator.count()) > 0 &&
+      (await candidate.locator.isVisible()) &&
+      !(await candidate.locator.isDisabled())
+    ) {
       return { button: candidate.locator, action: candidate.action };
     }
   }
@@ -153,6 +157,10 @@ test.describe('stock mutation execution', () => {
     await page.goto('/stock');
 
     const main = await expectStockPageLoaded(page);
+
+    const selectPosition = main.getByRole('button', { name: /^select$/i }).first();
+    await expect(selectPosition).toBeVisible();
+    await selectPosition.click();
 
     const { button, action } = await findActionButton(main);
     await button.click();

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import {
   getCurrentAccessRoleLabel,
   getRoleCapabilities,
@@ -210,6 +211,8 @@ async function fetchStockMovements(productId: string): Promise<StockMovement[]> 
     params.set('product_id', productId);
   }
 
+  params.set('limit', '8');
+
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<StockMovement[]>(`/stock/movements${suffix}`);
 }
@@ -248,6 +251,8 @@ async function fetchInventoryUsageSummary(
     params.set('storage_location_id', storageLocationId);
   }
 
+  params.set('compact', 'true');
+
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<InventoryUsageSummary>(`/stock/usage/summary${suffix}`);
 }
@@ -274,6 +279,20 @@ function formatUsageReason(reason: string | null | undefined): string {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function formatLotReference(lot: InventoryLot): string {
+  const lotNumber = (lot.lot_number || '').trim();
+  const batchNumber = (lot.batch_number || '').trim();
+
+  if (lotNumber === 'LEGACY-UNTRACKED') {
+    return 'Untracked opening balance';
+  }
+
+  return [
+    lotNumber ? `Lot ${lotNumber}` : '',
+    batchNumber ? `Batch ${batchNumber}` : ''
+  ].filter(Boolean).join(' · ') || 'No lot / batch reference';
 }
 
 function formatMovementReason(reason: string | null | undefined): string {
@@ -480,7 +499,7 @@ function StatCard(props: {
 
 export default function StockPage() {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedProductId = searchParams.get('product_id')?.trim() || '';
   const {
     isAdmin,
@@ -493,26 +512,34 @@ export default function StockPage() {
   const canViewMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
   const canConsume = !isAdmin && canConsumeStock && canRecordInventoryUsage;
   const accessRoleLabel = getCurrentAccessRoleLabel();
+  const preferredAction: StockActionType = canConsume ? 'consume' : canCount ? 'count' : canAdjust ? 'adjust' : 'consume';
   const selectedDetailsRef = useRef<HTMLElement | null>(null);
+  const [showOpeningStockImport, setShowOpeningStockImport] = useState(false);
+  const [showLotIntegrity, setShowLotIntegrity] = useState(false);
 
   const stockQuery = useQuery({
     queryKey: ['stock'],
-    queryFn: fetchStock
+    queryFn: fetchStock,
+    staleTime: 30_000
   });
 
   const lotsQuery = useQuery({
     queryKey: ['inventory-lots'],
-    queryFn: fetchInventoryLots
+    queryFn: fetchInventoryLots,
+    enabled: showLotIntegrity && stockQuery.isSuccess,
+    staleTime: 30_000
   });
   const reconciliationQuery = useQuery({
     queryKey: ['stock-reconciliation'],
-    queryFn: fetchStockReconciliation
+    queryFn: fetchStockReconciliation,
+    enabled: showLotIntegrity && stockQuery.isSuccess,
+    staleTime: 30_000
   });
 
   const rows = useMemo(() => stockQuery.data ?? [], [stockQuery.data]);
   const inventoryLots = useMemo(() => lotsQuery.data ?? [], [lotsQuery.data]);
 
-  const [searchText, setSearchText] = useState(() => requestedProductId);
+  const [searchText, setSearchText] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
@@ -521,9 +548,18 @@ export default function StockPage() {
   const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
   const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
   const expiryWindowValue = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.unit_cost || 0), 0), [expiryWindowLots]);
+  const expiredAvailableLots = useMemo(
+    () => inventoryLots.filter((lot) => {
+      const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined
+        ? null
+        : Number(lot.days_to_expiry);
+      return lot.condition === 'available' && days !== null && Number.isFinite(days) && days < 0;
+    }),
+    [inventoryLots]
+  );
 
   useEffect(() => {
-    setSearchText(requestedProductId);
+    setSearchText('');
     setLocationFilter('all');
     setCategoryFilter('all');
     setStatusFilter('all');
@@ -556,6 +592,10 @@ export default function StockPage() {
 
     return rows
       .filter((row) => {
+        if (requestedProductId && row.product_id !== requestedProductId) {
+          return false;
+        }
+
         if (locationFilter !== 'all' && row.storage_location_id !== locationFilter) {
           return false;
         }
@@ -597,33 +637,29 @@ export default function StockPage() {
 
         return leftName.localeCompare(rightName);
       });
-  }, [categoryFilter, locationFilter, rows, searchText, statusFilter]);
+  }, [categoryFilter, locationFilter, requestedProductId, rows, searchText, statusFilter]);
 
   const [selectedStockId, setSelectedStockId] = useState<string>('');
   const selectedRow = useMemo(
-    () =>
-      filteredRows.find((row) => row.id === selectedStockId) ??
-      filteredRows[0] ??
-      null,
+    () => filteredRows.find((row) => row.id === selectedStockId) ?? null,
     [filteredRows, selectedStockId]
   );
 
-  const [draft, setDraft] = useState<StockActionDraft>(getDefaultDraft('consume'));
+  const [draft, setDraft] = useState<StockActionDraft>(() => getDefaultDraft(preferredAction));
   const [operationFeedback, setOperationFeedback] = useState<string>('');
   const [operationError, setOperationError] = useState<string>('');
   const [lastResult, setLastResult] = useState<StockMutationResponse | null>(null);
 
   useEffect(() => {
-    const effectiveSelectedId = selectedRow?.id || '';
+    if (!selectedStockId) return;
+    if (filteredRows.some((row) => row.id === selectedStockId)) return;
 
-    if (effectiveSelectedId === selectedStockId) return;
-
-    setSelectedStockId(effectiveSelectedId);
-    setDraft((current) => getDefaultDraft(current.action));
+    setSelectedStockId('');
+    setDraft(getDefaultDraft(preferredAction));
     setOperationFeedback('');
     setOperationError('');
     setLastResult(null);
-  }, [selectedRow?.id, selectedStockId]);
+  }, [filteredRows, preferredAction, selectedStockId]);
 
   const selectedProductId = selectedRow?.product_id ?? '';
   const selectedLocationId = selectedRow?.storage_location_id ?? '';
@@ -631,7 +667,8 @@ export default function StockPage() {
   const movementsQuery = useQuery({
     queryKey: ['stock-movements', 'selected-stock-page', selectedProductId],
     queryFn: () => fetchStockMovements(selectedProductId),
-    enabled: Boolean(selectedProductId) && canViewMovements
+    enabled: Boolean(selectedProductId) && canViewMovements,
+    staleTime: 15_000
   });
 
   const usageLogsQuery = useQuery({
@@ -642,7 +679,8 @@ export default function StockPage() {
       selectedLocationId
     ],
     queryFn: () => fetchInventoryUsageLogs(selectedProductId, selectedLocationId),
-    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage
+    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage,
+    staleTime: 15_000
   });
 
   const usageSummaryQuery = useQuery({
@@ -653,7 +691,8 @@ export default function StockPage() {
       selectedLocationId
     ],
     queryFn: () => fetchInventoryUsageSummary(selectedProductId, selectedLocationId),
-    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage
+    enabled: Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage,
+    staleTime: 15_000
   });
 
   const recentMovements = useMemo(() => {
@@ -718,9 +757,7 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] })
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
     onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to process expired stock')
@@ -735,9 +772,7 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] })
+        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
     onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release quarantined stock')
@@ -784,6 +819,8 @@ export default function StockPage() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-usage-logs'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-usage-summary'] })
@@ -825,6 +862,8 @@ export default function StockPage() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
@@ -864,6 +903,8 @@ export default function StockPage() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
@@ -1058,6 +1099,8 @@ export default function StockPage() {
 
     await Promise.all([
       stockQuery.refetch(),
+      showLotIntegrity ? lotsQuery.refetch() : Promise.resolve(),
+      showLotIntegrity ? reconciliationQuery.refetch() : Promise.resolve(),
       selectedProductId && canViewMovements ? movementsQuery.refetch() : Promise.resolve(),
       selectedProductId && selectedLocationId && canViewInventoryUsage
         ? usageLogsQuery.refetch()
@@ -1070,27 +1113,31 @@ export default function StockPage() {
 
   const isRefreshingStockWorkbench =
     stockQuery.isFetching ||
-    (canViewMovements && movementsQuery.isFetching) ||
-    (canViewInventoryUsage && usageLogsQuery.isFetching) ||
-    (canViewInventoryUsage && usageSummaryQuery.isFetching);
+    (showLotIntegrity && (lotsQuery.isFetching || reconciliationQuery.isFetching)) ||
+    (Boolean(selectedProductId) && canViewMovements && movementsQuery.isFetching) ||
+    (Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage && usageLogsQuery.isFetching) ||
+    (Boolean(selectedProductId && selectedLocationId) && canViewInventoryUsage && usageSummaryQuery.isFetching);
 
   const stockWorkflowSteps = [
     {
       label: '1. Select Stock Position',
       detail: selectedRow
-        ? `${selectedRow.product_name || selectedRow.product_id} is selected for review.`
+        ? `${selectedRow.product_name || 'Selected product'} is selected for review.`
         : 'Choose the product and location you want to review or update.',
       complete: Boolean(selectedRow)
     },
     {
       label: '2. Choose Action',
-      detail:
-        draft.action === 'consume'
-          ? 'Consume removes stock for day-to-day operational usage.'
-          : draft.action === 'count'
-            ? 'Count sets stock to the physically verified quantity.'
-            : 'Adjust applies a positive or negative correction delta.',
-      complete: Boolean(selectedRow)
+      detail: !selectedRow
+        ? 'Select a stock position before choosing an action.'
+        : !currentActionAllowed
+          ? currentActionBlockedMessage
+          : draft.action === 'consume'
+            ? 'Consume removes stock for day-to-day operational usage.'
+            : draft.action === 'count'
+              ? 'Count sets stock to the physically verified quantity.'
+              : 'Adjust applies a positive or negative correction delta.',
+      complete: Boolean(selectedRow) && currentActionAllowed
     },
     {
       label: '3. Verify Preview',
@@ -1150,7 +1197,9 @@ export default function StockPage() {
 
   const selectStockRow = (stockId: string) => {
     setSelectedStockId(stockId);
-    setDraft(getDefaultDraft(draft.action));
+    const selectedActionAllowed =
+      draft.action === 'consume' ? canConsume : draft.action === 'count' ? canCount : canAdjust;
+    setDraft(getDefaultDraft(selectedActionAllowed ? draft.action : preferredAction));
     setOperationFeedback('');
     setOperationError('');
     setLastResult(null);
@@ -1166,9 +1215,16 @@ export default function StockPage() {
     setLocationFilter('all');
     setCategoryFilter('all');
     setStatusFilter('all');
+
+    if (requestedProductId) {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete('product_id');
+      setSearchParams(nextSearchParams, { replace: true });
+    }
   };
 
   const hasActiveStockFilters = Boolean(
+    requestedProductId ||
     searchText.trim() ||
     locationFilter !== 'all' ||
     categoryFilter !== 'all' ||
@@ -1214,27 +1270,40 @@ export default function StockPage() {
             controlled consumption, count, or adjustment actions.
           </p>
         </div>
+        {canAdjust ? (
+          <div style={styles.panelActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={() => setShowOpeningStockImport((current) => !current)}
+            >
+              {showOpeningStockImport ? 'Hide opening stock setup' : 'Opening stock setup'}
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      <InventoryCsvImportPanel
-        importType="opening_stock"
-        title="Opening Stock Import"
-        description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
-        templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
-        templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
-        canImport={canAdjust}
-        disabledReason="Stock-adjust permission is required for opening-stock import."
-        onCommitted={async () => {
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['stock'] }),
-            queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-            queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-            queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
-            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
-            queryClient.invalidateQueries({ queryKey: ['products'] })
-          ]);
-        }}
-      />
+      {canAdjust && showOpeningStockImport ? (
+        <InventoryCsvImportPanel
+          importType="opening_stock"
+          title="Opening Stock Import"
+          description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
+          templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
+          templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
+          canImport={canAdjust}
+          disabledReason="Stock-adjust permission is required for opening-stock import."
+          onCommitted={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['stock'] }),
+              queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+              queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+              queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+              queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+              queryClient.invalidateQueries({ queryKey: ['products'] })
+            ]);
+          }}
+        />
+      ) : null}
 
       <section style={styles.workflowGuideGrid}>
         {stockWorkflowSteps.map((step) => (
@@ -1248,7 +1317,7 @@ export default function StockPage() {
         ))}
       </section>
 
-      <div className="app-grid-stats" style={styles.statsGrid}>
+      <div className="app-grid-stats stock-page__summary-stats" style={styles.statsGrid}>
         <StatCard
           title="Stock Positions"
           value={summary.totalRows}
@@ -1289,61 +1358,97 @@ export default function StockPage() {
         <div style={styles.panelHeaderWithActions}>
           <div style={styles.panelHeaderText}>
             <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
-            <p style={styles.panelSubtitle}>See tracked stock, expiry risk, and stock that has been blocked from use. Held, quarantined, damaged, rejected, and expired stock is excluded from normal FEFO use.</p>
+            <p style={styles.panelSubtitle}>
+              Optional detail for lot balances, expiry risk, blocked stock, and reconciliation checks.
+              Load it when you need to investigate expiry or stock-integrity questions.
+            </p>
           </div>
-          {canAdjust ? (
+          <div style={styles.panelActions}>
             <button
               type="button"
-              style={processExpiredLotsMutation.isPending ? styles.secondaryButtonDisabled : styles.secondaryButton}
-              disabled={processExpiredLotsMutation.isPending}
-              onClick={() => {
-                if (!window.confirm('Process all expired available lots now? This removes their quantities from usable stock and records expiry write-off movements.')) return;
-                processExpiredLotsMutation.mutate();
-              }}
+              style={(lotsQuery.isFetching || reconciliationQuery.isFetching) ? styles.secondaryButtonDisabled : styles.secondaryButton}
+              disabled={lotsQuery.isFetching || reconciliationQuery.isFetching}
+              onClick={() => setShowLotIntegrity((current) => !current)}
             >
-              {processExpiredLotsMutation.isPending ? 'Processing...' : 'Process Expired Stock'}
+              {showLotIntegrity
+                ? 'Hide lot & integrity details'
+                : (lotsQuery.isFetching || reconciliationQuery.isFetching)
+                  ? 'Loading details...'
+                  : 'Load lot & integrity details'}
             </button>
-          ) : null}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>Expiry overview:</label>
-          <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
-            <option value={30}>Next 30 days</option><option value={60}>Next 60 days</option><option value={90}>Next 90 days</option><option value={180}>Next 180 days</option>
-          </select>
-        </div>
-        <div className="app-grid-stats" style={styles.statsGrid}>
-          <StatCard title="Tracked Lots" value={inventoryLots.length} subtitle="Lot/batch balances with remaining physical quantity" />
-          <StatCard title={`Expiring ≤ ${expiryWindowDays} days`} value={expiryWindowLots.length} subtitle={`${expiryWindowQuantity} unit(s) in the selected window`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
-          <StatCard title="Expiry Value at Risk" value={expiryWindowValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} subtitle="Estimated from lot unit cost where available" tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
-          <StatCard title="Expired" value={inventoryLots.filter((lot) => lot.operational_status === 'expired').length} subtitle="Expired lots requiring or already reflecting write-off status" tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
-          <StatCard title="Blocked / Held" value={inventoryLots.filter((lot) => lot.condition === 'hold').length} subtitle="Stock manually blocked from use" tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
-          <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Stock received into quarantine" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
-          <StatCard title="Ledger Mismatches" value={reconciliationQuery.data?.summary.ledger_mismatch_count ?? '-'} subtitle="Aggregate stock vs canonical movement ledger" tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
-          <StatCard title="Lot Mismatches" value={reconciliationQuery.data?.summary.lot_mismatch_count ?? '-'} subtitle="Aggregate stock vs available lot balances" tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
-        </div>
-        {lotsQuery.isError || reconciliationQuery.isError ? (
-          <div className="app-error-state">Lot or reconciliation data could not be loaded. Refresh after the inventory-integrity migration is applied.</div>
-        ) : null}
-        {inventoryLots.length > 0 ? (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead><tr><th style={styles.th}>Product</th><th style={styles.th}>Location</th><th style={styles.th}>Lot / Batch</th><th style={styles.th}>Expiry</th><th style={styles.th}>Condition</th><th style={styles.th}>Quantity</th><th style={styles.th}>Action</th></tr></thead>
-              <tbody>
-                {inventoryLots.slice(0, 100).map((lot) => (
-                  <tr key={lot.id}>
-                    <td style={styles.td}>{lot.product_name || lot.product_id}</td>
-                    <td style={styles.td}>{lot.storage_location_name || lot.storage_location_id}</td>
-                    <td style={styles.td}>{[lot.lot_number ? `Lot ${lot.lot_number}` : '', lot.batch_number ? `Batch ${lot.batch_number}` : ''].filter(Boolean).join(' · ') || 'Untracked'}</td>
-                    <td style={styles.td}>{lot.expiry_date ? formatDateTime(lot.expiry_date).split(',')[0] : '-'}</td>
-                    <td style={styles.td}>{formatUsageReason(lot.operational_status || lot.condition)}</td>
-                    <td style={styles.td}>{toNumber(lot.quantity)} {lot.product_unit || ''}</td>
-                    <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt('Why should this stock be blocked from use?'); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Block</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt('Why is this stock safe to use again?'); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Unblock</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-') : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {showLotIntegrity && canAdjust ? (
+              <button
+                type="button"
+                style={(processExpiredLotsMutation.isPending || expiredAvailableLots.length === 0) ? styles.secondaryButtonDisabled : styles.secondaryButton}
+                disabled={processExpiredLotsMutation.isPending || expiredAvailableLots.length === 0}
+                title={expiredAvailableLots.length === 0 ? 'No expired available lots currently need processing.' : undefined}
+                onClick={() => {
+                  if (!window.confirm(`Process ${expiredAvailableLots.length} expired available lot(s) now? This removes their quantities from usable stock and records expiry write-off movements.`)) return;
+                  processExpiredLotsMutation.mutate();
+                }}
+              >
+                {processExpiredLotsMutation.isPending ? 'Processing...' : `Process Expired Stock (${expiredAvailableLots.length})`}
+              </button>
+            ) : null}
           </div>
-        ) : null}
+        </div>
+
+        {!showLotIntegrity ? (
+          <div style={styles.emptyPanel}>
+            Lot and reconciliation details are kept closed by default so the everyday stock workspace can load with less database work.
+          </div>
+        ) : lotsQuery.isLoading || reconciliationQuery.isLoading ? (
+          <div style={styles.emptyPanel}>Loading lot and stock-integrity details...</div>
+        ) : lotsQuery.isError || reconciliationQuery.isError ? (
+          <div className="app-error-state">
+            Lot or reconciliation details could not be loaded. Try refreshing this section.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+              <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>Expiry overview:</label>
+              <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                <option value={30}>Next 30 days</option>
+                <option value={60}>Next 60 days</option>
+                <option value={90}>Next 90 days</option>
+                <option value={180}>Next 180 days</option>
+              </select>
+            </div>
+            <div className="app-grid-stats" style={styles.statsGrid}>
+              <StatCard title="Lot Balances" value={inventoryLots.length} subtitle="Available, held, quarantined, or expired lot-level balances" />
+              <StatCard title={`Expiring ≤ ${expiryWindowDays} days`} value={expiryWindowLots.length} subtitle={`${expiryWindowQuantity} unit(s) in the selected window`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
+              <StatCard title="Expiry Value at Risk" value={formatCurrencyAmount(expiryWindowValue)} subtitle="Estimated from lot unit cost where available" tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
+              <StatCard title="Expired" value={inventoryLots.filter((lot) => lot.operational_status === 'expired').length} subtitle="Expired lot balances requiring or reflecting write-off status" tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
+              <StatCard title="Blocked / Held" value={inventoryLots.filter((lot) => lot.condition === 'hold').length} subtitle="Stock manually blocked from use" tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
+              <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Stock received into quarantine" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
+              <StatCard title="Ledger Mismatches" value={reconciliationQuery.data?.summary.ledger_mismatch_count ?? '-'} subtitle="Aggregate stock vs canonical movement ledger" tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+              <StatCard title="Lot Mismatches" value={reconciliationQuery.data?.summary.lot_mismatch_count ?? '-'} subtitle="Aggregate stock vs available lot balances" tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+            </div>
+
+            {inventoryLots.length === 0 ? (
+              <div style={styles.emptyPanel}>No lot-level balances are currently available for this tenant.</div>
+            ) : (
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead><tr><th style={styles.th}>Product</th><th style={styles.th}>Location</th><th style={styles.th}>Lot / Batch</th><th style={styles.th}>Expiry</th><th style={styles.th}>Condition</th><th style={styles.th}>Quantity</th><th style={styles.th}>Action</th></tr></thead>
+                  <tbody>
+                    {inventoryLots.slice(0, 100).map((lot) => (
+                      <tr key={lot.id}>
+                        <td style={styles.td}>{lot.product_name || 'Unnamed product'}</td>
+                        <td style={styles.td}>{lot.storage_location_name || 'Unknown location'}</td>
+                        <td style={styles.td}>{formatLotReference(lot)}</td>
+                        <td style={styles.td}>{lot.expiry_date ? formatDateTime(lot.expiry_date).split(',')[0] : '-'}</td>
+                        <td style={styles.td}>{formatUsageReason(lot.operational_status || lot.condition)}</td>
+                        <td style={styles.td}>{toNumber(lot.quantity)} {lot.product_unit || ''}</td>
+                        <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt('Why should this stock be blocked from use?'); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Block</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt('Why is this stock safe to use again?'); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Unblock</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-') : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
@@ -1449,7 +1554,7 @@ export default function StockPage() {
                     type="search"
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
-                    placeholder="Product, category, unit, location, or ID"
+                    placeholder="Product, category, unit, or location"
                   />
                 </div>
                 <div>
@@ -1507,6 +1612,7 @@ export default function StockPage() {
               <div style={styles.selectorFooter}>
                 <span style={styles.resultCount}>
                   {filteredRows.length} of {rows.length} stock positions shown
+                  {requestedProductId ? ' · Linked product filter active' : ''}
                 </span>
                 <button
                   type="button"
@@ -1544,9 +1650,9 @@ export default function StockPage() {
                         >
                           <div style={styles.stockCardTopRow}>
                             <div style={styles.stockCardTitleBlock}>
-                              <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
+                              <div style={styles.rowTitle}>{item.product_name || 'Unnamed product'}</div>
                               <div style={styles.rowSubtle}>
-                                {item.storage_location_name || item.storage_location_id || '-'}
+                                {item.storage_location_name || 'Unknown location'}
                               </div>
                             </div>
                             <span
@@ -1625,11 +1731,10 @@ export default function StockPage() {
                                   </button>
                                 </td>
                                 <td style={styles.td}>
-                                  <div style={styles.rowTitle}>{item.product_name || item.product_id}</div>
-                                  <div style={styles.rowSubtle}>Product ID: {item.product_id}</div>
+                                  <div style={styles.rowTitle}>{item.product_name || 'Unnamed product'}</div>
                                 </td>
                                 <td style={styles.td}>
-                                  {item.storage_location_name || item.storage_location_id || '-'}
+                                  {item.storage_location_name || 'Unknown location'}
                                 </td>
                                 <td style={styles.td}>{quantity}</td>
                                 <td style={styles.td}>{reservedQuantity}</td>
@@ -1680,9 +1785,8 @@ export default function StockPage() {
                       <div style={styles.selectionPrimaryRow}>
                         <div style={styles.selectionPrimaryText}>
                           <div style={styles.selectedTitle}>
-                            {selectedRow.product_name || selectedRow.product_id}
+                            {selectedRow.product_name || 'Unnamed product'}
                           </div>
-                          <div style={styles.rowSubtle}>Product ID: {selectedRow.product_id}</div>
                         </div>
                         <span
                           style={
@@ -1707,9 +1811,7 @@ export default function StockPage() {
                         <div style={styles.selectionItem}>
                           <div style={styles.selectionLabel}>Storage Location</div>
                           <div style={styles.selectionValue}>
-                            {selectedRow.storage_location_name ||
-                              selectedRow.storage_location_id ||
-                              '-'}
+                            {selectedRow.storage_location_name || 'Unknown location'}
                           </div>
                         </div>
                         <div style={styles.selectionItem}>
@@ -1794,10 +1896,14 @@ export default function StockPage() {
                     <button
                       type="button"
                       style={
-                        draft.action === 'consume'
-                          ? styles.actionTypeButtonSelected
-                          : styles.actionTypeButton
+                        !canConsume
+                          ? styles.actionTypeButtonDisabled
+                          : draft.action === 'consume'
+                            ? styles.actionTypeButtonSelected
+                            : styles.actionTypeButton
                       }
+                      disabled={!canConsume}
+                      title={!canConsume ? currentActionBlockedMessage : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('consume'));
                         setOperationFeedback('');
@@ -1810,10 +1916,14 @@ export default function StockPage() {
                     <button
                       type="button"
                       style={
-                        draft.action === 'count'
-                          ? styles.actionTypeButtonSelected
-                          : styles.actionTypeButton
+                        !canCount
+                          ? styles.actionTypeButtonDisabled
+                          : draft.action === 'count'
+                            ? styles.actionTypeButtonSelected
+                            : styles.actionTypeButton
                       }
+                      disabled={!canCount}
+                      title={!canCount ? 'Your current access role cannot post physical stock counts.' : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('count'));
                         setOperationFeedback('');
@@ -1826,10 +1936,14 @@ export default function StockPage() {
                     <button
                       type="button"
                       style={
-                        draft.action === 'adjust'
-                          ? styles.actionTypeButtonSelected
-                          : styles.actionTypeButton
+                        !canAdjust
+                          ? styles.actionTypeButtonDisabled
+                          : draft.action === 'adjust'
+                            ? styles.actionTypeButtonSelected
+                            : styles.actionTypeButton
                       }
+                      disabled={!canAdjust}
+                      title={!canAdjust ? 'Your current access role cannot apply manual stock adjustments.' : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('adjust'));
                         setOperationFeedback('');
@@ -2195,7 +2309,7 @@ export default function StockPage() {
                       <div style={styles.selectionItem}>
                         <div style={styles.selectionLabel}>Storage Location</div>
                         <div style={styles.selectionValue}>
-                          {selectedRow?.storage_location_name || selectedRow?.storage_location_id || '-'}
+                          {selectedRow?.storage_location_name || 'Unknown location'}
                         </div>
                       </div>
                       <div style={styles.selectionItem}>
@@ -2266,7 +2380,7 @@ export default function StockPage() {
                                 {formatMovementReason(movement.reason)}
                               </span>
                               <span style={styles.rowSubtle}>
-                                By {movement.user_name || movement.user_id || 'system'}
+                                By {movement.user_name || 'System / unknown user'}
                               </span>
                             </div>
                             {movement.shipment_po_number ? (
@@ -2286,7 +2400,7 @@ export default function StockPage() {
                   <p style={styles.sectionDescription}>
                     Consumption history for the selected product at{' '}
                     <strong>
-                      {selectedRow?.storage_location_name || selectedRow?.storage_location_id || 'the selected location'}
+                      {selectedRow?.storage_location_name || 'the selected location'}
                     </strong>.
                   </p>
 
@@ -2372,14 +2486,14 @@ export default function StockPage() {
                               {usage.department || 'No department'}
                             </span>
                             <span style={styles.rowSubtle}>
-                              By {usage.created_by_user_name || usage.created_by_user_id || 'system'}
+                              By {usage.created_by_user_name || 'System / unknown user'}
                             </span>
                           </div>
                           {usage.event_name ? (
                             <div style={styles.rowSubtle}>Event/job: {usage.event_name}</div>
                           ) : null}
                           <div style={styles.rowSubtle}>
-                            Location: {usage.storage_location_name || usage.storage_location_id}
+                            Location: {usage.storage_location_name || 'Unknown location'}
                           </div>
                           {usage.notes ? (
                             <div style={styles.usageNotes}>{usage.notes}</div>
@@ -2406,7 +2520,12 @@ const styles: Record<string, CSSProperties> = {
   },
   header: {
     marginBottom: '20px',
-    minWidth: 0
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '16px',
+    flexWrap: 'wrap'
   },
   headerTextBlock: {
     minWidth: 0
@@ -2880,6 +2999,15 @@ const styles: Record<string, CSSProperties> = {
     color: '#1d4ed8',
     fontWeight: 800,
     cursor: 'pointer'
+  },
+  actionTypeButtonDisabled: {
+    minHeight: '46px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    color: '#94a3b8',
+    fontWeight: 700,
+    cursor: 'not-allowed'
   },
   actionInfoBox: {
     borderRadius: '12px',
