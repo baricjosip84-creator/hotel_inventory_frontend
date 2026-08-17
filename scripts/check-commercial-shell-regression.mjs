@@ -11,6 +11,7 @@ const layout = read('src/layouts/AppLayout.tsx');
 const intelligenceReviewPage = read('src/pages/HumanInLoopAIReviewPage.tsx');
 const collaborationPage = read('src/pages/EnterpriseCollaborationPage.tsx');
 const digitalTwinPage = read('src/pages/DigitalTwinVisualizationPage.tsx');
+const reliabilityCommandPage = read('src/pages/ReliabilityCommandPage.tsx');
 
 const commercialRoutes = [
   {
@@ -182,6 +183,32 @@ for (const forbiddenSignal of [
 ]) {
   if (digitalTwinPage.includes(forbiddenSignal)) {
     failures.push(`Digital Twin page must keep technical diagnostics out of the normal tenant-owner interface: ${forbiddenSignal}`);
+  }
+}
+
+for (const signal of [
+  "import { TenantNavIcon } from '../components/ui/TenantNavIcon';",
+  "import './ReliabilityCommandPage.css';",
+  "type ReliabilityView = 'posture' | 'review-path' | 'limits'",
+  'data-reliability-refined="true"',
+  'Posture and risks',
+  'Manual review path',
+  'Safety and limits'
+]) {
+  if (!reliabilityCommandPage.includes(signal)) {
+    failures.push(`Reliability Command page is missing approved tenant presentation signal: ${signal}`);
+  }
+}
+
+for (const forbiddenSignal of [
+  'TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ',
+  'canViewDiagnostics',
+  "view === 'diagnostics'",
+  'Technical response diagnostics',
+  'JSON.stringify(response.diagnostics, null, 2)'
+]) {
+  if (reliabilityCommandPage.includes(forbiddenSignal)) {
+    failures.push(`Reliability Command page must keep technical diagnostics out of the normal tenant-owner interface: ${forbiddenSignal}`);
   }
 }
 

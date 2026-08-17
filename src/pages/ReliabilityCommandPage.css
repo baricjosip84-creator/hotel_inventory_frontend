@@ -1,6 +1,13 @@
 .reliability-page {
   display: grid;
-  gap: 20px;
+  gap: 18px;
+}
+
+.reliability-page .card {
+  border: 1px solid var(--io-border, #e2e8f0);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
 }
 
 .reliability-page h2,
@@ -8,34 +15,50 @@
 .reliability-page h4,
 .reliability-page p,
 .reliability-page li,
-.reliability-page dd {
+.reliability-page dd,
+.reliability-page strong,
+.reliability-page span {
   overflow-wrap: anywhere;
 }
 
-.reliability-intro,
-.reliability-section-heading,
-.reliability-card-heading,
-.reliability-shortcuts,
-.reliability-badge-row,
-.reliability-card-actions,
-.reliability-filter-summary {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+.reliability-page h2,
+.reliability-page h3,
+.reliability-page h4 {
+  color: #0f172a;
 }
 
-.reliability-intro,
-.reliability-section-heading,
-.reliability-card-heading {
+.reliability-page .card__subtext {
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.reliability-intro {
+  display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 22px;
+}
+
+.reliability-intro__content,
+.reliability-section-title,
+.reliability-card-title,
+.reliability-stage-summary-title,
+.reliability-review-note,
+.reliability-limit-card,
+.reliability-state {
+  display: flex;
   align-items: flex-start;
 }
 
-.reliability-intro > div:first-child,
-.reliability-section-heading > div:first-child,
-.reliability-card-heading > div:first-child {
+.reliability-intro__content {
   min-width: 0;
-  flex: 1 1 480px;
+  flex: 1;
+  gap: 14px;
+}
+
+.reliability-intro__copy {
+  min-width: 0;
 }
 
 .reliability-intro h2,
@@ -44,75 +67,204 @@
 .reliability-card-heading h3,
 .reliability-card-heading h4,
 .reliability-review-note h2,
-.reliability-limit-grid h3,
-.reliability-diagnostics h2 {
+.reliability-limit-card h3,
+.reliability-safety-summary h3,
+.reliability-state h2,
+.reliability-state h3 {
   margin: 0;
 }
 
 .reliability-intro .card__subtext,
 .reliability-section-heading .card__subtext,
-.reliability-review-note .card__subtext {
+.reliability-review-note .card__subtext,
+.reliability-limit-card .card__subtext {
   margin: 6px 0 0;
 }
 
+.reliability-intro .card__subtext {
+  max-width: 980px;
+}
+
+.reliability-hero-icon,
+.reliability-heading-icon,
+.reliability-card-icon,
+.reliability-limit-icon,
+.reliability-state-icon,
+.reliability-summary-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.reliability-hero-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+
+.reliability-heading-icon,
+.reliability-card-icon,
+.reliability-limit-icon,
+.reliability-state-icon,
+.reliability-summary-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.reliability-hero-icon--slate,
+.reliability-heading-icon--slate {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.reliability-heading-icon--amber,
+.reliability-card-icon--amber {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.reliability-state-icon--error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .reliability-eyebrow {
-  color: #315ea8;
-  font-size: 0.78rem;
+  margin-bottom: 5px;
+  color: var(--io-primary, #2563eb);
+  font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
-.reliability-refresh {
-  min-width: 190px;
-  display: grid;
+.reliability-hero-badges,
+.reliability-filter-summary,
+.reliability-badge-row,
+.reliability-card-actions,
+.reliability-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  align-content: start;
-  padding: 12px 14px;
-  border: 1px solid var(--color-border);
+}
+
+.reliability-hero-badges {
+  margin-top: 14px;
+}
+
+.reliability-hero-badges span,
+.reliability-filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.reliability-refresh {
+  display: grid;
+  min-width: 240px;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #f8fafc;
 }
 
-.reliability-refresh span {
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
+.reliability-refresh__label {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reliability-refresh strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.reliability-filters {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.reliability-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.reliability-section-heading--outside {
+  margin-bottom: 14px;
+}
+
+.reliability-section-title,
+.reliability-card-title,
+.reliability-stage-summary-title {
+  min-width: 0;
+  gap: 10px;
+}
+
+.reliability-section-title > div,
+.reliability-card-title > div,
+.reliability-stage-summary-title > div {
+  min-width: 0;
 }
 
 .reliability-filter-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 16px;
 }
 
 .reliability-filter-grid label {
   display: grid;
-  gap: 7px;
   min-width: 0;
+  gap: 7px;
+  color: #334155;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
 .reliability-filter-grid select {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: #fff;
+  min-height: 44px;
+  padding: 10px 34px 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.reliability-filter-grid select:focus-visible {
+  border-color: var(--io-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
 }
 
 .reliability-filter-summary {
-  margin-top: 14px;
-  color: var(--color-text-muted);
-  font-size: 0.84rem;
+  color: #64748b;
+  font-size: 0.78rem;
 }
 
-.reliability-filter-summary span {
-  padding: 6px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: #f8fafc;
+.reliability-filter-summary strong {
+  color: #334155;
 }
 
 .reliability-summary-grid {
@@ -121,83 +273,132 @@
   gap: 14px;
 }
 
-.reliability-summary-grid .card {
+.reliability-summary-card {
+  position: relative;
   min-width: 0;
+  padding: 18px;
+  overflow: hidden;
 }
 
-.reliability-summary-grid .reliability-badge {
-  margin-top: 10px;
+.reliability-summary-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: #2563eb;
+  content: '';
 }
 
-.reliability-scoring-note,
-.reliability-inline-empty,
-.reliability-state {
-  padding: 16px 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
+.reliability-summary-card[data-tone='slate']::before { background: #64748b; }
+.reliability-summary-card[data-tone='amber']::before { background: #d97706; }
+.reliability-summary-card[data-tone='green']::before { background: #16a34a; }
+
+.reliability-summary-card[data-tone='slate'] .reliability-summary-icon {
+  border-color: #e2e8f0;
   background: #f8fafc;
-  color: var(--color-text-muted);
+  color: #475569;
+}
+
+.reliability-summary-card[data-tone='amber'] .reliability-summary-icon {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.reliability-summary-card[data-tone='green'] .reliability-summary-icon {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.reliability-summary-card__topline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.reliability-summary-card .card__label {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reliability-summary-value {
+  margin-bottom: 7px;
+  color: #0f172a;
+}
+
+.reliability-summary-card .reliability-badge {
+  margin: 0 0 9px;
 }
 
 .reliability-scoring-note {
-  border-color: #c9d8ef;
-  background: #f4f8fe;
-  color: #34506f;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #31577f;
+  line-height: 1.5;
 }
 
-.reliability-inline-empty h3,
-.reliability-state h2,
-.reliability-state h3 {
-  margin-top: 0;
-  color: var(--color-text);
-}
-
-.reliability-state--loading,
-.reliability-state--error {
-  min-height: 160px;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 8px;
-}
-
-.reliability-state--error {
-  border-color: #f0b8b8;
-  background: #fff6f6;
+.reliability-scoring-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #2563eb;
 }
 
 .reliability-view-switch {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px;
-  border: 1px solid var(--color-border);
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--io-border, #e2e8f0);
   border-radius: 14px;
-  background: #fff;
+  background: #f8fafc;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  overflow-x: auto;
 }
 
 .reliability-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
   border: 0;
   border-radius: 10px;
-  padding: 10px 14px;
   background: transparent;
-  color: var(--color-text);
-  font-weight: 750;
+  color: #475569;
+  font: inherit;
+  font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.reliability-view-switch button.is-active {
-  background: #e8eef8;
-  color: #173d78;
+.reliability-view-switch button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
-.reliability-section-heading--outside {
-  margin-bottom: 12px;
+.reliability-view-switch button.is-active,
+.reliability-view-switch button.is-active:hover,
+.reliability-view-switch button.is-active:focus-visible {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
 }
 
 .reliability-dimension-grid,
 .reliability-risk-grid,
-.reliability-limit-grid {
+.reliability-limit-grid,
+.reliability-stage-items {
   display: grid;
   gap: 14px;
   align-items: start;
@@ -207,38 +408,62 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-.reliability-dimension-card,
-.reliability-risk-card,
-.reliability-stage-item {
-  align-self: start;
+.reliability-dimension-card {
+  position: relative;
   min-width: 0;
+  padding: 18px;
+  overflow: hidden;
 }
 
-.reliability-dimension-card h3,
-.reliability-risk-card h3,
-.reliability-stage-item h4 {
-  margin: 3px 0 0;
+.reliability-dimension-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: #dbeafe;
+  content: '';
+}
+
+.reliability-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.reliability-card-heading .card__label {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reliability-card-heading h3,
+.reliability-card-heading h4 {
+  margin-top: 3px;
 }
 
 .reliability-score-line {
   display: flex;
-  gap: 10px;
   align-items: baseline;
+  gap: 10px;
   margin: 16px 0 10px;
 }
 
 .reliability-score-line strong {
-  font-size: 1.7rem;
+  color: #0f172a;
+  font-size: 1.75rem;
 }
 
 .reliability-score-line span {
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
+  color: #64748b;
+  font-size: 0.78rem;
 }
 
 .reliability-badge-row {
   justify-content: flex-end;
-  gap: 7px;
 }
 
 .reliability-badge {
@@ -248,9 +473,9 @@
   max-width: 100%;
   padding: 5px 9px;
   border-radius: 999px;
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .reliability-badge--critical {
@@ -283,6 +508,7 @@
   margin: 14px 0 0;
   padding-left: 20px;
   color: #475569;
+  line-height: 1.5;
 }
 
 .reliability-evidence-list li,
@@ -295,8 +521,39 @@
   margin-top: 14px;
 }
 
+.reliability-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.reliability-page .button--secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.reliability-page .button--secondary:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
 .reliability-risk-section {
   margin-top: 18px;
+  padding: 20px;
+}
+
+.reliability-returned-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .reliability-risk-grid {
@@ -306,15 +563,16 @@
 
 .reliability-risk-card,
 .reliability-stage-item {
+  min-width: 0;
   padding: 16px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #f8fafc;
 }
 
 .reliability-risk-card > p,
 .reliability-stage-item .reliability-card-heading p {
-  color: var(--color-text-muted);
+  color: #64748b;
 }
 
 .reliability-facts {
@@ -329,16 +587,38 @@
 }
 
 .reliability-facts dt {
-  color: var(--color-text-muted);
-  font-size: 0.77rem;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .reliability-facts dd {
   margin: 4px 0 0;
+  color: #0f172a;
   font-weight: 800;
 }
 
+.reliability-inline-empty {
+  margin-top: 14px;
+  padding: 17px 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.reliability-inline-empty h3 {
+  margin: 0;
+}
+
+.reliability-inline-empty p {
+  margin: 6px 0 0;
+  line-height: 1.55;
+}
+
 .reliability-review-note {
+  gap: 13px;
+  padding: 20px;
   margin-bottom: 14px;
 }
 
@@ -367,20 +647,15 @@
 }
 
 .reliability-stage summary::after {
-  content: '+';
   flex: 0 0 auto;
-  font-size: 1.4rem;
+  color: #2563eb;
+  font-size: 1.35rem;
   font-weight: 800;
-  color: #315ea8;
+  content: '+';
 }
 
 .reliability-stage[open] summary::after {
   content: '−';
-}
-
-.reliability-stage summary > div {
-  min-width: 0;
-  flex: 1;
 }
 
 .reliability-stage summary h3,
@@ -390,7 +665,7 @@
 
 .reliability-stage summary p {
   margin-top: 5px;
-  color: var(--color-text-muted);
+  color: #64748b;
 }
 
 .reliability-stage summary > span {
@@ -399,7 +674,7 @@
   border-radius: 999px;
   background: #eef2f7;
   color: #334155;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
 }
 
@@ -409,9 +684,7 @@
 }
 
 .reliability-stage-items {
-  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
 }
 
 .reliability-limit-grid {
@@ -423,43 +696,98 @@
   grid-column: 1 / -1;
 }
 
-.reliability-diagnostics pre {
-  max-height: 680px;
-  overflow: auto;
-  margin: 14px 0 0;
-  padding: 16px;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #e2e8f0;
-  font-size: 0.78rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.reliability-limit-card {
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
 }
 
-@media (max-width: 1100px) {
+.reliability-limit-card > div {
+  min-width: 0;
+}
+
+.reliability-safety-summary {
+  padding: 20px;
+}
+
+.reliability-safety-facts {
+  margin-top: 16px;
+}
+
+.reliability-safety-value {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.reliability-safety-value.is-safe {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.reliability-safety-value.is-blocked {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.reliability-state {
+  min-height: 170px;
+  gap: 14px;
+  padding: 22px;
+  align-content: center;
+}
+
+.reliability-state > div {
+  min-width: 0;
+}
+
+.reliability-state p {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.reliability-state .button {
+  margin-top: 12px;
+}
+
+.reliability-state--error {
+  border-color: #fecaca !important;
+  background: #fffafa !important;
+}
+
+@media (max-width: 1180px) {
   .reliability-summary-grid,
   .reliability-limit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   .reliability-filter-grid {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 700px) {
-  .reliability-intro,
-  .reliability-section-heading,
-  .reliability-card-heading,
-  .reliability-stage summary {
+  .reliability-intro {
     display: grid;
   }
 
   .reliability-refresh {
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .reliability-intro__content,
+  .reliability-section-heading,
+  .reliability-card-heading,
+  .reliability-stage summary,
+  .reliability-review-note,
+  .reliability-limit-card {
+    display: grid;
   }
 
   .reliability-summary-grid,
@@ -474,6 +802,7 @@
   .reliability-card-actions,
   .reliability-shortcuts {
     display: grid;
+    width: 100%;
   }
 
   .reliability-view-switch button,
@@ -486,46 +815,9 @@
   .reliability-badge-row {
     justify-content: flex-start;
   }
-}
 
-/* v3.46.25 approved visual-system alignment */
-.reliability-page .card {
-  border-color: var(--io-border, #e2e8f0);
-  border-radius: 16px;
-  box-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
-}
-
-.reliability-page .button--secondary {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
-}
-
-.reliability-page .button--secondary:hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.reliability-filter-grid select {
-  min-height: 44px;
-  border-radius: 12px;
-  border-color: #cbd5e1;
-  color: #0f172a;
-}
-
-.reliability-filter-grid select:focus-visible {
-  border-color: var(--io-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  outline: none;
-}
-
-.reliability-view-switch {
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
-.reliability-view-switch button.is-active {
-  background: #eff6ff;
-  color: #1d4ed8;
+  .reliability-stage summary::after {
+    position: absolute;
+    right: 18px;
+  }
 }
