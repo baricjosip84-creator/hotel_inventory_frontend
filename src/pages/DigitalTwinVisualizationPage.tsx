@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
-import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './DigitalTwinVisualizationPage.css';
 
-type DigitalTwinView = 'context' | 'limits' | 'diagnostics';
+type DigitalTwinView = 'context' | 'limits';
 type TwinDomain = 'facility' | 'inventory_flow' | 'execution_flow' | 'supplier_flow' | 'risk_propagation' | 'control_tower' | 'multi_domain';
 type TwinViewMode = 'topology' | 'flow_map' | 'risk_overlay' | 'congestion_heatmap' | 'dependency_map';
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
@@ -197,6 +197,31 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   return Object.prototype.hasOwnProperty.call(SOURCE_LABELS, sourceSurface) ? sourceSurface : null;
 }
 
+function DigitalTwinSummaryCard({
+  iconPath,
+  label,
+  value,
+  copy,
+  tone = 'blue'
+}: {
+  iconPath: string;
+  label: string;
+  value: string | number;
+  copy: string;
+  tone?: 'blue' | 'slate' | 'amber' | 'red';
+}) {
+  return (
+    <article className="card digital-twin-summary-card" data-tone={tone}>
+      <div className="digital-twin-summary-card__topline">
+        <span className="digital-twin-summary-icon"><TenantNavIcon path={iconPath} size={18} /></span>
+        <span className="card__label">{label}</span>
+      </div>
+      <div className="card__value digital-twin-summary-value">{value}</div>
+      <div className="card__subtext">{copy}</div>
+    </article>
+  );
+}
+
 async function fetchDigitalTwinSummary(filters: typeof DEFAULT_FILTERS): Promise<DigitalTwinResponse> {
   const params = new URLSearchParams({ limit: filters.limit });
   if (filters.twinDomain !== 'all') params.set('twin_domain', filters.twinDomain);
@@ -206,7 +231,6 @@ async function fetchDigitalTwinSummary(filters: typeof DEFAULT_FILTERS): Promise
 }
 
 export default function DigitalTwinVisualizationPage() {
-  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<DigitalTwinView>('context');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
@@ -224,19 +248,36 @@ export default function DigitalTwinVisualizationPage() {
   });
 
   if (digitalTwinQuery.isLoading) {
-    return <div className="digital-twin-state digital-twin-state--loading">Loading operational context map…</div>;
+    return (
+      <div className="digital-twin-page" data-digital-twin-refined="true">
+        <section className="card digital-twin-state digital-twin-state--loading" aria-live="polite">
+          <span className="digital-twin-state-icon"><TenantNavIcon path="/digital-twin" size={22} /></span>
+          <div>
+            <h2>Loading operational context</h2>
+            <p>Connecting the permitted topology, dependencies, and operational overlays.</p>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   if (digitalTwinQuery.error) {
     return (
-      <div className="digital-twin-state digital-twin-state--error">
-        <h2>Operational context could not be loaded</h2>
-        <p>
-          {digitalTwinQuery.error instanceof ApiError
-            ? digitalTwinQuery.error.message
-            : 'The Digital Twin summary is temporarily unavailable.'}
-        </p>
-        <button className="button button--secondary" type="button" onClick={() => digitalTwinQuery.refetch()}>Retry</button>
+      <div className="digital-twin-page" data-digital-twin-refined="true">
+        <section className="card digital-twin-state digital-twin-state--error" role="alert">
+          <span className="digital-twin-state-icon digital-twin-state-icon--danger"><TenantNavIcon path="/alerts" size={22} /></span>
+          <div className="digital-twin-state-copy">
+            <h2>Operational context could not be loaded</h2>
+            <p>
+              {digitalTwinQuery.error instanceof ApiError
+                ? digitalTwinQuery.error.message
+                : 'The Digital Twin summary is temporarily unavailable.'}
+            </p>
+            <button className="button button--secondary digital-twin-link-button" type="button" onClick={() => digitalTwinQuery.refetch()}>
+              <TenantNavIcon path="/digital-twin" size={16} /> Retry
+            </button>
+          </div>
+        </section>
       </div>
     );
   }
@@ -255,19 +296,27 @@ export default function DigitalTwinVisualizationPage() {
   const hasContext = nodes.length > 0 || edges.length > 0 || overlays.length > 0;
 
   return (
-    <div className="digital-twin-page">
+    <div className="digital-twin-page" data-digital-twin-refined="true">
       <section className="card digital-twin-intro">
-        <div>
-          <div className="digital-twin-eyebrow">Read-only operational context</div>
-          <h2>Review relationships, dependencies, risks, and operational pressure</h2>
-          <p className="card__subtext">
-            This page automatically connects permitted products, suppliers, locations, stock, purchase orders, shipments, reservations, requisitions, transfers, execution tasks, alerts, stored graph evidence, and current operational context. It is not a live simulation and does not change stock, routes, labor, tasks, rooms, or source records.
-          </p>
+        <div className="digital-twin-intro__content">
+          <span className="digital-twin-hero-icon"><TenantNavIcon path="/digital-twin" size={24} /></span>
+          <div className="digital-twin-intro__copy">
+            <div className="digital-twin-eyebrow">Read-only operational context</div>
+            <h2>Review relationships, dependencies, risks, and operational pressure</h2>
+            <p className="card__subtext">
+              This page automatically connects permitted products, suppliers, locations, stock, purchase orders, shipments, reservations, requisitions, transfers, execution tasks, alerts, stored graph evidence, and current operational context. It is not a live simulation and does not change stock, routes, labor, tasks, rooms, or source records.
+            </p>
+            <div className="digital-twin-hero-badges" aria-label="Digital Twin safeguards">
+              <span><TenantNavIcon path="/permissions" size={14} /> Source permissions apply</span>
+              <span><TenantNavIcon path="/action-center" size={14} /> Source workflows remain authoritative</span>
+            </div>
+          </div>
         </div>
         <div className="digital-twin-refresh">
-          <span>Last refreshed</span>
+          <span className="digital-twin-refresh__label">Last refreshed</span>
           <strong>{formatDateTime(response?.generated_at)}</strong>
-          <button className="button button--secondary" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>
+          <button className="button button--secondary digital-twin-link-button" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>
+            <TenantNavIcon path="/real-time-operations-feed" size={16} />
             {digitalTwinQuery.isFetching ? 'Refreshing…' : 'Refresh context'}
           </button>
         </div>
@@ -275,9 +324,12 @@ export default function DigitalTwinVisualizationPage() {
 
       <section className="card digital-twin-filters" aria-labelledby="digital-twin-filter-title">
         <div className="digital-twin-section-heading">
-          <div>
-            <h2 id="digital-twin-filter-title">Filter the operational context</h2>
-            <p className="card__subtext">Filters change only this read-only snapshot. The selected review perspective changes guidance; it does not generate a live diagram, simulation, or heatmap.</p>
+          <div className="digital-twin-section-title">
+            <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
+            <div>
+              <h2 id="digital-twin-filter-title">Filter the operational context</h2>
+              <p className="card__subtext">Filters change only this read-only snapshot. The selected review perspective changes guidance; it does not generate a live diagram, simulation, or heatmap.</p>
+            </div>
           </div>
           {hasActiveFilters ? <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)}>Clear filters</button> : null}
         </div>
@@ -316,63 +368,80 @@ export default function DigitalTwinVisualizationPage() {
       </section>
 
       <section className="digital-twin-summary-grid" aria-label="Digital Twin summary">
-        <article className="card">
-          <div className="card__label">Topology points</div>
-          <div className="card__value">{numberValue(summary.total_nodes ?? nodes.length)}</div>
-          <div className="card__subtext">Current permitted business records shown as read-only operational points.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Dependencies</div>
-          <div className="card__value">{numberValue(summary.total_edges ?? edges.length)}</div>
-          <div className="card__subtext">Visible relationships and dependency paths between operational points.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Operational overlays</div>
-          <div className="card__value">{numberValue(summary.total_overlays ?? overlays.length)}</div>
-          <div className="card__subtext">Distinct Action Center, event, coordination, and knowledge-graph risk context.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Critical overlays</div>
-          <div className="card__value">{numberValue(summary.critical_overlays)}</div>
-          <div className="card__subtext">Critical context that may need prompt source-workflow review.</div>
-        </article>
+        <DigitalTwinSummaryCard
+          iconPath="/digital-twin"
+          label="Topology points"
+          value={numberValue(summary.total_nodes ?? nodes.length)}
+          copy="Current permitted business records shown as read-only operational points."
+        />
+        <DigitalTwinSummaryCard
+          iconPath="/workspace"
+          label="Dependencies"
+          value={numberValue(summary.total_edges ?? edges.length)}
+          copy="Visible relationships and dependency paths between operational points."
+          tone="slate"
+        />
+        <DigitalTwinSummaryCard
+          iconPath="/action-center"
+          label="Operational overlays"
+          value={numberValue(summary.total_overlays ?? overlays.length)}
+          copy="Distinct Action Center, event, coordination, and knowledge-graph risk context."
+          tone="amber"
+        />
+        <DigitalTwinSummaryCard
+          iconPath="/alerts"
+          label="Critical overlays"
+          value={numberValue(summary.critical_overlays)}
+          copy="Critical context that may need prompt source-workflow review."
+          tone="red"
+        />
       </section>
 
       <div className="digital-twin-view-switch" role="tablist" aria-label="Digital Twin views">
-        <button type="button" role="tab" aria-selected={view === 'context'} className={view === 'context' ? 'is-active' : ''} onClick={() => setView('context')}>Operational context</button>
-        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>Safety and limits</button>
-        {canViewDiagnostics ? (
-          <button type="button" role="tab" aria-selected={view === 'diagnostics'} className={view === 'diagnostics' ? 'is-active' : ''} onClick={() => setView('diagnostics')}>Diagnostics</button>
-        ) : null}
+        <button type="button" role="tab" aria-selected={view === 'context'} className={view === 'context' ? 'is-active' : ''} onClick={() => setView('context')}>
+          <TenantNavIcon path="/digital-twin" size={16} /> Operational context
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>
+          <TenantNavIcon path="/permissions" size={16} /> Safety and limits
+        </button>
       </div>
 
       {view === 'context' ? (
         <section aria-labelledby="digital-twin-context-title">
           <div className="digital-twin-section-heading digital-twin-section-heading--outside">
-            <div>
-              <h2 id="digital-twin-context-title">Operational context</h2>
-              <p className="card__subtext">{guidance.visualization_guidance || 'Use this read-only context to understand the situation, then continue in the governed source workflow.'}</p>
+            <div className="digital-twin-section-title">
+              <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
+              <div>
+                <h2 id="digital-twin-context-title">Operational context</h2>
+                <p className="card__subtext">{guidance.visualization_guidance || 'Use this read-only context to understand the situation, then continue in the governed source workflow.'}</p>
+              </div>
             </div>
             <div className="digital-twin-shortcuts">
-              <Link className="button button--secondary" to="/workspace">Open Workspace</Link>
-              <Link className="button button--secondary" to="/collaboration">Open Collaboration</Link>
+              <Link className="button button--secondary digital-twin-link-button" to="/workspace"><TenantNavIcon path="/workspace" size={16} /> Open Workspace</Link>
+              <Link className="button button--secondary digital-twin-link-button" to="/collaboration"><TenantNavIcon path="/collaboration" size={16} /> Open Collaboration</Link>
             </div>
           </div>
 
           {!hasContext ? (
-            <div className="digital-twin-state">
-              <h3>No operational context matches the current filters</h3>
-              <p>Clear the filters or confirm that products, suppliers, locations, stock, procurement records, reservations, requisitions, transfers, execution tasks, alerts, or stored graph evidence exist for this tenant.</p>
+            <div className="card digital-twin-state digital-twin-empty-state">
+              <span className="digital-twin-state-icon"><TenantNavIcon path="/digital-twin" size={22} /></span>
+              <div>
+                <h3>No operational context matches the current filters</h3>
+                <p>Clear the filters or confirm that products, suppliers, locations, stock, procurement records, reservations, requisitions, transfers, execution tasks, alerts, or stored graph evidence exist for this tenant.</p>
+              </div>
             </div>
           ) : (
             <>
               <section className="card digital-twin-context-section" aria-labelledby="digital-twin-node-title">
                 <div className="digital-twin-section-heading">
-                  <div>
-                    <h3 id="digital-twin-node-title">Topology points</h3>
-                    <p className="card__subtext">Current permitted business records and stored graph entities connected by the backend.</p>
+                  <div className="digital-twin-section-title">
+                    <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
+                    <div>
+                      <h3 id="digital-twin-node-title">Topology points</h3>
+                      <p className="card__subtext">Current permitted business records and stored graph entities connected by the backend.</p>
+                    </div>
                   </div>
-                  <span>{nodes.length} returned</span>
+                  <span className="digital-twin-count-pill">{nodes.length} returned</span>
                 </div>
                 {nodes.length ? (
                   <div className="digital-twin-node-grid">
@@ -381,9 +450,12 @@ export default function DigitalTwinVisualizationPage() {
                       const sourceLabel = sourcePath ? SOURCE_LABELS[sourcePath] : null;
                       return (
                         <article className="card digital-twin-node-card" key={node.node_key || node.node_id || `${node.label || 'point'}-${index}`}>
-                          <div className="digital-twin-badges">
-                            <span className="digital-twin-badge">{formatIdentifier(node.twin_domain, 'Multiple areas')}</span>
-                            <span className="digital-twin-badge">{formatIdentifier(node.status, 'Observed')}</span>
+                          <div className="digital-twin-card-heading">
+                            <span className="digital-twin-card-icon"><TenantNavIcon path={sourcePath || '/digital-twin'} size={18} /></span>
+                            <div className="digital-twin-badges">
+                              <span className="digital-twin-badge">{formatIdentifier(node.twin_domain, 'Multiple areas')}</span>
+                              <span className="digital-twin-badge digital-twin-badge--active">{formatIdentifier(node.status, 'Observed')}</span>
+                            </div>
                           </div>
                           <h4>{readableTitle(node.label, 'Topology point')}</h4>
                           <p className="card__subtext">{formatIdentifier(node.node_type, 'General operational entity')}</p>
@@ -393,7 +465,7 @@ export default function DigitalTwinVisualizationPage() {
                           </dl>
                           {sourcePath && sourceLabel ? (
                             <div className="digital-twin-card-actions">
-                              <Link className="button button--secondary" to={sourcePath}>{sourceLabel}</Link>
+                              <Link className="button button--secondary digital-twin-link-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} /> {sourceLabel}</Link>
                             </div>
                           ) : null}
                         </article>
@@ -407,23 +479,27 @@ export default function DigitalTwinVisualizationPage() {
 
               <section className="card digital-twin-context-section" aria-labelledby="digital-twin-edge-title">
                 <div className="digital-twin-section-heading">
-                  <div>
-                    <h3 id="digital-twin-edge-title">Dependencies</h3>
-                    <p className="card__subtext">Visible relationships and dependency paths. These are context, not instructions to change routing.</p>
+                  <div className="digital-twin-section-title">
+                    <span className="digital-twin-heading-icon"><TenantNavIcon path="/workspace" size={17} /></span>
+                    <div>
+                      <h3 id="digital-twin-edge-title">Dependencies</h3>
+                      <p className="card__subtext">Visible relationships and dependency paths. These are context, not instructions to change routing.</p>
+                    </div>
                   </div>
-                  <span>{edges.length} returned</span>
+                  <span className="digital-twin-count-pill">{edges.length} returned</span>
                 </div>
                 {edges.length ? (
                   <div className="digital-twin-dependency-list">
                     {edges.map((edge, index) => (
                       <article key={edge.edge_key || edge.edge_id || `${edge.relationship || 'dependency'}-${index}`}>
-                        <div>
+                        <span className="digital-twin-dependency-icon"><TenantNavIcon path="/digital-twin" size={16} /></span>
+                        <div className="digital-twin-dependency-copy">
                           <strong>{edge.source_label && edge.target_label
                             ? `${readableTitle(edge.source_label)} → ${readableTitle(edge.target_label)}`
                             : formatIdentifier(edge.relationship, 'Operational dependency')}</strong>
                           <span>{formatIdentifier(edge.relationship, 'Operational dependency')} · {formatIdentifier(edge.twin_domain, 'Multiple areas')} · {formatIdentifier(edge.status, 'Observed')}</span>
                         </div>
-                        <div>
+                        <div className="digital-twin-dependency-confidence">
                           <span>Confidence</span>
                           <strong>{formatPercent(edge.confidence_score)}</strong>
                         </div>
@@ -437,11 +513,14 @@ export default function DigitalTwinVisualizationPage() {
 
               <section className="digital-twin-overlay-section" aria-labelledby="digital-twin-overlay-title">
                 <div className="digital-twin-section-heading digital-twin-section-heading--outside">
-                  <div>
-                    <h3 id="digital-twin-overlay-title">Operational overlays</h3>
-                    <p className="card__subtext">Distinct operational pressure, coordination, event, and risk context. Similar source records remain separate; Action Center and Collaboration copies of the same action are not duplicated.</p>
+                  <div className="digital-twin-section-title">
+                    <span className="digital-twin-heading-icon"><TenantNavIcon path="/action-center" size={17} /></span>
+                    <div>
+                      <h3 id="digital-twin-overlay-title">Operational overlays</h3>
+                      <p className="card__subtext">Distinct operational pressure, coordination, event, and risk context. Similar source records remain separate; Action Center and Collaboration copies of the same action are not duplicated.</p>
+                    </div>
                   </div>
-                  <span>{overlays.length} returned</span>
+                  <span className="digital-twin-count-pill">{overlays.length} returned</span>
                 </div>
                 {overlays.length ? (
                   <div className="digital-twin-overlay-grid">
@@ -450,21 +529,24 @@ export default function DigitalTwinVisualizationPage() {
                       const sourceLabel = sourcePath ? SOURCE_LABELS[sourcePath] : null;
                       return (
                         <article className="card digital-twin-overlay-card" key={overlay.overlay_key || overlay.overlay_id || `${overlay.title || 'overlay'}-${index}`}>
-                          <div className="digital-twin-badges">
-                            <span className={`digital-twin-badge digital-twin-badge--${String(overlay.urgency || 'unknown').toLowerCase()}`}>{formatIdentifier(overlay.urgency, 'Unspecified urgency')}</span>
-                            <span className="digital-twin-badge">{formatIdentifier(overlay.overlay_type, 'Operational context')}</span>
-                            <span className="digital-twin-badge">{formatIdentifier(overlay.twin_domain, 'Multiple areas')}</span>
+                          <div className="digital-twin-card-heading">
+                            <span className="digital-twin-card-icon"><TenantNavIcon path={sourcePath || '/action-center'} size={18} /></span>
+                            <div className="digital-twin-badges">
+                              <span className={`digital-twin-badge digital-twin-badge--${String(overlay.urgency || 'unknown').toLowerCase()}`}>{formatIdentifier(overlay.urgency, 'Unspecified urgency')}</span>
+                              <span className="digital-twin-badge">{formatIdentifier(overlay.overlay_type, 'Operational context')}</span>
+                              <span className="digital-twin-badge">{formatIdentifier(overlay.twin_domain, 'Multiple areas')}</span>
+                            </div>
                           </div>
                           <h4>{readableTitle(overlay.title)}</h4>
                           <p className="card__subtext">{overlay.summary || 'No additional source summary was provided.'}</p>
-                          <dl className="digital-twin-facts">
+                          <dl className="digital-twin-facts digital-twin-facts--overlay">
                             <div><dt>Priority</dt><dd>{formatScore(overlay.priority_score)}</dd></div>
                             <div><dt>Confidence</dt><dd>{formatPercent(overlay.confidence_score)}</dd></div>
                             <div><dt>Last updated</dt><dd>{formatDateTime(overlay.updated_at || overlay.created_at)}</dd></div>
                           </dl>
                           <div className="digital-twin-card-actions">
-                            {sourcePath && sourceLabel ? <Link className="button button--secondary" to={sourcePath}>{sourceLabel}</Link> : null}
-                            {sourcePath !== '/action-center' ? <Link className="button button--secondary" to="/action-center">Open Action Center</Link> : null}
+                            {sourcePath && sourceLabel ? <Link className="button button--secondary digital-twin-link-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} /> {sourceLabel}</Link> : null}
+                            {sourcePath !== '/action-center' ? <Link className="button button--secondary digital-twin-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> Open Action Center</Link> : null}
                           </div>
                         </article>
                       );
@@ -482,25 +564,20 @@ export default function DigitalTwinVisualizationPage() {
       {view === 'limits' ? (
         <section className="digital-twin-limit-grid" aria-labelledby="digital-twin-limits-title">
           <div className="digital-twin-section-heading digital-twin-section-heading--outside">
-            <div>
-              <h2 id="digital-twin-limits-title">Safety and interpretation limits</h2>
-              <p className="card__subtext">These rules apply to every topology point, dependency, and overlay shown on this page.</p>
+            <div className="digital-twin-section-title">
+              <span className="digital-twin-heading-icon"><TenantNavIcon path="/permissions" size={17} /></span>
+              <div>
+                <h2 id="digital-twin-limits-title">Safety and interpretation limits</h2>
+                <p className="card__subtext">These rules apply to every topology point, dependency, and overlay shown on this page.</p>
+              </div>
             </div>
           </div>
-          <article className="card"><h3>Not a live simulation</h3><p className="card__subtext">The page shows a current read-only snapshot. It does not simulate future stock, labor, routes, facilities, or supplier behavior.</p></article>
-          <article className="card"><h3>No automatic operational change</h3><p className="card__subtext">Nothing here can reassign labor, reserve stock, change routing, mutate tasks, or modify source records.</p></article>
-          <article className="card"><h3>Perspective is guidance only</h3><p className="card__subtext">Topology, flow, risk, congestion, and dependency choices change review guidance. They do not generate a graphical map or measured heatmap.</p></article>
-          <article className="card"><h3>Risk context remains explainable</h3><p className="card__subtext">{guidance.risk_propagation_guidance || 'Risk context comes from permitted source records and knowledge-graph evidence.'}</p></article>
-          <article className="card"><h3>Congestion remains advisory</h3><p className="card__subtext">{guidance.congestion_heatmap_guidance || 'Congestion context does not change work allocation or inventory.'}</p></article>
-          <article className="card"><h3>Source permissions still apply</h3><p className="card__subtext">Only permitted context is returned. Every source page keeps its own route, role, permission, tenant, and workflow controls.</p></article>
-        </section>
-      ) : null}
-
-      {view === 'diagnostics' && canViewDiagnostics ? (
-        <section className="card digital-twin-diagnostics">
-          <h2>Technical response diagnostics</h2>
-          <p className="card__subtext">Restricted implementation details for users with tenant diagnostics permission.</p>
-          <pre>{JSON.stringify(response, null, 2)}</pre>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/digital-twin" size={18} /></span><div><h3>Not a live simulation</h3><p className="card__subtext">The page shows a current read-only snapshot. It does not simulate future stock, labor, routes, facilities, or supplier behavior.</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/stock" size={18} /></span><div><h3>No automatic operational change</h3><p className="card__subtext">Nothing here can reassign labor, reserve stock, change routing, mutate tasks, or modify source records.</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/workspace" size={18} /></span><div><h3>Perspective is guidance only</h3><p className="card__subtext">Topology, flow, risk, congestion, and dependency choices change review guidance. They do not generate a graphical map or measured heatmap.</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span><div><h3>Risk context remains explainable</h3><p className="card__subtext">{guidance.risk_propagation_guidance || 'Risk context comes from permitted source records and knowledge-graph evidence.'}</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/action-center" size={18} /></span><div><h3>Congestion remains advisory</h3><p className="card__subtext">{guidance.congestion_heatmap_guidance || 'Congestion context does not change work allocation or inventory.'}</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/permissions" size={18} /></span><div><h3>Source permissions still apply</h3><p className="card__subtext">Only permitted context is returned. Every source page keeps its own route, role, permission, tenant, and workflow controls.</p></div></article>
         </section>
       ) : null}
     </div>
