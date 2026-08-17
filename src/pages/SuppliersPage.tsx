@@ -381,8 +381,11 @@ export default function SuppliersPage() {
     const withEmail = suppliers.filter(
       (supplier) => Boolean(supplier.email && supplier.email.trim())
     ).length;
-    const withContact = suppliers.filter(
-      (supplier) => Boolean(supplier.contact_info && supplier.contact_info.trim())
+    const withContact = suppliers.filter((supplier) =>
+      Boolean(
+        (supplier.contact_info && supplier.contact_info.trim()) ||
+        (supplier.phone && supplier.phone.trim())
+      )
     ).length;
 
     const lateShipments = slaBreaches.reduce(
@@ -398,6 +401,19 @@ export default function SuppliersPage() {
       slaBreaches: lateShipments
     };
   }, [suppliers, slaBreaches]);
+
+  const supplierById = useMemo(
+    () => new Map(suppliers.map((supplier) => [supplier.id, supplier])),
+    [suppliers]
+  );
+
+  const slaBreachBySupplierId = useMemo(() => {
+    const map = new Map<string, SupplierSlaBreachItem>();
+    slaBreaches.forEach((breach) => {
+      if (breach.supplier_id) map.set(breach.supplier_id, breach);
+    });
+    return map;
+  }, [slaBreaches]);
 
   const selectedSupplierSlaBreach = useMemo(
     () => slaBreaches.find((breach) => breach.supplier_id === selectedPerformanceSupplier?.id),
@@ -451,6 +467,20 @@ export default function SuppliersPage() {
     }
 
     createMutation.mutate(form);
+  };
+
+  const handleStartCreate = () => {
+    if (!canManageSuppliers) {
+      setFormError('Your current role cannot create suppliers.');
+      setFormMessage(null);
+      return;
+    }
+
+    setEditingSupplier(null);
+    setForm(emptyForm());
+    setFormError(null);
+    setFormMessage(null);
+    scrollToFormSection('supplier-form-panel');
   };
 
   const handleStartEdit = (supplier: SupplierItem) => {
@@ -508,150 +538,52 @@ export default function SuppliersPage() {
     <div className="io-operational-page io-suppliers-page" style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
-          title="Active Suppliers"
-          value={summary.total}
-          subtitle="Supplier records available to current workflows"
+          title="Suppliers"
+          value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.total}
+          subtitle="Active supplier records available to tenant workflows"
         />
         <StatCard
-          title="With Email"
-          value={summary.withEmail}
-          subtitle="Ready for supplier email workflows"
-          tone={summary.withEmail === summary.total ? 'good' : 'warn'}
+          title="Email Ready"
+          value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.withEmail}
+          subtitle="Suppliers with an email address for purchasing communication"
+          tone={!suppliersQuery.isLoading && summary.total > 0 && summary.withEmail === summary.total ? 'good' : 'warn'}
         />
         <StatCard
-          title="With Contact Info"
-          value={summary.withContact}
-          subtitle="Records with phone, account, or delivery notes"
-          tone={summary.withContact === summary.total ? 'good' : 'warn'}
+          title="Contact Ready"
+          value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.withContact}
+          subtitle="Suppliers with a phone number or contact notes"
+          tone={!suppliersQuery.isLoading && summary.total > 0 && summary.withContact === summary.total ? 'good' : 'warn'}
         />
         <StatCard
-          title="SLA Breaches"
-          value={summary.slaBreaches}
-          subtitle={`${summary.slaBreachSuppliers} ${supplierWord} with late pending or partial shipments`}
-          tone={summary.slaBreaches > 0 ? 'bad' : 'good'}
+          title="Late Shipments"
+          value={slaBreachesQuery.isLoading || slaBreachesQuery.isError ? '—' : summary.slaBreaches}
+          subtitle={slaBreachesQuery.isError ? 'Delivery status could not be loaded' : slaBreachesQuery.isLoading ? 'Checking pending and partially received shipments' : `${summary.slaBreachSuppliers} ${supplierWord} need delivery follow-up`}
+          tone={!slaBreachesQuery.isLoading && summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
 
+      <section className="app-panel app-panel--padded" style={styles.workspaceBanner}>
+        <div style={styles.workspaceBannerContent}>
+          <div>
+            <div style={styles.eyebrow}>SUPPLIER OPERATIONS</div>
+            <h3 style={styles.workspaceTitle}>Supplier workspace</h3>
+            <p style={styles.workspaceText}>
+              Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.
+            </p>
+          </div>
+          {canManageSuppliers ? (
+            <button type="button" style={styles.primaryButton} onClick={handleStartCreate}>
+              Add supplier
+            </button>
+          ) : null}
+        </div>
+      </section>
+
       {!canManageSuppliers ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          Current access role: {accessRoleLabel}. Suppliers are read-only because this role does not have suppliers.write permission.
+          Current access role: {accessRoleLabel}. You can review supplier details, delivery status, and performance. Creating, editing, deleting, and bulk importing suppliers requires suppliers.write permission.
         </div>
       ) : null}
-
-      <InventoryCsvImportPanel
-        importType="suppliers"
-        title="Bulk Supplier Import"
-        description="Validate supplier master-data rows before committing them. Duplicate active supplier names are rejected instead of overwritten."
-        templateColumns={['name', 'email', 'contact_info']}
-        templateExample={{ name: 'Metro Wholesale', email: 'orders@example.com', contact_info: 'Account 12345' }}
-        canImport={canManageSuppliers}
-        disabledReason="Suppliers write permission is required for bulk supplier import."
-        onCommitted={async () => {
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
-            queryClient.invalidateQueries({ queryKey: ['suppliers-available'] }),
-            queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] }),
-            queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
-          ]);
-        }}
-      />
-
-      <section id="supplier-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
-        <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
-        <p style={styles.panelSubtitle}>
-          {canManageSuppliers
-            ? 'Maintain supplier master records used across products, purchasing, shipments, receiving, and supplier communication.'
-            : 'This form remains visible for context, but all fields and supplier write actions are disabled for your current role.'}
-        </p>
-
-        {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
-        {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
-
-        <form onSubmit={handleSubmit} style={styles.formGrid}>
-          <div>
-            <label htmlFor="supplier-name" style={styles.label}>Supplier Name</label>
-            <input
-              id="supplier-name"
-              style={inputDisabled ? styles.disabledInput : styles.input}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Example: Metro Wholesale"
-              maxLength={255}
-              disabled={inputDisabled}
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="supplier-email" style={styles.label}>Email</label>
-            <input
-              id="supplier-email"
-              style={inputDisabled ? styles.disabledInput : styles.input}
-              type="email"
-              value={form.email}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, email: event.target.value }))
-              }
-              placeholder="orders@supplier.com"
-              maxLength={255}
-              disabled={inputDisabled}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="supplier-contact-info" style={styles.label}>Contact Info</label>
-            <input
-              id="supplier-contact-info"
-              style={inputDisabled ? styles.disabledInput : styles.input}
-              value={form.contact_info}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, contact_info: event.target.value }))
-              }
-              placeholder="Phone, account rep, delivery notes"
-              maxLength={1000}
-              disabled={inputDisabled}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="supplier-phone" style={styles.label}>Phone</label>
-            <input id="supplier-phone" style={inputDisabled ? styles.disabledInput : styles.input} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Supplier phone" maxLength={100} disabled={inputDisabled} />
-          </div>
-
-          <div>
-            <label htmlFor="supplier-tax-id" style={styles.label}>Tax / VAT ID</label>
-            <input id="supplier-tax-id" style={inputDisabled ? styles.disabledInput : styles.input} value={form.tax_id} onChange={(event) => setForm((current) => ({ ...current, tax_id: event.target.value }))} placeholder="Optional" maxLength={100} disabled={inputDisabled} />
-          </div>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label htmlFor="supplier-address" style={styles.label}>Supplier Address</label>
-            <textarea id="supplier-address" style={{ ...(inputDisabled ? styles.disabledInput : styles.input), minHeight: 78, resize: 'vertical' }} value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} placeholder="Street, postal code, city, country" maxLength={2000} disabled={inputDisabled} />
-          </div>
-
-          <div className="app-actions" style={styles.formActions}>
-            <button
-              type="submit"
-              style={inputDisabled ? styles.disabledButton : styles.primaryButton}
-              disabled={inputDisabled}
-              title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
-            >
-              {isSubmitting
-                ? editingSupplier
-                  ? 'Updating...'
-                  : 'Creating...'
-                : editingSupplier
-                  ? 'Update Supplier'
-                  : 'Create Supplier'}
-            </button>
-
-            {editingSupplier ? (
-              <button type="button" style={isSubmitting ? styles.disabledButton : styles.secondaryButton} onClick={handleCancelEdit} disabled={isSubmitting}>
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </form>
-      </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
@@ -718,10 +650,10 @@ export default function SuppliersPage() {
               <thead>
                 <tr>
                   <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Email</th>
-                  <th style={styles.th}>Contact Info</th>
+                  <th style={styles.th}>Contact</th>
+                  <th style={styles.th}>Communication</th>
                   <th style={styles.th}>Address / Tax</th>
-                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Delivery</th>
                   <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
@@ -739,24 +671,37 @@ export default function SuppliersPage() {
                     <tr key={supplier.id}>
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{supplier.name}</div>
-                        <div style={styles.rowSubtle}>Supplier ID: {supplier.id}</div>
+                        <div style={styles.rowSubtle}>Active supplier</div>
                       </td>
                       <td style={styles.td}>
-                        {supplier.email ? (
-                          <a href={`mailto:${supplier.email}`} style={styles.emailValue}>{supplier.email}</a>
-                        ) : (
-                          <span style={styles.missingValue}>No email</span>
-                        )}
+                        {supplier.contact_info || <span style={styles.missingValue}>No contact notes</span>}
                       </td>
                       <td style={styles.td}>
-                        {supplier.contact_info || <span style={styles.missingValue}>No contact info</span>}
+                        <div>
+                          {supplier.email ? (
+                            <a href={`mailto:${supplier.email}`} style={styles.emailValue}>{supplier.email}</a>
+                          ) : (
+                            <span style={styles.missingValue}>No email</span>
+                          )}
+                        </div>
+                        <div style={styles.rowSubtle}>{supplier.phone || 'No phone'}</div>
                       </td>
                       <td style={styles.td}>
                         <div>{supplier.address || <span style={styles.missingValue}>No address</span>}</div>
-                        <div style={styles.rowSubtle}>{supplier.phone || 'No phone'}{supplier.tax_id ? ` · Tax/VAT: ${supplier.tax_id}` : ''}</div>
+                        <div style={styles.rowSubtle}>{supplier.tax_id ? `Tax/VAT: ${supplier.tax_id}` : 'No Tax/VAT ID'}</div>
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.badgeActive}>Active</span>
+                        {slaBreachesQuery.isLoading ? (
+                          <span style={styles.badgeNeutral}>Checking…</span>
+                        ) : slaBreachesQuery.isError ? (
+                          <span style={styles.badgeNeutral}>Unavailable</span>
+                        ) : slaBreachBySupplierId.has(supplier.id) ? (
+                          <span style={styles.badgeDeleted}>
+                            {formatSlaBreachLateShipments(slaBreachBySupplierId.get(supplier.id) as SupplierSlaBreachItem)} late
+                          </span>
+                        ) : (
+                          <span style={styles.badgeActive}>On track</span>
+                        )}
                       </td>
                       <td style={styles.td}>
                         <div className="app-actions" style={styles.actionGroup}>
@@ -765,28 +710,29 @@ export default function SuppliersPage() {
                             style={styles.secondaryButton}
                             onClick={() => setSelectedPerformanceSupplier(supplier)}
                           >
-                            Performance
+                            View performance
                           </button>
 
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.secondaryButton}
-                            onClick={() => handleStartEdit(supplier)}
-                            disabled={!canManageSuppliers}
-                            title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
-                          >
-                            Edit
-                          </button>
+                          {canManageSuppliers ? (
+                            <>
+                              <button
+                                type="button"
+                                style={styles.secondaryButton}
+                                onClick={() => handleStartEdit(supplier)}
+                              >
+                                Edit
+                              </button>
 
-                          <button
-                            type="button"
-                            style={!canManageSuppliers ? styles.disabledButton : styles.dangerButton}
-                            onClick={() => handleDelete(supplier)}
-                            disabled={deleteMutation.isPending || !canManageSuppliers}
-                            title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
-                          >
-                            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                          </button>
+                              <button
+                                type="button"
+                                style={styles.dangerButton}
+                                onClick={() => handleDelete(supplier)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -797,6 +743,126 @@ export default function SuppliersPage() {
           </div>
         ) : null}
       </section>
+
+
+      {canManageSuppliers ? (
+      <InventoryCsvImportPanel
+          importType="suppliers"
+          title="Bulk Supplier Import"
+          description="Validate supplier master-data rows before committing them. Duplicate active supplier names are rejected instead of overwritten."
+          templateColumns={['name', 'email', 'contact_info', 'phone', 'address', 'tax_id']}
+          templateExample={{ name: 'Metro Wholesale', email: 'orders@example.com', contact_info: 'Account 12345', phone: '+385 51 555 010', address: 'Industrijska 10, Rijeka, Croatia', tax_id: 'HR12345678901' }}
+          canImport={canManageSuppliers}
+          disabledReason="Suppliers write permission is required for bulk supplier import."
+          onCommitted={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
+              queryClient.invalidateQueries({ queryKey: ['suppliers-available'] }),
+              queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] }),
+              queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+            ]);
+          }}
+        />
+      ) : null}
+
+      {canManageSuppliers ? (
+      <section id="supplier-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
+          <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
+          <p style={styles.panelSubtitle}>
+            {canManageSuppliers
+              ? 'Maintain supplier master records used across products, purchasing, shipments, receiving, and supplier communication.'
+              : 'This form remains visible for context, but all fields and supplier write actions are disabled for your current role.'}
+          </p>
+  
+          {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
+          {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
+  
+          <form onSubmit={handleSubmit} style={styles.formGrid}>
+            <div>
+              <label htmlFor="supplier-name" style={styles.label}>Supplier Name</label>
+              <input
+                id="supplier-name"
+                style={inputDisabled ? styles.disabledInput : styles.input}
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Example: Metro Wholesale"
+                maxLength={255}
+                disabled={inputDisabled}
+                required
+              />
+            </div>
+  
+            <div>
+              <label htmlFor="supplier-email" style={styles.label}>Email</label>
+              <input
+                id="supplier-email"
+                style={inputDisabled ? styles.disabledInput : styles.input}
+                type="email"
+                value={form.email}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, email: event.target.value }))
+                }
+                placeholder="orders@supplier.com"
+                maxLength={255}
+                disabled={inputDisabled}
+              />
+            </div>
+  
+            <div>
+              <label htmlFor="supplier-contact-info" style={styles.label}>Contact Info</label>
+              <input
+                id="supplier-contact-info"
+                style={inputDisabled ? styles.disabledInput : styles.input}
+                value={form.contact_info}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, contact_info: event.target.value }))
+                }
+                placeholder="Account rep, account number, delivery notes"
+                maxLength={1000}
+                disabled={inputDisabled}
+              />
+            </div>
+  
+            <div>
+              <label htmlFor="supplier-phone" style={styles.label}>Phone</label>
+              <input id="supplier-phone" style={inputDisabled ? styles.disabledInput : styles.input} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Supplier phone" maxLength={100} disabled={inputDisabled} />
+            </div>
+  
+            <div>
+              <label htmlFor="supplier-tax-id" style={styles.label}>Tax / VAT ID</label>
+              <input id="supplier-tax-id" style={inputDisabled ? styles.disabledInput : styles.input} value={form.tax_id} onChange={(event) => setForm((current) => ({ ...current, tax_id: event.target.value }))} placeholder="Optional" maxLength={100} disabled={inputDisabled} />
+            </div>
+  
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="supplier-address" style={styles.label}>Supplier Address</label>
+              <textarea id="supplier-address" style={{ ...(inputDisabled ? styles.disabledInput : styles.input), minHeight: 78, resize: 'vertical' }} value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} placeholder="Street, postal code, city, country" maxLength={2000} disabled={inputDisabled} />
+            </div>
+  
+            <div className="app-actions" style={styles.formActions}>
+              <button
+                type="submit"
+                style={inputDisabled ? styles.disabledButton : styles.primaryButton}
+                disabled={inputDisabled}
+                title={!canManageSuppliers ? 'Suppliers write permission required' : undefined}
+              >
+                {isSubmitting
+                  ? editingSupplier
+                    ? 'Updating...'
+                    : 'Creating...'
+                  : editingSupplier
+                    ? 'Update Supplier'
+                    : 'Create Supplier'}
+              </button>
+  
+              {editingSupplier ? (
+                <button type="button" style={isSubmitting ? styles.disabledButton : styles.secondaryButton} onClick={handleCancelEdit} disabled={isSubmitting}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       {selectedPerformanceSupplier ? (
         <section id="supplier-performance-panel" className="app-panel app-panel--padded" style={styles.panel}>
@@ -904,9 +970,9 @@ export default function SuppliersPage() {
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
           <div>
-            <h3 style={styles.panelTitle}>Supplier SLA Breaches</h3>
+            <h3 style={styles.panelTitle}>Delivery Follow-up</h3>
             <p style={styles.panelSubtitle}>
-              Late pending or partially received shipments grouped by supplier. Use this read-only view to identify delivery follow-up work.
+              Late pending or partially received shipments grouped by supplier. Review these first when a delivery has missed its expected date.
             </p>
           </div>
           <button
@@ -915,7 +981,7 @@ export default function SuppliersPage() {
             onClick={() => void slaBreachesQuery.refetch()}
             disabled={slaBreachesQuery.isFetching}
           >
-            {slaBreachesQuery.isFetching ? 'Refreshing...' : 'Refresh SLA Breaches'}
+            {slaBreachesQuery.isFetching ? 'Refreshing...' : 'Refresh delivery status'}
           </button>
         </div>
 
@@ -938,12 +1004,13 @@ export default function SuppliersPage() {
                   <th style={styles.th}>Late Shipments</th>
                   <th style={styles.th}>Earliest Overdue Date</th>
                   <th style={styles.th}>Latest Overdue Date</th>
+                  <th style={styles.th}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {slaBreaches.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={4}>
+                    <td style={styles.emptyCell} colSpan={5}>
                       No late pending or partially received supplier shipments were found.
                     </td>
                   </tr>
@@ -952,13 +1019,26 @@ export default function SuppliersPage() {
                     <tr key={`${breach.supplier_id || 'supplier'}-${breach.shipment_id || index}`}>
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{formatUnknown(breach.supplier_name || breach.supplier_id)}</div>
-                        <div style={styles.rowSubtle}>Supplier ID: {formatUnknown(breach.supplier_id)}</div>
+                        <div style={styles.rowSubtle}>Delivery follow-up required</div>
                       </td>
                       <td style={styles.td}>
                         <span style={styles.badgeDeleted}>{formatSlaBreachLateShipments(breach)}</span>
                       </td>
                       <td style={styles.td}>{formatDateOnly(getSlaBreachEarliestMissedDelivery(breach))}</td>
                       <td style={styles.td}>{formatDateOnly(getSlaBreachLatestMissedDelivery(breach))}</td>
+                      <td style={styles.td}>
+                        {breach.supplier_id && supplierById.has(breach.supplier_id) ? (
+                          <button
+                            type="button"
+                            style={styles.secondaryButton}
+                            onClick={() => setSelectedPerformanceSupplier(supplierById.get(breach.supplier_id as string) || null)}
+                          >
+                            View performance
+                          </button>
+                        ) : (
+                          <span style={styles.missingValue}>Unavailable</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1241,6 +1321,45 @@ const styles: Record<string, CSSProperties> = {
   },
   errorBox: {
     marginBottom: '14px'
+  },
+  workspaceBanner: {
+    marginBottom: '20px',
+    borderLeft: '4px solid #2563eb',
+    background: 'linear-gradient(90deg, #eff6ff 0%, #ffffff 48%)'
+  },
+  workspaceBannerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '18px',
+    flexWrap: 'wrap'
+  },
+  eyebrow: {
+    color: '#2563eb',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.12em',
+    marginBottom: '6px'
+  },
+  workspaceTitle: {
+    margin: 0,
+    fontSize: '20px',
+    fontWeight: 750
+  },
+  workspaceText: {
+    margin: '7px 0 0',
+    color: '#475569',
+    lineHeight: 1.5,
+    maxWidth: '760px'
+  },
+  badgeNeutral: {
+    display: 'inline-block',
+    padding: '6px 10px',
+    borderRadius: '999px',
+    background: '#f1f5f9',
+    color: '#475569',
+    fontWeight: 700,
+    fontSize: '12px'
   },
   warningBox: {
     marginBottom: '16px'
