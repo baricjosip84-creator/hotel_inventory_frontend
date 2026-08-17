@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './OperationalExperiencePages.css';
+import './MobileExecutionPage.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
 type ExecutionTaskSourceType = 'manual' | 'reservation' | 'requisition' | 'purchase_order' | 'shipment' | 'transfer' | 'cycle_count' | 'replenishment' | 'execution_request';
@@ -118,11 +119,6 @@ const SOURCE_FILTERS: Array<{ value: 'all' | ExecutionTaskSourceType; label: str
   { value: 'replenishment', label: 'Replenishment' }
 ];
 
-const gridStyle: CSSProperties = { gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' };
-const mobileQueueStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 };
-const toolbarStyle: CSSProperties = { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 };
-const selectStyle: CSSProperties = { border: '1px solid #cbd5e1', borderRadius: 12, padding: '10px 12px', background: '#ffffff', color: '#0f172a', minHeight: 44, minWidth: 180 };
-const badgeStyle: CSSProperties = { display: 'inline-flex', borderRadius: 999, padding: '5px 9px', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize' };
 
 function numberValue(value: unknown): number {
   const parsed = Number(value);
@@ -195,6 +191,20 @@ function allowedActions(status?: string | null): MobileAction[] {
   if (status === 'blocked') return ['unblock'];
   if (status === 'ready' || status === 'assigned' || status === 'in_progress') return ['start', 'complete', 'block'].filter((action) => !(status === 'in_progress' && action === 'start')) as MobileAction[];
   return [];
+}
+
+function urgencyToneClass(value?: string | null): 'danger' | 'warning' | 'amber' | 'green' {
+  const urgency = String(value || 'low').toLowerCase();
+  if (urgency === 'critical') return 'danger';
+  if (urgency === 'high') return 'warning';
+  if (urgency === 'medium') return 'amber';
+  return 'green';
+}
+
+function actionButtonClass(action: MobileAction): string {
+  if (action === 'complete') return 'button mobile-execution-task-button mobile-execution-task-button--primary';
+  if (action === 'block') return 'button button--secondary mobile-execution-task-button mobile-execution-task-button--danger';
+  return 'button button--secondary mobile-execution-task-button';
 }
 
 async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency, sourceType: 'all' | ExecutionTaskSourceType): Promise<MobileExecutionResponse> {
@@ -334,24 +344,61 @@ export default function MobileExecutionPage() {
   const usingOfflineSnapshot = !mobileExecutionQuery.data && Boolean(cachedResponse);
 
   return (
-    <div className="mobile-execution-page">
-      <div className="card-grid" style={gridStyle}>
-        <div className="card"><div className="card__label">Mobile queue</div><div className="card__value">{numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}</div><div className="card__subtext">Execution tasks prepared for touch-first warehouse work.</div></div>
-        <div className="card"><div className="card__label">Critical tasks</div><div className="card__value">{numberValue(summary.critical_mobile_tasks)}</div><div className="card__subtext">Highest urgency items requiring operator attention.</div></div>
-        <div className="card"><div className="card__label">Connection</div><div className="card__value" style={{ fontSize: 18 }}>{online ? 'Online' : 'Offline'}</div><div className="card__subtext">{pending.length} action{pending.length === 1 ? '' : 's'} waiting to synchronize.</div></div>
-        <div className="card"><div className="card__label">Execution mode</div><div className="card__value" style={{ fontSize: 18 }}>{formatLabel(response?.definition?.execution_mode)}</div><div className="card__subtext">Only execution-task lifecycle changes are allowed from this mobile surface.</div></div>
+    <div className="mobile-execution-page mobile-execution-page--refined">
+      <div className="mobile-execution-summary-grid">
+        <div className="card mobile-execution-summary-card">
+          <span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/mobile-execution" size={18} /></span>
+          <div className="mobile-execution-summary-copy">
+            <div className="card__label">Mobile queue</div>
+            <div className="card__value">{numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}</div>
+            <div className="card__subtext">Execution tasks prepared for touch-first warehouse work.</div>
+          </div>
+        </div>
+        <div className="card mobile-execution-summary-card">
+          <span className="mobile-execution-icon mobile-execution-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
+          <div className="mobile-execution-summary-copy">
+            <div className="card__label">Critical tasks</div>
+            <div className="card__value">{numberValue(summary.critical_mobile_tasks)}</div>
+            <div className="card__subtext">Highest urgency items requiring operator attention.</div>
+          </div>
+        </div>
+        <div className="card mobile-execution-summary-card">
+          <span className={`mobile-execution-icon ${online ? 'mobile-execution-icon--green' : 'mobile-execution-icon--warning'}`}><TenantNavIcon path="/operations-feed" size={18} /></span>
+          <div className="mobile-execution-summary-copy">
+            <div className="card__label">Connection</div>
+            <div className={`card__value mobile-execution-summary-text-value ${online ? 'mobile-execution-value--healthy' : 'mobile-execution-value--warning'}`}>{online ? 'Online' : 'Offline'}</div>
+            <div className="card__subtext">{pending.length} action{pending.length === 1 ? '' : 's'} waiting to synchronize.</div>
+          </div>
+        </div>
+        <div className="card mobile-execution-summary-card">
+          <span className="mobile-execution-icon mobile-execution-icon--violet"><TenantNavIcon path="/execution-tasks" size={18} /></span>
+          <div className="mobile-execution-summary-copy">
+            <div className="card__label">Execution mode</div>
+            <div className="card__value mobile-execution-summary-text-value">{formatLabel(response?.definition?.execution_mode)}</div>
+            <div className="card__subtext">Only execution-task lifecycle changes are allowed from this mobile surface.</div>
+          </div>
+        </div>
       </div>
 
-      <section className="section">
-        <div className="section__title">Mobile execution controls</div>
-        <div className="card">
-          <div style={toolbarStyle}>
-            <select style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-            <select style={selectStyle} value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-            <button className="button button--secondary" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>{mobileExecutionQuery.isFetching ? 'Refreshing…' : 'Refresh mobile queue'}</button>
-            <button className="button button--secondary" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canUpdateTasks}>{syncing ? 'Synchronizing…' : `Sync pending (${pending.length})`}</button>
-            <Link className="button button--secondary" to="/scanner">Open scanner</Link>
-            <Link className="button button--secondary" to="/execution-tasks">Open execution tasks</Link>
+      <section className="section mobile-execution-section">
+        <div className="section__title mobile-execution-section-title">
+          <span className="mobile-execution-section-icon"><TenantNavIcon path="/mobile-execution" size={16} /></span>
+          Mobile execution controls
+        </div>
+        <div className="card mobile-execution-controls-shell">
+          <div className="mobile-execution-toolbar">
+            <select aria-label="Filter mobile tasks by urgency" className="mobile-execution-select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            <select aria-label="Filter mobile tasks by source" className="mobile-execution-select" value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>
+              <TenantNavIcon path="/operations-feed" size={15} />
+              {mobileExecutionQuery.isFetching ? 'Refreshing…' : 'Refresh mobile queue'}
+            </button>
+            <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canUpdateTasks}>
+              <TenantNavIcon path="/mobile-execution" size={15} />
+              {syncing ? 'Synchronizing…' : `Sync pending (${pending.length})`}
+            </button>
+            <Link className="button button--secondary mobile-execution-control-button" to="/scanner"><TenantNavIcon path="/scanner" size={15} />Open scanner</Link>
+            <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks"><TenantNavIcon path="/execution-tasks" size={15} />Open execution tasks</Link>
           </div>
 
           {mobileExecutionQuery.isLoading && !cachedResponse ? <p className="card__subtext">Loading mobile execution queue…</p> : null}
@@ -359,29 +406,72 @@ export default function MobileExecutionPage() {
           {usingOfflineSnapshot ? <p className="card__subtext"><strong>Offline snapshot:</strong> showing the last successfully downloaded queue.</p> : null}
           {message ? <p className="form-success">{message}</p> : null}
           {actionError ? <p className="form-error">{actionError}</p> : null}
-          {hasUsableResponse ? <div style={{ display: 'grid', gap: 8 }}><span style={{ ...badgeStyle, width: 'fit-content' }}>{online ? 'Server-connected queue' : 'Local offline snapshot'}</span><p className="card__subtext">{guidance.offline_guidance}</p><p className="card__subtext">{guidance.scanner_guidance}</p></div> : null}
+          {hasUsableResponse ? (
+            <div className="mobile-execution-guidance">
+              <div className="mobile-execution-connection-row">
+                <span className={`mobile-execution-state-pill ${online ? 'mobile-execution-state-pill--online' : 'mobile-execution-state-pill--offline'}`}>
+                  <span className="mobile-execution-state-dot" />
+                  {online ? 'Server-connected queue' : 'Local offline snapshot'}
+                </span>
+                {pending.length > 0 ? <span className="mobile-execution-pending-pill">{pending.length} queued</span> : null}
+              </div>
+              <div className="mobile-execution-guidance-grid">
+                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/mobile-execution" size={15} /></span><p>{guidance.offline_guidance}</p></div>
+                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/scanner" size={15} /></span><p>{guidance.scanner_guidance}</p></div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__title">Touch-first task queue</div>
-        {mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card"><p className="card__subtext">No mobile execution tasks matched the selected filters.</p></div> : (
-          <div style={mobileQueueStyle}>
+      <section className="section mobile-execution-section">
+        <div className="section__title mobile-execution-section-title">
+          <span className="mobile-execution-section-icon"><TenantNavIcon path="/execution-tasks" size={16} /></span>
+          Touch-first task queue
+          {mobileTasks.length > 0 ? <span className="mobile-execution-section-count">{mobileTasks.length}</span> : null}
+        </div>
+        {mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card mobile-execution-empty-card"><span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/execution-tasks" size={18} /></span><div><div className="mobile-execution-empty-title">No matching mobile tasks</div><p className="card__subtext">No mobile execution tasks matched the selected filters.</p></div></div> : (
+          <div className="mobile-execution-queue-grid">
             {mobileTasks.map((task) => {
               const sourcePath = sourceSurfaceToAppPath(task.source_surface);
               const actions = allowedActions(task.execution_task_status);
               const queuedCount = pending.filter((operation) => operation.task_id === task.task_source_id).length;
+              const urgencyClass = urgencyToneClass(task.urgency);
               return (
-                <article className="card" key={task.mobile_action_id} style={{ display: 'grid', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}><div><div className="card__label">{formatLabel(task.execution_task_status || task.queue_status)}</div><h3 style={{ margin: '4px 0 0' }}>{task.title || 'Untitled mobile task'}</h3></div><span style={badgeStyle}>{formatLabel(task.urgency)}</span></div>
-                  <p className="card__subtext">{task.summary || 'No task summary was provided.'}</p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{task.barcode_ready ? <span style={badgeStyle}>Scan-ready</span> : null}{task.offline_safe_snapshot ? <span style={badgeStyle}>Offline snapshot</span> : null}{queuedCount ? <span style={badgeStyle}>{queuedCount} pending</span> : null}{task.execution_task_source_type ? <span style={badgeStyle}>Source {formatLabel(task.execution_task_source_type)}</span> : null}</div>
-                  <div><div className="card__label">Recommended next step</div><p className="card__subtext">{task.recommended_mobile_next_step}</p></div>
-                  <div><div className="card__label">Last updated</div><p className="card__subtext">{formatDateTime(task.updated_at || task.created_at)}</p></div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canUpdateTasks && task.task_source_id ? actions.map((action) => <button key={action} className={action === 'complete' ? 'button' : 'button button--secondary'} type="button" disabled={busyTaskId === task.task_source_id} onClick={() => void runAction(task, action)}>{formatLabel(action)}</button>) : null}
-                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}>Open source workflow</Link> : null}
-                    {task.barcode_ready ? <Link className="button button--secondary" to="/scanner">Scan/verify</Link> : null}
+                <article className={`card mobile-execution-task-card mobile-execution-task-card--${urgencyClass}`} key={task.mobile_action_id}>
+                  <div className="mobile-execution-task-header">
+                    <div className="mobile-execution-task-lead">
+                      <span className={`mobile-execution-icon mobile-execution-icon--${urgencyClass}`}><TenantNavIcon path={sourcePath || '/execution-tasks'} size={17} /></span>
+                      <div className="mobile-execution-task-heading">
+                        <div className="card__label">{formatLabel(task.execution_task_status || task.queue_status)}</div>
+                        <h3>{task.title || 'Untitled mobile task'}</h3>
+                      </div>
+                    </div>
+                    <span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{formatLabel(task.urgency)}</span>
+                  </div>
+
+                  <p className="card__subtext mobile-execution-task-summary">{task.summary || 'No task summary was provided.'}</p>
+
+                  <div className="mobile-execution-task-badges">
+                    {task.barcode_ready ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/scanner" size={13} />Scan-ready</span> : null}
+                    {task.offline_safe_snapshot ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/mobile-execution" size={13} />Offline snapshot</span> : null}
+                    {queuedCount ? <span className="mobile-execution-meta-pill mobile-execution-meta-pill--pending">{queuedCount} pending</span> : null}
+                    {task.execution_task_source_type ? <span className="mobile-execution-meta-pill"><TenantNavIcon path={sourcePath || '/execution-tasks'} size={13} />Source {formatLabel(task.execution_task_source_type)}</span> : null}
+                  </div>
+
+                  <div className="mobile-execution-task-detail">
+                    <div className="card__label">Recommended next step</div>
+                    <p className="card__subtext">{task.recommended_mobile_next_step}</p>
+                  </div>
+                  <div className="mobile-execution-task-detail mobile-execution-task-detail--time">
+                    <div className="card__label">Last updated</div>
+                    <p className="card__subtext">{formatDateTime(task.updated_at || task.created_at)}</p>
+                  </div>
+
+                  <div className="mobile-execution-task-actions">
+                    {canUpdateTasks && task.task_source_id ? actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.task_source_id} onClick={() => void runAction(task, action)}>{formatLabel(action)}</button>) : null}
+                    {sourcePath ? <Link className="button button--secondary mobile-execution-source-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={14} />Open source workflow</Link> : null}
+                    {task.barcode_ready ? <Link className="button button--secondary mobile-execution-source-button" to="/scanner"><TenantNavIcon path="/scanner" size={14} />Scan/verify</Link> : null}
                   </div>
                 </article>
               );
@@ -390,10 +480,13 @@ export default function MobileExecutionPage() {
         )}
       </section>
 
-      <section className="section">
-        <div className="section__title">Mobile safety contract</div>
-        <div className="card-grid" style={gridStyle}>
-          {safetyEntries.length === 0 ? <div className="card"><p className="card__subtext">Safety contract details were not returned by the backend.</p></div> : safetyEntries.map(([key]) => <div className="card" key={key}><div className="card__label">Enabled guardrail</div><div style={{ fontWeight: 800, textTransform: 'capitalize' }}>{formatLabel(key)}</div></div>)}
+      <section className="section mobile-execution-section">
+        <div className="section__title mobile-execution-section-title">
+          <span className="mobile-execution-section-icon"><TenantNavIcon path="/permissions" size={16} /></span>
+          Mobile safety contract
+        </div>
+        <div className="mobile-execution-safety-grid">
+          {safetyEntries.length === 0 ? <div className="card mobile-execution-empty-card"><p className="card__subtext">Safety contract details were not returned by the backend.</p></div> : safetyEntries.map(([key]) => <div className="card mobile-execution-safety-card" key={key}><span className="mobile-execution-icon mobile-execution-icon--green"><TenantNavIcon path="/permissions" size={16} /></span><div><div className="card__label">Enabled guardrail</div><div className="mobile-execution-safety-title">{formatLabel(key)}</div></div></div>)}
         </div>
       </section>
     </div>
