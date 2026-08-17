@@ -4,6 +4,14 @@
   gap: 16px;
 }
 
+.stock-movements-filter-grid--primary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stock-movements-filter-grid--advanced {
+  margin-top: 14px;
+}
+
 .stock-movements-field {
   display: flex;
   flex-direction: column;
@@ -35,12 +43,26 @@
 }
 
 .stock-movements-search-field {
-  grid-column: span 3;
+  grid-column: span 2;
+}
+
+.stock-movements-more-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.stock-movements-more-filters-row > span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .stock-movements-summary-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -79,14 +101,67 @@
   font-weight: 600;
 }
 
+.stock-movements-reference-link {
+  color: #1d4ed8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.stock-movements-reference-link:hover {
+  text-decoration: underline;
+}
+
+.stock-movements-details-button {
+  min-width: 66px;
+  padding: 8px 12px;
+}
+
+.stock-movements-details-row > td {
+  padding: 0 14px 14px !important;
+  background: #f8fafc;
+}
+
+.stock-movements-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.stock-movements-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.stock-movements-detail-card strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.stock-movements-detail-card code {
+  overflow-wrap: anywhere;
+  color: #334155;
+  font-size: 11px;
+}
+
 @media (max-width: 1250px) {
-  .stock-movements-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stock-movements-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 980px) {
-  .stock-movements-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-movements-filter-grid,
+  .stock-movements-filter-grid--primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stock-movements-search-field { grid-column: span 2; }
   .stock-movements-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-movements-details-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {

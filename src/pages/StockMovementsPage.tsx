@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import './StockMovementsPage.css';
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
@@ -40,6 +41,9 @@ type StockMovement = {
 
 type StockMovementSummary = {
   total_rows?: number | string;
+  inbound_rows?: number | string;
+  outbound_rows?: number | string;
+  no_change_rows?: number | string;
   total_inbound?: number | string;
   total_outbound?: number | string;
   net_change?: number | string;
@@ -226,6 +230,7 @@ function movementTypeFromRow(movement: StockMovement): string {
 
 const MOVEMENT_LABELS: Record<string, string> = {
   shipment_receive: 'Shipment received',
+  opening_stock: 'Opening stock',
   usage: 'Stock consumed',
   usage_reversal: 'Usage reversed',
   stock_count: 'Physical count',
@@ -235,6 +240,13 @@ const MOVEMENT_LABELS: Record<string, string> = {
   reservation_fulfillment: 'Reservation fulfilled',
   requisition_fulfillment: 'Requisition fulfilled',
   cycle_count_reconciliation: 'Cycle count reconciled',
+  expiry_writeoff: 'Expired stock write-off',
+  quarantine_release: 'Quarantine released',
+  stock_hold: 'Stock placed on hold',
+  stock_hold_release: 'Stock hold released',
+  supplier_return_dispatch: 'Supplier return sent',
+  outbound_dispatch: 'Outbound dispatched',
+  customer_return: 'Customer return',
   other: 'Other movement'
 };
 
@@ -261,8 +273,60 @@ function reasonDetail(movement: StockMovement): string | null {
   if (type === 'usage' && reason.startsWith('usage:')) return humanizeCode(reason.slice('usage:'.length));
   if (type === 'usage_reversal' && reason.startsWith('usage_reversal:')) return `Reversed ${humanizeCode(reason.slice('usage_reversal:'.length)).toLowerCase()}`;
   if (type === 'stock_transfer_in' || type === 'stock_transfer_out') return null;
+  if (type === 'outbound_dispatch' && reason.startsWith('outbound_dispatch:')) return `Order ${reason.slice('outbound_dispatch:'.length)}`;
+  if (type === 'customer_return' && reason.startsWith('customer_return:')) {
+    const [, returnNumber, condition] = reason.split(':');
+    return [returnNumber ? `Return ${returnNumber}` : null, condition ? humanizeCode(condition) : null].filter(Boolean).join(' · ') || null;
+  }
+  if (type === 'supplier_return_dispatch') return movement.receiving_note || null;
+  if (type === 'stock_hold' && reason.startsWith('stock_hold:')) {
+    const parts = reason.split(':');
+    const note = parts.slice(2).join(':').trim();
+    return note && note !== 'held' ? note : null;
+  }
+  if (type === 'stock_hold_release' && reason.startsWith('stock_hold_release:')) {
+    const parts = reason.split(':');
+    const note = parts.slice(2).join(':').trim();
+    return note && note !== 'released' ? note : null;
+  }
+  if (['expiry_writeoff', 'quarantine_release', 'opening_stock'].includes(type)) return null;
   if (reason === type || reason === 'shipment_receive' || reason === 'inventory_count' || reason === 'manual_adjustment') return null;
   return reason ? humanizeCode(reason) : null;
+}
+
+function businessReference(movement: StockMovement): { label: string; to?: string } {
+  if (movement.shipment_id) {
+    return {
+      label: movement.shipment_po_number || 'Shipment',
+      to: `/shipments?shipmentId=${encodeURIComponent(movement.shipment_id)}`
+    };
+  }
+
+  if (movement.stock_transfer_id) {
+    return {
+      label: 'Stock transfer',
+      to: `/stock-transfers?transfer_id=${encodeURIComponent(movement.stock_transfer_id)}`
+    };
+  }
+
+  const type = movementTypeFromRow(movement);
+  const detail = reasonDetail(movement);
+  if (type === 'requisition_fulfillment' && movement.receiving_note) {
+    return { label: `Requisition ${movement.receiving_note.replace(/^Fulfilled\s+/i, '')}` };
+  }
+  if (type === 'reservation_fulfillment' && movement.receiving_note) {
+    return { label: `Reservation ${movement.receiving_note.replace(/^Fulfilled reservation\s+/i, '')}` };
+  }
+  if (type === 'outbound_dispatch' && detail) return { label: detail };
+  if (type === 'customer_return' && detail) return { label: detail };
+  if (type === 'supplier_return_dispatch' && movement.receiving_note) return { label: movement.receiving_note };
+  if (type === 'opening_stock') return { label: 'Opening stock import' };
+  if (type === 'expiry_writeoff') return { label: 'Expiry processing' };
+  if (type === 'stock_hold') return { label: 'Lot hold' };
+  if (type === 'stock_hold_release') return { label: 'Lot hold release' };
+  if (type === 'quarantine_release') return { label: 'Quarantine release' };
+
+  return { label: 'No linked workflow' };
 }
 
 function shortId(value?: string | null): string {
@@ -271,12 +335,17 @@ function shortId(value?: string | null): string {
 }
 
 function hasPackageAudit(movement: StockMovement): boolean {
-  return Boolean(movement.package_id || movement.package_name || movement.package_barcode || movement.package_count_received);
+  return Boolean(
+    movement.package_id
+    || movement.package_name
+    || movement.package_barcode
+    || (movement.package_count_received !== null && movement.package_count_received !== undefined)
+  );
 }
 
 function badgeStyle(type: string): CSSProperties {
-  if (type === 'shipment_receive' || type === 'stock_transfer_in' || type === 'usage_reversal') return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  if (type === 'usage' || type === 'stock_transfer_out' || type.includes('fulfillment')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+  if (['shipment_receive', 'stock_transfer_in', 'usage_reversal', 'opening_stock', 'quarantine_release', 'stock_hold_release'].includes(type)) return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  if (['usage', 'stock_transfer_out', 'expiry_writeoff', 'stock_hold', 'supplier_return_dispatch', 'outbound_dispatch'].includes(type) || type.includes('fulfillment')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (type.includes('count') || type.includes('adjust')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   return { ...styles.badge, background: '#e5e7eb', color: '#374151' };
 }
@@ -323,11 +392,18 @@ function exportRows(rows: StockMovement[]) {
 
 export default function StockMovementsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const canOpenShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
+  const canOpenStockTransfers = hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_READ);
   const routeKey = searchParams.toString();
   const [filters, setFilters] = useState<FiltersState>(() => filtersFromSearchParams(searchParams));
   const [paging, setPaging] = useState<PagingState>(() => pagingFromSearchParams(searchParams));
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => {
+    const initial = filtersFromSearchParams(searchParams);
+    return Boolean(initial.shipment_id || initial.package_audited !== 'all' || initial.cost_status !== 'all' || initial.cost_source);
+  });
+  const [expandedMovementIds, setExpandedMovementIds] = useState<Set<string>>(() => new Set());
   const debouncedSearch = useDebouncedValue(filters.search, 250);
   const queryFilters = useMemo(() => ({ ...filters, search: debouncedSearch }), [debouncedSearch, filters]);
 
@@ -361,6 +437,17 @@ export default function StockMovementsPage() {
   const firstRow = totalRows === 0 ? 0 : (paging.page - 1) * paging.pageSize + 1;
   const lastRow = Math.min(paging.page * paging.pageSize, totalRows);
   const activeFilterCount = Object.entries(filters).filter(([key, value]) => value && value !== 'all' && !(key === 'search' && !String(value).trim())).length;
+  const advancedFilterCount = [
+    filters.shipment_id,
+    filters.package_audited !== 'all' ? filters.package_audited : '',
+    filters.cost_status !== 'all' ? filters.cost_status : '',
+    filters.cost_source
+  ].filter(Boolean).length;
+  const summaryAvailable = !summaryQuery.isLoading && !summaryQuery.isError;
+
+  useEffect(() => {
+    if (advancedFilterCount > 0) setShowAdvancedFilters(true);
+  }, [advancedFilterCount]);
 
   useEffect(() => {
     if (paging.page > totalPages && totalRows > 0) {
@@ -372,6 +459,15 @@ export default function StockMovementsPage() {
 
   const refreshAll = () => {
     void Promise.all([filterOptionsQuery.refetch(), summaryQuery.refetch(), movementsQuery.refetch()]);
+  };
+
+  const toggleMovementDetails = (movementId: string) => {
+    setExpandedMovementIds((current) => {
+      const next = new Set(current);
+      if (next.has(movementId)) next.delete(movementId);
+      else next.add(movementId);
+      return next;
+    });
   };
 
   const exportAll = async () => {
@@ -402,7 +498,7 @@ export default function StockMovementsPage() {
           <h2 style={styles.title}>Stock Movements</h2>
           <p style={styles.description}>Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.</p>
         </div>
-        <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching}>Refresh Ledger</button>
+        <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching}>Refresh Ledger</button>
       </header>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
@@ -417,7 +513,7 @@ export default function StockMovementsPage() {
         {filterOptionsQuery.isError ? <div className="app-error-state">Filter options could not be loaded. The ledger itself can still be searched.</div> : null}
         {filters.reason ? <div className="stock-movements-legacy-filter">Exact reason filter from a shared link: <strong>{humanizeCode(filters.reason)}</strong><button type="button" onClick={() => updateFilter('reason', '')}>Remove</button></div> : null}
 
-        <div className="stock-movements-filter-grid">
+        <div className="stock-movements-filter-grid stock-movements-filter-grid--primary">
           <label className="stock-movements-field">Product
             <select value={filters.product_id} onChange={(event) => updateFilter('product_id', event.target.value)}>
               <option value="">All products</option>
@@ -436,17 +532,36 @@ export default function StockMovementsPage() {
               {(options.movement_types ?? []).map((value) => <option key={value} value={value}>{movementTypeLabel(value)}</option>)}
             </select>
           </label>
-          <label className="stock-movements-field">Shipment
-            <select value={filters.shipment_id} onChange={(event) => updateFilter('shipment_id', event.target.value)}>
-              <option value="">All shipments</option>
-              {(options.shipments ?? []).map((item) => <option key={item.id} value={item.id}>{item.po_number || shortId(item.id)}</option>)}
-            </select>
-          </label>
           <label className="stock-movements-field">From Date
             <input type="date" value={filters.start_date} max={filters.end_date || undefined} onChange={(event) => updateFilter('start_date', event.target.value)} />
           </label>
           <label className="stock-movements-field">To Date
             <input type="date" value={filters.end_date} min={filters.start_date || undefined} onChange={(event) => updateFilter('end_date', event.target.value)} />
+          </label>
+          <label className="stock-movements-field stock-movements-search-field">Search Ledger
+            <input type="search" value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} placeholder="Product, location, operator, note, package/barcode, shipment, cost source, or movement ID" maxLength={255} />
+            <span>Search updates automatically after a brief pause.</span>
+          </label>
+        </div>
+
+        <div className="stock-movements-more-filters-row">
+          <button
+            type="button"
+            className="app-button app-button--secondary"
+            onClick={() => setShowAdvancedFilters((current) => !current)}
+            aria-expanded={showAdvancedFilters}
+          >
+            {showAdvancedFilters ? 'Hide more filters' : 'More filters'}{advancedFilterCount ? ` (${advancedFilterCount})` : ''}
+          </button>
+          <span>Shipment, package, and costing filters are available when you need a deeper audit.</span>
+        </div>
+
+        {showAdvancedFilters ? <div className="stock-movements-filter-grid stock-movements-filter-grid--advanced">
+          <label className="stock-movements-field">Shipment
+            <select value={filters.shipment_id} onChange={(event) => updateFilter('shipment_id', event.target.value)}>
+              <option value="">All shipments</option>
+              {(options.shipments ?? []).map((item) => <option key={item.id} value={item.id}>{item.po_number || shortId(item.id)}</option>)}
+            </select>
           </label>
           <label className="stock-movements-field">Package Audit
             <select value={filters.package_audited} onChange={(event) => updateFilter('package_audited', event.target.value as PackageAuditFilter)}>
@@ -464,22 +579,17 @@ export default function StockMovementsPage() {
               {(options.cost_sources ?? []).map((value) => <option key={value} value={value}>{costSourceLabel(value)}</option>)}
             </select>
           </label>
-          <label className="stock-movements-field stock-movements-search-field">Search Ledger
-            <input type="search" value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} placeholder="Product, location, operator, note, package/barcode, shipment, cost source, or movement ID" maxLength={255} />
-            <span>Search updates automatically after a brief pause.</span>
-          </label>
-        </div>
+        </div> : null}
       </section>
 
       <section className="stock-movements-summary-grid" aria-label="Filtered stock movement summary">
         {[
-          ['Movements', totalRows, 'All rows matching the current filters'],
-          ['Inbound', toNumber(summary.total_inbound), 'Base units added'],
-          ['Outbound', toNumber(summary.total_outbound), 'Base units removed'],
-          ['Net Change', toNumber(summary.net_change), 'Inbound minus outbound'],
-          ['Package Audited', toNumber(summary.package_audited_rows), 'Rows with package receiving evidence'],
-          ['Cost Captured', toNumber(summary.costed_rows), 'Rows with cost evidence'],
-          ['Received Cost', formatCurrencyBreakdown(summary.received_cost_by_currency), 'Inbound receipt cost grouped by currency; currencies are never added together']
+          ['Movements', summaryAvailable ? toNumber(summary.total_rows) : '—', summaryAvailable && toNumber(summary.no_change_rows) > 0 ? `${toNumber(summary.no_change_rows)} event(s) did not change usable stock` : 'All rows matching the current filters'],
+          ['Stock Added', summaryAvailable ? toNumber(summary.inbound_rows) : '—', 'Movement events that increased stock'],
+          ['Stock Removed', summaryAvailable ? toNumber(summary.outbound_rows) : '—', 'Movement events that reduced stock'],
+          ['Package Audited', summaryAvailable ? toNumber(summary.package_audited_rows) : '—', 'Rows with package receiving evidence'],
+          ['Cost Captured', summaryAvailable ? toNumber(summary.costed_rows) : '—', 'Rows with cost evidence'],
+          ['Received Cost', summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', 'Inbound receipt cost grouped by currency; currencies are never added together']
         ].map(([label, value, helper]) => (
           <article key={String(label)} style={styles.summaryCard}><div style={styles.summaryLabel}>{label}</div><div style={styles.summaryValue}>{value}</div><div style={styles.summaryHelper}>{helper}</div></article>
         ))}
@@ -501,7 +611,7 @@ export default function StockMovementsPage() {
 
         {exportError ? <div className="app-error-state">{exportError}</div> : null}
         {summaryQuery.isError ? <div className="app-error-state">The full filtered summary could not be loaded. The visible ledger rows are still shown.</div> : null}
-        {movementsQuery.isLoading || summaryQuery.isLoading ? <div className="app-empty-state">Loading stock movement ledger…</div> : null}
+        {movementsQuery.isLoading ? <div className="app-empty-state">Loading stock movement ledger…</div> : null}
         {movementsQuery.isError ? <div className="app-error-state">Failed to load stock movements: {(movementsQuery.error as Error).message || 'Unknown error'}</div> : null}
 
         {!movementsQuery.isLoading && !movementsQuery.isError && rows.length === 0 ? <div className="app-empty-state">No stock movements found for the current filters.</div> : null}
@@ -509,22 +619,56 @@ export default function StockMovementsPage() {
         {rows.length > 0 ? (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
-              <thead><tr><th style={styles.th}>Created</th><th style={styles.th}>Product & Location</th><th style={styles.th}>Change</th><th style={styles.th}>Movement</th><th style={styles.th}>Cost Evidence</th><th style={styles.th}>Package Evidence</th><th style={styles.th}>Reference</th><th style={styles.th}>Operator</th><th style={styles.th}>Audit ID</th></tr></thead>
+              <thead><tr><th style={styles.th}>Created</th><th style={styles.th}>Product & Location</th><th style={styles.th}>Change</th><th style={styles.th}>Movement</th><th style={styles.th}>Reference</th><th style={styles.th}>Operator</th><th style={styles.th}>Details</th></tr></thead>
               <tbody>{rows.map((movement) => {
                 const amount = toNumber(movement.change);
                 const type = movementTypeFromRow(movement);
                 const detail = reasonDetail(movement);
-                return <tr key={movement.id}>
-                  <td style={styles.td}>{formatDateTime(movement.created_at)}</td>
-                  <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name}</div><div style={styles.rowSubtle}>{movement.storage_location_name || 'Location not recorded (legacy row)'}</div><div style={styles.rowSubtle}>{movement.product_unit}</div></td>
-                  <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${amount}` : amount}</span><div style={styles.rowSubtle}>{Math.abs(amount)} {movement.product_unit}</div></td>
-                  <td style={styles.td}><span style={badgeStyle(type)}>{movementTypeLabel(type)}</span>{detail ? <div style={styles.rowSubtle}>{detail}</div> : null}{movement.receiving_note ? <div style={styles.note}>Note: {movement.receiving_note}</div> : null}</td>
-                  <td style={styles.td}>{movement.total_cost !== null && movement.total_cost !== undefined ? <><div style={styles.rowTitle}>{formatMoney(movement.total_cost, movement.cost_currency)}</div><div style={styles.rowSubtle}>Unit: {formatMoney(movement.unit_cost, movement.cost_currency)}</div><div style={styles.rowSubtle}>{costSourceLabel(movement.cost_source)}</div></> : <span style={styles.rowSubtle}>No cost captured</span>}</td>
-                  <td style={styles.td}>{hasPackageAudit(movement) ? <><div style={styles.rowTitle}>{toNumber(movement.package_count_received) > 0 ? `${toNumber(movement.package_count_received)} × ` : ''}{movement.package_name || 'Package'}</div>{movement.units_per_package ? <div style={styles.rowSubtle}>{movement.units_per_package} units per package</div> : null}{movement.package_barcode ? <div style={styles.rowSubtle}>Barcode: {movement.package_barcode}</div> : null}</> : <span style={styles.rowSubtle}>Base-unit or manual movement</span>}</td>
-                  <td style={styles.td}>{movement.shipment_id ? <><div style={styles.rowTitle}>{movement.shipment_po_number || 'Shipment'}</div><div style={styles.rowSubtle} title={movement.shipment_id}>{shortId(movement.shipment_id)}</div></> : movement.stock_transfer_id ? <><div style={styles.rowTitle}>Stock transfer</div><div style={styles.rowSubtle} title={movement.stock_transfer_id}>{shortId(movement.stock_transfer_id)}</div></> : <span style={styles.rowSubtle}>No linked shipment or transfer</span>}</td>
-                  <td style={styles.td}><div style={styles.rowTitle}>{movement.user_name || 'System / support actor'}</div>{!movement.user_name && movement.user_id ? <div style={styles.rowSubtle} title={movement.user_id}>{shortId(movement.user_id)}</div> : null}</td>
-                  <td style={styles.td}><span style={styles.auditId} title={movement.id}>{shortId(movement.id)}</span></td>
-                </tr>;
+                const reference = businessReference(movement);
+                const canOpenReference = Boolean(
+                  reference.to
+                  && ((movement.shipment_id && canOpenShipments) || (movement.stock_transfer_id && canOpenStockTransfers))
+                );
+                const isExpanded = expandedMovementIds.has(movement.id);
+                return <Fragment key={movement.id}>
+                  <tr>
+                    <td style={styles.td}>{formatDateTime(movement.created_at)}</td>
+                    <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name}</div><div style={styles.rowSubtle}>{movement.storage_location_name || 'Historical location unavailable'}</div><div style={styles.rowSubtle}>{movement.product_unit}</div></td>
+                    <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${amount}` : amount}</span><div style={styles.rowSubtle}>{Math.abs(amount)} {movement.product_unit}</div></td>
+                    <td style={styles.td}><span style={badgeStyle(type)}>{movementTypeLabel(type)}</span>{detail ? <div style={styles.rowSubtle}>{detail}</div> : null}{movement.receiving_note && detail !== movement.receiving_note ? <div style={styles.note}>Note: {movement.receiving_note}</div> : null}</td>
+                    <td style={styles.td}>{canOpenReference && reference.to ? <Link className="stock-movements-reference-link" to={reference.to}>{reference.label}</Link> : <div style={styles.rowTitle}>{reference.label}</div>}</td>
+                    <td style={styles.td}><div style={styles.rowTitle}>{movement.user_name || 'System / support actor'}</div></td>
+                    <td style={styles.td}><button type="button" className="app-button app-button--secondary stock-movements-details-button" onClick={() => toggleMovementDetails(movement.id)} aria-expanded={isExpanded}>{isExpanded ? 'Hide' : 'View'}</button></td>
+                  </tr>
+                  {isExpanded ? <tr className="stock-movements-details-row">
+                    <td colSpan={7}>
+                      <div className="stock-movements-details-grid">
+                        <div className="stock-movements-detail-card">
+                          <strong>Cost evidence</strong>
+                          {movement.total_cost !== null && movement.total_cost !== undefined ? <>
+                            <span>Total: {formatMoney(movement.total_cost, movement.cost_currency)}</span>
+                            <span>Unit: {formatMoney(movement.unit_cost, movement.cost_currency)}</span>
+                            <span>{costSourceLabel(movement.cost_source)}</span>
+                          </> : <span>No cost captured for this movement.</span>}
+                        </div>
+                        <div className="stock-movements-detail-card">
+                          <strong>Package evidence</strong>
+                          {hasPackageAudit(movement) ? <>
+                            <span>{toNumber(movement.package_count_received) > 0 ? `${toNumber(movement.package_count_received)} × ` : ''}{movement.package_name || 'Package'}</span>
+                            {movement.units_per_package ? <span>{movement.units_per_package} units per package</span> : null}
+                            {movement.package_barcode ? <span>Barcode: {movement.package_barcode}</span> : null}
+                          </> : <span>Base-unit or manual movement; no package receiving evidence.</span>}
+                        </div>
+                        <div className="stock-movements-detail-card">
+                          <strong>Audit context</strong>
+                          <span>Movement ID: <code>{movement.id}</code></span>
+                          <span>Reason code: <code>{movement.reason || 'not recorded'}</code></span>
+                          {!movement.user_name && movement.user_id ? <span>Actor ID: <code>{movement.user_id}</code></span> : null}
+                        </div>
+                      </div>
+                    </td>
+                  </tr> : null}
+                </Fragment>;
               })}</tbody>
             </table>
           </div>
@@ -550,12 +694,11 @@ const styles: Record<string, CSSProperties> = {
   summaryValue: { fontSize: 28, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere', color: '#0f172a' },
   summaryHelper: { fontSize: 12, color: '#64748b', lineHeight: 1.4, marginTop: 8 },
   tableWrapper: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflowX: 'auto', minWidth: 0 },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: 1380 },
+  table: { width: '100%', borderCollapse: 'collapse', minWidth: 980 },
   th: { textAlign: 'left', padding: 14, background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' },
   td: { padding: 14, borderBottom: '1px solid #f1f5f9', fontSize: 14, color: '#0f172a', verticalAlign: 'top', overflowWrap: 'anywhere' },
   badge: { display: 'inline-block', padding: '6px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' },
   rowTitle: { fontWeight: 700, color: '#0f172a', marginBottom: 5 },
   rowSubtle: { fontSize: 12, color: '#64748b', lineHeight: 1.4, marginTop: 4 },
-  note: { fontSize: 12, color: '#374151', lineHeight: 1.4, marginTop: 7 },
-  auditId: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }
+  note: { fontSize: 12, color: '#374151', lineHeight: 1.4, marginTop: 7 }
 };
