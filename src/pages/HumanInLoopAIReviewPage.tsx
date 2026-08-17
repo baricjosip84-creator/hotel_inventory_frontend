@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './HumanInLoopAIReviewPage.css';
 
 
@@ -4468,11 +4469,16 @@ export default function HumanInLoopAIReviewPage() {
   };
 
   return (
-    <div className="ai-review-page">
+    <div className="ai-review-page ai-review-page--refined">
       <div className="card ai-review-page__intro" style={{ marginBottom: 16 }}>
-        <div className="card__label">Intelligence review</div>
-        <h2 className="ai-review-page__intro-title">Review recommendations and technical readiness separately</h2>
-        <p className="card__subtext">
+        <div className="ai-review-page__intro-heading">
+          <span className="ai-review-page__intro-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={20} /></span>
+          <div>
+            <div className="card__label">Intelligence review</div>
+            <h2 className="ai-review-page__intro-title">Review recommendations and technical readiness separately</h2>
+          </div>
+        </div>
+        <p className="card__subtext ai-review-page__intro-copy">
           Not every item on this page was produced by an AI model. Recommendation reviews can come from rule-based calculations, simulations, optimisation logic, governance findings, or an optional AI-assisted Copilot. Readiness checks are technical, read-only controls.
         </p>
         <div className="ai-review-page__view-switch" role="group" aria-label="Intelligence review view">
@@ -4482,6 +4488,7 @@ export default function HumanInLoopAIReviewPage() {
             aria-pressed={activeView === 'recommendations'}
             onClick={() => selectView('recommendations')}
           >
+            <TenantNavIcon path="/intelligence-review" size={16} />
             Recommendation reviews
           </button>
           <button
@@ -4490,6 +4497,7 @@ export default function HumanInLoopAIReviewPage() {
             aria-pressed={activeView === 'readiness'}
             onClick={() => selectView('readiness')}
           >
+            <TenantNavIcon path="/reliability-command" size={16} />
             Readiness &amp; governance
           </button>
         </div>
@@ -4500,12 +4508,13 @@ export default function HumanInLoopAIReviewPage() {
             onClick={refreshActiveView}
             disabled={isRefreshingActiveView}
           >
+            <TenantNavIcon path="/intelligence-review" size={16} />
             {isRefreshingActiveView
               ? activeView === 'readiness' ? 'Refreshing readiness checks…' : 'Refreshing recommendation reviews…'
               : activeView === 'readiness' ? 'Refresh readiness checks' : 'Refresh recommendation reviews'}
           </button>
-          <Link className="button button--secondary" to="/action-center">Open action center</Link>
-          <Link className="button button--secondary" to="/workflow-composer">Open workflow composer</Link>
+          <Link className="button button--secondary" to="/action-center"><TenantNavIcon path="/action-center" size={16} />Open action center</Link>
+          <Link className="button button--secondary" to="/workflow-composer"><TenantNavIcon path="/workflow-composer" size={16} />Open workflow composer</Link>
         </div>
         <p className="card__subtext ai-review-page__mode-explanation">
           {activeView === 'readiness'
@@ -4515,26 +4524,30 @@ export default function HumanInLoopAIReviewPage() {
       </div>
 
       {activeView === 'recommendations' ? (
-        <div className="card-grid" style={gridStyle}>
-          <div className="card">
-            <div className="card__label">Recommendation reviews</div>
+        <div className="card-grid ai-review-page__summary-grid" style={gridStyle}>
+          <div className="card ai-review-page__summary-card">
+            <span className="ai-review-page__summary-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={19} /></span>
+            <div className="ai-review-page__summary-copy"><div className="card__label">Recommendation reviews</div>
             <div className="card__value">{numberValue(summary.total_reviews ?? reviews.length)}</div>
-            <div className="card__subtext">Rule-based and optional AI-assisted proposals waiting for human review.</div>
+            <div className="card__subtext">Rule-based and optional AI-assisted proposals waiting for human review.</div></div>
           </div>
-          <div className="card">
-            <div className="card__label">Approval required</div>
+          <div className="card ai-review-page__summary-card">
+            <span className="ai-review-page__summary-icon ai-review-page__icon--amber"><TenantNavIcon path="/permissions" size={19} /></span>
+            <div className="ai-review-page__summary-copy"><div className="card__label">Approval required</div>
             <div className="card__value">{numberValue(summary.approval_required_reviews)}</div>
-            <div className="card__subtext">Items that must remain inside an existing governed approval workflow.</div>
+            <div className="card__subtext">Items that must remain inside an existing governed approval workflow.</div></div>
           </div>
-          <div className="card">
-            <div className="card__label">Escalated</div>
+          <div className="card ai-review-page__summary-card">
+            <span className="ai-review-page__summary-icon ai-review-page__icon--red"><TenantNavIcon path="/alerts" size={19} /></span>
+            <div className="ai-review-page__summary-copy"><div className="card__label">Escalated</div>
             <div className="card__value">{numberValue(summary.escalated_reviews)}</div>
-            <div className="card__subtext">High-attention items requiring management or governance follow-up.</div>
+            <div className="card__subtext">High-attention items requiring management or governance follow-up.</div></div>
           </div>
-          <div className="card">
-            <div className="card__label">Safety rule</div>
+          <div className="card ai-review-page__summary-card">
+            <span className="ai-review-page__summary-icon ai-review-page__icon--green"><TenantNavIcon path="/reliability-command" size={19} /></span>
+            <div className="ai-review-page__summary-copy"><div className="card__label">Safety rule</div>
             <div className="card__value" style={{ fontSize: 18 }}>Human decision only</div>
-            <div className="card__subtext">This page records a review; it does not execute the recommendation.</div>
+            <div className="card__subtext">This page records a review; it does not execute the recommendation.</div></div>
           </div>
         </div>
       ) : null}
@@ -4583,7 +4596,7 @@ export default function HumanInLoopAIReviewPage() {
               <p className="card__subtext">
                 This readiness view is read-only. It does not execute recommendations, mutate inventory, approve decisions, call external AI, or train models.
               </p>
-              <div style={reviewListStyle}>
+              <div className="ai-review-page__review-list" style={reviewListStyle}>
                 {criticalReadinessFeatures.map((feature) => (
                   <article className="card" key={feature.key}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -8017,34 +8030,34 @@ export default function HumanInLoopAIReviewPage() {
       {activeView === 'recommendations' ? (
         <>
       <section className="section">
-        <div className="section__title">Recommendation review controls</div>
+        <div className="section__title ai-review-page__section-title"><span className="ai-review-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>Recommendation review controls</span></div>
         {reviewActionMessage ? (
           <div className="card ai-review-page__feedback" style={{ marginBottom: 12 }} role="status" aria-live="polite">
             <p className="card__subtext">{reviewActionMessage}</p>
           </div>
         ) : null}
-        <div className="card">
-          <div style={toolbarStyle}>
-            <select aria-label="Review category" style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
+        <div className="card ai-review-page__controls-card">
+          <div className="ai-review-page__toolbar" style={toolbarStyle}>
+            <label className="ai-review-page__field"><span>Review category</span><select aria-label="Review category" style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
               {DOMAIN_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-            </select>
-            <select aria-label="Review state" style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
+            </select></label>
+            <label className="ai-review-page__field"><span>Review state</span><select aria-label="Review state" style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
               {REVIEW_STATE_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-            </select>
-            <select aria-label="Review urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
+            </select></label>
+            <label className="ai-review-page__field"><span>Urgency</span><select aria-label="Review urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
               {URGENCY_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-            </select>
-            <button className="button button--secondary" type="button" onClick={() => reviewQuery.refetch()} disabled={reviewQuery.isFetching}>
-              {reviewQuery.isFetching ? 'Refreshing…' : 'Refresh review queue'}
+            </select></label>
+            <button className="button button--secondary ai-review-page__toolbar-action" type="button" onClick={() => reviewQuery.refetch()} disabled={reviewQuery.isFetching}>
+              <TenantNavIcon path="/intelligence-review" size={16} />{reviewQuery.isFetching ? 'Refreshing…' : 'Refresh review queue'}
             </button>
-            <Link className="button button--secondary" to="/workflow-composer">Open workflow composer</Link>
-            <Link className="button button--secondary" to="/system-context">Open system context</Link>
+            <Link className="button button--secondary ai-review-page__toolbar-action" to="/workflow-composer"><TenantNavIcon path="/workflow-composer" size={16} />Open workflow composer</Link>
+            <Link className="button button--secondary ai-review-page__toolbar-action" to="/system-context"><TenantNavIcon path="/system-context" size={16} />Open system context</Link>
           </div>
 
           {reviewQuery.isLoading ? (
@@ -8064,7 +8077,7 @@ export default function HumanInLoopAIReviewPage() {
       </section>
 
       <section className="section" id="ai-review-queue" style={{ scrollMarginTop: 16 }}>
-        <div className="section__title">Review queue</div>
+        <div className="section__title ai-review-page__section-title"><span className="ai-review-page__section-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>Review queue</span></div>
         {reviews.length === 0 && !reviewQuery.isLoading ? (
           <div className="empty-state">No recommendation review items match the selected filters.</div>
         ) : (
@@ -8085,32 +8098,32 @@ export default function HumanInLoopAIReviewPage() {
               const decisionValidationMessage = reviewDecisionValidationMessage(selectedDecision, decisionDraft);
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               return (
-                <article className="card" key={review.review_id} id={sourceActionId ? `ai-review-${sourceActionId}` : undefined} tabIndex={-1} style={{ scrollMarginTop: 16 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <span style={badgeStyle}>{formatLabel(review.urgency)}</span>
-                    <span style={badgeStyle}>{formatLabel(review.review_state)}</span>
-                    <span style={badgeStyle}>{formatLabel(review.ai_operation_domain)}</span>
-                    {review.governance_approval_guidance?.approval_required ? <span style={badgeStyle}>Approval required</span> : null}
+                <article className={`card ai-review-page__review-card ai-review-page__review-card--${review.urgency || 'medium'}`} key={review.review_id} id={sourceActionId ? `ai-review-${sourceActionId}` : undefined} tabIndex={-1} style={{ scrollMarginTop: 16 }}>
+                  <div className="ai-review-page__review-badges">
+                    <span className={`ai-review-page__badge ai-review-page__badge--${review.urgency || 'medium'}`}>{formatLabel(review.urgency)}</span>
+                    <span className="ai-review-page__badge">{formatLabel(review.review_state)}</span>
+                    <span className="ai-review-page__badge ai-review-page__badge--violet">{formatLabel(review.ai_operation_domain)}</span>
+                    {review.governance_approval_guidance?.approval_required ? <span className="ai-review-page__badge ai-review-page__badge--amber">Approval required</span> : null}
                   </div>
-                  <h3 style={{ marginTop: 0 }}>{review.title || review.review_id}</h3>
+                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title || review.review_id}</h3></div>
                   <p className="card__subtext">{review.summary || 'No review summary was provided.'}</p>
-                  <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', marginTop: 12 }}>
-                    <div>
+                  <div className="card-grid ai-review-page__evidence-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
+                    <div className="ai-review-page__evidence-card">
                       <div className="card__label">Source confidence</div>
                       <strong>{formatPercent(confidence?.confidence_score)}</strong>
                       <div className="card__subtext">{formatLabel(confidence?.confidence_band)} · {formatLabel(confidence?.score_source)} · advisory only</div>
                     </div>
-                    <div>
+                    <div className="ai-review-page__evidence-card">
                       <div className="card__label">Evidence preview</div>
                       <strong>{evidencePreview?.preview_available ? 'Structured evidence available' : 'Metadata only'}</strong>
                       <div className="card__subtext">{formatLabel(evidencePreview?.preview_kind)}</div>
                     </div>
-                    <div>
+                    <div className="ai-review-page__evidence-card">
                       <div className="card__label">How this result was produced</div>
                       <strong>{reviewOrigin.label}</strong>
                       <div className="card__subtext">{reviewOrigin.detail}</div>
                     </div>
-                    <div>
+                    <div className="ai-review-page__evidence-card">
                       <div className="card__label">Updated</div>
                       <strong>{formatDateTime(review.updated_at || review.created_at)}</strong>
                     </div>
@@ -8147,7 +8160,7 @@ export default function HumanInLoopAIReviewPage() {
                     </div>
                   ) : null}
 
-                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-color, #d9dde5)' }}>
+                  <div className="ai-review-page__lifecycle-panel">
                     <div className="card__label">Persisted review lifecycle</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                       <span style={badgeStyle}>Status: {formatLabel(lifecycle?.current_status || review.review_state)}</span>
@@ -8162,8 +8175,8 @@ export default function HumanInLoopAIReviewPage() {
                   </div>
 
                   {capabilities.canGovernDecisionIntelligence && sourceActionId && visibleDecisionOptions.length ? (
-                    <div style={{ marginTop: 14, padding: 12, border: '1px solid var(--border-color, #d9dde5)', borderRadius: 8 }}>
-                      <div className="card__label">Record human decision</div>
+                    <div className="ai-review-page__decision-panel">
+                      <div className="card__label ai-review-page__panel-title"><span className="ai-review-page__panel-icon"><TenantNavIcon path="/permissions" size={15} /></span>Record human decision</div>
                       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>
                         <label>
                           <span className="card__subtext">Decision</span>
@@ -8222,14 +8235,14 @@ export default function HumanInLoopAIReviewPage() {
                         data-skip-global-action-feedback="true"
                         onClick={() => submitReviewDecision(review)}
                       >
-                        {reviewDecisionMutation.isPending ? 'Recording…' : 'Record review decision'}
+                        <TenantNavIcon path="/intelligence-review" size={16} />{reviewDecisionMutation.isPending ? 'Recording…' : 'Record review decision'}
                       </button>
                     </div>
                   ) : null}
 
                   {historyIsSelected ? (
-                    <div style={{ marginTop: 14, padding: 12, border: '1px solid var(--border-color, #d9dde5)', borderRadius: 8 }}>
-                      <div className="card__label">Review history</div>
+                    <div className="ai-review-page__history-panel">
+                      <div className="card__label ai-review-page__panel-title"><span className="ai-review-page__panel-icon"><TenantNavIcon path="/audit" size={15} /></span>Review history</div>
                       {reviewHistoryQuery.isLoading ? <p className="card__subtext">Loading review history…</p> : null}
                       {reviewHistoryQuery.error ? <p className="form-error">{reviewHistoryQuery.error instanceof Error ? reviewHistoryQuery.error.message : 'Unable to load review history.'}</p> : null}
                       {!reviewHistoryQuery.isLoading && !(reviewHistoryQuery.data?.events?.length) ? <p className="card__subtext">No persisted review events yet.</p> : null}
@@ -8245,16 +8258,16 @@ export default function HumanInLoopAIReviewPage() {
                     </div>
                   ) : null}
 
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}>Open source surface</Link> : null}
-                    <Link className="button button--secondary" to="/action-center">Open action center</Link>
+                  <div className="ai-review-page__review-actions">
+                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} />Open source surface</Link> : null}
+                    <Link className="button button--secondary" to="/action-center"><TenantNavIcon path="/action-center" size={16} />Open action center</Link>
                     {sourceActionId ? (
                       <button
                         className="button button--secondary"
                         type="button"
                         onClick={() => setSelectedHistorySourceActionId(historyIsSelected ? null : sourceActionId)}
                       >
-                        {historyIsSelected ? 'Hide review history' : 'View review history'}
+                        <TenantNavIcon path="/audit" size={16} />{historyIsSelected ? 'Hide review history' : 'View review history'}
                       </button>
                     ) : null}
                     {capabilities.canGovernDecisionIntelligence
@@ -8268,10 +8281,10 @@ export default function HumanInLoopAIReviewPage() {
                           data-skip-global-action-feedback="true"
                           onClick={() => executionRequestDraftMutation.mutate(sourceActionId)}
                         >
-                          {executionRequestDraftMutation.isPending ? 'Creating draft…' : 'Create Execution Request draft'}
+                          <TenantNavIcon path="/execution-requests" size={16} />{executionRequestDraftMutation.isPending ? 'Creating draft…' : 'Create Execution Request draft'}
                         </button>
                       ) : null}
-                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true">Open linked Execution Request</Link> : null}
+                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />Open linked Execution Request</Link> : null}
                   </div>
                 </article>
               );
