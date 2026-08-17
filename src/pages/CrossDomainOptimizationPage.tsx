@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './decisionIntelligencePages.css';
+import './CrossDomainOptimizationPage.css';
 
-type OptimizationView = 'evidence' | 'readiness' | 'diagnostics';
+type OptimizationView = 'evidence' | 'readiness';
 
 type OptimizationFilterState = {
   optimization_domain: string;
@@ -365,23 +366,40 @@ function StatusBadge({ value, tone }: { value: unknown; tone?: ReturnType<typeof
   return <span className={`forecast-badge forecast-badge--${resolvedTone}`}>{formatLabel(value)}</span>;
 }
 
-function MetricCard({ label, value, format = 'number' }: { label: string; value: unknown; format?: ReviewConfig['metrics'][number]['format'] }) {
+function MetricCard({
+  label,
+  value,
+  format = 'number',
+  iconPath,
+  tone = 'blue'
+}: {
+  label: string;
+  value: unknown;
+  format?: ReviewConfig['metrics'][number]['format'];
+  iconPath?: string;
+  tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
+}) {
   return (
-    <div className="forecast-metric">
-      <span className="forecast-metric__label">{label}</span>
-      <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
+    <div className={`forecast-metric ${iconPath ? 'forecast-metric--with-icon' : ''}`} data-tone={tone}>
+      {iconPath ? <span className="forecast-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
+      <div className="forecast-metric__copy">
+        <span className="forecast-metric__label">{label}</span>
+        <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
+      </div>
     </div>
   );
 }
 
 function EvidenceSection({
   title,
+  iconPath,
   description,
   rows,
   headers,
   renderRow
 }: {
   title: string;
+  iconPath: string;
   description: string;
   rows: Array<Record<string, unknown>>;
   headers: string[];
@@ -390,9 +408,12 @@ function EvidenceSection({
   return (
     <section className="card forecast-evidence-section">
       <div className="card__header">
-        <div>
-          <h2>{title}</h2>
-          <p className="card__subtext">{description}</p>
+        <div className="forecast-section-heading">
+          <span className="forecast-heading-icon"><TenantNavIcon path={iconPath} size={17} /></span>
+          <div>
+            <h2>{title}</h2>
+            <p className="card__subtext">{description}</p>
+          </div>
         </div>
         <StatusBadge value={`${rows.length} returned`} />
       </div>
@@ -413,7 +434,7 @@ function EvidenceSection({
 function CheckColumn({ title, items }: { title: string; items: Array<Record<string, unknown>> }) {
   return (
     <section className="forecast-check-card">
-      <h3>{title}</h3>
+      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${title === 'Items needing attention' ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={title === 'Items needing attention' ? '/alerts' : '/permissions'} size={15} /></span>{title}</h3>
       {!items.length ? (
         <p className="forecast-muted">No items were returned for this section.</p>
       ) : (
@@ -451,9 +472,12 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
   return (
     <section className="card forecast-lifecycle">
       <div className="forecast-lifecycle__header">
-        <div>
-          <h2>{config.title}</h2>
-          <p className="card__subtext">{config.description}</p>
+        <div className="forecast-section-heading">
+          <span className="forecast-heading-icon"><TenantNavIcon path="/reliability-command" size={17} /></span>
+          <div>
+            <h2>{config.title}</h2>
+            <p className="card__subtext">{config.description}</p>
+          </div>
         </div>
         <div className="forecast-decision">
           <span>Current result</span>
@@ -484,7 +508,6 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
 }
 
 export default function CrossDomainOptimizationPage() {
-  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<OptimizationView>('evidence');
   const [filters, setFilters] = useState<OptimizationFilterState>(DEFAULT_FILTERS);
 
@@ -517,37 +540,47 @@ export default function CrossDomainOptimizationPage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page">
-        <section className="card"><p>Loading cross-area optimization evidence…</p></section>
+      <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
+        <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/cross-domain-optimization" size={18} /></span><p>Loading cross-area optimization evidence…</p></section>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="decision-intelligence-page">
-        <section className="card card--danger">
-          <h2>Cross-area optimization evidence could not be loaded</h2>
-          <p>Check your Decision Intelligence access and try the read-only request again.</p>
-          <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}>Retry</button>
+      <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
+        <section className="card card--danger forecast-state-card forecast-state-card--error">
+          <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
+          <div>
+            <h2>Cross-area optimization evidence could not be loaded</h2>
+            <p>Check your Decision Intelligence access and try the read-only request again.</p>
+            <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />Retry</button>
+          </div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="decision-intelligence-page">
+    <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
       <section className="card forecast-intro">
-        <div>
-          <span className="eyebrow">Read-only cross-area planning review</span>
-          <h2>Compare planning options, tradeoffs, and actual trial outcomes across business areas</h2>
-          <p className="card__subtext">
-            This page shows stored optimization runs, business objectives, proposed options, tradeoffs, and outcomes recorded through Learning Feedback. It helps people decide whether a manual trial has enough evidence for further review. It does not create options, approve plans, change objective weights, apply a plan, or scale a pattern automatically.
-          </p>
+        <div className="forecast-intro__content">
+          <span className="forecast-hero-icon"><TenantNavIcon path="/cross-domain-optimization" size={24} /></span>
+          <div className="forecast-intro__copy">
+            <span className="eyebrow">Read-only cross-area planning review</span>
+            <h2>Compare planning options, tradeoffs, and actual trial outcomes across business areas</h2>
+            <p className="card__subtext">
+              This page shows stored optimization runs, business objectives, proposed options, tradeoffs, and outcomes recorded through Learning Feedback. It helps people decide whether a manual trial has enough evidence for further review. It does not create options, approve plans, change objective weights, apply a plan, or scale a pattern automatically.
+            </p>
+            <div className="forecast-hero-badges" aria-label="Cross-domain optimization guardrails">
+              <span className="forecast-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-governed planning</span>
+              <span className="forecast-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />No automatic plan execution</span>
+            </div>
+          </div>
         </div>
         <div className="forecast-refresh">
           <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? 'Refreshing…' : 'Refresh evidence'}
+            <TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
           </button>
           <span>Last refreshed: {lastRefreshed}</span>
         </div>
@@ -555,11 +588,14 @@ export default function CrossDomainOptimizationPage() {
 
       <section className="card forecast-filters" aria-label="Cross-domain optimization filters">
         <div className="card__header">
-          <div>
-            <h2>Filter the evidence</h2>
-            <p className="card__subtext">Planning filters apply consistently to runs and their related objectives, options, and tradeoffs. Outcome status filters the recorded Learning Feedback results.</p>
+          <div className="forecast-section-heading">
+            <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
+            <div>
+              <h2>Filter the evidence</h2>
+              <p className="card__subtext">Planning filters apply consistently to runs and their related objectives, options, and tradeoffs. Outcome status filters the recorded Learning Feedback results.</p>
+            </div>
           </div>
-          <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}>Clear filters</button>
+          <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}><TenantNavIcon path="/system-context" size={14} />Clear filters</button>
         </div>
         <div className="forecast-filter-grid">
           <label>
@@ -614,40 +650,46 @@ export default function CrossDomainOptimizationPage() {
       </section>
 
       <div className="forecast-view-switch" role="tablist" aria-label="Cross-domain optimization page views">
-        <button className={`forecast-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}>Optimization evidence</button>
-        <button className={`forecast-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}>Review checks</button>
-        {canViewDiagnostics ? (
-          <button className={`forecast-view-switch__button ${view === 'diagnostics' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'diagnostics'} onClick={() => setView('diagnostics')}>Diagnostics</button>
-        ) : null}
+        <button className={`forecast-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}><TenantNavIcon path="/cross-domain-optimization" size={14} />Optimization evidence</button>
+        <button className={`forecast-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}><TenantNavIcon path="/reliability-command" size={14} />Review checks</button>
       </div>
 
       <section className="forecast-summary-grid" aria-label="Cross-domain optimization evidence summary">
-        <MetricCard label="Runs" value={runCount} />
-        <MetricCard label="Objectives" value={objectiveCount} />
-        <MetricCard label="Options" value={optionCount} />
-        <MetricCard label="Tradeoffs" value={tradeoffCount} />
-        <MetricCard label="Recorded outcomes" value={resultCount} />
-        <MetricCard label="Confirmed outcomes" value={data?.governance?.confirmed_result_count} />
-        <MetricCard label="Adverse outcomes" value={data?.governance?.adverse_result_count} />
-        <div className="forecast-metric forecast-metric--wide">
-          <span className="forecast-metric__label">Current posture</span>
-          <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.cross_domain_optimization_posture)}</strong>
+        <MetricCard label="Runs" value={runCount} iconPath="/cross-domain-optimization" tone="blue" />
+        <MetricCard label="Objectives" value={objectiveCount} iconPath="/system-context" tone="violet" />
+        <MetricCard label="Options" value={optionCount} iconPath="/workflow-composer" tone="blue" />
+        <MetricCard label="Tradeoffs" value={tradeoffCount} iconPath="/alerts" tone="amber" />
+        <MetricCard label="Recorded outcomes" value={resultCount} iconPath="/decision-learning-feedback" tone="slate" />
+        <MetricCard label="Confirmed outcomes" value={data?.governance?.confirmed_result_count} iconPath="/reliability-command" tone="green" />
+        <MetricCard label="Adverse outcomes" value={data?.governance?.adverse_result_count} iconPath="/alerts" tone="amber" />
+        <div className="forecast-metric forecast-metric--wide forecast-metric--with-icon" data-tone="slate">
+          <span className="forecast-metric__icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
+          <div className="forecast-metric__copy">
+            <span className="forecast-metric__label">Current posture</span>
+            <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.cross_domain_optimization_posture)}</strong>
+          </div>
         </div>
       </section>
 
       {!hasEvidence ? (
         <section className="card forecast-empty-state">
-          <h2>No cross-area optimization evidence is available for this tenant and filter set</h2>
-          <p>Review scores are not assessed when no run, objective, option, tradeoff, or recorded outcome exists. Zero records do not mean that a plan is safe, valuable, approved, ready to scale, or free from tradeoffs.</p>
-          <p>This page has no plan-creation or outcome-recording action. Planning evidence must come from the supported optimization data process, and actual outcomes must be recorded through Learning Feedback.</p>
+          <div className="forecast-section-heading">
+            <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/cross-domain-optimization" size={17} /></span>
+            <div>
+              <h2>No cross-area optimization evidence is available for this tenant and filter set</h2>
+              <p>Review scores are not assessed when no run, objective, option, tradeoff, or recorded outcome exists. Zero records do not mean that a plan is safe, valuable, approved, ready to scale, or free from tradeoffs.</p>
+              <p>This page has no plan-creation or outcome-recording action. Planning evidence must come from the supported optimization data process, and actual outcomes must be recorded through Learning Feedback.</p>
+            </div>
+          </div>
         </section>
       ) : null}
 
       {view === 'evidence' ? (
         <>
-          <p className="forecast-limit-note">Each list shows up to {filters.limit} matching records. Review checks use the same filtered evidence.</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />Each list shows up to {filters.limit} matching records. Review checks use the same filtered evidence.</p>
           <EvidenceSection
             title="Optimization runs"
+            iconPath="/cross-domain-optimization"
             description="Stored cross-area planning exercises and their current human-review status."
             rows={(data?.optimization_runs || []) as Array<Record<string, unknown>>}
             headers={['Run', 'Business area', 'Status', 'Confidence', 'Updated']}
@@ -666,6 +708,7 @@ export default function CrossDomainOptimizationPage() {
           />
           <EvidenceSection
             title="Business objectives"
+            iconPath="/system-context"
             description="The goals and relative weights used to compare options, such as service risk, working capital, labor cost, or supplier reliability."
             rows={(data?.objectives || []) as Array<Record<string, unknown>>}
             headers={['Run', 'Objective', 'Business area', 'Direction', 'Weight', 'Confidence', 'Recorded']}
@@ -686,6 +729,7 @@ export default function CrossDomainOptimizationPage() {
           />
           <EvidenceSection
             title="Planning options"
+            iconPath="/workflow-composer"
             description="Proposed choices created for comparison. Projected scores are planning estimates, not proof of actual business value."
             rows={(data?.options || []) as Array<Record<string, unknown>>}
             headers={['Run', 'Option', 'Status', 'Projected score', 'Confidence', 'Recorded']}
@@ -705,6 +749,7 @@ export default function CrossDomainOptimizationPage() {
           />
           <EvidenceSection
             title="Tradeoffs"
+            iconPath="/alerts"
             description="Expected positive, negative, neutral, or mixed effects attached to a planning option."
             rows={(data?.tradeoffs || []) as Array<Record<string, unknown>>}
             headers={['Option', 'Objective', 'Business area', 'Direction', 'Impact', 'Confidence', 'Recorded']}
@@ -725,6 +770,7 @@ export default function CrossDomainOptimizationPage() {
           />
           <EvidenceSection
             title="Actual optimization outcomes"
+            iconPath="/decision-learning-feedback"
             description="Observed results recorded through Learning Feedback. These records provide the actual evidence used for trial reconciliation, drift, lifecycle, and scaling checks."
             rows={(data?.optimization_results || []) as Array<Record<string, unknown>>}
             headers={['Run', 'Option', 'Outcome', 'Business area', 'Realized value', 'Observed']}
@@ -749,8 +795,13 @@ export default function CrossDomainOptimizationPage() {
         hasEvidence ? (
           <>
             <section className="card forecast-readiness-note">
-              <h2>These are advisory checks, not approvals or automated actions</h2>
-              <p className="card__subtext">A passing check only means that the returned records satisfy that specific calculation. It does not approve a plan, apply an option, change objective weights, promote a pattern, start monitoring, retire anything, or scale a plan to another business area.</p>
+              <div className="forecast-section-heading">
+                <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
+                <div>
+                  <h2>These are advisory checks, not approvals or automated actions</h2>
+                  <p className="card__subtext">A passing check only means that the returned records satisfy that specific calculation. It does not approve a plan, apply an option, change objective weights, promote a pattern, start monitoring, retire anything, or scale a plan to another business area.</p>
+                </div>
+              </div>
             </section>
             {REVIEW_SECTIONS.map((config) => (
               <ReviewCard key={String(config.key)} config={config} section={data?.[config.key] as OptimizationReviewSection | undefined} />
@@ -758,26 +809,17 @@ export default function CrossDomainOptimizationPage() {
           </>
         ) : (
           <section className="card forecast-not-assessed-card">
-            <h2>Review checks are not assessed</h2>
-            <p>At least one matching optimization planning record or actual outcome is required before these calculations can produce a meaningful result.</p>
+            <div className="forecast-section-heading">
+              <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span>
+              <div>
+                <h2>Review checks are not assessed</h2>
+                <p>At least one matching optimization planning record or actual outcome is required before these calculations can produce a meaningful result.</p>
+              </div>
+            </div>
           </section>
         )
       ) : null}
 
-      {view === 'diagnostics' && canViewDiagnostics ? (
-        <section className="card forecast-diagnostics">
-          <div className="card__header">
-            <div>
-              <h2>Technical response diagnostics</h2>
-              <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
-            </div>
-          </div>
-          <details className="forecast-technical-details">
-            <summary>View restricted response details</summary>
-            <pre>{JSON.stringify(data, null, 2)}</pre>
-          </details>
-        </section>
-      ) : null}
     </main>
   );
 }

@@ -82,6 +82,17 @@ for (const relativePath of pages) {
       fail(`${relativePath} must import its Probabilistic Forecasting visual-system stylesheet.`);
     }
   }
+  if (relativePath === 'src/pages/CrossDomainOptimizationPage.tsx') {
+    if (!source.includes("import { TenantNavIcon } from '../components/ui/TenantNavIcon';")) {
+      fail(`${relativePath} must import TenantNavIcon when rendering shared tenant navigation icons.`);
+    }
+    if (!source.includes("import './CrossDomainOptimizationPage.css';")) {
+      fail(`${relativePath} must import its Cross-Domain Optimization visual-system stylesheet.`);
+    }
+    if (source.includes("view === 'diagnostics'") || source.includes('View restricted response details')) {
+      fail(`${relativePath} must keep technical diagnostics out of the normal tenant-owner Cross-Domain Optimization interface.`);
+    }
+  }
   if (source.includes('className="page-shell"')) {
     fail(`${relativePath} must not reuse the application shell class inside AppLayout.`);
   }
