@@ -4,6 +4,8 @@ import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import './OperationalExperiencePages.css';
+import './AlertsPage.css';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   TENANT_PERMISSIONS,
   getCurrentAccessRoleLabel,
@@ -462,16 +464,24 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="alerts-page" style={styles.page}>
-      <section className="app-panel app-panel--padded" style={styles.workflowPanel}>
+    <div className="alerts-page" style={styles.page} data-alerts-refined="true">
+      <section className="app-panel app-panel--padded alerts-hero" style={styles.workflowPanel}>
         <div style={styles.workflowHeader}>
-          <div style={styles.headerTextBlock}>
-            <h2 style={styles.workflowTitle}>Recommended alert workflow</h2>
-            <p style={styles.workflowText}>
-              Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.
-            </p>
+          <div style={styles.headerTextBlock} className="alerts-hero__content">
+            <span className="alerts-hero-icon"><TenantNavIcon path="/alerts" size={24} /></span>
+            <div className="alerts-hero__copy">
+              <div className="alerts-eyebrow">Operational alert control</div>
+              <h2 style={styles.workflowTitle}>Recommended alert workflow</h2>
+              <p style={styles.workflowText}>
+                Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.
+              </p>
+              <div className="alerts-hero-badges">
+                <span>Open → acknowledge → resolve</span>
+                <span>Source workflow stays authoritative</span>
+              </div>
+            </div>
           </div>
-          <div style={styles.refreshCard}>
+          <div style={styles.refreshCard} className="alerts-refresh-card">
             <span style={styles.refreshLabel}>Last refreshed</span>
             <strong>{alertsQuery.dataUpdatedAt ? new Date(alertsQuery.dataUpdatedAt).toLocaleString() : 'Not loaded yet'}</strong>
             <span style={styles.refreshMeta}>Maximum visible results: {filters.limit}</span>
@@ -483,23 +493,23 @@ export default function AlertsPage() {
       </section>
 
       <div className="app-grid-stats" style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <div style={styles.statTitle}>Visible results</div>
+        <div style={styles.statCard} className="alerts-summary-card" data-tone="blue">
+          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon"><TenantNavIcon path="/alerts" size={18} /></span><div style={styles.statTitle}>Visible results</div></div>
           <div style={styles.statValue}>{summary.total}</div>
           <div style={styles.statSubtitle}>Up to {filters.limit} alerts matching the applied filters</div>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statTitle}>Open</div>
+        <div style={styles.statCard} className="alerts-summary-card" data-tone="amber">
+          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--amber"><TenantNavIcon path="/action-center" size={18} /></span><div style={styles.statTitle}>Open</div></div>
           <div style={styles.statValueWarn}>{summary.unresolved}</div>
           <div style={styles.statSubtitle}>Still requiring review or action</div>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statTitle}>Critical open</div>
+        <div style={styles.statCard} className="alerts-summary-card" data-tone="red">
+          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--red"><TenantNavIcon path="/reliability-command" size={18} /></span><div style={styles.statTitle}>Critical open</div></div>
           <div style={styles.statValueDanger}>{summary.critical}</div>
           <div style={styles.statSubtitle}>Blocks protected stock and shipment operations until resolved</div>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statTitle}>Unacknowledged open</div>
+        <div style={styles.statCard} className="alerts-summary-card" data-tone="slate">
+          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--slate"><TenantNavIcon path="/collaboration" size={18} /></span><div style={styles.statTitle}>Unacknowledged open</div></div>
           <div style={styles.statValue}>{summary.unacknowledged}</div>
           <div style={styles.statSubtitle}>No operator has taken ownership yet</div>
         </div>
@@ -515,8 +525,8 @@ export default function AlertsPage() {
       {actionMessage ? <div className="app-success-state" style={styles.messageBox} role="status">{actionMessage}</div> : null}
 
       {canManageAlerts ? (
-        <section className="app-panel app-panel--padded" style={styles.panel}>
-          <h2 style={styles.panelTitle}>Create a manual alert</h2>
+        <section className="app-panel app-panel--padded alerts-section alerts-section--manual" style={styles.panel}>
+          <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>Create a manual alert</h2></div>
           <p style={styles.formHint}>
             Use this only for a real operational issue that is not already represented by an existing alert. New manual alerts start at escalation level 0.
           </p>
@@ -601,8 +611,8 @@ export default function AlertsPage() {
         </section>
       ) : null}
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
-        <h2 style={styles.panelTitle}>Filter the alert queue</h2>
+      <section className="app-panel app-panel--padded alerts-section" style={styles.panel}>
+        <div className="alerts-section-heading"><span className="alerts-heading-icon alerts-heading-icon--slate"><TenantNavIcon path="/reports" size={18} /></span><h2 style={styles.panelTitle}>Filter the alert queue</h2></div>
         <form onSubmit={applyFilters} style={styles.formStack}>
           <div className="app-grid-toolbar" style={styles.filterGrid}>
             <label style={styles.fieldLabel}>
@@ -661,10 +671,10 @@ export default function AlertsPage() {
         </form>
       </section>
 
-      <section className="app-panel app-panel--padded" style={styles.panel}>
+      <section className="app-panel app-panel--padded alerts-section alerts-queue-section" style={styles.panel}>
         <div style={styles.queueHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Alert queue</h2>
+            <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>Alert queue</h2></div>
             <p style={styles.formHint}>Open alerts appear before resolved alerts, with Critical items first.</p>
           </div>
           {alertsQuery.isFetching ? <span style={styles.refreshingText}>Refreshing…</span> : null}
@@ -689,7 +699,7 @@ export default function AlertsPage() {
               const isOverriding = overrideMutation.isPending && overrideMutation.variables?.id === alert.id;
 
               return (
-                <article style={styles.card} key={alert.id}>
+                <article style={styles.card} className="alerts-alert-card" data-severity={alert.severity} data-resolved={alert.resolved ? "true" : "false"} key={alert.id}>
                   <div style={styles.cardTop}>
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alertTitle}</div>
@@ -697,7 +707,7 @@ export default function AlertsPage() {
                         {alert.product_name || 'No product linked'} · Created {formatDateTime(alert.created_at)}
                       </div>
                     </div>
-                    <div style={styles.badgeRow}>
+                    <div style={styles.badgeRow} className="alerts-badge-row">
                       <span style={severityStyle(alert.severity)}>{severityLabel(alert.severity)}</span>
                       <span style={alert.resolved ? styles.resolvedBadge : alert.acknowledged ? styles.acknowledgedBadge : styles.openBadge}>
                         {alert.resolved ? 'Resolved' : alert.acknowledged ? 'Acknowledged' : 'Open'}
@@ -713,17 +723,17 @@ export default function AlertsPage() {
                   <div style={styles.cardText}>{alert.message}</div>
 
                   <div style={styles.keyGrid}>
-                    <div style={styles.keyCard}>
+                    <div style={styles.keyCard} className="alerts-key-card">
                       <strong style={styles.keyLabel}>Ownership</strong>
                       <div style={styles.keyValue}>{alert.acknowledged ? alert.acknowledged_by_name || 'Acknowledged' : 'Not acknowledged'}</div>
                       <small style={styles.keyHelp}>{alert.acknowledged ? formatDateTime(alert.acknowledged_at) : 'No operator has taken ownership.'}</small>
                     </div>
-                    <div style={styles.keyCard}>
+                    <div style={styles.keyCard} className="alerts-key-card">
                       <strong style={styles.keyLabel}>Escalation level</strong>
                       <div style={styles.keyValue}>{alert.escalation_level}</div>
                       <small style={styles.keyHelp}>{alert.last_escalated_at ? `Last escalated ${formatDateTime(alert.last_escalated_at)}` : 'Not escalated.'}</small>
                     </div>
-                    <div style={styles.keyCard}>
+                    <div style={styles.keyCard} className="alerts-key-card">
                       <strong style={styles.keyLabel}>Resolution</strong>
                       <div style={styles.keyValue}>{alert.resolved ? alert.resolved_by_name || 'Resolved' : 'Open'}</div>
                       <small style={styles.keyHelp}>{alert.resolved ? formatDateTime(alert.resolved_at) : 'No resolution recorded.'}</small>
@@ -754,7 +764,7 @@ export default function AlertsPage() {
                   ) : null}
 
                   <div className="app-actions" style={styles.actionRow}>
-                    {next ? <Link to={next.to} style={styles.linkButton}>{next.label}</Link> : null}
+                    {next ? <Link to={next.to} style={styles.linkButton}><TenantNavIcon path={next.to} size={16} /><span>{next.label}</span></Link> : null}
 
                     {canManageAlerts && !alert.acknowledged && !alert.resolved ? (
                       <button
@@ -855,7 +865,7 @@ export default function AlertsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 16, width: '100%', minWidth: 0 },
+  page: { display: 'grid', gap: 18, width: '100%', minWidth: 0 },
   headerTextBlock: { minWidth: 0, flex: '1 1 520px' },
   refreshCard: { display: 'grid', gap: 8, minWidth: 220, padding: 14, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc' },
   refreshLabel: { color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' },
@@ -865,7 +875,7 @@ const styles: Record<string, CSSProperties> = {
   workflowTitle: { margin: 0, fontSize: '1.05rem', color: '#0f172a', wordBreak: 'break-word' },
   workflowText: { margin: '6px 0 0', color: '#475569', lineHeight: 1.5, wordBreak: 'break-word' },
   statsGrid: { width: '100%', minWidth: 0 },
-  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, minWidth: 0 },
+  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, minWidth: 0 },
   statTitle: { fontSize: '0.85rem', color: '#64748b', marginBottom: 8 },
   statValue: { fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' },
   statValueWarn: { fontSize: '1.6rem', fontWeight: 800, color: '#b45309', wordBreak: 'break-word' },
@@ -889,7 +899,7 @@ const styles: Record<string, CSSProperties> = {
   refreshingText: { color: '#64748b', fontWeight: 700 },
   emptyState: { display: 'grid', gap: 6 },
   cardList: { display: 'grid', gap: 14, minWidth: 0 },
-  card: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, background: '#fff', display: 'grid', gap: 14, minWidth: 0 },
+  card: { border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, background: '#fff', display: 'grid', gap: 14, minWidth: 0 },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', minWidth: 0 },
   cardHeaderText: { minWidth: 0, flex: '1 1 260px' },
   cardTitle: { fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', wordBreak: 'break-word' },
@@ -902,7 +912,7 @@ const styles: Record<string, CSSProperties> = {
   keyHelp: { display: 'block', marginTop: 5, color: '#64748b', lineHeight: 1.35 },
   resolutionNoteBox: { display: 'grid', gap: 5, padding: 12, border: '1px solid #bbf7d0', borderRadius: 12, background: '#f0fdf4', color: '#166534' },
   actionRow: { minWidth: 0 },
-  linkButton: { border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#1d4ed8', padding: '0.8rem 1rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center' },
+  linkButton: { border: '1px solid #bfdbfe', borderRadius: 12, background: '#eff6ff', color: '#1d4ed8', padding: '0.8rem 1rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center', display: 'inline-flex', alignItems: 'center', gap: 7 },
   primaryButton: { border: 'none', borderRadius: 12, background: '#2563eb', color: '#fff', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#0f172a', padding: '0.8rem 1rem', fontWeight: 600, cursor: 'pointer' },
   warnButton: { border: '1px solid #fde68a', borderRadius: 12, background: '#fffbeb', color: '#92400e', padding: '0.8rem 1rem', fontWeight: 700, cursor: 'pointer' },

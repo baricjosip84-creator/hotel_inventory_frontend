@@ -12,6 +12,7 @@ const intelligenceReviewPage = read('src/pages/HumanInLoopAIReviewPage.tsx');
 const collaborationPage = read('src/pages/EnterpriseCollaborationPage.tsx');
 const digitalTwinPage = read('src/pages/DigitalTwinVisualizationPage.tsx');
 const reliabilityCommandPage = read('src/pages/ReliabilityCommandPage.tsx');
+const alertsPage = read('src/pages/AlertsPage.tsx');
 
 const commercialRoutes = [
   {
@@ -209,6 +210,30 @@ for (const forbiddenSignal of [
 ]) {
   if (reliabilityCommandPage.includes(forbiddenSignal)) {
     failures.push(`Reliability Command page must keep technical diagnostics out of the normal tenant-owner interface: ${forbiddenSignal}`);
+  }
+}
+
+for (const signal of [
+  "import { TenantNavIcon } from '../components/ui/TenantNavIcon';",
+  "import './AlertsPage.css';",
+  'data-alerts-refined="true"',
+  'Operational alert control',
+  'Alert queue'
+]) {
+  if (!alertsPage.includes(signal)) {
+    failures.push(`Alerts page is missing approved tenant presentation signal: ${signal}`);
+  }
+}
+
+for (const signal of [
+  "queryKey: ['alerts', 'navigation-open-indicator'",
+  "'/alerts?resolved=false&limit=1'",
+  'hasOpenAlerts',
+  'alertIndicatorDot',
+  'Open alerts require attention'
+]) {
+  if (!layout.includes(signal)) {
+    failures.push(`AppLayout.tsx is missing the open-alert navigation indicator signal: ${signal}`);
   }
 }
 

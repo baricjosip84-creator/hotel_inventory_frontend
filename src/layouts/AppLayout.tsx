@@ -1,18 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { CSSProperties, MouseEvent } from 'react';
 import {
   clearSupportSessionAccessToken,
   getSupportSessionInfo
 } from '../lib/auth';
-import { logoutTenantSession } from '../lib/api';
+import { apiRequest, logoutTenantSession } from '../lib/api';
 import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/supportContext';
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
 import { fetchAnnouncementContext, type AnnouncementContext } from '../lib/announcementContext';
 import { fetchIncidentContext, type IncidentContext } from '../lib/incidentContext';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../lib/tenantSubscriptionAccess';
-import { getCurrentAccessRoleLabel, getCurrentUserRole, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getCurrentUserRole, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSIONS, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
@@ -20,6 +21,8 @@ import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryBrand } from '../components/brand/InventoryBrand';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
+
+type NavAlertIndicatorRow = { id: string };
 
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
@@ -42,6 +45,17 @@ export default function AppLayout() {
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
+  const canReadAlerts = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
+  const openAlertsIndicatorQuery = useQuery({
+    queryKey: ['alerts', 'navigation-open-indicator', tenantAccess.tenantId],
+    queryFn: () => apiRequest<NavAlertIndicatorRow[]>('/alerts?resolved=false&limit=1'),
+    enabled: canReadAlerts,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const hasOpenAlerts = canReadAlerts && (openAlertsIndicatorQuery.data?.length ?? 0) > 0;
 
   const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
   const [maintenanceContext, setMaintenanceContext] = useState<MaintenanceContext | null>(null);
@@ -417,7 +431,17 @@ export default function AppLayout() {
                       ...(isActive ? styles.navItemActive : {})
                     })}
                   >
-                    <span style={styles.navItemIcon}><TenantNavIcon path={item.to} /></span><span style={styles.navItemLabel}>{item.label}</span>
+                    <span style={styles.navItemIcon}><TenantNavIcon path={item.to} /></span>
+                    <span style={styles.navItemLabelGroup}>
+                      <span style={styles.navItemLabel}>{item.label}</span>
+                      {item.to === '/alerts' && hasOpenAlerts ? (
+                        <span
+                          style={styles.alertIndicatorDot}
+                          aria-label="Open alerts require attention"
+                          title="Open alerts require attention"
+                        />
+                      ) : null}
+                    </span>
                   </NavLink>
                 ))}
               </div>
@@ -739,7 +763,7 @@ const styles: Record<string, CSSProperties> = {
   },
   brandWorkspace: { marginTop: '14px', padding: '10px 11px', borderRadius: '8px', background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.08)' },
   brandWorkspaceLabel: { color: 'rgba(255,255,255,.38)', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '3px' },
-  navItemIcon: { width: '19px', height: '19px', flex: '0 0 19px', display: 'grid', placeItems: 'center' }, navItemLabel: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  navItemIcon: { width: '19px', height: '19px', flex: '0 0 19px', display: 'grid', placeItems: 'center' }, navItemLabelGroup: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '7px', flex: '1 1 auto' }, navItemLabel: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, alertIndicatorDot: { width: '8px', height: '8px', flex: '0 0 8px', borderRadius: '999px', background: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,.16)' },
   sidebarIdentity: { display: 'grid', gridTemplateColumns: '32px minmax(0,1fr)', alignItems: 'center', gap: '9px', marginBottom: '10px' }, sidebarAvatar: { width: '32px', height: '32px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#2563eb', color: '#fff', fontSize: '12px', fontWeight: 800 }, sidebarIdentityText: { minWidth: 0 }, sidebarIdentityName: { color: '#fff', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, sidebarIdentityRole: { color: 'rgba(255,255,255,.5)', fontSize: '11px', marginTop: '2px' },
   headerContext: { display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0, paddingTop: '2px' }, headerContextAvatar: { width: '34px', height: '34px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '12px', fontWeight: 800 }, headerContextText: { textAlign: 'right', minWidth: 0 }, headerContextRole: { color: '#0f172a', fontSize: '12.5px', fontWeight: 800 }, headerContextTenant: { color: '#64748b', fontSize: '11px', marginTop: '1px', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   supportPill: {

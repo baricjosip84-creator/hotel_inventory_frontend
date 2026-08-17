@@ -1,0 +1,235 @@
+.alerts-page {
+  --alerts-border: var(--io-border, #e2e8f0);
+  --alerts-shadow: var(--io-shadow-card, 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.alerts-page .app-panel,
+.alerts-page .alerts-summary-card,
+.alerts-page .alerts-alert-card {
+  box-shadow: var(--alerts-shadow);
+}
+
+.alerts-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.alerts-hero::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #2563eb;
+  content: '';
+}
+
+.alerts-hero__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.alerts-hero__copy {
+  min-width: 0;
+}
+
+.alerts-hero-icon,
+.alerts-heading-icon,
+.alerts-summary-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.alerts-hero-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+
+.alerts-heading-icon,
+.alerts-summary-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.alerts-heading-icon--slate,
+.alerts-summary-icon--slate {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.alerts-summary-icon--amber {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.alerts-summary-icon--red {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.alerts-eyebrow {
+  margin-bottom: 5px;
+  color: var(--io-primary, #2563eb);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.alerts-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.alerts-hero-badges span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.alerts-refresh-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.alerts-summary-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.alerts-summary-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: #2563eb;
+  content: '';
+}
+
+.alerts-summary-card[data-tone='amber']::before { background: #d97706; }
+.alerts-summary-card[data-tone='red']::before { background: #dc2626; }
+.alerts-summary-card[data-tone='slate']::before { background: #64748b; }
+
+.alerts-summary-card__topline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.alerts-summary-card__topline > div {
+  margin-bottom: 0 !important;
+}
+
+.alerts-section {
+  position: relative;
+}
+
+.alerts-section--manual {
+  border-color: #dbeafe !important;
+}
+
+.alerts-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.alerts-section-heading h2 {
+  min-width: 0;
+}
+
+.alerts-page input:focus-visible,
+.alerts-page select:focus-visible,
+.alerts-page textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.alerts-page button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.58;
+}
+
+.alerts-alert-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.alerts-alert-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #60a5fa;
+  content: '';
+}
+
+.alerts-alert-card[data-severity='warning']::before { background: #f59e0b; }
+.alerts-alert-card[data-severity='critical']::before { background: #dc2626; }
+.alerts-alert-card[data-resolved='true']::before { background: #22c55e; }
+
+.alerts-alert-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.alerts-badge-row {
+  align-items: center;
+}
+
+.alerts-key-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.alerts-page .app-actions a,
+.alerts-page .app-actions button {
+  min-height: 42px;
+}
+
+@media (max-width: 900px) {
+  .alerts-hero__content {
+    gap: 11px;
+  }
+
+  .alerts-hero-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .alerts-hero__content {
+    display: block;
+  }
+
+  .alerts-hero-icon {
+    margin-bottom: 12px;
+  }
+
+  .alerts-hero-badges {
+    display: grid;
+  }
+
+  .alerts-page .app-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
