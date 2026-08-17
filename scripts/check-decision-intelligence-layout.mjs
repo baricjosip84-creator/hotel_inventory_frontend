@@ -64,6 +64,14 @@ for (const relativePath of pages) {
   if (!source.includes('className="decision-intelligence-page"')) {
     fail(`${relativePath} must use the scoped Decision Intelligence page root.`);
   }
+  if (relativePath === 'src/pages/DecisionLearningFeedbackPage.tsx') {
+    if (!source.includes("import { TenantNavIcon } from '../components/ui/TenantNavIcon';")) {
+      fail(`${relativePath} must import TenantNavIcon when rendering shared tenant navigation icons.`);
+    }
+    if (!source.includes("import './DecisionLearningFeedbackPage.css';")) {
+      fail(`${relativePath} must import its Learning Feedback visual-system stylesheet.`);
+    }
+  }
   if (source.includes('className="page-shell"')) {
     fail(`${relativePath} must not reuse the application shell class inside AppLayout.`);
   }
