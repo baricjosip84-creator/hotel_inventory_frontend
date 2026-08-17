@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './decisionIntelligencePages.css';
+import './AdaptivePolicyEnginePage.css';
 
 type AdaptivePolicyView = 'evidence' | 'readiness' | 'diagnostics';
 
@@ -118,6 +120,7 @@ type AdaptivePolicySummary = {
 type LifecycleConfig = {
   key: keyof AdaptivePolicySummary;
   title: string;
+  iconPath: string;
   description: string;
   decisionKey: string;
   scoreKey: string;
@@ -199,6 +202,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   {
     key: 'learning_feedback_loop',
     title: 'Learning readiness',
+    iconPath: '/decision-learning-feedback',
     description: 'Checks whether policies have enough signals, measured results, and human review evidence to support a tuning discussion.',
     decisionKey: 'learning_feedback_decision',
     scoreKey: 'learning_feedback_score',
@@ -216,6 +220,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   {
     key: 'outcome_reconciliation',
     title: 'Outcome reconciliation',
+    iconPath: '/reports',
     description: 'Checks whether approved or recommended policy changes can be traced to measured business outcomes.',
     decisionKey: 'outcome_reconciliation_decision',
     scoreKey: 'outcome_reconciliation_score',
@@ -233,6 +238,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   {
     key: 'promotion_guard',
     title: 'Promotion safety review',
+    iconPath: '/permissions',
     description: 'Checks whether a policy pattern has enough signal, outcome, approval, and rollback evidence before wider manual reuse.',
     decisionKey: 'promotion_decision',
     scoreKey: 'promotion_score',
@@ -250,6 +256,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   {
     key: 'post_promotion_monitoring',
     title: 'Post-promotion monitoring',
+    iconPath: '/reliability-command',
     description: 'Checks whether manually approved policies remain measured and connected to monitoring signals after approval.',
     decisionKey: 'monitoring_decision',
     scoreKey: 'monitoring_score',
@@ -267,6 +274,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   {
     key: 'rollback_retirement_gate',
     title: 'Rollback and retirement review',
+    iconPath: '/alerts',
     description: 'Checks whether negative results, retired policies, and high-risk recommendations have enough evidence for a manual lifecycle decision.',
     decisionKey: 'rollback_retirement_decision',
     scoreKey: 'rollback_retirement_score',
@@ -338,11 +346,26 @@ function StatusBadge({ value, tone }: { value: unknown; tone?: 'good' | 'warning
   return <span className={`adaptive-policy-badge adaptive-policy-badge--${tone || 'neutral'}`}>{formatLabel(value)}</span>;
 }
 
-function MetricCard({ label, value, format }: { label: string; value: unknown; format?: 'number' | 'percent' | 'delta' }) {
+function MetricCard({
+  label,
+  value,
+  format,
+  iconPath,
+  tone = 'blue'
+}: {
+  label: string;
+  value: unknown;
+  format?: 'number' | 'percent' | 'delta';
+  iconPath?: string;
+  tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
+}) {
   return (
-    <div className="adaptive-policy-metric">
-      <span className="adaptive-policy-metric__label">{label}</span>
-      <strong className="adaptive-policy-metric__value">{metricValue(value, format)}</strong>
+    <div className={`adaptive-policy-metric ${iconPath ? 'adaptive-policy-metric--with-icon' : ''}`} data-tone={tone}>
+      {iconPath ? <span className="adaptive-policy-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
+      <div className="adaptive-policy-metric__copy">
+        <span className="adaptive-policy-metric__label">{label}</span>
+        <strong className="adaptive-policy-metric__value">{metricValue(value, format)}</strong>
+      </div>
     </div>
   );
 }
@@ -350,7 +373,7 @@ function MetricCard({ label, value, format }: { label: string; value: unknown; f
 function CheckList({ title, items, kind }: { title: string; items: CheckItem[] | BlockerItem[]; kind: 'checks' | 'blockers' }) {
   return (
     <section className="adaptive-policy-check-card">
-      <h3>{title}</h3>
+      <h3><span className={`adaptive-policy-heading-icon ${kind === 'blockers' ? 'adaptive-policy-heading-icon--warning' : ''}`}><TenantNavIcon path={kind === 'blockers' ? '/alerts' : '/permissions'} size={15} /></span>{title}</h3>
       {!items.length ? (
         <p className="adaptive-policy-muted">No items require attention in this section.</p>
       ) : (
@@ -392,9 +415,12 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
   return (
     <section className="card adaptive-policy-lifecycle">
       <div className="adaptive-policy-lifecycle__header">
-        <div>
-          <h2>{config.title}</h2>
-          <p className="card__subtext">{config.description}</p>
+        <div className="adaptive-policy-section-heading">
+          <span className="adaptive-policy-heading-icon"><TenantNavIcon path={config.iconPath} size={17} /></span>
+          <div>
+            <h2>{config.title}</h2>
+            <p className="card__subtext">{config.description}</p>
+          </div>
         </div>
         <div className="adaptive-policy-decision">
           <span>Current assessment</span>
@@ -422,12 +448,14 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
 function EvidenceSection({
   title,
   description,
+  iconPath,
   rows,
   headers,
   renderRow
 }: {
   title: string;
   description: string;
+  iconPath: string;
   rows: Array<Record<string, unknown>>;
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
@@ -435,9 +463,12 @@ function EvidenceSection({
   return (
     <section className="card adaptive-policy-evidence-section">
       <div className="card__header">
-        <div>
-          <h2>{title}</h2>
-          <p className="card__subtext">{description}</p>
+        <div className="adaptive-policy-section-heading">
+          <span className="adaptive-policy-heading-icon"><TenantNavIcon path={iconPath} size={17} /></span>
+          <div>
+            <h2>{title}</h2>
+            <p className="card__subtext">{description}</p>
+          </div>
         </div>
         <StatusBadge value={`${rows.length} returned`} />
       </div>
@@ -489,38 +520,45 @@ export default function AdaptivePolicyEnginePage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page adaptive-policy-page">
-        <section className="card"><p>Loading adaptive policy evidence…</p></section>
+      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
+        <section className="card adaptive-policy-state-card"><span className="adaptive-policy-state-icon"><TenantNavIcon path="/adaptive-policy-engine" size={18} /></span><p>Loading adaptive policy evidence…</p></section>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="decision-intelligence-page adaptive-policy-page">
-        <section className="card card--danger">
-          <h2>Adaptive policy evidence could not be loaded</h2>
+      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
+        <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger">
+          <span className="adaptive-policy-state-icon adaptive-policy-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span><div><h2>Adaptive policy evidence could not be loaded</h2>
           <p>Check your Decision Intelligence access and try the read-only request again.</p>
-          <button className="button" type="button" onClick={() => void refetch()}>Retry</button>
+          <button className="button" type="button" onClick={() => void refetch()}><TenantNavIcon path="/adaptive-policy-engine" size={14} />Retry</button></div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="decision-intelligence-page adaptive-policy-page">
+    <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
       <section className="card adaptive-policy-intro">
-        <div>
-          <span className="eyebrow">Read-only policy review</span>
-          <h2>Understand how policy ideas are performing before people reuse or change them</h2>
-          <p className="card__subtext">
+        <div className="adaptive-policy-intro__content">
+          <span className="adaptive-policy-hero-icon"><TenantNavIcon path="/adaptive-policy-engine" size={24} /></span>
+          <div className="adaptive-policy-intro__copy">
+            <span className="eyebrow">Read-only policy review</span>
+            <h2>Understand how policy ideas are performing before people reuse or change them</h2>
+            <p className="card__subtext">
             This page brings together policy records, observed signals, recommendations, and measured outcomes. It does not create,
             approve, apply, promote, roll back, or retire policies.
           </p>
+          <div className="adaptive-policy-hero-badges">
+            <span className="adaptive-policy-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-governed decisions</span>
+            <span className="adaptive-policy-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />Evidence only</span>
+          </div>
+          </div>
         </div>
         <div className="adaptive-policy-refresh">
           <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? 'Refreshing…' : 'Refresh evidence'}
+            <TenantNavIcon path="/adaptive-policy-engine" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
           </button>
           <span>Last refreshed: {lastRefreshed}</span>
         </div>
@@ -528,12 +566,15 @@ export default function AdaptivePolicyEnginePage() {
 
       <section className="card adaptive-policy-filters" aria-label="Adaptive policy filters">
         <div className="card__header">
-          <div>
-            <h2>Filter the evidence</h2>
-            <p className="card__subtext">Filters apply consistently to policies and their related signals, recommendations, and measurements.</p>
+          <div className="adaptive-policy-section-heading">
+            <span className="adaptive-policy-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
+            <div>
+              <h2>Filter the evidence</h2>
+              <p className="card__subtext">Filters apply consistently to policies and their related signals, recommendations, and measurements.</p>
+            </div>
           </div>
           <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS)}>
-            Clear filters
+            <TenantNavIcon path="/system-context" size={14} />Clear filters
           </button>
         </div>
         <div className="adaptive-policy-filter-grid">
@@ -576,34 +617,37 @@ export default function AdaptivePolicyEnginePage() {
 
       <div className="adaptive-policy-view-switch" role="tablist" aria-label="Adaptive policy page views">
         <button className={`adaptive-policy-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}>
-          Policy evidence
+          <TenantNavIcon path="/adaptive-policy-engine" size={14} />Policy evidence
         </button>
         <button className={`adaptive-policy-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}>
-          Readiness checks
+          <TenantNavIcon path="/reliability-command" size={14} />Readiness checks
         </button>
         {canViewDiagnostics ? (
           <button className={`adaptive-policy-view-switch__button ${view === 'diagnostics' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'diagnostics'} onClick={() => setView('diagnostics')}>
-            Diagnostics
+            <TenantNavIcon path="/admin-system" size={14} />Diagnostics
           </button>
         ) : null}
       </div>
 
       <section className="adaptive-policy-summary-grid" aria-label="Adaptive policy evidence summary">
-        <MetricCard label="Policies" value={policyCount} />
-        <MetricCard label="Signals" value={signalCount} />
-        <MetricCard label="Recommendations" value={recommendationCount} />
-        <MetricCard label="Measurements" value={measurementCount} />
-        <div className="adaptive-policy-metric adaptive-policy-metric--wide">
-          <span className="adaptive-policy-metric__label">Current posture</span>
-          <strong className="adaptive-policy-metric__value adaptive-policy-metric__value--text">
-            {formatLabel(data?.governance?.adaptive_policy_posture)}
-          </strong>
+        <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
+        <MetricCard label="Signals" value={signalCount} iconPath="/insights" tone="violet" />
+        <MetricCard label="Recommendations" value={recommendationCount} iconPath="/intelligence-review" tone="amber" />
+        <MetricCard label="Measurements" value={measurementCount} iconPath="/reports" tone="green" />
+        <div className="adaptive-policy-metric adaptive-policy-metric--wide adaptive-policy-metric--with-icon" data-tone="slate">
+          <span className="adaptive-policy-metric__icon"><TenantNavIcon path="/permissions" size={18} /></span>
+          <div className="adaptive-policy-metric__copy">
+            <span className="adaptive-policy-metric__label">Current posture</span>
+            <strong className="adaptive-policy-metric__value adaptive-policy-metric__value--text">
+              {formatLabel(data?.governance?.adaptive_policy_posture)}
+            </strong>
+          </div>
         </div>
       </section>
 
       {!hasEvidence ? (
         <section className="card adaptive-policy-empty-state">
-          <h2>No adaptive policy evidence is available for this tenant and filter set</h2>
+          <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span><h2>No adaptive policy evidence is available for this tenant and filter set</h2></div>
           <p>
             Readiness is not assessed when there are no policy, signal, recommendation, or effectiveness records. Zero records do
             not mean that policies are safe, approved, or ready for promotion.
@@ -617,11 +661,12 @@ export default function AdaptivePolicyEnginePage() {
 
       {view === 'evidence' ? (
         <>
-          <p className="adaptive-policy-limit-note">
+          <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
             Lists show up to {filters.limit} matching records in each evidence category. Readiness checks use the same filtered record set.
           </p>
           <EvidenceSection
             title="Policies"
+            iconPath="/adaptive-policy-engine"
             description="The policy ideas currently being observed or manually reviewed."
             rows={(data?.policies || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Area', 'Type', 'Status', 'Confidence', 'Updated']}
@@ -641,6 +686,7 @@ export default function AdaptivePolicyEnginePage() {
           />
           <EvidenceSection
             title="Observed signals"
+            iconPath="/insights"
             description="Measurements or indicators connected to the returned policies."
             rows={(data?.signals || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Area', 'Signal', 'Variance', 'Weight', 'Confidence', 'Observed']}
@@ -661,6 +707,7 @@ export default function AdaptivePolicyEnginePage() {
           />
           <EvidenceSection
             title="Policy recommendations"
+            iconPath="/intelligence-review"
             description="Advisory policy changes that still require human review and manual application."
             rows={(data?.recommendations || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Recommendation', 'Type', 'Status', 'Risk', 'Confidence', 'Created']}
@@ -681,6 +728,7 @@ export default function AdaptivePolicyEnginePage() {
           />
           <EvidenceSection
             title="Effectiveness measurements"
+            iconPath="/reports"
             description="Baseline and observed results used to understand whether a policy helped, harmed, or had no measured change."
             rows={(data?.effectiveness || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Measurement', 'Type', 'Baseline', 'Observed', 'Change', 'Confidence', 'Measured']}
@@ -707,11 +755,14 @@ export default function AdaptivePolicyEnginePage() {
         hasEvidence ? (
           <>
             <section className="card adaptive-policy-readiness-note">
-              <h2>These checks support a human review; they are not approvals</h2>
+              <div className="adaptive-policy-section-heading">
+                <span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
+                <div><h2>These checks support a human review; they are not approvals</h2>
               <p className="card__subtext">
                 A passing check means the returned evidence satisfies that specific rule. It does not automatically approve,
                 apply, promote, roll back, or retire a policy.
-              </p>
+              </p></div>
+              </div>
             </section>
             {LIFECYCLE_SECTIONS.map((config) => (
               <LifecycleCard key={config.key} config={config} section={data?.[config.key] as LifecycleSection | undefined} />
@@ -719,8 +770,8 @@ export default function AdaptivePolicyEnginePage() {
           </>
         ) : (
           <section className="card adaptive-policy-not-assessed">
-            <h2>Readiness checks are not assessed</h2>
-            <p>At least one adaptive policy evidence record is required before these checks can produce a meaningful result.</p>
+            <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span><div><h2>Readiness checks are not assessed</h2>
+            <p>At least one adaptive policy evidence record is required before these checks can produce a meaningful result.</p></div></div>
           </section>
         )
       ) : null}
@@ -728,9 +779,12 @@ export default function AdaptivePolicyEnginePage() {
       {view === 'diagnostics' && canViewDiagnostics ? (
         <section className="card adaptive-policy-diagnostics">
           <div className="card__header">
-            <div>
-              <h2>Technical response diagnostics</h2>
-              <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+            <div className="adaptive-policy-section-heading">
+              <span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/admin-system" size={17} /></span>
+              <div>
+                <h2>Technical response diagnostics</h2>
+                <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+              </div>
             </div>
           </div>
           <div className="adaptive-policy-metrics">
