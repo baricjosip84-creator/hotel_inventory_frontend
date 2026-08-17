@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 
 /**
  * ============================================================================
@@ -383,18 +384,44 @@ function formatActivityReason(reason: string): string {
   return detail ? `${actionLabel} — ${formatPart(detail)}` : actionLabel;
 }
 
+function dashboardIconToneStyle(tone: 'default' | 'good' | 'warn' | 'danger' = 'default'): CSSProperties {
+  if (tone === 'good') return { background: '#ecfdf5', color: '#16a34a' };
+  if (tone === 'warn') return { background: '#fff7ed', color: '#ea580c' };
+  if (tone === 'danger') return { background: '#fef2f2', color: '#dc2626' };
+  return { background: '#eff6ff', color: '#2563eb' };
+}
+
+function DashboardIconBadge(props: {
+  path: string;
+  tone?: 'default' | 'good' | 'warn' | 'danger';
+  size?: number;
+}) {
+  return (
+    <span style={{ ...styles.iconBadge, ...dashboardIconToneStyle(props.tone) }}>
+      <TenantNavIcon path={props.path} size={props.size ?? 20} />
+    </span>
+  );
+}
+
 function Section(props: {
   title: string;
   subtitle: string;
   actionHint?: string;
+  iconPath?: string;
+  iconTone?: 'default' | 'good' | 'warn' | 'danger';
   children: React.ReactNode;
 }) {
   return (
     <section className="app-panel app-panel--padded" style={styles.panel}>
       <div style={styles.sectionHeader}>
-        <div style={styles.sectionHeaderText}>
-          <h3 style={styles.sectionTitle}>{props.title}</h3>
-          <p style={styles.sectionSubtitle}>{props.subtitle}</p>
+        <div style={styles.sectionHeaderLead}>
+          {props.iconPath ? (
+            <DashboardIconBadge path={props.iconPath} tone={props.iconTone} size={18} />
+          ) : null}
+          <div style={styles.sectionHeaderText}>
+            <h3 style={styles.sectionTitle}>{props.title}</h3>
+            <p style={styles.sectionSubtitle}>{props.subtitle}</p>
+          </div>
         </div>
         {props.actionHint ? <div style={styles.sectionHint}>{props.actionHint}</div> : null}
       </div>
@@ -432,10 +459,11 @@ function PremiumEmptyState(props: {
   );
 }
 
-function ActionLink(props: { to: string; label: string }) {
+function ActionLink(props: { to: string; label: string; iconPath?: string }) {
   return (
     <Link to={props.to} style={styles.actionLink}>
-      {props.label}
+      {props.iconPath ? <TenantNavIcon path={props.iconPath} size={16} /> : null}
+      <span>{props.label}</span>
     </Link>
   );
 }
@@ -445,6 +473,7 @@ function StatCard(props: {
   value: number | string;
   subtitle: string;
   tone?: 'default' | 'good' | 'warn' | 'danger';
+  iconPath: string;
 }) {
   const toneStyle =
     props.tone === 'good'
@@ -457,9 +486,12 @@ function StatCard(props: {
 
   return (
     <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
+      <DashboardIconBadge path={props.iconPath} tone={props.tone} size={21} />
+      <div style={styles.statContent}>
+        <div style={styles.statTitle}>{props.title}</div>
+        <div style={toneStyle}>{props.value}</div>
+        <div style={styles.statSubtitle}>{props.subtitle}</div>
+      </div>
     </div>
   );
 }
@@ -613,43 +645,48 @@ export default function DashboardPage() {
       ) : null}
 
       <div style={styles.quickActionRow}>
-        {canViewStock ? <ActionLink to="/stock" label="Open Stock" /> : null}
-        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" /> : null}
-        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" /> : null}
+        {canViewStock ? <ActionLink to="/stock" label="Open Stock" iconPath="/stock" /> : null}
+        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" iconPath="/shipments" /> : null}
+        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" iconPath="/alerts" /> : null}
         {canViewProducts ? (
-          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} />
+          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} iconPath="/products" />
         ) : null}
-        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" /> : null}
-        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" /> : null}
-        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" /> : null}
-        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" /> : null}
-        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" /> : null}
+        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" iconPath="/suppliers" /> : null}
+        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" iconPath="/storage-locations" /> : null}
+        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" iconPath="/outbound" /> : null}
+        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" iconPath="/reports" /> : null}
+        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" iconPath="/insights" /> : null}
       </div>
 
       <div className="app-grid-stats" style={styles.kpiGrid}>
         <StatCard
           title="Products"
+          iconPath="/products"
           value={summary.master_data.total_products}
           subtitle="Active products"
         />
         <StatCard
           title="Suppliers"
+          iconPath="/suppliers"
           value={summary.master_data.total_suppliers}
           subtitle="Active suppliers"
         />
         <StatCard
           title="Storage Locations"
+          iconPath="/storage-locations"
           value={summary.master_data.total_storage_locations}
           subtitle="Configured locations"
         />
         <StatCard
           title="Pending Shipments"
+          iconPath="/shipments"
           value={summary.shipments.pending_shipments}
           subtitle="Not yet received"
           tone={summary.shipments.pending_shipments > 0 ? 'warn' : 'good'}
         />
         <StatCard
           title="Partial Shipments"
+          iconPath="/shipments"
           value={summary.shipments.partial_shipments}
           subtitle="Partially received"
           tone={summary.shipments.partial_shipments > 0 ? 'warn' : 'default'}
@@ -657,6 +694,7 @@ export default function DashboardPage() {
         {canViewOutbound ? (
           <StatCard
             title="Open Outbound Orders"
+            iconPath="/outbound"
             value={outboundSummaryQuery.data?.open_orders ?? 0}
             subtitle={`${outboundSummaryQuery.data?.units_waiting ?? 0} unit(s) still waiting`}
             tone={(outboundSummaryQuery.data?.packed_orders ?? 0) > 0 ? 'warn' : 'default'}
@@ -665,6 +703,7 @@ export default function DashboardPage() {
         {canViewOutbound && (outboundSummaryQuery.data?.partially_dispatched_orders ?? 0) > 0 ? (
           <StatCard
             title="Partial Customer Shipments"
+            iconPath="/outbound"
             value={outboundSummaryQuery.data?.partially_dispatched_orders ?? 0}
             subtitle="Orders with a remainder still reserved"
             tone="warn"
@@ -672,18 +711,21 @@ export default function DashboardPage() {
         ) : null}
         <StatCard
           title="Low Stock Rows"
+          iconPath="/stock"
           value={summary.stock.low_stock_rows}
           subtitle="Below configured minimum"
           tone={summary.stock.low_stock_rows > 0 ? 'danger' : 'good'}
         />
         <StatCard
           title="Unresolved Alerts"
+          iconPath="/alerts"
           value={summary.alerts.unresolved_alerts}
           subtitle="Still requiring attention"
           tone={summary.alerts.unresolved_alerts > 0 ? 'danger' : 'good'}
         />
         <StatCard
           title="Critical Alerts"
+          iconPath="/alerts"
           value={summary.alerts.critical_unresolved_alerts}
           subtitle="Highest priority"
           tone={summary.alerts.critical_unresolved_alerts > 0 ? 'danger' : 'good'}
@@ -693,10 +735,13 @@ export default function DashboardPage() {
       <div className="app-grid-stats" style={styles.kpiGrid}>
         <div className="app-panel app-panel--padded" style={styles.healthCard}>
           <div style={styles.healthHeader}>
-            <div style={styles.healthHeaderText}>
-              <div style={styles.healthTitle}>Operational Health</div>
-              <div style={styles.healthSubtitle}>
-                Tenant-level health based on alerts, overdue shipments, low stock, and discrepancy pressure.
+            <div style={styles.healthHeaderLead}>
+              <DashboardIconBadge path="/insights" size={19} />
+              <div style={styles.healthHeaderText}>
+                <div style={styles.healthTitle}>Operational Health</div>
+                <div style={styles.healthSubtitle}>
+                  Tenant-level health based on alerts, overdue shipments, low stock, and discrepancy pressure.
+                </div>
               </div>
             </div>
 
@@ -719,42 +764,64 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <>
-              <div style={styles.healthScore}>
-                <span>{toNumber(health.health_score)}</span>
-                <span style={styles.healthScoreScale}> / 100</span>
+            <div style={styles.healthBody}>
+              <div style={styles.healthScoreBlock}>
+                <div style={styles.healthScore}>
+                  <span>{toNumber(health.health_score)}</span>
+                  <span style={styles.healthScoreScale}> / 100</span>
+                </div>
+                <div style={styles.healthProgressTrack} aria-hidden="true">
+                  <div
+                    style={{
+                      ...styles.healthProgressValue,
+                      width: `${Math.min(100, Math.max(0, toNumber(health.health_score)))}%`
+                    }}
+                  />
+                </div>
               </div>
 
               <div style={styles.healthMetricsGrid}>
                 <div style={styles.healthMetric}>
-                  <div style={styles.healthMetricLabel}>Low Stock Rate</div>
-                  <div style={styles.healthMetricValue}>
-                    {toNumber(health.metrics.low_stock_rate_pct)}%
+                  <DashboardIconBadge path="/stock" tone="danger" size={18} />
+                  <div style={styles.healthMetricText}>
+                    <div style={styles.healthMetricLabel}>Low Stock Rate</div>
+                    <div style={styles.healthMetricValue}>
+                      {toNumber(health.metrics.low_stock_rate_pct)}%
+                    </div>
                   </div>
                 </div>
 
                 <div style={styles.healthMetric}>
-                  <div style={styles.healthMetricLabel}>Discrepancy Rate</div>
-                  <div style={styles.healthMetricValue}>
-                    {toNumber(health.metrics.discrepancy_rate_pct)}%
+                  <DashboardIconBadge path="/stock-movements" tone="warn" size={18} />
+                  <div style={styles.healthMetricText}>
+                    <div style={styles.healthMetricLabel}>Discrepancy Rate</div>
+                    <div style={styles.healthMetricValue}>
+                      {toNumber(health.metrics.discrepancy_rate_pct)}%
+                    </div>
                   </div>
                 </div>
 
                 <div style={styles.healthMetric}>
-                  <div style={styles.healthMetricLabel}>Overdue Shipments</div>
-                  <div style={styles.healthMetricValue}>
-                    {health.metrics.overdue_shipments}
+                  <DashboardIconBadge path="/shipments" tone="warn" size={18} />
+                  <div style={styles.healthMetricText}>
+                    <div style={styles.healthMetricLabel}>Overdue Shipments</div>
+                    <div style={styles.healthMetricValue}>
+                      {health.metrics.overdue_shipments}
+                    </div>
                   </div>
                 </div>
 
                 <div style={styles.healthMetric}>
-                  <div style={styles.healthMetricLabel}>Unresolved Alerts</div>
-                  <div style={styles.healthMetricValue}>
-                    {health.metrics.unresolved_alerts}
+                  <DashboardIconBadge path="/alerts" tone="danger" size={18} />
+                  <div style={styles.healthMetricText}>
+                    <div style={styles.healthMetricLabel}>Unresolved Alerts</div>
+                    <div style={styles.healthMetricValue}>
+                      {health.metrics.unresolved_alerts}
+                    </div>
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -762,6 +829,8 @@ export default function DashboardPage() {
       <div style={styles.twoColumnGrid}>
         <Section
           title="Depletion Risk"
+          iconPath="/insights"
+          iconTone="warn"
           subtitle="Products and stock rows most at risk of running out soon."
           actionHint="Top risk candidates"
         >
@@ -835,6 +904,8 @@ export default function DashboardPage() {
 
         <Section
           title="Reorder Recommendations"
+          iconPath="/insights"
+          iconTone="default"
           subtitle="Explainable reorder signals based on current stock and recent usage."
           actionHint="Action queue"
         >
@@ -905,9 +976,11 @@ export default function DashboardPage() {
         </Section>
       </div>
 
-      <div style={styles.twoColumnGrid}>
+      <div style={styles.threeColumnGrid}>
         <Section
           title="Low Stock"
+          iconPath="/stock"
+          iconTone="danger"
           subtitle="Most urgent low-stock rows requiring action."
         >
           {lowStockQuery.isLoading ? (
@@ -954,6 +1027,8 @@ export default function DashboardPage() {
 
         <Section
           title="Overdue Shipments"
+          iconPath="/shipments"
+          iconTone="warn"
           subtitle="Shipments past their delivery date and not fully received."
         >
           {overdueShipmentsQuery.isLoading ? (
@@ -993,6 +1068,7 @@ export default function DashboardPage() {
                             <ActionLink
                               to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
                               label="Open Shipment"
+                              iconPath="/shipments"
                             />
                           ) : null}
                         </td>
@@ -1002,6 +1078,7 @@ export default function DashboardPage() {
                             <ActionLink
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
                               label="Open Supplier"
+                              iconPath="/suppliers"
                             />
                           ) : null}
                         </td>
@@ -1020,11 +1097,11 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
-      </div>
 
-      <div style={styles.twoColumnGrid}>
         <Section
           title="Unresolved Alerts"
+          iconPath="/alerts"
+          iconTone="danger"
           subtitle="Highest-priority unresolved alerts requiring review."
         >
           {unresolvedAlertsQuery.isLoading ? (
@@ -1062,6 +1139,7 @@ export default function DashboardPage() {
                       <ActionLink
                         to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
                         label="Open in Alerts"
+                        iconPath="/alerts"
                       />
                     ) : null}
 
@@ -1080,9 +1158,13 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+      </div>
 
+      <div style={styles.threeColumnGrid}>
         <Section
           title="Inventory Anomalies"
+          iconPath="/insights"
+          iconTone="good"
           subtitle="Products with unusually high outbound activity compared to their own baseline."
         >
           {!canViewInsights ? (
@@ -1139,11 +1221,11 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
-      </div>
 
-      <div style={styles.twoColumnGrid}>
         <Section
           title="Recent Activity"
+          iconPath="/stock-movements"
+          iconTone="default"
           subtitle="Latest stock movement activity visible to operators and managers."
         >
           {recentActivityQuery.isLoading ? (
@@ -1204,6 +1286,8 @@ export default function DashboardPage() {
 
         <Section
           title="Supplier Performance"
+          iconPath="/suppliers"
+          iconTone="default"
           subtitle="Shipment execution summary by supplier."
         >
           {supplierPerformanceQuery.isLoading ? (
@@ -1244,6 +1328,7 @@ export default function DashboardPage() {
                             <ActionLink
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
                               label="Open Supplier"
+                              iconPath="/suppliers"
                             />
                           ) : null}
                         </td>
@@ -1268,10 +1353,11 @@ export default function DashboardPage() {
 const styles: Record<string, CSSProperties> = {
   page: {
     width: '100%',
-    minWidth: 0
+    minWidth: 0,
+    color: '#0f172a'
   },
   header: {
-    marginBottom: '20px',
+    marginBottom: '18px',
     minWidth: 0
   },
   headerTextBlock: {
@@ -1280,193 +1366,283 @@ const styles: Record<string, CSSProperties> = {
   title: {
     margin: 0,
     fontSize: '28px',
-    fontWeight: 700
+    fontWeight: 800,
+    letterSpacing: '-0.02em'
   },
   description: {
-    marginTop: '8px',
+    marginTop: '6px',
     color: '#64748b',
     lineHeight: 1.5,
     wordBreak: 'break-word'
   },
   kpiGrid: {
-    marginBottom: '20px',
+    marginBottom: '14px',
     width: '100%',
-    minWidth: 0
+    minWidth: 0,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(205px, 1fr))',
+    gap: '12px'
   },
   statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
     background: '#ffffff',
     border: '1px solid #e2e8f0',
-    borderRadius: '14px',
-    padding: '18px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-    minWidth: 0
+    borderRadius: '12px',
+    padding: '14px 16px',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.025), 0 8px 22px rgba(15, 23, 42, 0.035)',
+    minWidth: 0,
+    minHeight: '82px'
+  },
+  statContent: {
+    minWidth: 0,
+    flex: 1
   },
   statTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
+    fontSize: '12px',
+    fontWeight: 700,
     color: '#64748b',
-    marginBottom: '10px'
+    marginBottom: '2px'
   },
   statValue: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    lineHeight: 1.2,
+    fontSize: '26px',
+    fontWeight: 800,
+    marginBottom: '1px',
+    lineHeight: 1.05,
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   statValueGood: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#166534',
-    lineHeight: 1.2,
+    fontSize: '26px',
+    fontWeight: 800,
+    marginBottom: '1px',
+    color: '#15803d',
+    lineHeight: 1.05,
     wordBreak: 'break-word'
   },
   statValueWarn: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#92400e',
-    lineHeight: 1.2,
+    fontSize: '26px',
+    fontWeight: 800,
+    marginBottom: '1px',
+    color: '#c2410c',
+    lineHeight: 1.05,
     wordBreak: 'break-word'
   },
   statValueDanger: {
-    fontSize: '32px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#991b1b',
-    lineHeight: 1.2,
+    fontSize: '26px',
+    fontWeight: 800,
+    marginBottom: '1px',
+    color: '#dc2626',
+    lineHeight: 1.05,
     wordBreak: 'break-word'
   },
   statSubtitle: {
-    fontSize: '13px',
+    fontSize: '11px',
     color: '#64748b',
-    lineHeight: 1.4
+    lineHeight: 1.35
+  },
+  iconBadge: {
+    width: '38px',
+    height: '38px',
+    borderRadius: '11px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: '0 0 auto'
   },
   healthCard: {
-    minWidth: 0
+    minWidth: 0,
+    borderRadius: '12px',
+    borderColor: '#dbe3ef',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.025), 0 10px 28px rgba(15, 23, 42, 0.04)'
   },
   healthHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: '12px',
     alignItems: 'flex-start',
-    marginBottom: '16px',
+    marginBottom: '14px',
     flexWrap: 'wrap'
+  },
+  healthHeaderLead: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'flex-start',
+    minWidth: 0,
+    flex: 1
   },
   healthHeaderText: {
     minWidth: 0
   },
   healthTitle: {
-    fontSize: '20px',
-    fontWeight: 700,
-    marginBottom: '6px'
+    fontSize: '17px',
+    fontWeight: 800,
+    marginBottom: '3px',
+    color: '#0f172a'
   },
   healthSubtitle: {
-    fontSize: '14px',
+    fontSize: '12px',
     color: '#64748b',
-    lineHeight: 1.5,
-    maxWidth: '700px',
+    lineHeight: 1.45,
+    maxWidth: '760px',
     wordBreak: 'break-word'
   },
+  healthBody: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))',
+    gap: '16px',
+    alignItems: 'stretch',
+    minWidth: 0
+  },
+  healthScoreBlock: {
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '4px 4px 2px'
+  },
   healthScore: {
-    fontSize: '56px',
-    fontWeight: 800,
+    fontSize: '46px',
+    fontWeight: 850,
     lineHeight: 1,
-    marginBottom: '16px'
+    marginBottom: '10px',
+    color: '#2563eb',
+    letterSpacing: '-0.035em'
   },
   healthScoreScale: {
-    fontSize: '20px',
+    fontSize: '17px',
     fontWeight: 700,
-    color: '#64748b'
+    color: '#64748b',
+    letterSpacing: 0
+  },
+  healthProgressTrack: {
+    width: '100%',
+    maxWidth: '360px',
+    height: '7px',
+    borderRadius: '999px',
+    overflow: 'hidden',
+    background: '#e2e8f0'
+  },
+  healthProgressValue: {
+    height: '100%',
+    borderRadius: '999px',
+    background: 'linear-gradient(90deg, #2563eb 0%, #60a5fa 100%)'
   },
   healthMetricsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '14px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '10px',
     minWidth: 0
   },
   healthMetric: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
     border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    padding: '14px',
-    background: '#f8fafc',
+    borderRadius: '11px',
+    padding: '11px 12px',
+    background: '#fbfdff',
+    minWidth: 0
+  },
+  healthMetricText: {
     minWidth: 0
   },
   healthMetricLabel: {
-    fontSize: '13px',
+    fontSize: '11px',
     color: '#64748b',
-    marginBottom: '8px',
-    fontWeight: 600
+    marginBottom: '2px',
+    fontWeight: 700
   },
   healthMetricValue: {
-    fontSize: '24px',
-    fontWeight: 700
+    fontSize: '19px',
+    fontWeight: 800,
+    color: '#0f172a'
   },
   twoColumnGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
     alignItems: 'start',
-    gap: '20px',
-    marginBottom: '20px',
+    gap: '14px',
+    marginBottom: '14px',
+    width: '100%',
+    minWidth: 0
+  },
+  threeColumnGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(350px, 100%), 1fr))',
+    alignItems: 'start',
+    gap: '14px',
+    marginBottom: '14px',
     width: '100%',
     minWidth: 0
   },
   panel: {
     minWidth: 0,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    borderRadius: '12px',
+    borderColor: '#e2e8f0',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.025), 0 8px 22px rgba(15, 23, 42, 0.03)'
   },
   sectionHeader: {
-    marginBottom: '16px',
+    marginBottom: '12px',
     display: 'flex',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: '10px',
     alignItems: 'flex-start',
     flexWrap: 'wrap'
+  },
+  sectionHeaderLead: {
+    display: 'flex',
+    gap: '9px',
+    alignItems: 'flex-start',
+    minWidth: 0,
+    flex: 1
   },
   sectionHeaderText: {
     minWidth: 0
   },
   sectionTitle: {
     margin: 0,
-    fontSize: '20px',
-    fontWeight: 700,
+    fontSize: '16px',
+    fontWeight: 800,
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   sectionSubtitle: {
-    margin: '8px 0 0 0',
+    margin: '3px 0 0 0',
     color: '#64748b',
-    lineHeight: 1.5,
+    fontSize: '12px',
+    lineHeight: 1.4,
     wordBreak: 'break-word'
   },
   sectionHint: {
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#64748b',
+    fontSize: '10px',
+    fontWeight: 800,
+    color: '#475569',
     background: '#f8fafc',
     border: '1px solid #e2e8f0',
     borderRadius: '999px',
-    padding: '6px 10px',
+    padding: '5px 9px',
     whiteSpace: 'nowrap'
   },
   list: {
     display: 'grid',
-    gap: '14px',
+    gap: '10px',
     minWidth: 0
   },
   listCard: {
     border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    padding: '14px',
-    background: '#f8fafc',
+    borderRadius: '10px',
+    padding: '11px 12px',
+    background: '#fbfdff',
     minWidth: 0
   },
   listCardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: '10px',
     alignItems: 'flex-start',
-    marginBottom: '12px',
+    marginBottom: '8px',
     flexWrap: 'wrap',
     minWidth: 0
   },
@@ -1474,21 +1650,23 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   listCardTitle: {
-    fontSize: '16px',
-    fontWeight: 700,
-    marginBottom: '4px',
+    fontSize: '14px',
+    fontWeight: 800,
+    marginBottom: '2px',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   listCardMeta: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#64748b',
-    lineHeight: 1.4,
+    lineHeight: 1.35,
     wordBreak: 'break-word'
   },
   cardText: {
     color: '#334155',
-    lineHeight: 1.6,
-    marginBottom: '12px',
+    fontSize: '12px',
+    lineHeight: 1.5,
+    marginBottom: '9px',
     wordBreak: 'break-word'
   },
   metricRow: {
@@ -1496,15 +1674,15 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     flexWrap: 'wrap',
-    gap: '12px',
-    fontSize: '14px',
-    padding: '6px 0',
-    borderTop: '1px solid #f1f5f9'
+    gap: '10px',
+    fontSize: '12px',
+    padding: '5px 0',
+    borderTop: '1px solid #eef2f7'
   },
   tableWrapper: {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
-    borderRadius: '14px',
+    borderRadius: '10px',
     overflow: 'hidden',
     overflowX: 'auto',
     minWidth: 0
@@ -1512,45 +1690,48 @@ const styles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '600px'
+    minWidth: '430px'
   },
   th: {
     textAlign: 'left',
-    padding: '14px',
+    padding: '10px 11px',
     background: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
-    fontSize: '13px',
-    color: '#64748b'
+    fontSize: '11px',
+    fontWeight: 800,
+    color: '#475569'
   },
   td: {
-    padding: '14px',
+    padding: '10px 11px',
     borderBottom: '1px solid #f1f5f9',
-    fontSize: '14px',
+    fontSize: '12px',
     verticalAlign: 'top',
+    color: '#334155',
     wordBreak: 'break-word'
   },
   emptyCell: {
-    padding: '24px',
+    padding: '20px',
     textAlign: 'center',
     color: '#64748b'
   },
   badgeBase: {
     display: 'inline-block',
-    padding: '6px 10px',
+    padding: '4px 8px',
     borderRadius: '999px',
-    fontWeight: 700,
-    fontSize: '12px',
+    fontWeight: 800,
+    fontSize: '10px',
     whiteSpace: 'nowrap'
   },
   rowTitle: {
-    fontWeight: 700,
-    marginBottom: '6px',
+    fontWeight: 800,
+    marginBottom: '4px',
+    color: '#0f172a',
     wordBreak: 'break-word'
   },
   rowSubtle: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#64748b',
-    lineHeight: 1.4,
+    lineHeight: 1.35,
     wordBreak: 'break-word'
   },
   emptyStateNeutral: {
@@ -1560,16 +1741,17 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0
   },
   emptyStateTitle: {
-    fontWeight: 700,
-    marginBottom: '8px',
-    fontSize: '16px'
+    fontWeight: 800,
+    marginBottom: '5px',
+    fontSize: '13px'
   },
   emptyStateMessage: {
-    lineHeight: 1.5
+    lineHeight: 1.45,
+    fontSize: '12px'
   },
   emptyStateMeta: {
-    marginTop: '10px',
-    fontSize: '12px',
+    marginTop: '7px',
+    fontSize: '10px',
     opacity: 0.85
   },
   errorInline: {
@@ -1577,9 +1759,9 @@ const styles: Record<string, CSSProperties> = {
   },
   quickActionRow: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '10px',
-    marginBottom: '18px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
+    gap: '8px',
+    marginBottom: '14px',
     width: '100%',
     minWidth: 0
   },
@@ -1587,15 +1769,17 @@ const styles: Record<string, CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: '7px',
     border: '1px solid #cbd5e1',
-    borderRadius: '10px',
-    padding: '8px 12px',
+    borderRadius: '8px',
+    padding: '8px 10px',
     background: '#ffffff',
     color: '#1d4ed8',
-    fontWeight: 700,
+    fontWeight: 800,
     textDecoration: 'none',
-    fontSize: '13px',
+    fontSize: '11px',
     minWidth: 0,
-    textAlign: 'center'
+    textAlign: 'center',
+    boxShadow: '0 1px 1px rgba(15, 23, 42, 0.02)'
   }
 };
