@@ -7,6 +7,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError } from '../lib/actionFeedback';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import type { ProductItem } from '../types/inventory';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './AIOperationsCopilotPage.css';
 
 type CopilotIntent =
@@ -366,13 +367,16 @@ async function fetchProducts(): Promise<ProductItem[]> {
   return apiRequest<ProductItem[]>('/products?limit=100');
 }
 
-function Panel(props: { title: string; subtitle?: string; children: React.ReactNode; id?: string }) {
+function Panel(props: { title: string; subtitle?: string; children: React.ReactNode; id?: string; iconPath?: string }) {
   return (
     <section id={props.id} className="app-panel app-panel--padded ai-copilot-panel" style={styles.panel}>
       <div style={styles.panelHeader}>
-        <div>
-          <h2 style={styles.panelTitle}>{props.title}</h2>
-          {props.subtitle ? <p style={styles.panelSubtitle}>{props.subtitle}</p> : null}
+        <div style={styles.panelHeading}>
+          {props.iconPath ? <span style={styles.panelIcon}><TenantNavIcon path={props.iconPath} size={18} /></span> : null}
+          <div>
+            <h2 style={styles.panelTitle}>{props.title}</h2>
+            {props.subtitle ? <p style={styles.panelSubtitle}>{props.subtitle}</p> : null}
+          </div>
         </div>
       </div>
       {props.children}
@@ -589,13 +593,16 @@ export default function AIOperationsCopilotPage() {
 
   return (
     <div className="ai-copilot-page" style={styles.page}>
-      <header style={styles.hero}>
-        <div>
-          <div style={styles.eyebrow}>Governed tenant intelligence</div>
-          <h1 style={styles.title}>Inventory analysis and proposal assistant</h1>
-          <p style={styles.subtitle}>
-            Choose a defined inventory analysis or prepare a product proposal for human review. It explains information but cannot change inventory or approve work.
-          </p>
+      <header className="ai-copilot-hero" style={styles.hero}>
+        <div style={styles.heroTitleRow}>
+          <span style={styles.heroIcon}><TenantNavIcon path="/ai-copilot" size={24} /></span>
+          <div>
+            <div style={styles.eyebrow}>Governed tenant intelligence</div>
+            <h1 style={styles.title}>Inventory analysis and proposal assistant</h1>
+            <p style={styles.subtitle}>
+              Choose a defined inventory analysis or prepare a product proposal for human review. It explains information but cannot change inventory or approve work.
+            </p>
+          </div>
         </div>
         <div style={styles.heroBadges}>
           <Badge tone="good">Tenant scoped</Badge>
@@ -607,26 +614,38 @@ export default function AIOperationsCopilotPage() {
       {capabilitiesQuery.isError ? <div style={styles.error}>{readableError(capabilitiesQuery.error)}</div> : null}
       {actionMessage ? <div style={styles.info}>{actionMessage}</div> : null}
 
-      <div style={styles.summaryGrid}>
+      <div className="ai-copilot-summary-grid" style={styles.summaryGrid}>
         <div style={styles.summaryCard}>
-          <div style={styles.summaryLabel}>How results are produced</div>
-          <div style={styles.summaryValue}>{modeDetails.label}</div>
-          <div style={styles.summaryHelp}>{provider?.model && provider?.effective_mode === 'openai_responses' ? `Model: ${provider.model}` : modeDetails.explanation}</div>
+          <span style={{ ...styles.summaryIcon, ...styles.summaryIconBlue }}><TenantNavIcon path="/ai-copilot" size={20} /></span>
+          <div style={styles.summaryContent}>
+            <div style={styles.summaryLabel}>How results are produced</div>
+            <div style={styles.summaryValue}>{modeDetails.label}</div>
+            <div style={styles.summaryHelp}>{provider?.model && provider?.effective_mode === 'openai_responses' ? `Model: ${provider.model}` : modeDetails.explanation}</div>
+          </div>
         </div>
         <div style={styles.summaryCard}>
-          <div style={styles.summaryLabel}>External data sharing</div>
-          <div style={styles.summaryValue}>{provider?.external_provider_ready ? 'Configured' : 'Not active'}</div>
-          <div style={styles.summaryHelp}>Each completed run records whether tenant evidence was shared externally.</div>
+          <span style={{ ...styles.summaryIcon, ...styles.summaryIconPurple }}><TenantNavIcon path="/system-context" size={20} /></span>
+          <div style={styles.summaryContent}>
+            <div style={styles.summaryLabel}>External data sharing</div>
+            <div style={styles.summaryValue}>{provider?.external_provider_ready ? 'Configured' : 'Not active'}</div>
+            <div style={styles.summaryHelp}>Each completed run records whether tenant evidence was shared externally.</div>
+          </div>
         </div>
         <div style={styles.summaryCard}>
-          <div style={styles.summaryLabel}>What it can change</div>
-          <div style={styles.summaryValue}>None</div>
-          <div style={styles.summaryHelp}>The Copilot cannot submit, approve, or execute an Execution Request.</div>
+          <span style={{ ...styles.summaryIcon, ...styles.summaryIconGreen }}><TenantNavIcon path="/reliability-command" size={20} /></span>
+          <div style={styles.summaryContent}>
+            <div style={styles.summaryLabel}>What it can change</div>
+            <div style={styles.summaryValue}>None</div>
+            <div style={styles.summaryHelp}>The Copilot cannot submit, approve, or execute an Execution Request.</div>
+          </div>
         </div>
         <div style={styles.summaryCard}>
-          <div style={styles.summaryLabel}>Runs this hour</div>
-          <div style={styles.summaryValue}>{capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}</div>
-          <div style={styles.summaryHelp}>User runs used. Tenant usage: {capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}.</div>
+          <span style={{ ...styles.summaryIcon, ...styles.summaryIconAmber }}><TenantNavIcon path="/automation-schedules" size={20} /></span>
+          <div style={styles.summaryContent}>
+            <div style={styles.summaryLabel}>Runs this hour</div>
+            <div style={styles.summaryValue}>{capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}</div>
+            <div style={styles.summaryHelp}>User runs used. Tenant usage: {capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}.</div>
+          </div>
         </div>
       </div>
 
@@ -638,7 +657,7 @@ export default function AIOperationsCopilotPage() {
       ) : null}
 
       <div className="ai-copilot-main-grid" style={styles.mainGrid}>
-        <Panel title="Start a new analysis" subtitle="Choose the result you need. Options are limited by your current permissions.">
+        <Panel title="Start a new analysis" subtitle="Choose the result you need. Options are limited by your current permissions." iconPath="/ai-copilot">
           <form onSubmit={handleSubmit} style={styles.form} data-skip-global-action-feedback="true">
             <label style={styles.field}>
               <span style={styles.label}>Analysis type</span>
@@ -868,6 +887,7 @@ export default function AIOperationsCopilotPage() {
         </Panel>
 
         <Panel
+          iconPath="/intelligence-review"
           title="Selected result"
           subtitle={selectedRun
             ? `${intentFallbacks[selectedRun.intent]?.label || formatLabel(selectedRun.intent)} · ${formatDateTime(selectedRun.created_at)}`
@@ -940,8 +960,8 @@ export default function AIOperationsCopilotPage() {
                   {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>Override reason: {proposal.payload.override_reason}</p> : null}
                   <p style={styles.help}>No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.</p>
                   <div style={styles.actionRow}>
-                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true">Open in Intelligence Review</Link>
-                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true">Open linked Execution Request</Link> : null}
+                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />Open in Intelligence Review</Link>
+                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />Open linked Execution Request</Link> : null}
                   </div>
                 </div>
               ) : null}
@@ -964,7 +984,7 @@ export default function AIOperationsCopilotPage() {
         </Panel>
       </div>
 
-      <Panel title="Run history" subtitle={runsQuery.data && runsQuery.data.total > runRows.length ? `Showing the newest ${runRows.length} of ${runsQuery.data.total} permitted runs.` : `${runsQuery.data?.total || 0} permitted run(s). Select one to view the saved result.`}>
+      <Panel title="Run history" iconPath="/audit" subtitle={runsQuery.data && runsQuery.data.total > runRows.length ? `Showing the newest ${runRows.length} of ${runsQuery.data.total} permitted runs.` : `${runsQuery.data?.total || 0} permitted run(s). Select one to view the saved result above.`}>
         {runsQuery.isError ? <div style={styles.error}>{readableError(runsQuery.error)}</div> : null}
         {runsQuery.isLoading ? <div style={styles.empty}>Loading Copilot history…</div> : null}
         <div className="ai-copilot-history-list" style={styles.historyList}>
@@ -978,6 +998,7 @@ export default function AIOperationsCopilotPage() {
                 <Badge tone={run.run_status === 'completed' ? 'good' : run.run_status === 'failed' ? 'bad' : 'warn'}>{formatLabel(run.run_status)}</Badge>
                 {run.proposal_snapshot ? <Badge tone="warn">Proposal</Badge> : <Badge>Read only</Badge>}
                 <span>{formatDateTime(run.created_at)}</span>
+                <span style={styles.historyView}><TenantNavIcon path="/intelligence-review" size={14} />View saved result</span>
               </div>
             </button>
           ))}
@@ -985,7 +1006,7 @@ export default function AIOperationsCopilotPage() {
         </div>
       </Panel>
 
-      <Panel title="What the Copilot is not allowed to do" subtitle="These restrictions are enforced by the server, not by instructions given to an AI model.">
+      <Panel title="What the Copilot is not allowed to do" iconPath="/reliability-command" subtitle="These restrictions are enforced by the server, not by instructions given to an AI model.">
         <div style={styles.safetyGrid}>
           {Object.entries(capabilitiesQuery.data?.safety_contract || {
             tenant_scoped_reads_only: true,
@@ -1008,19 +1029,29 @@ export default function AIOperationsCopilotPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'grid', gap: 20 },
-  hero: { display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap', padding: 20, border: '1px solid #e2e8f0', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04)' },
+  hero: { display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap', padding: 22, border: '1px solid #dbe5f1', borderRadius: 18, background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03), 0 12px 30px rgba(15, 23, 42, 0.05)' },
+  heroTitleRow: { display: 'flex', gap: 14, alignItems: 'flex-start', minWidth: 0, flex: '1 1 620px' },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', color: '#2563eb', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.9)' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 12, fontWeight: 800, color: '#2563eb' },
   title: { margin: '4px 0 8px', fontSize: 32, lineHeight: 1.15 },
   subtitle: { margin: 0, maxWidth: 850, color: 'var(--muted-text, #64748b)', lineHeight: 1.55 },
   heroBadges: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  summaryCard: { border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04)' },
+  summaryCard: { border: '1px solid #dbe5f1', borderRadius: 16, padding: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04)', display: 'flex', gap: 12, alignItems: 'flex-start' },
+  summaryContent: { minWidth: 0, flex: 1 },
+  summaryIcon: { width: 40, height: 40, borderRadius: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', border: '1px solid transparent' },
+  summaryIconBlue: { color: '#2563eb', background: '#eff6ff', borderColor: '#dbeafe' },
+  summaryIconPurple: { color: '#7c3aed', background: '#f5f3ff', borderColor: '#ede9fe' },
+  summaryIconGreen: { color: '#059669', background: '#ecfdf5', borderColor: '#d1fae5' },
+  summaryIconAmber: { color: '#d97706', background: '#fff7ed', borderColor: '#ffedd5' },
   summaryLabel: { fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted-text, #64748b)' },
   summaryValue: { fontSize: 20, fontWeight: 800, marginTop: 5, textTransform: 'capitalize' },
   summaryHelp: { marginTop: 6, fontSize: 13, color: 'var(--muted-text, #64748b)', lineHeight: 1.4 },
   mainGrid: { display: 'grid', gridTemplateColumns: 'minmax(300px, 0.8fr) minmax(360px, 1.2fr)', gap: 16, alignItems: 'start' },
   panel: { border: '1px solid #e2e8f0', borderRadius: 16, background: '#ffffff', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04)' },
   panelHeader: { display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 16 },
+  panelHeading: { display: 'flex', gap: 11, alignItems: 'flex-start', minWidth: 0 },
+  panelIcon: { width: 36, height: 36, borderRadius: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', background: '#eff6ff', border: '1px solid #dbeafe', flex: '0 0 auto' },
   panelTitle: { margin: 0, fontSize: 19 },
   panelSubtitle: { margin: '5px 0 0', color: 'var(--muted-text, #64748b)', lineHeight: 1.45 },
   form: { display: 'grid', gap: 15 },
@@ -1061,8 +1092,8 @@ const styles: Record<string, CSSProperties> = {
   keyValueGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
   keyLabel: { display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--muted-text, #64748b)', marginBottom: 3 },
   actionRow: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
-  linkButton: { display: 'inline-flex', padding: '9px 12px', borderRadius: 8, background: 'var(--primary-color, #2563eb)', color: '#fff', textDecoration: 'none', fontWeight: 800, fontSize: 13 },
-  secondaryLink: { fontWeight: 800, fontSize: 13 },
+  linkButton: { display: 'inline-flex', gap: 7, alignItems: 'center', padding: '9px 12px', borderRadius: 9, background: 'var(--primary-color, #2563eb)', color: '#fff', textDecoration: 'none', fontWeight: 800, fontSize: 13 },
+  secondaryLink: { display: 'inline-flex', gap: 7, alignItems: 'center', padding: '9px 12px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#ffffff', color: '#1d4ed8', textDecoration: 'none', fontWeight: 800, fontSize: 13 },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border-color, #dbe3ee)' },
   historyList: { display: 'grid', gap: 8 },
   historyButton: { width: '100%', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#ffffff', color: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 },
@@ -1070,6 +1101,7 @@ const styles: Record<string, CSSProperties> = {
   historyMain: { display: 'grid', gap: 4, minWidth: 0 },
   historyPrompt: { color: 'var(--muted-text, #64748b)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 700 },
   historyMeta: { display: 'flex', flexWrap: 'wrap', gap: 7, alignItems: 'center', justifyContent: 'flex-end', fontSize: 12, color: 'var(--muted-text, #64748b)' },
+  historyView: { display: 'inline-flex', alignItems: 'center', gap: 5, color: '#2563eb', fontWeight: 800 },
   safetyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 9 },
   safetyItem: { display: 'flex', gap: 9, alignItems: 'center', padding: 9, borderRadius: 8, background: 'rgba(100, 116, 139, 0.07)', fontSize: 13 }
 };
