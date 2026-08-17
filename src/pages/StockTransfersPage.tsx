@@ -318,11 +318,11 @@ async function cancelTransfer(input: { id: string; reason?: string }): Promise<{
   });
 }
 
-function StatCard(props: { title: string; value: number | string; subtitle: string }) {
+function StatCard(props: { title: string; value: number | string; subtitle: string; loading?: boolean }) {
   return (
     <div style={styles.statCard}>
       <div style={styles.statTitle}>{props.title}</div>
-      <div style={styles.statValue}>{formatNumber(props.value)}</div>
+      <div style={styles.statValue}>{props.loading ? '—' : formatNumber(props.value)}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
   );
@@ -893,11 +893,11 @@ export default function StockTransfersPage() {
   return (
     <div className="io-operational-page io-stock-transfers-page" style={styles.page}>
       <div className="app-grid-stats" style={styles.statsGrid}>
-        <StatCard title="Transfers" value={summary.transfer_count} subtitle="Matching the current filters" />
-        <StatCard title="Drafts" value={summary.draft_count} subtitle="Waiting for execution or cancellation" />
-        <StatCard title="Executed" value={summary.executed_count} subtitle="Stock already moved" />
-        <StatCard title="Cancelled" value={summary.cancelled_count} subtitle="Drafts closed without moving stock" />
-        <StatCard title="Line Items" value={summary.item_count} subtitle="Product lines across matching transfers" />
+        <StatCard title="Transfers" value={summary.transfer_count} subtitle="Matching the current filters" loading={transferSummaryQuery.isLoading} />
+        <StatCard title="Drafts" value={summary.draft_count} subtitle="Waiting for execution or cancellation" loading={transferSummaryQuery.isLoading} />
+        <StatCard title="Executed" value={summary.executed_count} subtitle="Stock already moved" loading={transferSummaryQuery.isLoading} />
+        <StatCard title="Cancelled" value={summary.cancelled_count} subtitle="Drafts closed without moving stock" loading={transferSummaryQuery.isLoading} />
+        <StatCard title="Line Items" value={summary.item_count} subtitle="Product lines across matching transfers" loading={transferSummaryQuery.isLoading} />
       </div>
 
       {message ? <div className="app-success-state" style={styles.feedbackBox}>{message}</div> : null}
