@@ -1716,10 +1716,13 @@ function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState): stri
   return null;
 }
 
-function StatCard({ label, value }: { label: string; value: unknown }) {
+function StatCard({ label, value, iconPath, tone = 'blue' }: { label: string; value: unknown; iconPath?: string; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate' }) {
   return (
-    <div className="card" style={{ minWidth: 170, flex: '1 1 170px' }}>
-      <div className="card__label">{label}</div>
+    <div className={'card learning-feedback-stat-card'} data-tone={tone} style={{ minWidth: 170, flex: '1 1 170px' }}>
+      <div className={'learning-feedback-stat-card__top'}>
+        {iconPath ? <span className={'learning-feedback-stat-card__icon'}><TenantNavIcon path={iconPath} size={18} /></span> : null}
+        <div className="card__label">{label}</div>
+      </div>
       <div className="card__value">{formatLabel(value)}</div>
     </div>
   );
@@ -1730,20 +1733,20 @@ function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedbac
   const actions = plan?.recommended_actions || [];
 
   return (
-    <section className="card">
+    <section className={'card learning-feedback-section learning-feedback-action-plan'}>
       <div className="card__header">
         <div>
-          <h2>Feedback action plan</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/action-center" size={18} /></span>Feedback action plan</h2>
           <p className="card__subtext">
             Suggested follow-up work based on the feedback records already captured. People still decide whether to take any action, who owns it, and when it is complete.
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Actions" value={plan?.action_count ?? 0} />
-        <StatCard label="High priority" value={plan?.high_priority_action_count ?? 0} />
-        <StatCard label="Medium priority" value={plan?.medium_priority_action_count ?? 0} />
-        <StatCard label="Next review focus" value={plan?.next_review_focus || 'routine_learning_monitoring'} />
+        <StatCard label="Actions" value={plan?.action_count ?? 0} iconPath="/action-center" tone="blue" />
+        <StatCard label="High priority" value={plan?.high_priority_action_count ?? 0} iconPath="/alerts" tone="amber" />
+        <StatCard label="Medium priority" value={plan?.medium_priority_action_count ?? 0} iconPath="/workflow-composer" tone="violet" />
+        <StatCard label="Next review focus" value={plan?.next_review_focus || 'routine_learning_monitoring'} iconPath="/decision-learning-feedback" tone="green" />
       </div>
       {!actions.length ? (
         <p className="card__subtext">No recommended learning actions available yet.</p>
@@ -1785,21 +1788,21 @@ function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearni
   const domains = assessment?.domain_impact_summary || [];
 
   return (
-    <section className="card">
+    <section className={'card learning-feedback-section learning-feedback-impact'}>
       <div className="card__header">
         <div>
-          <h2>Learning impact assessment</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/insights" size={18} /></span>Learning impact assessment</h2>
           <p className="card__subtext">
             A read-only comparison of positive results, signs that results are changing, and evidence that still needs human review.
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Impact posture" value={assessment?.impact_posture || 'no_learning_evidence_yet'} />
-        <StatCard label="Learning signal" value={assessment?.learning_signal_score ?? 100} />
-        <StatCard label="Drift pressure" value={assessment?.drift_pressure_score ?? 0} />
-        <StatCard label="Total evidence" value={assessment?.total_evidence_count ?? 0} />
-        <StatCard label="Open review" value={assessment?.open_review_evidence_count ?? 0} />
+        <StatCard label="Impact posture" value={assessment?.impact_posture || 'no_learning_evidence_yet'} iconPath="/decision-learning-feedback" tone="blue" />
+        <StatCard label="Learning signal" value={assessment?.learning_signal_score ?? 100} iconPath="/insights" tone="green" />
+        <StatCard label="Drift pressure" value={assessment?.drift_pressure_score ?? 0} iconPath="/alerts" tone="amber" />
+        <StatCard label="Total evidence" value={assessment?.total_evidence_count ?? 0} iconPath="/audit" tone="violet" />
+        <StatCard label="Open review" value={assessment?.open_review_evidence_count ?? 0} iconPath="/intelligence-review" tone="slate" />
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
         <StatCard label="Avg outcome score" value={assessment?.average_outcome_score ?? '—'} />
@@ -3634,20 +3637,20 @@ function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feed
   const items = board?.review_items || [];
 
   return (
-    <section className="card">
+    <section className={'card learning-feedback-section learning-feedback-review-board'}>
       <div className="card__header">
         <div>
-          <h2>Feedback review board</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/intelligence-review" size={18} /></span>Feedback review board</h2>
           <p className="card__subtext">
             Feedback records that still need a person to check, accept, correct, or close. This page only helps organize the review; it does not carry out recommendations.
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Review posture" value={board?.review_posture || 'no_review_items_open'} />
-        <StatCard label="Open review items" value={board?.review_item_count ?? 0} />
-        <StatCard label="Domains" value={board?.domain_count ?? 0} />
-        <StatCard label="Readiness score" value={board?.review_readiness_score ?? 100} />
+        <StatCard label="Review posture" value={board?.review_posture || 'no_review_items_open'} iconPath="/intelligence-review" tone="blue" />
+        <StatCard label="Open review items" value={board?.review_item_count ?? 0} iconPath="/alerts" tone="amber" />
+        <StatCard label="Domains" value={board?.domain_count ?? 0} iconPath="/enterprise-inventory" tone="violet" />
+        <StatCard label="Readiness score" value={board?.review_readiness_score ?? 100} iconPath="/reliability-command" tone="green" />
       </div>
       {domains.length > 0 ? (
         <div style={{ overflowX: 'auto', marginBottom: 12 }}>
@@ -4362,12 +4365,19 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
 
 function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<string, unknown>> }) {
   const previewRows = rows.slice(0, 8);
+  const iconPath = title === 'Forecast accuracy'
+    ? '/probabilistic-forecasting'
+    : title === 'Policy effectiveness'
+      ? '/adaptive-policy-engine'
+      : title === 'Optimization results'
+        ? '/cross-domain-optimization'
+        : '/decision-learning-feedback';
 
   return (
-    <section className="card">
+    <section className={'card learning-feedback-section learning-feedback-evidence-table'}>
       <div className="card__header">
         <div>
-          <h2>{title}</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path={iconPath} size={18} /></span>{title}</h2>
           <p className="card__subtext">
             The latest saved records in this category. {rows.length > previewRows.length ? `Showing ${previewRows.length} of ${rows.length}.` : `${rows.length} record${rows.length === 1 ? '' : 's'} shown.`}
           </p>
@@ -4478,16 +4488,21 @@ export default function DecisionLearningFeedbackPage() {
 
   return (
     <div className="decision-intelligence-page">
+      <div className={'learning-feedback-page'}>
       <div className="page-header">
-        <div>
+        <div className={'learning-feedback-page-header__content'}>
+          <span className={'learning-feedback-page-header__icon'}><TenantNavIcon path="/decision-learning-feedback" size={24} /></span>
+          <div>
           <p className="eyebrow">Decision Intelligence</p>
           <h1>Learning Feedback</h1>
           <p className="page-subtitle">
             Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.
           </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+        <div className={'learning-feedback-refresh'}>
           <button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
+            <TenantNavIcon path="/decision-learning-feedback" size={16} />
             {summaryQuery.isFetching ? 'Refreshing…' : 'Refresh summary'}
           </button>
           <span className="card__subtext">Last refreshed: {formatTimestamp(summaryQuery.dataUpdatedAt)}</span>
@@ -4506,12 +4521,12 @@ export default function DecisionLearningFeedbackPage() {
         </section>
       ) : null}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <StatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} />
-        <StatCard label="Outcomes" value={governance?.outcome_count ?? 0} />
-        <StatCard label="Forecast evidence" value={governance?.forecast_accuracy_count ?? 0} />
-        <StatCard label="Policy evidence" value={governance?.policy_effectiveness_count ?? 0} />
-        <StatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} />
+      <div className={'learning-feedback-summary-grid'}>
+        <StatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
+        <StatCard label="Outcomes" value={governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
+        <StatCard label="Forecast evidence" value={governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
+        <StatCard label="Policy evidence" value={governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
+        <StatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
       </div>
 
       <div className="learning-feedback-view-switch" role="tablist" aria-label="Learning Feedback view">
@@ -4522,6 +4537,7 @@ export default function DecisionLearningFeedbackPage() {
           aria-selected={view === 'feedback'}
           onClick={() => setView('feedback')}
         >
+          <TenantNavIcon path="/decision-learning-feedback" size={16} />
           Feedback records
         </button>
         {canViewDiagnostics ? (
@@ -4532,16 +4548,17 @@ export default function DecisionLearningFeedbackPage() {
             aria-selected={view === 'readiness'}
             onClick={() => setView('readiness')}
           >
+            <TenantNavIcon path="/reliability-command" size={16} />
             Readiness checks
           </button>
         ) : null}
       </div>
 
       {view === 'feedback' ? (canGovern ? (
-      <section className="card">
+      <section className={'card learning-feedback-form-card'}>
         <div className="card__header">
           <div>
-            <h2>Record feedback evidence</h2>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>Record feedback evidence</h2>
             <p className="card__subtext">Choose what was reviewed, identify the source, and describe the expected and actual result. The saved record is added to the audit trail and the summary is refreshed.</p>
             <p className="card__subtext">Advanced fields are optional. Leave a field blank when the answer is not known; the system will not turn a blank field into a measured result, decision, or assigned action.</p>
           </div>
@@ -5000,6 +5017,7 @@ export default function DecisionLearningFeedbackPage() {
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           <button className="button" type="button" disabled={mutation.isPending} onClick={submitFeedback}>
+            <TenantNavIcon path="/decision-learning-feedback" size={16} />
             {mutation.isPending ? 'Recording…' : 'Record feedback evidence'}
           </button>
           {message ? <span className="card__subtext" role="status">{message}</span> : null}
@@ -5018,8 +5036,8 @@ export default function DecisionLearningFeedbackPage() {
           <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
           <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} />
 
-          <section className="card">
-            <h2>What this page can change</h2>
+          <section className={'card learning-feedback-section learning-feedback-safety-card'}>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/permissions" size={18} /></span>What this page can change</h2>
             <p className="card__subtext">
               It can save feedback evidence for later review. It cannot train an external model, change an AI model or policy by itself, execute a recommendation, or change stock and other operational records.
             </p>
@@ -5035,8 +5053,8 @@ export default function DecisionLearningFeedbackPage() {
         </>
       ) : canViewDiagnostics ? (
         <>
-          <section className="card">
-            <h2>Readiness checks</h2>
+          <section className={'card learning-feedback-section learning-feedback-readiness-intro'}>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/reliability-command" size={18} /></span>Readiness checks</h2>
             <p className="card__subtext">
               These technical checks support internal release, monitoring, audit, and rollout reviews. They do not prove that an AI model was used and they do not carry out operational work.
             </p>
@@ -5080,6 +5098,7 @@ export default function DecisionLearningFeedbackPage() {
           <ClosedLoopEnterpriseExpansionGovernanceCadence cadence={summaryQuery.data?.closed_loop_enterprise_expansion_governance_cadence} />
         </>
       ) : null}
+      </div>
     </div>
   );
 }

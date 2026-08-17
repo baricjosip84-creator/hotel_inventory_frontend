@@ -1,0 +1,333 @@
+.learning-feedback-page,
+.learning-feedback-page * {
+  box-sizing: border-box;
+}
+
+.learning-feedback-page {
+  --lf-blue: #2563eb;
+  --lf-navy: #0f172a;
+  --lf-border: #dbe5f1;
+  --lf-soft: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+}
+
+.learning-feedback-page .page-header,
+.learning-feedback-page .card {
+  border-color: var(--lf-border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 28px rgba(15, 23, 42, 0.045);
+}
+
+.learning-feedback-page .page-header {
+  align-items: center;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.learning-feedback-page-header__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.learning-feedback-page-header__icon,
+.learning-feedback-heading-icon,
+.learning-feedback-stat-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--lf-blue);
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.learning-feedback-page-header__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.learning-feedback-refresh {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.learning-feedback-page .button {
+  gap: 7px;
+}
+
+.learning-feedback-page .button:not(.button--secondary) {
+  border: 1px solid #1d4ed8;
+  background: linear-gradient(180deg, #2f6fed, #2563eb);
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.16);
+}
+
+.learning-feedback-page .button:not(.button--secondary):hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.learning-feedback-page .button--secondary {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.learning-feedback-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.learning-feedback-page .learning-feedback-stat-card {
+  position: relative;
+  min-height: 118px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.learning-feedback-page .learning-feedback-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: #bfdbfe;
+}
+
+.learning-feedback-page .learning-feedback-stat-card[data-tone='green']::after { background: #86efac; }
+.learning-feedback-page .learning-feedback-stat-card[data-tone='amber']::after { background: #fcd34d; }
+.learning-feedback-page .learning-feedback-stat-card[data-tone='violet']::after { background: #c4b5fd; }
+.learning-feedback-page .learning-feedback-stat-card[data-tone='slate']::after { background: #94a3b8; }
+
+.learning-feedback-stat-card__top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.learning-feedback-stat-card__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.learning-feedback-stat-card[data-tone='green'] .learning-feedback-stat-card__icon {
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #dcfce7;
+}
+
+.learning-feedback-stat-card[data-tone='amber'] .learning-feedback-stat-card__icon {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fef3c7;
+}
+
+.learning-feedback-stat-card[data-tone='violet'] .learning-feedback-stat-card__icon {
+  color: #7c3aed;
+  background: #f5f3ff;
+  border-color: #ede9fe;
+}
+
+.learning-feedback-stat-card[data-tone='slate'] .learning-feedback-stat-card__icon {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.learning-feedback-page .learning-feedback-stat-card .card__value {
+  margin-top: 13px;
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -0.02em;
+}
+
+.learning-feedback-page .learning-feedback-view-switch {
+  width: fit-content;
+  padding: 5px;
+  border-color: #d8e2ef;
+  border-radius: 14px;
+  background: #f1f5f9;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.learning-feedback-page .learning-feedback-view-switch__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding-inline: 16px;
+}
+
+.learning-feedback-page .learning-feedback-view-switch__button.is-active {
+  color: #ffffff;
+  background: var(--lf-blue);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+}
+
+.learning-feedback-page .learning-feedback-view-switch__button.is-active:hover,
+.learning-feedback-page .learning-feedback-view-switch__button.is-active:focus-visible {
+  color: #ffffff;
+  background: #1d4ed8;
+}
+
+.learning-feedback-page .learning-feedback-form-card {
+  border-top: 3px solid #93c5fd;
+}
+
+.learning-feedback-page .learning-feedback-section {
+  border-top: 3px solid #dbeafe;
+}
+
+.learning-feedback-page .learning-feedback-action-plan { border-top-color: #93c5fd; }
+.learning-feedback-page .learning-feedback-impact { border-top-color: #86efac; }
+.learning-feedback-page .learning-feedback-review-board { border-top-color: #c4b5fd; }
+.learning-feedback-page .learning-feedback-safety-card { border-top-color: #94a3b8; }
+.learning-feedback-page .learning-feedback-readiness-intro { border-top-color: #fcd34d; }
+
+.learning-feedback-page .card__header h2,
+.learning-feedback-page .learning-feedback-section > h2,
+.learning-feedback-page .learning-feedback-form-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.learning-feedback-heading-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.learning-feedback-page .learning-feedback-advanced {
+  border-color: #d8e2ef;
+  border-radius: 14px;
+  background: #fbfdff;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.025);
+}
+
+.learning-feedback-page .learning-feedback-advanced > summary {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  color: #1e293b;
+  background: #f8fafc;
+}
+
+.learning-feedback-page .learning-feedback-advanced[open] > summary {
+  background: #f1f5f9;
+}
+
+.learning-feedback-page .learning-feedback-advanced__body {
+  background: #ffffff;
+}
+
+.learning-feedback-page .input {
+  min-height: 44px;
+  border-radius: 11px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.learning-feedback-page textarea.input {
+  resize: vertical;
+}
+
+.learning-feedback-page .table,
+.learning-feedback-page .data-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.learning-feedback-page .table th,
+.learning-feedback-page .data-table th {
+  color: #334155;
+  background: #f8fafc;
+}
+
+.learning-feedback-page .table tbody tr:hover td,
+.learning-feedback-page .data-table tbody tr:hover td {
+  background: #fbfdff;
+}
+
+.learning-feedback-page .learning-feedback-evidence-table .card__header {
+  margin-bottom: 12px;
+}
+
+.learning-feedback-page .learning-feedback-evidence-table > .card__subtext {
+  margin-top: 2px;
+  padding: 14px;
+  border: 1px dashed #dbe5f1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.learning-feedback-page .learning-feedback-read-only {
+  border-left-color: #64748b;
+  background: #f8fafc;
+}
+
+.learning-feedback-page [role='status'] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+@media (max-width: 1240px) {
+  .learning-feedback-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .learning-feedback-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .learning-feedback-page {
+    gap: 16px;
+  }
+
+  .learning-feedback-page .page-header {
+    align-items: stretch;
+  }
+
+  .learning-feedback-page-header__content {
+    width: 100%;
+  }
+
+  .learning-feedback-refresh {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .learning-feedback-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-feedback-page .learning-feedback-view-switch {
+    width: 100%;
+  }
+
+  .learning-feedback-page .learning-feedback-view-switch__button {
+    width: 100%;
+  }
+
+  .learning-feedback-page .learning-feedback-stat-card {
+    min-height: 0;
+  }
+}
