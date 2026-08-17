@@ -6,6 +6,8 @@ import { ApiError, apiRequest } from '../lib/api';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import './InsightsPage.css';
 
 type DepletionRiskResponse = {
   generated_at: string;
@@ -511,21 +513,47 @@ async function fetchSupplierTrustProductionReview(): Promise<SupplierTrustProduc
   return apiRequest<SupplierTrustProductionReviewResponse>('/supplier-insights/trust-scores/production-review');
 }
 
+function sectionIconPath(title: string): string {
+  const normalized = title.trim().toLowerCase();
+  if (normalized.includes('supplier')) return '/suppliers';
+  if (normalized.includes('reorder')) return '/products';
+  if (normalized.includes('depletion')) return '/stock';
+  if (normalized.includes('stock is under pressure')) return '/stock-movements';
+  if (normalized.includes('unusual inventory movement')) return '/stock-movements';
+  if (normalized.includes('anomaly')) return '/reliability-command';
+  if (normalized.includes('health')) return '/dashboard';
+  if (normalized.includes('action')) return '/action-center';
+  return '/insights';
+}
+
 function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
+  const iconPath = sectionIconPath(props.title);
+
   return (
-    <section className="app-panel app-panel--padded" style={styles.panel}>
-      <div style={styles.panelHeader}>
-        <div style={styles.panelHeaderText}>
-          <h3 style={styles.panelTitle}>{props.title}</h3>
-          <p style={styles.panelSubtitle}>{props.subtitle}</p>
+    <section className="app-panel app-panel--padded insights-section" style={styles.panel}>
+      <div className="insights-section__header" style={styles.panelHeader}>
+        <div className="insights-section__heading">
+          <span className="insights-section__icon" aria-hidden="true">
+            <TenantNavIcon path={iconPath} size={19} />
+          </span>
+          <div style={styles.panelHeaderText}>
+            <h3 style={styles.panelTitle}>{props.title}</h3>
+            <p style={styles.panelSubtitle}>{props.subtitle}</p>
+          </div>
         </div>
       </div>
-      {props.children}
+      <div className="insights-section__body">{props.children}</div>
     </section>
   );
 }
 
-function StatCard(props: { title: string; value: string; subtitle: string; tone?: 'default' | 'warn' | 'bad' | 'good' }) {
+function StatCard(props: {
+  title: string;
+  value: string;
+  subtitle: string;
+  tone?: 'default' | 'warn' | 'bad' | 'good';
+  iconPath?: string;
+}) {
   const valueStyle =
     props.tone === 'bad'
       ? styles.statValueBad
@@ -536,8 +564,13 @@ function StatCard(props: { title: string; value: string; subtitle: string; tone?
           : styles.statValue;
 
   return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
+    <div className="insights-stat-card" data-tone={props.tone ?? 'default'} style={styles.statCard}>
+      <div className="insights-stat-card__header">
+        <span className="insights-stat-card__icon" aria-hidden="true">
+          <TenantNavIcon path={props.iconPath ?? '/insights'} size={18} />
+        </span>
+        <div style={styles.statTitle}>{props.title}</div>
+      </div>
       <div style={valueStyle}>{props.value}</div>
       <div style={styles.statSubtitle}>{props.subtitle}</div>
     </div>
@@ -1261,28 +1294,67 @@ export default function InsightsPage() {
   }
 
   return (
-    <div style={styles.page}>
-      <section className="app-grid-stats" style={styles.statsGrid}>
+    <div className="insights-page" style={styles.page}>
+      <section className="app-panel app-panel--padded insights-hero">
+        <div className="insights-hero__main">
+          <div className="insights-hero__content">
+            <span className="insights-hero__icon" aria-hidden="true">
+              <TenantNavIcon path="/insights" size={24} />
+            </span>
+            <div className="insights-hero__copy">
+              <div className="insights-eyebrow">Management intelligence</div>
+              <h2>Turn operational signals into a clear next-action view</h2>
+              <p>
+                Review tenant health, supplier performance, depletion pressure, reorder needs, and unusual movement evidence in one place.
+                Insights remain read-only; operational changes stay in their authoritative source workflows.
+              </p>
+              <div className="insights-hero__badges" aria-label="Insights operating safeguards">
+                <span>Read-only intelligence</span>
+                <span>Tenant-scoped evidence</span>
+                <span>Source workflows stay authoritative</span>
+              </div>
+            </div>
+          </div>
+          <aside className="insights-refresh-card" aria-label="Insight refresh status">
+            <span>Last refreshed</span>
+            <strong>{lastRefreshedAt ? formatDateTime(lastRefreshedAt) : 'Not loaded yet'}</strong>
+            <button
+              type="button"
+              className="app-button app-button--primary insights-refresh-button"
+              onClick={() => void refreshAllInsights()}
+              disabled={isRefreshingAll}
+            >
+              {isRefreshingAll ? 'Refreshing insights…' : 'Refresh all insights'}
+            </button>
+          </aside>
+        </div>
+      </section>
+
+      <section className="app-grid-stats insights-summary-grid" style={styles.statsGrid}>
         <StatCard
           title="Operational Health"
           value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}
           subtitle={healthQuery.data ? `Current tier: ${formatReadableStatus(healthQuery.data.health_tier)}` : 'Tenant-level health score.'}
           tone={healthQuery.data?.health_tier === 'critical' ? 'bad' : healthQuery.data?.health_tier === 'watch' ? 'warn' : 'good'}
+          iconPath="/dashboard"
         />
         <StatCard
           title="Stock rows assessed"
           value={depletionRiskQuery.data ? String(depletionRiskQuery.data.rows.length) : '-'}
           subtitle="Product and location rows reviewed for depletion pressure."
+          iconPath="/stock"
         />
         <StatCard
           title="Reorder Candidates"
           value={reorderQuery.data ? String(activeReorderRows.length) : '-'}
           subtitle="Products with a recommended reorder quantity."
+          iconPath="/products"
         />
         <StatCard
           title="Rated suppliers"
           value={supplierTrustQuery.data ? formatNumber(supplierTrustQuery.data.summary?.rated_suppliers ?? 0, 0) : '-'}
           subtitle={supplierTrustQuery.data ? `${formatNumber(supplierTrustQuery.data.summary?.unrated_suppliers ?? 0, 0)} supplier(s) need delivery history.` : 'Supplier performance based on real delivery history.'}
+          iconPath="/suppliers"
         />
       </section>
 
@@ -1292,9 +1364,16 @@ export default function InsightsPage() {
             {actionAgenda.map((item) => (
               <article
                 key={item.title}
+                className="insights-action-card"
+                data-tone={item.tone}
                 style={item.tone === 'bad' ? styles.actionCardBad : item.tone === 'warn' ? styles.actionCardWarn : styles.actionCardGood}
               >
-                <div style={styles.actionCardTitle}>{item.title}</div>
+                <div className="insights-action-card__header">
+                  <span className="insights-action-card__icon" aria-hidden="true">
+                    <TenantNavIcon path={item.route} size={18} />
+                  </span>
+                  <div style={styles.actionCardTitle}>{item.title}</div>
+                </div>
                 <div style={styles.actionCardText}>{item.detail}</div>
                 <Link to={item.route} style={styles.actionCardLink}>
                   {item.linkLabel}
@@ -1309,7 +1388,7 @@ export default function InsightsPage() {
         )}
       </Section>
 
-      <Section title="Insight controls" subtitle="Choose the recent-history window, refresh every insight together, and confirm when the current data was generated.">
+      <Section title="Insight controls" subtitle="Choose the recent-history window used by the supported windowed analyses. Refresh status and the global refresh action are available above.">
         <div className="app-actions" style={styles.controlRow}>
           <label style={styles.label}>
             Recent history window
@@ -1320,17 +1399,19 @@ export default function InsightsPage() {
               <option value={90}>90 days</option>
             </select>
           </label>
-          <button type="button" style={styles.primaryButton} onClick={() => void refreshAllInsights()} disabled={isRefreshingAll}>
-            {isRefreshingAll ? 'Refreshing insights…' : 'Refresh all insights'}
-          </button>
-          <div style={styles.refreshMeta}>
-            <strong>Last refreshed</strong>
-            <span>{lastRefreshedAt ? formatDateTime(lastRefreshedAt) : 'Not loaded yet'}</span>
+          <div className="insights-control-note">
+            <span className="insights-control-note__icon" aria-hidden="true">
+              <TenantNavIcon path="/stock-movements" size={18} />
+            </span>
+            <div>
+              <strong>Windowed evidence</strong>
+              <span>The history window applies to depletion and reorder analysis; other management signals use their current supported evidence windows.</span>
+            </div>
           </div>
         </div>
       </Section>
 
-      <div style={styles.grid}>
+      <div className="insights-sections" style={styles.grid}>
         <Section title="Operational health" subtitle="Tenant-level health based on alerts, overdue shipments, low-stock pressure, and discrepancy pressure.">
           {healthQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading health score...</div> : null}
           {healthQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(healthQuery.error)}</div> : null}
@@ -1370,7 +1451,7 @@ export default function InsightsPage() {
           {supplierTrustProductionReviewQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>Loading supplier performance review...</div> : null}
           {supplierTrustProductionReviewQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(supplierTrustProductionReviewQuery.error)}</div> : null}
           {supplierTrustProductionReviewQuery.data ? (
-            <div style={styles.supplierBreakdownPanel} aria-label="Supplier performance review">
+            <div className="insights-review-panel" style={styles.supplierBreakdownPanel} aria-label="Supplier performance review">
               <div style={styles.itemTitle}>Supplier Performance Review</div>
               <div className="app-grid-stats" style={styles.supplierSummaryGrid}>
                 <StatCard
@@ -1378,30 +1459,34 @@ export default function InsightsPage() {
                   value={formatReadableStatus(supplierTrustProductionReviewQuery.data.production_status)}
                   subtitle="Advisory status based on delivery history and active risk factors."
                   tone={supplierTrustProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : supplierTrustProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+                  iconPath="/suppliers"
                 />
                 <StatCard
                   title="Suppliers needing review"
                   value={formatNumber(supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
                   subtitle={`${formatNumber(supplierTrustProductionReviewQuery.data.summary.total_rows, 0)} suppliers reviewed.`}
                   tone={supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+                  iconPath="/suppliers"
                 />
                 <StatCard
                   title="Blockers"
                   value={formatNumber(supplierTrustProductionReviewQuery.data.blockers.length, 0)}
                   subtitle="Blocking supplier performance issues requiring human review."
                   tone={supplierTrustProductionReviewQuery.data.blockers.length > 0 ? 'bad' : 'good'}
+                  iconPath="/suppliers"
                 />
                 <StatCard
                   title="Read-only review"
                   value={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'Yes' : 'No'}
                   subtitle="Does not change suppliers, update status, or create purchase orders."
                   tone={supplierTrustProductionReviewQuery.data.safety_contract.read_only ? 'good' : 'bad'}
+                  iconPath="/suppliers"
                 />
               </div>
               {supplierTrustProductionReviewQuery.data.blockers.length ? (
                 <div style={styles.list}>
                   {supplierTrustProductionReviewQuery.data.blockers.map((blocker) => (
-                    <div key={blocker.code} style={styles.itemCard}>
+                    <div key={blocker.code} className="insights-item-card" style={styles.itemCard}>
                       <div style={styles.itemTitle}>{blocker.message}</div>
                       <div style={styles.itemMeta}>Severity {formatReadableStatus(blocker.severity)} · {formatNumber(blocker.affected_count, 0)} supplier(s) affected</div>
                     </div>
@@ -1424,33 +1509,37 @@ export default function InsightsPage() {
                     value={formatNumber(supplierTrustQuery.data.summary.suppliers_with_risk, 0)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.risk_supplier_rate_pct)}% of suppliers have at least one active risk flag.`}
                     tone={toNumber(supplierTrustQuery.data.summary.high_risk_flags) > 0 ? 'bad' : toNumber(supplierTrustQuery.data.summary.suppliers_with_risk) > 0 ? 'warn' : 'good'}
+                    iconPath="/suppliers"
                   />
                   <StatCard
                     title="High-risk signals"
                     value={formatNumber(supplierTrustQuery.data.summary.high_risk_flags, 0)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.total_risk_flags, 0)} total supplier risk flags.`}
                     tone={toNumber(supplierTrustQuery.data.summary.high_risk_flags) > 0 ? 'bad' : 'good'}
+                    iconPath="/suppliers"
                   />
                   <StatCard
                     title="Overdue Open POs"
                     value={formatNumber(supplierTrustQuery.data.summary.overdue_open_purchase_orders, 0)}
                     subtitle="Open supplier POs past expected delivery date."
                     tone={toNumber(supplierTrustQuery.data.summary.overdue_open_purchase_orders) > 0 ? 'bad' : 'good'}
+                    iconPath="/suppliers"
                   />
                   <StatCard
                     title="Remaining PO Value"
                     value={formatSupplierMoney(supplierTrustQuery.data.summary.po_remaining_value, supplierTrustQuery.data.summary.currency_code)}
                     subtitle={`${formatNumber(supplierTrustQuery.data.summary.po_remaining_quantity)} units still open across supplier POs.`}
                     tone={toNumber(supplierTrustQuery.data.summary.po_remaining_quantity) > 0 ? 'warn' : 'good'}
+                    iconPath="/suppliers"
                   />
                 </div>
               ) : null}
-              <div style={styles.supplierDataMetaPanel} aria-label="Supplier performance data status">
+              <div className="insights-meta-panel" style={styles.supplierDataMetaPanel} aria-label="Supplier performance data status">
                 <span>Generated {formatDateTime(supplierTrustQuery.data.generated_at)}</span>
                 <span>{visibleSupplierTrustRows.length} matching suppliers · {supplierTrustQuery.data.rows.length} total suppliers</span>
                 {supplierTrustQuery.isFetching ? <span>Refreshing...</span> : null}
               </div>
-              <div style={styles.supplierActionSummaryPanel} aria-label="Supplier recommended action summary">
+              <div className="insights-action-summary" style={styles.supplierActionSummaryPanel} aria-label="Supplier recommended action summary">
                 <div style={styles.supplierActionSummaryHeader}>
                   <div>
                     <div style={styles.itemTitle}>Recommended action summary</div>
@@ -1552,7 +1641,7 @@ export default function InsightsPage() {
                 </label>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={clearSupplierTrustFilters}
                   disabled={!supplierActiveFilterChips.length}
@@ -1561,7 +1650,7 @@ export default function InsightsPage() {
                 </button>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={() => void supplierTrustQuery.refetch()}
                   disabled={supplierTrustQuery.isFetching}
@@ -1570,7 +1659,7 @@ export default function InsightsPage() {
                 </button>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={exportSupplierTrustCsv}
                   disabled={!visibleSupplierTrustRows.length}
@@ -1579,7 +1668,7 @@ export default function InsightsPage() {
                 </button>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={printSupplierTrust}
                   disabled={!visibleSupplierTrustRows.length}
@@ -1588,7 +1677,7 @@ export default function InsightsPage() {
                 </button>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={() => void copySupplierTrustViewLink()}
                 >
@@ -1613,7 +1702,7 @@ export default function InsightsPage() {
               <div style={styles.itemMeta}>
                 Showing {pagedSupplierTrustRows.length ? ((supplierCurrentPage - 1) * supplierPageSize) + 1 : 0}-{Math.min(supplierCurrentPage * supplierPageSize, visibleSupplierTrustRows.length)} of {visibleSupplierTrustRows.length} matching suppliers · {supplierTrustQuery.data.rows.length} total.
               </div>
-              <div style={styles.supplierBreakdownPanel} aria-label="Supplier performance breakdown filters">
+              <div className="insights-breakdown-panel" style={styles.supplierBreakdownPanel} aria-label="Supplier performance breakdown filters">
                 <div style={styles.itemTitle}>Supplier performance breakdown</div>
                 <div style={styles.supplierBreakdownGrid}>
                   <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('with_risk'); setSupplierTierFilter('all'); }}>
@@ -1650,7 +1739,7 @@ export default function InsightsPage() {
               </div>
               <div style={styles.list}>
               {pagedSupplierTrustRows.map((row) => (
-                <article key={row.supplier_id} style={styles.itemCard}>
+                <article key={row.supplier_id} className="insights-item-card insights-item-card--supplier" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.supplier_name}</div>
                   <div style={styles.itemMeta}>Performance {formatSupplierTrustScore(row)} · {row.trust_tier === 'unrated' ? 'Not enough delivery history' : `Tier ${formatReadableStatus(row.trust_tier)}`}</div>
                   <div style={styles.itemText}>
@@ -1694,7 +1783,7 @@ export default function InsightsPage() {
               <div style={styles.paginationControls}>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={() => setSupplierPage((page) => Math.max(1, page - 1))}
                   disabled={supplierCurrentPage <= 1}
@@ -1704,7 +1793,7 @@ export default function InsightsPage() {
                 <span style={styles.itemMeta}>Page {supplierCurrentPage} of {supplierTotalPages}</span>
                 <button
                   type="button"
-                  className="app-button app-button--secondary"
+                  className="app-button app-button--secondary insights-secondary-button"
                   style={styles.secondaryButton}
                   onClick={() => setSupplierPage((page) => Math.min(supplierTotalPages, page + 1))}
                   disabled={supplierCurrentPage >= supplierTotalPages}
@@ -1713,7 +1802,7 @@ export default function InsightsPage() {
                 </button>
               </div>
               {selectedSupplierTrustRow ? (
-                <article style={styles.supplierDetailPanel} aria-label={`Supplier performance detail for ${selectedSupplierTrustRow.supplier_name}`}>
+                <article className="insights-supplier-detail" style={styles.supplierDetailPanel} aria-label={`Supplier performance detail for ${selectedSupplierTrustRow.supplier_name}`}>
                   <div style={styles.supplierDetailHeader}>
                     <div>
                       <div style={styles.itemTitle}>{selectedSupplierTrustRow.supplier_name}</div>
@@ -1806,7 +1895,7 @@ export default function InsightsPage() {
                   ) : (
                     <div className="app-empty-state" style={styles.infoState}>No active supplier risk flags.</div>
                   )}
-                  <div style={styles.recommendedActionPanel}>
+                  <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
                     <div style={styles.itemTitle}>Recommended Actions</div>
                     <div style={styles.riskFlagDetailList}>
                       {getSupplierRecommendedActions(selectedSupplierTrustRow).map((action) => (
@@ -1849,7 +1938,7 @@ export default function InsightsPage() {
           {depletionRiskQuery.data?.rows.length ? (
             <div style={styles.list}>
               {depletionRiskQuery.data.rows.slice(0, 10).map((row) => (
-                <article key={row.stock_id} style={styles.itemCard}>
+                <article key={row.stock_id} className="insights-item-card insights-item-card--stock" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
                     {row.storage_location_name} · Risk {formatNumber(row.risk_score, 0)} · Tier {formatReadableStatus(row.risk_tier)}
@@ -1872,13 +1961,13 @@ export default function InsightsPage() {
           {depletionRootCauseQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRootCauseQuery.error)}</div> : null}
           {depletionRootCauseQuery.data ? (
             <div style={styles.list}>
-              <div style={styles.supplierDataMetaPanel}>
+              <div className="insights-meta-panel" style={styles.supplierDataMetaPanel}>
                 <span>{formatNumber(depletionRootCauseQuery.data.summary.total_rows, 0)} stock rows reviewed</span>
                 <span>{formatNumber(depletionRootCauseQuery.data.summary.rows_requiring_human_review, 0)} need human review</span>
                 <span>Read-only: {depletionRootCauseQuery.data.safety_contract.read_only ? 'yes' : 'no'}</span>
               </div>
               {depletionRootCauseQuery.data.rows.slice(0, 8).map((row) => (
-                <article key={`${row.stock_id}-root-cause`} style={styles.itemCard}>
+                <article key={`${row.stock_id}-root-cause`} className="insights-item-card insights-item-card--root-cause" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
                     {row.storage_location_name} · Highest concern {formatReadableStatus(row.highest_factor_severity)} · Risk {formatNumber(row.risk_score, 0)} / {formatReadableStatus(row.risk_tier)}
@@ -1896,7 +1985,7 @@ export default function InsightsPage() {
                       </div>
                     ))}
                   </div>
-                  <div style={styles.recommendedActionPanel}>
+                  <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
                     <div style={styles.itemTitle}>Investigation steps</div>
                     <ul style={styles.compactList}>
                       {row.recommended_investigation_steps.slice(0, 3).map((step) => (
@@ -1919,7 +2008,7 @@ export default function InsightsPage() {
           {activeReorderRows.length ? (
             <div style={styles.list}>
               {activeReorderRows.slice(0, 8).map((row) => (
-                <article key={row.product_id} style={styles.itemCard}>
+                <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>Urgency {row.urgency} · Reorder {formatNumber(row.recommended_reorder_quantity)}</div>
                   <div style={styles.itemText}>
@@ -1948,25 +2037,28 @@ export default function InsightsPage() {
                 value={formatReadableStatus(anomalyProductionReviewQuery.data.production_status)}
                 subtitle={`Health tier: ${formatReadableStatus(anomalyProductionReviewQuery.data.operational_health_context.health_tier)}`}
                 tone={anomalyProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : anomalyProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+                iconPath="/reliability-command"
               />
               <StatCard
                 title="Rows needing review"
                 value={formatNumber(anomalyProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
                 subtitle={`${formatNumber(anomalyProductionReviewQuery.data.summary.total_rows, 0)} anomaly rows reviewed.`}
                 tone={anomalyProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+                iconPath="/reliability-command"
               />
               <StatCard
                 title="Review safeguards"
                 value={anomalyProductionReviewQuery.data.safety_contract.read_only ? 'Read-only review' : 'Write-enabled review'}
                 subtitle={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'Mutation enabled' : 'Read-only; no stock mutation or alert suppression.'}
                 tone={anomalyProductionReviewQuery.data.safety_contract.mutates_inventory ? 'bad' : 'good'}
+                iconPath="/reliability-command"
               />
             </div>
 
             {anomalyProductionReviewQuery.data.blockers.length || anomalyProductionReviewQuery.data.warnings.length ? (
               <div style={styles.list}>
                 {[...anomalyProductionReviewQuery.data.blockers, ...anomalyProductionReviewQuery.data.warnings].map((item) => (
-                  <article key={item.code} style={item.severity === 'critical' ? styles.actionCardBad : styles.actionCardWarn}>
+                  <article key={item.code} className="insights-action-card" data-tone={item.severity === 'critical' ? 'bad' : 'warn'} style={item.severity === 'critical' ? styles.actionCardBad : styles.actionCardWarn}>
                     <div style={styles.actionCardTitle}>{item.message}</div>
                     <div style={styles.itemMeta}>Affected rows: {formatNumber(item.affected_count, 0)} · Severity {formatReadableStatus(item.severity)}</div>
                   </article>
@@ -1976,7 +2068,7 @@ export default function InsightsPage() {
               <div className="app-empty-state" style={styles.infoState}>No blocking anomaly-review issues were found.</div>
             )}
 
-            <div style={styles.itemCard}>
+            <div className="insights-item-card" style={styles.itemCard}>
               <div style={styles.itemTitle}>Next actions</div>
               <ul style={styles.compactList}>
                 {anomalyProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{action}</li>)}
@@ -1984,7 +2076,7 @@ export default function InsightsPage() {
             </div>
 
             {anomalyProductionReviewQuery.data.rows.slice(0, 8).map((row) => (
-              <article key={row.product_id} style={styles.itemCard}>
+              <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
                 <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {formatReadableStatus(row.anomaly_tier)} · Review severity {formatReadableStatus(row.highest_factor_severity)}</div>
                 <div style={styles.itemText}>{row.review_factors.map((factor) => `${factor.label}: ${factor.detail}`).join(' ')}</div>
@@ -2003,7 +2095,7 @@ export default function InsightsPage() {
         {anomaliesQuery.data?.rows.length ? (
           <div style={styles.list}>
             {anomaliesQuery.data.rows.slice(0, 10).map((row) => (
-              <article key={row.product_id} style={styles.itemCard}>
+              <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
                 <div style={styles.itemMeta}>Anomaly {formatNumber(row.anomaly_score, 0)} · Tier {formatReadableStatus(row.anomaly_tier)}</div>
                 <div style={styles.itemText}>
