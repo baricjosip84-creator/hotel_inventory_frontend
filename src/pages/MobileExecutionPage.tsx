@@ -363,7 +363,7 @@ export default function MobileExecutionPage() {
           </div>
         </div>
         <div className="card mobile-execution-summary-card">
-          <span className={`mobile-execution-icon ${online ? 'mobile-execution-icon--green' : 'mobile-execution-icon--warning'}`}><TenantNavIcon path="/operations-feed" size={18} /></span>
+          <span className={`mobile-execution-icon ${online ? 'mobile-execution-icon--green' : 'mobile-execution-icon--warning'}`}><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
           <div className="mobile-execution-summary-copy">
             <div className="card__label">Connection</div>
             <div className={`card__value mobile-execution-summary-text-value ${online ? 'mobile-execution-value--healthy' : 'mobile-execution-value--warning'}`}>{online ? 'Online' : 'Offline'}</div>
@@ -390,7 +390,7 @@ export default function MobileExecutionPage() {
             <select aria-label="Filter mobile tasks by urgency" className="mobile-execution-select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
             <select aria-label="Filter mobile tasks by source" className="mobile-execution-select" value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>
-              <TenantNavIcon path="/operations-feed" size={15} />
+              <TenantNavIcon path="/real-time-operations-feed" size={15} />
               {mobileExecutionQuery.isFetching ? 'Refreshing…' : 'Refresh mobile queue'}
             </button>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canUpdateTasks}>

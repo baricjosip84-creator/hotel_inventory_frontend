@@ -275,3 +275,294 @@
   border-color: #e2e8f0;
   background: #f8fafc;
 }
+
+/* v3.46.51 reference-design refinement */
+.operations-feed-page--refined {
+  display: grid;
+  gap: 18px;
+}
+
+.operations-feed-page--refined .section {
+  margin-top: 0;
+}
+
+.operations-feed-page--refined .card {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 28px rgba(15, 23, 42, 0.045);
+}
+
+.operations-feed-page--refined .operations-feed-page__summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.operations-feed-page__summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 132px;
+  padding: 18px;
+}
+
+.operations-feed-page__summary-copy {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.operations-feed-page__summary-card .card__value {
+  margin: 1px 0 2px;
+  font-size: 28px;
+  line-height: 1.05;
+  color: #0f172a;
+}
+
+.operations-feed-page__summary-card .card__subtext {
+  line-height: 1.45;
+}
+
+.operations-feed-page__value--danger { color: #b91c1c !important; }
+.operations-feed-page__value--warning { color: #b45309 !important; }
+
+.operations-feed-page__icon,
+.operations-feed-page__section-icon,
+.operations-feed-page__guidance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.operations-feed-page__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border-color: #dbeafe;
+}
+
+.operations-feed-page__section-icon,
+.operations-feed-page__guidance-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border-color: #dbeafe;
+}
+
+.operations-feed-page__icon--danger { color: #dc2626; background: #fef2f2; border-color: #fee2e2; }
+.operations-feed-page__icon--warning { color: #c2410c; background: #fff7ed; border-color: #ffedd5; }
+.operations-feed-page__icon--amber { color: #b45309; background: #fffbeb; border-color: #fef3c7; }
+.operations-feed-page__icon--green { color: #15803d; background: #f0fdf4; border-color: #dcfce7; }
+.operations-feed-page__icon--blue { color: #2563eb; background: #eff6ff; border-color: #dbeafe; }
+
+.operations-feed-page__section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  color: #0f172a;
+}
+
+.operations-feed-page__section-count {
+  display: inline-flex;
+  min-width: 26px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  margin-left: 2px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operations-feed-page__controls-card {
+  gap: 18px;
+  padding: 16px;
+}
+
+.operations-feed-page__toolbar {
+  gap: 10px;
+}
+
+.operations-feed-page__toolbar-action,
+.operations-feed-page__actions .button {
+  gap: 7px;
+  font-weight: 700;
+}
+
+.operations-feed-page__guidance-grid {
+  gap: 10px;
+}
+
+.operations-feed-page__guidance-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 98px;
+  padding: 14px;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.operations-feed-page__guidance-item .card__subtext {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.operations-feed-page__updated {
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.operations-feed-page__state {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.operations-feed-page__state .card__subtext,
+.operations-feed-page__state .form-error {
+  margin: 4px 0 10px;
+}
+
+.operations-feed-page__timeline {
+  gap: 14px;
+}
+
+.operations-feed-page__timeline-card {
+  position: relative;
+  gap: 13px;
+  padding: 17px 18px 17px 20px;
+  overflow: hidden;
+}
+
+.operations-feed-page__timeline-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #60a5fa;
+}
+
+.operations-feed-page__timeline-card--critical::before { background: #dc2626; }
+.operations-feed-page__timeline-card--high::before { background: #ea580c; }
+.operations-feed-page__timeline-card--medium::before { background: #d97706; }
+.operations-feed-page__timeline-card--low::before { background: #16a34a; }
+
+.operations-feed-page__item-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.operations-feed-page__item-title {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.operations-feed-page__item-summary {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.operations-feed-page__next-step {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.operations-feed-page__next-step .card__subtext {
+  color: #475569;
+}
+
+.operations-feed-page__details,
+.operations-feed-page__technical-safety {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.operations-feed-page__details summary,
+.operations-feed-page__technical-safety summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #0f172a;
+}
+
+.operations-feed-page__actions {
+  padding-top: 1px;
+}
+
+.operations-feed-page__actions .button:first-child {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.operations-feed-page__actions .button:first-child:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.operations-feed-page__safety-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.operations-feed-page__safety-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 142px;
+  padding: 15px;
+}
+
+.operations-feed-page__safety-title {
+  margin: 2px 0 5px;
+  color: #0f172a;
+}
+
+.operations-feed-page__safety-card .card__subtext {
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .operations-feed-page--refined .operations-feed-page__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .operations-feed-page__safety-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .operations-feed-page--refined .operations-feed-page__summary-grid,
+  .operations-feed-page__safety-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .operations-feed-page__summary-card,
+  .operations-feed-page__safety-card {
+    min-height: 0;
+  }
+  .operations-feed-page__item-heading {
+    width: 100%;
+  }
+}

@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './RealTimeOperationsFeedPage.css';
 
 type EventUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -254,6 +255,29 @@ function relatedActionLink(item: TimelineItem): string | null {
   return `/action-center?${new URLSearchParams({ source_action_id: item.correlation_id }).toString()}`;
 }
 
+function domainIconPath(domain?: string | null): string {
+  if (domain === 'alerts') return '/alerts';
+  if (domain === 'inventory') return '/stock';
+  if (domain === 'procurement') return '/procurement-recommendations';
+  if (domain === 'reservation') return '/inventory-reservations';
+  if (domain === 'execution') return '/execution-tasks';
+  if (domain === 'optimization') return '/cross-domain-optimization';
+  if (domain === 'control_tower') return '/reliability-command';
+  if (domain === 'decision_intelligence' || domain === 'ai_governance') return '/intelligence-review';
+  if (domain === 'financial') return '/reports';
+  if (domain === 'integration') return '/system-context';
+  if (domain === 'audit') return '/audit';
+  return '/real-time-operations-feed';
+}
+
+function safetyIconPath(key: string): string {
+  if (key === 'tenant_isolated') return '/system-context';
+  if (key === 'permission_gated') return '/permissions';
+  if (key === 'approval_gated_when_required') return '/intelligence-review';
+  if (key === 'human_action_only') return '/workspace';
+  return '/real-time-operations-feed';
+}
+
 function localAvailableDomains(): EventDomain[] {
   const available = new Set<EventDomain>();
 
@@ -324,125 +348,112 @@ export default function RealTimeOperationsFeedPage() {
   }, [availableDomains, eventDomain]);
 
   return (
-    <div className="operations-feed-page">
+    <div className="operations-feed-page operations-feed-page--refined">
       <div className="operations-feed-page__summary-grid">
-        <div className="card operations-feed-page__card">
-          <div className="card__label">Items shown</div>
-          <div className="card__value">{numberValue(summary.total_timeline_items ?? timeline.length)}</div>
-          <div className="card__subtext">Open work, permitted integration events, and current delivery problems matching the filters.</div>
+        <div className="card operations-feed-page__card operations-feed-page__summary-card">
+          <span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
+          <div className="operations-feed-page__summary-copy">
+            <div className="card__label">Items shown</div>
+            <div className="card__value">{numberValue(summary.total_timeline_items ?? timeline.length)}</div>
+            <div className="card__subtext">Open work, permitted integration events, and current delivery problems matching the filters.</div>
+          </div>
         </div>
-        <div className="card operations-feed-page__card">
-          <div className="card__label">Critical items</div>
-          <div className="card__value">{numberValue(summary.critical_events)}</div>
-          <div className="card__subtext">Items that need the fastest human review.</div>
+        <div className="card operations-feed-page__card operations-feed-page__summary-card">
+          <span className="operations-feed-page__icon operations-feed-page__icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
+          <div className="operations-feed-page__summary-copy">
+            <div className="card__label">Critical items</div>
+            <div className="card__value operations-feed-page__value--danger">{numberValue(summary.critical_events)}</div>
+            <div className="card__subtext">Items that need the fastest human review.</div>
+          </div>
         </div>
-        <div className="card operations-feed-page__card">
-          <div className="card__label">Blocked or failed</div>
-          <div className="card__value">{numberValue(summary.blocked_or_failed_events)}</div>
-          <div className="card__subtext">Work or integration events reporting a disruption.</div>
+        <div className="card operations-feed-page__card operations-feed-page__summary-card">
+          <span className="operations-feed-page__icon operations-feed-page__icon--warning"><TenantNavIcon path="/reliability-command" size={18} /></span>
+          <div className="operations-feed-page__summary-copy">
+            <div className="card__label">Blocked or failed</div>
+            <div className="card__value operations-feed-page__value--warning">{numberValue(summary.blocked_or_failed_events)}</div>
+            <div className="card__subtext">Work or integration events reporting a disruption.</div>
+          </div>
         </div>
-        <div className="card operations-feed-page__card">
-          <div className="card__label">Page mode</div>
-          <div className="card__value operations-feed-page__mode-value">Guidance only</div>
-          <div className="card__subtext">Use the source page to perform the real follow-up.</div>
+        <div className="card operations-feed-page__card operations-feed-page__summary-card">
+          <span className="operations-feed-page__icon operations-feed-page__icon--green"><TenantNavIcon path="/workspace" size={18} /></span>
+          <div className="operations-feed-page__summary-copy">
+            <div className="card__label">Page mode</div>
+            <div className="card__value operations-feed-page__mode-value">Guidance only</div>
+            <div className="card__subtext">Use the source page to perform the real follow-up.</div>
+          </div>
         </div>
       </div>
 
-      <section className="section">
-        <div className="section__title">Operations feed controls</div>
+      <section className="section operations-feed-page__section">
+        <div className="section__title operations-feed-page__section-title">
+          <span className="operations-feed-page__section-icon"><TenantNavIcon path="/real-time-operations-feed" size={16} /></span>
+          <span>Operations feed controls</span>
+        </div>
         <div className="card operations-feed-page__controls-card">
           <div className="operations-feed-page__toolbar">
             <label className="operations-feed-page__field">
               <span>Work area</span>
-              <select
-                className="operations-feed-page__select"
-                value={eventDomain}
-                onChange={(event) => setEventDomain(event.target.value as 'all' | EventDomain)}
-              >
-                {availableDomainFilters.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+              <select className="operations-feed-page__select" value={eventDomain} onChange={(event) => setEventDomain(event.target.value as 'all' | EventDomain)}>
+                {availableDomainFilters.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
             <label className="operations-feed-page__field">
               <span>Urgency</span>
-              <select
-                className="operations-feed-page__select"
-                value={urgency}
-                onChange={(event) => setUrgency(event.target.value as 'all' | EventUrgency)}
-              >
-                {URGENCY_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+              <select className="operations-feed-page__select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | EventUrgency)}>
+                {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
             <button className="button button--secondary operations-feed-page__toolbar-action" type="button" onClick={() => feedQuery.refetch()} disabled={feedQuery.isFetching}>
-              {feedQuery.isFetching ? 'Refreshing…' : 'Refresh feed'}
+              <TenantNavIcon path="/real-time-operations-feed" size={14} />{feedQuery.isFetching ? 'Refreshing…' : 'Refresh feed'}
             </button>
-            <Link className="button button--secondary operations-feed-page__toolbar-action" to="/action-center">Open Action Center</Link>
-            <Link className="button button--secondary operations-feed-page__toolbar-action" to="/workspace">Open Workspace</Link>
+            <Link className="button button--secondary operations-feed-page__toolbar-action" to="/action-center"><TenantNavIcon path="/action-center" size={14} />Open Action Center</Link>
+            <Link className="button button--secondary operations-feed-page__toolbar-action" to="/workspace"><TenantNavIcon path="/workspace" size={14} />Open Workspace</Link>
           </div>
 
           {feedQuery.isLoading ? (
             <div className="operations-feed-page__state" role="status">
-              <div className="operations-feed-page__state-title">Loading the latest operations feed</div>
-              <p className="card__subtext">Collecting work and events permitted for the current role.</p>
+              <span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={17} /></span>
+              <div><div className="operations-feed-page__state-title">Loading the latest operations feed</div><p className="card__subtext">Collecting work and events permitted for the current role.</p></div>
             </div>
           ) : feedQuery.error ? (
             <div className="operations-feed-page__state" role="alert">
-              <div className="operations-feed-page__state-title">The operations feed could not be loaded</div>
-              <p className="form-error">
-                {feedQuery.error instanceof ApiError ? feedQuery.error.message : 'Unable to load the operations feed.'}
-              </p>
-              <button className="button button--secondary" type="button" onClick={() => feedQuery.refetch()}>Try again</button>
+              <span className="operations-feed-page__icon operations-feed-page__icon--danger"><TenantNavIcon path="/alerts" size={17} /></span>
+              <div><div className="operations-feed-page__state-title">The operations feed could not be loaded</div><p className="form-error">{feedQuery.error instanceof ApiError ? feedQuery.error.message : 'Unable to load the operations feed.'}</p><button className="button button--secondary" type="button" onClick={() => feedQuery.refetch()}>Try again</button></div>
             </div>
           ) : (
             <div className="operations-feed-page__guidance-grid">
-              <div className="operations-feed-page__guidance-item">
-                <div className="operations-feed-page__guidance-title">Safe to review without editing</div>
-                <p className="card__subtext">This page does not replay events, publish messages, or update operational records.</p>
-              </div>
-              <div className="operations-feed-page__guidance-item">
-                <div className="operations-feed-page__guidance-title">How to follow up</div>
-                <p className="card__subtext">{guidance.coordination_guidance || 'Open the source page for the item and complete the work there.'}</p>
-              </div>
-              <div className="operations-feed-page__guidance-item">
-                <div className="operations-feed-page__guidance-title">What the feed contains</div>
-                <p className="card__subtext">{guidance.incident_timeline_guidance || 'The feed combines permitted work items and integration event summaries.'}</p>
-              </div>
-              <div className="operations-feed-page__guidance-item">
-                <div className="operations-feed-page__guidance-title">When something is blocked or failed</div>
-                <p className="card__subtext">{guidance.disruption_guidance || 'Review the source workflow and coordinate a human response.'}</p>
-              </div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/permissions" size={15} /></span><div><div className="operations-feed-page__guidance-title">Safe to review without editing</div><p className="card__subtext">This page does not replay events, publish messages, or update operational records.</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/workspace" size={15} /></span><div><div className="operations-feed-page__guidance-title">How to follow up</div><p className="card__subtext">{guidance.coordination_guidance || 'Open the source page for the item and complete the work there.'}</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/real-time-operations-feed" size={15} /></span><div><div className="operations-feed-page__guidance-title">What the feed contains</div><p className="card__subtext">{guidance.incident_timeline_guidance || 'The feed combines permitted work items and integration event summaries.'}</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/reliability-command" size={15} /></span><div><div className="operations-feed-page__guidance-title">When something is blocked or failed</div><p className="card__subtext">{guidance.disruption_guidance || 'Review the source workflow and coordinate a human response.'}</p></div></div>
             </div>
           )}
 
-          {response?.generated_at ? (
-            <p className="card__subtext operations-feed-page__updated">
-              Feed updated {formatDateTime(response.generated_at)}. Press Refresh feed whenever you need the latest snapshot.
-            </p>
-          ) : null}
+          {response?.generated_at ? <p className="card__subtext operations-feed-page__updated">Feed updated {formatDateTime(response.generated_at)}. Press Refresh feed whenever you need the latest snapshot.</p> : null}
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__title">Operational coordination feed</div>
+      <section className="section operations-feed-page__section">
+        <div className="section__title operations-feed-page__section-title">
+          <span className="operations-feed-page__section-icon"><TenantNavIcon path="/real-time-operations-feed" size={16} /></span>
+          <span>Operational coordination feed</span>
+          {!feedQuery.isLoading && !feedQuery.error ? <span className="operations-feed-page__section-count">{timeline.length}</span> : null}
+        </div>
         {feedQuery.isLoading || feedQuery.error ? null : timeline.length === 0 ? (
-          <div className="card operations-feed-page__state">
-            <div className="operations-feed-page__state-title">No matching items</div>
-            <p className="card__subtext">No work or integration event matched the selected work area and urgency.</p>
-          </div>
+          <div className="card operations-feed-page__state"><span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={17} /></span><div><div className="operations-feed-page__state-title">No matching items</div><p className="card__subtext">No work or integration event matched the selected work area and urgency.</p></div></div>
         ) : (
           <div className="operations-feed-page__timeline">
             {timeline.map((item) => {
               const sourceLink = sourceItemLink(item);
               const actionCenterPath = relatedActionLink(item);
+              const itemDomainIcon = domainIconPath(item.timeline_domain);
+              const urgencyTone = String(item.urgency || 'low').toLowerCase();
               return (
-                <article className="card operations-feed-page__timeline-card" key={item.timeline_item_id}>
+                <article className={`card operations-feed-page__timeline-card operations-feed-page__timeline-card--${urgencyTone}`} key={item.timeline_item_id}>
                   <div className="operations-feed-page__item-header">
                     <div className="operations-feed-page__item-heading">
-                      <div className="card__label">{itemSourceLabel(item)}</div>
-                      <h3 className="operations-feed-page__item-title">{itemTitle(item)}</h3>
+                      <span className={`operations-feed-page__icon operations-feed-page__icon--${urgencyTone === 'critical' ? 'danger' : urgencyTone === 'high' ? 'warning' : urgencyTone === 'medium' ? 'amber' : 'green'}`}><TenantNavIcon path={itemDomainIcon} size={17} /></span>
+                      <div><div className="card__label">{itemSourceLabel(item)}</div><h3 className="operations-feed-page__item-title">{itemTitle(item)}</h3></div>
                     </div>
                     <span className={urgencyClass(item.urgency)}>{formatLabel(item.urgency)}</span>
                   </div>
@@ -451,51 +462,22 @@ export default function RealTimeOperationsFeedPage() {
 
                   <div className="operations-feed-page__badge-row">
                     <span className={statusClass(item.event_status)}>Status: {formatLabel(item.event_status)}</span>
-                    <span className="operations-feed-page__badge operations-feed-page__badge--neutral">
-                      Observed {formatDateTime(item.observed_at || item.updated_at)}
-                    </span>
-                    {item.timeline_type === 'event_delivery_disruption' && item.delivery_attempt_count != null && Number.isFinite(Number(item.delivery_attempt_count)) ? (
-                      <span className="operations-feed-page__badge operations-feed-page__badge--neutral">
-                        Attempts: {numberValue(item.delivery_attempt_count)}
-                      </span>
-                    ) : null}
-                    {item.timeline_type === 'event_delivery_disruption' && item.next_retry_at ? (
-                      <span className="operations-feed-page__badge operations-feed-page__badge--neutral">
-                        Next planned retry: {formatDateTime(item.next_retry_at)}
-                      </span>
-                    ) : null}
+                    <span className="operations-feed-page__badge operations-feed-page__badge--neutral">Observed {formatDateTime(item.observed_at || item.updated_at)}</span>
+                    {item.timeline_type === 'event_delivery_disruption' && item.delivery_attempt_count != null && Number.isFinite(Number(item.delivery_attempt_count)) ? <span className="operations-feed-page__badge operations-feed-page__badge--neutral">Attempts: {numberValue(item.delivery_attempt_count)}</span> : null}
+                    {item.timeline_type === 'event_delivery_disruption' && item.next_retry_at ? <span className="operations-feed-page__badge operations-feed-page__badge--neutral">Next planned retry: {formatDateTime(item.next_retry_at)}</span> : null}
                   </div>
 
-                  <div>
-                    <div className="card__label">Recommended next step</div>
-                    <p className="card__subtext operations-feed-page__item-summary">
-                      {item.recommended_next_step || 'Open the source page and review the item there.'}
-                    </p>
-                  </div>
+                  <div className="operations-feed-page__next-step"><div className="card__label">Recommended next step</div><p className="card__subtext operations-feed-page__item-summary">{item.recommended_next_step || 'Open the source page and review the item there.'}</p></div>
 
                   {canViewDiagnostics ? (
-                    <details className="operations-feed-page__details">
-                      <summary>Technical event details</summary>
-                      <dl className="operations-feed-page__details-grid">
-                        <dt>Timeline item</dt><dd>{item.timeline_item_id}</dd>
-                        <dt>Correlation</dt><dd>{item.correlation_id || 'Not reported'}</dd>
-                        <dt>Priority score</dt><dd>{numberValue(item.priority_score)}</dd>
-                        <dt>Source type</dt><dd>{item.source_reference?.source_type || 'Not reported'}</dd>
-                        <dt>Source record</dt><dd>{item.source_reference?.source_id || 'Not reported'}</dd>
-                        <dt>Payload information</dt><dd>{item.payload_material_redacted ? 'Not included in this feed' : item.payload_material_present ? 'Reported as present' : 'Not reported'}</dd>
-                      </dl>
-                    </details>
+                    <details className="operations-feed-page__details"><summary><TenantNavIcon path="/system-context" size={14} />Technical event details</summary><dl className="operations-feed-page__details-grid"><dt>Timeline item</dt><dd>{item.timeline_item_id}</dd><dt>Correlation</dt><dd>{item.correlation_id || 'Not reported'}</dd><dt>Priority score</dt><dd>{numberValue(item.priority_score)}</dd><dt>Source type</dt><dd>{item.source_reference?.source_type || 'Not reported'}</dd><dt>Source record</dt><dd>{item.source_reference?.source_id || 'Not reported'}</dd><dt>Payload information</dt><dd>{item.payload_material_redacted ? 'Not included in this feed' : item.payload_material_present ? 'Reported as present' : 'Not reported'}</dd></dl></details>
                   ) : null}
 
-                  {['event_stream_message', 'event_delivery_disruption'].includes(String(item.timeline_type)) && !sourceLink ? (
-                    <p className="card__subtext operations-feed-page__item-summary">
-                      This integration item does not currently have a tenant working page. Use it for awareness and ask an administrator or support team to investigate when it is blocked or failed.
-                    </p>
-                  ) : null}
+                  {['event_stream_message', 'event_delivery_disruption'].includes(String(item.timeline_type)) && !sourceLink ? <p className="card__subtext operations-feed-page__item-summary">This integration item does not currently have a tenant working page. Use it for awareness and ask an administrator or support team to investigate when it is blocked or failed.</p> : null}
 
                   <div className="operations-feed-page__actions">
-                    {sourceLink ? <Link className="button" to={sourceLink.to}>{sourceLink.label}</Link> : null}
-                    {actionCenterPath ? <Link className="button button--secondary" to={actionCenterPath}>Open in Action Center</Link> : null}
+                    {sourceLink ? <Link className="button" to={sourceLink.to}><TenantNavIcon path={sourceLink.to.split('?')[0]} size={14} />{sourceLink.label}</Link> : null}
+                    {actionCenterPath ? <Link className="button button--secondary" to={actionCenterPath}><TenantNavIcon path="/action-center" size={14} />Open in Action Center</Link> : null}
                   </div>
                 </article>
               );
@@ -504,30 +486,16 @@ export default function RealTimeOperationsFeedPage() {
         )}
       </section>
 
-      <section className="section">
-        <div className="section__title">Why this feed is safe to use</div>
+      <section className="section operations-feed-page__section">
+        <div className="section__title operations-feed-page__section-title"><span className="operations-feed-page__section-icon"><TenantNavIcon path="/permissions" size={16} /></span><span>Why this feed is safe to use</span></div>
         <div className="operations-feed-page__safety-grid">
-          {safetyEntries.length === 0 ? (
-            <div className="card operations-feed-page__card">
-              <p className="card__subtext">Safety information was not returned by the backend.</p>
-            </div>
-          ) : safetyEntries.map((entry) => (
-            <div className="card operations-feed-page__safety-card" key={entry.key}>
-              <div className="operations-feed-page__safety-title">{entry.title}</div>
-              <p className="card__subtext">{entry.description}</p>
-            </div>
+          {safetyEntries.length === 0 ? <div className="card operations-feed-page__card"><p className="card__subtext">Safety information was not returned by the backend.</p></div> : safetyEntries.map((entry) => (
+            <div className="card operations-feed-page__safety-card" key={entry.key}><span className="operations-feed-page__icon operations-feed-page__icon--green"><TenantNavIcon path={safetyIconPath(entry.key)} size={16} /></span><div><div className="card__label">Guaranteed</div><div className="operations-feed-page__safety-title">{entry.title}</div><p className="card__subtext">{entry.description}</p></div></div>
           ))}
         </div>
 
         {canViewDiagnostics && technicalSafetyEntries.length > 0 ? (
-          <details className="operations-feed-page__technical-safety">
-            <summary>Technical safety details</summary>
-            <div className="operations-feed-page__technical-safety-grid">
-              {technicalSafetyEntries.map(([key]) => (
-                <span className="operations-feed-page__badge operations-feed-page__badge--neutral" key={key}>{formatLabel(key)}</span>
-              ))}
-            </div>
-          </details>
+          <details className="operations-feed-page__technical-safety"><summary><TenantNavIcon path="/system-context" size={14} />Technical safety details</summary><div className="operations-feed-page__technical-safety-grid">{technicalSafetyEntries.map(([key]) => <span className="operations-feed-page__badge operations-feed-page__badge--neutral" key={key}>{formatLabel(key)}</span>)}</div></details>
         ) : null}
       </section>
     </div>
