@@ -230,6 +230,9 @@ for (const signal of [
   "'/alerts?resolved=false&limit=1'",
   'hasOpenAlerts',
   'alertIndicatorDot',
+  "width: '280px', minWidth: '280px'",
+  "whiteSpace: 'normal'",
+  "marginLeft: 'auto'",
   'Open alerts require attention'
 ]) {
   if (!layout.includes(signal)) {

@@ -434,14 +434,14 @@ export default function AppLayout() {
                     <span style={styles.navItemIcon}><TenantNavIcon path={item.to} /></span>
                     <span style={styles.navItemLabelGroup}>
                       <span style={styles.navItemLabel}>{item.label}</span>
-                      {item.to === '/alerts' && hasOpenAlerts ? (
-                        <span
-                          style={styles.alertIndicatorDot}
-                          aria-label="Open alerts require attention"
-                          title="Open alerts require attention"
-                        />
-                      ) : null}
                     </span>
+                    {item.to === '/alerts' && hasOpenAlerts ? (
+                      <span
+                        style={styles.alertIndicatorDot}
+                        aria-label="Open alerts require attention"
+                        title="Open alerts require attention"
+                      />
+                    ) : null}
                   </NavLink>
                 ))}
               </div>
@@ -711,7 +711,7 @@ const styles: Record<string, CSSProperties> = {
     background: 'linear-gradient(180deg,#0f2749 0%,#0b1b32 48%,#081220 100%)', color: '#fff', padding: '18px 12px 14px', display: 'flex', flexDirection: 'column', zIndex: 40, overflow: 'hidden', minWidth: 0
   },
   sidebarDesktop: {
-    width: '244px', minWidth: '244px', height: '100dvh', position: 'sticky', top: 0, borderRight: '1px solid rgba(148,163,184,.12)', boxShadow: '8px 0 24px rgba(15,23,42,.05)'
+    width: '280px', minWidth: '280px', height: '100dvh', position: 'sticky', top: 0, borderRight: '1px solid rgba(148,163,184,.12)', boxShadow: '8px 0 24px rgba(15,23,42,.05)'
   },
   sidebarMobile: {
     width: '280px',
@@ -763,7 +763,7 @@ const styles: Record<string, CSSProperties> = {
   },
   brandWorkspace: { marginTop: '14px', padding: '10px 11px', borderRadius: '8px', background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.08)' },
   brandWorkspaceLabel: { color: 'rgba(255,255,255,.38)', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '3px' },
-  navItemIcon: { width: '19px', height: '19px', flex: '0 0 19px', display: 'grid', placeItems: 'center' }, navItemLabelGroup: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '7px', flex: '1 1 auto' }, navItemLabel: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, alertIndicatorDot: { width: '8px', height: '8px', flex: '0 0 8px', borderRadius: '999px', background: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,.16)' },
+  navItemIcon: { width: '19px', height: '19px', flex: '0 0 19px', display: 'grid', placeItems: 'center' }, navItemLabelGroup: { minWidth: 0, display: 'flex', alignItems: 'center', flex: '1 1 auto' }, navItemLabel: { minWidth: 0, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'normal', lineHeight: 1.25 }, alertIndicatorDot: { width: '8px', height: '8px', flex: '0 0 8px', marginLeft: 'auto', marginRight: '1px', borderRadius: '999px', background: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,.16)' },
   sidebarIdentity: { display: 'grid', gridTemplateColumns: '32px minmax(0,1fr)', alignItems: 'center', gap: '9px', marginBottom: '10px' }, sidebarAvatar: { width: '32px', height: '32px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#2563eb', color: '#fff', fontSize: '12px', fontWeight: 800 }, sidebarIdentityText: { minWidth: 0 }, sidebarIdentityName: { color: '#fff', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, sidebarIdentityRole: { color: 'rgba(255,255,255,.5)', fontSize: '11px', marginTop: '2px' },
   headerContext: { display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0, paddingTop: '2px' }, headerContextAvatar: { width: '34px', height: '34px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', fontSize: '12px', fontWeight: 800 }, headerContextText: { textAlign: 'right', minWidth: 0 }, headerContextRole: { color: '#0f172a', fontSize: '12.5px', fontWeight: 800 }, headerContextTenant: { color: '#64748b', fontSize: '11px', marginTop: '1px', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   supportPill: {
