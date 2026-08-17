@@ -41,8 +41,10 @@ import type {
   CostRiskDetailFilterState,
   CostValuationDetailFilterState
 } from './productCostAssessmentApi';
+import type { ProductWorkspaceView } from './useProductPageState';
 
 export type ProductPageQueryInput = {
+  workspaceView: ProductWorkspaceView;
   categoryFilter: string;
   supplierFilter: string;
   costStatusFilter: string;
@@ -58,6 +60,7 @@ export type ProductPageQueryInput = {
 };
 
 export function useProductPageQueries({
+  workspaceView,
   categoryFilter,
   supplierFilter,
   costStatusFilter,
@@ -71,6 +74,10 @@ export function useProductPageQueries({
   costRiskDetailFilters,
   costActionDetailFilters
 }: ProductPageQueryInput) {
+  const valuationEnabled = workspaceView === 'valuation';
+  const actionsEnabled = workspaceView === 'actions';
+  const governanceEnabled = workspaceView === 'governance';
+
   const productsQuery = useQuery({
     queryKey: ['products', categoryFilter, supplierFilter, costStatusFilter, costBasisFilter, costVarianceStatusFilter],
     queryFn: () =>
@@ -86,7 +93,8 @@ export function useProductPageQueries({
 
   const costValuationQuery = useQuery({
     queryKey: ['product-cost-valuation-summary'],
-    queryFn: fetchProductCostValuationSummary
+    queryFn: fetchProductCostValuationSummary,
+    enabled: valuationEnabled
   });
 
   const costValuationDetailsQuery = useQuery({
@@ -97,65 +105,77 @@ export function useProductPageQueries({
       costValuationDetailFilters.sort,
       costValuationDetailFilters.direction
     ],
-    queryFn: () => fetchProductCostValuationDetails(costValuationDetailFilters)
+    queryFn: () => fetchProductCostValuationDetails(costValuationDetailFilters),
+    enabled: valuationEnabled
   });
 
   const costActionQuery = useQuery({
     queryKey: ['product-cost-action-summary'],
-    queryFn: fetchProductCostActionSummary
+    queryFn: fetchProductCostActionSummary,
+    enabled: actionsEnabled
   });
 
   const costActionPlanQuery = useQuery({
     queryKey: ['product-cost-action-plan-summary'],
-    queryFn: fetchProductCostActionPlanSummary
+    queryFn: fetchProductCostActionPlanSummary,
+    enabled: actionsEnabled
   });
 
   const costActionCategoryQuery = useQuery({
     queryKey: ['product-cost-action-category-summary'],
-    queryFn: fetchProductCostActionCategorySummary
+    queryFn: fetchProductCostActionCategorySummary,
+    enabled: actionsEnabled
   });
 
   const costActionImpactQuery = useQuery({
     queryKey: ['product-cost-action-impact-summary'],
-    queryFn: fetchProductCostActionImpactSummary
+    queryFn: fetchProductCostActionImpactSummary,
+    enabled: actionsEnabled
   });
 
   const costActionSupplierQuery = useQuery({
     queryKey: ['product-cost-action-supplier-summary'],
-    queryFn: fetchProductCostActionSupplierSummary
+    queryFn: fetchProductCostActionSupplierSummary,
+    enabled: actionsEnabled
   });
 
   const costActionSourceQuery = useQuery({
     queryKey: ['product-cost-action-source-summary'],
-    queryFn: fetchProductCostActionSourceSummary
+    queryFn: fetchProductCostActionSourceSummary,
+    enabled: actionsEnabled
   });
 
   const costActionAgeQuery = useQuery({
     queryKey: ['product-cost-action-age-summary'],
-    queryFn: fetchProductCostActionAgeSummary
+    queryFn: fetchProductCostActionAgeSummary,
+    enabled: actionsEnabled
   });
 
   const costActionCoverageQuery = useQuery({
     queryKey: ['product-cost-action-coverage-summary'],
-    queryFn: fetchProductCostActionCoverageSummary
+    queryFn: fetchProductCostActionCoverageSummary,
+    enabled: actionsEnabled
   });
 
   const costAlertQuery = useQuery({
     queryKey: ['product-cost-alert-summary'],
-    queryFn: fetchProductCostAlertSummary
+    queryFn: fetchProductCostAlertSummary,
+    enabled: actionsEnabled
   });
 
   const costRecommendationQuery = useQuery({
     queryKey: ['product-cost-recommendation-summary'],
-    queryFn: fetchProductCostRecommendationSummary
+    queryFn: fetchProductCostRecommendationSummary,
+    enabled: actionsEnabled
   });
 
   const costDashboardQuery = useQuery({
     queryKey: ['product-cost-dashboard-summary'],
-    queryFn: fetchProductCostDashboardSummary
+    queryFn: fetchProductCostDashboardSummary,
+    enabled: valuationEnabled
   });
 
-  const governanceQueries = useProductCostGovernanceQueries();
+  const governanceQueries = useProductCostGovernanceQueries(governanceEnabled);
 
   const costActionDetailsQuery = useQuery({
     queryKey: [
@@ -165,12 +185,14 @@ export function useProductPageQueries({
       costActionDetailFilters.sort,
       costActionDetailFilters.direction
     ],
-    queryFn: () => fetchProductCostActionDetails(costActionDetailFilters)
+    queryFn: () => fetchProductCostActionDetails(costActionDetailFilters),
+    enabled: actionsEnabled
   });
 
   const costRiskQuery = useQuery({
     queryKey: ['product-cost-risk-summary'],
-    queryFn: fetchProductCostRiskSummary
+    queryFn: fetchProductCostRiskSummary,
+    enabled: actionsEnabled
   });
 
   const costRiskDetailsQuery = useQuery({
@@ -181,7 +203,8 @@ export function useProductPageQueries({
       costRiskDetailFilters.sort,
       costRiskDetailFilters.direction
     ],
-    queryFn: () => fetchProductCostRiskDetails(costRiskDetailFilters)
+    queryFn: () => fetchProductCostRiskDetails(costRiskDetailFilters),
+    enabled: actionsEnabled
   });
 
   const suppliersQuery = useQuery({

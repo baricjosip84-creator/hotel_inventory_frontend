@@ -19,90 +19,107 @@ import {
   fetchProductCostReportSummary
 } from './productCostGovernanceApi';
 
-export function useProductCostGovernanceQueries() {
+export function useProductCostGovernanceQueries(enabled = true) {
   const costGovernanceQuery = useQuery({
     queryKey: ['product-cost-governance-summary'],
-    queryFn: fetchProductCostGovernanceSummary
+    queryFn: fetchProductCostGovernanceSummary,
+    enabled
   });
 
   const costGovernanceDetailsQuery = useQuery({
     queryKey: ['product-cost-governance-details'],
-    queryFn: fetchProductCostGovernanceDetails
+    queryFn: fetchProductCostGovernanceDetails,
+    enabled
   });
 
   const costGovernanceAuditQuery = useQuery({
     queryKey: ['product-cost-governance-audit-pack'],
-    queryFn: fetchProductCostGovernanceAuditPack
+    queryFn: fetchProductCostGovernanceAuditPack,
+    enabled
   });
 
   const costGovernanceSignoffQuery = useQuery({
     queryKey: ['product-cost-governance-signoff-summary'],
-    queryFn: fetchProductCostGovernanceSignoffSummary
+    queryFn: fetchProductCostGovernanceSignoffSummary,
+    enabled
   });
 
   const costGovernanceReviewQueueQuery = useQuery({
     queryKey: ['product-cost-governance-review-queue'],
-    queryFn: fetchProductCostGovernanceReviewQueue
+    queryFn: fetchProductCostGovernanceReviewQueue,
+    enabled
   });
 
   const costGovernanceReviewPackQuery = useQuery({
     queryKey: ['product-cost-governance-review-pack'],
-    queryFn: fetchProductCostGovernanceReviewPack
+    queryFn: fetchProductCostGovernanceReviewPack,
+    enabled
   });
 
   const costGovernanceClosureQuery = useQuery({
     queryKey: ['product-cost-governance-closure-summary'],
-    queryFn: fetchProductCostGovernanceClosureSummary
+    queryFn: fetchProductCostGovernanceClosureSummary,
+    enabled
   });
 
   const costGovernanceHandoffQuery = useQuery({
     queryKey: ['product-cost-governance-handoff-summary'],
-    queryFn: fetchProductCostGovernanceHandoffSummary
+    queryFn: fetchProductCostGovernanceHandoffSummary,
+    enabled
   });
 
   const costOperationsRunbookQuery = useQuery({
     queryKey: ['product-cost-operations-runbook-summary'],
-    queryFn: fetchProductCostOperationsRunbookSummary
+    queryFn: fetchProductCostOperationsRunbookSummary,
+    enabled
   });
 
   const costOperationsControlQuery = useQuery({
     queryKey: ['product-cost-operations-control-summary'],
-    queryFn: fetchProductCostOperationsControlSummary
+    queryFn: fetchProductCostOperationsControlSummary,
+    enabled
   });
 
   const costOperationsEvidenceQuery = useQuery({
     queryKey: ['product-cost-operations-evidence-summary'],
-    queryFn: fetchProductCostOperationsEvidenceSummary
+    queryFn: fetchProductCostOperationsEvidenceSummary,
+    enabled
   });
 
   const costOperationsReadinessQuery = useQuery({
     queryKey: ['product-cost-operations-readiness-summary'],
-    queryFn: fetchProductCostOperationsReadinessSummary
+    queryFn: fetchProductCostOperationsReadinessSummary,
+    enabled
   });
 
   const costGovernanceFinalQuery = useQuery({
     queryKey: ['product-cost-governance-final-summary'],
-    queryFn: fetchProductCostGovernanceFinalSummary
+    queryFn: fetchProductCostGovernanceFinalSummary,
+    enabled
   });
 
   const costPerformanceQuery = useQuery({
     queryKey: ['product-cost-performance-summary'],
-    queryFn: fetchProductCostPerformanceSummary
+    queryFn: fetchProductCostPerformanceSummary,
+    enabled
   });
 
   const costSecurityAuditQuery = useQuery({
     queryKey: ['product-cost-security-audit-summary'],
-    queryFn: fetchProductCostSecurityAuditSummary
+    queryFn: fetchProductCostSecurityAuditSummary,
+    enabled
   });
 
   const costHardeningQuery = useQuery({
     queryKey: ['product-cost-hardening-summary'],
-    queryFn: fetchProductCostHardeningSummary
+    queryFn: fetchProductCostHardeningSummary,
+    enabled
   });
 
   const costReportQuery = useQuery({
     queryKey: ['product-cost-report-summary'],
-    queryFn: fetchProductCostReportSummary
+    queryFn: fetchProductCostReportSummary,
+    enabled
   });
 
   return {

@@ -70,6 +70,11 @@ export function buildProductActionHandlers({
       return;
     }
 
+    if (!form.sku.trim()) {
+      setFormError('SKU is required.');
+      return;
+    }
+
     if (!form.name.trim()) {
       setFormError('Product name is required.');
       return;

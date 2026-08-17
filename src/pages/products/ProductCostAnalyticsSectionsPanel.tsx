@@ -21,254 +21,202 @@ import { styles } from './productStyles';
 
 type ProductCostAnalyticsSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
-export function ProductCostAnalyticsSectionsPanel({
-  costingReadiness,
-  setCategoryFilter,
-  costValuationQuery,
-  costValuationSummary,
-  costValuationDetailsQuery,
-  costValuationDetails,
-  costValuationDetailFilters,
-  setCostValuationDetailFilters,
-  handleOpenCostHistory,
-  handleExportCostValuationDetailsCsv,
-  costActionQuery,
-  costActionSummary,
-  costActionPlanQuery,
-  costActionPlan,
-  costActionCategoryQuery,
-  costActionCategorySummary,
-  costActionImpactQuery,
-  costActionImpactSummary,
-  costActionSupplierQuery,
-  costActionSupplierSummary,
-  costActionSourceQuery,
-  costActionSourceSummary,
-  costActionAgeQuery,
-  costActionAgeSummary,
-  costActionCoverageQuery,
-  costActionCoverageSummary,
-  costDashboardQuery,
-  costDashboardSummary,
-  costHardeningQuery,
-  costHardeningSummary,
-  costGovernanceQuery,
-  costGovernanceDetailsQuery,
-  costGovernanceAuditQuery,
-  costGovernanceSignoffQuery,
-  costGovernanceReviewQueueQuery,
-  costGovernanceReviewPackQuery,
-  costGovernanceClosureQuery,
-  costGovernanceHandoffQuery,
-  costOperationsRunbookQuery,
-  costOperationsControlQuery,
-  costOperationsEvidenceQuery,
-  costOperationsReadinessQuery,
-  costGovernanceFinalQuery,
-  costPerformanceQuery,
-  costSecurityAuditQuery,
-  costGovernanceSummary,
-  costGovernanceDetails,
-  costGovernanceAuditPack,
-  costGovernanceSignoff,
-  costGovernanceReviewQueue,
-  costGovernanceReviewPack,
-  costGovernanceClosureSummary,
-  costGovernanceHandoffSummary,
-  costOperationsRunbookSummary,
-  costOperationsControlSummary,
-  costOperationsEvidenceSummary,
-  costOperationsReadinessSummary,
-  costGovernanceFinalSummary,
-  costPerformanceSummary,
-  costSecurityAuditSummary,
-  handleExportCostGovernanceAuditCsv,
-  handleExportCostGovernanceReviewPackCsv,
-  handleExportCostGovernanceClosureCsv,
-  handleExportCostGovernanceHandoffCsv,
-  handlePrintCostGovernanceAudit,
-  costReportQuery,
-  costReportSummary,
-  handleExportCostReportCsv,
-  handlePrintCostReport,
-  costAlertQuery,
-  costAlertSummary,
-  costRecommendationQuery,
-  costRecommendationSummary,
-  costActionDetailsQuery,
-  costActionDetails,
-  costActionDetailFilters,
-  setCostActionDetailFilters,
-  handleExportCostActionDetailsCsv,
-  costRiskQuery,
-  costRiskDetailsQuery,
-  costRiskSummary,
-  costRiskDetails,
-  costRiskDetailFilters,
-  setCostRiskDetailFilters,
-  handleExportCostRiskDetailsCsv
-}: ProductCostAnalyticsSectionsPanelProps) {
+function CostWorkspaceIntro({ title, description }: { title: string; description: string }) {
   return (
-    <>
-      <section id="product-cost-intelligence" style={styles.panel}>
-        <h3 style={styles.panelTitle}>Cost Intelligence and Governance</h3>
-        <p style={styles.panelSubtitle}>
-          Read-only valuation, risk, action, audit, readiness, and governance views derived from product master data and stock-movement costs. These panels do not change products, standard costs, stock, shipments, or audit records.
-        </p>
-      </section>
-
-      <ProductCostingReadinessPanel
-        costingReadiness={costingReadiness}
-        onCategoryFilterChange={setCategoryFilter}
-      />
-
-      <ProductCostValuationPanel
-        costValuationQuery={costValuationQuery}
-        costValuationSummary={costValuationSummary}
-        costValuationDetailsQuery={costValuationDetailsQuery}
-        costValuationDetails={costValuationDetails}
-        costValuationDetailFilters={costValuationDetailFilters}
-        setCostValuationDetailFilters={setCostValuationDetailFilters}
-        onOpenCostHistory={handleOpenCostHistory}
-        onExportCostValuationDetailsCsv={handleExportCostValuationDetailsCsv}
-        onViewCategory={setCategoryFilter}
-      />
-
-      <ProductCostActionSummaryPanel
-        costActionQuery={costActionQuery}
-        costActionSummary={costActionSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionPlanPanel
-        costActionPlanQuery={costActionPlanQuery}
-        costActionPlan={costActionPlan}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionCategoryPanel
-        costActionCategoryQuery={costActionCategoryQuery}
-        costActionCategorySummary={costActionCategorySummary}
-      />
-
-      <ProductCostActionImpactPanel
-        costActionImpactQuery={costActionImpactQuery}
-        costActionImpactSummary={costActionImpactSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionSupplierPanel
-        costActionSupplierQuery={costActionSupplierQuery}
-        costActionSupplierSummary={costActionSupplierSummary}
-      />
-
-      <ProductCostActionSourcePanel
-        costActionSourceQuery={costActionSourceQuery}
-        costActionSourceSummary={costActionSourceSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionAgePanel
-        costActionAgeQuery={costActionAgeQuery}
-        costActionAgeSummary={costActionAgeSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionCoveragePanel
-        costActionCoverageQuery={costActionCoverageQuery}
-        costActionCoverageSummary={costActionCoverageSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostDashboardSummaryPanel
-        costDashboardQuery={costDashboardQuery}
-        costDashboardSummary={costDashboardSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostHardeningSummaryPanel
-        costHardeningQuery={costHardeningQuery}
-        costHardeningSummary={costHardeningSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostGovernanceSummaryPanel
-        costGovernanceQuery={costGovernanceQuery}
-        costGovernanceDetailsQuery={costGovernanceDetailsQuery}
-        costGovernanceAuditQuery={costGovernanceAuditQuery}
-        costGovernanceSignoffQuery={costGovernanceSignoffQuery}
-        costGovernanceReviewQueueQuery={costGovernanceReviewQueueQuery}
-        costGovernanceReviewPackQuery={costGovernanceReviewPackQuery}
-        costGovernanceClosureQuery={costGovernanceClosureQuery}
-        costGovernanceHandoffQuery={costGovernanceHandoffQuery}
-        costOperationsRunbookQuery={costOperationsRunbookQuery}
-        costOperationsControlQuery={costOperationsControlQuery}
-        costOperationsEvidenceQuery={costOperationsEvidenceQuery}
-        costOperationsReadinessQuery={costOperationsReadinessQuery}
-        costGovernanceFinalQuery={costGovernanceFinalQuery}
-        costPerformanceQuery={costPerformanceQuery}
-        costSecurityAuditQuery={costSecurityAuditQuery}
-        costGovernanceSummary={costGovernanceSummary}
-        costGovernanceDetails={costGovernanceDetails}
-        costGovernanceAuditPack={costGovernanceAuditPack}
-        costGovernanceSignoff={costGovernanceSignoff}
-        costGovernanceReviewQueue={costGovernanceReviewQueue}
-        costGovernanceReviewPack={costGovernanceReviewPack}
-        costGovernanceClosureSummary={costGovernanceClosureSummary}
-        costGovernanceHandoffSummary={costGovernanceHandoffSummary}
-        costOperationsRunbookSummary={costOperationsRunbookSummary}
-        costOperationsControlSummary={costOperationsControlSummary}
-        costOperationsEvidenceSummary={costOperationsEvidenceSummary}
-        costOperationsReadinessSummary={costOperationsReadinessSummary}
-        costGovernanceFinalSummary={costGovernanceFinalSummary}
-        costPerformanceSummary={costPerformanceSummary}
-        costSecurityAuditSummary={costSecurityAuditSummary}
-        handleExportCostGovernanceAuditCsv={handleExportCostGovernanceAuditCsv}
-        handleExportCostGovernanceReviewPackCsv={handleExportCostGovernanceReviewPackCsv}
-        handleExportCostGovernanceClosureCsv={handleExportCostGovernanceClosureCsv}
-        handleExportCostGovernanceHandoffCsv={handleExportCostGovernanceHandoffCsv}
-        handlePrintCostGovernanceAudit={handlePrintCostGovernanceAudit}
-        handleOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostReportSummaryPanel
-        costReportQuery={costReportQuery}
-        costReportSummary={costReportSummary}
-        onExportCostReportCsv={handleExportCostReportCsv}
-        onPrintCostReport={handlePrintCostReport}
-      />
-
-      <ProductCostAlertSummaryPanel
-        costAlertQuery={costAlertQuery}
-        costAlertSummary={costAlertSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostRecommendationSummaryPanel
-        costRecommendationQuery={costRecommendationQuery}
-        costRecommendationSummary={costRecommendationSummary}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostActionDetailsPanel
-        costActionDetailsQuery={costActionDetailsQuery}
-        costActionDetails={costActionDetails}
-        costActionDetailFilters={costActionDetailFilters}
-        setCostActionDetailFilters={setCostActionDetailFilters}
-        onExportCostActionDetailsCsv={handleExportCostActionDetailsCsv}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-
-      <ProductCostRiskSummaryPanel
-        costRiskQuery={costRiskQuery}
-        costRiskDetailsQuery={costRiskDetailsQuery}
-        costRiskSummary={costRiskSummary}
-        costRiskDetails={costRiskDetails}
-        costRiskDetailFilters={costRiskDetailFilters}
-        setCostRiskDetailFilters={setCostRiskDetailFilters}
-        onExportCostRiskDetailsCsv={handleExportCostRiskDetailsCsv}
-        onOpenCostHistory={handleOpenCostHistory}
-      />
-    </>
+    <section className="products-cost-intro" style={styles.panel}>
+      <span className="products-cost-intro__eyebrow">Cost intelligence</span>
+      <h3 style={styles.panelTitle}>{title}</h3>
+      <p style={{ ...styles.panelSubtitle, marginBottom: 0 }}>{description}</p>
+    </section>
   );
+}
+
+export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSectionsPanelProps) {
+  if (props.workspaceView === 'valuation') {
+    return (
+      <>
+        <CostWorkspaceIntro
+          title="Cost & valuation"
+          description="Review cost coverage and estimated stock value without changing products, stock, shipments, or receiving records."
+        />
+
+        <ProductCostingReadinessPanel
+          costingReadiness={props.costingReadiness}
+          onCategoryFilterChange={props.setCategoryFilter}
+        />
+
+        <ProductCostValuationPanel
+          costValuationQuery={props.costValuationQuery}
+          costValuationSummary={props.costValuationSummary}
+          costValuationDetailsQuery={props.costValuationDetailsQuery}
+          costValuationDetails={props.costValuationDetails}
+          costValuationDetailFilters={props.costValuationDetailFilters}
+          setCostValuationDetailFilters={props.setCostValuationDetailFilters}
+          onOpenCostHistory={props.handleOpenCostHistory}
+          onExportCostValuationDetailsCsv={props.handleExportCostValuationDetailsCsv}
+          onViewCategory={props.setCategoryFilter}
+        />
+
+        <ProductCostDashboardSummaryPanel
+          costDashboardQuery={props.costDashboardQuery}
+          costDashboardSummary={props.costDashboardSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+      </>
+    );
+  }
+
+  if (props.workspaceView === 'actions') {
+    return (
+      <>
+        <CostWorkspaceIntro
+          title="Cost review"
+          description="Work through cost exceptions, recommendations, and supporting evidence. These sections are read-only and point people back to audited product and receiving workflows for any actual change."
+        />
+
+        <ProductCostActionSummaryPanel
+          costActionQuery={props.costActionQuery}
+          costActionSummary={props.costActionSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionPlanPanel
+          costActionPlanQuery={props.costActionPlanQuery}
+          costActionPlan={props.costActionPlan}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostRecommendationSummaryPanel
+          costRecommendationQuery={props.costRecommendationQuery}
+          costRecommendationSummary={props.costRecommendationSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostAlertSummaryPanel
+          costAlertQuery={props.costAlertQuery}
+          costAlertSummary={props.costAlertSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionCategoryPanel
+          costActionCategoryQuery={props.costActionCategoryQuery}
+          costActionCategorySummary={props.costActionCategorySummary}
+        />
+
+        <ProductCostActionImpactPanel
+          costActionImpactQuery={props.costActionImpactQuery}
+          costActionImpactSummary={props.costActionImpactSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionSupplierPanel
+          costActionSupplierQuery={props.costActionSupplierQuery}
+          costActionSupplierSummary={props.costActionSupplierSummary}
+        />
+
+        <ProductCostActionSourcePanel
+          costActionSourceQuery={props.costActionSourceQuery}
+          costActionSourceSummary={props.costActionSourceSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionAgePanel
+          costActionAgeQuery={props.costActionAgeQuery}
+          costActionAgeSummary={props.costActionAgeSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionCoveragePanel
+          costActionCoverageQuery={props.costActionCoverageQuery}
+          costActionCoverageSummary={props.costActionCoverageSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostActionDetailsPanel
+          costActionDetailsQuery={props.costActionDetailsQuery}
+          costActionDetails={props.costActionDetails}
+          costActionDetailFilters={props.costActionDetailFilters}
+          setCostActionDetailFilters={props.setCostActionDetailFilters}
+          onExportCostActionDetailsCsv={props.handleExportCostActionDetailsCsv}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostRiskSummaryPanel
+          costRiskQuery={props.costRiskQuery}
+          costRiskDetailsQuery={props.costRiskDetailsQuery}
+          costRiskSummary={props.costRiskSummary}
+          costRiskDetails={props.costRiskDetails}
+          costRiskDetailFilters={props.costRiskDetailFilters}
+          setCostRiskDetailFilters={props.setCostRiskDetailFilters}
+          onExportCostRiskDetailsCsv={props.handleExportCostRiskDetailsCsv}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+      </>
+    );
+  }
+
+  if (props.workspaceView === 'governance') {
+    return (
+      <>
+        <CostWorkspaceIntro
+          title="Cost controls & audit"
+          description="Review finance-close readiness, hardening checks, governance evidence, and exportable audit material. This remains tenant-scoped and does not automatically change cost or stock records."
+        />
+
+        <ProductCostHardeningSummaryPanel
+          costHardeningQuery={props.costHardeningQuery}
+          costHardeningSummary={props.costHardeningSummary}
+          onOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostGovernanceSummaryPanel
+          costGovernanceQuery={props.costGovernanceQuery}
+          costGovernanceDetailsQuery={props.costGovernanceDetailsQuery}
+          costGovernanceAuditQuery={props.costGovernanceAuditQuery}
+          costGovernanceSignoffQuery={props.costGovernanceSignoffQuery}
+          costGovernanceReviewQueueQuery={props.costGovernanceReviewQueueQuery}
+          costGovernanceReviewPackQuery={props.costGovernanceReviewPackQuery}
+          costGovernanceClosureQuery={props.costGovernanceClosureQuery}
+          costGovernanceHandoffQuery={props.costGovernanceHandoffQuery}
+          costOperationsRunbookQuery={props.costOperationsRunbookQuery}
+          costOperationsControlQuery={props.costOperationsControlQuery}
+          costOperationsEvidenceQuery={props.costOperationsEvidenceQuery}
+          costOperationsReadinessQuery={props.costOperationsReadinessQuery}
+          costGovernanceFinalQuery={props.costGovernanceFinalQuery}
+          costPerformanceQuery={props.costPerformanceQuery}
+          costSecurityAuditQuery={props.costSecurityAuditQuery}
+          costGovernanceSummary={props.costGovernanceSummary}
+          costGovernanceDetails={props.costGovernanceDetails}
+          costGovernanceAuditPack={props.costGovernanceAuditPack}
+          costGovernanceSignoff={props.costGovernanceSignoff}
+          costGovernanceReviewQueue={props.costGovernanceReviewQueue}
+          costGovernanceReviewPack={props.costGovernanceReviewPack}
+          costGovernanceClosureSummary={props.costGovernanceClosureSummary}
+          costGovernanceHandoffSummary={props.costGovernanceHandoffSummary}
+          costOperationsRunbookSummary={props.costOperationsRunbookSummary}
+          costOperationsControlSummary={props.costOperationsControlSummary}
+          costOperationsEvidenceSummary={props.costOperationsEvidenceSummary}
+          costOperationsReadinessSummary={props.costOperationsReadinessSummary}
+          costGovernanceFinalSummary={props.costGovernanceFinalSummary}
+          costPerformanceSummary={props.costPerformanceSummary}
+          costSecurityAuditSummary={props.costSecurityAuditSummary}
+          handleExportCostGovernanceAuditCsv={props.handleExportCostGovernanceAuditCsv}
+          handleExportCostGovernanceReviewPackCsv={props.handleExportCostGovernanceReviewPackCsv}
+          handleExportCostGovernanceClosureCsv={props.handleExportCostGovernanceClosureCsv}
+          handleExportCostGovernanceHandoffCsv={props.handleExportCostGovernanceHandoffCsv}
+          handlePrintCostGovernanceAudit={props.handlePrintCostGovernanceAudit}
+          handleOpenCostHistory={props.handleOpenCostHistory}
+        />
+
+        <ProductCostReportSummaryPanel
+          costReportQuery={props.costReportQuery}
+          costReportSummary={props.costReportSummary}
+          onExportCostReportCsv={props.handleExportCostReportCsv}
+          onPrintCostReport={props.handlePrintCostReport}
+        />
+      </>
+    );
+  }
+
+  return null;
 }

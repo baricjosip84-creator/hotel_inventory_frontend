@@ -3,8 +3,6 @@ import type { useProductPageViewModel } from './useProductPageViewModel';
 import { getCurrentAccessRoleLabel } from '../../lib/permissions';
 import { styles } from './productStyles';
 import { ProductFormPanel } from './ProductFormPanel';
-import { ProductPackagesPanel } from './ProductPackagesPanel';
-import { ProductCostHistoryPanel } from './ProductCostHistoryPanel';
 import { ProductListPanel } from './ProductListPanel';
 import { InventoryCsvImportPanel } from '../../components/imports/InventoryCsvImportPanel';
 
@@ -23,34 +21,6 @@ export function ProductManagementSectionsPanel({
   handleSubmit,
   handleCancelEdit,
   setForm,
-  selectedPackageProduct,
-  packagesQuery,
-  packages,
-  packageForm,
-  editingPackage,
-  packageError,
-  packageMessage,
-  isPackageSubmitting,
-  canManageProductPackages,
-  deletePackageMutation,
-  setPackageForm,
-  handleClosePackages,
-  handlePackageSubmit,
-  handleCancelPackageEdit,
-  handleStartEditPackage,
-  handleDeletePackage,
-  selectedCostProduct,
-  costHistoryQuery,
-  standardCostHistoryQuery,
-  costHistory,
-  standardCostHistory,
-  costSummary,
-  costHistoryFilters,
-  setCostHistoryFilters,
-  handleExportCostHistoryCsv,
-  handleExportStandardCostHistoryCsv,
-  handleCloseCostHistory,
-  handleClearCostHistoryFilters,
   productsQuery,
   products,
   totalProductsCount,
@@ -139,40 +109,6 @@ export function ProductManagementSectionsPanel({
         onOpenPackages={handleOpenPackages}
         onStartEdit={handleStartEdit}
         onDelete={handleDelete}
-      />
-
-      <ProductPackagesPanel
-        selectedPackageProduct={selectedPackageProduct}
-        packagesQuery={packagesQuery}
-        packages={packages}
-        packageForm={packageForm}
-        editingPackage={editingPackage}
-        packageError={packageError}
-        packageMessage={packageMessage}
-        isPackageSubmitting={isPackageSubmitting}
-        canManageProductPackages={canManageProductPackages}
-        deletePackagePending={deletePackageMutation.isPending}
-        setPackageForm={setPackageForm}
-        onClosePackages={handleClosePackages}
-        onSubmit={handlePackageSubmit}
-        onCancelPackageEdit={handleCancelPackageEdit}
-        onStartEditPackage={handleStartEditPackage}
-        onDeletePackage={handleDeletePackage}
-      />
-
-      <ProductCostHistoryPanel
-        selectedCostProduct={selectedCostProduct}
-        costHistoryQuery={costHistoryQuery}
-        standardCostHistoryQuery={standardCostHistoryQuery}
-        costHistory={costHistory}
-        standardCostHistory={standardCostHistory}
-        costSummary={costSummary}
-        costHistoryFilters={costHistoryFilters}
-        setCostHistoryFilters={setCostHistoryFilters}
-        onExportCostHistoryCsv={handleExportCostHistoryCsv}
-        onExportStandardCostHistoryCsv={handleExportStandardCostHistoryCsv}
-        onCloseCostHistory={handleCloseCostHistory}
-        onClearCostHistoryFilters={handleClearCostHistoryFilters}
       />
     </>
   );

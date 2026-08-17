@@ -49,6 +49,20 @@ export function ProductFormPanel({
 
       <form onSubmit={onSubmit} style={styles.formGrid}>
         <div>
+          <label htmlFor="product-sku" style={styles.label}>SKU</label>
+          <input
+            id="product-sku"
+            style={styles.input}
+            value={form.sku}
+            onChange={(event) => setForm((current) => ({ ...current, sku: event.target.value }))}
+            placeholder="Example: BEV-COFFEE-001"
+            required
+            disabled={fieldsDisabled}
+          />
+          <div style={styles.fieldHint}>Required unique product code used by imports, integrations, and searches.</div>
+        </div>
+
+        <div>
           <label htmlFor="product-name" style={styles.label}>Product Name</label>
           <input
             id="product-name"

@@ -20,8 +20,17 @@ import {
   emptyProductForm
 } from './productFormDefaults';
 
+export type ProductWorkspaceView = 'catalog' | 'valuation' | 'actions' | 'governance';
+
+const isProductWorkspaceView = (value: string | null): value is ProductWorkspaceView =>
+  value === 'catalog' || value === 'valuation' || value === 'actions' || value === 'governance';
+
 export function useProductPageState() {
   const [searchParams] = useSearchParams();
+  const [workspaceView, setWorkspaceView] = useState<ProductWorkspaceView>(() => {
+    const requestedView = searchParams.get('view');
+    return isProductWorkspaceView(requestedView) ? requestedView : 'catalog';
+  });
   const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
   const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('category')?.trim() || '');
   const [supplierFilter, setSupplierFilter] = useState(() => searchParams.get('supplier_id')?.trim() || '');
@@ -47,6 +56,8 @@ export function useProductPageState() {
   const [packageError, setPackageError] = useState<string | null>(null);
 
   return {
+    workspaceView,
+    setWorkspaceView,
     search,
     setSearch,
     categoryFilter,

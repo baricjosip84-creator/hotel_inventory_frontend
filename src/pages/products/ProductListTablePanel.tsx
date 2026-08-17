@@ -1,5 +1,5 @@
 import type { ProductItem } from '../../types/inventory';
-import { formatCostVarianceStatus, formatDateTime, formatMoney, formatPercent } from './productFormatting';
+import { formatCostVarianceStatus, formatMoney, formatPercent } from './productFormatting';
 import { styles } from './productStyles';
 
 type ProductsQueryState = {
@@ -19,6 +19,18 @@ type ProductListTablePanelProps = {
   onOpenPackages: (product: ProductItem) => void;
   onStartEdit: (product: ProductItem) => void;
   onDelete: (product: ProductItem) => void;
+};
+
+const toNumber = (value: number | string | null | undefined): number => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatCostBasis = (source: string | null | undefined): string => {
+  if (source === 'product_standard') return 'Standard fallback';
+  if (source === 'landed_cost') return 'Landed cost';
+  if (source) return 'Received cost';
+  return 'No cost basis';
 };
 
 export function ProductListTablePanel({
@@ -46,119 +58,115 @@ export function ProductListTablePanel({
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>SKU</th>
-            <th style={styles.th}>Name</th>
-            <th style={styles.th}>Category</th>
-            <th style={styles.th}>Unit</th>
-            <th style={styles.th}>Min Stock</th>
+            <th style={styles.th}>Product</th>
+            <th style={styles.th}>Category / Unit</th>
             <th style={styles.th}>Supplier</th>
+            <th style={styles.th}>Stock</th>
             <th style={styles.th}>Default Barcode</th>
-            <th style={styles.th}>Costing</th>
+            <th style={styles.th}>Cost</th>
             <th style={styles.th}>Est. Value</th>
-            <th style={styles.th}>Created</th>
-            <th style={styles.th}>Version</th>
             <th style={styles.th}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {products.length === 0 ? (
             <tr>
-              <td style={styles.emptyCell} colSpan={12}>
+              <td style={styles.emptyCell} colSpan={8}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            products.map((product) => (
-              <tr key={product.id}>
-                <td style={styles.td}><span style={styles.barcodeValue}>{product.sku || '-'}</span></td>
-                <td style={styles.td}>
-                  <div style={styles.rowTitle}>{product.name}</div>
-                  <div style={styles.rowSubtle}>Product ID: {product.id}</div>
-                </td>
-                <td style={styles.td}>{product.category || '-'}</td>
-                <td style={styles.td}>{product.unit}</td>
-                <td style={styles.td}>{String(product.min_stock)}</td>
-                <td style={styles.td}>{product.supplier_name || 'Not linked'}</td>
-                <td style={styles.td}>
-                  {product.barcode ? <span style={styles.barcodeValue}>{product.barcode}</span> : '-'}
-                </td>
-                <td style={styles.td}>
-                  {product.effective_unit_cost !== null && product.effective_unit_cost !== undefined ? (
-                    <div>
-                      <div style={styles.rowTitle}>{formatMoney(product.effective_unit_cost)}</div>
-                      <div style={styles.rowSubtle}>
-                        Source: {product.effective_cost_source === 'product_standard' ? 'standard cost' : product.effective_cost_source || 'movement'}
+            products.map((product) => {
+              const currentStock = toNumber(product.current_stock_quantity);
+              const minimumStock = toNumber(product.min_stock);
+              const belowMinimum = minimumStock > 0 && currentStock < minimumStock;
+
+              return (
+                <tr key={product.id}>
+                  <td style={styles.td}>
+                    <div style={styles.rowTitle}>{product.name}</div>
+                    <div style={styles.rowSubtle}>SKU: {product.sku || '-'}</div>
+                    {product.requires_lot_tracking || product.requires_expiry_date ? (
+                      <div style={styles.rowBadgeGroup}>
+                        {product.requires_lot_tracking ? <span style={styles.miniBadge}>Lot / batch</span> : null}
+                        {product.requires_expiry_date ? <span style={styles.miniBadge}>Expiry</span> : null}
                       </div>
-                      <div style={styles.rowSubtle}>
-                        Effective at: {formatDateTime(product.effective_cost_at)}
-                      </div>
-                      {product.latest_unit_cost !== null && product.latest_unit_cost !== undefined ? (
-                        <div style={styles.rowSubtle}>Movement cost: {formatMoney(product.latest_unit_cost)}</div>
-                      ) : product.standard_unit_cost !== null && product.standard_unit_cost !== undefined ? (
-                        <div style={styles.rowSubtle}>Fallback standard cost</div>
-                      ) : null}
-                      <div style={styles.rowSubtle}>
-                        Standard variance: {formatCostVarianceStatus(product.cost_variance_status)}
-                      </div>
-                      {product.cost_variance_amount !== null && product.cost_variance_amount !== undefined ? (
-                        <div style={styles.rowSubtle}>
-                          Δ {formatMoney(product.cost_variance_amount)} ({formatPercent(product.cost_variance_percent)})
-                        </div>
-                      ) : null}
+                    ) : null}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.rowTitle}>{product.category || 'Uncategorized'}</div>
+                    <div style={styles.rowSubtle}>{product.unit}</div>
+                  </td>
+                  <td style={styles.td}>{product.supplier_name || 'Not linked'}</td>
+                  <td style={styles.td}>
+                    <div style={belowMinimum ? styles.rowTitleWarn : styles.rowTitle}>
+                      {String(product.current_stock_quantity ?? 0)} {product.unit}
                     </div>
-                  ) : (
-                    <span style={styles.rowSubtle}>No cost configured</span>
-                  )}
-                </td>
-                <td style={styles.td}>
-                  <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value)}</div>
-                  <div style={styles.rowSubtle}>
-                    Stock: {String(product.current_stock_quantity ?? 0)} {product.unit}
-                  </div>
-                </td>
-                <td style={styles.td}>{formatDateTime(product.created_at)}</td>
-                <td style={styles.td}>
-                  <span style={styles.badgeVersion}>v{product.version}</span>
-                </td>
-                <td style={styles.td}>
-                  <div style={styles.actionGroup}>
-                    <button type="button" style={styles.secondaryButton} onClick={() => onOpenCostHistory(product)}>
-                      Cost History
-                    </button>
+                    <div style={styles.rowSubtle}>Minimum: {String(product.min_stock ?? 0)}</div>
+                    {belowMinimum ? <span style={styles.miniBadgeWarn}>Below minimum</span> : null}
+                  </td>
+                  <td style={styles.td}>
+                    {product.barcode ? <span style={styles.barcodeValue}>{product.barcode}</span> : <span style={styles.rowSubtle}>No default barcode</span>}
+                  </td>
+                  <td style={styles.td}>
+                    {product.effective_unit_cost !== null && product.effective_unit_cost !== undefined ? (
+                      <div>
+                        <div style={styles.rowTitle}>{formatMoney(product.effective_unit_cost)}</div>
+                        <div style={styles.rowSubtle}>{formatCostBasis(product.effective_cost_source)}</div>
+                        <div style={styles.rowSubtle}>Variance: {formatCostVarianceStatus(product.cost_variance_status)}</div>
+                        {product.cost_variance_amount !== null && product.cost_variance_amount !== undefined ? (
+                          <div style={styles.rowSubtle}>
+                            Δ {formatMoney(product.cost_variance_amount)} ({formatPercent(product.cost_variance_percent)})
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span style={styles.rowSubtle}>No cost configured</span>
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value)}</div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.actionGroup}>
+                      <button type="button" style={styles.secondaryButton} onClick={() => onOpenCostHistory(product)}>
+                        Cost history
+                      </button>
 
-                    <button
-                      type="button"
-                      style={!canViewProductPackages ? styles.disabledButton : styles.secondaryButton}
-                      onClick={() => onOpenPackages(product)}
-                      disabled={!canViewProductPackages}
-                      title={!canViewProductPackages ? 'Product package read permission required' : undefined}
-                    >
-                      Packages
-                    </button>
+                      <button
+                        type="button"
+                        style={!canViewProductPackages ? styles.disabledButton : styles.secondaryButton}
+                        onClick={() => onOpenPackages(product)}
+                        disabled={!canViewProductPackages}
+                        title={!canViewProductPackages ? 'Product package read permission required' : undefined}
+                      >
+                        Packages
+                      </button>
 
-                    <button
-                      type="button"
-                      style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
-                      onClick={() => onStartEdit(product)}
-                      disabled={!canManageProducts}
-                      title={!canManageProducts ? 'Products write permission required' : undefined}
-                    >
-                      Edit
-                    </button>
+                      <button
+                        type="button"
+                        style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
+                        onClick={() => onStartEdit(product)}
+                        disabled={!canManageProducts}
+                        title={!canManageProducts ? 'Products write permission required' : undefined}
+                      >
+                        Edit
+                      </button>
 
-                    <button
-                      type="button"
-                      style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
-                      onClick={() => onDelete(product)}
-                      disabled={deleteProductPending || !canManageProducts}
-                      title={!canManageProducts ? 'Products write permission required' : undefined}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
+                      <button
+                        type="button"
+                        style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
+                        onClick={() => onDelete(product)}
+                        disabled={deleteProductPending || !canManageProducts}
+                        title={!canManageProducts ? 'Products write permission required' : undefined}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

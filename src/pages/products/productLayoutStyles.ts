@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 export const productLayoutStyles: Record<string, CSSProperties> = {
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '16px',
     marginBottom: '20px'
   },

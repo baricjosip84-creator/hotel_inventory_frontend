@@ -12,6 +12,7 @@ export function useProductPageViewModel() {
   const productPageState = useProductPageState();
 
   const queries = useProductPageQueries({
+    workspaceView: productPageState.workspaceView,
     categoryFilter: productPageState.categoryFilter,
     supplierFilter: productPageState.supplierFilter,
     costStatusFilter: productPageState.costStatusFilter,

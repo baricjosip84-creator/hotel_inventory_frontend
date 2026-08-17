@@ -23,7 +23,7 @@ export const productTableStyles: Record<string, CSSProperties> = {
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: '1160px'
+    minWidth: '980px'
   },
   packageTable: {
     width: '100%',
@@ -57,7 +57,7 @@ export const productTableStyles: Record<string, CSSProperties> = {
     fontSize: '12px',
     color: '#64748b',
     lineHeight: 1.4,
-    wordBreak: 'break-all'
+    overflowWrap: 'anywhere'
   },
   fieldHint: {
     marginTop: '6px',
@@ -68,7 +68,7 @@ export const productTableStyles: Record<string, CSSProperties> = {
   barcodeValue: {
     fontFamily: 'monospace',
     fontSize: '13px',
-    wordBreak: 'break-all'
+    overflowWrap: 'anywhere'
   },
   badgeVersion: {
     display: 'inline-block',
@@ -87,6 +87,36 @@ export const productTableStyles: Record<string, CSSProperties> = {
     color: '#166534',
     fontWeight: 700,
     fontSize: '12px'
+  },
+  rowTitleWarn: {
+    fontWeight: 700,
+    marginBottom: '6px',
+    color: '#b45309'
+  },
+  rowBadgeGroup: {
+    display: 'flex',
+    gap: '6px',
+    flexWrap: 'wrap',
+    marginTop: '8px'
+  },
+  miniBadge: {
+    display: 'inline-block',
+    padding: '3px 7px',
+    borderRadius: '999px',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    fontWeight: 700,
+    fontSize: '11px'
+  },
+  miniBadgeWarn: {
+    display: 'inline-block',
+    marginTop: '6px',
+    padding: '3px 7px',
+    borderRadius: '999px',
+    background: '#fff7ed',
+    color: '#b45309',
+    fontWeight: 700,
+    fontSize: '11px'
   },
   actionGroup: {
     display: 'flex',
