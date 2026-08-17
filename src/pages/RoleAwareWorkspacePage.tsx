@@ -10,6 +10,7 @@ import {
   hasPermission
 } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './RoleAwareWorkspacePage.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -260,6 +261,30 @@ function widgetContent(widgetId: string): { title: string; description: string }
   };
 }
 
+function widgetIconPath(widgetId: string): string {
+  if (widgetId.includes('alert')) return '/alerts';
+  if (widgetId.includes('execution')) return '/execution-tasks';
+  if (widgetId.includes('decision') || widgetId.includes('governance')) return '/intelligence-review';
+  if (widgetId.includes('risk') || widgetId.includes('control_tower')) return '/reliability-command';
+  return '/workspace';
+}
+
+function actionDomainIconPath(domain?: string | null): string {
+  if (domain === 'alerts') return '/alerts';
+  if (domain === 'execution') return '/execution-tasks';
+  if (domain === 'control_tower') return '/reliability-command';
+  if (domain === 'decision_intelligence' || domain === 'ai_governance') return '/intelligence-review';
+  if (domain === 'multi_domain') return '/workspace';
+  return '/action-center';
+}
+
+function urgencyToneClass(urgency?: string | null): string {
+  if (urgency === 'critical') return 'workspace-page__icon--danger';
+  if (urgency === 'high') return 'workspace-page__icon--warning';
+  if (urgency === 'medium') return 'workspace-page__icon--amber';
+  return 'workspace-page__icon--green';
+}
+
 function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
 
@@ -392,38 +417,56 @@ export default function RoleAwareWorkspacePage() {
   return (
     <div className="workspace-page">
       <div className="workspace-page__summary-grid">
-        <div className="card">
-          <div className="card__label">Workspace</div>
-          <div className="card__value" style={{ fontSize: 20 }}>{workspace.workspace_name || 'Role workspace'}</div>
-          <div className="card__subtext">Prepared for the current access role: {accessRoleLabel}.</div>
+        <div className="card workspace-page__summary-card">
+          <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/workspace" size={18} /></span>
+          <div className="workspace-page__summary-copy">
+            <div className="card__label">Workspace</div>
+            <div className="card__value workspace-page__summary-text-value">{workspace.workspace_name || 'Role workspace'}</div>
+            <div className="card__subtext">Prepared for the current access role: {accessRoleLabel}.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Actions available</div>
-          <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
-          <div className="card__subtext">Open work currently returned for the selected filters.</div>
+        <div className="card workspace-page__summary-card">
+          <span className="workspace-page__icon workspace-page__icon--violet"><TenantNavIcon path="/action-center" size={18} /></span>
+          <div className="workspace-page__summary-copy">
+            <div className="card__label">Actions available</div>
+            <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
+            <div className="card__subtext">Open work currently returned for the selected filters.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Critical actions</div>
-          <div className="card__value">{numberValue(summary.critical_actions)}</div>
-          <div className="card__subtext">Items that need the fastest attention.</div>
+        <div className="card workspace-page__summary-card">
+          <span className="workspace-page__icon workspace-page__icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
+          <div className="workspace-page__summary-copy">
+            <div className="card__label">Critical actions</div>
+            <div className="card__value">{numberValue(summary.critical_actions)}</div>
+            <div className="card__subtext">Items that need the fastest attention.</div>
+          </div>
         </div>
-        <div className="card">
-          <div className="card__label">Role filtering</div>
-          <div className="card__value" style={{ fontSize: 20 }}>Active</div>
-          <div className="card__subtext">Only work that this role is allowed to read is included.</div>
+        <div className="card workspace-page__summary-card">
+          <span className="workspace-page__icon workspace-page__icon--green"><TenantNavIcon path="/permissions" size={18} /></span>
+          <div className="workspace-page__summary-copy">
+            <div className="card__label">Role filtering</div>
+            <div className="card__value workspace-page__summary-text-value">Active</div>
+            <div className="card__subtext">Only work that this role is allowed to read is included.</div>
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 800 }}>How this page works</div>
-        <p className="card__subtext" style={{ marginBottom: 0 }}>
-          Workspace gives each role a simpler view of the Action Center. It shows what deserves attention and sends the user to the correct page, but it does not complete tasks or change inventory itself.
-        </p>
+      <div className="card workspace-page__info-card">
+        <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
+        <div>
+          <div className="workspace-page__info-title">How this page works</div>
+          <p className="card__subtext">
+            Workspace gives each role a simpler view of the Action Center. It shows what deserves attention and sends the user to the correct page, but it does not complete tasks or change inventory itself.
+          </p>
+        </div>
       </div>
 
-      <section className="section">
-        <div className="section__title">Workspace controls</div>
-        <div className="card">
+      <section className="section workspace-page__section">
+        <div className="section__title workspace-page__section-title">
+          <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
+          <span>Workspace controls</span>
+        </div>
+        <div className="card workspace-page__controls-shell">
           <div className="workspace-page__toolbar">
             <select aria-label="Filter by work area" className="workspace-page__select" value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
               {availableDomains.map((option) => (
@@ -435,35 +478,48 @@ export default function RoleAwareWorkspacePage() {
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <button className="button button--secondary" type="button" onClick={() => workspaceQuery.refetch()} disabled={workspaceQuery.isFetching}>
-              {workspaceQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+            <button className="button button--secondary workspace-page__refresh" type="button" onClick={() => workspaceQuery.refetch()} disabled={workspaceQuery.isFetching}>
+              <TenantNavIcon path="/real-time-operations-feed" size={15} />
+              <span>{workspaceQuery.isFetching ? 'Refreshing…' : 'Refresh'}</span>
             </button>
           </div>
 
           <div className="workspace-page__context-grid">
-            <div className="card workspace-page__card" style={{ background: 'var(--color-surface-soft)' }}>
-              <div className="card__label">Main purpose</div>
-              <div className="workspace-page__copy" style={{ fontWeight: 800 }}>{primaryFocusLabel(workspace.primary_focus)}</div>
+            <div className="card workspace-page__context-card">
+              <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/workspace" size={17} /></span>
+              <div className="workspace-page__context-copy">
+                <div className="card__label">Main purpose</div>
+                <div className="workspace-page__copy">{primaryFocusLabel(workspace.primary_focus)}</div>
+              </div>
             </div>
-            <div className="card workspace-page__card" style={{ background: 'var(--color-surface-soft)' }}>
-              <div className="card__label">How work is organised</div>
-              <div className="workspace-page__copy" style={{ fontWeight: 800 }}>{actionStrategyLabel(workspace.action_strategy)}</div>
+            <div className="card workspace-page__context-card">
+              <span className="workspace-page__icon workspace-page__icon--violet"><TenantNavIcon path="/action-center" size={17} /></span>
+              <div className="workspace-page__context-copy">
+                <div className="card__label">How work is organised</div>
+                <div className="workspace-page__copy">{actionStrategyLabel(workspace.action_strategy)}</div>
+              </div>
             </div>
-            <div className="card workspace-page__card" style={{ background: 'var(--color-surface-soft)' }}>
-              <div className="card__label">Page mode</div>
-              <div className="workspace-page__copy" style={{ fontWeight: 800 }}>{executionModeLabel(response?.definition?.execution_mode)}</div>
-              <div className="card__subtext">The page gives guidance only. Real work is completed on the source page.</div>
+            <div className="card workspace-page__context-card">
+              <span className="workspace-page__icon workspace-page__icon--green"><TenantNavIcon path="/execution-tasks" size={17} /></span>
+              <div className="workspace-page__context-copy">
+                <div className="card__label">Page mode</div>
+                <div className="workspace-page__copy">{executionModeLabel(response?.definition?.execution_mode)}</div>
+                <div className="card__subtext">The page gives guidance only. Real work is completed on the source page.</div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__title">Workspace summaries</div>
+      <section className="section workspace-page__section">
+        <div className="section__title workspace-page__section-title">
+          <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
+          <span>Workspace summaries</span>
+        </div>
         <div className="workspace-page__widget-grid">
           {widgets.length === 0 ? (
-            <div className="card">
-              <div style={{ fontWeight: 800 }}>No summary groups available</div>
+            <div className="card workspace-page__empty-card">
+              <div className="workspace-page__empty-title">No summary groups available</div>
               <div className="card__subtext">No workspace summary matched this role and filter selection.</div>
             </div>
           ) : widgets.map((widget) => {
@@ -471,56 +527,69 @@ export default function RoleAwareWorkspacePage() {
             const count = numberValue(widget.visible_action_count);
 
             return (
-              <div className="card workspace-page__card" key={widget.widget_id}>
+              <div className="card workspace-page__widget-card" key={widget.widget_id}>
+                <div className="workspace-page__widget-head">
+                  <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path={widgetIconPath(widget.widget_id)} size={17} /></span>
+                  <span className="workspace-page__count-pill">{count}</span>
+                </div>
                 <div className="card__label">Read-only summary</div>
-                <div className="card__value" style={{ fontSize: 19 }}>{content.title}</div>
+                <div className="card__value workspace-page__widget-title">{content.title}</div>
                 <div className="card__subtext">{content.description}</div>
-                <div style={{ marginTop: 10, fontWeight: 800 }}>{count} matching {count === 1 ? 'item' : 'items'}</div>
+                <div className="workspace-page__widget-count">{count} matching {count === 1 ? 'item' : 'items'}</div>
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__title">Guided next actions</div>
-        <div className="card">
-          <div style={{ fontWeight: 800 }}>Where to start</div>
-          <p className="card__subtext" style={{ marginBottom: 4 }}>
-            {response?.guidance?.next_action_title
-              ? `Start with: ${formatLabel(response.guidance.next_action_title)}.`
-              : 'There is no open action to start with for the selected filters.'}
-          </p>
-          <p className="card__subtext" style={{ marginBottom: 4 }}>
-            {response?.guidance?.operator_guidance || 'Workspace guidance is not available yet.'}
-          </p>
-          <p className="card__subtext" style={{ marginBottom: 0 }}>
-            {response?.guidance?.escalation_guidance || 'Only permitted work is included.'}
-          </p>
+      <section className="section workspace-page__section">
+        <div className="section__title workspace-page__section-title">
+          <span className="workspace-page__section-icon"><TenantNavIcon path="/action-center" size={16} /></span>
+          <span>Guided next actions</span>
+        </div>
+        <div className="card workspace-page__guidance-card">
+          <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
+          <div className="workspace-page__guidance-copy">
+            <div className="workspace-page__guidance-title">Where to start</div>
+            <p className="card__subtext">
+              {response?.guidance?.next_action_title
+                ? `Start with: ${formatLabel(response.guidance.next_action_title)}.`
+                : 'There is no open action to start with for the selected filters.'}
+            </p>
+            <p className="card__subtext">
+              {response?.guidance?.operator_guidance || 'Workspace guidance is not available yet.'}
+            </p>
+            <p className="card__subtext">
+              {response?.guidance?.escalation_guidance || 'Only permitted work is included.'}
+            </p>
+          </div>
         </div>
 
         {actions.length === 0 ? (
-          <div className="card" style={{ marginTop: 12 }}>
-            <div style={{ fontWeight: 800 }}>No matching actions</div>
-            <p className="card__subtext" style={{ marginBottom: 0 }}>
+          <div className="card workspace-page__empty-card workspace-page__empty-card--actions">
+            <div className="workspace-page__empty-title">No matching actions</div>
+            <p className="card__subtext">
               No open work matched the selected area and urgency. Try a broader filter or refresh the page.
             </p>
           </div>
         ) : (
           <>
             {actions.length > shownActions.length ? (
-              <p className="card__subtext">Showing the first {shownActions.length} of {actions.length} actions. Open the Action Center to review the complete returned list.</p>
+              <p className="card__subtext workspace-page__showing-copy">Showing the first {shownActions.length} of {actions.length} actions. Open the Action Center to review the complete returned list.</p>
             ) : null}
             <div className="workspace-page__action-list">
               {shownActions.map((action) => {
                 const sourceLink = sourceActionLink(action);
 
                 return (
-                  <article key={action.action_id} className="card workspace-page__card" style={{ background: 'var(--color-surface-soft)' }}>
+                  <article key={action.action_id} className={`card workspace-page__action-card workspace-page__action-card--${String(action.urgency || 'low').toLowerCase()}`}>
                     <div className="workspace-page__action-header">
-                      <div className="workspace-page__action-copy">
-                        <div style={{ fontWeight: 800 }}>{actionTitleLabel(action)}</div>
-                        <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                      <div className="workspace-page__action-lead">
+                        <span className={`workspace-page__icon ${urgencyToneClass(action.urgency)}`}><TenantNavIcon path={actionDomainIconPath(action.action_domain)} size={17} /></span>
+                        <div className="workspace-page__action-copy">
+                          <div className="workspace-page__action-title">{actionTitleLabel(action)}</div>
+                          <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                        </div>
                       </div>
                       <div className="workspace-page__badges">
                         <span style={urgencyBadgeStyle(action.urgency)}>{formatLabel(action.urgency)}</span>
@@ -529,13 +598,21 @@ export default function RoleAwareWorkspacePage() {
                       </div>
                     </div>
                     {action.recommended_next_step ? (
-                      <p className="card__subtext"><strong>Next step:</strong> {action.recommended_next_step}</p>
+                      <div className="workspace-page__next-step"><strong>Next step:</strong><span>{action.recommended_next_step}</span></div>
                     ) : null}
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                      {sourceLink ? (
-                        <Link className="button button--secondary" to={sourceLink.to}>{sourceLink.label}</Link>
-                      ) : null}
-                      <Link className="button button--secondary" to={actionCenterLink(action)}>View in Action Center</Link>
+                    <div className="workspace-page__action-footer">
+                      <div className="workspace-page__action-buttons">
+                        {sourceLink ? (
+                          <Link className="button button--secondary workspace-page__source-button" to={sourceLink.to}>
+                            <TenantNavIcon path={sourceLink.to.split('?')[0]} size={14} />
+                            <span>{sourceLink.label}</span>
+                          </Link>
+                        ) : null}
+                        <Link className="button button--secondary workspace-page__source-button" to={actionCenterLink(action)}>
+                          <TenantNavIcon path="/action-center" size={14} />
+                          <span>View in Action Center</span>
+                        </Link>
+                      </div>
                     </div>
                   </article>
                 );
@@ -543,7 +620,7 @@ export default function RoleAwareWorkspacePage() {
             </div>
           </>
         )}
-        <p className="card__subtext">Generated at: {formatDateTime(response?.generated_at)}</p>
+        <p className="card__subtext workspace-page__generated-at">Generated at: {formatDateTime(response?.generated_at)}</p>
       </section>
     </div>
   );
