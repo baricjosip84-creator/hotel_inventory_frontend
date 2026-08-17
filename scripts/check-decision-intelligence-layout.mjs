@@ -18,10 +18,12 @@ const allowedClasses = new Set([
   'learning-feedback-view-switch', 'learning-feedback-view-switch__button',
   'forecast-check-card', 'forecast-check-grid', 'forecast-check-item', 'forecast-check-item__heading', 'forecast-check-list',
   'forecast-decision', 'forecast-diagnostics', 'forecast-empty-state', 'forecast-evidence-section', 'forecast-filter-grid',
+  'forecast-heading-icon', 'forecast-heading-icon--amber', 'forecast-heading-icon--slate', 'forecast-hero-badge', 'forecast-hero-badges', 'forecast-hero-icon',
+  'forecast-intro__content', 'forecast-intro__copy',
   'forecast-filters', 'forecast-intro', 'forecast-lifecycle', 'forecast-lifecycle__header', 'forecast-limit-note',
-  'forecast-metric', 'forecast-metric--wide', 'forecast-metric__label', 'forecast-metric__value', 'forecast-metric__value--text',
+  'forecast-metric', 'forecast-metric--wide', 'forecast-metric--with-icon', 'forecast-metric__copy', 'forecast-metric__icon', 'forecast-metric__label', 'forecast-metric__value', 'forecast-metric__value--text',
   'forecast-metrics', 'forecast-muted', 'forecast-not-assessed', 'forecast-not-assessed-card', 'forecast-observed',
-  'forecast-readiness-note', 'forecast-refresh', 'forecast-summary-grid', 'forecast-table', 'forecast-table__subtext',
+  'forecast-readiness-note', 'forecast-refresh', 'forecast-section-heading', 'forecast-state-card', 'forecast-state-card--error', 'forecast-state-icon', 'forecast-state-icon--danger', 'forecast-summary-grid', 'forecast-table', 'forecast-table__subtext',
   'forecast-technical-details', 'forecast-view-switch',
   'stat-card', 'stat-card__label', 'stat-card__value', 'table', 'table-wrap',
   'bg-amber-50', 'bg-red-50', 'bg-red-700', 'bg-slate-100', 'bg-slate-200', 'bg-slate-50', 'bg-slate-900', 'bg-white',
@@ -70,6 +72,14 @@ for (const relativePath of pages) {
     }
     if (!source.includes("import './DecisionLearningFeedbackPage.css';")) {
       fail(`${relativePath} must import its Learning Feedback visual-system stylesheet.`);
+    }
+  }
+  if (relativePath === 'src/pages/ProbabilisticForecastingPage.tsx') {
+    if (!source.includes("import { TenantNavIcon } from '../components/ui/TenantNavIcon';")) {
+      fail(`${relativePath} must import TenantNavIcon when rendering shared tenant navigation icons.`);
+    }
+    if (!source.includes("import './ProbabilisticForecastingPage.css';")) {
+      fail(`${relativePath} must import its Probabilistic Forecasting visual-system stylesheet.`);
     }
   }
   if (source.includes('className="page-shell"')) {

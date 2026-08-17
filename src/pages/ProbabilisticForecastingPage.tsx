@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './decisionIntelligencePages.css';
+import './ProbabilisticForecastingPage.css';
 
 type ForecastView = 'evidence' | 'readiness' | 'diagnostics';
 
@@ -448,23 +450,40 @@ function StatusBadge({ value, tone }: { value: unknown; tone?: ReturnType<typeof
   return <span className={`forecast-badge forecast-badge--${resolvedTone}`}>{formatLabel(value)}</span>;
 }
 
-function MetricCard({ label, value, format = 'number' }: { label: string; value: unknown; format?: LifecycleConfig['metrics'][number]['format'] }) {
+function MetricCard({
+  label,
+  value,
+  format = 'number',
+  iconPath,
+  tone = 'blue'
+}: {
+  label: string;
+  value: unknown;
+  format?: LifecycleConfig['metrics'][number]['format'];
+  iconPath?: string;
+  tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
+}) {
   return (
-    <div className="forecast-metric">
-      <span className="forecast-metric__label">{label}</span>
-      <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
+    <div className={`forecast-metric ${iconPath ? 'forecast-metric--with-icon' : ''}`} data-tone={tone}>
+      {iconPath ? <span className="forecast-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
+      <div className="forecast-metric__copy">
+        <span className="forecast-metric__label">{label}</span>
+        <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
+      </div>
     </div>
   );
 }
 
 function EvidenceSection({
   title,
+  iconPath,
   description,
   rows,
   headers,
   renderRow
 }: {
   title: string;
+  iconPath: string;
   description: string;
   rows: Array<Record<string, unknown>>;
   headers: string[];
@@ -473,9 +492,12 @@ function EvidenceSection({
   return (
     <section className="card forecast-evidence-section">
       <div className="card__header">
-        <div>
-          <h2>{title}</h2>
-          <p className="card__subtext">{description}</p>
+        <div className="forecast-section-heading">
+          <span className="forecast-heading-icon"><TenantNavIcon path={iconPath} size={17} /></span>
+          <div>
+            <h2>{title}</h2>
+            <p className="card__subtext">{description}</p>
+          </div>
         </div>
         <StatusBadge value={`${rows.length} returned`} />
       </div>
@@ -498,7 +520,7 @@ function EvidenceSection({
 function CheckColumn({ title, items }: { title: string; items: Array<Record<string, unknown>> }) {
   return (
     <section className="forecast-check-card">
-      <h3>{title}</h3>
+      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${title === 'Items needing attention' ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={title === 'Items needing attention' ? '/alerts' : '/permissions'} size={15} /></span>{title}</h3>
       {!items.length ? (
         <p className="forecast-muted">No items were returned for this section.</p>
       ) : (
@@ -533,9 +555,12 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
   return (
     <section className="card forecast-lifecycle">
       <div className="forecast-lifecycle__header">
-        <div>
-          <h2>{config.title}</h2>
-          <p className="card__subtext">{config.description}</p>
+        <div className="forecast-section-heading">
+          <span className="forecast-heading-icon"><TenantNavIcon path="/reliability-command" size={17} /></span>
+          <div>
+            <h2>{config.title}</h2>
+            <p className="card__subtext">{config.description}</p>
+          </div>
         </div>
         <div className="forecast-decision">
           <span>Current result</span>
@@ -598,37 +623,47 @@ export default function ProbabilisticForecastingPage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page">
-        <section className="card"><p>Loading probabilistic forecast evidence…</p></section>
+      <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
+        <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/probabilistic-forecasting" size={18} /></span><p>Loading probabilistic forecast evidence…</p></section>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="decision-intelligence-page">
-        <section className="card card--danger">
-          <h2>Probabilistic forecast evidence could not be loaded</h2>
-          <p>Check your Decision Intelligence access and try the read-only request again.</p>
-          <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}>Retry</button>
+      <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
+        <section className="card card--danger forecast-state-card forecast-state-card--error">
+          <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
+          <div>
+            <h2>Probabilistic forecast evidence could not be loaded</h2>
+            <p>Check your Decision Intelligence access and try the read-only request again.</p>
+            <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />Retry</button>
+          </div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="decision-intelligence-page">
+    <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
       <section className="card forecast-intro">
-        <div>
-          <span className="eyebrow">Read-only forecast review</span>
-          <h2>Compare forecast ranges and probabilities with what actually happened</h2>
-          <p className="card__subtext">
-            This page shows stored forecast models, uncertainty ranges, risk probabilities, and outcome measurements. It helps people judge whether a forecast deserves more or less trust. It does not create forecasts, change confidence, retire models, or apply predictions to business operations.
-          </p>
+        <div className="forecast-intro__content">
+          <span className="forecast-hero-icon"><TenantNavIcon path="/probabilistic-forecasting" size={24} /></span>
+          <div className="forecast-intro__copy">
+            <span className="eyebrow">Read-only forecast review</span>
+            <h2>Compare forecast ranges and probabilities with what actually happened</h2>
+            <p className="card__subtext">
+              This page shows stored forecast models, uncertainty ranges, risk probabilities, and outcome measurements. It helps people judge whether a forecast deserves more or less trust. It does not create forecasts, change confidence, retire models, or apply predictions to business operations.
+            </p>
+            <div className="forecast-hero-badges" aria-label="Forecast review guardrails">
+              <span className="forecast-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-reviewed evidence</span>
+              <span className="forecast-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />No automatic business action</span>
+            </div>
+          </div>
         </div>
         <div className="forecast-refresh">
           <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? 'Refreshing…' : 'Refresh evidence'}
+            <TenantNavIcon path="/probabilistic-forecasting" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
           </button>
           <span>Last refreshed: {lastRefreshed}</span>
         </div>
@@ -636,12 +671,15 @@ export default function ProbabilisticForecastingPage() {
 
       <section className="card forecast-filters" aria-label="Probabilistic forecast filters">
         <div className="card__header">
-          <div>
-            <h2>Filter the evidence</h2>
-            <p className="card__subtext">Filters apply to models and their related ranges, risk probabilities, and outcome observations.</p>
+          <div className="forecast-section-heading">
+            <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
+            <div>
+              <h2>Filter the evidence</h2>
+              <p className="card__subtext">Filters apply to models and their related ranges, risk probabilities, and outcome observations.</p>
+            </div>
           </div>
           <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}>
-            Clear filters
+            <TenantNavIcon path="/system-context" size={14} />Clear filters
           </button>
         </div>
         <div className="forecast-filter-grid">
@@ -698,42 +736,51 @@ export default function ProbabilisticForecastingPage() {
 
       <div className="forecast-view-switch" role="tablist" aria-label="Probabilistic forecasting page views">
         <button className={`forecast-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}>
-          Forecast evidence
+          <TenantNavIcon path="/probabilistic-forecasting" size={14} />Forecast evidence
         </button>
         <button className={`forecast-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}>
-          Review checks
+          <TenantNavIcon path="/reliability-command" size={14} />Review checks
         </button>
         {canViewDiagnostics ? (
           <button className={`forecast-view-switch__button ${view === 'diagnostics' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'diagnostics'} onClick={() => setView('diagnostics')}>
-            Diagnostics
+            <TenantNavIcon path="/admin-system" size={14} />Diagnostics
           </button>
         ) : null}
       </div>
 
       <section className="forecast-summary-grid" aria-label="Probabilistic forecast evidence summary">
-        <MetricCard label="Models" value={modelCount} />
-        <MetricCard label="Uncertainty ranges" value={intervalCount} />
-        <MetricCard label="Risk probabilities" value={riskCount} />
-        <MetricCard label="Outcome observations" value={calibrationCount} />
-        <div className="forecast-metric forecast-metric--wide">
-          <span className="forecast-metric__label">Current posture</span>
-          <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.probabilistic_forecasting_posture)}</strong>
+        <MetricCard label="Models" value={modelCount} iconPath="/probabilistic-forecasting" tone="blue" />
+        <MetricCard label="Uncertainty ranges" value={intervalCount} iconPath="/insights" tone="violet" />
+        <MetricCard label="Risk probabilities" value={riskCount} iconPath="/alerts" tone="amber" />
+        <MetricCard label="Outcome observations" value={calibrationCount} iconPath="/decision-learning-feedback" tone="green" />
+        <div className="forecast-metric forecast-metric--wide forecast-metric--with-icon" data-tone="slate">
+          <span className="forecast-metric__icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
+          <div className="forecast-metric__copy">
+            <span className="forecast-metric__label">Current posture</span>
+            <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.probabilistic_forecasting_posture)}</strong>
+          </div>
         </div>
       </section>
 
       {!hasEvidence ? (
         <section className="card forecast-empty-state">
-          <h2>No probabilistic forecast evidence is available for this tenant and filter set</h2>
-          <p>Review scores are not assessed when no model, uncertainty range, risk probability, or actual-outcome observation exists. Zero records do not mean that forecasting is accurate, safe, approved, or ready for business use.</p>
-          <p>This page has no model-creation or outcome-recording action. Evidence must first be produced through the supported forecasting and Learning Feedback data process.</p>
+          <div className="forecast-section-heading">
+            <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/probabilistic-forecasting" size={17} /></span>
+            <div>
+              <h2>No probabilistic forecast evidence is available for this tenant and filter set</h2>
+              <p>Review scores are not assessed when no model, uncertainty range, risk probability, or actual-outcome observation exists. Zero records do not mean that forecasting is accurate, safe, approved, or ready for business use.</p>
+              <p>This page has no model-creation or outcome-recording action. Evidence must first be produced through the supported forecasting and Learning Feedback data process.</p>
+            </div>
+          </div>
         </section>
       ) : null}
 
       {view === 'evidence' ? (
         <>
-          <p className="forecast-limit-note">Each list shows up to {filters.limit} matching records. Review checks use the same filtered record set.</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />Each list shows up to {filters.limit} matching records. Review checks use the same filtered record set.</p>
           <EvidenceSection
             title="Forecast models"
+            iconPath="/probabilistic-forecasting"
             description="Stored forecast definitions and their current human-review status."
             rows={(data?.models || []) as Array<Record<string, unknown>>}
             headers={['Model', 'Area', 'Forecast type', 'Status', 'Method', 'Confidence', 'Updated']}
@@ -754,6 +801,7 @@ export default function ProbabilisticForecastingPage() {
           />
           <EvidenceSection
             title="Uncertainty ranges"
+            iconPath="/insights"
             description="Expected values and lower-to-upper ranges produced for a forecast period. The three displayed values are lower, expected, and upper."
             rows={(data?.intervals || []) as Array<Record<string, unknown>>}
             headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Confidence level', 'Generated']}
@@ -774,6 +822,7 @@ export default function ProbabilisticForecastingPage() {
           />
           <EvidenceSection
             title="Risk probabilities"
+            iconPath="/alerts"
             description="Stored estimates of how likely a specific business risk is, together with its possible severity."
             rows={(data?.risk_probabilities || []) as Array<Record<string, unknown>>}
             headers={['Model', 'Area', 'Risk', 'Probability', 'Severity', 'Explanation', 'Observed']}
@@ -794,6 +843,7 @@ export default function ProbabilisticForecastingPage() {
           />
           <EvidenceSection
             title="Actual-outcome observations"
+            iconPath="/decision-learning-feedback"
             description="Comparisons between predicted and actual values used to understand forecast error and whether an uncertainty range captured the result."
             rows={(data?.calibration || []) as Array<Record<string, unknown>>}
             headers={['Model', 'Observation', 'Type', 'Predicted', 'Actual', 'Error', 'Inside range', 'Calibration', 'Measured']}
@@ -821,8 +871,13 @@ export default function ProbabilisticForecastingPage() {
         hasEvidence ? (
           <>
             <section className="card forecast-readiness-note">
-              <h2>These are advisory checks, not approvals or automated actions</h2>
-              <p className="card__subtext">A passing check only means that the returned records satisfy that specific calculation. It does not create a forecast, increase confidence, approve business use, open an incident, replace a model, or retire anything.</p>
+              <div className="forecast-section-heading">
+                <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
+                <div>
+                  <h2>These are advisory checks, not approvals or automated actions</h2>
+                  <p className="card__subtext">A passing check only means that the returned records satisfy that specific calculation. It does not create a forecast, increase confidence, approve business use, open an incident, replace a model, or retire anything.</p>
+                </div>
+              </div>
             </section>
             {LIFECYCLE_SECTIONS.map((config) => (
               <LifecycleCard key={String(config.key)} config={config} section={data?.[config.key] as ForecastLifecycleSection | undefined} />
@@ -830,8 +885,13 @@ export default function ProbabilisticForecastingPage() {
           </>
         ) : (
           <section className="card forecast-not-assessed-card">
-            <h2>Review checks are not assessed</h2>
-            <p>At least one matching forecast evidence record is required before these calculations can produce a meaningful result.</p>
+            <div className="forecast-section-heading">
+              <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span>
+              <div>
+                <h2>Review checks are not assessed</h2>
+                <p>At least one matching forecast evidence record is required before these calculations can produce a meaningful result.</p>
+              </div>
+            </div>
           </section>
         )
       ) : null}
@@ -839,16 +899,19 @@ export default function ProbabilisticForecastingPage() {
       {view === 'diagnostics' && canViewDiagnostics ? (
         <section className="card forecast-diagnostics">
           <div className="card__header">
-            <div>
-              <h2>Technical response diagnostics</h2>
-              <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+            <div className="forecast-section-heading">
+              <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/admin-system" size={17} /></span>
+              <div>
+                <h2>Technical response diagnostics</h2>
+                <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+              </div>
             </div>
           </div>
           <div className="forecast-metrics">
-            <MetricCard label="Contract score" value={data?.forecast_response_contract_audit?.contract_score} />
-            <MetricCard label="Coverage score" value={data?.forecast_response_contract_audit?.response_coverage_score} />
-            <MetricCard label="Expected response sections" value={data?.forecast_response_contract_audit?.expected_response_keys?.length || 0} />
-            <MetricCard label="Missing response sections" value={(data?.forecast_response_contract_audit?.missing_expected_response_keys?.length || 0) + (data?.forecast_response_contract_audit?.missing_frontend_panel_keys?.length || 0)} />
+            <MetricCard label="Contract score" value={data?.forecast_response_contract_audit?.contract_score} iconPath="/admin-system" tone="blue" />
+            <MetricCard label="Coverage score" value={data?.forecast_response_contract_audit?.response_coverage_score} iconPath="/reports" tone="green" />
+            <MetricCard label="Expected response sections" value={data?.forecast_response_contract_audit?.expected_response_keys?.length || 0} iconPath="/system-context" tone="violet" />
+            <MetricCard label="Missing response sections" value={(data?.forecast_response_contract_audit?.missing_expected_response_keys?.length || 0) + (data?.forecast_response_contract_audit?.missing_frontend_panel_keys?.length || 0)} iconPath="/alerts" tone="amber" />
           </div>
           <details className="forecast-technical-details">
             <summary>View restricted response details</summary>

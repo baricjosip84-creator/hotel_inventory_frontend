@@ -1,0 +1,574 @@
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] {
+  --pf-blue: #2563eb;
+  --pf-blue-soft: #eff6ff;
+  --pf-border: #dbe5f1;
+  --pf-slate: #64748b;
+  --pf-ink: #0f172a;
+  color: var(--pf-ink);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'],
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] * {
+  min-width: 0;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .card {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .card__subtext {
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro {
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border-color: #dbe5f1;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0));
+  transform: translate(42%, -42%);
+  pointer-events: none;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro__content {
+  display: flex;
+  flex: 1 1 660px;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro__copy {
+  flex: 1;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-hero-icon,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric__icon,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-hero-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .eyebrow {
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro h2 {
+  max-width: 800px;
+  margin-top: 5px;
+  color: #0f172a;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro .card__subtext {
+  max-width: 920px;
+  margin-top: 9px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  color: #475569;
+  border: 1px solid #dbe5f1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-refresh {
+  position: relative;
+  z-index: 1;
+  align-items: flex-end;
+  padding-top: 1px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-refresh .button,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filters .button,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-card .button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 10px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filters,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-evidence-section,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics {
+  border-top: 3px solid #dbeafe;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filters {
+  padding: 18px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filters .card__header,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-evidence-section .card__header,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics .card__header {
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon--small {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon--warning,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon--amber {
+  color: #b45309;
+  border-color: #fef3c7;
+  background: #fffbeb;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-heading-icon--slate {
+  color: #475569;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-section-heading h2,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-check-card h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-section-heading .card__subtext {
+  margin-top: 4px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filter-grid {
+  gap: 12px;
+  padding-top: 15px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filter-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .form-label {
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .input {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .input:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch {
+  gap: 4px;
+  padding: 5px;
+  border-color: #d8e2ef;
+  border-radius: 14px;
+  background: #f1f5f9;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch__button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding-inline: 15px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch__button.is-active,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch__button.is-active:hover,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch__button.is-active:focus-visible {
+  color: #ffffff;
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric {
+  position: relative;
+  overflow: hidden;
+  padding: 15px 16px;
+  border-color: #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid > .forecast-metric::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: #93c5fd;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid > .forecast-metric[data-tone='green']::after { background: #86efac; }
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid > .forecast-metric[data-tone='amber']::after { background: #fcd34d; }
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid > .forecast-metric[data-tone='violet']::after { background: #c4b5fd; }
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid > .forecast-metric[data-tone='slate']::after { background: #94a3b8; }
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric--with-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric[data-tone='green'] .forecast-metric__icon {
+  color: #15803d;
+  border-color: #dcfce7;
+  background: #f0fdf4;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric[data-tone='amber'] .forecast-metric__icon {
+  color: #b45309;
+  border-color: #fef3c7;
+  background: #fffbeb;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric[data-tone='violet'] .forecast-metric__icon {
+  color: #7c3aed;
+  border-color: #ede9fe;
+  background: #f5f3ff;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric[data-tone='slate'] .forecast-metric__icon {
+  color: #475569;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric__value {
+  margin-top: 5px;
+  color: #0f172a;
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+  letter-spacing: -0.02em;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric__value--text {
+  font-size: 0.98rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metric--wide {
+  grid-column: 1 / -1;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-limit-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 2px -2px;
+  color: #64748b;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-empty-state,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-not-assessed-card,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-readiness-note {
+  border-left: 0;
+  border-top: 3px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-readiness-note {
+  border-top-color: #fde68a;
+  background: linear-gradient(135deg, #ffffff 0%, #fffdf7 100%);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-empty-state p,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-not-assessed-card p,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-readiness-note p {
+  margin-top: 7px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-evidence-section {
+  overflow: hidden;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-evidence-section .card__header {
+  padding: 17px 18px 14px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-evidence-section > .forecast-muted {
+  margin: 16px 18px 18px;
+  padding: 13px 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .table-wrap {
+  margin: 0 18px 18px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table {
+  margin: 0;
+  border: 0;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th {
+  color: #334155;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table td {
+  padding: 11px 12px;
+  border-bottom-color: #eef2f7;
+  vertical-align: top;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table tbody tr:hover td {
+  background: #fbfdff;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle {
+  padding: 18px;
+  gap: 16px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__header {
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-decision {
+  border-color: #dbe5f1;
+  background: #f8fafc;
+  box-shadow: inset 3px 0 0 #93c5fd;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metrics {
+  gap: 10px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-metrics .forecast-metric {
+  box-shadow: none;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-check-grid {
+  gap: 12px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-check-card {
+  border-color: #e2e8f0;
+  background: #fbfdff;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-check-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-check-item {
+  border-color: #e2e8f0;
+  background: #ffffff;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics {
+  overflow: hidden;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics .card__header {
+  padding: 17px 18px 14px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics > .forecast-metrics,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics > .forecast-technical-details {
+  margin-right: 18px;
+  margin-left: 18px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics > .forecast-metrics {
+  margin-top: 18px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-diagnostics > .forecast-technical-details {
+  margin-bottom: 18px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-card--error > div {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-state-icon--danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+@media (max-width: 1100px) {
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro,
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__header {
+    flex-direction: column;
+  }
+
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-refresh {
+    align-items: flex-start;
+  }
+
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-decision {
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-intro__content,
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-section-heading {
+    gap: 9px;
+  }
+
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch {
+    display: grid;
+    width: 100%;
+  }
+
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-view-switch__button,
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-refresh .button,
+  .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-filters .button {
+    width: 100%;
+  }
+}
