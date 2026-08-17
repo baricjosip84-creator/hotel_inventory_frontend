@@ -9,6 +9,7 @@ const registry = read('src/app/navigationRegistry.ts');
 const router = read('src/app/router.tsx');
 const layout = read('src/layouts/AppLayout.tsx');
 const intelligenceReviewPage = read('src/pages/HumanInLoopAIReviewPage.tsx');
+const collaborationPage = read('src/pages/EnterpriseCollaborationPage.tsx');
 
 const commercialRoutes = [
   {
@@ -130,6 +131,31 @@ for (const signal of [
 ]) {
   if (!intelligenceReviewPage.includes(signal)) {
     failures.push(`Intelligence Review page is missing clarity/split-view signal: ${signal}`);
+  }
+}
+
+for (const signal of [
+  "import { TenantNavIcon } from '../components/ui/TenantNavIcon';",
+  "import './EnterpriseCollaborationPage.css';",
+  "type CollaborationView = 'recommendations' | 'limits'",
+  'data-collaboration-refined="true"',
+  'Coordination recommendations',
+  'Safety and limits'
+]) {
+  if (!collaborationPage.includes(signal)) {
+    failures.push(`Collaboration page is missing approved tenant presentation signal: ${signal}`);
+  }
+}
+
+for (const forbiddenSignal of [
+  'TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ',
+  'canViewDiagnostics',
+  "view === 'diagnostics'",
+  'Technical response diagnostics',
+  'JSON.stringify(response, null, 2)'
+]) {
+  if (collaborationPage.includes(forbiddenSignal)) {
+    failures.push(`Collaboration page must keep technical diagnostics out of the normal tenant-owner interface: ${forbiddenSignal}`);
   }
 }
 

@@ -3,9 +3,10 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './EnterpriseCollaborationPage.css';
 
-type CollaborationView = 'recommendations' | 'limits' | 'diagnostics';
+type CollaborationView = 'recommendations' | 'limits';
 
 type CollaborationDomain =
   | 'alerts'
@@ -57,13 +58,6 @@ type CollaborationThread = {
 };
 
 type CollaborationResponse = {
-  definition?: {
-    execution_mode?: string;
-    [key: string]: unknown;
-  };
-  access?: {
-    can_view_diagnostics?: boolean;
-  };
   filters?: {
     collaboration_domain?: string | null;
     thread_type?: string | null;
@@ -83,12 +77,10 @@ type CollaborationResponse = {
     escalation_thread_guidance?: string;
     incident_war_room_guidance?: string;
     supplier_coordination_guidance?: string;
-    [key: string]: unknown;
   };
   threads?: CollaborationThread[];
   non_mutation_guarantee?: boolean;
   generated_at?: string;
-  [key: string]: unknown;
 };
 
 const DOMAIN_FILTERS: Array<{ value: 'all' | CollaborationDomain; label: string }> = [
@@ -254,8 +246,26 @@ async function fetchEnterpriseCollaborationSummary(filters: typeof DEFAULT_FILTE
   return apiRequest<CollaborationResponse>(`/operational-action-center/enterprise-collaboration-summary?${params.toString()}`);
 }
 
+function SummaryCard({ iconPath, label, value, description, tone = 'blue' }: {
+  iconPath: string;
+  label: string;
+  value: string | number;
+  description: string;
+  tone?: 'blue' | 'amber' | 'red' | 'slate';
+}) {
+  return (
+    <article className="card collaboration-summary-card" data-tone={tone}>
+      <div className="collaboration-summary-card__topline">
+        <span className="collaboration-summary-icon"><TenantNavIcon path={iconPath} size={18} /></span>
+        <span className="card__label">{label}</span>
+      </div>
+      <div className="card__value collaboration-summary-value">{value}</div>
+      <div className="card__subtext">{description}</div>
+    </article>
+  );
+}
+
 export default function EnterpriseCollaborationPage() {
-  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canViewIntelligenceReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const [view, setView] = useState<CollaborationView>('recommendations');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -286,37 +296,60 @@ export default function EnterpriseCollaborationPage() {
   const clearFilters = () => setFilters(DEFAULT_FILTERS);
 
   if (collaborationQuery.isLoading) {
-    return <div className="collaboration-state collaboration-state--loading">Loading coordination recommendations…</div>;
+    return (
+      <div className="collaboration-page">
+        <section className="card collaboration-state collaboration-state--loading" aria-live="polite">
+          <span className="collaboration-state-icon"><TenantNavIcon path="/collaboration" size={22} /></span>
+          <div>
+            <h2>Loading coordination recommendations</h2>
+            <p>Preparing the current read-only collaboration snapshot.</p>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   if (collaborationQuery.error) {
     return (
-      <div className="collaboration-state collaboration-state--error">
-        <h2>Coordination recommendations could not be loaded</h2>
-        <p>
-          {collaborationQuery.error instanceof ApiError
-            ? collaborationQuery.error.message
-            : 'The collaboration summary is temporarily unavailable.'}
-        </p>
-        <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()}>Retry</button>
+      <div className="collaboration-page">
+        <section className="card collaboration-state collaboration-state--error" role="alert">
+          <span className="collaboration-state-icon collaboration-state-icon--danger"><TenantNavIcon path="/alerts" size={22} /></span>
+          <div className="collaboration-state-copy">
+            <h2>Coordination recommendations could not be loaded</h2>
+            <p>
+              {collaborationQuery.error instanceof ApiError
+                ? collaborationQuery.error.message
+                : 'The collaboration summary is temporarily unavailable.'}
+            </p>
+            <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()}>Retry</button>
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="collaboration-page">
+    <div className="collaboration-page" data-collaboration-refined="true">
       <section className="card collaboration-intro">
-        <div>
-          <div className="collaboration-eyebrow">Read-only coordination guidance</div>
-          <h2>Coordinate work in the source workflow</h2>
-          <p className="card__subtext">
-            This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.
-          </p>
+        <div className="collaboration-intro__content">
+          <span className="collaboration-hero-icon"><TenantNavIcon path="/collaboration" size={24} /></span>
+          <div className="collaboration-intro__copy">
+            <div className="collaboration-eyebrow">Read-only coordination guidance</div>
+            <h2>Coordinate work in the source workflow</h2>
+            <p className="card__subtext">
+              This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.
+            </p>
+            <div className="collaboration-hero-badges" aria-label="Collaboration safeguards">
+              <span><TenantNavIcon path="/permissions" size={14} /> Source permissions apply</span>
+              <span><TenantNavIcon path="/action-center" size={14} /> Source workflow stays authoritative</span>
+            </div>
+          </div>
         </div>
         <div className="collaboration-refresh">
-          <span>Last refreshed</span>
+          <span className="collaboration-refresh__label">Last refreshed</span>
           <strong>{formatDateTime(response?.generated_at)}</strong>
-          <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
+          <button className="button button--secondary collaboration-link-button" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
+            <TenantNavIcon path="/real-time-operations-feed" size={16} />
             {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh recommendations'}
           </button>
         </div>
@@ -324,9 +357,12 @@ export default function EnterpriseCollaborationPage() {
 
       <section className="card collaboration-filters" aria-labelledby="collaboration-filter-title">
         <div className="collaboration-section-heading">
-          <div>
-            <h2 id="collaboration-filter-title">Filter the recommendations</h2>
-            <p className="card__subtext">Filters change only this read-only snapshot. They do not change any alert, task, review, or operational event.</p>
+          <div className="collaboration-section-title">
+            <span className="collaboration-heading-icon"><TenantNavIcon path="/collaboration" size={17} /></span>
+            <div>
+              <h2 id="collaboration-filter-title">Filter the recommendations</h2>
+              <p className="card__subtext">Filters change only this read-only snapshot. They do not change any alert, task, review, or operational event.</p>
+            </div>
           </div>
           {hasActiveFilters ? <button className="button button--secondary" type="button" onClick={clearFilters}>Clear filters</button> : null}
         </div>
@@ -359,55 +395,69 @@ export default function EnterpriseCollaborationPage() {
       </section>
 
       <section className="collaboration-summary-grid" aria-label="Collaboration summary">
-        <article className="card">
-          <div className="card__label">Coordination recommendations</div>
-          <div className="card__value">{numberValue(summary.total_threads ?? threads.length)}</div>
-          <div className="card__subtext">Suggested human coordination items returned by the current filters.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Active coordination suggested</div>
-          <div className="card__value">{numberValue(summary.war_room_candidates)}</div>
-          <div className="card__subtext">Critical items that may need sustained human coordination.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Escalation suggested</div>
-          <div className="card__value">{numberValue(summary.escalation_recommended)}</div>
-          <div className="card__subtext">Critical or high-urgency items where owner or escalation review is recommended.</div>
-        </article>
-        <article className="card">
-          <div className="card__label">Operating mode</div>
-          <div className="collaboration-mode">Read-only guidance</div>
-          <div className="card__subtext">All actions remain in their source workflows.</div>
-        </article>
+        <SummaryCard
+          iconPath="/collaboration"
+          label="Coordination recommendations"
+          value={numberValue(summary.total_threads ?? threads.length)}
+          description="Suggested human coordination items returned by the current filters."
+        />
+        <SummaryCard
+          iconPath="/real-time-operations-feed"
+          label="Active coordination suggested"
+          value={numberValue(summary.war_room_candidates)}
+          description="Critical items that may need sustained human coordination."
+          tone="amber"
+        />
+        <SummaryCard
+          iconPath="/alerts"
+          label="Escalation suggested"
+          value={numberValue(summary.escalation_recommended)}
+          description="Critical or high-urgency items where owner or escalation review is recommended."
+          tone="red"
+        />
+        <SummaryCard
+          iconPath="/permissions"
+          label="Operating mode"
+          value="Read-only guidance"
+          description="All actions remain in their source workflows."
+          tone="slate"
+        />
       </section>
 
       <div className="collaboration-view-switch" role="tablist" aria-label="Collaboration views">
-        <button type="button" role="tab" aria-selected={view === 'recommendations'} className={view === 'recommendations' ? 'is-active' : ''} onClick={() => setView('recommendations')}>Coordination recommendations</button>
-        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>Safety and limits</button>
-        {canViewDiagnostics ? (
-          <button type="button" role="tab" aria-selected={view === 'diagnostics'} className={view === 'diagnostics' ? 'is-active' : ''} onClick={() => setView('diagnostics')}>Diagnostics</button>
-        ) : null}
+        <button type="button" role="tab" aria-selected={view === 'recommendations'} className={view === 'recommendations' ? 'is-active' : ''} onClick={() => setView('recommendations')}>
+          <TenantNavIcon path="/collaboration" size={16} /> Coordination recommendations
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>
+          <TenantNavIcon path="/permissions" size={16} /> Safety and limits
+        </button>
       </div>
 
       {view === 'recommendations' ? (
         <section aria-labelledby="coordination-recommendations-title">
           <div className="collaboration-section-heading collaboration-section-heading--outside">
-            <div>
-              <h2 id="coordination-recommendations-title">Coordination recommendations</h2>
-              <p className="card__subtext">
-                {guidance.collaboration_guidance || 'Use these suggestions to coordinate people in the appropriate source workflow.'} Showing up to {appliedLimit} items.
-              </p>
+            <div className="collaboration-section-title">
+              <span className="collaboration-heading-icon"><TenantNavIcon path="/collaboration" size={17} /></span>
+              <div>
+                <h2 id="coordination-recommendations-title">Coordination recommendations</h2>
+                <p className="card__subtext">
+                  {guidance.collaboration_guidance || 'Use these suggestions to coordinate people in the appropriate source workflow.'} Showing up to {appliedLimit} items.
+                </p>
+              </div>
             </div>
             <div className="collaboration-shortcuts">
-              <Link className="button button--secondary" to="/real-time-operations-feed">Open Operations Feed</Link>
-              {canViewIntelligenceReview ? <Link className="button button--secondary" to="/intelligence-review">Open Intelligence Review</Link> : null}
+              <Link className="button button--secondary collaboration-link-button" to="/real-time-operations-feed"><TenantNavIcon path="/real-time-operations-feed" size={16} /> Open Operations Feed</Link>
+              {canViewIntelligenceReview ? <Link className="button button--secondary collaboration-link-button" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={16} /> Open Intelligence Review</Link> : null}
             </div>
           </div>
 
           {threads.length === 0 ? (
-            <div className="collaboration-state">
-              <h3>No coordination recommendations match the current filters</h3>
-              <p>Clear the filters or confirm that an open alert, task, review, or operational event exists for this tenant.</p>
+            <div className="card collaboration-state collaboration-empty-state">
+              <span className="collaboration-state-icon"><TenantNavIcon path="/collaboration" size={22} /></span>
+              <div>
+                <h3>No coordination recommendations match the current filters</h3>
+                <p>Clear the filters or confirm that an open alert, task, review, or operational event exists for this tenant.</p>
+              </div>
             </div>
           ) : (
             <div className="collaboration-thread-grid">
@@ -419,15 +469,20 @@ export default function EnterpriseCollaborationPage() {
                 const commentTopics = thread.comment_guidance?.recommended_comment_topics || [];
                 return (
                   <article className="card collaboration-thread-card" key={itemKey}>
-                    <div className="collaboration-badges">
-                      <span className={`collaboration-badge collaboration-badge--${String(thread.urgency || 'unknown').toLowerCase()}`}>{urgencyLabel(thread.urgency)}</span>
-                      <span className="collaboration-badge">{threadTypeLabel(thread.thread_type)}</span>
-                      <span className="collaboration-badge">{domainLabel(thread.collaboration_domain)}</span>
-                      {thread.war_room_guidance?.war_room_candidate ? <span className="collaboration-badge collaboration-badge--attention">Active coordination suggested</span> : null}
+                    <div className="collaboration-thread-card__heading">
+                      <span className="collaboration-thread-icon"><TenantNavIcon path={sourcePath || '/collaboration'} size={18} /></span>
+                      <div className="collaboration-badges">
+                        <span className={`collaboration-badge collaboration-badge--${String(thread.urgency || 'unknown').toLowerCase()}`}>{urgencyLabel(thread.urgency)}</span>
+                        <span className="collaboration-badge">{threadTypeLabel(thread.thread_type)}</span>
+                        <span className="collaboration-badge">{domainLabel(thread.collaboration_domain)}</span>
+                        {thread.war_room_guidance?.war_room_candidate ? <span className="collaboration-badge collaboration-badge--attention">Active coordination suggested</span> : null}
+                      </div>
                     </div>
 
-                    <h3>{thread.title || 'Coordination item'}</h3>
-                    <p className="card__subtext">{thread.summary || 'No additional summary was provided.'}</p>
+                    <div className="collaboration-thread-copy">
+                      <h3>{thread.title || 'Coordination item'}</h3>
+                      <p className="card__subtext">{thread.summary || 'No additional summary was provided.'}</p>
+                    </div>
 
                     <dl className="collaboration-facts">
                       <div>
@@ -457,8 +512,8 @@ export default function EnterpriseCollaborationPage() {
                     ) : null}
 
                     <div className="collaboration-card-actions">
-                      {sourcePath && sourceLabel ? <Link className="button button--secondary" to={sourcePath}>{sourceLabel}</Link> : null}
-                      {sourcePath !== '/action-center' ? <Link className="button button--secondary" to="/action-center">Open Action Center</Link> : null}
+                      {sourcePath && sourceLabel ? <Link className="button button--secondary collaboration-link-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} /> {sourceLabel}</Link> : null}
+                      {sourcePath !== '/action-center' ? <Link className="button button--secondary collaboration-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> Open Action Center</Link> : null}
                     </div>
                   </article>
                 );
@@ -471,43 +526,38 @@ export default function EnterpriseCollaborationPage() {
       {view === 'limits' ? (
         <section className="collaboration-limit-grid" aria-labelledby="collaboration-limits-title">
           <div className="collaboration-section-heading collaboration-section-heading--outside">
-            <div>
-              <h2 id="collaboration-limits-title">Safety and coordination limits</h2>
-              <p className="card__subtext">These rules apply to every recommendation shown on this page.</p>
+            <div className="collaboration-section-title">
+              <span className="collaboration-heading-icon"><TenantNavIcon path="/permissions" size={17} /></span>
+              <div>
+                <h2 id="collaboration-limits-title">Safety and coordination limits</h2>
+                <p className="card__subtext">These rules apply to every recommendation shown on this page.</p>
+              </div>
             </div>
           </div>
-          <article className="card">
-            <h3>Escalation remains in the source workflow</h3>
-            <p className="card__subtext">{guidance.escalation_thread_guidance || 'Use the existing alert, task, Action Center, or governance process for escalation.'}</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/alerts" size={18} /></span>
+            <div><h3>Escalation remains in the source workflow</h3><p className="card__subtext">{guidance.escalation_thread_guidance || 'Use the existing alert, task, Action Center, or governance process for escalation.'}</p></div>
           </article>
-          <article className="card">
-            <h3>No coordination room is created</h3>
-            <p className="card__subtext">{guidance.incident_war_room_guidance || 'Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.'}</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/collaboration" size={18} /></span>
+            <div><h3>No coordination room is created</h3><p className="card__subtext">{guidance.incident_war_room_guidance || 'Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.'}</p></div>
           </article>
-          <article className="card">
-            <h3>No external partner is contacted</h3>
-            <p className="card__subtext">{guidance.supplier_coordination_guidance || 'Supplier, carrier, and partner communication remains in the authorized source process.'}</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/suppliers" size={18} /></span>
+            <div><h3>No external partner is contacted</h3><p className="card__subtext">{guidance.supplier_coordination_guidance || 'Supplier, carrier, and partner communication remains in the authorized source process.'}</p></div>
           </article>
-          <article className="card">
-            <h3>No messages or comments are recorded</h3>
-            <p className="card__subtext">Use the suggested topics in the source workflow. This page does not send messages, notify users, or save comments.</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
+            <div><h3>No messages or comments are recorded</h3><p className="card__subtext">Use the suggested topics in the source workflow. This page does not send messages, notify users, or save comments.</p></div>
           </article>
-          <article className="card">
-            <h3>No operational data is changed</h3>
-            <p className="card__subtext">Opening or refreshing Collaboration does not change stock, alerts, tasks, approvals, suppliers, shipments, finance, or integrations.</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/stock" size={18} /></span>
+            <div><h3>No operational data is changed</h3><p className="card__subtext">Opening or refreshing Collaboration does not change stock, alerts, tasks, approvals, suppliers, shipments, finance, or integrations.</p></div>
           </article>
-          <article className="card">
-            <h3>Source permissions still apply</h3>
-            <p className="card__subtext">Only recommendations supported by records the current user may read are returned. The source page remains authoritative.</p>
+          <article className="card collaboration-limit-card">
+            <span className="collaboration-limit-icon"><TenantNavIcon path="/permissions" size={18} /></span>
+            <div><h3>Source permissions still apply</h3><p className="card__subtext">Only recommendations supported by records the current user may read are returned. The source page remains authoritative.</p></div>
           </article>
-        </section>
-      ) : null}
-
-      {view === 'diagnostics' && canViewDiagnostics ? (
-        <section className="card collaboration-diagnostics">
-          <h2>Technical response diagnostics</h2>
-          <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
-          <pre>{JSON.stringify(response, null, 2)}</pre>
         </section>
       ) : null}
     </div>
