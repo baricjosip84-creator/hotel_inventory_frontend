@@ -276,7 +276,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/execution-requests',
         label: 'Execution Requests',
-        description: 'Create, review, and govern tenant-scoped execution requests.',
+        description: 'Propose, review, approve, and safely apply governed product changes.',
         section: 'Execution workflow',
         permission: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW
       },

@@ -23,6 +23,7 @@ const operationalPages = [
   'src/pages/inventoryUsage/InventoryUsageDashboard.tsx',
   'src/pages/InventoryRequisitionsPage.tsx',
   'src/pages/InventoryReservationsPage.tsx',
+  'src/pages/ExecutionRequestsPage.tsx',
 ];
 
 const tabbedPages = [
@@ -35,6 +36,7 @@ const tabbedPages = [
   'src/pages/OutboundPage.tsx',
   'src/pages/inventoryUsage/InventoryUsageDashboard.tsx',
   'src/pages/InventoryReservationsPage.tsx',
+  'src/pages/ExecutionRequestsPage.tsx',
 ];
 
 const pageRootTokens = new Map([
@@ -56,7 +58,8 @@ const pageRootTokens = new Map([
   ['src/pages/OutboundPage.tsx', 'io-outbound-page'],
   ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', 'io-usage-ledger-page'],
   ['src/pages/InventoryRequisitionsPage.tsx', 'io-requisitions-page'],
-  ['src/pages/InventoryReservationsPage.tsx', 'io-reservations-page']
+  ['src/pages/InventoryReservationsPage.tsx', 'io-reservations-page'],
+  ['src/pages/ExecutionRequestsPage.tsx', 'io-execution-requests-page']
 ]);
 
 const statsPages = [
@@ -77,6 +80,7 @@ const statsPages = [
   'src/pages/inventoryUsage/InventoryUsageDashboard.tsx',
   'src/pages/InventoryRequisitionsPage.tsx',
   'src/pages/InventoryReservationsPage.tsx',
+  'src/pages/ExecutionRequestsPage.tsx',
   'src/pages/products/ProductSummaryStatsPanel.tsx'
 ];
 
@@ -98,7 +102,8 @@ const topOrderStatsMarkers = new Map([
   ['src/pages/OutboundPage.tsx', 'io-workspace-stats'],
   ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', '<OperationalWorkspaceStats'],
   ['src/pages/InventoryRequisitionsPage.tsx', '<OperationalWorkspaceStats'],
-  ['src/pages/InventoryReservationsPage.tsx', '<OperationalWorkspaceStats']
+  ['src/pages/InventoryReservationsPage.tsx', '<OperationalWorkspaceStats'],
+  ['src/pages/ExecutionRequestsPage.tsx', '<OperationalWorkspaceStats']
 ]);
 
 const requiredSharedFiles = [

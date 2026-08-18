@@ -5,6 +5,15 @@ import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,
@@ -21,6 +30,7 @@ type StatusFilter = '' | ExecutionRequest['status'];
 type TypeFilter = '' | ExecutionRequest['request_type'];
 type ExecutionStatusFilter = '' | 'not_executed' | 'completed' | 'noop_completed' | 'failed';
 type ControlledRequestType = 'cost_standard_update' | 'product_min_stock_update';
+type ExecutionWorkspaceSection = 'overview' | 'create' | 'queue' | 'controls';
 
 const requestTypes: ExecutionRequest['request_type'][] = [
   'cost_review',
@@ -54,6 +64,12 @@ function formatDateTime(value?: string | null): string {
 
 function label(value?: string | null): string {
   return value ? value.replace(/_/g, ' ') : '-';
+}
+
+function executionStatusLabel(value?: string | null): string {
+  if (!value || value === 'not_executed') return 'Not executed';
+  if (value === 'noop_completed') return 'Completed without change';
+  return label(value);
 }
 
 const beforeAfterFieldLabels: Record<string, string> = {
@@ -166,6 +182,7 @@ export default function ExecutionRequestsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [secondaryWarning, setSecondaryWarning] = useState<string | null>(null);
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ExecutionWorkspaceSection>('overview');
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -479,8 +496,8 @@ export default function ExecutionRequestsPage() {
   };
 
   const executeNoopRequest = async (request: ExecutionRequest) => {
-    if (!window.confirm('Run the no-op executor? This records a completed pipeline test but does not change a business record.')) return;
-    const note = window.prompt('No-op execution note (optional)') || '';
+    if (!window.confirm('Complete this approved request without changing business data? This records a safe workflow completion only.')) return;
+    const note = window.prompt('Completion note (optional)') || '';
 
     setSaving(true);
     setError(null);
@@ -491,9 +508,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('No-op execution completed.');
+      showTenantActionSuccess('Request completed without a business-data change.');
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to run no-op executor';
+      const message = err instanceof ApiError ? err.message : 'Failed to complete request without change';
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -624,6 +641,13 @@ export default function ExecutionRequestsPage() {
     setOffset(0);
   };
 
+  const navigateWorkspaceSection = (section: ExecutionWorkspaceSection, targetId: string) => {
+    setActiveWorkspaceSection(section);
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const exportFilteredRequests = async () => {
     setSaving(true);
     setError(null);
@@ -659,7 +683,7 @@ export default function ExecutionRequestsPage() {
         request.requested_by_name || request.requested_by || '',
         formatDateTime(request.created_at),
         formatDateTime(request.updated_at),
-        request.execution_status ? label(request.execution_status) : 'Not executed',
+        executionStatusLabel(request.execution_status),
         request.reviewed_by_name || request.reviewed_by || '',
         request.executed_by_name || request.executed_by || '',
         request.review_note || '',
@@ -707,44 +731,125 @@ export default function ExecutionRequestsPage() {
   const canGoNext = offset + requests.length < total;
 
   return (
-    <div className="io-execution-requests-page" style={styles.page}>
-      <section style={styles.hero}>
-        <div>
-          <h1 style={styles.title}>Controlled execution requests</h1>
-          <p style={styles.subtitle}>
-            Propose, review, approve, and execute tightly scoped product-field changes. Approval never changes a product by itself, and every real execution is permission-checked, audited, and protected from duplicate runs.
-          </p>
-        </div>
-        <div style={styles.actions}>
-          <button type="button" className="btn btn-secondary" onClick={loadRequests} disabled={loading || saving}>
-            {loading ? 'Refreshing…' : 'Refresh page'}
-          </button>
-          {canCreateExecutionRequests && canViewSystemContext ? (
-            <button type="button" className="btn btn-secondary" onClick={createSystemRecommendation} disabled={saving}>
-              Create System Context review draft
+    <div
+      className="io-operational-page io-execution-requests-page io-workspace-page"
+      id="execution-requests-workspace-top"
+      style={styles.page}
+    >
+      <OperationalWorkspaceHero
+        iconPath="/execution-requests"
+        eyebrow="Execution workflow"
+        title="Controlled execution requests"
+        description="Propose, review, approve, and safely apply tightly scoped product changes. Approval never changes a product by itself; execution stays permission-checked, auditable, and protected from duplicate runs."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human approval required</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>
+              {canExecuteExecutionRequests
+                ? 'Execution access'
+                : canReviewExecutionRequests
+                  ? 'Review access'
+                  : canCreateExecutionRequests
+                    ? 'Draft creation access'
+                    : 'Read-only access'}
+            </OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div style={styles.actions}>
+            <button type="button" className="btn btn-secondary" onClick={loadRequests} disabled={loading || saving}>
+              {loading ? 'Refreshing…' : 'Refresh'}
             </button>
-          ) : null}
-        </div>
-      </section>
+            {canCreateExecutionRequests && canViewSystemContext ? (
+              <button type="button" className="btn btn-secondary" onClick={createSystemRecommendation} disabled={saving}>
+                Create System Context draft
+              </button>
+            ) : null}
+          </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Execution request summary">
+        <OperationalWorkspaceStatCard
+          label="Needs action"
+          value={summaryCounts.pending}
+          helper="Drafts or requests awaiting review"
+          tone={summaryCounts.pending > 0 ? 'warn' : 'good'}
+          iconPath="/execution-requests"
+          loading={loading && !hardeningSummary}
+        />
+        <OperationalWorkspaceStatCard
+          label="Approved waiting"
+          value={summaryCounts.approvedWaiting}
+          helper="Approved requests waiting for completion"
+          tone={summaryCounts.approvedWaiting > 0 ? 'blue' : 'neutral'}
+          iconPath="/execution-tasks"
+          loading={loading && !hardeningSummary}
+        />
+        <OperationalWorkspaceStatCard
+          label="Completed"
+          value={summaryCounts.executed}
+          helper="Applied changes and safe completions without change"
+          tone="good"
+          iconPath="/audit"
+          loading={loading && !hardeningSummary}
+        />
+        <OperationalWorkspaceStatCard
+          label="Failed executions"
+          value={summaryCounts.failed}
+          helper="Failures retained for review and retry control"
+          tone={summaryCounts.failed > 0 ? 'danger' : 'good'}
+          iconPath="/alerts"
+          loading={loading && !hardeningSummary}
+        />
+        <OperationalWorkspaceStatCard
+          label="System Context drafts"
+          value={summaryCounts.systemContext}
+          helper="Recommendations captured as governed requests"
+          tone="slate"
+          iconPath="/system-context"
+          loading={loading && !hardeningSummary}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Execution request work areas" hint="Jump to the part of the workflow you need.">
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'overview'}
+          iconPath="/dashboard"
+          label="Overview"
+          onClick={() => navigateWorkspaceSection('overview', 'execution-requests-workspace-top')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'create'}
+          iconPath="/execution-requests"
+          label="Create request"
+          onClick={() => navigateWorkspaceSection('create', 'execution-request-create')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'queue'}
+          iconPath="/execution-tasks"
+          label="Request queue"
+          count={total}
+          onClick={() => navigateWorkspaceSection('queue', 'execution-request-queue')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'controls'}
+          iconPath="/permissions"
+          label="Safety & controls"
+          onClick={() => navigateWorkspaceSection('controls', 'execution-request-controls')}
+        />
+      </OperationalWorkspaceTabs>
 
       {error ? <div className="app-error" style={styles.error}>{error}</div> : null}
       {secondaryWarning ? <div style={styles.warning}>{secondaryWarning}</div> : null}
 
-      <section style={styles.summaryPanel} aria-label="Execution request summary">
-        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Needs workflow action</span><strong>{summaryCounts.pending}</strong><span style={styles.meta}>Draft or awaiting review</span></div>
-        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Approved waiting</span><strong>{summaryCounts.approvedWaiting}</strong><span style={styles.meta}>Eligible for execution or no-op</span></div>
-        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Executed</span><strong>{summaryCounts.executed}</strong><span style={styles.meta}>Real and no-op completions</span></div>
-        <div style={styles.summaryTile}><span style={styles.summaryLabel}>Execution failures</span><strong>{summaryCounts.failed}</strong><span style={styles.meta}>Stored for review</span></div>
-        <div style={styles.summaryTile}><span style={styles.summaryLabel}>System Context requests</span><strong>{summaryCounts.systemContext}</strong><span style={styles.meta}>Captured recommendations</span></div>
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Create controlled product update</h2>
-            <div style={styles.meta}>Creates a draft only. A separate user action must submit, review, approve, and execute it.</div>
-          </div>
-        </div>
+      <section className="app-panel" id="execution-request-create" style={styles.sectionCard}>
+        <OperationalSectionHeader
+          iconPath="/execution-requests"
+          title="Create controlled product change"
+          description="Create a draft for a standard-cost or minimum-stock change. Submission, review, approval, and execution remain separate governed steps."
+        />
         {canCreateExecutionRequests ? (
           <>
             <div style={styles.createGrid}>
@@ -781,7 +886,7 @@ export default function ExecutionRequestsPage() {
                 <span style={styles.meta}>
                   {selectedCreateProduct
                     ? `Current ${controlledValueLabels[createType].replace(/^New /, '').toLowerCase()}: ${formatUnknown(currentCreateValue)}${selectedCreateProduct.unit ? ` · Unit: ${selectedCreateProduct.unit}` : ''}`
-                    : 'The current product value will be stored with the request so later execution can detect stale approvals.'}
+                    : 'The current product value is stored with the request so execution can detect an outdated approval.'}
                 </span>
               </div>
               <button type="button" className="btn btn-primary" onClick={createControlledProductRequest} disabled={saving || !createProductId || createValue === ''}>
@@ -790,57 +895,65 @@ export default function ExecutionRequestsPage() {
             </div>
           </>
         ) : (
-          <div className="app-empty-state">You can review execution requests, but your role cannot create new drafts.</div>
+          <div className="app-empty-state">Your role can view execution requests but cannot create new drafts.</div>
         )}
       </section>
 
-      <section style={styles.filters}>
-        <label style={styles.field}>
-          <span>Workflow status</span>
-          <select value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setOffset(0); }}>
-            <option value="">All workflow statuses</option>
-            {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-          </select>
-        </label>
-        <label style={styles.field}>
-          <span>Request type</span>
-          <select value={requestType} onChange={(event) => { setRequestType(event.target.value as TypeFilter); setOffset(0); }}>
-            <option value="">All request types</option>
-            {requestTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-          </select>
-        </label>
-        <label style={styles.field}>
-          <span>Execution outcome</span>
-          <select value={executionStatus} onChange={(event) => { setExecutionStatus(event.target.value as ExecutionStatusFilter); setOffset(0); }}>
-            <option value="">All execution outcomes</option>
-            {executionStatuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-          </select>
-        </label>
-        <label style={styles.fieldWide}>
-          <span>Search</span>
-          <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="Request ID, product, person, type, status, or stored reason" />
-        </label>
-        <div style={styles.filterActions}>
-          <button type="button" className="btn btn-secondary" onClick={clearFilters} disabled={saving || (!status && !requestType && !executionStatus && !search)}>Clear filters</button>
-          <button type="button" className="btn btn-secondary" onClick={exportFilteredRequests} disabled={saving || loading}>Export filtered CSV</button>
-        </div>
-      </section>
+      <div id="execution-request-queue" ref={registrySectionRef} style={styles.scrollAnchor}>
+        <section className="app-panel" style={styles.sectionCard}>
+          <OperationalSectionHeader
+            iconPath="/execution-tasks"
+            title="Request queue"
+            description="Filter tenant requests, review their status, and open a request for workflow actions and evidence."
+            actions={
+              <label style={styles.compactField}>
+                <span>Rows</span>
+                <select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setOffset(0); }}>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+            }
+          />
 
-      <div style={styles.layout} ref={registrySectionRef}>
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>Request registry</h2>
-              <span style={styles.meta}>{loading ? 'Loading…' : `${visibleStart}–${visibleEnd} of ${total}`}</span>
-            </div>
-            <label style={styles.compactField}>
-              <span>Rows</span>
-              <select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setOffset(0); }}>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
+          <div style={styles.filterGrid}>
+            <label style={styles.field}>
+              <span>Workflow status</span>
+              <select value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setOffset(0); }}>
+                <option value="">All workflow statuses</option>
+                {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
               </select>
             </label>
+            <label style={styles.field}>
+              <span>Request type</span>
+              <select value={requestType} onChange={(event) => { setRequestType(event.target.value as TypeFilter); setOffset(0); }}>
+                <option value="">All request types</option>
+                {requestTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}
+              </select>
+            </label>
+            <label style={styles.field}>
+              <span>Execution outcome</span>
+              <select value={executionStatus} onChange={(event) => { setExecutionStatus(event.target.value as ExecutionStatusFilter); setOffset(0); }}>
+                <option value="">All execution outcomes</option>
+                {executionStatuses.map((item) => <option key={item} value={item}>{executionStatusLabel(item)}</option>)}
+              </select>
+            </label>
+            <label style={styles.fieldWide}>
+              <span>Search</span>
+              <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="ID, product, person, type, status, or reason" />
+            </label>
+            <div style={styles.filterActions}>
+              <button type="button" className="btn btn-secondary" onClick={clearFilters} disabled={saving || (!status && !requestType && !executionStatus && !search)}>Clear filters</button>
+              <button type="button" className="btn btn-secondary" onClick={exportFilteredRequests} disabled={saving || loading}>Export CSV</button>
+            </div>
+          </div>
+
+          <div style={styles.queueHeader}>
+            <div>
+              <strong>Request registry</strong>
+              <div style={styles.meta}>{loading ? 'Loading…' : `${visibleStart}–${visibleEnd} of ${total}`}</div>
+            </div>
           </div>
           <div style={styles.tableWrap}>
             <table style={styles.table}>
@@ -865,7 +978,7 @@ export default function ExecutionRequestsPage() {
                     <td>{request.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(request)}</td>
                     <td>{request.requested_by_name || request.requested_by || 'System/support'}</td>
                     <td>{formatDateTime(request.created_at)}</td>
-                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{label(request.execution_status)}</span> : <span style={styles.meta}>Not executed</span>}</td>
+                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{executionStatusLabel(request.execution_status)}</span> : <span style={styles.meta}>Not executed</span>}</td>
                     <td>
                       <div style={styles.rowActions}>
                         <button type="button" className="btn btn-secondary" disabled={saving} data-skip-global-action-feedback="true" onClick={() => loadRequestDetail(request)}>Open</button>
@@ -873,7 +986,7 @@ export default function ExecutionRequestsPage() {
                         {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
                         {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
                         {canExecuteExecutionRequests && canWriteProducts && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>Execute</button> : null}
-                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>No-op</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>Complete without change</button> : null}
                         {canExecuteExecutionRequests && request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>Prepare retry</button> : null}
                         {canCancelExecutionRequests && (request.status === 'draft' || request.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>Cancel</button> : null}
                       </div>
@@ -893,45 +1006,44 @@ export default function ExecutionRequestsPage() {
           </div>
           {data?.notes?.map((note) => <div key={note} style={styles.note}>{note}</div>)}
         </section>
+      </div>
 
-        <section style={styles.detailCard}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>Selected request</h2>
-              <span style={styles.meta}>{selected ? selected.id : 'Open a request from the registry'}</span>
+      {selected ? (
+        <section className="app-panel" id="execution-request-detail" style={styles.sectionCard}>
+          <OperationalSectionHeader
+            iconPath="/audit"
+            title="Selected request"
+            description={selected.id}
+            actions={<button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>Copy ID</button>}
+          />
+          <div style={styles.detail}>
+            <div style={styles.badgeRow}>
+              <span style={{ ...styles.badge, ...statusTone(selected.status) }}>{label(selected.status)}</span>
+              <span style={{ ...styles.badge, ...executionTone(selected.execution_status) }}>{executionStatusLabel(selected.execution_status)}</span>
+              {isSystemContextRequest(selected) ? <span style={styles.badge}>System Context</span> : null}
+              <span style={styles.badge}>{selected.adapter?.execution_enabled ? 'Controlled product change' : 'Completes without business change'}</span>
             </div>
-            {selected ? (
-              <button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>Copy ID</button>
-            ) : null}
-          </div>
-          {selected ? (
-            <div style={styles.detail}>
-              <div style={styles.badgeRow}>
-                <span style={{ ...styles.badge, ...statusTone(selected.status) }}>{label(selected.status)}</span>
-                <span style={{ ...styles.badge, ...executionTone(selected.execution_status) }}>{selected.execution_status ? label(selected.execution_status) : 'Not executed'}</span>
-                {isSystemContextRequest(selected) ? <span style={styles.badge}>System Context</span> : null}
-                <span style={styles.badge}>{selected.adapter?.execution_enabled ? 'Controlled real executor' : 'No-op only'}</span>
-              </div>
 
-              <div style={styles.detailActions}>
-                {canSubmitExecutionRequests && selected.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(selected)}>Submit for review</button> : null}
-                {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(selected)}>Approve</button> : null}
-                {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(selected)}>Reject</button> : null}
-                {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(selected)}>Execute approved change</button> : null}
-                {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(selected)}>Run no-op executor</button> : null}
-                {canExecuteExecutionRequests && !canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <span style={styles.meta}>Real execution also requires product-edit permission.</span> : null}
-                {canExecuteExecutionRequests && selected.status === 'approved' && selected.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(selected)}>Prepare retry</button> : null}
-                {canCancelExecutionRequests && (selected.status === 'draft' || selected.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(selected)}>Cancel request</button> : null}
-                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>Refresh detail</button>
-              </div>
+            <div style={styles.detailActions}>
+              {canSubmitExecutionRequests && selected.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(selected)}>Submit for review</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(selected)}>Approve</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(selected)}>Reject</button> : null}
+              {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(selected)}>Execute approved change</button> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(selected)}>Complete without change</button> : null}
+              {canExecuteExecutionRequests && !canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <span style={styles.meta}>Applying the approved change also requires product-edit permission.</span> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && selected.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(selected)}>Prepare retry</button> : null}
+              {canCancelExecutionRequests && (selected.status === 'draft' || selected.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(selected)}>Cancel request</button> : null}
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>Refresh detail</button>
+            </div>
 
-              <div style={styles.summaryGrid}>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Type</span><strong>{selected.adapter?.label || label(selected.request_type)}</strong></div>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Product / subject</span><strong>{selected.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(selected)}</strong></div>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Requested change</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getRequestedValue(selected) as number | string | null | undefined) : formatUnknown(getRequestedValue(selected))}</strong></div>
-                <div style={styles.summaryTile}><span style={styles.summaryLabel}>Value at request time</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getExpectedValue(selected) as number | string | null | undefined) : formatUnknown(getExpectedValue(selected))}</strong></div>
-              </div>
+            <div style={styles.summaryGrid}>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Type</span><strong>{selected.adapter?.label || label(selected.request_type)}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Product / subject</span><strong>{selected.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(selected)}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Requested change</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getRequestedValue(selected) as number | string | null | undefined) : formatUnknown(getRequestedValue(selected))}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Value at request time</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getExpectedValue(selected) as number | string | null | undefined) : formatUnknown(getExpectedValue(selected))}</strong></div>
+            </div>
 
+            <div style={styles.detailFacts}>
               <KeyValue label="Requested by" value={selected.requested_by_name || selected.requested_by || 'System/support'} />
               <KeyValue label="Created" value={formatDateTime(selected.created_at)} />
               <KeyValue label="Updated" value={formatDateTime(selected.updated_at)} />
@@ -943,63 +1055,63 @@ export default function ExecutionRequestsPage() {
               <KeyValue label="Cancellation reason" value={selected.cancel_reason || '-'} />
               <KeyValue label="Executed by" value={selected.executed_by_name || selected.executed_by || '-'} />
               <KeyValue label="Executed at" value={formatDateTime(selected.executed_at)} />
-
-              {selected.timeline?.length ? (
-                <details style={styles.detailsPanel}>
-                  <summary style={styles.detailsSummary}>Workflow timeline</summary>
-                  <div style={styles.auditTrail}>
-                    {selected.timeline.map((event, index) => (
-                      <div key={`${event.status}-${event.at || index}`} style={styles.auditEvent}>
-                        <strong>{event.label}</strong>
-                        <div style={styles.meta}>{event.at ? formatDateTime(event.at) : 'Exact time available in the Audit pack'} · {event.by || 'Unknown actor'}</div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-
-              <details style={styles.detailsPanel}>
-                <summary style={styles.detailsSummary}>Security and separation-of-duties review</summary>
-                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>Load security audit</button>
-                <ExecutionSecurityAuditPanel securityAudit={securityAudit} />
-              </details>
-
-              <details style={styles.detailsPanel}>
-                <summary style={styles.detailsSummary}>Audit pack</summary>
-                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>Load audit pack</button>
-                <ExecutionAuditPackPanel auditPack={auditPack} />
-              </details>
-
-              <details style={styles.detailsPanel}>
-                <summary style={styles.detailsSummary}>Execution result and before/after evidence</summary>
-                <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadExecutionReview(selected)}>Load execution review</button>
-                <ExecutionReviewPanel request={selected} executionReview={executionReview} />
-              </details>
-
-              <details style={styles.detailsPanel}>
-                <summary style={styles.detailsSummary}>Advanced stored snapshots</summary>
-                <div style={styles.meta}>Technical evidence retained exactly as stored. Normal workflow decisions should use the business fields above.</div>
-                <h3 style={styles.subheading}>Payload snapshot</h3>
-                <JsonBlock value={selected.payload} />
-                <h3 style={styles.subheading}>Gate snapshot</h3>
-                <JsonBlock value={selected.gate_snapshot} />
-                <h3 style={styles.subheading}>Context snapshot</h3>
-                <JsonBlock value={selected.context_snapshot} />
-                <h3 style={styles.subheading}>Execution result snapshot</h3>
-                <JsonBlock value={selected.execution_result} />
-              </details>
             </div>
-          ) : (
-            <div className="app-empty-state">Open an execution request to review its proposed change, workflow state, approvals, execution evidence, and audit controls.</div>
-          )}
-        </section>
-      </div>
 
-      <details style={styles.governanceDetails}>
+            {selected.timeline?.length ? (
+              <details style={styles.detailsPanel}>
+                <summary style={styles.detailsSummary}>Workflow timeline</summary>
+                <div style={styles.auditTrail}>
+                  {selected.timeline.map((event, index) => (
+                    <div key={`${event.status}-${event.at || index}`} style={styles.auditEvent}>
+                      <strong>{event.label}</strong>
+                      <div style={styles.meta}>{event.at ? formatDateTime(event.at) : 'Exact time available in the audit pack'} · {event.by || 'Unknown actor'}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            <details style={styles.detailsPanel}>
+              <summary style={styles.detailsSummary}>Security and separation-of-duties review</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>Load security review</button>
+              <ExecutionSecurityAuditPanel securityAudit={securityAudit} />
+            </details>
+
+            <details style={styles.detailsPanel}>
+              <summary style={styles.detailsSummary}>Audit pack</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>Load audit pack</button>
+              <ExecutionAuditPackPanel auditPack={auditPack} />
+            </details>
+
+            <details style={styles.detailsPanel}>
+              <summary style={styles.detailsSummary}>Execution result and before/after evidence</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadExecutionReview(selected)}>Load execution review</button>
+              <ExecutionReviewPanel request={selected} executionReview={executionReview} />
+            </details>
+
+            <details style={styles.detailsPanel}>
+              <summary style={styles.detailsSummary}>Technical snapshots (advanced)</summary>
+              <div style={styles.meta}>Stored technical evidence is available here when troubleshooting or auditing. Normal workflow decisions should use the readable fields above.</div>
+              <h3 style={styles.subheading}>Payload snapshot</h3>
+              <JsonBlock value={selected.payload} />
+              <h3 style={styles.subheading}>Gate snapshot</h3>
+              <JsonBlock value={selected.gate_snapshot} />
+              <h3 style={styles.subheading}>Context snapshot</h3>
+              <JsonBlock value={selected.context_snapshot} />
+              <h3 style={styles.subheading}>Execution result snapshot</h3>
+              <JsonBlock value={selected.execution_result} />
+            </details>
+          </div>
+        </section>
+      ) : (
+        <div style={styles.selectionHint}>Select <strong>Open</strong> on a request to review its workflow, approvals, actions, and audit evidence.</div>
+      )}
+
+      <details id="execution-request-controls" style={styles.governanceDetails}>
         <summary style={styles.governanceSummary}>
-          <span>
-            <strong>Execution controls and governance</strong>
-            <span style={styles.meta}>Adapter availability, hardening checks, retry controls, and safety contract</span>
+          <span style={styles.governanceSummaryCopy}>
+            <strong>Safety & execution controls</strong>
+            <span style={styles.meta}>Approval, duplicate protection, retry rules, and supported request actions</span>
           </span>
           <span style={{ ...styles.badge, ...statusTone(hardeningSummary?.module_status === 'needs_fix' ? 'rejected' : hardeningSummary?.module_status === 'complete' ? 'approved' : 'pending_review') }}>
             {hardeningSummary ? label(hardeningSummary.module_status) : 'Loading'}
@@ -1009,10 +1121,10 @@ export default function ExecutionRequestsPage() {
           <ExecutionModuleHardeningPanel hardeningSummary={hardeningSummary} />
           <section style={styles.card}>
             <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>Execution adapter registry</h2>
-              <span style={styles.meta}>{adapterRegistry ? `${adapterRegistry.summary.execution_enabled_count} enabled / ${adapterRegistry.summary.total_adapters} total` : 'Loading…'}</span>
+              <h2 style={styles.cardTitle}>Supported request actions</h2>
+              <span style={styles.meta}>{adapterRegistry ? `${adapterRegistry.summary.execution_enabled_count} change-capable / ${adapterRegistry.summary.total_adapters} total` : 'Loading…'}</span>
             </div>
-            <p style={styles.note}>Only standard cost and minimum stock updates currently perform controlled real product changes. Pricing requests remain review/no-op-only because the product schema has no governed unit-price field.</p>
+            <p style={styles.note}>Standard cost and minimum stock requests can apply approved product changes. Other request types remain review-only and can complete safely without changing business data.</p>
             <div style={styles.adapterGrid}>
               {(adapterRegistry?.adapters || []).map((adapter) => (
                 <div key={adapter.request_type} style={styles.adapterCard}>
@@ -1022,8 +1134,8 @@ export default function ExecutionRequestsPage() {
                   </div>
                   <div style={styles.meta}>{label(adapter.category)}</div>
                   <p style={styles.adapterDescription}>{adapter.description}</p>
-                  <KeyValue label="Real execution" value={adapter.execution_enabled ? 'Enabled' : 'Disabled'} />
-                  <KeyValue label="No-op path" value="Available after approval" />
+                  <KeyValue label="Controlled product change" value={adapter.execution_enabled ? 'Enabled' : 'Disabled'} />
+                  <KeyValue label="Completion without change" value="Available after approval" />
                 </div>
               ))}
             </div>
@@ -1047,7 +1159,7 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
     return (
       <section style={styles.card}>
         <div style={styles.cardHeader}>
-          <h2 style={styles.cardTitle}>Execution Module Hardening</h2>
+          <h2 style={styles.cardTitle}>Workflow safety status</h2>
           <span style={styles.meta}>Loading…</span>
         </div>
       </section>
@@ -1057,7 +1169,7 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
   return (
     <section style={styles.card}>
       <div style={styles.cardHeader}>
-        <h2 style={styles.cardTitle}>Execution Module Hardening</h2>
+        <h2 style={styles.cardTitle}>Workflow safety status</h2>
         <span style={{ ...styles.badge, ...statusTone(hardeningSummary.module_status === 'complete' ? 'approved' : hardeningSummary.module_status === 'needs_fix' ? 'rejected' : 'pending_review') }}>
           {label(hardeningSummary.module_status)}
         </span>
@@ -1066,12 +1178,12 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
       <div style={styles.metricsGrid}>
         <KeyValue label="Total Requests" value={formatUnknown(hardeningSummary.totals.total_requests)} />
         <KeyValue label="Approved Waiting" value={formatUnknown(hardeningSummary.totals.approved_waiting_execution)} />
-        <KeyValue label="Real Execution Ready" value={formatUnknown(hardeningSummary.totals.real_execution_ready)} />
-        <KeyValue label="Completed Executions" value={formatUnknown(hardeningSummary.totals.completed_executions)} />
+        <KeyValue label="Ready for controlled change" value={formatUnknown(hardeningSummary.totals.real_execution_ready)} />
+        <KeyValue label="Completed changes" value={formatUnknown(hardeningSummary.totals.completed_executions)} />
         <KeyValue label="Failed Executions" value={formatUnknown(hardeningSummary.totals.failed_executions)} />
-        <KeyValue label="No-op Executions" value={formatUnknown(hardeningSummary.totals.noop_executions)} />
+        <KeyValue label="Completed without change" value={formatUnknown(hardeningSummary.totals.noop_executions)} />
       </div>
-      <h3 style={styles.subheading}>Closeout Checks</h3>
+      <h3 style={styles.subheading}>Safety checks</h3>
       <div style={styles.checkList}>
         {hardeningSummary.checks.map((check) => (
           <div key={check.key} style={styles.checkItem}>
@@ -1083,14 +1195,14 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
           </div>
         ))}
       </div>
-      <h3 style={styles.subheading}>Safety Contract</h3>
+      <h3 style={styles.subheading}>Built-in protections</h3>
       <div style={styles.metricsGrid}>
-        <KeyValue label="Approval Required" value={hardeningSummary.safety_contract.approval_required ? 'Yes' : 'No'} />
-        <KeyValue label="Duplicate Blocked" value={hardeningSummary.safety_contract.duplicate_execution_blocked ? 'Yes' : 'No'} />
-        <KeyValue label="Retry Explicit" value={hardeningSummary.safety_contract.retry_requires_explicit_preparation ? 'Yes' : 'No'} />
-        <KeyValue label="Inventory Mutations" value={hardeningSummary.safety_contract.mutates_inventory ? 'Yes' : 'No'} />
-        <KeyValue label="Shipment Mutations" value={hardeningSummary.safety_contract.mutates_shipments ? 'Yes' : 'No'} />
-        <KeyValue label="Background Jobs" value={hardeningSummary.safety_contract.creates_background_jobs ? 'Yes' : 'No'} />
+        <KeyValue label="Approval required" value={hardeningSummary.safety_contract.approval_required ? 'Yes' : 'No'} />
+        <KeyValue label="Duplicate execution blocked" value={hardeningSummary.safety_contract.duplicate_execution_blocked ? 'Yes' : 'No'} />
+        <KeyValue label="Retry requires preparation" value={hardeningSummary.safety_contract.retry_requires_explicit_preparation ? 'Yes' : 'No'} />
+        <KeyValue label="Changes stock quantities" value={hardeningSummary.safety_contract.mutates_inventory ? 'Yes' : 'No'} />
+        <KeyValue label="Changes shipments" value={hardeningSummary.safety_contract.mutates_shipments ? 'Yes' : 'No'} />
+        <KeyValue label="Starts background jobs" value={hardeningSummary.safety_contract.creates_background_jobs ? 'Yes' : 'No'} />
       </div>
       {hardeningSummary.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
     </section>
@@ -1106,7 +1218,7 @@ function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: Executi
     <div style={styles.securityPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Execution Security Audit</strong>
+          <strong>Security review</strong>
           <div style={styles.meta}>Generated {formatDateTime(securityAudit.generated_at)}</div>
         </div>
         <span style={{ ...styles.badge, ...securityTone(securityAudit.summary.security_posture) }}>
@@ -1132,8 +1244,10 @@ function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: Executi
         ))}
       </div>
       {securityAudit.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
-      <h3 style={styles.subheading}>Full Security Audit JSON</h3>
-      <JsonBlock value={securityAudit} />
+      <details style={styles.technicalDetails}>
+        <summary style={styles.technicalSummary}>Technical security evidence</summary>
+        <JsonBlock value={securityAudit} />
+      </details>
     </div>
   );
 }
@@ -1147,26 +1261,26 @@ function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAud
     <div style={styles.auditPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Execution Audit Pack</strong>
+          <strong>Audit pack</strong>
           <div style={styles.meta}>Generated {formatDateTime(auditPack.generated_at)}</div>
         </div>
         <span style={{ ...styles.badge, ...(auditPack.completeness.safe_for_governance_review ? styles.successTone : styles.pendingTone) }}>
           {auditPack.completeness.safe_for_governance_review ? 'Audit ready' : 'Review gaps'}
         </span>
       </div>
-      <KeyValue label="Audit Events" value={formatUnknown(auditPack.completeness.audit_event_count)} />
+      <KeyValue label="Audit events" value={formatUnknown(auditPack.completeness.audit_event_count)} />
       <KeyValue label="Complete" value={auditPack.completeness.complete ? 'Yes' : 'No'} />
-      <KeyValue label="Payload Snapshot" value={auditPack.completeness.has_payload_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Gate Snapshot" value={auditPack.completeness.has_gate_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Context Snapshot" value={auditPack.completeness.has_context_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Execution Result" value={auditPack.completeness.has_execution_result ? 'Yes' : 'No'} />
+      <KeyValue label="Payload snapshot" value={auditPack.completeness.has_payload_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Gate snapshot" value={auditPack.completeness.has_gate_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Context snapshot" value={auditPack.completeness.has_context_snapshot ? 'Yes' : 'No'} />
+      <KeyValue label="Execution result" value={auditPack.completeness.has_execution_result ? 'Yes' : 'No'} />
       {auditPack.completeness.missing_actions.length ? (
         <div style={styles.failurePanel}>
-          <strong>Missing Audit Actions</strong>
+          <strong>Missing audit actions</strong>
           {auditPack.completeness.missing_actions.map((action) => <div key={action} style={styles.meta}>{action}</div>)}
         </div>
       ) : null}
-      <h3 style={styles.subheading}>Audit Trail</h3>
+      <h3 style={styles.subheading}>Audit trail</h3>
       <div style={styles.auditTrail}>
         {auditPack.audit_trail.map((event) => (
           <div key={event.id} style={styles.auditEvent}>
@@ -1177,8 +1291,10 @@ function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAud
         {!auditPack.audit_trail.length ? <div style={styles.meta}>No audit events found for this request.</div> : null}
       </div>
       {auditPack.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
-      <h3 style={styles.subheading}>Full Audit Pack JSON</h3>
-      <JsonBlock value={auditPack} />
+      <details style={styles.technicalDetails}>
+        <summary style={styles.technicalSummary}>Technical audit evidence</summary>
+        <JsonBlock value={auditPack} />
+      </details>
     </div>
   );
 }
@@ -1194,7 +1310,7 @@ function ExecutionReviewPanel({ request, executionReview }: { request: Execution
     <div style={styles.reviewPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Execution Review</strong>
+          <strong>Execution review</strong>
           <div style={styles.meta}>{executionReview?.request_id === request.id ? 'Loaded from /execution-requests/:id/execution-review.' : 'Embedded execution review evidence from request detail/list.'}</div>
         </div>
         <span style={{ ...styles.badge, ...(review.available ? styles.successTone : styles.pendingTone) }}>
@@ -1203,7 +1319,7 @@ function ExecutionReviewPanel({ request, executionReview }: { request: Execution
       </div>
       <KeyValue label="Executor" value={review.executor ? label(review.executor) : '-'} />
       <KeyValue label="Outcome" value={review.outcome ? label(review.outcome) : '-'} />
-      <KeyValue label="Real Action" value={review.executed_real_action ? 'Yes' : 'No'} />
+      <KeyValue label="Changed business data" value={review.executed_real_action ? 'Yes' : 'No'} />
       <KeyValue label="Executed At" value={formatDateTime(review.executed_at)} />
       <KeyValue label="Executed By" value={review.executed_by_name || review.executed_by || '-'} />
       <KeyValue label="Retry Eligible" value={review.retry_eligibility?.eligible ? 'Yes' : 'No'} />
@@ -1214,7 +1330,7 @@ function ExecutionReviewPanel({ request, executionReview }: { request: Execution
 
       {review.failure ? (
         <div style={styles.failurePanel}>
-          <strong>Failure Details</strong>
+          <strong>Failure details</strong>
           <KeyValue label="Error Code" value={review.failure.error_code || '-'} />
           <KeyValue label="Error Message" value={review.failure.error_message || '-'} />
           <KeyValue label="Failed At" value={formatDateTime(review.failure.failed_at)} />
@@ -1241,7 +1357,7 @@ function BeforeAfterEvidence({ beforeAfter }: { beforeAfter: NonNullable<Executi
     <div style={styles.reviewPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Before / After Evidence</strong>
+          <strong>Before / after evidence</strong>
           <div style={styles.meta}>{beforeAfter.product_name || beforeAfter.product_id || 'Product-field execution snapshot'}</div>
         </div>
         <span style={{ ...styles.badge, ...(beforeAfter.changed ? styles.successTone : styles.pendingTone) }}>
@@ -1317,7 +1433,8 @@ const styles: Record<string, CSSProperties> = {
   summaryLabel: { color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' },
   badgeRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' },
   badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize', fontSize: '0.75rem', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
-  filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
+  filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' },
+  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end', marginTop: '0.95rem' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
   fieldWide: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
   optional: { color: '#94a3b8', fontWeight: 400 },
@@ -1333,7 +1450,12 @@ const styles: Record<string, CSSProperties> = {
   metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.65rem', marginTop: '0.75rem' },
   checkList: { display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.5rem' },
   checkItem: { display: 'flex', gap: '0.65rem', alignItems: 'flex-start', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' },
-  layout: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem', alignItems: 'start' },
+  layout: { display: 'grid', gap: '1rem' },
+  sectionCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', minWidth: 0, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)', scrollMarginTop: '1rem' },
+  scrollAnchor: { scrollMarginTop: '1rem' },
+  queueHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', margin: '1rem 0 0.65rem', paddingTop: '0.9rem', borderTop: '1px solid #e2e8f0' },
+  selectionHint: { padding: '0.9rem 1rem', border: '1px dashed #cbd5e1', borderRadius: '14px', background: '#f8fafc', color: '#64748b', fontSize: '0.88rem' },
+  detailFacts: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.55rem 1rem' },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', minWidth: 0, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
   detailCard: {
     background: '#fff',
@@ -1348,7 +1470,7 @@ const styles: Record<string, CSSProperties> = {
   cardTitle: { margin: 0, fontSize: '1.1rem' },
   meta: { color: '#64748b', fontSize: '0.85rem' },
   tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
+  table: { width: '100%', minWidth: '1080px', borderCollapse: 'collapse', fontSize: '0.9rem' },
   selectedRow: { background: '#eff6ff' },
   rowActions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap', minWidth: '180px' },
   pagination: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginTop: '0.85rem', flexWrap: 'wrap' },
@@ -1375,8 +1497,11 @@ const styles: Record<string, CSSProperties> = {
   kvValue: { fontWeight: 700, color: '#0f172a', textAlign: 'right' },
   subheading: { margin: '0.65rem 0 0', fontSize: '0.95rem' },
   json: { maxHeight: '260px', overflow: 'auto', background: '#0f172a', color: '#e2e8f0', padding: '0.75rem', borderRadius: '12px', fontSize: '0.75rem' },
-  governanceDetails: { border: '1px solid #cbd5e1', borderRadius: '16px', background: '#fff', overflow: 'hidden' },
+  technicalDetails: { marginTop: '0.35rem', borderTop: '1px solid rgba(148, 163, 184, 0.35)', paddingTop: '0.55rem' },
+  technicalSummary: { cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '0.84rem' },
+  governanceDetails: { border: '1px solid #cbd5e1', borderRadius: '16px', background: '#fff', overflow: 'hidden', scrollMarginTop: '1rem' },
   governanceSummary: { cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#f8fafc' },
+  governanceSummaryCopy: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   governanceBody: { display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' },
   successTone: { background: '#dcfce7', color: '#166534' },
   pendingTone: { background: '#fef3c7', color: '#92400e' }
