@@ -129,6 +129,23 @@ async function findShipmentItemId(main: Locator): Promise<string | null> {
 }
 
 test.describe('scanner return and auto-receive integration', () => {
+  test('standalone scanner is shipment lookup only and does not show a receiving-context warning', async ({
+    page,
+    request
+  }) => {
+    await bootstrapAuthenticatedPage(page, request);
+
+    await page.goto('/scanner');
+
+    await expect(page).toHaveURL(/\/scanner$/);
+    await expect(page.getByRole('heading', { name: 'Shipment QR Scanner' })).toBeVisible();
+    await expect(page.getByText('Shipment QR lookup only opens the matching shipment. It does not change stock.')).toBeVisible();
+    await expect(page.getByText(/Select a shipment before opening the receiving barcode scanner/i)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start Camera Scanner' })).toBeEnabled();
+    await expect(page.getByPlaceholder('Enter shipment QR text')).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Open Shipments' })).toBeVisible();
+  });
+
   test('scanner return restores shipment and default scan location context', async ({
     page,
     request
@@ -137,7 +154,7 @@ test.describe('scanner return and auto-receive integration', () => {
 
     await page.goto('/shipments');
 
-    await getMain(page);
+    const main = await getMain(page);
 
     await selectFirstOperationalShipment(main);
 

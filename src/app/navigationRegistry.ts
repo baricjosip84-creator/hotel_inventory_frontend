@@ -235,7 +235,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/scanner',
         label: 'Scanner',
-        description: 'Use the device camera to scan QR codes and barcodes.',
+        description: 'Scan shipment QR codes, or open receiving barcode scanning from a selected shipment.',
         section: 'Inventory operations',
         permission: TENANT_PERMISSIONS.SHIPMENTS_READ
       }

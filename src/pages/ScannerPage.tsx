@@ -105,6 +105,12 @@ type ProductBarcodeLookupResponse = {
     id: string;
     name: string;
     barcode?: string | null;
+    requires_lot_tracking?: boolean;
+    requires_expiry_date?: boolean;
+  };
+  serial_tracking?: {
+    enabled: boolean;
+    require_on_receipt: boolean;
   };
   match_source?: 'label' | 'package' | 'product';
   package?: {
@@ -136,11 +142,15 @@ const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 function scannerResolutionError(error: unknown, mode: ScannerMode): string {
   if (error instanceof ApiError) {
     if (error.code === 'SHIPMENT_NOT_FOUND') {
-      return 'No active shipment matches this QR code.';
+      return 'No shipment matches this QR code.';
     }
 
     if (error.code === 'SHIPMENT_PRODUCT_NOT_FOUND') {
       return 'This barcode does not match an active item in the selected shipment.';
+    }
+
+    if (error.code === 'SHIPMENT_RECEIVING_CLOSED') {
+      return 'This shipment is already finalized. Barcode receiving is closed.';
     }
 
     return error.message;
@@ -176,6 +186,23 @@ function cameraStartError(error: unknown): string {
   }
 
   return 'The camera could not be started. Check browser permission, HTTPS, and whether another application is using the camera.';
+}
+
+function shouldRetryWithSoftCameraConstraint(error: unknown): boolean {
+  const name = error instanceof DOMException ? error.name : '';
+
+  if (
+    name === 'NotAllowedError' ||
+    name === 'PermissionDeniedError' ||
+    name === 'NotReadableError' ||
+    name === 'TrackStartError'
+  ) {
+    return false;
+  }
+
+  // Exact rear-camera selection varies by browser/device. For every other
+  // start failure, try once more with the softer environment preference.
+  return true;
 }
 
 function modeLabel(mode: ScannerMode): string {
@@ -220,6 +247,7 @@ export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scanInFlightRef = useRef(false);
+  const cameraDecodeLockRef = useRef(false);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -232,13 +260,15 @@ export default function ScannerPage() {
   const canReceiveShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
   const isProductContextMissing = mode === 'product' && (!shipmentId || !locationId);
   const isProductPermissionMissing = mode === 'product' && !canReceiveShipments;
-  const productModeUnavailableReason = isProductPermissionMissing
-    ? 'Shipment receive permission is required for the receiving barcode scanner.'
-    : !shipmentId
-      ? 'Select a shipment before opening the receiving barcode scanner.'
-      : !locationId
-        ? 'Select a default storage location before opening the receiving barcode scanner.'
-        : null;
+  const productModeUnavailableReason = mode !== 'product'
+    ? null
+    : isProductPermissionMissing
+      ? 'Shipment receive permission is required for the receiving barcode scanner.'
+      : !shipmentId
+        ? 'Select a shipment before opening the receiving barcode scanner.'
+        : !locationId
+          ? 'Select a default storage location before opening the receiving barcode scanner.'
+          : null;
   const secureCameraContext = typeof window === 'undefined' ? true : window.isSecureContext;
   const cameraApiAvailable = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
   const liveCameraUnavailableReason = !secureCameraContext
@@ -248,6 +278,7 @@ export default function ScannerPage() {
       : null;
 
   const [isRunning, setIsRunning] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [resolvedShipmentId, setResolvedShipmentId] = useState<string | null>(null);
   const [resolvedShipmentItemId, setResolvedShipmentItemId] = useState<string | null>(null);
@@ -260,7 +291,7 @@ export default function ScannerPage() {
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing || isProductPermissionMissing;
-  const liveScannerDisabled = isRunning || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
+  const liveScannerDisabled = isRunning || isStartingCamera || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
   const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
   const stopScanner = async () => {
@@ -348,6 +379,18 @@ export default function ScannerPage() {
       );
     }
 
+    if (match.product?.requires_lot_tracking) {
+      params.set('requiresLotTracking', 'true');
+    }
+
+    if (match.product?.requires_expiry_date) {
+      params.set('requiresExpiryDate', 'true');
+    }
+
+    if (match.serial_tracking?.require_on_receipt) {
+      params.set('requiresSerialOnReceipt', 'true');
+    }
+
     params.set('locationId', locationId);
 
     playSuccessFeedback();
@@ -397,6 +440,12 @@ export default function ScannerPage() {
   };
 
   const handleResolvedScan = async (decodedText: string) => {
+    if (cameraDecodeLockRef.current) {
+      return;
+    }
+
+    cameraDecodeLockRef.current = true;
+
     try {
       /*
         Stop the camera immediately after a successful decode so the same code
@@ -410,6 +459,8 @@ export default function ScannerPage() {
       } else {
         setError('Failed to process scanned code.');
       }
+    } finally {
+      cameraDecodeLockRef.current = false;
     }
   };
 
@@ -432,6 +483,28 @@ export default function ScannerPage() {
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
     setResolvedLabel(null);
+    setIsStartingCamera(true);
+
+    const availableWidth = typeof window === 'undefined'
+      ? 420
+      : Math.max(240, window.innerWidth - 72);
+    const productScanWidth = Math.max(220, Math.min(360, availableWidth));
+    const shipmentScanSize = Math.max(200, Math.min(280, availableWidth));
+    const scanConfig = mode === 'product'
+      ? {
+          fps: 15,
+          aspectRatio: 1.7777778,
+          qrbox: {
+            width: productScanWidth,
+            height: Math.max(110, Math.round(productScanWidth * 0.44))
+          },
+          disableFlip: false
+        }
+      : {
+          fps: 10,
+          qrbox: shipmentScanSize,
+          disableFlip: false
+        };
 
     try {
       await stopScanner();
@@ -447,18 +520,7 @@ export default function ScannerPage() {
         {
           facingMode: { exact: 'environment' }
         },
-        mode === 'product'
-          ? {
-              fps: 15,
-              aspectRatio: 1.7777778,
-              qrbox: { width: 360, height: 160 },
-              disableFlip: false
-            }
-          : {
-              fps: 10,
-              qrbox: 280,
-              disableFlip: false
-            },
+        scanConfig,
         (decodedText) => {
           if (!scanInFlightRef.current) {
             void handleResolvedScan(decodedText);
@@ -468,7 +530,14 @@ export default function ScannerPage() {
       );
 
       setIsRunning(true);
-    } catch {
+    } catch (initialError) {
+      if (!shouldRetryWithSoftCameraConstraint(initialError)) {
+        await stopScanner();
+        setError(cameraStartError(initialError));
+        setIsStartingCamera(false);
+        return;
+      }
+
       /*
         Some devices reject exact rear-camera mode.
         Fall back to a softer camera request.
@@ -485,18 +554,7 @@ export default function ScannerPage() {
 
         await fallbackScanner.start(
           { facingMode: 'environment' },
-          mode === 'product'
-            ? {
-                fps: 15,
-                aspectRatio: 1.7777778,
-                qrbox: { width: 360, height: 160 },
-                disableFlip: false
-              }
-            : {
-                fps: 10,
-                qrbox: 280,
-                disableFlip: false
-              },
+          scanConfig,
           (decodedText) => {
             if (!scanInFlightRef.current) {
               void handleResolvedScan(decodedText);
@@ -507,8 +565,11 @@ export default function ScannerPage() {
 
         setIsRunning(true);
       } catch (err) {
+        await stopScanner();
         setError(cameraStartError(err));
       }
+    } finally {
+      setIsStartingCamera(false);
     }
   };
 
@@ -640,50 +701,62 @@ export default function ScannerPage() {
           </div>
         ) : null}
 
-        {productModeUnavailableReason ? (
+        {mode === 'product' && productModeUnavailableReason ? (
           <div className="app-warning-state" style={styles.infoBanner}>
             {productModeUnavailableReason} Open the scanner from the Shipments page to preserve the selected shipment and destination.
           </div>
         ) : null}
 
-        <div style={styles.readinessGrid}>
-          <div style={styles.readinessCard}>
-            <div style={styles.readinessLabel}>Current mode</div>
-            <div style={styles.readinessValue}>{mode === 'product' ? 'Shipment receiving' : 'Shipment lookup'}</div>
-            <div style={styles.readinessMeta}>{mode === 'product' ? 'A successful match returns to receiving.' : 'A successful QR scan opens the shipment without changing stock.'}</div>
+        <div style={styles.statusStrip}>
+          <div style={styles.statusItem}>
+            <span style={styles.statusLabel}>Mode</span>
+            <strong>{mode === 'product' ? 'Receiving barcode' : 'Shipment QR lookup'}</strong>
           </div>
-          <div style={liveCameraUnavailableReason ? styles.readinessCardWarn : styles.readinessCardSuccess}>
-            <div style={styles.readinessLabel}>Live camera</div>
-            <div style={styles.readinessValue}>{liveCameraUnavailableReason ? 'Unavailable' : 'Ready'}</div>
-            <div style={styles.readinessMeta}>{liveCameraUnavailableReason || 'Camera access is supported; browser permission will be requested when scanning starts.'}</div>
+          <div style={styles.statusItem}>
+            <span style={styles.statusLabel}>Camera</span>
+            <strong style={liveCameraUnavailableReason ? styles.statusWarnText : styles.statusSuccessText}>
+              {liveCameraUnavailableReason ? 'Unavailable' : 'Ready'}
+            </strong>
           </div>
-          <div style={styles.readinessCardSuccess}>
-            <div style={styles.readinessLabel}>Fallbacks</div>
-            <div style={styles.readinessValue}>Manual and image</div>
-            <div style={styles.readinessMeta}>Handheld scanners can type into the manual field and submit Enter.</div>
+          <div style={styles.statusItem}>
+            <span style={styles.statusLabel}>Fallback</span>
+            <strong>Manual entry or image</strong>
           </div>
         </div>
 
-        <div style={mode === 'product' ? styles.tipBannerWarn : styles.tipBannerInfo}>
-          {mode === 'product' ? (
-            <>
-              <strong>Barcode scan tips:</strong>
-              <div>Hold the barcode horizontally inside the wide scan area.</div>
-              <div>Move a little farther back than you would for a QR code.</div>
-              <div>Use strong light and avoid glare.</div>
-              <div>If live scan fails, use manual entry or image upload below.</div>
-              <div>Camera scanning requires HTTPS and browser camera permission.</div>
-              <div><strong>Action:</strong> a successful match returns to the shipment and receives one base unit or one full scanned package into the selected location.</div>
-            </>
-          ) : (
-            <>
-              <strong>QR scan tips:</strong>
-              <div>Center the QR code inside the square scan area.</div>
-              <div>If live scan fails, use manual entry or image upload below.</div>
-              <div>Camera scanning requires HTTPS and browser camera permission.</div>
-            </>
-          )}
+        <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
+          {mode === 'product'
+            ? 'A successful barcode scan returns to the selected shipment. Standard items are received immediately; tracked items pause for any required serial, lot/batch, or expiry details.'
+            : 'Shipment QR lookup only opens the matching shipment. It does not change stock.'}
         </div>
+
+        {mode === 'shipment' ? (
+          <div style={styles.receivingHint}>
+            <div>
+              <strong>Receiving products by barcode?</strong>
+              <div style={styles.receivingHintText}>Open a shipment, choose the receiving location, then use its Scan Barcode action.</div>
+            </div>
+            <button type="button" onClick={() => navigate('/shipments')} style={styles.secondaryButton}>
+              Open Shipments
+            </button>
+          </div>
+        ) : null}
+
+        <details style={styles.helpDetails}>
+          <summary style={styles.helpSummary}>Scanning help</summary>
+          <div style={styles.helpBody}>
+            {mode === 'product' ? (
+              <>
+                <div>Hold the barcode horizontally inside the wide scan area and avoid glare.</div>
+                <div>Move slightly farther back if a 1D barcode will not focus.</div>
+              </>
+            ) : (
+              <div>Center the shipment QR code inside the square scan area.</div>
+            )}
+            <div>If live scan fails, use manual entry or image upload below.</div>
+            <div>Live camera scanning requires HTTPS and browser camera permission.</div>
+          </div>
+        </details>
 
         <div className="app-actions" style={styles.actionGrid}>
           <button
@@ -695,7 +768,7 @@ export default function ScannerPage() {
               ...(liveScannerDisabled ? styles.disabledButton : {})
             }}
           >
-            {isRunning ? 'Scanner Running' : 'Start Camera Scanner'}
+            {isStartingCamera ? 'Starting Camera...' : isRunning ? 'Scanner Running' : 'Start Camera Scanner'}
           </button>
 
           <button
@@ -730,7 +803,11 @@ export default function ScannerPage() {
 
         <div style={styles.scannerShell}>
           <div style={styles.scannerStatus}>
-            {isRunning ? 'Camera is active. Hold one code inside the highlighted scan area.' : 'The camera preview appears below after Start Camera Scanner.'}
+            {isStartingCamera
+              ? 'Requesting camera access...'
+              : isRunning
+                ? 'Camera is active. Hold one code inside the highlighted scan area.'
+                : 'Camera preview appears here after Start Camera Scanner.'}
           </div>
           <div
             id="scanner-container"
@@ -745,9 +822,9 @@ export default function ScannerPage() {
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeader}>
           <div style={styles.panelHeaderText}>
-            <h3 style={styles.panelTitle}>Manual / Fallback Options</h3>
+              <h3 style={styles.panelTitle}>Manual Entry or Image</h3>
             <p style={styles.panelSubtitle}>
-              Use this when live camera decoding is unreliable in current warehouse conditions.
+              Use a typed/scanned code or upload an image when the live camera is not practical.
             </p>
           </div>
         </div>
@@ -1004,69 +1081,88 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     wordBreak: 'break-all'
   },
-  readinessGrid: {
+  statusStrip: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-    gap: '12px',
-    minWidth: 0
-  },
-  readinessCard: {
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     border: '1px solid #e2e8f0',
+    borderRadius: '12px',
     background: '#f8fafc',
-    borderRadius: '12px',
-    padding: '14px',
+    overflow: 'hidden',
     minWidth: 0
   },
-  readinessCardSuccess: {
-    border: '1px solid #bbf7d0',
-    background: '#f0fdf4',
-    borderRadius: '12px',
-    padding: '14px',
+  statusItem: {
+    display: 'grid',
+    gap: '4px',
+    padding: '12px 14px',
+    borderRight: '1px solid #e2e8f0',
     minWidth: 0
   },
-  readinessCardWarn: {
-    border: '1px solid #fed7aa',
-    background: '#fff7ed',
-    borderRadius: '12px',
-    padding: '14px',
-    minWidth: 0
-  },
-  readinessLabel: {
+  statusLabel: {
     color: '#64748b',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 800,
     letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-    marginBottom: '6px'
+    textTransform: 'uppercase'
   },
-  readinessValue: {
-    color: '#0f172a',
-    fontSize: '17px',
-    fontWeight: 800,
-    lineHeight: 1.3
+  statusSuccessText: {
+    color: '#166534'
   },
-  readinessMeta: {
-    color: '#475569',
-    fontSize: '13px',
-    lineHeight: 1.45,
-    marginTop: '6px',
-    wordBreak: 'break-word'
+  statusWarnText: {
+    color: '#9a3412'
   },
-  tipBannerInfo: {
-    padding: '12px 14px',
-    borderRadius: '12px',
+  operationNoticeInfo: {
+    padding: '11px 13px',
+    borderRadius: '10px',
     background: '#eff6ff',
     border: '1px solid #bfdbfe',
-    color: '#1d4ed8',
-    lineHeight: 1.6
+    color: '#1e40af',
+    lineHeight: 1.5
   },
-  tipBannerWarn: {
-    padding: '12px 14px',
-    borderRadius: '12px',
+  operationNoticeWarn: {
+    padding: '11px 13px',
+    borderRadius: '10px',
     background: '#fff7ed',
     border: '1px solid #fdba74',
     color: '#9a3412',
-    lineHeight: 1.6
+    lineHeight: 1.5,
+    fontWeight: 600
+  },
+  receivingHint: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    padding: '12px 14px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    background: '#ffffff'
+  },
+  receivingHintText: {
+    marginTop: '4px',
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.45
+  },
+  helpDetails: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    background: '#ffffff',
+    padding: '0 12px'
+  },
+  helpSummary: {
+    cursor: 'pointer',
+    padding: '10px 0',
+    color: '#334155',
+    fontWeight: 700
+  },
+  helpBody: {
+    display: 'grid',
+    gap: '5px',
+    padding: '0 0 12px 0',
+    color: '#64748b',
+    fontSize: '13px',
+    lineHeight: 1.5
   },
   actionGrid: {
     /*

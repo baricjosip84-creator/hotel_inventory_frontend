@@ -258,6 +258,9 @@ type PendingAutoReceive = {
   labelLot: string | null;
   labelBatch: string | null;
   labelExpiry: string | null;
+  requiresLotTracking: boolean;
+  requiresExpiryDate: boolean;
+  requiresSerialOnReceipt: boolean;
 };
 
 async function fetchShipments(): Promise<ShipmentSummary[]> {
@@ -1047,6 +1050,21 @@ export default function ShipmentsPage() {
   const hasStorageLocations = storageLocations.length > 0;
   const hasShipmentItems = shipmentItems.length > 0;
   const hasRemainingQuantity = selectedShipmentRemainingTotal > 0;
+  const scannerReceivingBlockedReason =
+    !canReceiveShipments
+      ? 'Shipment receive permission is required.'
+      : !selectedShipment
+        ? 'Select a shipment first.'
+        : selectedShipment.status === 'received'
+          ? 'This shipment is already finalized.'
+          : !hasShipmentItems
+            ? 'Add at least one shipment item before scanning.'
+            : !hasRemainingQuantity
+              ? 'All shipment items are already fully received.'
+              : !selectedScannerLocationId
+                ? 'Select a default scan location first.'
+                : null;
+  const scannerReceivingReady = scannerReceivingBlockedReason === null;
   const shipmentWorkflowSteps = [
     {
       label: '1. Select Shipment',
@@ -1172,6 +1190,9 @@ export default function ShipmentsPage() {
     const labelLotFromQuery = searchParams.get('labelLot');
     const labelBatchFromQuery = searchParams.get('labelBatch');
     const labelExpiryFromQuery = searchParams.get('labelExpiry');
+    const requiresLotTrackingFromQuery = searchParams.get('requiresLotTracking') === 'true';
+    const requiresExpiryDateFromQuery = searchParams.get('requiresExpiryDate') === 'true';
+    const requiresSerialOnReceiptFromQuery = searchParams.get('requiresSerialOnReceipt') === 'true';
     const parsedUnitsPerPackage = unitsPerPackageFromQuery ? Number(unitsPerPackageFromQuery) : null;
     const parsedRemainingPackagesEstimate = remainingPackagesEstimateFromQuery
       ? Number(remainingPackagesEstimateFromQuery)
@@ -1221,7 +1242,10 @@ export default function ShipmentsPage() {
           labelBarcode: labelBarcodeFromQuery,
           labelLot: labelLotFromQuery,
           labelBatch: labelBatchFromQuery,
-          labelExpiry: labelExpiryFromQuery
+          labelExpiry: labelExpiryFromQuery,
+          requiresLotTracking: requiresLotTrackingFromQuery,
+          requiresExpiryDate: requiresExpiryDateFromQuery,
+          requiresSerialOnReceipt: requiresSerialOnReceiptFromQuery
         });
 
         const labelTraceability = [
@@ -1264,6 +1288,9 @@ export default function ShipmentsPage() {
     nextParams.delete('labelLot');
     nextParams.delete('labelBatch');
     nextParams.delete('labelExpiry');
+    nextParams.delete('requiresLotTracking');
+    nextParams.delete('requiresExpiryDate');
+    nextParams.delete('requiresSerialOnReceipt');
     setSearchParams(nextParams, { replace: true });
   }, [shipments, searchParams, setSearchParams]);
 
@@ -1427,21 +1454,49 @@ export default function ShipmentsPage() {
       return;
     }
 
+    const effectiveLotNumber = pendingAutoReceive.labelLot || draft.lot_number || matchedItem.lot_number || '';
+    const effectiveBatchNumber = pendingAutoReceive.labelBatch || draft.batch_number || matchedItem.batch_number || '';
+    const effectiveExpiryDate = pendingAutoReceive.labelExpiry
+      ? String(pendingAutoReceive.labelExpiry).slice(0, 10)
+      : draft.expiry_date || (matchedItem.expiry_date ? String(matchedItem.expiry_date).slice(0, 10) : '');
+
+    const prefilledDraft: ReceiveDraft = {
+      ...draft,
+      quantity_received: String(baseQuantityToReceive),
+      storage_location_id: safeStorageLocationId,
+      lot_number: effectiveLotNumber,
+      batch_number: effectiveBatchNumber,
+      expiry_date: effectiveExpiryDate
+    };
+
     setReceiveDrafts((current) => ({
       ...current,
-      [matchedItem.id]: {
-        ...(current[matchedItem.id] ?? makeDefaultReceiveDraft(matchedItem)),
-        quantity_received: String(baseQuantityToReceive),
-        storage_location_id: safeStorageLocationId,
-        lot_number: pendingAutoReceive.labelLot || current[matchedItem.id]?.lot_number || matchedItem.lot_number || '',
-        batch_number: pendingAutoReceive.labelBatch || current[matchedItem.id]?.batch_number || matchedItem.batch_number || '',
-        expiry_date: pendingAutoReceive.labelExpiry ? String(pendingAutoReceive.labelExpiry).slice(0, 10) : (current[matchedItem.id]?.expiry_date || (matchedItem.expiry_date ? String(matchedItem.expiry_date).slice(0, 10) : ''))
-      }
+      [matchedItem.id]: prefilledDraft
     }));
+
+    const missingTrackingDetails: string[] = [];
+    if (pendingAutoReceive.requiresSerialOnReceipt) {
+      missingTrackingDetails.push('serial number(s)');
+    }
+    if (pendingAutoReceive.requiresLotTracking && !effectiveLotNumber && !effectiveBatchNumber) {
+      missingTrackingDetails.push('lot or batch');
+    }
+    if (pendingAutoReceive.requiresExpiryDate && !effectiveExpiryDate) {
+      missingTrackingDetails.push('expiry date');
+    }
 
     autoReceiveAttemptKeyRef.current = attemptKey;
     setPendingAutoReceive(null);
     setPageError(null);
+
+    if (missingTrackingDetails.length > 0) {
+      setHighlightedItemId(matchedItem.id);
+      setPageMessage(
+        `Barcode matched and receiving details were prefilled. Enter the required ${missingTrackingDetails.join(', ')} below, then click Receive.`
+      );
+      return;
+    }
+
     setPageMessage(
       shouldReceiveByPackage
         ? `${pendingAutoReceive.packageName || 'Scanned package'} matched. Auto receiving 1 package (${formatQuantity(baseQuantityToReceive)} base units)...`
@@ -1461,23 +1516,23 @@ export default function ShipmentsPage() {
             package_id: pendingAutoReceive.packageId,
             package_count_received: 1,
             storage_location_id: safeStorageLocationId,
-            lot_number: pendingAutoReceive.labelLot || draft.lot_number || null,
-            batch_number: pendingAutoReceive.labelBatch || draft.batch_number || null,
-            expiry_date: pendingAutoReceive.labelExpiry || draft.expiry_date || null,
-            manufactured_at: draft.manufactured_at || null,
-            discrepancy_reason: draft.discrepancy_reason.trim() || null,
-            receiving_note: draft.receiving_note.trim() || null
+            lot_number: effectiveLotNumber || null,
+            batch_number: effectiveBatchNumber || null,
+            expiry_date: effectiveExpiryDate || null,
+            manufactured_at: prefilledDraft.manufactured_at || null,
+            discrepancy_reason: prefilledDraft.discrepancy_reason.trim() || null,
+            receiving_note: prefilledDraft.receiving_note.trim() || null
           }
         : {
             product_id: matchedItem.product_id,
             quantity_received: baseQuantityToReceive,
             storage_location_id: safeStorageLocationId,
-            lot_number: pendingAutoReceive.labelLot || draft.lot_number || null,
-            batch_number: pendingAutoReceive.labelBatch || draft.batch_number || null,
-            expiry_date: pendingAutoReceive.labelExpiry || draft.expiry_date || null,
-            manufactured_at: draft.manufactured_at || null,
-            discrepancy_reason: draft.discrepancy_reason.trim() || null,
-            receiving_note: draft.receiving_note.trim() || null
+            lot_number: effectiveLotNumber || null,
+            batch_number: effectiveBatchNumber || null,
+            expiry_date: effectiveExpiryDate || null,
+            manufactured_at: prefilledDraft.manufactured_at || null,
+            discrepancy_reason: prefilledDraft.discrepancy_reason.trim() || null,
+            receiving_note: prefilledDraft.receiving_note.trim() || null
           }
     });
   }, [
@@ -1983,6 +2038,21 @@ export default function ShipmentsPage() {
 
     if (!selectedShipmentId) {
       setPageError('Select a shipment before opening product scanner.');
+      return;
+    }
+
+    if (selectedShipment?.status === 'received') {
+      setPageError('This shipment is already finalized. Barcode receiving is closed.');
+      return;
+    }
+
+    if (!hasShipmentItems) {
+      setPageError('Add at least one shipment item before opening the receiving barcode scanner.');
+      return;
+    }
+
+    if (!hasRemainingQuantity) {
+      setPageError('All shipment items are already fully received. There is nothing left to scan into stock.');
       return;
     }
 
@@ -2679,8 +2749,16 @@ export default function ShipmentsPage() {
                         Make scan destination explicit before operators open the scanner.
                       </div>
                     </div>
-                    <span style={canReceiveShipments && selectedScannerLocationId ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
-                      {!canReceiveShipments ? 'Receive permission required' : selectedScannerLocationId ? 'Ready to scan' : 'Location required'}
+                    <span style={scannerReceivingReady ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
+                      {scannerReceivingReady
+                        ? 'Ready to scan'
+                        : !canReceiveShipments
+                          ? 'Receive permission required'
+                          : selectedShipment?.status === 'received' || !hasRemainingQuantity
+                            ? 'Receiving closed'
+                            : !hasShipmentItems
+                              ? 'Items required'
+                              : 'Location required'}
                     </span>
                   </div>
 
@@ -2711,6 +2789,18 @@ export default function ShipmentsPage() {
                   ) : !hasStorageLocations ? (
                     <div style={styles.scanWarningBanner}>
                       No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
+                    </div>
+                  ) : selectedShipment?.status === 'received' ? (
+                    <div style={styles.scanWarningBanner}>
+                      This shipment is finalized. Barcode receiving is closed.
+                    </div>
+                  ) : !hasShipmentItems ? (
+                    <div style={styles.scanWarningBanner}>
+                      Add at least one shipment item before barcode receiving.
+                    </div>
+                  ) : !hasRemainingQuantity ? (
+                    <div style={styles.scanReadyBanner}>
+                      All shipment items are already fully received.
                     </div>
                   ) : selectedScannerLocationId ? (
                     <div style={styles.scanReadyBanner}>
@@ -2897,18 +2987,12 @@ export default function ShipmentsPage() {
                     style={{
                       ...styles.scannerButton,
                       width: isMobile ? '100%' : undefined,
-                      ...(canReceiveShipments && selectedScannerLocationId ? {} : styles.scannerButtonDisabled)
+                      ...(scannerReceivingReady ? {} : styles.scannerButtonDisabled)
                     }}
                     onClick={openProductScanner}
                     data-skip-global-action-feedback="true"
-                    disabled={!canReceiveShipments || !selectedScannerLocationId}
-                    title={
-                      !canReceiveShipments
-                        ? 'Shipment receive permission is required'
-                        : selectedScannerLocationId
-                          ? 'Open receiving barcode scanner'
-                          : 'Select a default scan location first'
-                    }
+                    disabled={!scannerReceivingReady}
+                    title={scannerReceivingBlockedReason || 'Open receiving barcode scanner'}
                   >
                     Scan Barcode
                   </button>
