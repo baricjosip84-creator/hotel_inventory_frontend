@@ -410,10 +410,6 @@
   overflow-wrap: anywhere;
 }
 
-.execution-tasks-key-value .is-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
 
 .execution-tasks-timeline {
   display: grid;
@@ -840,10 +836,6 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
-.execution-tasks-detail-grid--technical {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 10px;
-}
 
 .execution-tasks-detail-section {
   display: grid;
@@ -898,34 +890,6 @@
   background: #fff;
 }
 
-.execution-tasks-audit-metadata {
-  margin-top: 8px;
-}
-
-.execution-tasks-audit-metadata > summary,
-.execution-tasks-raw-data > summary {
-  cursor: pointer;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.execution-tasks-evidence--advanced {
-  background: #f8fafc;
-}
-
-.execution-tasks-advanced-copy {
-  margin: 9px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.execution-tasks-raw-data {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #e2e8f0;
-}
 
 .execution-tasks-governance {
   border-radius: 14px;
@@ -955,16 +919,14 @@
     grid-column: span 2;
   }
 
-  .execution-tasks-create-grid--advanced,
-  .execution-tasks-detail-grid--technical {
+  .execution-tasks-create-grid--advanced {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 720px) {
   .execution-tasks-create-grid,
-  .execution-tasks-create-grid--advanced,
-  .execution-tasks-detail-grid--technical {
+  .execution-tasks-create-grid--advanced {
     grid-template-columns: 1fr;
   }
 

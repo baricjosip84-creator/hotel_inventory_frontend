@@ -330,10 +330,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function hasJsonContent(value: unknown): boolean {
-  return Boolean(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
-}
-
 function downloadTextFile(content: string, filename: string, type = 'text/csv;charset=utf-8;') {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -352,7 +348,7 @@ function payloadFacts(payload?: Record<string, unknown>): Array<{ key: string; v
     'product_name', 'product_unit', 'storage_location_name', 'from_storage_location_name',
     'to_storage_location_name', 'reservation_number', 'purchase_order_number', 'transfer_number',
     'requisition_number', 'replenishment_quantity', 'allocated_quantity', 'total_quantity',
-    'item_count', 'line_count', 'status', 'adapter'
+    'item_count', 'line_count', 'status'
   ];
   return preferredKeys.flatMap((key) => {
     const value = payload[key];
@@ -1299,40 +1295,17 @@ function TaskDetail({ task, auditRows, userLabel, locationLabel, saving, canAssi
               <article key={row.id}>
                 <strong>{label(row.action)}</strong>
                 <span>{dateTime(row.created_at)} · {userLabel(row.user_id)}</span>
-                {hasJsonContent(row.metadata) ? (
-                  <details className="execution-tasks-audit-metadata">
-                    <summary>Technical event details</summary>
-                    <pre>{JSON.stringify(row.metadata, null, 2)}</pre>
-                  </details>
-                ) : null}
               </article>
             ))}
           </div>
         ) : <p>No audit events were returned for this task.</p>}
       </details>
-
-      <details className="execution-tasks-evidence execution-tasks-evidence--advanced">
-        <summary>Advanced technical data</summary>
-        <p className="execution-tasks-advanced-copy">Internal IDs, scoring, stored payloads, and dependency evidence are kept here for support and detailed investigation. They are not needed for normal task handling.</p>
-        <div className="execution-tasks-detail-grid execution-tasks-detail-grid--technical">
-          <KeyValue title="Source ID" value={task.source_id || 'Not linked'} mono />
-          <KeyValue title="Priority score" value={String(task.priority_score ?? 'Not calculated')} />
-          <KeyValue title="Due state" value={label(task.due_bucket)} />
-          <KeyValue title="Updated" value={dateTime(task.updated_at)} />
-        </div>
-        {hasJsonContent(task.payload) ? (
-          <details className="execution-tasks-raw-data"><summary>Stored payload</summary><pre>{JSON.stringify(task.payload, null, 2)}</pre></details>
-        ) : <p>No stored payload evidence.</p>}
-        {task.dependency_snapshot?.length ? (
-          <details className="execution-tasks-raw-data"><summary>Dependency snapshot</summary><pre>{JSON.stringify(task.dependency_snapshot, null, 2)}</pre></details>
-        ) : <p>No dependency snapshot was stored.</p>}
-      </details>
     </section>
   );
 }
 
-function KeyValue({ title, value, mono = false }: { title: string; value: string; mono?: boolean }) {
-  return <div className="execution-tasks-key-value"><span>{title}</span><strong className={mono ? 'is-mono' : ''}>{value}</strong></div>;
+function KeyValue({ title, value }: { title: string; value: string }) {
+  return <div className="execution-tasks-key-value"><span>{title}</span><strong>{value}</strong></div>;
 }
 
 function TimelineItem({ title, value }: { title: string; value?: string | null }) {
