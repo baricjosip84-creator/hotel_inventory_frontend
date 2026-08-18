@@ -1,0 +1,397 @@
+.replenishment-planning-page {
+  min-width: 0;
+}
+
+.replenishment-planning-page * {
+  box-sizing: border-box;
+}
+
+.replenishment-planning-scroll-anchor {
+  scroll-margin-top: 16px;
+}
+
+.replenishment-planning-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035);
+}
+
+.replenishment-planning-run-controls,
+.replenishment-planning-filter-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  align-items: end;
+}
+
+.replenishment-planning-run-controls {
+  grid-template-columns: minmax(170px, 0.55fr) auto minmax(320px, 1.45fr);
+}
+
+.replenishment-planning-filter-grid {
+  grid-template-columns: minmax(300px, 1.6fr) minmax(190px, 0.8fr) auto;
+}
+
+.replenishment-planning-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.replenishment-planning-field > span {
+  color: #334155;
+}
+
+.replenishment-planning-field input,
+.replenishment-planning-field select,
+.replenishment-planning-table input,
+.replenishment-planning-table select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 500;
+}
+
+.replenishment-planning-field input:focus,
+.replenishment-planning-field select:focus,
+.replenishment-planning-table input:focus,
+.replenishment-planning-table select:focus {
+  outline: 2px solid #bfdbfe;
+  outline-offset: 1px;
+  border-color: #60a5fa;
+}
+
+.replenishment-planning-field input:disabled,
+.replenishment-planning-field select:disabled,
+.replenishment-planning-table input:disabled,
+.replenishment-planning-table select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.replenishment-planning-generate-button {
+  white-space: nowrap;
+}
+
+.replenishment-planning-note,
+.replenishment-planning-warning-note {
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.replenishment-planning-note {
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  color: #475569;
+}
+
+.replenishment-planning-warning-note {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.replenishment-planning-empty-workspace {
+  min-height: 150px;
+  place-items: center;
+}
+
+.replenishment-planning-empty-state {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  min-width: 0;
+  padding: 22px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+}
+
+.replenishment-planning-empty-state strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.replenishment-planning-empty-state span {
+  max-width: 760px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.replenishment-planning-empty-state--compact {
+  padding: 16px;
+}
+
+.replenishment-planning-summary-grid,
+.replenishment-planning-advanced-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.replenishment-planning-summary-grid > div,
+.replenishment-planning-advanced-detail-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.replenishment-planning-summary-grid span,
+.replenishment-planning-advanced-detail-grid span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.replenishment-planning-summary-grid strong,
+.replenishment-planning-advanced-detail-grid strong,
+.replenishment-planning-advanced-detail-grid code {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.replenishment-planning-advanced-details {
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.replenishment-planning-advanced-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.replenishment-planning-advanced-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.replenishment-planning-advanced-details > summary::before {
+  content: '›';
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.replenishment-planning-advanced-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.replenishment-planning-advanced-detail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 12px 12px;
+}
+
+.replenishment-planning-review-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.replenishment-planning-count {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.replenishment-planning-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.replenishment-planning-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.replenishment-planning-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.replenishment-planning-table--transfers {
+  min-width: 1220px;
+}
+
+.replenishment-planning-table--purchases {
+  min-width: 1560px;
+}
+
+.replenishment-planning-table th,
+.replenishment-planning-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: top;
+  text-align: left;
+}
+
+.replenishment-planning-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.replenishment-planning-table td {
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.replenishment-planning-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.replenishment-planning-table strong {
+  display: block;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.replenishment-planning-table small,
+.replenishment-planning-muted {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.replenishment-planning-table a {
+  color: #2563eb;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.replenishment-planning-table a:hover {
+  text-decoration: underline;
+}
+
+.replenishment-planning-table input,
+.replenishment-planning-table select {
+  min-width: 150px;
+}
+
+.replenishment-planning-table .replenishment-planning-quantity-input {
+  min-width: 105px;
+  width: 105px;
+}
+
+.replenishment-planning-inline-error {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.replenishment-planning-gate-stats,
+.replenishment-planning-outcome-stats {
+  margin-top: 0 !important;
+}
+
+.replenishment-planning-draft-actions {
+  padding-top: 2px;
+}
+
+.replenishment-planning-subsection-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.replenishment-planning-subsection-title strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.replenishment-planning-subsection-title span,
+.replenishment-planning-footnote {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .replenishment-planning-run-controls {
+    grid-template-columns: minmax(160px, 0.65fr) auto minmax(280px, 1.2fr);
+  }
+
+  .replenishment-planning-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .replenishment-planning-advanced-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 850px) {
+  .replenishment-planning-run-controls,
+  .replenishment-planning-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .replenishment-planning-generate-button {
+    width: 100%;
+  }
+
+  .replenishment-planning-summary-grid,
+  .replenishment-planning-advanced-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .replenishment-planning-summary-grid,
+  .replenishment-planning-advanced-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
