@@ -1,10 +1,19 @@
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
 import { getRoleCapabilities } from "../lib/permissions";
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs,
+} from "../components/ui/OperationalWorkspace";
+import "./ProcurementRecommendationsPage.css";
 
 type CurrencyTotal = { currency_code: string; amount: number | string };
 
@@ -663,6 +672,8 @@ type ReplenishmentRecommendationsResponse = {
   summary?: RecommendationSummary;
   rows: ReplenishmentRecommendation[];
 };
+
+type ProcurementWorkspaceSection = "overview" | "queue" | "bulk" | "drafts" | "detail" | "advanced";
 
 type RecommendationFilters = {
   lookbackDays: number;
@@ -1455,6 +1466,12 @@ export default function ProcurementRecommendationsPage() {
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [poDraftOffset, setPoDraftOffset] = useState(0);
   const poDraftLimit = 25;
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ProcurementWorkspaceSection>("overview");
+  const queueRef = useRef<HTMLDivElement>(null);
+  const bulkRef = useRef<HTMLDivElement>(null);
+  const poDraftRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const advancedRef = useRef<HTMLDivElement>(null);
 
   const optionsQuery = useQuery({
     queryKey: ["procurement-recommendation-options"],
@@ -1800,29 +1817,33 @@ export default function ProcurementRecommendationsPage() {
     poDraftConversionMutation.reset();
   };
 
+  const navigateWorkspaceSection = (section: ProcurementWorkspaceSection, target: HTMLElement | null) => {
+    setActiveWorkspaceSection(section);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <p style={styles.kicker}>
-            Procurement workflow
-          </p>
-          <h1 style={styles.title}>Procurement recommendations</h1>
-          <p style={styles.subtitle}>
-            Review active replenishment needs, keep governed stock thresholds separate from order quantities, count only reliable inbound supply, and convert approved recommendations into purchase order drafts.
-          </p>
-        </div>
-        <div style={styles.generatedBox}>
-          <div style={styles.generatedLabel}>Generated</div>
-          <div style={styles.generatedValue}>
-            {data?.generated_at
-              ? new Date(data.generated_at).toLocaleString()
-              : "-"}
-          </div>
-          <div style={styles.headerActions}>
+    <div className="procurement-recommendations-page io-operational-page io-workspace-page" id="procurement-recommendations-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/procurement-recommendations"
+        eyebrow="Procurement"
+        title="Procurement recommendations"
+        description="Review replenishment needs, choose what should be ordered, and turn approved recommendations into purchase order drafts without changing stock directly."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human approval</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Transfer-before-buy aware</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>
+              Generated {data?.generated_at ? new Date(data.generated_at).toLocaleString() : "—"}
+            </OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div className="procurement-recommendations-hero-actions">
             <button
               type="button"
-              style={styles.secondaryButton}
+              className="app-button app-button--secondary"
               onClick={() => {
                 clearBulkSelectionState();
                 void recommendationsQuery.refetch();
@@ -1837,56 +1858,1447 @@ export default function ProcurementRecommendationsPage() {
                 }
               }}
             >
-              Refresh page
+              Refresh
             </button>
-            <button type="button" style={styles.secondaryButton} onClick={() => navigate('/replenishment-planning')}>
-              Open transfer-before-buy planning
+            <button
+              type="button"
+              className="app-button app-button--primary"
+              onClick={() => navigate('/replenishment-planning')}
+            >
+              Check transfers first
+            </button>
+          </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Procurement recommendation summary">
+        <OperationalWorkspaceStatCard
+          label="Active recommendations"
+          value={formatNumber(summary.recommended_count ?? 0, 0)}
+          helper="Current products suggested for replenishment"
+          tone={toNumber(summary.recommended_count) > 0 ? "blue" : "neutral"}
+          iconPath="/procurement-recommendations"
+          loading={recommendationsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Critical"
+          value={formatNumber(summary.critical_count ?? 0, 0)}
+          helper="Highest urgency recommendations"
+          tone={toNumber(summary.critical_count) > 0 ? "danger" : "good"}
+          iconPath="/alerts"
+          loading={recommendationsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Blocked"
+          value={formatNumber(summary.blocked_count ?? 0, 0)}
+          helper="Recommendations missing required buying evidence"
+          tone={toNumber(summary.blocked_count) > 0 ? "warn" : "good"}
+          iconPath="/alerts"
+          loading={recommendationsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Estimated spend"
+          value={formatMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
+          helper="Estimated value of the filtered recommendations"
+          tone="neutral"
+          iconPath="/purchase-orders"
+          loading={recommendationsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Budget status"
+          value={titleCase(summary.budget_status || "not_configured")}
+          helper={summary.budget_status === "not_configured" ? "No procurement budget limit is configured" : "Budget check for the current recommendation scope"}
+          tone={summary.budget_status === "over_budget" ? "danger" : summary.budget_status === "within_budget" ? "good" : "neutral"}
+          iconPath="/reports"
+          loading={recommendationsQuery.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Procurement recommendation work areas" hint="Jump to the part of the procurement workflow you need.">
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "overview"}
+          iconPath="/dashboard"
+          label="Overview"
+          onClick={() => navigateWorkspaceSection("overview", document.getElementById("procurement-recommendations-workspace-top"))}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "queue"}
+          iconPath="/procurement-recommendations"
+          label="Recommendations"
+          count={totalRows}
+          onClick={() => navigateWorkspaceSection("queue", queueRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "bulk"}
+          iconPath="/execution-requests"
+          label="Bulk actions"
+          count={selectedProductIds.length || undefined}
+          disabled={rows.length === 0}
+          onClick={() => navigateWorkspaceSection("bulk", bulkRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "drafts"}
+          iconPath="/purchase-orders"
+          label="PO drafts"
+          count={canViewGeneratedPurchaseOrderDrafts ? toNumber(poDraftReviewQuery.data?.pagination.total) : undefined}
+          onClick={() => navigateWorkspaceSection("drafts", poDraftRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "detail"}
+          iconPath="/audit"
+          label="Recommendation detail"
+          disabled={!selectedProductId}
+          onClick={() => navigateWorkspaceSection("detail", detailRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === "advanced"}
+          iconPath="/reliability-command"
+          label="Advanced controls"
+          onClick={() => {
+            setGovernanceOpen(true);
+            navigateWorkspaceSection("advanced", advancedRef.current);
+          }}
+        />
+      </OperationalWorkspaceTabs>
+
+      <div ref={queueRef} className="procurement-recommendations-scroll-anchor">
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Recommendation filters</h2>
+            <p style={styles.panelSubtitle}>
+              Focus the queue by product, urgency, supplier, and readiness. More technical planning filters stay tucked away.
+            </p>
+          </div>
+          <button
+            style={styles.secondaryButton}
+            type="button"
+            onClick={() => {
+              clearBulkSelectionState();
+              setFilters(DEFAULT_FILTERS);
+            }}
+          >
+            Reset
+          </button>
+        </div>
+        <div className="procurement-recommendations-primary-filters">
+          <label style={styles.label}>
+            Search
+            <input
+              style={styles.input}
+              value={filters.search}
+              onChange={(event) => setFilter("search", event.target.value)}
+              placeholder="Product, supplier, SKU..."
+            />
+          </label>
+          <label style={styles.label}>
+            Urgency
+            <select
+              style={styles.input}
+              value={filters.urgency}
+              onChange={(event) => setFilter("urgency", event.target.value)}
+            >
+              <option value="">All urgencies</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label style={styles.label}>
+            Supplier
+            <select
+              style={styles.input}
+              value={filters.supplierId}
+              onChange={(event) => setFilter("supplierId", event.target.value)}
+            >
+              <option value="">All suppliers</option>
+              {(optionsQuery.data?.suppliers || []).map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={styles.label}>
+            Readiness
+            <select
+              style={styles.input}
+              value={filters.procurementReady}
+              onChange={(event) => setFilter("procurementReady", event.target.value)}
+            >
+              <option value="">All recommendations</option>
+              <option value="true">Supplier assigned</option>
+              <option value="false">Supplier missing</option>
+            </select>
+          </label>
+        </div>
+
+        <details className="procurement-recommendations-advanced-filters">
+          <summary>Advanced planning filters</summary>
+          <div className="procurement-recommendations-advanced-filter-grid">
+            <label style={styles.label}>
+              Shortage window
+              <select
+                style={styles.input}
+                value={filters.shortageWindowDays}
+                onChange={(event) => setFilter("shortageWindowDays", event.target.value)}
+              >
+                <option value="">Any</option>
+                <option value="7">≤ 7 days</option>
+                <option value="14">≤ 14 days</option>
+                <option value="30">≤ 30 days</option>
+                <option value="60">≤ 60 days</option>
+              </select>
+            </label>
+            <label style={styles.label}>
+              Budget limit
+              <input
+                style={styles.input}
+                type="number"
+                min={0}
+                step="0.01"
+                value={filters.budgetLimit}
+                onChange={(event) => setFilter("budgetLimit", event.target.value)}
+                placeholder="Optional spend cap"
+              />
+            </label>
+            <label style={styles.label}>
+              Usage lookback
+              <input
+                style={styles.input}
+                type="number"
+                min={1}
+                max={90}
+                value={filters.lookbackDays}
+                onChange={(event) => setFilter("lookbackDays", Number(event.target.value) || 30)}
+              />
+            </label>
+            <label style={styles.label}>
+              Rows per page
+              <select
+                style={styles.input}
+                value={filters.limit}
+                onChange={(event) => setFilter("limit", Number(event.target.value))}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+          </div>
+        </details>
+        {optionsQuery.isError ? (
+          <div style={styles.errorBox}>Supplier filters could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
+        ) : null}
+        <div className="procurement-recommendations-helper-note">
+          Supplier assignment is only the first readiness check. Cost, lead time, package, budget, and supplier performance can still block approval or PO creation.
+        </div>
+      </section>
+      </div>
+
+      {recommendationsQuery.isLoading ? (
+        <div style={styles.infoBox}>Loading procurement recommendations...</div>
+      ) : null}
+      {recommendationsQuery.isError ? (
+        <div style={styles.errorBox}>
+          {getErrorMessage(recommendationsQuery.error)}
+        </div>
+      ) : null}
+      {exportFilteredMutation.isError ? (
+        <div style={styles.errorBox}>Filtered export failed: {getErrorMessage(exportFilteredMutation.error)}</div>
+      ) : null}
+
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Recommendation queue</h2>
+            <p style={styles.panelSubtitle}>
+              {formatNumber(totalRows, 0)} matching active recommendation(s) · showing{" "}
+              {formatNumber(rows.length ? filters.offset + 1 : 0, 0)}–{formatNumber(filters.offset + rows.length, 0)}
+            </p>
+          </div>
+          <div style={styles.paginationControls}>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={rows.length === 0 || exportFilteredMutation.isPending}
+              onClick={() => exportFilteredMutation.mutate()}
+            >
+              {exportFilteredMutation.isPending ? "Preparing export..." : "Export filtered CSV"}
+            </button>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={selectedRows.length === 0}
+              onClick={() =>
+                exportRecommendationRowsCsv({
+                  rows: selectedRows,
+                  generatedAt: data?.generated_at,
+                  scope: "selected",
+                })
+              }
+            >
+              Export selected CSV
+            </button>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={!canPrevious}
+              onClick={() =>
+                setFilter("offset", Math.max(0, filters.offset - filters.limit))
+              }
+            >
+              Previous
+            </button>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={!canNext}
+              onClick={() =>
+                setFilter("offset", filters.offset + filters.limit)
+              }
+            >
+              Next
             </button>
           </div>
         </div>
-      </header>
 
-      <section style={styles.statsGrid}>
-        <StatCard
-          label="Recommended"
-          value={formatNumber(summary.recommended_count ?? 0, 0)}
-          tone="warn"
-        />
-        <StatCard
-          label="Critical"
-          value={formatNumber(summary.critical_count ?? 0, 0)}
-          tone={toNumber(summary.critical_count) > 0 ? "bad" : "good"}
-        />
-        <StatCard
-          label="Blocked"
-          value={formatNumber(summary.blocked_count ?? 0, 0)}
-          tone={toNumber(summary.blocked_count) > 0 ? "bad" : "good"}
-        />
-        <StatCard
-          label="Estimated spend"
-          value={formatMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
-        />
-        <StatCard
-          label="Budget status"
-          value={titleCase(summary.budget_status || "not_configured")}
-          tone={
-            summary.budget_status === "over_budget"
-              ? "bad"
-              : summary.budget_status === "within_budget"
-                ? "good"
-                : undefined
-          }
-        />
+        <div className="procurement-recommendations-table-wrap">
+          <table className="procurement-recommendations-table">
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Product</th>
+                <th>Urgency</th>
+                <th>Stock & coverage</th>
+                <th>Recommended order</th>
+                <th>Supplier</th>
+                <th>Estimated cost</th>
+                <th>Readiness</th>
+                <th>Decision</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.product_id}
+                  className={selectedProductId === row.product_id ? "is-selected" : undefined}
+                >
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedProductIds.includes(row.product_id)}
+                      onChange={(event) => toggleSelectedProduct(row.product_id, event.target.checked)}
+                      aria-label={`Select ${row.product_name}`}
+                    />
+                  </td>
+                  <td>
+                    <div className="procurement-recommendations-product-name">{row.product_name}</div>
+                    <div className="procurement-recommendations-cell-note">
+                      {row.category || "Uncategorized"} · {row.unit || "unit"}
+                    </div>
+                  </td>
+                  <td>
+                    <Badge
+                      tone={row.urgency === "critical" ? "bad" : row.urgency === "high" || row.urgency === "medium" ? "warn" : "good"}
+                    >
+                      {titleCase(row.urgency)}
+                    </Badge>
+                  </td>
+                  <td>
+                    <div className="procurement-recommendations-cell-main">
+                      {formatNumber(row.current_quantity)} {row.unit || ""} on hand
+                    </div>
+                    <div className="procurement-recommendations-cell-note">
+                      {row.estimated_days_of_coverage === null
+                        ? "Coverage unavailable"
+                        : `${formatNumber(row.estimated_days_of_coverage)} days coverage`}
+                    </div>
+                    {toNumber(row.reliable_open_inbound_quantity) > 0 ? (
+                      <div className="procurement-recommendations-cell-note">
+                        + {formatNumber(row.reliable_open_inbound_quantity)} reliable inbound
+                      </div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="procurement-recommendations-cell-main">
+                      {formatNumber(row.recommended_reorder_quantity)} {row.unit || ""}
+                    </div>
+                    <div className="procurement-recommendations-cell-note">
+                      Target {formatNumber(row.target_stock_quantity)}
+                      {toNumber(row.min_order_quantity) > 0 ? ` · MOQ ${formatNumber(row.min_order_quantity)}` : ""}
+                    </div>
+                    {row.package_rounding_applied ? (
+                      <div className="procurement-recommendations-cell-warning">Package rounding applied</div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="procurement-recommendations-cell-main">
+                      {row.recommended_supplier_name || "Not assigned"}
+                    </div>
+                    <div className="procurement-recommendations-cell-note">
+                      {titleCase(row.supplier_selection_confidence || "unknown")} confidence
+                    </div>
+                    {row.lead_time_configured === false ? (
+                      <div className="procurement-recommendations-cell-warning">Lead time missing</div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="procurement-recommendations-cell-main">
+                      {formatMoney(row.estimated_total_cost, row.currency)}
+                    </div>
+                    <div className="procurement-recommendations-cell-note">
+                      {titleCase(row.budget_status || "not_configured")} budget
+                    </div>
+                  </td>
+                  <td>
+                    <Badge tone={row.procurement_ready ? "good" : "bad"}>
+                      {row.procurement_ready ? "Ready for review" : "Needs setup"}
+                    </Badge>
+                    {row.blocker_message ? (
+                      <div className="procurement-recommendations-cell-blocker">{row.blocker_message}</div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <Badge
+                      tone={row.decision_status === "approved" ? "good" : row.decision_status === "rejected" ? "bad" : row.decision_status === "deferred" ? "warn" : "neutral"}
+                    >
+                      {titleCase(row.decision_status || "pending")}
+                    </Badge>
+                    {row.converted_purchase_order_id ? (
+                      <div className="procurement-recommendations-cell-note">PO draft created</div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <button
+                      className="app-button app-button--secondary app-button--compact"
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductId(row.product_id);
+                        navigateWorkspaceSection("detail", detailRef.current);
+                      }}
+                    >
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!recommendationsQuery.isLoading && rows.length === 0 ? (
+                <tr>
+                  <td className="procurement-recommendations-empty-cell" colSpan={10}>
+                    No procurement recommendations match the current filters.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
+      <div ref={bulkRef} className="procurement-recommendations-scroll-anchor">
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Bulk actions</h2>
+            <p style={styles.panelSubtitle}>
+              Select recommendations from the current page, run readiness
+              preview, then approve, defer, or reject in one governed action.
+            </p>
+          </div>
+          <div style={styles.actionRow}>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              onClick={selectPageReady}
+              disabled={rows.length === 0}
+            >
+              Select page-ready candidates
+            </button>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              onClick={clearBulkSelectionState}
+              disabled={selectedProductIds.length === 0}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+        <div style={styles.bulkGrid}>
+          <StatCard
+            label="Selected"
+            value={formatNumber(selectedProductIds.length, 0)}
+          />
+          <StatCard
+            label="Ready to approve"
+            value={formatNumber(approvableSelectedCount, 0)}
+            tone={
+              approvableSelectedCount === selectedProductIds.length &&
+              selectedProductIds.length > 0
+                ? "good"
+                : selectedProductIds.length > 0
+                  ? "warn"
+                  : undefined
+            }
+          />
+          <StatCard
+            label="Approved for PO draft"
+            value={formatNumber(poConvertibleSelectedCount, 0)}
+            tone={
+              poConvertibleSelectedCount > 0 &&
+              poConvertibleSelectedCount === selectedProductIds.length
+                ? "good"
+                : selectedProductIds.length > 0
+                  ? "warn"
+                  : undefined
+            }
+          />
+          <StatCard
+            label="Blocked selected"
+            value={formatNumber(
+              Math.max(0, selectedProductIds.length - approvableSelectedCount),
+              0,
+            )}
+            tone={
+              selectedProductIds.length - approvableSelectedCount > 0
+                ? "bad"
+                : "good"
+            }
+          />
+        </div>
+        <label style={{ ...styles.label, marginTop: 12 }}>
+          Bulk decision note
+          <textarea
+            style={styles.textarea}
+            value={bulkDecisionNote}
+            onChange={(event) => setBulkDecisionNote(event.target.value)}
+            placeholder="Optional note applied to every selected recommendation"
+          />
+        </label>
+        {!canApproveRecommendations ? (
+          <div style={styles.infoBox}>Purchase order approval permission is required for bulk readiness, bulk approval, defer, and reject actions.</div>
+        ) : null}
+        {!canCreatePurchaseOrderDrafts ? (
+          <div style={styles.infoBox}>Purchase order create permission is required to convert approved recommendations into PO drafts.</div>
+        ) : null}
+        {bulkReadinessMutation.isError ? (
+          <div style={styles.errorBox}>
+            {getErrorMessage(bulkReadinessMutation.error)}
+          </div>
+        ) : null}
+        {bulkDecisionMutation.isError ? (
+          <div style={styles.errorBox}>
+            {getErrorMessage(bulkDecisionMutation.error)}
+          </div>
+        ) : null}
+        {bulkReadiness ? (
+          <div
+            style={
+              bulkReadiness.summary.approval_ready
+                ? styles.infoBox
+                : styles.errorBox
+            }
+          >
+            Readiness preview:{" "}
+            {formatNumber(bulkReadiness.summary.ready_count, 0)} ready,{" "}
+            {formatNumber(bulkReadiness.summary.blocked_count, 0)} blocked,{" "}
+            {formatNumber(bulkReadiness.summary.failed_count, 0)} failed,{" "}
+            {formatNumber(bulkReadiness.summary.warning_count, 0)} warnings ·
+            estimated spend{" "}
+            {formatMoneyBreakdown(
+              bulkReadiness.summary.estimated_total_cost_by_currency,
+              bulkReadiness.summary.estimated_total_cost,
+              bulkReadiness.summary.budget_currency,
+            )}.
+            {bulkReadiness.summary.budget_status &&
+            bulkReadiness.summary.budget_status !== "not_configured" ? (
+              <>
+                {" "}
+                Budget: {titleCase(bulkReadiness.summary.budget_status)} (
+                {formatMoney(
+                  bulkReadiness.summary.budget_variance,
+                  bulkReadiness.summary.budget_currency,
+                )} variance).
+              </>
+            ) : null}
+            {bulkReadiness.results.some((row) => !row.can_approve) ? (
+              <ul style={styles.reasonList}>
+                {bulkReadiness.results
+                  .filter((row) => !row.can_approve)
+                  .slice(0, 5)
+                  .map((row) => (
+                    <li key={`bulk-preview-${row.product_id}`}>
+                      {row.product_name || row.product_id}:{" "}
+                      {(row.blockers || [])
+                        .map((blocker) => blocker.message || blocker.code)
+                        .join("; ") || "Not approvable"}
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {bulkDecisionMutation.data ? (
+          <div style={styles.infoBox}>
+            Bulk decision complete:{" "}
+            {formatNumber(bulkDecisionMutation.data.decided_count, 0)} decided,{" "}
+            {formatNumber(bulkDecisionMutation.data.blocked_count, 0)} blocked,{" "}
+            {formatNumber(bulkDecisionMutation.data.failed_count, 0)} failed.
+          </div>
+        ) : null}
+        {poDraftConversionMutation.isError ? (
+          <div style={styles.errorBox}>
+            {getErrorMessage(poDraftConversionMutation.error)}
+          </div>
+        ) : null}
+        {poDraftConversionMutation.data ? (
+          <div style={styles.infoBox}>
+            PO draft conversion complete:{" "}
+            {formatNumber(poDraftConversionMutation.data.converted_count, 0)}{" "}
+            recommendations converted into{" "}
+            {formatNumber(
+              poDraftConversionMutation.data.purchase_order_count,
+              0,
+            )}{" "}
+            draft PO(s).
+            <ul style={styles.reasonList}>
+              {poDraftConversionMutation.data.purchase_orders.map((po) => (
+                <li key={po.purchase_order_id} style={styles.conversionResultItem}>
+                  <span>
+                    {po.po_number} · {po.supplier_name || "Supplier unavailable"} ·{" "}
+                    {formatNumber(po.item_count, 0)} item(s) ·{" "}
+                    {formatMoney(po.estimated_total_cost, po.currency)}
+                  </span>
+                  <button
+                    type="button"
+                    style={styles.inlineActionButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
+                  >
+                    Open draft
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div style={styles.actionRow}>
+          <button
+            style={styles.secondaryButton}
+            type="button"
+            disabled={
+              !canApproveRecommendations ||
+              selectedProductIds.length === 0 || bulkReadinessMutation.isPending
+            }
+            onClick={() =>
+              bulkReadinessMutation.mutate({
+                productIds: selectedProductIds,
+                status: "approved",
+              })
+            }
+          >
+            Preview approval readiness
+          </button>
+          <button
+            style={styles.primaryButton}
+            type="button"
+            disabled={
+              !canApproveRecommendations ||
+              selectedProductIds.length === 0 ||
+              !approvalPreviewReady ||
+              bulkDecisionMutation.isPending
+            }
+            onClick={() =>
+              requestConfirmation({
+                title: `Approve ${selectedProductIds.length} recommendation(s)?`,
+                message: "This records approval decisions only after the server rechecks every selected recommendation under transaction locks.",
+                confirmLabel: "Bulk approve",
+                tone: "primary",
+                action: () =>
+                  bulkDecisionMutation.mutate({
+                    productIds: selectedProductIds,
+                    status: "approved",
+                    note: bulkDecisionNote,
+                  }),
+              })
+            }
+          >
+            Bulk approve
+          </button>
+          <button
+            style={styles.primaryButton}
+            type="button"
+            disabled={
+              !canCreatePurchaseOrderDrafts ||
+              selectedProductIds.length === 0 ||
+              poConvertibleSelectedCount !== selectedProductIds.length ||
+              poDraftConversionMutation.isPending
+            }
+            onClick={() =>
+              requestConfirmation({
+                title: `Create purchase order draft(s) from ${selectedProductIds.length} approval(s)?`,
+                message: "The server rechecks approved supplier, quantity, cost, package, and threshold evidence under transaction locks before creating supplier-grouped purchase order drafts. Stock is not changed.",
+                confirmLabel: "Create PO drafts",
+                tone: "primary",
+                action: () =>
+                  poDraftConversionMutation.mutate({
+                    productIds: selectedProductIds,
+                  }),
+              })
+            }
+          >
+            Create PO draft(s)
+          </button>
+          <button
+            style={styles.secondaryButton}
+            type="button"
+            disabled={
+              !canApproveRecommendations ||
+              selectedProductIds.length === 0 || bulkDecisionMutation.isPending
+            }
+            onClick={() =>
+              bulkDecisionMutation.mutate({
+                productIds: selectedProductIds,
+                status: "deferred",
+                note: bulkDecisionNote,
+              })
+            }
+          >
+            Bulk defer
+          </button>
+          <button
+            style={styles.dangerButton}
+            type="button"
+            disabled={
+              !canApproveRecommendations ||
+              selectedProductIds.length === 0 || bulkDecisionMutation.isPending
+            }
+            onClick={() =>
+              requestConfirmation({
+                title: `Reject ${selectedProductIds.length} recommendation(s)?`,
+                message: "This records a rejection decision for every selected recommendation.",
+                confirmLabel: "Bulk reject",
+                tone: "danger",
+                action: () =>
+                  bulkDecisionMutation.mutate({
+                    productIds: selectedProductIds,
+                    status: "rejected",
+                    note: bulkDecisionNote,
+                  }),
+              })
+            }
+          >
+            Bulk reject
+          </button>
+        </div>
+      </section>
+
+      </div>
+
+      <div ref={poDraftRef} className="procurement-recommendations-scroll-anchor">
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Purchase order drafts</h2>
+            <p style={styles.panelSubtitle}>
+              Review purchase order drafts created from approved recommendations before they move through the normal purchase order lifecycle.
+            </p>
+          </div>
+          <div style={styles.actionGroup}>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={!canViewGeneratedPurchaseOrderDrafts || toNumber(poDraftReviewQuery.data?.pagination.total) === 0 || exportPoDraftReviewMutation.isPending}
+              onClick={() => exportPoDraftReviewMutation.mutate()}
+            >
+              {exportPoDraftReviewMutation.isPending ? "Preparing export..." : "Export draft CSV"}
+            </button>
+            <button
+              style={styles.secondaryButton}
+              type="button"
+              disabled={!canViewGeneratedPurchaseOrderDrafts}
+              onClick={() => void poDraftReviewQuery.refetch()}
+            >
+              Refresh drafts
+            </button>
+          </div>
+        </div>
+        {!canViewGeneratedPurchaseOrderDrafts ? (
+          <div style={styles.infoBox}>Purchase order read permission is required to load recommendation-generated PO draft review data.</div>
+        ) : null}
+        {poDraftReviewQuery.isLoading ? (
+          <div style={styles.infoBox}>Loading generated PO drafts...</div>
+        ) : null}
+        {poDraftReviewQuery.isError ? (
+          <div style={styles.errorBox}>
+            {getErrorMessage(poDraftReviewQuery.error)}
+          </div>
+        ) : null}
+        {exportPoDraftReviewMutation.isError ? (
+          <div style={styles.errorBox}>PO draft export failed: {getErrorMessage(exportPoDraftReviewMutation.error)}</div>
+        ) : null}
+        {poDraftReviewQuery.data ? (
+          <>
+            <div style={styles.bulkGrid}>
+              <StatCard
+                label="Loaded drafts"
+                value={formatNumber(
+                  poDraftReviewQuery.data.summary.draft_count,
+                  0,
+                )}
+                tone={
+                  toNumber(poDraftReviewQuery.data.summary.draft_count) > 0
+                    ? "warn"
+                    : undefined
+                }
+              />
+              <StatCard
+                label="Loaded submitted"
+                value={formatNumber(
+                  poDraftReviewQuery.data.summary.submitted_count,
+                  0,
+                )}
+              />
+              <StatCard
+                label="Loaded warnings"
+                value={formatNumber(
+                  poDraftReviewQuery.data.summary.warning_count,
+                  0,
+                )}
+                tone={
+                  toNumber(poDraftReviewQuery.data.summary.warning_count) > 0
+                    ? "bad"
+                    : "good"
+                }
+              />
+              <StatCard
+                label="Loaded spend"
+                value={formatMoneyBreakdown(
+                  poDraftReviewQuery.data.summary.estimated_total_cost_by_currency,
+                  poDraftReviewQuery.data.summary.estimated_total_cost,
+                )}
+              />
+            </div>
+            {toNumber(poDraftReviewQuery.data.summary.warning_count) > 0 ? (
+              <div style={styles.commercialWarningBox}>
+                <strong>Commercial review required:</strong> one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.
+              </div>
+            ) : null}
+            <div style={{ ...styles.tableWrap, marginTop: 12 }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>PO draft</th>
+                    <th style={styles.th}>Supplier</th>
+                    <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Items</th>
+                    <th style={styles.th}>Estimated spend</th>
+                    <th style={styles.th}>Source link</th>
+                    <th style={styles.th}>Warnings</th>
+                    <th style={styles.th}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poDraftReviewQuery.data.rows.map((po) => (
+                    <tr key={po.purchase_order_id} style={styles.tr}>
+                      <td style={styles.td}>
+                        <div style={styles.primaryText}>{po.po_number}</div>
+                        <div style={styles.mutedText}>
+                          Created{" "}
+                          {po.created_at
+                            ? new Date(po.created_at).toLocaleString()
+                            : "-"}
+                        </div>
+                        <div style={styles.mutedText}>
+                          Expected {po.expected_delivery_date || "not set"}
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        {po.supplier_name || po.supplier_id}
+                      </td>
+                      <td style={styles.td}>
+                        <Badge
+                          tone={
+                            po.status === "draft"
+                              ? "warn"
+                              : po.status === "cancelled"
+                                ? "bad"
+                                : "good"
+                          }
+                        >
+                          {poDraftReviewLabel(po)}
+                        </Badge>
+                      </td>
+                      <td style={styles.td}>
+                        <div>{formatNumber(po.item_count, 0)} item(s)</div>
+                        <div style={styles.mutedText}>
+                          Qty {formatNumber(po.total_quantity)}
+                        </div>
+                        <ul style={styles.reasonList}>
+                          {po.items.slice(0, 3).map((item) => (
+                            <li
+                              key={`${po.purchase_order_id}-${item.product_id}`}
+                            >
+                              {item.product_name || item.product_id}:{" "}
+                              {formatNumber(item.quantity)} @{" "}
+                              {formatMoney(item.unit_cost, po.currency)}
+                            </li>
+                          ))}
+                          {po.items.length > 3 ? (
+                            <li>+{po.items.length - 3} more</li>
+                          ) : null}
+                        </ul>
+                      </td>
+                      <td style={styles.td}>
+                        {formatMoney(po.estimated_total_cost, po.currency)}
+                      </td>
+                      <td style={styles.td}>
+                        <Badge
+                          tone={
+                            po.recommendation_linkage_complete ? "good" : "bad"
+                          }
+                        >
+                          {po.recommendation_linkage_complete
+                            ? "Linked"
+                            : "Needs review"}
+                        </Badge>
+                        <div style={styles.mutedText}>
+                          {formatNumber(po.linked_recommendation_count, 0)} /{" "}
+                          {formatNumber(po.item_count, 0)} linked
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        {po.governance_warnings.length === 0 ? (
+                          <Badge tone="good">Clear</Badge>
+                        ) : (
+                          <ul style={styles.reasonList}>
+                            {po.governance_warnings.map((warning) => (
+                              <li
+                                key={`${po.purchase_order_id}-${warning.code}`}
+                              >
+                                {warning.message || warning.code}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td style={styles.td}>
+                        <button
+                          type="button"
+                          style={styles.primaryButton}
+                          onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
+                        >
+                          Open purchase order
+                        </button>
+                        {hasPoDraftCostWarning(po) ? (
+                          <div style={styles.blockerText}>Enter positive item costs in Purchase Orders before submitting this draft.</div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                  {poDraftReviewQuery.data.rows.length === 0 ? (
+                    <tr>
+                      <td style={styles.emptyCell} colSpan={8}>
+                        No recommendation-generated PO drafts found.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <div style={styles.paginationFooter}>
+              <span style={styles.mutedText}>
+                Showing {poDraftReviewQuery.data.rows.length ? poDraftOffset + 1 : 0}–{poDraftOffset + poDraftReviewQuery.data.rows.length} of {formatNumber(poDraftReviewQuery.data.pagination.total, 0)} generated purchase order(s)
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={poDraftOffset === 0 || poDraftReviewQuery.isFetching}
+                  onClick={() => setPoDraftOffset(Math.max(0, poDraftOffset - poDraftLimit))}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={!poDraftReviewQuery.data.pagination.has_more || poDraftReviewQuery.isFetching}
+                  onClick={() => setPoDraftOffset(poDraftOffset + poDraftLimit)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      </div>
+
+      <div ref={detailRef} className="procurement-recommendations-scroll-anchor">
+      <section style={styles.detailPanel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Recommendation detail</h2>
+            <p style={styles.panelSubtitle}>
+              Review the selected product's stock need, supplier evidence, cost, and approval readiness.
+            </p>
+          </div>
+          {selectedProductId ? (
+            <div style={styles.actionRow}>
+              <button
+                style={styles.secondaryButton}
+                type="button"
+                disabled={!selectedDetail}
+                onClick={() =>
+                  selectedDetail
+                    ? exportRecommendationRowsCsv({
+                        rows: [selectedDetail],
+                        generatedAt: detailQuery.data?.generated_at,
+                        scope: "detail",
+                      })
+                    : undefined
+                }
+              >
+                Export detail CSV
+              </button>
+              <button
+                style={styles.secondaryButton}
+                type="button"
+                onClick={() => setSelectedProductId(null)}
+              >
+                Close
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {!selectedProductId ? (
+          <div style={styles.infoBox}>
+            Select “Review” on a recommendation row to see the full buying evidence and available actions.
+          </div>
+        ) : null}
+        {selectedProductId && detailQuery.isLoading ? (
+          <div style={styles.infoBox}>Loading recommendation detail...</div>
+        ) : null}
+        {selectedProductId && detailQuery.isError ? (
+          <div style={styles.errorBox}>
+            {getErrorMessage(detailQuery.error)}
+          </div>
+        ) : null}
+
+        {selectedDetail ? (
+          <div style={styles.detailGrid}>
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Product</div>
+              <h3 style={styles.detailTitle}>{selectedDetail.product_name}</h3>
+              <p style={styles.riskText}>
+                {selectedDetail.category || "Uncategorized"} ·{" "}
+                {selectedDetail.unit || "unit"} ·{" "}
+                {titleCase(selectedDetail.source_signal)}
+              </p>
+              <Badge tone={selectedDetail.procurement_ready ? "good" : "bad"}>
+                {selectedDetail.procurement_ready ? "Supplier assigned" : "Supplier missing"}
+              </Badge>
+              <p style={styles.riskText}>
+                Execution scope:{" "}
+                {titleCase(
+                  selectedDetail.detail?.execution_scope ||
+                    "product_replenishment",
+                )}
+              </p>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Depletion reasoning</div>
+              <div style={styles.metricLine}>
+                <strong>ADU:</strong>{" "}
+                {formatNumber(selectedDetail.average_daily_usage)}{" "}
+                {selectedDetail.unit || ""}/day
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Coverage:</strong>{" "}
+                {selectedDetail.estimated_days_of_coverage === null
+                  ? "No usage signal"
+                  : `${formatNumber(selectedDetail.estimated_days_of_coverage)} days`}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Projected depletion:</strong>{" "}
+                {selectedDetail.projected_depletion_date || "-"}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Lead time + buffer:</strong>{" "}
+                {selectedDetail.lead_time_configured === false
+                  ? `Missing lead time · effective ${formatNumber(
+                      toNumber(selectedDetail.effective_lead_time_days),
+                      0,
+                    )} + buffer ${formatNumber(
+                      toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
+                      0,
+                    )} day(s)`
+                  : `${formatNumber(
+                      toNumber(selectedDetail.lead_time_days) +
+                        toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
+                      0,
+                    )} days`}
+              </div>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Threshold and supply position</div>
+              <div style={styles.metricLine}><strong>Current stock:</strong> {formatNumber(selectedDetail.current_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Current product minimum:</strong> {formatNumber(selectedDetail.product_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Calculated threshold:</strong> {formatNumber(selectedDetail.system_recommended_min_stock ?? selectedDetail.calculated_min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Governed threshold:</strong> {formatNumber(selectedDetail.governed_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Threshold evidence:</strong> {formatNumber(toNumber(selectedDetail.min_stock_confidence_score) * 100, 0)}% · {titleCase(selectedDetail.min_stock_recommendation_status)}</div>
+              <div style={styles.metricLine}><strong>Gross open inbound:</strong> {formatNumber(selectedDetail.gross_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Reliable inbound counted:</strong> {formatNumber(selectedDetail.reliable_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>At-risk inbound excluded:</strong> {formatNumber(selectedDetail.at_risk_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Inventory position:</strong> {formatNumber(selectedDetail.current_inventory_position)} {selectedDetail.unit || ""}</div>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Separate reorder plan</div>
+              <div style={styles.metricLine}><strong>Target coverage:</strong> {formatNumber(selectedDetail.target_coverage_days ?? detailQuery.data?.target_coverage_days, 0)} days</div>
+              <div style={styles.metricLine}><strong>Target stock:</strong> {formatNumber(selectedDetail.target_stock_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Need before MOQ:</strong> {formatNumber(selectedDetail.base_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>MOQ-adjusted need:</strong> {formatNumber(selectedDetail.moq_adjusted_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>Recommended order:</strong> {formatNumber(selectedDetail.recommended_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <p style={styles.riskText}>Package size and MOQ affect this order quantity only; they do not inflate the minimum-stock threshold.</p>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Budget governance</div>
+              <div style={styles.metricLine}>
+                <strong>Status:</strong>{" "}
+                {titleCase(selectedDetail.budget_status || "not_configured")}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Limit:</strong>{" "}
+                {formatMoney(selectedDetail.budget_limit, selectedDetail.budget_currency)}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Remaining:</strong>{" "}
+                {formatMoney(
+                  selectedDetail.budget_remaining_after_recommendation,
+                  selectedDetail.budget_currency,
+                )}
+              </div>
+              {selectedDetail.budget_blocker_message ? (
+                <p style={styles.blockerText}>
+                  {selectedDetail.budget_blocker_message}
+                </p>
+              ) : null}
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Supplier reasoning</div>
+              <div style={styles.metricLine}>
+                <strong>Supplier:</strong>{" "}
+                {selectedDetail.recommended_supplier_name || "-"}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Confidence:</strong>{" "}
+                {titleCase(selectedDetail.supplier_selection_confidence)}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Reason:</strong>{" "}
+                {titleCase(selectedDetail.supplier_selection_reason)}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Performance:</strong>{" "}
+                {titleCase(selectedDetail.supplier_performance_status)}{" "}
+                {selectedDetail.supplier_performance_score !== null &&
+                selectedDetail.supplier_performance_score !== undefined
+                  ? `· ${formatNumber(selectedDetail.supplier_performance_score, 0)}`
+                  : ""}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Last purchase:</strong>{" "}
+                {selectedDetail.last_purchase_date || "-"} ·{" "}
+                {formatMoney(
+                  selectedDetail.last_purchase_unit_cost,
+                  selectedDetail.last_purchase_currency ||
+                    selectedDetail.currency,
+                )}
+              </div>
+            </div>
+
+            <div style={styles.detailCardWide}>
+              <div style={styles.statLabel}>Approval decision</div>
+              <div style={styles.metricLine}>
+                <strong>Status:</strong>{" "}
+                {titleCase(selectedDetail.decision_status || "pending")}
+              </div>
+              {selectedDetail.decided_at ? (
+                <div style={styles.metricLine}>
+                  <strong>Decided:</strong>{" "}
+                  {new Date(selectedDetail.decided_at).toLocaleString()}
+                </div>
+              ) : null}
+              {selectedDetail.decision_note ? (
+                <div style={styles.metricLine}>
+                  <strong>Last note:</strong> {selectedDetail.decision_note}
+                </div>
+              ) : null}
+              {selectedDetail.converted_purchase_order_id ? (
+                <div style={styles.metricLine}>
+                  <strong>PO draft:</strong>{" "}
+                  <button
+                    type="button"
+                    style={styles.linkButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.converted_purchase_order_id as string))}
+                  >
+                    Open in Purchase Orders
+                  </button>
+                  {selectedDetail.converted_at
+                    ? ` · ${new Date(selectedDetail.converted_at).toLocaleString()}`
+                    : ""}
+                </div>
+              ) : null}
+              {selectedDetail.previous_converted_purchase_order_id ? (
+                <div style={styles.infoBox}>
+                  <strong>Previous procurement cycle:</strong>{" "}
+                  <button
+                    type="button"
+                    style={styles.linkButton}
+                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.previous_converted_purchase_order_id as string))}
+                  >
+                    Open previous purchase order
+                  </button>
+                  {selectedDetail.previous_converted_purchase_order_status
+                    ? ` · ${titleCase(selectedDetail.previous_converted_purchase_order_status)}`
+                    : ""}
+                  <div style={styles.mutedText}>
+                    That purchase order is closed. The current stock need is a new recommendation cycle and requires a new decision.
+                  </div>
+                </div>
+              ) : null}
+              <label style={{ ...styles.label, marginTop: 10 }}>
+                Decision note
+                <textarea
+                  style={styles.textarea}
+                  value={decisionNote}
+                  onChange={(event) => setDecisionNote(event.target.value)}
+                  placeholder="Optional approval, rejection, or defer note"
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open)}
+                />
+              </label>
+              {!canApproveRecommendations ? (
+                <div style={styles.infoBox}>Purchase order approval permission is required to approve, defer, or reject this recommendation.</div>
+              ) : null}
+              {decisionMutation.isError ? (
+                <div style={styles.errorBox}>
+                  {getErrorMessage(decisionMutation.error)}
+                </div>
+              ) : null}
+              <div style={styles.actionRow}>
+                <button
+                  style={styles.primaryButton}
+                  type="button"
+                  disabled={
+                    !canApproveRecommendations ||
+                    !selectedDetail.detail?.can_enter_approval_review ||
+                    decisionMutation.isPending
+                  }
+                  onClick={() =>
+                    requestConfirmation({
+                      title: "Approve recommendation?",
+                      message: "The server rechecks approval readiness under a transaction lock, then records the current commercial snapshot. Purchase order creation remains a separate action.",
+                      confirmLabel: "Approve",
+                      tone: "primary",
+                      action: () =>
+                        decisionMutation.mutate({
+                          productId: selectedDetail.product_id,
+                          status: "approved",
+                          note: decisionNote,
+                        }),
+                    })
+                  }
+                >
+                  Approve
+                </button>
+                <button
+                  style={styles.secondaryButton}
+                  type="button"
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
+                  onClick={() =>
+                    decisionMutation.mutate({
+                      productId: selectedDetail.product_id,
+                      status: "deferred",
+                      note: decisionNote,
+                    })
+                  }
+                >
+                  Defer
+                </button>
+                <button
+                  style={styles.dangerButton}
+                  type="button"
+                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
+                  onClick={() =>
+                    requestConfirmation({
+                      title: "Reject recommendation?",
+                      message: "This records a rejection decision for the current recommendation evidence.",
+                      confirmLabel: "Reject",
+                      tone: "danger",
+                      action: () =>
+                        decisionMutation.mutate({
+                          productId: selectedDetail.product_id,
+                          status: "rejected",
+                          note: decisionNote,
+                        }),
+                    })
+                  }
+                >
+                  Reject
+                </button>
+              </div>
+              {!selectedDetail.detail?.can_enter_approval_review ? (
+                <p style={styles.blockerText}>
+                  Approval is blocked until the current recommendation passes all row-level readiness checks. Review the blockers below.
+                </p>
+              ) : null}
+            </div>
+
+            <div style={styles.detailCardWide}>
+              <div style={styles.statLabel}>Recommendation explanation</div>
+              <ul style={styles.reasonList}>
+                {(selectedDetail.detail?.reasoning || []).map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+                {selectedDetail.detail?.blockers?.map((blocker) => (
+                  <li
+                    key={`${blocker.code}-${blocker.message}`}
+                    style={styles.blockerText}
+                  >
+                    {blocker.message || blocker.code}
+                  </li>
+                ))}
+                {selectedDetail.detail?.warnings?.map((warning) => (
+                  <li key={`warning-${warning.code}-${warning.message}`} style={styles.warningText}>
+                    {warning.message || warning.code}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={styles.detailCard}>
+              <div style={styles.statLabel}>Cost and conversion</div>
+              <div style={styles.metricLine}>
+                <strong>Unit cost:</strong>{" "}
+                {formatMoney(
+                  selectedDetail.estimated_unit_cost,
+                  selectedDetail.currency,
+                )}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Total cost:</strong>{" "}
+                {formatMoney(
+                  selectedDetail.estimated_total_cost,
+                  selectedDetail.currency,
+                )}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>MOQ:</strong>{" "}
+                {formatNumber(selectedDetail.min_order_quantity)}{" "}
+                {selectedDetail.unit || ""}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Order package:</strong>{" "}
+                {selectedDetail.order_package_name || "Base unit"}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Package count:</strong>{" "}
+                {formatNumber(
+                  selectedDetail.recommended_order_package_count,
+                  0,
+                )}{" "}
+                × {formatNumber(selectedDetail.units_per_order_package || 1)}{" "}
+                {selectedDetail.unit || "unit(s)"}
+              </div>
+              {selectedDetail.package_rounding_applied ? (
+                <div style={styles.metricLine}>
+                  <strong>Package rounding:</strong> +
+                  {formatNumber(selectedDetail.package_rounding_added_quantity)}{" "}
+                  {selectedDetail.unit || ""}
+                </div>
+              ) : null}
+              <div style={styles.metricLine}>
+                <strong>Approval readiness:</strong>{" "}
+                {selectedDetail.detail?.can_enter_approval_review ? "Ready" : "Blocked"}
+              </div>
+              <div style={styles.metricLine}>
+                <strong>Approved and eligible for PO-draft conversion:</strong>{" "}
+                {selectedDetail.detail?.can_generate_po_draft ? "Yes" : "No"}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      </div>
+
+      <section style={styles.panel}>
+        <div style={styles.panelHeader}>
+          <div>
+            <h2 style={styles.panelTitle}>Priority review</h2>
+            <p style={styles.panelSubtitle}>
+              The most urgent recommendations in the current queue, summarized for quick review.
+            </p>
+          </div>
+        </div>
+        <div style={styles.riskGrid}>
+          {highestRiskRows.map((row) => (
+            <article key={`risk-${row.product_id}`} style={styles.riskCard}>
+              <div style={styles.riskCardHeader}>
+                <strong>{row.product_name}</strong>
+                <Badge tone={row.urgency === "critical" ? "bad" : "warn"}>
+                  {titleCase(row.urgency)}
+                </Badge>
+              </div>
+              <p style={styles.riskText}>
+                {row.estimated_days_of_coverage === null
+                  ? "Coverage cannot be projected."
+                  : `${formatNumber(row.estimated_days_of_coverage)} days of coverage remain.`}
+              </p>
+              <p style={styles.riskText}>
+                Recommend {formatNumber(row.recommended_reorder_quantity)}{" "}
+                {row.unit || "units"} from{" "}
+                {row.recommended_supplier_name || "unassigned supplier"}.
+              </p>
+              <p style={styles.riskText}>
+                Supplier confidence:{" "}
+                {titleCase(row.supplier_selection_confidence || "unknown")} ·{" "}
+                {titleCase(row.supplier_performance_status || "unknown")}.
+              </p>
+              {row.package_rounding_applied ? (
+                <p style={styles.riskText}>
+                  Package governance rounded the order to{" "}
+                  {formatNumber(row.recommended_order_package_count, 0)}{" "}
+                  pack(s).
+                </p>
+              ) : null}
+            </article>
+          ))}
+          {!recommendationsQuery.isLoading && highestRiskRows.length === 0 ? (
+            <div style={styles.infoBox}>
+              No active high-risk recommendations to summarize.
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <div ref={advancedRef} className="procurement-recommendations-scroll-anchor">
       <details
         style={styles.governanceDetails}
         open={governanceOpen}
         onToggle={(event) => setGovernanceOpen(event.currentTarget.open)}
       >
         <summary style={styles.governanceSummary}>
-          <span>Planning, automation, exceptions, and governance</span>
-          <span style={styles.mutedText}>Dashboards, production review, scheduled runs, outcomes, history, and exception handling</span>
+          <span>Advanced procurement controls</span>
+          <span style={styles.mutedText}>Scheduling, exception handling, execution history, and operational review</span>
         </summary>
         <div style={styles.governanceContent}>
 
@@ -2727,1465 +4139,7 @@ export default function ProcurementRecommendationsPage() {
         </div>
       </details>
 
-      <section style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>Queue controls</h2>
-            <p style={styles.panelSubtitle}>
-              Filter active recommendations before approval, deferral, rejection, or purchase-order draft conversion.
-            </p>
-          </div>
-          <button
-            style={styles.secondaryButton}
-            type="button"
-            onClick={() => {
-              clearBulkSelectionState();
-              setFilters(DEFAULT_FILTERS);
-            }}
-          >
-            Reset
-          </button>
-        </div>
-        <div style={styles.filterGrid}>
-          <label style={styles.label}>
-            Search
-            <input
-              style={styles.input}
-              value={filters.search}
-              onChange={(event) => setFilter("search", event.target.value)}
-              placeholder="Product, supplier, SKU..."
-            />
-          </label>
-          <label style={styles.label}>
-            Urgency
-            <select
-              style={styles.input}
-              value={filters.urgency}
-              onChange={(event) => setFilter("urgency", event.target.value)}
-            >
-              <option value="">All</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <label style={styles.label}>
-            Supplier
-            <select
-              style={styles.input}
-              value={filters.supplierId}
-              onChange={(event) => setFilter("supplierId", event.target.value)}
-            >
-              <option value="">All suppliers</option>
-              {(optionsQuery.data?.suppliers || []).map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={styles.label}>
-            Supplier assignment
-            <select
-              style={styles.input}
-              value={filters.procurementReady}
-              onChange={(event) =>
-                setFilter("procurementReady", event.target.value)
-              }
-            >
-              <option value="">All</option>
-              <option value="true">Assigned</option>
-              <option value="false">Missing</option>
-            </select>
-          </label>
-          <label style={styles.label}>
-            Shortage window
-            <select
-              style={styles.input}
-              value={filters.shortageWindowDays}
-              onChange={(event) =>
-                setFilter("shortageWindowDays", event.target.value)
-              }
-            >
-              <option value="">Any</option>
-              <option value="7">≤ 7 days</option>
-              <option value="14">≤ 14 days</option>
-              <option value="30">≤ 30 days</option>
-              <option value="60">≤ 60 days</option>
-            </select>
-          </label>
-          <label style={styles.label}>
-            Budget limit
-            <input
-              style={styles.input}
-              type="number"
-              min={0}
-              step="0.01"
-              value={filters.budgetLimit}
-              onChange={(event) => setFilter("budgetLimit", event.target.value)}
-              placeholder="Optional spend cap"
-            />
-          </label>
-          <label style={styles.label}>
-            Lookback days
-            <input
-              style={styles.input}
-              type="number"
-              min={1}
-              max={90}
-              value={filters.lookbackDays}
-              onChange={(event) =>
-                setFilter("lookbackDays", Number(event.target.value) || 30)
-              }
-            />
-          </label>
-          <label style={styles.label}>
-            Rows per page
-            <select
-              style={styles.input}
-              value={filters.limit}
-              onChange={(event) => setFilter("limit", Number(event.target.value))}
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </label>
-        </div>
-        {optionsQuery.isError ? (
-          <div style={styles.errorBox}>Supplier filters could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
-        ) : null}
-        <div style={styles.infoBox}>
-          “Supplier assigned” means the recommendation can enter review. Missing cost, lead-time, package, budget, or supplier-performance evidence can still require attention before a purchase order is submitted.
-        </div>
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>Bulk approval controls</h2>
-            <p style={styles.panelSubtitle}>
-              Select recommendations from the current page, run readiness
-              preview, then approve, defer, or reject in one governed action.
-            </p>
-          </div>
-          <div style={styles.actionRow}>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              onClick={selectPageReady}
-              disabled={rows.length === 0}
-            >
-              Select page-ready candidates
-            </button>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              onClick={clearBulkSelectionState}
-              disabled={selectedProductIds.length === 0}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-        <div style={styles.bulkGrid}>
-          <StatCard
-            label="Selected"
-            value={formatNumber(selectedProductIds.length, 0)}
-          />
-          <StatCard
-            label="Row-ready selected"
-            value={formatNumber(approvableSelectedCount, 0)}
-            tone={
-              approvableSelectedCount === selectedProductIds.length &&
-              selectedProductIds.length > 0
-                ? "good"
-                : selectedProductIds.length > 0
-                  ? "warn"
-                  : undefined
-            }
-          />
-          <StatCard
-            label="PO-draft ready"
-            value={formatNumber(poConvertibleSelectedCount, 0)}
-            tone={
-              poConvertibleSelectedCount > 0 &&
-              poConvertibleSelectedCount === selectedProductIds.length
-                ? "good"
-                : selectedProductIds.length > 0
-                  ? "warn"
-                  : undefined
-            }
-          />
-          <StatCard
-            label="Row blockers"
-            value={formatNumber(
-              Math.max(0, selectedProductIds.length - approvableSelectedCount),
-              0,
-            )}
-            tone={
-              selectedProductIds.length - approvableSelectedCount > 0
-                ? "bad"
-                : "good"
-            }
-          />
-        </div>
-        <label style={{ ...styles.label, marginTop: 12 }}>
-          Bulk decision note
-          <textarea
-            style={styles.textarea}
-            value={bulkDecisionNote}
-            onChange={(event) => setBulkDecisionNote(event.target.value)}
-            placeholder="Optional note applied to every selected recommendation"
-          />
-        </label>
-        {!canApproveRecommendations ? (
-          <div style={styles.infoBox}>Purchase order approval permission is required for bulk readiness, bulk approval, defer, and reject actions.</div>
-        ) : null}
-        {!canCreatePurchaseOrderDrafts ? (
-          <div style={styles.infoBox}>Purchase order create permission is required to convert approved recommendations into PO drafts.</div>
-        ) : null}
-        {bulkReadinessMutation.isError ? (
-          <div style={styles.errorBox}>
-            {getErrorMessage(bulkReadinessMutation.error)}
-          </div>
-        ) : null}
-        {bulkDecisionMutation.isError ? (
-          <div style={styles.errorBox}>
-            {getErrorMessage(bulkDecisionMutation.error)}
-          </div>
-        ) : null}
-        {bulkReadiness ? (
-          <div
-            style={
-              bulkReadiness.summary.approval_ready
-                ? styles.infoBox
-                : styles.errorBox
-            }
-          >
-            Readiness preview:{" "}
-            {formatNumber(bulkReadiness.summary.ready_count, 0)} ready,{" "}
-            {formatNumber(bulkReadiness.summary.blocked_count, 0)} blocked,{" "}
-            {formatNumber(bulkReadiness.summary.failed_count, 0)} failed,{" "}
-            {formatNumber(bulkReadiness.summary.warning_count, 0)} warnings ·
-            estimated spend{" "}
-            {formatMoneyBreakdown(
-              bulkReadiness.summary.estimated_total_cost_by_currency,
-              bulkReadiness.summary.estimated_total_cost,
-              bulkReadiness.summary.budget_currency,
-            )}.
-            {bulkReadiness.summary.budget_status &&
-            bulkReadiness.summary.budget_status !== "not_configured" ? (
-              <>
-                {" "}
-                Budget: {titleCase(bulkReadiness.summary.budget_status)} (
-                {formatMoney(
-                  bulkReadiness.summary.budget_variance,
-                  bulkReadiness.summary.budget_currency,
-                )} variance).
-              </>
-            ) : null}
-            {bulkReadiness.results.some((row) => !row.can_approve) ? (
-              <ul style={styles.reasonList}>
-                {bulkReadiness.results
-                  .filter((row) => !row.can_approve)
-                  .slice(0, 5)
-                  .map((row) => (
-                    <li key={`bulk-preview-${row.product_id}`}>
-                      {row.product_name || row.product_id}:{" "}
-                      {(row.blockers || [])
-                        .map((blocker) => blocker.message || blocker.code)
-                        .join("; ") || "Not approvable"}
-                    </li>
-                  ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-        {bulkDecisionMutation.data ? (
-          <div style={styles.infoBox}>
-            Bulk decision complete:{" "}
-            {formatNumber(bulkDecisionMutation.data.decided_count, 0)} decided,{" "}
-            {formatNumber(bulkDecisionMutation.data.blocked_count, 0)} blocked,{" "}
-            {formatNumber(bulkDecisionMutation.data.failed_count, 0)} failed.
-          </div>
-        ) : null}
-        {poDraftConversionMutation.isError ? (
-          <div style={styles.errorBox}>
-            {getErrorMessage(poDraftConversionMutation.error)}
-          </div>
-        ) : null}
-        {poDraftConversionMutation.data ? (
-          <div style={styles.infoBox}>
-            PO draft conversion complete:{" "}
-            {formatNumber(poDraftConversionMutation.data.converted_count, 0)}{" "}
-            recommendations converted into{" "}
-            {formatNumber(
-              poDraftConversionMutation.data.purchase_order_count,
-              0,
-            )}{" "}
-            draft PO(s).
-            <ul style={styles.reasonList}>
-              {poDraftConversionMutation.data.purchase_orders.map((po) => (
-                <li key={po.purchase_order_id} style={styles.conversionResultItem}>
-                  <span>
-                    {po.po_number} · {po.supplier_name || po.supplier_id} ·{" "}
-                    {formatNumber(po.item_count, 0)} item(s) ·{" "}
-                    {formatMoney(po.estimated_total_cost, po.currency)}
-                  </span>
-                  <button
-                    type="button"
-                    style={styles.inlineActionButton}
-                    onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
-                  >
-                    Open draft
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        <div style={styles.actionRow}>
-          <button
-            style={styles.secondaryButton}
-            type="button"
-            disabled={
-              !canApproveRecommendations ||
-              selectedProductIds.length === 0 || bulkReadinessMutation.isPending
-            }
-            onClick={() =>
-              bulkReadinessMutation.mutate({
-                productIds: selectedProductIds,
-                status: "approved",
-              })
-            }
-          >
-            Preview approval readiness
-          </button>
-          <button
-            style={styles.primaryButton}
-            type="button"
-            disabled={
-              !canApproveRecommendations ||
-              selectedProductIds.length === 0 ||
-              !approvalPreviewReady ||
-              bulkDecisionMutation.isPending
-            }
-            onClick={() =>
-              requestConfirmation({
-                title: `Approve ${selectedProductIds.length} recommendation(s)?`,
-                message: "This records approval decisions only after the server rechecks every selected recommendation under transaction locks.",
-                confirmLabel: "Bulk approve",
-                tone: "primary",
-                action: () =>
-                  bulkDecisionMutation.mutate({
-                    productIds: selectedProductIds,
-                    status: "approved",
-                    note: bulkDecisionNote,
-                  }),
-              })
-            }
-          >
-            Bulk approve
-          </button>
-          <button
-            style={styles.primaryButton}
-            type="button"
-            disabled={
-              !canCreatePurchaseOrderDrafts ||
-              selectedProductIds.length === 0 ||
-              poConvertibleSelectedCount !== selectedProductIds.length ||
-              poDraftConversionMutation.isPending
-            }
-            onClick={() =>
-              requestConfirmation({
-                title: `Create purchase order draft(s) from ${selectedProductIds.length} approval(s)?`,
-                message: "The server rechecks approved supplier, quantity, cost, package, and threshold evidence under transaction locks before creating supplier-grouped purchase order drafts. Stock is not changed.",
-                confirmLabel: "Create PO drafts",
-                tone: "primary",
-                action: () =>
-                  poDraftConversionMutation.mutate({
-                    productIds: selectedProductIds,
-                  }),
-              })
-            }
-          >
-            Create PO draft(s)
-          </button>
-          <button
-            style={styles.secondaryButton}
-            type="button"
-            disabled={
-              !canApproveRecommendations ||
-              selectedProductIds.length === 0 || bulkDecisionMutation.isPending
-            }
-            onClick={() =>
-              bulkDecisionMutation.mutate({
-                productIds: selectedProductIds,
-                status: "deferred",
-                note: bulkDecisionNote,
-              })
-            }
-          >
-            Bulk defer
-          </button>
-          <button
-            style={styles.dangerButton}
-            type="button"
-            disabled={
-              !canApproveRecommendations ||
-              selectedProductIds.length === 0 || bulkDecisionMutation.isPending
-            }
-            onClick={() =>
-              requestConfirmation({
-                title: `Reject ${selectedProductIds.length} recommendation(s)?`,
-                message: "This records a rejection decision for every selected recommendation.",
-                confirmLabel: "Bulk reject",
-                tone: "danger",
-                action: () =>
-                  bulkDecisionMutation.mutate({
-                    productIds: selectedProductIds,
-                    status: "rejected",
-                    note: bulkDecisionNote,
-                  }),
-              })
-            }
-          >
-            Bulk reject
-          </button>
-        </div>
-      </section>
-
-      {recommendationsQuery.isLoading ? (
-        <div style={styles.infoBox}>Loading procurement recommendations...</div>
-      ) : null}
-      {recommendationsQuery.isError ? (
-        <div style={styles.errorBox}>
-          {getErrorMessage(recommendationsQuery.error)}
-        </div>
-      ) : null}
-      {exportFilteredMutation.isError ? (
-        <div style={styles.errorBox}>Filtered export failed: {getErrorMessage(exportFilteredMutation.error)}</div>
-      ) : null}
-
-      <section style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>Recommendation queue</h2>
-            <p style={styles.panelSubtitle}>
-              {formatNumber(totalRows, 0)} matching active recommendation(s) · showing{" "}
-              {formatNumber(rows.length ? filters.offset + 1 : 0, 0)}–{formatNumber(filters.offset + rows.length, 0)}
-            </p>
-          </div>
-          <div style={styles.paginationControls}>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={rows.length === 0 || exportFilteredMutation.isPending}
-              onClick={() => exportFilteredMutation.mutate()}
-            >
-              {exportFilteredMutation.isPending ? "Preparing export..." : "Export filtered CSV"}
-            </button>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={selectedRows.length === 0}
-              onClick={() =>
-                exportRecommendationRowsCsv({
-                  rows: selectedRows,
-                  generatedAt: data?.generated_at,
-                  scope: "selected",
-                })
-              }
-            >
-              Export selected CSV
-            </button>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={!canPrevious}
-              onClick={() =>
-                setFilter("offset", Math.max(0, filters.offset - filters.limit))
-              }
-            >
-              Previous
-            </button>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={!canNext}
-              onClick={() =>
-                setFilter("offset", filters.offset + filters.limit)
-              }
-            >
-              Next
-            </button>
-          </div>
-        </div>
-
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Select</th>
-                <th style={styles.th}>Product</th>
-                <th style={styles.th}>Urgency</th>
-                <th style={styles.th}>Coverage</th>
-                <th style={styles.th}>Threshold</th>
-                <th style={styles.th}>Supply position</th>
-                <th style={styles.th}>Reorder qty</th>
-                <th style={styles.th}>Supplier</th>
-                <th style={styles.th}>Supplier signal</th>
-                <th style={styles.th}>Lead/MOQ</th>
-                <th style={styles.th}>Package governance</th>
-                <th style={styles.th}>Est. cost</th>
-                <th style={styles.th}>Readiness</th>
-                <th style={styles.th}>Decision</th>
-                <th style={styles.th}>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.product_id}
-                  style={{
-                    ...styles.tr,
-                    ...(selectedProductId === row.product_id
-                      ? styles.selectedTr
-                      : {}),
-                  }}
-                >
-                  <td style={styles.td}>
-                    <input
-                      type="checkbox"
-                      checked={selectedProductIds.includes(row.product_id)}
-                      onChange={(event) =>
-                        toggleSelectedProduct(
-                          row.product_id,
-                          event.target.checked,
-                        )
-                      }
-                      aria-label={`Select ${row.product_name}`}
-                    />
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.primaryText}>{row.product_name}</div>
-                    <div style={styles.mutedText}>
-                      {row.category || "Uncategorized"} · {row.unit || "unit"} ·{" "}
-                      {titleCase(row.source_signal)}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <Badge
-                      tone={
-                        row.urgency === "critical"
-                          ? "bad"
-                          : row.urgency === "high" || row.urgency === "medium"
-                            ? "warn"
-                            : "good"
-                      }
-                    >
-                      {titleCase(row.urgency)}
-                    </Badge>
-                  </td>
-                  <td style={styles.td}>
-                    <div>
-                      {row.estimated_days_of_coverage === null
-                        ? "No usage signal"
-                        : `${formatNumber(row.estimated_days_of_coverage)} days`}
-                    </div>
-                    <div style={styles.mutedText}>
-                      Depletion: {row.projected_depletion_date || "-"}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.primaryText}>
-                      Current {formatNumber(row.product_min_stock ?? row.min_stock)} → governed {formatNumber(row.governed_min_stock ?? row.min_stock)}
-                    </div>
-                    <div style={styles.mutedText}>
-                      Calculated {formatNumber(row.system_recommended_min_stock ?? row.calculated_min_stock)} · {formatNumber(toNumber(row.min_stock_confidence_score) * 100, 0)}% evidence
-                    </div>
-                    <div style={styles.mutedText}>{titleCase(row.min_stock_recommendation_status || row.min_stock_direction)}</div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.primaryText}>
-                      Position {formatNumber(row.current_inventory_position ?? row.current_quantity)} {row.unit || ""}
-                    </div>
-                    <div style={styles.mutedText}>
-                      Stock {formatNumber(row.current_quantity)} + reliable inbound {formatNumber(row.reliable_open_inbound_quantity)}
-                    </div>
-                    {toNumber(row.at_risk_open_inbound_quantity) > 0 ? (
-                      <div style={styles.warningText}>{formatNumber(row.at_risk_open_inbound_quantity)} inbound excluded as at risk</div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.primaryText}>
-                      {formatNumber(row.recommended_reorder_quantity)}{" "}
-                      {row.unit || ""}
-                    </div>
-                    <div style={styles.mutedText}>
-                      Target {formatNumber(row.target_stock_quantity)} · before MOQ {formatNumber(row.base_reorder_quantity)}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div>{row.recommended_supplier_name || "-"}</div>
-                    <div style={styles.mutedText}>
-                      {row.supplier_sku
-                        ? `SKU ${row.supplier_sku}`
-                        : titleCase(row.supplier_source)}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div>
-                      <Badge
-                        tone={
-                          row.supplier_selection_confidence === "high"
-                            ? "good"
-                            : row.supplier_selection_confidence === "blocked"
-                              ? "bad"
-                              : "warn"
-                        }
-                      >
-                        {titleCase(
-                          row.supplier_selection_confidence || "unknown",
-                        )}
-                      </Badge>
-                    </div>
-                    <div style={styles.mutedText}>
-                      {titleCase(row.supplier_selection_reason)}
-                    </div>
-                    <div style={styles.mutedText}>
-                      Performance: {titleCase(row.supplier_performance_status)}{" "}
-                      {row.supplier_performance_score !== null &&
-                      row.supplier_performance_score !== undefined
-                        ? `· ${formatNumber(row.supplier_performance_score, 0)}`
-                        : ""}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    {row.lead_time_configured === false
-                      ? "Lead time missing"
-                      : `${formatNumber(row.lead_time_days, 0)} days`} · MOQ{" "}
-                    {formatNumber(row.min_order_quantity)}
-                    {row.lead_time_configured === false ? (
-                      <div style={styles.warningText}>
-                        Using {formatNumber(row.effective_lead_time_days, 0)} effective day(s) plus buffer until configured.
-                      </div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <div>
-                      {row.order_package_name || "Base unit"}
-                      {row.recommended_order_package_count !== null &&
-                      row.recommended_order_package_count !== undefined
-                        ? ` · ${formatNumber(row.recommended_order_package_count, 0)} pack(s)`
-                        : ""}
-                    </div>
-                    <div style={styles.mutedText}>
-                      {formatNumber(row.units_per_order_package || 1)}{" "}
-                      {row.unit || "unit(s)"}/pack
-                    </div>
-                    {row.package_rounding_applied ? (
-                      <div style={styles.warningText}>
-                        Rounded +
-                        {formatNumber(row.package_rounding_added_quantity)}{" "}
-                        {row.unit || ""}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <div>
-                      {formatMoney(row.estimated_total_cost, row.currency)}
-                    </div>
-                    <div style={styles.mutedText}>
-                      {titleCase(row.estimated_cost_source)}
-                    </div>
-                    {row.last_purchase_date ? (
-                      <div style={styles.mutedText}>
-                        Last PO {row.last_purchase_date}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <Badge
-                      tone={
-                        ["over_budget", "currency_mismatch"].includes(row.budget_status || "")
-                          ? "bad"
-                          : row.budget_status === "within_budget"
-                            ? "good"
-                            : "neutral"
-                      }
-                    >
-                      {titleCase(row.budget_status || "not_configured")}
-                    </Badge>
-                    {row.budget_limit ? (
-                      <div style={styles.mutedText}>
-                        Limit {formatMoney(row.budget_limit, row.budget_currency)} · remaining{" "}
-                        {formatMoney(row.budget_remaining_after_recommendation, row.budget_currency)}
-                      </div>
-                    ) : null}
-                    {row.budget_blocker_message ? (
-                      <div style={styles.blockerText}>
-                        {row.budget_blocker_message}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <Badge tone={row.procurement_ready ? "good" : "bad"}>
-                      {row.procurement_ready ? "Supplier assigned" : "Supplier missing"}
-                    </Badge>
-                    {row.blocker_message ? (
-                      <div style={styles.blockerText}>
-                        {row.blocker_message}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <Badge
-                      tone={
-                        row.decision_status === "approved"
-                          ? "good"
-                          : row.decision_status === "rejected"
-                            ? "bad"
-                            : row.decision_status === "deferred"
-                              ? "warn"
-                              : "neutral"
-                      }
-                    >
-                      {titleCase(row.decision_status || "pending")}
-                    </Badge>
-                    {row.decided_at ? (
-                      <div style={styles.mutedText}>
-                        {new Date(row.decided_at).toLocaleString()}
-                      </div>
-                    ) : null}
-                    {row.converted_purchase_order_id ? (
-                      <div style={styles.mutedText}>PO draft created</div>
-                    ) : null}
-                    {!row.converted_purchase_order_id && row.previous_converted_purchase_order_id ? (
-                      <div style={styles.mutedText}>Previous PO {titleCase(row.previous_converted_purchase_order_status || "closed")} · new cycle</div>
-                    ) : null}
-                  </td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.secondaryButton}
-                      type="button"
-                      onClick={() => setSelectedProductId(row.product_id)}
-                    >
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!recommendationsQuery.isLoading && rows.length === 0 ? (
-                <tr>
-                  <td style={styles.emptyCell} colSpan={16}>
-                    No procurement recommendations match the current filters.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>PO draft review workspace</h2>
-            <p style={styles.panelSubtitle}>
-              Review recommendation-generated purchase order drafts before they
-              move through the normal purchase order lifecycle.
-            </p>
-          </div>
-          <div style={styles.actionGroup}>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={!canViewGeneratedPurchaseOrderDrafts || toNumber(poDraftReviewQuery.data?.pagination.total) === 0 || exportPoDraftReviewMutation.isPending}
-              onClick={() => exportPoDraftReviewMutation.mutate()}
-            >
-              {exportPoDraftReviewMutation.isPending ? "Preparing export..." : "Export all PO draft CSV"}
-            </button>
-            <button
-              style={styles.secondaryButton}
-              type="button"
-              disabled={!canViewGeneratedPurchaseOrderDrafts}
-              onClick={() => void poDraftReviewQuery.refetch()}
-            >
-              Refresh drafts
-            </button>
-          </div>
-        </div>
-        {!canViewGeneratedPurchaseOrderDrafts ? (
-          <div style={styles.infoBox}>Purchase order read permission is required to load recommendation-generated PO draft review data.</div>
-        ) : null}
-        {poDraftReviewQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading generated PO drafts...</div>
-        ) : null}
-        {poDraftReviewQuery.isError ? (
-          <div style={styles.errorBox}>
-            {getErrorMessage(poDraftReviewQuery.error)}
-          </div>
-        ) : null}
-        {exportPoDraftReviewMutation.isError ? (
-          <div style={styles.errorBox}>PO draft export failed: {getErrorMessage(exportPoDraftReviewMutation.error)}</div>
-        ) : null}
-        {poDraftReviewQuery.data ? (
-          <>
-            <div style={styles.bulkGrid}>
-              <StatCard
-                label="Loaded drafts"
-                value={formatNumber(
-                  poDraftReviewQuery.data.summary.draft_count,
-                  0,
-                )}
-                tone={
-                  toNumber(poDraftReviewQuery.data.summary.draft_count) > 0
-                    ? "warn"
-                    : undefined
-                }
-              />
-              <StatCard
-                label="Loaded submitted"
-                value={formatNumber(
-                  poDraftReviewQuery.data.summary.submitted_count,
-                  0,
-                )}
-              />
-              <StatCard
-                label="Loaded warnings"
-                value={formatNumber(
-                  poDraftReviewQuery.data.summary.warning_count,
-                  0,
-                )}
-                tone={
-                  toNumber(poDraftReviewQuery.data.summary.warning_count) > 0
-                    ? "bad"
-                    : "good"
-                }
-              />
-              <StatCard
-                label="Loaded spend"
-                value={formatMoneyBreakdown(
-                  poDraftReviewQuery.data.summary.estimated_total_cost_by_currency,
-                  poDraftReviewQuery.data.summary.estimated_total_cost,
-                )}
-              />
-            </div>
-            {toNumber(poDraftReviewQuery.data.summary.warning_count) > 0 ? (
-              <div style={styles.commercialWarningBox}>
-                <strong>Commercial review required:</strong> one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.
-              </div>
-            ) : null}
-            <div style={{ ...styles.tableWrap, marginTop: 12 }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>PO draft</th>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Items</th>
-                    <th style={styles.th}>Estimated spend</th>
-                    <th style={styles.th}>Recommendation linkage</th>
-                    <th style={styles.th}>Warnings</th>
-                    <th style={styles.th}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {poDraftReviewQuery.data.rows.map((po) => (
-                    <tr key={po.purchase_order_id} style={styles.tr}>
-                      <td style={styles.td}>
-                        <div style={styles.primaryText}>{po.po_number}</div>
-                        <div style={styles.mutedText}>
-                          Created{" "}
-                          {po.created_at
-                            ? new Date(po.created_at).toLocaleString()
-                            : "-"}
-                        </div>
-                        <div style={styles.mutedText}>
-                          Expected {po.expected_delivery_date || "not set"}
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        {po.supplier_name || po.supplier_id}
-                      </td>
-                      <td style={styles.td}>
-                        <Badge
-                          tone={
-                            po.status === "draft"
-                              ? "warn"
-                              : po.status === "cancelled"
-                                ? "bad"
-                                : "good"
-                          }
-                        >
-                          {poDraftReviewLabel(po)}
-                        </Badge>
-                      </td>
-                      <td style={styles.td}>
-                        <div>{formatNumber(po.item_count, 0)} item(s)</div>
-                        <div style={styles.mutedText}>
-                          Qty {formatNumber(po.total_quantity)}
-                        </div>
-                        <ul style={styles.reasonList}>
-                          {po.items.slice(0, 3).map((item) => (
-                            <li
-                              key={`${po.purchase_order_id}-${item.product_id}`}
-                            >
-                              {item.product_name || item.product_id}:{" "}
-                              {formatNumber(item.quantity)} @{" "}
-                              {formatMoney(item.unit_cost, po.currency)}
-                              {item.recommendation_key ? (
-                                <div style={styles.mutedText}>
-                                  Recommendation {item.recommendation_key}
-                                </div>
-                              ) : null}
-                            </li>
-                          ))}
-                          {po.items.length > 3 ? (
-                            <li>+{po.items.length - 3} more</li>
-                          ) : null}
-                        </ul>
-                      </td>
-                      <td style={styles.td}>
-                        {formatMoney(po.estimated_total_cost, po.currency)}
-                      </td>
-                      <td style={styles.td}>
-                        <Badge
-                          tone={
-                            po.recommendation_linkage_complete ? "good" : "bad"
-                          }
-                        >
-                          {po.recommendation_linkage_complete
-                            ? "Complete"
-                            : "Incomplete"}
-                        </Badge>
-                        <div style={styles.mutedText}>
-                          {formatNumber(po.linked_recommendation_count, 0)} /{" "}
-                          {formatNumber(po.item_count, 0)} linked
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        {po.governance_warnings.length === 0 ? (
-                          <Badge tone="good">Clear</Badge>
-                        ) : (
-                          <ul style={styles.reasonList}>
-                            {po.governance_warnings.map((warning) => (
-                              <li
-                                key={`${po.purchase_order_id}-${warning.code}`}
-                              >
-                                {warning.message || warning.code}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </td>
-                      <td style={styles.td}>
-                        <button
-                          type="button"
-                          style={styles.primaryButton}
-                          onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
-                        >
-                          Open / Review PO
-                        </button>
-                        {hasPoDraftCostWarning(po) ? (
-                          <div style={styles.blockerText}>Enter positive item costs in Purchase Orders before submitting this draft.</div>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                  {poDraftReviewQuery.data.rows.length === 0 ? (
-                    <tr>
-                      <td style={styles.emptyCell} colSpan={8}>
-                        No recommendation-generated PO drafts found.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-            <div style={styles.paginationFooter}>
-              <span style={styles.mutedText}>
-                Showing {poDraftReviewQuery.data.rows.length ? poDraftOffset + 1 : 0}–{poDraftOffset + poDraftReviewQuery.data.rows.length} of {formatNumber(poDraftReviewQuery.data.pagination.total, 0)} generated purchase order(s)
-              </span>
-              <div style={styles.paginationControls}>
-                <button
-                  type="button"
-                  style={styles.secondaryButton}
-                  disabled={poDraftOffset === 0 || poDraftReviewQuery.isFetching}
-                  onClick={() => setPoDraftOffset(Math.max(0, poDraftOffset - poDraftLimit))}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  style={styles.secondaryButton}
-                  disabled={!poDraftReviewQuery.data.pagination.has_more || poDraftReviewQuery.isFetching}
-                  onClick={() => setPoDraftOffset(poDraftOffset + poDraftLimit)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </>
-        ) : null}
-      </section>
-
-      <section style={styles.detailPanel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>Recommendation detail</h2>
-            <p style={styles.panelSubtitle}>
-              Drawer-style inspection for depletion reasoning, usage velocity,
-              supplier fit, stock snapshot, and PO readiness.
-            </p>
-          </div>
-          {selectedProductId ? (
-            <div style={styles.actionRow}>
-              <button
-                style={styles.secondaryButton}
-                type="button"
-                disabled={!selectedDetail}
-                onClick={() =>
-                  selectedDetail
-                    ? exportRecommendationRowsCsv({
-                        rows: [selectedDetail],
-                        generatedAt: detailQuery.data?.generated_at,
-                        scope: "detail",
-                      })
-                    : undefined
-                }
-              >
-                Export detail CSV
-              </button>
-              <button
-                style={styles.secondaryButton}
-                type="button"
-                onClick={() => setSelectedProductId(null)}
-              >
-                Close
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        {!selectedProductId ? (
-          <div style={styles.infoBox}>
-            Select “Inspect” on a recommendation row to review the procurement
-            evidence package.
-          </div>
-        ) : null}
-        {selectedProductId && detailQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading recommendation detail...</div>
-        ) : null}
-        {selectedProductId && detailQuery.isError ? (
-          <div style={styles.errorBox}>
-            {getErrorMessage(detailQuery.error)}
-          </div>
-        ) : null}
-
-        {selectedDetail ? (
-          <div style={styles.detailGrid}>
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Product</div>
-              <h3 style={styles.detailTitle}>{selectedDetail.product_name}</h3>
-              <p style={styles.riskText}>
-                {selectedDetail.category || "Uncategorized"} ·{" "}
-                {selectedDetail.unit || "unit"} ·{" "}
-                {titleCase(selectedDetail.source_signal)}
-              </p>
-              <Badge tone={selectedDetail.procurement_ready ? "good" : "bad"}>
-                {selectedDetail.procurement_ready ? "Supplier assigned" : "Supplier missing"}
-              </Badge>
-              <p style={styles.riskText}>
-                Execution scope:{" "}
-                {titleCase(
-                  selectedDetail.detail?.execution_scope ||
-                    "product_replenishment",
-                )}
-              </p>
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Depletion reasoning</div>
-              <div style={styles.metricLine}>
-                <strong>ADU:</strong>{" "}
-                {formatNumber(selectedDetail.average_daily_usage)}{" "}
-                {selectedDetail.unit || ""}/day
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Coverage:</strong>{" "}
-                {selectedDetail.estimated_days_of_coverage === null
-                  ? "No usage signal"
-                  : `${formatNumber(selectedDetail.estimated_days_of_coverage)} days`}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Projected depletion:</strong>{" "}
-                {selectedDetail.projected_depletion_date || "-"}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Lead time + buffer:</strong>{" "}
-                {selectedDetail.lead_time_configured === false
-                  ? `Missing lead time · effective ${formatNumber(
-                      toNumber(selectedDetail.effective_lead_time_days),
-                      0,
-                    )} + buffer ${formatNumber(
-                      toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
-                      0,
-                    )} day(s)`
-                  : `${formatNumber(
-                      toNumber(selectedDetail.lead_time_days) +
-                        toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
-                      0,
-                    )} days`}
-              </div>
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Threshold and supply position</div>
-              <div style={styles.metricLine}><strong>Current stock:</strong> {formatNumber(selectedDetail.current_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Current product minimum:</strong> {formatNumber(selectedDetail.product_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Calculated threshold:</strong> {formatNumber(selectedDetail.system_recommended_min_stock ?? selectedDetail.calculated_min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Governed threshold:</strong> {formatNumber(selectedDetail.governed_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Threshold evidence:</strong> {formatNumber(toNumber(selectedDetail.min_stock_confidence_score) * 100, 0)}% · {titleCase(selectedDetail.min_stock_recommendation_status)}</div>
-              <div style={styles.metricLine}><strong>Gross open inbound:</strong> {formatNumber(selectedDetail.gross_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Reliable inbound counted:</strong> {formatNumber(selectedDetail.reliable_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>At-risk inbound excluded:</strong> {formatNumber(selectedDetail.at_risk_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Inventory position:</strong> {formatNumber(selectedDetail.current_inventory_position)} {selectedDetail.unit || ""}</div>
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Separate reorder plan</div>
-              <div style={styles.metricLine}><strong>Target coverage:</strong> {formatNumber(selectedDetail.target_coverage_days ?? detailQuery.data?.target_coverage_days, 0)} days</div>
-              <div style={styles.metricLine}><strong>Target stock:</strong> {formatNumber(selectedDetail.target_stock_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Need before MOQ:</strong> {formatNumber(selectedDetail.base_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>MOQ-adjusted need:</strong> {formatNumber(selectedDetail.moq_adjusted_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Recommended order:</strong> {formatNumber(selectedDetail.recommended_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <p style={styles.riskText}>Package size and MOQ affect this order quantity only; they do not inflate the minimum-stock threshold.</p>
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Budget governance</div>
-              <div style={styles.metricLine}>
-                <strong>Status:</strong>{" "}
-                {titleCase(selectedDetail.budget_status || "not_configured")}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Limit:</strong>{" "}
-                {formatMoney(selectedDetail.budget_limit, selectedDetail.budget_currency)}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Remaining:</strong>{" "}
-                {formatMoney(
-                  selectedDetail.budget_remaining_after_recommendation,
-                  selectedDetail.budget_currency,
-                )}
-              </div>
-              {selectedDetail.budget_blocker_message ? (
-                <p style={styles.blockerText}>
-                  {selectedDetail.budget_blocker_message}
-                </p>
-              ) : null}
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Supplier reasoning</div>
-              <div style={styles.metricLine}>
-                <strong>Supplier:</strong>{" "}
-                {selectedDetail.recommended_supplier_name || "-"}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Confidence:</strong>{" "}
-                {titleCase(selectedDetail.supplier_selection_confidence)}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Reason:</strong>{" "}
-                {titleCase(selectedDetail.supplier_selection_reason)}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Performance:</strong>{" "}
-                {titleCase(selectedDetail.supplier_performance_status)}{" "}
-                {selectedDetail.supplier_performance_score !== null &&
-                selectedDetail.supplier_performance_score !== undefined
-                  ? `· ${formatNumber(selectedDetail.supplier_performance_score, 0)}`
-                  : ""}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Last purchase:</strong>{" "}
-                {selectedDetail.last_purchase_date || "-"} ·{" "}
-                {formatMoney(
-                  selectedDetail.last_purchase_unit_cost,
-                  selectedDetail.last_purchase_currency ||
-                    selectedDetail.currency,
-                )}
-              </div>
-            </div>
-
-            <div style={styles.detailCardWide}>
-              <div style={styles.statLabel}>Approval decision</div>
-              <div style={styles.metricLine}>
-                <strong>Status:</strong>{" "}
-                {titleCase(selectedDetail.decision_status || "pending")}
-              </div>
-              {selectedDetail.decided_at ? (
-                <div style={styles.metricLine}>
-                  <strong>Decided:</strong>{" "}
-                  {new Date(selectedDetail.decided_at).toLocaleString()}
-                </div>
-              ) : null}
-              {selectedDetail.decision_note ? (
-                <div style={styles.metricLine}>
-                  <strong>Last note:</strong> {selectedDetail.decision_note}
-                </div>
-              ) : null}
-              {selectedDetail.converted_purchase_order_id ? (
-                <div style={styles.metricLine}>
-                  <strong>PO draft:</strong>{" "}
-                  <button
-                    type="button"
-                    style={styles.linkButton}
-                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.converted_purchase_order_id as string))}
-                  >
-                    Open in Purchase Orders
-                  </button>
-                  {selectedDetail.converted_at
-                    ? ` · ${new Date(selectedDetail.converted_at).toLocaleString()}`
-                    : ""}
-                </div>
-              ) : null}
-              {selectedDetail.previous_converted_purchase_order_id ? (
-                <div style={styles.infoBox}>
-                  <strong>Previous procurement cycle:</strong>{" "}
-                  <button
-                    type="button"
-                    style={styles.linkButton}
-                    onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.previous_converted_purchase_order_id as string))}
-                  >
-                    Open previous purchase order
-                  </button>
-                  {selectedDetail.previous_converted_purchase_order_status
-                    ? ` · ${titleCase(selectedDetail.previous_converted_purchase_order_status)}`
-                    : ""}
-                  <div style={styles.mutedText}>
-                    That purchase order is closed. The current stock need is a new recommendation cycle and requires a new decision.
-                  </div>
-                </div>
-              ) : null}
-              <label style={{ ...styles.label, marginTop: 10 }}>
-                Decision note
-                <textarea
-                  style={styles.textarea}
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  placeholder="Optional approval, rejection, or defer note"
-                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open)}
-                />
-              </label>
-              {!canApproveRecommendations ? (
-                <div style={styles.infoBox}>Purchase order approval permission is required to approve, defer, or reject this recommendation.</div>
-              ) : null}
-              {decisionMutation.isError ? (
-                <div style={styles.errorBox}>
-                  {getErrorMessage(decisionMutation.error)}
-                </div>
-              ) : null}
-              <div style={styles.actionRow}>
-                <button
-                  style={styles.primaryButton}
-                  type="button"
-                  disabled={
-                    !canApproveRecommendations ||
-                    !selectedDetail.detail?.can_enter_approval_review ||
-                    decisionMutation.isPending
-                  }
-                  onClick={() =>
-                    requestConfirmation({
-                      title: "Approve recommendation?",
-                      message: "The server rechecks approval readiness under a transaction lock, then records the current commercial snapshot. Purchase order creation remains a separate action.",
-                      confirmLabel: "Approve",
-                      tone: "primary",
-                      action: () =>
-                        decisionMutation.mutate({
-                          productId: selectedDetail.product_id,
-                          status: "approved",
-                          note: decisionNote,
-                        }),
-                    })
-                  }
-                >
-                  Approve
-                </button>
-                <button
-                  style={styles.secondaryButton}
-                  type="button"
-                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
-                  onClick={() =>
-                    decisionMutation.mutate({
-                      productId: selectedDetail.product_id,
-                      status: "deferred",
-                      note: decisionNote,
-                    })
-                  }
-                >
-                  Defer
-                </button>
-                <button
-                  style={styles.dangerButton}
-                  type="button"
-                  disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
-                  onClick={() =>
-                    requestConfirmation({
-                      title: "Reject recommendation?",
-                      message: "This records a rejection decision for the current recommendation evidence.",
-                      confirmLabel: "Reject",
-                      tone: "danger",
-                      action: () =>
-                        decisionMutation.mutate({
-                          productId: selectedDetail.product_id,
-                          status: "rejected",
-                          note: decisionNote,
-                        }),
-                    })
-                  }
-                >
-                  Reject
-                </button>
-              </div>
-              {!selectedDetail.detail?.can_enter_approval_review ? (
-                <p style={styles.blockerText}>
-                  Approval is blocked until the current recommendation passes all row-level readiness checks. Review the blockers below.
-                </p>
-              ) : null}
-            </div>
-
-            <div style={styles.detailCardWide}>
-              <div style={styles.statLabel}>Recommendation explanation</div>
-              <ul style={styles.reasonList}>
-                {(selectedDetail.detail?.reasoning || []).map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-                {selectedDetail.detail?.blockers?.map((blocker) => (
-                  <li
-                    key={`${blocker.code}-${blocker.message}`}
-                    style={styles.blockerText}
-                  >
-                    {blocker.message || blocker.code}
-                  </li>
-                ))}
-                {selectedDetail.detail?.warnings?.map((warning) => (
-                  <li key={`warning-${warning.code}-${warning.message}`} style={styles.warningText}>
-                    {warning.message || warning.code}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Cost and conversion</div>
-              <div style={styles.metricLine}>
-                <strong>Unit cost:</strong>{" "}
-                {formatMoney(
-                  selectedDetail.estimated_unit_cost,
-                  selectedDetail.currency,
-                )}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Total cost:</strong>{" "}
-                {formatMoney(
-                  selectedDetail.estimated_total_cost,
-                  selectedDetail.currency,
-                )}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>MOQ:</strong>{" "}
-                {formatNumber(selectedDetail.min_order_quantity)}{" "}
-                {selectedDetail.unit || ""}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Order package:</strong>{" "}
-                {selectedDetail.order_package_name || "Base unit"}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Package count:</strong>{" "}
-                {formatNumber(
-                  selectedDetail.recommended_order_package_count,
-                  0,
-                )}{" "}
-                × {formatNumber(selectedDetail.units_per_order_package || 1)}{" "}
-                {selectedDetail.unit || "unit(s)"}
-              </div>
-              {selectedDetail.package_rounding_applied ? (
-                <div style={styles.metricLine}>
-                  <strong>Package rounding:</strong> +
-                  {formatNumber(selectedDetail.package_rounding_added_quantity)}{" "}
-                  {selectedDetail.unit || ""}
-                </div>
-              ) : null}
-              <div style={styles.metricLine}>
-                <strong>Approval readiness:</strong>{" "}
-                {selectedDetail.detail?.can_enter_approval_review ? "Ready" : "Blocked"}
-              </div>
-              <div style={styles.metricLine}>
-                <strong>Approved and eligible for PO-draft conversion:</strong>{" "}
-                {selectedDetail.detail?.can_generate_po_draft ? "Yes" : "No"}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div>
-            <h2 style={styles.panelTitle}>Highest-risk recommendations</h2>
-            <p style={styles.panelSubtitle}>
-              Prioritized review list for procurement leads before approval
-              automation is added.
-            </p>
-          </div>
-        </div>
-        <div style={styles.riskGrid}>
-          {highestRiskRows.map((row) => (
-            <article key={`risk-${row.product_id}`} style={styles.riskCard}>
-              <div style={styles.riskCardHeader}>
-                <strong>{row.product_name}</strong>
-                <Badge tone={row.urgency === "critical" ? "bad" : "warn"}>
-                  {titleCase(row.urgency)}
-                </Badge>
-              </div>
-              <p style={styles.riskText}>
-                {row.estimated_days_of_coverage === null
-                  ? "Coverage cannot be projected."
-                  : `${formatNumber(row.estimated_days_of_coverage)} days of coverage remain.`}
-              </p>
-              <p style={styles.riskText}>
-                Recommend {formatNumber(row.recommended_reorder_quantity)}{" "}
-                {row.unit || "units"} from{" "}
-                {row.recommended_supplier_name || "unassigned supplier"}.
-              </p>
-              <p style={styles.riskText}>
-                Supplier confidence:{" "}
-                {titleCase(row.supplier_selection_confidence || "unknown")} ·{" "}
-                {titleCase(row.supplier_performance_status || "unknown")}.
-              </p>
-              {row.package_rounding_applied ? (
-                <p style={styles.riskText}>
-                  Package governance rounded the order to{" "}
-                  {formatNumber(row.recommended_order_package_count, 0)}{" "}
-                  pack(s).
-                </p>
-              ) : null}
-            </article>
-          ))}
-          {!recommendationsQuery.isLoading && highestRiskRows.length === 0 ? (
-            <div style={styles.infoBox}>
-              No active high-risk recommendations to summarize.
-            </div>
-          ) : null}
-        </div>
-      </section>
+      </div>
 
       {confirmation ? (
         <div style={styles.modalBackdrop} role="presentation" onMouseDown={() => setConfirmation(null)}>

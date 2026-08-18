@@ -26,6 +26,7 @@ const operationalPages = [
   'src/pages/ExecutionRequestsPage.tsx',
   'src/pages/AutomationSchedulesPage.tsx',
   'src/pages/PurchaseOrdersPage.tsx',
+  'src/pages/ProcurementRecommendationsPage.tsx',
 ];
 
 const tabbedPages = [
@@ -41,6 +42,7 @@ const tabbedPages = [
   'src/pages/ExecutionRequestsPage.tsx',
   'src/pages/AutomationSchedulesPage.tsx',
   'src/pages/PurchaseOrdersPage.tsx',
+  'src/pages/ProcurementRecommendationsPage.tsx',
 ];
 
 const pageRootTokens = new Map([
@@ -65,7 +67,8 @@ const pageRootTokens = new Map([
   ['src/pages/InventoryReservationsPage.tsx', 'io-reservations-page'],
   ['src/pages/ExecutionRequestsPage.tsx', 'io-execution-requests-page'],
   ['src/pages/AutomationSchedulesPage.tsx', 'automation-schedules-page'],
-  ['src/pages/PurchaseOrdersPage.tsx', 'purchase-orders-page']
+  ['src/pages/PurchaseOrdersPage.tsx', 'purchase-orders-page'],
+  ['src/pages/ProcurementRecommendationsPage.tsx', 'procurement-recommendations-page']
 ]);
 
 const statsPages = [
@@ -89,6 +92,7 @@ const statsPages = [
   'src/pages/ExecutionRequestsPage.tsx',
   'src/pages/AutomationSchedulesPage.tsx',
   'src/pages/PurchaseOrdersPage.tsx',
+  'src/pages/ProcurementRecommendationsPage.tsx',
   'src/pages/products/ProductSummaryStatsPanel.tsx'
 ];
 
@@ -113,7 +117,8 @@ const topOrderStatsMarkers = new Map([
   ['src/pages/InventoryReservationsPage.tsx', '<OperationalWorkspaceStats'],
   ['src/pages/ExecutionRequestsPage.tsx', '<OperationalWorkspaceStats'],
   ['src/pages/AutomationSchedulesPage.tsx', '<OperationalWorkspaceStats'],
-  ['src/pages/PurchaseOrdersPage.tsx', '<OperationalWorkspaceStats']
+  ['src/pages/PurchaseOrdersPage.tsx', '<OperationalWorkspaceStats'],
+  ['src/pages/ProcurementRecommendationsPage.tsx', '<OperationalWorkspaceStats']
 ]);
 
 const requiredSharedFiles = [

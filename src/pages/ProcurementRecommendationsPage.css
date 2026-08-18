@@ -1,0 +1,207 @@
+.procurement-recommendations-page {
+  min-width: 0;
+}
+
+.procurement-recommendations-page * {
+  box-sizing: border-box;
+}
+
+.procurement-recommendations-scroll-anchor {
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.procurement-recommendations-scroll-anchor > section {
+  min-width: 0;
+}
+
+.procurement-recommendations-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.procurement-recommendations-primary-filters,
+.procurement-recommendations-advanced-filter-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.procurement-recommendations-primary-filters {
+  grid-template-columns: minmax(260px, 1.5fr) repeat(3, minmax(160px, 0.85fr));
+}
+
+.procurement-recommendations-advanced-filter-grid {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+.procurement-recommendations-advanced-filters {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.procurement-recommendations-advanced-filters > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.procurement-recommendations-advanced-filters > summary::-webkit-details-marker {
+  display: none;
+}
+
+.procurement-recommendations-advanced-filters > summary::before {
+  content: '›';
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.procurement-recommendations-advanced-filters[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.procurement-recommendations-advanced-filter-grid {
+  padding: 0 12px 12px;
+}
+
+.procurement-recommendations-helper-note {
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 11px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.procurement-recommendations-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.procurement-recommendations-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.procurement-recommendations-table th,
+.procurement-recommendations-table td {
+  padding: 11px 9px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: top;
+  text-align: left;
+}
+
+.procurement-recommendations-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.procurement-recommendations-table td {
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.procurement-recommendations-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.procurement-recommendations-table tbody tr.is-selected td {
+  background: #eff6ff;
+}
+
+.procurement-recommendations-product-name,
+.procurement-recommendations-cell-main {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.procurement-recommendations-product-name {
+  max-width: 190px;
+  overflow-wrap: anywhere;
+}
+
+.procurement-recommendations-cell-note,
+.procurement-recommendations-cell-warning,
+.procurement-recommendations-cell-blocker {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.procurement-recommendations-cell-note {
+  color: #64748b;
+}
+
+.procurement-recommendations-cell-warning {
+  color: #b45309;
+}
+
+.procurement-recommendations-cell-blocker {
+  max-width: 190px;
+  color: #b91c1c;
+}
+
+.procurement-recommendations-empty-cell {
+  padding: 28px !important;
+  color: #64748b !important;
+  text-align: center !important;
+}
+
+.procurement-recommendations-page .app-button--compact {
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.procurement-recommendations-page details[style] > summary {
+  outline: none;
+}
+
+@media (max-width: 1180px) {
+  .procurement-recommendations-primary-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .procurement-recommendations-advanced-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .procurement-recommendations-hero-actions {
+    justify-content: flex-start;
+  }
+
+  .procurement-recommendations-primary-filters,
+  .procurement-recommendations-advanced-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
