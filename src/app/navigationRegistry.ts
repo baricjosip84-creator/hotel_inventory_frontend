@@ -228,7 +228,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/inventory-capabilities',
         label: 'Advanced Inventory',
-        description: 'Manage integrations, serials, UoM, custom fields, landed cost, variants, hierarchy, BOMs, and offline mobile foundations.',
+        description: 'Configure serial tracking, units, custom fields, landed cost, variants, warehouse structure, integrations, and assemblies.',
         section: 'Inventory operations',
         permission: TENANT_PERMISSIONS.PRODUCTS_READ
       },

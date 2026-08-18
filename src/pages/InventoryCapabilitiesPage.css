@@ -1,0 +1,207 @@
+.io-advanced-inventory-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.io-advanced-inventory-page .section {
+  min-width: 0;
+}
+
+.io-advanced-inventory-page .capability-overview-card {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 28px rgba(15, 23, 42, 0.04);
+}
+
+.io-advanced-inventory-page .capability-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.io-advanced-inventory-page .capability-summary-card {
+  min-height: 116px;
+  box-shadow: none;
+  background: #ffffff;
+}
+
+.io-advanced-inventory-page .capability-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  overflow-x: auto;
+  flex-wrap: nowrap !important;
+  width: 100%;
+  scrollbar-width: thin;
+}
+
+.io-advanced-inventory-page .capability-tabs .button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.io-advanced-inventory-page .card {
+  min-width: 0;
+}
+
+.io-advanced-inventory-page .card > h3:first-child,
+.io-advanced-inventory-page .card > h4:first-child {
+  margin-top: 0;
+}
+
+.io-advanced-inventory-page label {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.io-advanced-inventory-page label > input:not([type='checkbox']):not([type='radio']),
+.io-advanced-inventory-page label > select,
+.io-advanced-inventory-page form > input:not([type='checkbox']):not([type='radio']),
+.io-advanced-inventory-page form > select,
+.io-advanced-inventory-page .card > select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin-top: 6px;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 500;
+}
+
+.io-advanced-inventory-page form > input:not([type='checkbox']):not([type='radio']),
+.io-advanced-inventory-page form > select {
+  margin-top: 0;
+}
+
+.io-advanced-inventory-page input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0 7px 0 0;
+  vertical-align: -3px;
+}
+
+.io-advanced-inventory-page input:disabled,
+.io-advanced-inventory-page select:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.io-advanced-inventory-page fieldset legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.io-advanced-inventory-page table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.io-advanced-inventory-page th,
+.io-advanced-inventory-page td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #e2e8f0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.io-advanced-inventory-page th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.io-advanced-inventory-page tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.io-advanced-inventory-page .capability-empty-cell {
+  padding: 22px 14px;
+  text-align: center;
+  color: #64748b;
+  font-weight: 500;
+  background: #ffffff;
+}
+
+.io-advanced-inventory-page .capability-help {
+  margin-top: 0;
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+
+.io-advanced-inventory-page .capability-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 9px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.io-advanced-inventory-page .capability-result {
+  align-self: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.io-advanced-inventory-page .capability-base-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.io-advanced-inventory-page .capability-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.io-advanced-inventory-page .capability-cost-actions {
+  align-self: end;
+  min-width: 0;
+}
+
+.io-advanced-inventory-page .form-error,
+.io-advanced-inventory-page .form-success {
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .io-advanced-inventory-page .capability-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .io-advanced-inventory-page .capability-tabs {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .io-advanced-inventory-page .capability-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
