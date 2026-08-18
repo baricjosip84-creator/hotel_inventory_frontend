@@ -410,28 +410,34 @@ export default function StorageLocationsPage() {
       <div className="app-grid-stats" style={styles.statsGrid}>
         <StatCard
           title="Active Locations"
-          value={summary.active}
+          value={locationsQuery.isLoading ? '—' : summary.active}
           subtitle="Available to current inventory workflows"
         />
         <StatCard
           title="Locations With Stock"
-          value={summary.withStock}
+          value={locationsQuery.isLoading ? '—' : summary.withStock}
           subtitle="At least one stock position has a non-zero balance"
-          tone={summary.withStock > 0 ? 'good' : 'default'}
+          tone={!locationsQuery.isLoading && summary.withStock > 0 ? 'good' : 'default'}
         />
         <StatCard
           title="Empty Locations"
-          value={summary.empty}
+          value={locationsQuery.isLoading ? '—' : summary.empty}
           subtitle="No non-zero stock; active work may still block retirement"
-          tone={summary.empty > 0 ? 'good' : 'default'}
         />
         <StatCard
-          title="Zone Needs Review"
-          value={summary.zonesNeedingReview}
-          subtitle="Missing or outside the recommended condition labels"
-          tone={summary.zonesNeedingReview > 0 ? 'warn' : 'good'}
+          title="Condition Labels to Review"
+          value={locationsQuery.isLoading ? '—' : summary.zonesNeedingReview}
+          subtitle="Missing or outside the recommended storage-condition labels"
+          tone={!locationsQuery.isLoading && summary.zonesNeedingReview > 0 ? 'warn' : 'good'}
         />
       </div>
+
+      {!locationsQuery.isLoading && !locationsQuery.isError && summary.zonesNeedingReview > 0 ? (
+        <div className="app-info-state" style={styles.classificationGuide}>
+          <strong>{summary.zonesNeedingReview} {summary.zonesNeedingReview === 1 ? 'location needs' : 'locations need'} condition-label review.</strong>{' '}
+          The location name should identify where stock is kept; the condition label should describe the storage environment, such as Ambient, Chilled, Refrigerated, or Frozen. Custom labels remain allowed and do not block normal operations.
+        </div>
+      ) : null}
 
       {!canManageStorageLocations ? (
         <div className="app-warning-state" style={styles.warningBox}>
@@ -478,7 +484,7 @@ export default function StorageLocationsPage() {
           </div>
 
           <div>
-            <label htmlFor="storage-location-temperature-zone" style={styles.label}>Temperature / Condition Zone</label>
+            <label htmlFor="storage-location-temperature-zone" style={styles.label}>Storage Condition</label>
             <input
               id="storage-location-temperature-zone"
               list="storage-location-temperature-zone-options"
@@ -553,7 +559,7 @@ export default function StorageLocationsPage() {
           </div>
 
           <div>
-            <label htmlFor="storage-location-zone-filter" style={styles.label}>Temperature / condition zone</label>
+            <label htmlFor="storage-location-zone-filter" style={styles.label}>Storage condition</label>
             <select
               id="storage-location-zone-filter"
               value={zoneFilter}
@@ -605,7 +611,7 @@ export default function StorageLocationsPage() {
                 <thead>
                   <tr>
                     <th style={styles.th}>Name</th>
-                    <th style={styles.th}>Temperature / Condition</th>
+                    <th style={styles.th}>Storage Condition</th>
                     <th style={styles.th}>Stock Use</th>
                     <th style={styles.th}>Created</th>
                     <th style={styles.th}>Actions</th>
@@ -991,6 +997,10 @@ const styles: Record<string, CSSProperties> = {
   },
   warningBox: {
     marginBottom: '16px'
+  },
+  classificationGuide: {
+    marginBottom: '16px',
+    lineHeight: 1.5
   },
   successBox: {
     marginBottom: '14px'
