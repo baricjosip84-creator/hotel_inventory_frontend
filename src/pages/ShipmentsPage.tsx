@@ -6,6 +6,15 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 
 /**
  * ============================================================================
@@ -242,6 +251,8 @@ type SupplierEmailPreview = {
     }>;
   };
 };
+
+type ShipmentWorkspaceSection = 'overview' | 'shipments' | 'create' | 'receiving' | 'advanced';
 
 type PendingAutoReceive = {
   itemId: string;
@@ -596,6 +607,7 @@ export default function ShipmentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
 
+  const [workspaceSection, setWorkspaceSection] = useState<ShipmentWorkspaceSection>('overview');
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
   const [highlightedItemId, setHighlightedItemId] = useState('');
   const [shipmentSearch, setShipmentSearch] = useState('');
@@ -913,6 +925,29 @@ export default function ShipmentsPage() {
   });
 
   const shipments = useMemo(() => shipmentsQuery.data ?? [], [shipmentsQuery.data]);
+  const shipmentSummary = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return shipments.reduce(
+      (summary, shipment) => {
+        summary.total += 1;
+        if (shipment.status === 'pending') summary.pending += 1;
+        if (shipment.status === 'partial') summary.partial += 1;
+        if (shipment.status === 'received') summary.received += 1;
+
+        if (shipment.status !== 'received' && shipment.delivery_date) {
+          const deliveryDate = new Date(`${shipment.delivery_date.slice(0, 10)}T00:00:00`);
+          if (!Number.isNaN(deliveryDate.getTime()) && deliveryDate < today) {
+            summary.overdue += 1;
+          }
+        }
+
+        return summary;
+      },
+      { total: 0, pending: 0, partial: 0, received: 0, overdue: 0 }
+    );
+  }, [shipments]);
   const shipmentItems = useMemo(() => shipmentItemsQuery.data ?? [], [shipmentItemsQuery.data]);
   const suppliers = useMemo(
     () => shipmentOptionsQuery.data?.suppliers ?? [],
@@ -2071,6 +2106,13 @@ export default function ShipmentsPage() {
     navigate(`/scanner?${scannerParams.toString()}`);
   };
 
+  const jumpToWorkspaceSection = (section: ShipmentWorkspaceSection, elementId: string) => {
+    setWorkspaceSection(section);
+    window.requestAnimationFrame(() => {
+      document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const handleRefreshPage = async () => {
     setPageError(null);
     setPageMessage(null);
@@ -2088,24 +2130,112 @@ export default function ShipmentsPage() {
   };
 
   return (
-    <div className="io-operational-page io-shipments-page">
-      <div style={styles.header}>
-        <div>
-          <h2 style={styles.title}>Inbound Receiving</h2>
-          <p style={styles.description}>
-            Create inbound shipments, add shipment items, receive lines partially
-            or fully, and finalize only when all shortages are documented.
-          </p>
-        </div>
-        <button
-          type="button"
-          style={styles.secondaryButton}
-          onClick={handleRefreshPage}
-          disabled={shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching}
-        >
-          {shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching ? 'Refreshing...' : 'Refresh page'}
-        </button>
+    <div className="io-operational-page io-workspace-page io-shipments-page">
+      <div id="shipments-overview">
+        <OperationalWorkspaceHero
+          iconPath="/shipments"
+          eyebrow="Procurement"
+          title="Inbound shipments"
+          description="Receive supplier deliveries into inventory, keep partial receipts visible, document shortages, and finalize only when the shipment record is complete."
+          meta={
+            <>
+              <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+              <OperationalWorkspaceMetaPill>Receiving updates stock</OperationalWorkspaceMetaPill>
+              <OperationalWorkspaceMetaPill>Purchase-order aware</OperationalWorkspaceMetaPill>
+            </>
+          }
+          aside={
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={handleRefreshPage}
+              disabled={shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching}
+            >
+              {shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching ? 'Refreshing...' : 'Refresh'}
+            </button>
+          }
+        />
       </div>
+
+      <OperationalWorkspaceStats ariaLabel="Shipment receiving summary">
+        <OperationalWorkspaceStatCard
+          label="Total shipments"
+          value={shipmentSummary.total}
+          helper="Current tenant shipment records"
+          tone="neutral"
+          iconPath="/shipments"
+          loading={shipmentsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Awaiting receiving"
+          value={shipmentSummary.pending}
+          helper="Created but not yet received"
+          tone={shipmentSummary.pending ? 'warn' : 'good'}
+          iconPath="/alerts"
+          loading={shipmentsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Partially received"
+          value={shipmentSummary.partial}
+          helper="Still waiting for remaining quantity"
+          tone={shipmentSummary.partial ? 'warn' : 'good'}
+          iconPath="/shipments"
+          loading={shipmentsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Completed"
+          value={shipmentSummary.received}
+          helper="Finalized receiving records"
+          tone="good"
+          iconPath="/shipments"
+          loading={shipmentsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Overdue"
+          value={shipmentSummary.overdue}
+          helper="Open shipments past delivery date"
+          tone={shipmentSummary.overdue ? 'danger' : 'good'}
+          iconPath="/alerts"
+          loading={shipmentsQuery.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Shipment work areas" hint="Jump to the part of the receiving workflow you need.">
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'overview'}
+          iconPath="/dashboard"
+          label="Overview"
+          onClick={() => jumpToWorkspaceSection('overview', 'shipments-overview')}
+        />
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'shipments'}
+          iconPath="/shipments"
+          label="Shipment list"
+          count={filteredShipments.length}
+          onClick={() => jumpToWorkspaceSection('shipments', 'shipments-list')}
+        />
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'create'}
+          iconPath="/purchase-orders"
+          label="Create shipment"
+          onClick={() => jumpToWorkspaceSection('create', 'shipments-create')}
+        />
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'receiving'}
+          iconPath="/scanner"
+          label="Receive & finalize"
+          count={selectedShipment ? 1 : undefined}
+          onClick={() => jumpToWorkspaceSection('receiving', 'shipments-detail')}
+        />
+        {canAutoReorderShipments ? (
+          <OperationalWorkspaceTab
+            active={workspaceSection === 'advanced'}
+            iconPath="/admin-system"
+            label="Advanced"
+            onClick={() => jumpToWorkspaceSection('advanced', 'shipments-advanced')}
+          />
+        ) : null}
+      </OperationalWorkspaceTabs>
 
       {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
       {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
@@ -2132,12 +2262,12 @@ export default function ShipmentsPage() {
         <div style={styles.warningBox}>
           Current access role: {accessRoleLabel}.{' '}
           {[
-            !canManageShipments ? 'Shipment creation and header changes require shipments.write.' : null,
-            !canManageShipmentItems ? 'Ordered shipment-line changes require shipment_items.write.' : null,
-            !canFinalizeShipments ? 'Finalization requires shipments.finalize.' : null,
+            !canManageShipments ? 'This role cannot create or edit shipment headers.' : null,
+            !canManageShipmentItems ? 'This role cannot change ordered shipment lines.' : null,
+            !canFinalizeShipments ? 'This role cannot finalize shipments.' : null,
             canReceiveShipments
-              ? 'Receiving remains available through shipments.receive.'
-              : 'Receiving requires shipments.receive.'
+              ? 'Receiving is available.'
+              : 'This role cannot receive stock from shipments.'
           ].filter(Boolean).join(' ')}
         </div>
       ) : null}
@@ -2148,175 +2278,14 @@ export default function ShipmentsPage() {
         </div>
       ) : null}
 
-      {canAutoReorderShipments ? (
-        <details style={styles.advancedPanel}>
-          <summary style={styles.advancedSummary}>Direct shipment reorder (legacy)</summary>
-          <p style={styles.panelSubtitle}>
-            This directly creates pending shipment records from low-stock rules. It does not create or approve a Purchase Order. Use Procurement Recommendations or Replenishment Planning for the governed planning workflows.
-          </p>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={handleAutoReorderShipments}
-            disabled={autoReorderShipmentMutation.isPending}
-          >
-            {autoReorderShipmentMutation.isPending ? 'Running direct reorder...' : 'Run direct reorder'}
-          </button>
-        </details>
-      ) : null}
-
-      <section style={styles.panel}>
-        <h3 style={styles.panelTitle}>Create Shipment</h3>
-
-        {!canManageShipments ? (
-          <div style={styles.readOnlyNotice}>
-            This role can review shipments but cannot create or edit shipment headers.
-          </div>
-        ) : (
-        <form
-          onSubmit={handleCreateShipment}
-          style={styles.formGrid}
-          data-skip-global-action-feedback="true"
-        >
-          <div>
-            <label style={styles.label}>Supplier</label>
-            <select
-              style={styles.input}
-              value={shipmentForm.supplier_id}
-              onChange={(event) =>
-                setShipmentForm((current) => ({
-                  ...current,
-                  supplier_id: event.target.value,
-                  purchase_order_id: ''
-                }))
-              }
-              required
-            >
-              <option value="">Select supplier</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={styles.label}>Delivery Date</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={shipmentForm.delivery_date}
-              onChange={(event) =>
-                setShipmentForm((current) => ({
-                  ...current,
-                  delivery_date: event.target.value
-                }))
-              }
-              required
+      <div style={styles.twoColumnGrid}>
+        <div id="shipments-list" style={styles.panel}>
+          <div style={styles.sectionHeaderWrap}>
+            <OperationalSectionHeader
+              iconPath="/shipments"
+              title="Shipment List"
+              description="Find an inbound shipment, review its receiving state, and open it for line receiving or finalization."
             />
-          </div>
-
-          <div>
-            <label style={styles.label}>PO Number</label>
-            <input
-              style={styles.input}
-              type="text"
-              value={shipmentForm.po_number}
-              onChange={(event) =>
-                setShipmentForm((current) => ({
-                  ...current,
-                  po_number: event.target.value
-                }))
-              }
-              placeholder="Optional purchase order number"
-              maxLength={100}
-            />
-          </div>
-
-          {purchaseOrdersFeatureReady ? (
-          <div>
-            <div style={styles.fieldLabelRow}>
-              <label style={styles.labelInline}>Linked Purchase Order</label>
-              <span
-                style={styles.infoBadge}
-                role="note"
-                tabIndex={0}
-                aria-label="Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic."
-                title="Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic."
-              >
-                i
-              </span>
-            </div>
-            <select
-              style={styles.input}
-              value={shipmentForm.purchase_order_id}
-              onChange={(event) => {
-                const purchaseOrderId = event.target.value;
-                const selectedOrder = approvedPurchaseOrders.find((order) => order.id === purchaseOrderId);
-
-                setShipmentForm((current) => ({
-                  ...current,
-                  purchase_order_id: purchaseOrderId,
-                  supplier_id: selectedOrder?.supplier_id || current.supplier_id,
-                  po_number: selectedOrder?.po_number || current.po_number
-                }));
-              }}
-            >
-              <option value="">No linked PO yet</option>
-              {linkablePurchaseOrders.map((order) => (
-                <option key={order.id} value={order.id}>
-                  {order.po_number} · {order.supplier_name || order.supplier_id}
-                  {order.expected_delivery_date ? ` · ${formatDate(order.expected_delivery_date)}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          ) : null}
-
-          <div style={styles.formActionRow}>
-            <span style={styles.actionLabelSpacer} aria-hidden="true">Action</span>
-            <button
-              type="submit"
-              style={{
-                ...styles.primaryButton,
-                ...(!canSubmitCreateShipment ? styles.primaryButtonDisabled : {})
-              }}
-              disabled={!canSubmitCreateShipment}
-              title={
-                !canManageShipments
-                  ? 'Shipments write permission required'
-                  : !shipmentForm.supplier_id || !shipmentForm.delivery_date
-                    ? 'Select a supplier and delivery date first'
-                    : undefined
-              }
-            >
-              {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
-            </button>
-            {!shipmentForm.supplier_id || !shipmentForm.delivery_date ? (
-              <p style={styles.formActionHint}>
-                Select a supplier and delivery date before creating a shipment.
-              </p>
-            ) : null}
-          </div>
-        </form>
-        )}
-      </section>
-
-      <section
-        style={{
-          ...styles.twoColumnGrid,
-          gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 420px) minmax(0, 1fr)'
-        }}
-      >
-        <div style={styles.panel}>
-          <div style={styles.shipmentListHeader}>
-            <div>
-              <h3 style={styles.panelTitle}>Shipment List</h3>
-              <p style={styles.panelSubtitle}>
-                Filter shipments and select one for line management and receiving.
-              </p>
-            </div>
           </div>
 
           <div
@@ -2465,14 +2434,157 @@ export default function ShipmentsPage() {
           ) : null}
         </div>
 
-        <div style={styles.panel}>
-          <div style={styles.shipmentListHeader}>
-            <div>
-              <h3 style={styles.panelTitle}>Selected Shipment</h3>
-              <p style={styles.panelSubtitle}>
-                Add shipment lines, receive stock into locations, document shortages, and finalize the shipment.
-              </p>
+        <section id="shipments-create" style={styles.panel}>
+          <div style={styles.sectionHeaderWrap}>
+            <OperationalSectionHeader
+              iconPath="/shipments"
+              title="Create shipment"
+              description="Create the inbound record first. Supplier, expected delivery, and optional purchase-order linkage can be set before receiving begins."
+            />
+          </div>
+
+          {!canManageShipments ? (
+            <div style={styles.readOnlyNotice}>
+              This role can review shipments but cannot create or edit shipment headers.
             </div>
+          ) : (
+          <form
+            onSubmit={handleCreateShipment}
+            style={styles.formGrid}
+            data-skip-global-action-feedback="true"
+          >
+            <div>
+              <label style={styles.label}>Supplier</label>
+              <select
+                style={styles.input}
+                value={shipmentForm.supplier_id}
+                onChange={(event) =>
+                  setShipmentForm((current) => ({
+                    ...current,
+                    supplier_id: event.target.value,
+                    purchase_order_id: ''
+                  }))
+                }
+                required
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={styles.label}>Delivery Date</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={shipmentForm.delivery_date}
+                onChange={(event) =>
+                  setShipmentForm((current) => ({
+                    ...current,
+                    delivery_date: event.target.value
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>PO Number</label>
+              <input
+                style={styles.input}
+                type="text"
+                value={shipmentForm.po_number}
+                onChange={(event) =>
+                  setShipmentForm((current) => ({
+                    ...current,
+                    po_number: event.target.value
+                  }))
+                }
+                placeholder="Optional purchase order number"
+                maxLength={100}
+              />
+            </div>
+
+            {purchaseOrdersFeatureReady ? (
+            <div>
+              <div style={styles.fieldLabelRow}>
+                <label style={styles.labelInline}>Linked Purchase Order</label>
+                <span
+                  style={styles.infoBadge}
+                  role="note"
+                  tabIndex={0}
+                  aria-label="Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic."
+                  title="Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic."
+                >
+                  i
+                </span>
+              </div>
+              <select
+                style={styles.input}
+                value={shipmentForm.purchase_order_id}
+                onChange={(event) => {
+                  const purchaseOrderId = event.target.value;
+                  const selectedOrder = approvedPurchaseOrders.find((order) => order.id === purchaseOrderId);
+
+                  setShipmentForm((current) => ({
+                    ...current,
+                    purchase_order_id: purchaseOrderId,
+                    supplier_id: selectedOrder?.supplier_id || current.supplier_id,
+                    po_number: selectedOrder?.po_number || current.po_number
+                  }));
+                }}
+              >
+                <option value="">No linked PO yet</option>
+                {linkablePurchaseOrders.map((order) => (
+                  <option key={order.id} value={order.id}>
+                    {order.po_number} · {order.supplier_name || order.supplier_id}
+                    {order.expected_delivery_date ? ` · ${formatDate(order.expected_delivery_date)}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            ) : null}
+
+            <div style={styles.formActionRow}>
+              <span style={styles.actionLabelSpacer} aria-hidden="true">Action</span>
+              <button
+                type="submit"
+                style={{
+                  ...styles.primaryButton,
+                  ...(!canSubmitCreateShipment ? styles.primaryButtonDisabled : {})
+                }}
+                disabled={!canSubmitCreateShipment}
+                title={
+                  !canManageShipments
+                    ? 'Shipments write permission required'
+                    : !shipmentForm.supplier_id || !shipmentForm.delivery_date
+                      ? 'Select a supplier and delivery date first'
+                      : undefined
+                }
+              >
+                {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
+              </button>
+              {!shipmentForm.supplier_id || !shipmentForm.delivery_date ? (
+                <p style={styles.formActionHint}>
+                  Select a supplier and delivery date before creating a shipment.
+                </p>
+              ) : null}
+            </div>
+          </form>
+          )}
+        </section>
+
+        <div id="shipments-detail" style={styles.panel}>
+          <div style={styles.sectionHeaderWrap}>
+            <OperationalSectionHeader
+              iconPath="/scanner"
+              title="Selected Shipment"
+              description="Add shipment lines, receive stock into locations, document shortages, and finalize the shipment."
+            />
           </div>
 
           {!selectedShipment ? (
@@ -2518,10 +2630,6 @@ export default function ShipmentsPage() {
                   }}
                 >
                   <div>
-                    <strong>Shipment ID</strong>
-                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.id}</div>
-                  </div>
-                  <div>
                     <strong>Status</strong>
                     <div>{formatShipmentStatus(selectedShipment.status)}</div>
                   </div>
@@ -2560,16 +2668,34 @@ export default function ShipmentsPage() {
                       </>
                     ) : null}
                   </div>
+                </div>
+              </div>
+
+              <details style={{ ...styles.advancedPanel, marginTop: 14, marginBottom: 0 }}>
+                <summary style={styles.advancedSummary}>Advanced shipment details</summary>
+                <p style={styles.panelSubtitle}>
+                  Internal reference, record version, and QR payload are kept here for support, scanner troubleshooting, or detailed audit work.
+                </p>
+                <div
+                  style={{
+                    ...styles.selectedShipmentGrid,
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))'
+                  }}
+                >
                   <div>
-                    <strong>Version</strong>
+                    <strong>Shipment reference</strong>
+                    <div style={{ wordBreak: 'break-all' }}>{selectedShipment.id}</div>
+                  </div>
+                  <div>
+                    <strong>Record version</strong>
                     <div>{selectedShipment.version}</div>
                   </div>
                   <div>
-                    <strong>QR Code</strong>
+                    <strong>QR payload</strong>
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.qr_code}</div>
                   </div>
                 </div>
-              </div>
+              </details>
 
               {canManageShipments && selectedShipmentIsPending ? (
                 <div style={styles.selectedActionRow}>
@@ -2763,7 +2889,7 @@ export default function ShipmentsPage() {
                   </div>
 
                   <label style={styles.label}>
-                    Default Scan Location
+                    Default receiving location
                     <div style={styles.inlineHint}>Required for barcode scanning and auto-receive</div>
                   </label>
 
@@ -2808,7 +2934,7 @@ export default function ShipmentsPage() {
                     </div>
                   ) : (
                     <div style={styles.scanWarningBanner}>
-                      Default Scan Location required before scanning.
+                      Default receiving location required before scanning.
                     </div>
                   )}
                 </div>
@@ -2963,7 +3089,7 @@ export default function ShipmentsPage() {
                   <h4 style={styles.sectionTitle}>Shipment Items</h4>
 
                   <div style={styles.defaultLocationSummary}>
-                    <strong>Default Scan Location:</strong>{' '}
+                    <strong>Default receiving location:</strong>{' '}
                     {selectedScannerLocationId ? selectedScannerLocationName : 'Not selected'}
                     <div style={styles.inlineHint}>
                       {selectedScannerLocationId
@@ -3189,10 +3315,6 @@ export default function ShipmentsPage() {
                             <strong>Receiving Exceptions</strong>
                             <div>Short {formatQuantity(toNumber(item.shortage_quantity))} · Over {formatQuantity(toNumber(item.overage_quantity))} · Damaged {formatQuantity(toNumber(item.damaged_quantity))} · Rejected {formatQuantity(toNumber(item.rejected_quantity))} · Quarantine {formatQuantity(toNumber(item.quarantine_quantity))}</div>
                           </div>
-                          <div>
-                            <strong>Product ID</strong>
-                            <div style={{ wordBreak: 'break-all' }}>{item.product_id}</div>
-                          </div>
                         </div>
 
                         {canManageShipmentItems && selectedShipmentIsPending ? (
@@ -3416,7 +3538,33 @@ export default function ShipmentsPage() {
             </>
           )}
         </div>
-      </section>
+      </div>
+
+      {canAutoReorderShipments ? (
+        <section id="shipments-advanced" style={styles.panel}>
+          <div style={styles.sectionHeaderWrap}>
+            <OperationalSectionHeader
+              iconPath="/admin-system"
+              title="Advanced shipment controls"
+              description="Less common legacy actions stay separated from the normal receiving workflow."
+            />
+          </div>
+          <details style={{ ...styles.advancedPanel, marginBottom: 0 }}>
+            <summary style={styles.advancedSummary}>Legacy direct reorder</summary>
+            <p style={styles.panelSubtitle}>
+              This older shortcut creates pending shipments directly from low-stock rules. Use Procurement Recommendations or Replenishment Planning for normal governed purchasing.
+            </p>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={handleAutoReorderShipments}
+              disabled={autoReorderShipmentMutation.isPending}
+            >
+              {autoReorderShipmentMutation.isPending ? 'Running direct reorder...' : 'Run direct reorder'}
+            </button>
+          </details>
+        </section>
+      ) : null}
 
       {supplierEmailPreview ? (
         <div style={styles.emailPreviewOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSupplierEmailPreview(); }}>
@@ -3623,7 +3771,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 12,
     padding: 20,
     boxShadow: '0 1px 2px rgba(15,23,42,0.03), 0 8px 24px rgba(15,23,42,0.03)',
-    marginBottom: 20,
+    marginBottom: 0,
     minWidth: 0
   },
   advancedPanel: {
@@ -3861,10 +4009,13 @@ const styles: Record<string, CSSProperties> = {
   twoColumnGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr',
-    gap: 20,
+    gap: 16,
     alignItems: 'start'
   },
   shipmentListHeader: {
+    marginBottom: 16
+  },
+  sectionHeaderWrap: {
     marginBottom: 16
   },
   filterGrid: {
@@ -3874,8 +4025,8 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 16
   },
   shipmentList: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
     gap: 12,
     overflowY: 'visible',
     minWidth: 0
