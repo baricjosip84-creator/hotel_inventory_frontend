@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import './InventoryCapabilitiesPage.css';
 
-type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cost' | 'variants' | 'hierarchy' | 'bom';
+type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cost' | 'variants' | 'hierarchy' | 'bom' | 'mobile';
 
 type Product = { id: string; sku: string; name: string; unit: string; barcode?: string | null; parent_product_id?: string | null };
 type Location = { id: string; name: string; parent_location_id?: string | null; location_type?: string; location_code?: string | null; path?: string; depth?: number; is_pickable?: boolean; stock_quantity?: number | string };
@@ -39,12 +40,14 @@ const TABS: Array<{ key: TabKey; label: string; countKey: string; metricLabel: s
   { key: 'landed-cost', label: 'Landed cost', countKey: 'landed_cost_documents', metricLabel: 'Finalized cost records' },
   { key: 'variants', label: 'Variants', countKey: 'variants', metricLabel: 'Variant products' },
   { key: 'hierarchy', label: 'Location hierarchy', countKey: 'hierarchical_locations', metricLabel: 'Nested locations' },
-  { key: 'bom', label: 'BOM & assemblies', countKey: 'active_boms', metricLabel: 'Active BOMs' }
+  { key: 'bom', label: 'BOM & assemblies', countKey: 'active_boms', metricLabel: 'Active BOMs' },
+  { key: 'mobile', label: 'Offline task mode', countKey: 'mobile_sync_batches', metricLabel: 'Offline sync batches' }
 ];
 
 const panelStyle: CSSProperties = { display: 'grid', gap: 18 };
 const formGridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' };
 const tableWrapStyle: CSSProperties = { overflowX: 'auto', borderRadius: 12 };
+const badgeStyle: CSSProperties = { display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 800 };
 const tabRowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18, padding: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 14, maxWidth: '100%' };
 
 function messageFrom(error: unknown, fallback: string): string {
@@ -94,13 +97,17 @@ export default function InventoryCapabilitiesPage() {
   const canGovernIntegrations = hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN);
   const canAdjustStock = hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
   const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
+  const canUseMobileExecution = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+  const canOpenScanner = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
 
   const visibleTabs = useMemo(() => TABS.filter((item) => {
     if (item.key === 'integrations') return canReadIntegrations;
     if (item.key === 'landed-cost') return canReadShipments;
     if (item.key === 'hierarchy') return canReadLocations;
+    if (item.key === 'mobile') return canUseMobileExecution;
     return true;
-  }), [canReadIntegrations, canReadLocations, canReadShipments]);
+  }), [canReadIntegrations, canReadLocations, canReadShipments, canUseMobileExecution]);
 
   useEffect(() => {
     if (!visibleTabs.some((item) => item.key === tab)) {
@@ -165,6 +172,7 @@ export default function InventoryCapabilitiesPage() {
       {tab === 'variants' && <VariantsPanel products={productsQuery.data || []} canWrite={canWriteProducts} onChanged={() => queryClient.invalidateQueries({ queryKey: ['inventory-capabilities-products'] })} />}
       {tab === 'hierarchy' && canReadLocations && <HierarchyPanel locations={locationsQuery.data || []} canWrite={canWriteLocations} />}
       {tab === 'bom' && <BomPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} canExecute={canAdjustStock && canReadLocations} />}
+      {tab === 'mobile' && canUseMobileExecution && <MobilePanel canOpenScanner={canOpenScanner} />}
     </div>
   );
 }
@@ -672,3 +680,22 @@ function BomPanel({ products, locations, canWrite, canExecute }: { products: Pro
   </section>;
 }
 
+function MobilePanel({ canOpenScanner }: { canOpenScanner: boolean }) {
+  return <section className="section" style={panelStyle}>
+    <div className="section__title">Offline mobile task execution</div>
+    <div className="card">
+      <div className="card__label">Operational mobile mode</div>
+      <h3>Mobile Execution keeps a local task snapshot and queues supported task actions while offline.</h3>
+      <p className="card__subtext capability-help">Operators can start, complete, block, or unblock execution tasks while disconnected. When connectivity returns, queued actions are replayed through the normal task permissions and audit trail. Stock-changing work such as receiving, transfers, counts, and dispatch still requires connectivity so the app does not create conflicting offline inventory ledgers.</p>
+      <div className="capability-action-row">
+        <Link className="button" to="/mobile-execution">Open Mobile Execution</Link>
+        {canOpenScanner ? <Link className="button button--secondary" to="/scanner">Open scanner</Link> : null}
+      </div>
+    </div>
+    <div className="card">
+      <div className="card__label">Installable web app foundation</div>
+      <p className="card__subtext">On supported phones and tablets, the app can be installed from the browser for quicker access to the mobile workflow.</p>
+      <span style={badgeStyle}>Offline queue + server replay</span>
+    </div>
+  </section>;
+}
