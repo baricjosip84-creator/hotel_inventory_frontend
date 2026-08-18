@@ -72,6 +72,13 @@ function executionStatusLabel(value?: string | null): string {
   return label(value);
 }
 
+function workflowSafeguardStatusLabel(value?: string | null): string {
+  if (value === 'complete') return 'Safeguards ready';
+  if (value === 'ready_with_watch_items') return 'Review recommended';
+  if (value === 'needs_fix') return 'Attention required';
+  return value ? label(value) : 'Loading';
+}
+
 const beforeAfterFieldLabels: Record<string, string> = {
   standard_unit_cost: 'Standard Cost',
   standard_cost_updated_at: 'Standard Cost Updated At',
@@ -328,7 +335,7 @@ export default function ExecutionRequestsPage() {
       nextParams.set('request_id', created.id);
       setSearchParams(nextParams, { replace: true });
       await loadRequests();
-      showTenantActionSuccess('System Context review request draft created.');
+      showTenantActionSuccess('Recommendation draft created.');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to create execution request';
       setError(message);
@@ -763,7 +770,7 @@ export default function ExecutionRequestsPage() {
             </button>
             {canCreateExecutionRequests && canViewSystemContext ? (
               <button type="button" className="btn btn-secondary" onClick={createSystemRecommendation} disabled={saving}>
-                Create System Context draft
+                Create recommendation draft
               </button>
             ) : null}
           </div>
@@ -804,9 +811,9 @@ export default function ExecutionRequestsPage() {
           loading={loading && !hardeningSummary}
         />
         <OperationalWorkspaceStatCard
-          label="System Context drafts"
+          label="Recommendation drafts"
           value={summaryCounts.systemContext}
-          helper="Recommendations captured as governed requests"
+          helper="System Context recommendations captured for review"
           tone="slate"
           iconPath="/system-context"
           loading={loading && !hardeningSummary}
@@ -836,7 +843,7 @@ export default function ExecutionRequestsPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'controls'}
           iconPath="/permissions"
-          label="Safety & controls"
+          label="Safeguards"
           onClick={() => navigateWorkspaceSection('controls', 'execution-request-controls')}
         />
       </OperationalWorkspaceTabs>
@@ -939,9 +946,9 @@ export default function ExecutionRequestsPage() {
                 {executionStatuses.map((item) => <option key={item} value={item}>{executionStatusLabel(item)}</option>)}
               </select>
             </label>
-            <label style={styles.fieldWide}>
+            <label style={styles.searchField}>
               <span>Search</span>
-              <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="ID, product, person, type, status, or reason" />
+              <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="Search by ID, product, person, type, status, or reason" />
             </label>
             <div style={styles.filterActions}>
               <button type="button" className="btn btn-secondary" onClick={clearFilters} disabled={saving || (!status && !requestType && !executionStatus && !search)}>Clear filters</button>
@@ -1004,7 +1011,15 @@ export default function ExecutionRequestsPage() {
             <span style={styles.meta}>{visibleStart}–{visibleEnd} of {total}</span>
             <button type="button" className="btn btn-secondary" disabled={loading || saving || !canGoNext} onClick={() => setOffset(offset + limit)}>Next</button>
           </div>
-          {data?.notes?.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+          <div style={styles.queueGuidance}>
+            Approving a request does not apply the change. An authorized user must execute it separately.
+          </div>
+          {data?.notes?.length ? (
+            <details style={styles.technicalNotes}>
+              <summary style={styles.technicalSummary}>Advanced workflow notes</summary>
+              {data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
+            </details>
+          ) : null}
         </section>
       </div>
 
@@ -1110,11 +1125,11 @@ export default function ExecutionRequestsPage() {
       <details id="execution-request-controls" style={styles.governanceDetails}>
         <summary style={styles.governanceSummary}>
           <span style={styles.governanceSummaryCopy}>
-            <strong>Safety & execution controls</strong>
-            <span style={styles.meta}>Approval, duplicate protection, retry rules, and supported request actions</span>
+            <strong>Workflow safeguards</strong>
+            <span style={styles.meta}>Approval rules, duplicate protection, and retry safeguards</span>
           </span>
           <span style={{ ...styles.badge, ...statusTone(hardeningSummary?.module_status === 'needs_fix' ? 'rejected' : hardeningSummary?.module_status === 'complete' ? 'approved' : 'pending_review') }}>
-            {hardeningSummary ? label(hardeningSummary.module_status) : 'Loading'}
+            {workflowSafeguardStatusLabel(hardeningSummary?.module_status)}
           </span>
         </summary>
         <div style={styles.governanceBody}>
@@ -1159,7 +1174,7 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
     return (
       <section style={styles.card}>
         <div style={styles.cardHeader}>
-          <h2 style={styles.cardTitle}>Workflow safety status</h2>
+          <h2 style={styles.cardTitle}>Workflow safeguard status</h2>
           <span style={styles.meta}>Loading…</span>
         </div>
       </section>
@@ -1169,9 +1184,9 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
   return (
     <section style={styles.card}>
       <div style={styles.cardHeader}>
-        <h2 style={styles.cardTitle}>Workflow safety status</h2>
+        <h2 style={styles.cardTitle}>Workflow safeguard status</h2>
         <span style={{ ...styles.badge, ...statusTone(hardeningSummary.module_status === 'complete' ? 'approved' : hardeningSummary.module_status === 'needs_fix' ? 'rejected' : 'pending_review') }}>
-          {label(hardeningSummary.module_status)}
+          {workflowSafeguardStatusLabel(hardeningSummary.module_status)}
         </span>
       </div>
       <p style={styles.note}>{hardeningSummary.closeout_recommendation}</p>
@@ -1435,13 +1450,14 @@ const styles: Record<string, CSSProperties> = {
   badge: { display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, textTransform: 'capitalize', fontSize: '0.75rem', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' },
   filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end', marginTop: '0.95rem' },
+  searchField: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700, gridColumn: 'span 2', minWidth: 0 },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
   fieldWide: { display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#334155', fontSize: '0.85rem', fontWeight: 700 },
   optional: { color: '#94a3b8', fontWeight: 400 },
   createGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' },
   createFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginTop: '0.85rem' },
   currentValuePanel: { display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 'min(100%, 320px)', flex: '1 1 360px', padding: '0.75rem', border: '1px solid #dbeafe', borderRadius: '12px', background: '#eff6ff' },
-  filterActions: { display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' },
+  filterActions: { display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap', gridColumn: '1 / -1', paddingTop: '0.05rem' },
   compactField: { display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#64748b', fontSize: '0.8rem' },
   adapterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem', marginTop: '0.75rem' },
   adapterCard: { border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.45rem' },
@@ -1455,6 +1471,8 @@ const styles: Record<string, CSSProperties> = {
   scrollAnchor: { scrollMarginTop: '1rem' },
   queueHeader: { display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', margin: '1rem 0 0.65rem', paddingTop: '0.9rem', borderTop: '1px solid #e2e8f0' },
   selectionHint: { padding: '0.9rem 1rem', border: '1px dashed #cbd5e1', borderRadius: '14px', background: '#f8fafc', color: '#64748b', fontSize: '0.88rem' },
+  queueGuidance: { marginTop: '0.8rem', padding: '0.7rem 0.8rem', border: '1px solid #dbeafe', borderRadius: '10px', background: '#eff6ff', color: '#475569', fontSize: '0.84rem' },
+  technicalNotes: { marginTop: '0.55rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.55rem' },
   detailFacts: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.55rem 1rem' },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '1rem', minWidth: 0, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
   detailCard: {
