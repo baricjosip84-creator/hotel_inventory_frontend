@@ -772,7 +772,7 @@ export default function AutomationSchedulesPage() {
           </label>
         ) : null}
         <label className="automation-schedules-field" htmlFor={`${idPrefix}-request-status`}>
-          <span>Created request starts as</span>
+          <span>New request status</span>
           <select id={`${idPrefix}-request-status`} value={value.default_status} onChange={(event) => onChange({ ...value, default_status: event.target.value as RequestDefaultStatus })}>
             <option value="draft">Draft</option>
             <option value="pending_review">Pending review</option>
@@ -977,7 +977,7 @@ export default function AutomationSchedulesPage() {
             <div><span>Last run</span><strong>{formatDateTime(selected.last_run_at, scheduleTimezone(selected))}</strong></div>
             <div><span>Created by</span><strong>{selected.created_by_name || 'System / unavailable'}</strong></div>
             <div><span>Updated</span><strong>{formatDateTime(selected.updated_at)}</strong></div>
-            <div><span>Created request starts as</span><strong>{humanize(String(selected.request_defaults?.default_status || 'draft'))}</strong></div>
+            <div><span>New request status</span><strong>{humanize(String(selected.request_defaults?.default_status || 'draft'))}</strong></div>
             <div><span>Automatic execution</span><strong>No</strong></div>
           </div>
 
@@ -1053,7 +1053,7 @@ export default function AutomationSchedulesPage() {
         <OperationalSectionHeader
           iconPath="/reliability-command"
           title="Automation safety"
-          description="Review whether schedules can prepare requests and see recent schedule activity. Technical runner diagnostics remain outside the normal tenant workflow."
+          description="See whether scheduled reviews are available and check recent automation activity."
           actions={<button type="button" className="btn btn-secondary" aria-expanded={governanceOpen} onClick={() => setGovernanceOpen((current) => !current)}>{governanceOpen ? 'Hide details' : 'Show details'}</button>}
         />
 
