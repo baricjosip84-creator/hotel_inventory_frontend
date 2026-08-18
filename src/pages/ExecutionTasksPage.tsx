@@ -2,6 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './ExecutionTasksPage.css';
 
 type ExecutionTaskStatus = 'draft' | 'ready' | 'assigned' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
@@ -12,6 +21,7 @@ type ExecutionTaskBatchStatus = 'draft' | 'released' | 'cancelled';
 type ExecutionTaskBatchType = 'manual' | 'reservation_fulfillment' | 'receiving' | 'replenishment' | 'transfer' | 'mixed';
 type TaskAction = 'ready' | 'start' | 'unblock' | 'complete' | 'cancel' | 'block' | 'assign';
 type BatchAction = 'release' | 'cancel';
+type ExecutionTasksWorkspaceSection = 'overview' | 'queue' | 'create' | 'detail' | 'management';
 
 type ExecutionTaskAuditRow = {
   id: string;
@@ -356,7 +366,9 @@ export default function ExecutionTasksPage() {
   const [searchParams] = useSearchParams();
   const requestedTaskId = searchParams.get('task_id')?.trim() || '';
   const queueRef = useRef<HTMLDivElement | null>(null);
-  const detailRef = useRef<HTMLDivElement | null>(null);
+  const createRef = useRef<HTMLDivElement | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
+  const managementRef = useRef<HTMLDetailsElement | null>(null);
 
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canCreate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CREATE);
@@ -388,6 +400,7 @@ export default function ExecutionTasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ExecutionTasksWorkspaceSection>('overview');
 
   const [statusFilter, setStatusFilter] = useState<ExecutionTaskStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ExecutionTaskType | 'all'>('all');
@@ -634,8 +647,14 @@ export default function ExecutionTasksPage() {
     return location ? `${location.name}${location.is_active ? '' : ' (retired)'}` : `Location ${locationId.slice(0, 8)}…`;
   };
 
+  const navigateWorkspaceSection = (section: ExecutionTasksWorkspaceSection, target: HTMLElement | null) => {
+    setActiveWorkspaceSection(section);
+    window.setTimeout(() => target?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 20);
+  };
+
   const selectTask = (task: ExecutionTask) => {
     setSelected(task);
+    setActiveWorkspaceSection('detail');
     window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
@@ -853,46 +872,67 @@ export default function ExecutionTasksPage() {
   }
 
   return (
-    <main className="execution-tasks-page">
-      <section className="execution-tasks-hero">
-        <div>
-          <p className="execution-tasks-eyebrow">Operations workflow</p>
-          <h2>Operational task queue</h2>
-          <p>Create, assign, start, block, complete, and audit tenant work. These task records coordinate work; they do not by themselves receive, transfer, count, reserve, or consume stock.</p>
-        </div>
-        <div className="execution-tasks-actions">
-          <button type="button" className="btn btn-secondary" disabled={saving || loading} onClick={() => void exportTaskAnalytics()}>Export filtered CSV</button>
-          <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={() => void Promise.all([loadOptions(), loadOperationalData(true), analyticsOpen ? loadAnalytics() : Promise.resolve()])}>Refresh page</button>
-        </div>
-      </section>
+    <main className="execution-tasks-page io-operational-page io-workspace-page" id="execution-tasks-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/execution-tasks"
+        eyebrow="Execution workflow"
+        title="Operational task queue"
+        description="Coordinate tenant work from assignment through completion. Execution tasks organize and evidence the work; stock-changing actions remain governed by their source workflows."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Operational work queue</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>
+              {canCreate || canAssign || canUpdate || canComplete || canCancel ? 'Workflow access' : 'Read-only access'}
+            </OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div className="execution-tasks-actions">
+            <button type="button" className="btn btn-secondary" disabled={saving || loading} onClick={() => void exportTaskAnalytics()}>Export filtered CSV</button>
+            <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={() => void Promise.all([loadOptions(), loadOperationalData(true), analyticsOpen ? loadAnalytics() : Promise.resolve()])}>
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        }
+      />
 
       {message ? <div className="execution-tasks-alert execution-tasks-alert--success" role="status">{message}</div> : null}
       {error ? <div className="execution-tasks-alert execution-tasks-alert--error" role="alert">{error}</div> : null}
 
-      <section className="execution-tasks-summary-grid" aria-label="Task summary">
-        <SummaryCard label="Matching tasks" value={summary.matching_task_count} helper="All statuses under the current filters" />
-        <SummaryCard label="Open" value={summary.open_task_count} helper="Draft through blocked" />
-        <SummaryCard label="Blocked" value={summary.blocked_task_count} helper="Needs a blocker resolved" />
-        <SummaryCard label="Overdue" value={summary.overdue_task_count} helper="Past due or SLA time" />
-        <SummaryCard label="Unassigned" value={summary.unassigned_task_count} helper={`${summary.due_soon_task_count} due within 24 hours`} />
-      </section>
+      <OperationalWorkspaceStats ariaLabel="Task summary">
+        <OperationalWorkspaceStatCard label="Open" value={summary.open_task_count} helper="Work not yet completed or cancelled" tone={summary.open_task_count > 0 ? 'blue' : 'neutral'} iconPath="/execution-tasks" loading={loading} />
+        <OperationalWorkspaceStatCard label="Blocked" value={summary.blocked_task_count} helper="Tasks waiting for a blocker to be resolved" tone={summary.blocked_task_count > 0 ? 'warn' : 'good'} iconPath="/alerts" loading={loading} />
+        <OperationalWorkspaceStatCard label="Overdue" value={summary.overdue_task_count} helper="Past the task due or SLA time" tone={summary.overdue_task_count > 0 ? 'danger' : 'good'} iconPath="/alerts" loading={loading} />
+        <OperationalWorkspaceStatCard label="Unassigned" value={summary.unassigned_task_count} helper={`${summary.due_soon_task_count} due within 24 hours`} tone={summary.unassigned_task_count > 0 ? 'warn' : 'good'} iconPath="/users" loading={loading} />
+        <OperationalWorkspaceStatCard label="Matching tasks" value={summary.matching_task_count} helper="All tasks under the current filters" tone="slate" iconPath="/dashboard" loading={loading} />
+      </OperationalWorkspaceStats>
 
-      <section className="execution-tasks-core-grid">
-        <div className="execution-tasks-card" ref={queueRef}>
-          <div className="execution-tasks-card-header">
-            <div>
-              <h3>Task queue</h3>
-              <p>{priorityQueueMode ? 'Backend priority scoring orders open work by urgency, status, source, and due risk.' : 'Search and filter tenant execution tasks. Select a row to review its detail and evidence.'}</p>
-            </div>
-            <div className="execution-tasks-actions">
-              <button type="button" className={priorityQueueMode ? 'btn btn-primary' : 'btn btn-secondary'} disabled={loading} onClick={() => setPriorityQueueMode((current) => !current)}>{priorityQueueMode ? 'Priority order on' : 'Use priority order'}</button>
-              <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={clearFilters}>Clear filters</button>
-            </div>
-          </div>
+      <OperationalWorkspaceTabs ariaLabel="Execution task work areas" hint="Jump to the part of the task workflow you need.">
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'overview'} iconPath="/dashboard" label="Overview" onClick={() => navigateWorkspaceSection('overview', document.getElementById('execution-tasks-workspace-top'))} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'queue'} iconPath="/execution-tasks" label="Task queue" count={summary.matching_task_count} onClick={() => navigateWorkspaceSection('queue', queueRef.current)} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'create'} iconPath="/execution-requests" label="Create task" onClick={() => navigateWorkspaceSection('create', createRef.current)} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'detail'} iconPath="/audit" label="Task detail" onClick={() => navigateWorkspaceSection('detail', detailRef.current)} disabled={!selected} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'management'} iconPath="/reliability-command" label="Management insights" onClick={() => { setAnalyticsOpen(true); navigateWorkspaceSection('management', managementRef.current); }} />
+      </OperationalWorkspaceTabs>
+
+      <div ref={queueRef} id="execution-task-queue" className="execution-tasks-scroll-anchor">
+        <section className="app-panel execution-tasks-card execution-tasks-section-card">
+          <OperationalSectionHeader
+            iconPath="/execution-tasks"
+            title="Task queue"
+            description={priorityQueueMode ? 'Priority order is active, so open work is ranked by urgency, status, source, and due risk.' : 'Find tenant work, review its status, and open a task for actions and detail.'}
+            actions={
+              <div className="execution-tasks-actions">
+                <button type="button" className={priorityQueueMode ? 'btn btn-primary' : 'btn btn-secondary'} disabled={loading} onClick={() => setPriorityQueueMode((current) => !current)}>{priorityQueueMode ? 'Priority order on' : 'Use priority order'}</button>
+                <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={clearFilters}>Clear filters</button>
+              </div>
+            }
+          />
 
           <div className="execution-tasks-filter-grid">
             <label>Search
-              <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Code, title, description, type, status, source" disabled={priorityQueueMode} />
+              <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search code, title, description, type, status, or source" disabled={priorityQueueMode} />
             </label>
             <label>Status
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ExecutionTaskStatus | 'all')} disabled={priorityQueueMode}>
@@ -963,7 +1003,7 @@ export default function ExecutionTasksPage() {
                   </select>
                 </label>
               </div>
-              <p>Advanced IDs are intended for links from other modules or support investigations. Normal users should use the readable selectors above.</p>
+              <p>These filters are mainly for linked records and support investigations. Most users can work with the readable filters above.</p>
             </details>
           </div>
 
@@ -976,7 +1016,7 @@ export default function ExecutionTasksPage() {
                   <th>Priority</th>
                   <th>Due</th>
                   <th>Assigned to</th>
-                  <th>Score</th>
+                  <th>Due state</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -992,7 +1032,7 @@ export default function ExecutionTasksPage() {
                     <td>{label(task.priority)}</td>
                     <td><span className={task.is_overdue ? 'execution-tasks-text-danger' : ''}>{dateTime(task.sla_due_at || task.due_at)}</span></td>
                     <td>{userLabel(task.assigned_to)}</td>
-                    <td><strong>{task.priority_score ?? '—'}</strong><span>{label(task.due_bucket)}</span></td>
+                    <td><span>{label(task.due_bucket)}</span></td>
                     <td><TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => void runTaskAction(task, action)} onDialogAction={(action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} /></td>
                   </tr>
                 ))}
@@ -1006,51 +1046,53 @@ export default function ExecutionTasksPage() {
             <span>Showing {visibleStart}–{visibleEnd} of {summary.matching_task_count} matching tasks</span>
             <button type="button" className="btn btn-secondary" disabled={loading || !hasNextPage} onClick={() => setOffset(offset + pageSize)}>Next</button>
           </div>
-        </div>
+        </section>
+      </div>
 
-        <aside className="execution-tasks-side-column">
-          {canCreate ? (
-            <section className="execution-tasks-card">
-              <div className="execution-tasks-card-header">
-                <div><h3>Create task</h3><p>Create a coordination record. Use the source module’s own workflow for stock-changing work.</p></div>
+      <div ref={createRef} id="execution-task-create" className="execution-tasks-scroll-anchor">
+        {canCreate ? (
+          <section className="app-panel execution-tasks-card execution-tasks-section-card">
+            <OperationalSectionHeader
+              iconPath="/execution-requests"
+              title="Create operational task"
+              description="Create a coordination record for tenant work. If the work changes stock, use the source module to perform the actual stock transaction."
+            />
+            <div className="execution-tasks-create-grid">
+              <label className="execution-tasks-field-wide">Title<input value={form.title} maxLength={180} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="What needs to be done" /></label>
+              <label className="execution-tasks-field-wide">Description<textarea value={form.description} maxLength={2000} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Optional instructions or context" /></label>
+              <label>Task type<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}</select></label>
+              <label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label>
+              <label>Initial state<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">Draft</option><option value="ready">Ready</option></select></label>
+              <label>Assign to<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">Unassigned</option>{options.active_users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label>
+              <label>Storage location<select value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} disabled={optionsLoading}><option value="">No location</option>{options.active_locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
+              <label>Due at<input type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
+              <label>SLA due at<input type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
+              <div className="execution-tasks-create-action">
+                <span>{createValidation || 'The task is a coordination record and does not change stock by itself.'}</span>
+                <button type="button" className="btn btn-primary" disabled={saving || Boolean(createValidation)} onClick={() => void createTask()}>Create task</button>
               </div>
-              <div className="execution-tasks-form-grid">
-                <label>Title<input value={form.title} maxLength={180} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
-                <label>Description<textarea value={form.description} maxLength={2000} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-                <div className="execution-tasks-two-column">
-                  <label>Task type<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((type) => <option key={type} value={type}>{label(type)}</option>)}</select></label>
-                  <label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority)}</option>)}</select></label>
-                  <label>Initial state<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">Draft</option><option value="ready">Ready</option></select></label>
-                  <label>Assign to<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">Unassigned</option>{options.active_users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label>
-                  <label>Storage location<select value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} disabled={optionsLoading}><option value="">No location</option>{options.active_locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
-                  <label>Due at<input type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
-                  <label>SLA due at<input type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
-                </div>
-                <details className="execution-tasks-advanced-filters">
-                  <summary>Advanced source linkage</summary>
-                  <div className="execution-tasks-form-grid">
-                    <label>Source type<select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as NewTaskForm['source_type'], source_id: event.target.value === 'manual' ? '' : form.source_id })}>{MANUAL_CREATE_SOURCE_TYPES.map((source) => <option key={source} value={source}>{label(source)}</option>)}</select></label>
-                    {form.source_type !== 'manual' ? <label>Source ID<input value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Required tenant-owned source UUID" /></label> : null}
-                    <label>Facility ID<input value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder="Optional facility UUID" /></label>
-                  </div>
-                  <p>For reservation, requisition, purchase-order, shipment, transfer, cycle-count, or replenishment records, prefer creating the task from that source module. The backend verifies that a linked source belongs to this tenant.</p>
-                </details>
-                {createValidation ? <p className="execution-tasks-form-help">{createValidation}</p> : null}
-                <button type="button" className="btn btn-primary" disabled={saving || Boolean(createValidation)} onClick={() => void createTask()}>Create execution task</button>
+            </div>
+            <details className="execution-tasks-advanced-filters execution-tasks-create-advanced">
+              <summary>Advanced source linkage</summary>
+              <div className="execution-tasks-create-grid execution-tasks-create-grid--advanced">
+                <label>Source type<select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value as NewTaskForm['source_type'], source_id: event.target.value === 'manual' ? '' : form.source_id })}>{MANUAL_CREATE_SOURCE_TYPES.map((source) => <option key={source} value={source}>{label(source)}</option>)}</select></label>
+                {form.source_type !== 'manual' ? <label>Source ID<input value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder="Required tenant-owned source UUID" /></label> : null}
+                <label>Facility ID<input value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder="Optional facility UUID" /></label>
               </div>
-            </section>
-          ) : (
-            <section className="execution-tasks-card execution-tasks-readonly-note"><h3>Create task</h3><p>You have read access but not permission to create execution tasks.</p></section>
-          )}
-        </aside>
-      </section>
+              <p>For reservations, requisitions, purchase orders, shipments, transfers, cycle counts, or replenishment, creating the task from that source module is preferred. Linked records are still tenant-checked by the backend.</p>
+            </details>
+          </section>
+        ) : (
+          <section className="app-panel execution-tasks-card execution-tasks-readonly-note"><OperationalSectionHeader iconPath="/execution-requests" title="Create operational task" description="Your role can view execution tasks but cannot create new ones." /></section>
+        )}
+      </div>
 
-      <section ref={detailRef}>
+      <section ref={detailRef} id="execution-task-detail" className="execution-tasks-scroll-anchor">
         <TaskDetail task={selected} auditRows={taskAudit} userLabel={userLabel} locationLabel={locationLabel} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(task, action) => void runTaskAction(task, action)} onDialogAction={(task, action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} />
       </section>
 
-      <details className="execution-tasks-governance" open={analyticsOpen} onToggle={(event) => setAnalyticsOpen((event.currentTarget as HTMLDetailsElement).open)}>
-        <summary><span>Planning, mobile queues, batches, workload, SLA, and optimization</span><span>{analyticsLoading ? 'Loading…' : 'Open management analysis'}</span></summary>
+      <details ref={managementRef} id="execution-task-management" className="execution-tasks-governance execution-tasks-scroll-anchor" open={analyticsOpen} onToggle={(event) => { const open = (event.currentTarget as HTMLDetailsElement).open; setAnalyticsOpen(open); if (open) setActiveWorkspaceSection('management'); }}>
+        <summary><span>Management insights</span><span>{analyticsLoading ? 'Loading…' : 'Workload, SLA, mobile queues, batches, and planning'}</span></summary>
         <div className="execution-tasks-governance-body">
           {analyticsError ? <div className="execution-tasks-alert execution-tasks-alert--warning">Operational task work remains available, but management analysis could not be loaded: {analyticsError}</div> : null}
 
@@ -1123,7 +1165,7 @@ export default function ExecutionTasksPage() {
             <section className="execution-tasks-card">
               <div className="execution-tasks-card-header">
                 <div><h3>Advisory optimization</h3><p>Read-only planning signals. Generating scaffolds creates advisory evidence only; it does not apply recommendations or change tasks.</p></div>
-                <div className="execution-tasks-actions">{canCreateOptimization ? <button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void generateAiRecommendationScaffolds()}>Generate advisory scaffolds</button> : null}<button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void exportOptimizationAnalytics()}>Export optimization CSV</button></div>
+                <div className="execution-tasks-actions">{canCreateOptimization ? <button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void generateAiRecommendationScaffolds()}>Generate planning recommendations</button> : null}<button type="button" className="btn btn-secondary" disabled={saving || !optimizationDashboard} onClick={() => void exportOptimizationAnalytics()}>Export optimization CSV</button></div>
               </div>
               <div className="execution-tasks-summary-grid execution-tasks-summary-grid--compact">
                 <SummaryCard label="Plans" value={optimizationDashboard?.summary.plan_count ?? 0} />
@@ -1192,36 +1234,99 @@ function TaskDetail({ task, auditRows, userLabel, locationLabel, saving, canAssi
   onDirectAction: (task: ExecutionTask, action: 'ready' | 'start' | 'unblock') => void;
   onDialogAction: (task: ExecutionTask, action: 'assign' | 'block' | 'complete' | 'cancel') => void;
 }) {
-  if (!task) return <section className="execution-tasks-card execution-tasks-empty-detail"><h3>Selected task</h3><p>Select a task in the queue to inspect it.</p></section>;
+  if (!task) {
+    return (
+      <section className="app-panel execution-tasks-card execution-tasks-empty-detail">
+        <OperationalSectionHeader iconPath="/audit" title="Task detail" description="Open a task from the queue to review its work details, lifecycle, and history." />
+      </section>
+    );
+  }
   const facts = payloadFacts(task.payload);
   return (
-    <section className="execution-tasks-card execution-tasks-detail-card">
-      <div className="execution-tasks-card-header">
-        <div><p className="execution-tasks-eyebrow">Selected task</p><h3>{task.task_code} · {task.title}</h3><p>{task.description || 'No task description was recorded.'}</p></div>
-        <StatusPill status={task.status} />
+    <section className="app-panel execution-tasks-card execution-tasks-detail-card">
+      <OperationalSectionHeader
+        iconPath="/audit"
+        title={`${task.task_code} · ${task.title}`}
+        description={task.description || 'No task description was recorded.'}
+        actions={<StatusPill status={task.status} />}
+      />
+
+      <div className="execution-tasks-detail-actions">
+        <TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => onDirectAction(task, action)} onDialogAction={(action) => onDialogAction(task, action)} />
       </div>
-      <TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => onDirectAction(task, action)} onDialogAction={(action) => onDialogAction(task, action)} />
+
       <div className="execution-tasks-detail-grid">
         <KeyValue title="Type" value={label(task.task_type)} />
         <KeyValue title="Priority" value={label(task.priority)} />
         <KeyValue title="Assigned to" value={userLabel(task.assigned_to)} />
         <KeyValue title="Storage location" value={locationLabel(task.storage_location_id)} />
         <KeyValue title="Source" value={label(task.source_type)} />
-        <KeyValue title="Source ID" value={task.source_id || 'Not linked'} mono />
         <KeyValue title="Due" value={dateTime(task.due_at)} />
         <KeyValue title="SLA due" value={dateTime(task.sla_due_at)} />
-        <KeyValue title="Priority score" value={String(task.priority_score ?? 'Not calculated')} />
-        <KeyValue title="Due state" value={label(task.due_bucket)} />
         <KeyValue title="Created" value={dateTime(task.created_at)} />
-        <KeyValue title="Updated" value={dateTime(task.updated_at)} />
       </div>
+
       {task.blocked_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>Blocked reason:</strong> {task.blocked_reason}</div> : null}
       {task.cancellation_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>Cancellation reason:</strong> {task.cancellation_reason}</div> : null}
       {task.completion_note ? <div className="execution-tasks-alert execution-tasks-alert--success"><strong>Completion note:</strong> {task.completion_note}</div> : null}
-      {facts.length ? <div><h4>Operational context</h4><div className="execution-tasks-detail-grid">{facts.map((fact) => <KeyValue key={fact.key} title={fact.key} value={fact.value} />)}</div></div> : null}
-      <div><h4>Lifecycle timeline</h4><div className="execution-tasks-timeline"><TimelineItem title="Ready" value={task.ready_at} /><TimelineItem title="Assigned" value={task.assigned_at} /><TimelineItem title="Started" value={task.started_at} /><TimelineItem title="Blocked" value={task.blocked_at} /><TimelineItem title="Completed" value={task.completed_at} /><TimelineItem title="Cancelled" value={task.cancelled_at} /></div></div>
-      <details className="execution-tasks-evidence"><summary>Technical payload and dependency evidence</summary>{hasJsonContent(task.payload) ? <><h4>Stored payload</h4><pre>{JSON.stringify(task.payload, null, 2)}</pre></> : <p>No stored payload evidence.</p>}{task.dependency_snapshot?.length ? <><h4>Dependency snapshot</h4><pre>{JSON.stringify(task.dependency_snapshot, null, 2)}</pre></> : <p>No dependency snapshot was stored.</p>}</details>
-      <details className="execution-tasks-evidence"><summary>Audit trail ({auditRows.length})</summary>{auditRows.length ? <div className="execution-tasks-audit-list">{auditRows.map((row) => <article key={row.id}><strong>{label(row.action)}</strong><span>{dateTime(row.created_at)} · {userLabel(row.user_id)}</span>{hasJsonContent(row.metadata) ? <details><summary>Event metadata</summary><pre>{JSON.stringify(row.metadata, null, 2)}</pre></details> : null}</article>)}</div> : <p>No audit events were returned for this task.</p>}</details>
+
+      {facts.length ? (
+        <div className="execution-tasks-detail-section">
+          <h4>Source context</h4>
+          <div className="execution-tasks-detail-grid execution-tasks-detail-grid--context">
+            {facts.map((fact) => <KeyValue key={fact.key} title={fact.key === 'Status' ? 'Source status' : fact.key} value={fact.value} />)}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="execution-tasks-detail-section">
+        <h4>Lifecycle</h4>
+        <div className="execution-tasks-timeline">
+          <TimelineItem title="Ready" value={task.ready_at} />
+          <TimelineItem title="Assigned" value={task.assigned_at} />
+          <TimelineItem title="Started" value={task.started_at} />
+          <TimelineItem title="Blocked" value={task.blocked_at} />
+          <TimelineItem title="Completed" value={task.completed_at} />
+          <TimelineItem title="Cancelled" value={task.cancelled_at} />
+        </div>
+      </div>
+
+      <details className="execution-tasks-evidence execution-tasks-audit">
+        <summary>Audit trail ({auditRows.length})</summary>
+        {auditRows.length ? (
+          <div className="execution-tasks-audit-list">
+            {auditRows.map((row) => (
+              <article key={row.id}>
+                <strong>{label(row.action)}</strong>
+                <span>{dateTime(row.created_at)} · {userLabel(row.user_id)}</span>
+                {hasJsonContent(row.metadata) ? (
+                  <details className="execution-tasks-audit-metadata">
+                    <summary>Technical event details</summary>
+                    <pre>{JSON.stringify(row.metadata, null, 2)}</pre>
+                  </details>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : <p>No audit events were returned for this task.</p>}
+      </details>
+
+      <details className="execution-tasks-evidence execution-tasks-evidence--advanced">
+        <summary>Advanced technical data</summary>
+        <p className="execution-tasks-advanced-copy">Internal IDs, scoring, stored payloads, and dependency evidence are kept here for support and detailed investigation. They are not needed for normal task handling.</p>
+        <div className="execution-tasks-detail-grid execution-tasks-detail-grid--technical">
+          <KeyValue title="Source ID" value={task.source_id || 'Not linked'} mono />
+          <KeyValue title="Priority score" value={String(task.priority_score ?? 'Not calculated')} />
+          <KeyValue title="Due state" value={label(task.due_bucket)} />
+          <KeyValue title="Updated" value={dateTime(task.updated_at)} />
+        </div>
+        {hasJsonContent(task.payload) ? (
+          <details className="execution-tasks-raw-data"><summary>Stored payload</summary><pre>{JSON.stringify(task.payload, null, 2)}</pre></details>
+        ) : <p>No stored payload evidence.</p>}
+        {task.dependency_snapshot?.length ? (
+          <details className="execution-tasks-raw-data"><summary>Dependency snapshot</summary><pre>{JSON.stringify(task.dependency_snapshot, null, 2)}</pre></details>
+        ) : <p>No dependency snapshot was stored.</p>}
+      </details>
     </section>
   );
 }
@@ -1231,7 +1336,7 @@ function KeyValue({ title, value, mono = false }: { title: string; value: string
 }
 
 function TimelineItem({ title, value }: { title: string; value?: string | null }) {
-  return <div><span>{title}</span><strong>{value ? dateTime(value) : 'Not reached'}</strong></div>;
+  return <div className={value ? 'is-reached' : ''}><span>{title}</span><strong>{value ? dateTime(value) : 'Not reached'}</strong></div>;
 }
 
 function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfirm }: {
