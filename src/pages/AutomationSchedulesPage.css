@@ -732,3 +732,173 @@
     border-radius: 12px;
   }
 }
+
+/* v3.46.90 tenant-facing workspace alignment */
+.automation-schedules-page .btn {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.automation-schedules-page .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.automation-schedules-page .btn-primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.automation-schedules-page .btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.automation-schedules-page .btn-secondary {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #1f2937;
+}
+
+.automation-schedules-page .btn-secondary:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.automation-schedules-page .btn-danger {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.automation-schedules-page .btn-danger:hover:not(:disabled) {
+  background: #ffe4e6;
+}
+
+.automation-schedules-scroll-anchor {
+  scroll-margin-top: 16px;
+}
+
+.automation-schedules-section-card {
+  padding: 16px;
+}
+
+.automation-schedules-filters {
+  grid-template-columns: minmax(280px, 1.6fr) repeat(3, minmax(150px, 0.8fr));
+}
+
+.automation-schedules-form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.automation-schedules-create-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.automation-schedules-create-footer .btn {
+  flex: 0 0 auto;
+}
+
+.automation-schedules-safety-baseline,
+.automation-schedules-metrics--safety {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.automation-schedules-safety-baseline > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.automation-schedules-safety-baseline strong {
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.automation-schedules-safety-baseline span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.automation-schedules-safety-baseline small {
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.automation-schedules-safety-content {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.automation-schedules-metrics--safety {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.automation-schedules-recent-activity {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.automation-schedules-table--compact {
+  min-width: 720px;
+}
+
+@media (max-width: 1200px) {
+  .automation-schedules-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .automation-schedules-metrics--safety {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .automation-schedules-filters,
+  .automation-schedules-safety-baseline,
+  .automation-schedules-metrics--safety {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .automation-schedules-create-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .automation-schedules-filters,
+  .automation-schedules-form-grid,
+  .automation-schedules-safety-baseline,
+  .automation-schedules-metrics--safety {
+    grid-template-columns: 1fr;
+  }
+}

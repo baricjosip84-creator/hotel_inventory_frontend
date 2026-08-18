@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import { fetchTenantSubscriptionAccess, type TenantFeatureEntitlementRow } from '../lib/tenantSubscriptionAccess';
 import type {
-  AutomationRunnerExecutiveSummaryResponse,
-  AutomationRunnerLaunchAttestationResponse,
   AutomationRunnerReadinessResponse,
   AutomationRunnerRunOnceResponse,
   AutomationRunnerStatusResponse,
@@ -24,6 +31,7 @@ type StatusFilter = '' | AutomationSchedule['status'];
 type TypeFilter = '' | AutomationSchedule['automation_type'];
 type ScheduleKind = 'manual' | 'daily' | 'weekly' | 'monthly';
 type RequestDefaultStatus = 'draft' | 'pending_review';
+type AutomationWorkspaceSection = 'overview' | 'registry' | 'create' | 'detail' | 'safety';
 
 type FormState = {
   name: string;
@@ -163,10 +171,6 @@ function isValidTimezone(timezone: string): boolean {
   }
 }
 
-function JsonEvidence({ value }: { value: unknown }) {
-  return <pre className="automation-schedules-json">{JSON.stringify(value ?? null, null, 2)}</pre>;
-}
-
 function StatusChip({ status }: { status?: string | null }) {
   const normalized = status || 'unknown';
   return <span className={`automation-schedules-chip automation-schedules-chip--${normalized}`}>{humanize(normalized)}</span>;
@@ -187,8 +191,6 @@ export default function AutomationSchedulesPage() {
   const [types, setTypes] = useState<AutomationScheduleTypesResponse | null>(null);
   const [runnerReadiness, setRunnerReadiness] = useState<AutomationRunnerReadinessResponse | null>(null);
   const [runnerStatus, setRunnerStatus] = useState<AutomationRunnerStatusResponse | null>(null);
-  const [runnerExecutiveSummary, setRunnerExecutiveSummary] = useState<AutomationRunnerExecutiveSummaryResponse | null>(null);
-  const [runnerLaunchAttestation, setRunnerLaunchAttestation] = useState<AutomationRunnerLaunchAttestationResponse | null>(null);
   const [runEvents, setRunEvents] = useState<AutomationScheduleRunEventsResponse | null>(null);
   const [selected, setSelected] = useState<AutomationSchedule | null>(null);
   const [editForm, setEditForm] = useState<FormState | null>(null);
@@ -215,6 +217,12 @@ export default function AutomationSchedulesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirmationText, setConfirmationText] = useState('');
+
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<AutomationWorkspaceSection>('overview');
+  const registryRef = useRef<HTMLDivElement | null>(null);
+  const createRef = useRef<HTMLDivElement | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
+  const safetyRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -316,26 +324,18 @@ export default function AutomationSchedulesPage() {
         apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner-status')
       ];
       if (canViewExecutionRequests) {
-        requests.push(
-          apiRequest<AutomationRunnerExecutiveSummaryResponse>('/automation-schedules/runner-executive-summary'),
-          apiRequest<AutomationRunnerLaunchAttestationResponse>('/automation-schedules/runner-launch-attestation'),
-          apiRequest<AutomationScheduleRunEventsResponse>('/automation-schedules/run-events?limit=25&offset=0')
-        );
+        requests.push(apiRequest<AutomationScheduleRunEventsResponse>('/automation-schedules/run-events?limit=25&offset=0'));
       }
 
       const results = await Promise.allSettled(requests);
       const warnings: string[] = [];
 
       if (results[0]?.status === 'fulfilled') setRunnerStatus(results[0].value as AutomationRunnerStatusResponse);
-      else warnings.push('Runner status could not be loaded.');
+      else warnings.push('Automation safety status could not be loaded.');
 
       if (canViewExecutionRequests) {
-        if (results[1]?.status === 'fulfilled') setRunnerExecutiveSummary(results[1].value as AutomationRunnerExecutiveSummaryResponse);
-        else warnings.push('Executive governance summary could not be loaded.');
-        if (results[2]?.status === 'fulfilled') setRunnerLaunchAttestation(results[2].value as AutomationRunnerLaunchAttestationResponse);
-        else warnings.push('Launch attestation could not be loaded.');
-        if (results[3]?.status === 'fulfilled') setRunEvents(results[3].value as AutomationScheduleRunEventsResponse);
-        else warnings.push('Run ledger could not be loaded.');
+        if (results[1]?.status === 'fulfilled') setRunEvents(results[1].value as AutomationScheduleRunEventsResponse);
+        else warnings.push('Recent automation activity could not be loaded.');
       }
 
       setGovernanceLoaded(true);
@@ -416,6 +416,7 @@ export default function AutomationSchedulesPage() {
         })
       });
       setSelected(created);
+      setActiveWorkspaceSection('detail');
       setEditForm(null);
       setForm(createDefaultForm());
       setMessage(`Created draft schedule “${created.name}”. It will not run automatically until it is activated and runner request creation is explicitly enabled.`);
@@ -435,6 +436,7 @@ export default function AutomationSchedulesPage() {
     try {
       const response = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`);
       setSelected(response);
+      setActiveWorkspaceSection('detail');
       setEditForm(null);
       setDryRunResult(null);
       setManualRunResult(null);
@@ -555,6 +557,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({})
       });
       setSelected(response.schedule || schedule);
+      setActiveWorkspaceSection('detail');
       setEditForm(null);
       setDryRunResult(response);
       setManualRunResult(null);
@@ -578,6 +581,7 @@ export default function AutomationSchedulesPage() {
         body: JSON.stringify({})
       });
       setSelected(response.schedule);
+      setActiveWorkspaceSection('detail');
       setEditForm(null);
       setManualRunResult(response);
       setDryRunResult(null);
@@ -606,6 +610,7 @@ export default function AutomationSchedulesPage() {
     try {
       const response = await apiRequest<AutomationScheduleAuditPackResponse>(`/automation-schedules/${schedule.id}/audit-pack`);
       setSelected(schedule);
+      setActiveWorkspaceSection('detail');
       setEditForm(null);
       setAuditPack(response);
       setDryRunResult(null);
@@ -652,7 +657,7 @@ export default function AutomationSchedulesPage() {
     );
 
     if (!expectedLastUnsafeAt || expectedUnsafeCount <= 0) {
-      setError('Refresh runner evidence before acknowledging the anomaly review.');
+      setError('Refresh automation safety status before acknowledging the review.');
       setConfirmation(null);
       return;
     }
@@ -671,7 +676,7 @@ export default function AutomationSchedulesPage() {
         })
       });
       setRunnerStatus(response);
-      setMessage('Runner anomaly review was acknowledged. The evidence remains preserved and the review note body remains redacted from status output.');
+      setMessage('Automation safety review was acknowledged and the audit evidence remains preserved.');
       await loadGovernance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to acknowledge runner anomaly review');
@@ -703,6 +708,11 @@ export default function AutomationSchedulesPage() {
       }
       return acknowledgeRunnerUnsafeOutputReview(confirmationText);
     }
+  };
+
+  const navigateWorkspaceSection = (section: AutomationWorkspaceSection, target: HTMLElement | null) => {
+    setActiveWorkspaceSection(section);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const clearFilters = () => {
@@ -791,68 +801,76 @@ export default function AutomationSchedulesPage() {
 
   if (automationEntitlement && !automationEntitlement.allowed) {
     return (
-      <div className="automation-schedules-page">
-        <section className="automation-schedules-hero">
-          <div>
-            <p className="automation-schedules-eyebrow">Controlled review scheduling</p>
-            <h2>Automation Schedules</h2>
-            <p>Prepare future review requests without automatic approval, execution, or inventory changes.</p>
-          </div>
-          <StatusChip status="disabled" />
-        </section>
-        <section className="automation-schedules-card">
-          <h3>Automation schedules are not included in this tenant plan</h3>
-          <p className="automation-schedules-muted">No automation-schedule endpoints are called while the feature is unavailable.</p>
-          <div className="automation-schedules-metrics">
-            <div><strong>{humanize(automationEntitlement.reason)}</strong><span>Reason</span></div>
-            <div><strong>{automationEntitlement.required_flags?.join(', ') || 'automation'}</strong><span>Required entitlement</span></div>
-          </div>
+      <div className="automation-schedules-page io-operational-page io-workspace-page">
+        <OperationalWorkspaceHero
+          iconPath="/automation-schedules"
+          eyebrow="Execution workflow"
+          title="Automation schedules"
+          description="Plan recurring review checks that can prepare execution requests without automatic approval, execution, or inventory changes."
+          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+          aside={<StatusChip status="disabled" />}
+        />
+        <section className="app-panel automation-schedules-card">
+          <OperationalSectionHeader iconPath="/automation-schedules" title="Automation schedules are not included in this tenant plan" description="The feature is unavailable for this tenant, so schedule endpoints are not used." />
         </section>
       </div>
     );
   }
 
   return (
-    <div className="automation-schedules-page">
-      <section className="automation-schedules-hero">
-        <div>
-          <p className="automation-schedules-eyebrow">Controlled review scheduling</p>
-          <h2>Automation Schedules</h2>
-          <p>Create, activate, pause, preview, and audit schedules that may prepare execution requests. Schedules never approve or execute those requests.</p>
-        </div>
-        <div className="automation-schedules-hero-actions">
-          <span className="automation-schedules-safety-pill">No automatic execution</span>
-          <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={loading || saving} onClick={() => void refreshPage()}>{loading ? 'Refreshing…' : 'Refresh page'}</button>
-        </div>
-      </section>
+    <div className="automation-schedules-page io-operational-page io-workspace-page" id="automation-schedules-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/automation-schedules"
+        eyebrow="Execution workflow"
+        title="Automation schedules"
+        description="Plan recurring review checks that can prepare execution requests. Schedules never approve or execute changes automatically."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Review scheduling</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>No automatic execution</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={() => void refreshPage()}>
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        }
+      />
 
       {error ? <div className="automation-schedules-alert automation-schedules-alert--error" role="alert">{error}</div> : null}
       {warning ? <div className="automation-schedules-alert automation-schedules-alert--warning" role="status">{warning}</div> : null}
       {message ? <div className="automation-schedules-alert automation-schedules-alert--success" role="status">{message}</div> : null}
 
-      <section className="automation-schedules-summary" aria-label="Automation schedule summary">
-        <div><strong>{numberValue(runnerReadiness?.totals.total_schedules)}</strong><span>Total schedules</span></div>
-        <div><strong>{activeCount}</strong><span>Active</span></div>
-        <div><strong>{numberValue(runnerReadiness?.totals.draft_schedules)}</strong><span>Draft</span></div>
-        <div><strong>{numberValue(runnerReadiness?.totals.paused_schedules)}</strong><span>Paused</span></div>
-        <div><strong>{numberValue(runnerReadiness?.totals.due_schedule_count)}</strong><span>Due now</span></div>
-        <div><strong>{numberValue(runnerReadiness?.totals.disabled_schedules)}</strong><span>Disabled</span></div>
-      </section>
+      <OperationalWorkspaceStats ariaLabel="Automation schedule summary">
+        <OperationalWorkspaceStatCard label="Total schedules" value={numberValue(runnerReadiness?.totals.total_schedules)} helper={`${numberValue(runnerReadiness?.totals.draft_schedules)} drafts`} tone="slate" iconPath="/automation-schedules" loading={loading} />
+        <OperationalWorkspaceStatCard label="Active" value={activeCount} helper="Currently eligible for scheduled review preparation" tone={activeCount > 0 ? 'blue' : 'neutral'} iconPath="/automation-schedules" loading={loading} />
+        <OperationalWorkspaceStatCard label="Due now" value={numberValue(runnerReadiness?.totals.due_schedule_count)} helper="Active schedules currently due" tone={numberValue(runnerReadiness?.totals.due_schedule_count) > 0 ? 'warn' : 'good'} iconPath="/alerts" loading={loading} />
+        <OperationalWorkspaceStatCard label="Paused" value={numberValue(runnerReadiness?.totals.paused_schedules)} helper="Temporarily excluded from scheduled runs" tone="neutral" iconPath="/automation-schedules" loading={loading} />
+        <OperationalWorkspaceStatCard label="Disabled" value={numberValue(runnerReadiness?.totals.disabled_schedules)} helper="Permanently stopped schedules" tone={numberValue(runnerReadiness?.totals.disabled_schedules) > 0 ? 'warn' : 'good'} iconPath="/automation-schedules" loading={loading} />
+      </OperationalWorkspaceStats>
 
-      <section className="automation-schedules-workspace">
-        <div className="automation-schedules-card automation-schedules-list-card">
-          <div className="automation-schedules-section-heading">
-            <div>
-              <h3>Schedule registry</h3>
-              <p>Search and manage tenant-owned schedule definitions.</p>
-            </div>
-            <span>{total} matching</span>
-          </div>
+      <OperationalWorkspaceTabs ariaLabel="Automation schedule work areas" hint="Jump to the part of the scheduling workflow you need.">
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'overview'} iconPath="/dashboard" label="Overview" onClick={() => navigateWorkspaceSection('overview', document.getElementById('automation-schedules-workspace-top'))} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'registry'} iconPath="/automation-schedules" label="Schedules" count={total} onClick={() => navigateWorkspaceSection('registry', registryRef.current)} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'create'} iconPath="/execution-requests" label="Create schedule" onClick={() => navigateWorkspaceSection('create', createRef.current)} disabled={!canCreateAutomationSchedules} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'detail'} iconPath="/audit" label="Schedule detail" onClick={() => navigateWorkspaceSection('detail', detailRef.current)} disabled={!selected} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'safety'} iconPath="/reliability-command" label="Automation safety" onClick={() => { setGovernanceOpen(true); navigateWorkspaceSection('safety', safetyRef.current); }} />
+      </OperationalWorkspaceTabs>
+
+      <div ref={registryRef} id="automation-schedule-registry" className="automation-schedules-scroll-anchor">
+        <section className="app-panel automation-schedules-card automation-schedules-section-card">
+          <OperationalSectionHeader
+            iconPath="/automation-schedules"
+            title="Schedule registry"
+            description="Find tenant schedules, review their status, and open one for actions or history."
+            actions={<button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={clearFilters}>Clear filters</button>}
+          />
 
           <div className="automation-schedules-filters">
             <label>
               <span>Search</span>
-              <input value={searchInput} maxLength={255} onChange={(event) => setSearchInput(event.target.value)} placeholder="Name, description, type, status, or timezone" />
+              <input value={searchInput} maxLength={255} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search name, description, review type, status, or timezone" />
             </label>
             <label>
               <span>Status</span>
@@ -872,32 +890,20 @@ export default function AutomationSchedulesPage() {
               </select>
             </label>
             <label>
-              <span>Rows</span>
+              <span>Rows per page</span>
               <select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setOffset(0); }}>
                 {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
             </label>
-            <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={clearFilters}>Clear filters</button>
           </div>
 
           <div className="automation-schedules-table-wrap">
             <table className="automation-schedules-table">
-              <thead>
-                <tr>
-                  <th>Schedule</th>
-                  <th>Status</th>
-                  <th>Timing</th>
-                  <th>Next run</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Schedule</th><th>Status</th><th>Timing</th><th>Next run</th><th>Actions</th></tr></thead>
               <tbody>
                 {data?.rows.map((schedule) => (
                   <tr key={schedule.id} className={selected?.id === schedule.id ? 'automation-schedules-row--selected' : undefined}>
-                    <td>
-                      <button type="button" className="automation-schedules-name-button" onClick={() => void loadScheduleDetail(schedule)}>{schedule.name}</button>
-                      <span>{schedule.type_definition?.label || humanize(schedule.automation_type)}</span>
-                    </td>
+                    <td><button type="button" className="automation-schedules-name-button" onClick={() => void loadScheduleDetail(schedule)}>{schedule.name}</button><span>{schedule.type_definition?.label || humanize(schedule.automation_type)}</span></td>
                     <td><StatusChip status={schedule.status} /></td>
                     <td>{schedulePattern(schedule)}</td>
                     <td>{schedule.next_run_at ? formatDateTime(schedule.next_run_at, scheduleTimezone(schedule)) : 'Not scheduled'}</td>
@@ -914,12 +920,8 @@ export default function AutomationSchedulesPage() {
                     </td>
                   </tr>
                 ))}
-                {!loading && !data?.rows.length ? (
-                  <tr><td colSpan={5} className="automation-schedules-empty">No schedules match the current filters.</td></tr>
-                ) : null}
-                {loading && !data?.rows.length ? (
-                  <tr><td colSpan={5} className="automation-schedules-empty">Loading schedules…</td></tr>
-                ) : null}
+                {!loading && !data?.rows.length ? <tr><td colSpan={5} className="automation-schedules-empty">No schedules match the current filters.</td></tr> : null}
+                {loading && !data?.rows.length ? <tr><td colSpan={5} className="automation-schedules-empty">Loading schedules…</td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -931,46 +933,41 @@ export default function AutomationSchedulesPage() {
               <button type="button" disabled={!hasNextPage || loading} onClick={() => setOffset(offset + limit)}>Next</button>
             </div>
           </div>
-        </div>
+        </section>
+      </div>
 
-        <aside className="automation-schedules-card automation-schedules-create-card">
-          <div className="automation-schedules-section-heading">
-            <div>
-              <h3>Create schedule</h3>
-              <p>New schedules start as drafts.</p>
-            </div>
-          </div>
+      <div ref={createRef} id="automation-schedule-create" className="automation-schedules-scroll-anchor">
+        <section className="app-panel automation-schedules-card automation-schedules-section-card">
+          <OperationalSectionHeader iconPath="/execution-requests" title="Create schedule" description="Create a draft schedule for a recurring or manual review. Nothing runs until the schedule is activated." />
           {canCreateAutomationSchedules ? (
             <>
               {formFields(form, setForm, 'automation-create')}
               {selectedTypeDefinition ? <p className="automation-schedules-type-help"><strong>{selectedTypeDefinition.label}:</strong> {selectedTypeDefinition.description}</p> : null}
-              <p className="automation-schedules-muted">A schedule can prepare a request only. It cannot approve, execute, or change stock.</p>
-              <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving || form.name.trim().length < 3} onClick={() => void createSchedule()}>{saving ? 'Creating…' : 'Create draft schedule'}</button>
+              <div className="automation-schedules-create-footer">
+                <span>A schedule may prepare a reviewable request. It cannot approve, execute, or change stock.</span>
+                <button type="button" className="btn btn-primary" disabled={saving || form.name.trim().length < 3} onClick={() => void createSchedule()}>{saving ? 'Creating…' : 'Create draft schedule'}</button>
+              </div>
             </>
-          ) : (
-            <div className="automation-schedules-readonly">You can view schedules, but your role cannot create them.</div>
-          )}
-        </aside>
-      </section>
+          ) : <div className="automation-schedules-readonly">You can view schedules, but your role cannot create them.</div>}
+        </section>
+      </div>
 
       {selected ? (
-        <section id="automation-schedule-detail" className="automation-schedules-card automation-schedules-detail-card">
-          <div className="automation-schedules-section-heading">
-            <div>
-              <p className="automation-schedules-eyebrow">Selected schedule</p>
-              <h3>{selected.name}</h3>
-              <p>{selected.description || 'No description recorded.'}</p>
-            </div>
-            <StatusChip status={selected.status} />
-          </div>
+        <section ref={detailRef} id="automation-schedule-detail" className="app-panel automation-schedules-card automation-schedules-detail-card automation-schedules-scroll-anchor">
+          <OperationalSectionHeader
+            iconPath="/audit"
+            title={selected.name}
+            description={selected.description || 'No description recorded.'}
+            actions={<StatusChip status={selected.status} />}
+          />
 
           <div className="automation-schedules-detail-actions" aria-label="Selected schedule actions">
-            <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving || selected.status === 'disabled'} onClick={() => void dryRunSchedule(selected)}>Preview</button>
-            {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving || selected.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule: selected })}>Create request</button> : null}
-            {(selected.status === 'draft' || selected.status === 'paused') && canResumeAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule: selected })}>Activate</button> : null}
-            {(selected.status === 'draft' || selected.status === 'active') && canPauseAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => void pauseSchedule(selected)}>Pause</button> : null}
-            {selected.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="automation-schedules-button automation-schedules-button--danger" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule: selected }); setConfirmationText(''); }}>Disable</button> : null}
-            {canViewExecutionRequests ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => void loadAuditPack(selected)}>Load audit pack</button> : null}
+            <button type="button" className="btn btn-secondary" disabled={saving || selected.status === 'disabled'} onClick={() => void dryRunSchedule(selected)}>Preview</button>
+            {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" className="btn btn-secondary" disabled={saving || selected.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule: selected })}>Create request</button> : null}
+            {(selected.status === 'draft' || selected.status === 'paused') && canResumeAutomationSchedules ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule: selected })}>Activate</button> : null}
+            {(selected.status === 'draft' || selected.status === 'active') && canPauseAutomationSchedules ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void pauseSchedule(selected)}>Pause</button> : null}
+            {selected.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule: selected }); setConfirmationText(''); }}>Disable</button> : null}
+            {canViewExecutionRequests ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void loadAuditPack(selected)}>Load audit history</button> : null}
           </div>
 
           <div className="automation-schedules-detail-grid">
@@ -980,7 +977,7 @@ export default function AutomationSchedulesPage() {
             <div><span>Last run</span><strong>{formatDateTime(selected.last_run_at, scheduleTimezone(selected))}</strong></div>
             <div><span>Created by</span><strong>{selected.created_by_name || 'System / unavailable'}</strong></div>
             <div><span>Updated</span><strong>{formatDateTime(selected.updated_at)}</strong></div>
-            <div><span>Created request status</span><strong>{humanize(String(selected.request_defaults?.default_status || 'draft'))}</strong></div>
+            <div><span>Created request starts as</span><strong>{humanize(String(selected.request_defaults?.default_status || 'draft'))}</strong></div>
             <div><span>Automatic execution</span><strong>No</strong></div>
           </div>
 
@@ -989,12 +986,7 @@ export default function AutomationSchedulesPage() {
           {selected.timeline?.length ? (
             <div className="automation-schedules-timeline">
               <h4>Lifecycle</h4>
-              {selected.timeline.map((row, index) => (
-                <div key={`${row.status}-${row.at || index}`}>
-                  <span className="automation-schedules-timeline-dot" />
-                  <div><strong>{row.label}</strong><span>{formatDateTime(row.at)} · {row.by || 'Unknown user'}</span></div>
-                </div>
-              ))}
+              {selected.timeline.map((row, index) => <div key={`${row.status}-${row.at || index}`}><span className="automation-schedules-timeline-dot" /><div><strong>{row.label}</strong><span>{formatDateTime(row.at)} · {row.by || 'Unknown user'}</span></div></div>)}
             </div>
           ) : null}
 
@@ -1002,17 +994,9 @@ export default function AutomationSchedulesPage() {
             <div id="automation-schedule-edit-form" className="automation-schedules-edit-panel">
               <div className="automation-schedules-section-heading">
                 <div><h4>Edit schedule</h4><p>Changing calendar settings recalculates the next future occurrence.</p></div>
-                {!editForm ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => { setEditForm(scheduleToForm(selected)); scrollToFormSection('automation-schedule-edit-form'); }}>Edit</button> : null}
+                {!editForm ? <button type="button" className="btn btn-secondary" onClick={() => { setEditForm(scheduleToForm(selected)); scrollToFormSection('automation-schedule-edit-form'); }}>Edit</button> : null}
               </div>
-              {editForm ? (
-                <>
-                  {formFields(editForm, setEditForm, 'automation-edit')}
-                  <div className="automation-schedules-actions">
-                    <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving} onClick={() => void updateSchedule(selected)}>{saving ? 'Saving…' : 'Save changes'}</button>
-                    <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Reset</button>
-                  </div>
-                </>
-              ) : null}
+              {editForm ? <>{formFields(editForm, setEditForm, 'automation-edit')}<div className="automation-schedules-actions"><button type="button" className="btn btn-primary" disabled={saving} onClick={() => void updateSchedule(selected)}>{saving ? 'Saving…' : 'Save changes'}</button><button type="button" className="btn btn-secondary" disabled={saving} onClick={() => setEditForm(scheduleToForm(selected))}>Reset</button></div></> : null}
             </div>
           ) : null}
 
@@ -1026,135 +1010,97 @@ export default function AutomationSchedulesPage() {
                 <div><strong>{humanize(dryRunResult.candidate_request.status)}</strong><span>Request starting status</span></div>
               </div>
               <ul className="automation-schedules-check-list">{dryRunResult.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
-              <details><summary>Technical request preview</summary><JsonEvidence value={dryRunResult.candidate_request} /></details>
             </div>
           ) : null}
 
           {manualRunResult ? (
             <div className="automation-schedules-result-panel">
-              <div className="automation-schedules-section-heading"><div><h4>Manual request-creation result</h4><p>The resulting request still requires its normal review and approval workflow.</p></div><StatusChip status={manualRunResult.execution_request?.status} /></div>
+              <div className="automation-schedules-section-heading"><div><h4>Request creation result</h4><p>The resulting request still follows its normal review and approval workflow.</p></div><StatusChip status={manualRunResult.execution_request?.status} /></div>
               <div className="automation-schedules-metrics">
                 <div><strong>{manualRunResult.created_execution_request_count}</strong><span>Requests created</span></div>
-                <div><strong>{manualRunResult.duplicate_guard_triggered ? 'Yes' : 'No'}</strong><span>Duplicate guard</span></div>
+                <div><strong>{manualRunResult.duplicate_guard_triggered ? 'Yes' : 'No'}</strong><span>Duplicate prevented</span></div>
                 <div><strong>No</strong><span>Automatic approval</span></div>
                 <div><strong>No</strong><span>Automatic execution</span></div>
               </div>
               <ul className="automation-schedules-check-list">{manualRunResult.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
-              <details><summary>Technical result evidence</summary><JsonEvidence value={manualRunResult} /></details>
             </div>
           ) : null}
 
           {auditPack ? (
             <div className="automation-schedules-result-panel">
-              <div className="automation-schedules-section-heading"><div><h4>Audit pack</h4><p>Schedule history, linked requests, run ledger, and completeness checks.</p></div><StatusChip status={auditPack.completeness.complete ? 'pass' : 'watch'} /></div>
+              <div className="automation-schedules-section-heading"><div><h4>Audit history</h4><p>Schedule activity, linked requests, and completeness checks.</p></div><StatusChip status={auditPack.completeness.complete ? 'pass' : 'watch'} /></div>
               <div className="automation-schedules-metrics">
-                <div><strong>{auditPack.evidence_summary.schedule_audit_event_count}</strong><span>Schedule audit events</span></div>
+                <div><strong>{auditPack.evidence_summary.schedule_audit_event_count}</strong><span>Schedule events</span></div>
                 <div><strong>{auditPack.evidence_summary.execution_request_count}</strong><span>Linked requests</span></div>
-                <div><strong>{auditPack.evidence_summary.run_event_count || 0}</strong><span>Run events</span></div>
-                <div><strong>{auditPack.completeness.complete ? 'Complete' : 'Review needed'}</strong><span>Evidence status</span></div>
+                <div><strong>{auditPack.evidence_summary.run_event_count || 0}</strong><span>Schedule runs</span></div>
+                <div><strong>{auditPack.completeness.complete ? 'Complete' : 'Review needed'}</strong><span>Audit status</span></div>
               </div>
               <ul className="automation-schedules-check-list">{auditPack.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
               {auditPack.linked_execution_requests.length ? (
                 <div className="automation-schedules-table-wrap">
                   <table className="automation-schedules-table automation-schedules-table--compact">
-                    <thead><tr><th>Request</th><th>Type</th><th>Workflow</th><th>Execution</th><th>Created</th></tr></thead>
-                    <tbody>{auditPack.linked_execution_requests.map((request) => <tr key={request.id}><td>{request.id}</td><td>{humanize(request.request_type)}</td><td>{humanize(request.status)}</td><td>{humanize(request.execution_status)}</td><td>{formatDateTime(request.created_at)}</td></tr>)}</tbody>
+                    <thead><tr><th>Request type</th><th>Workflow</th><th>Execution</th><th>Created</th></tr></thead>
+                    <tbody>{auditPack.linked_execution_requests.map((request) => <tr key={request.id}><td>{humanize(request.request_type)}</td><td>{humanize(request.status)}</td><td>{humanize(request.execution_status)}</td><td>{formatDateTime(request.created_at)}</td></tr>)}</tbody>
                   </table>
                 </div>
               ) : <p className="automation-schedules-muted">No linked execution requests were found.</p>}
-              <details><summary>Complete technical audit evidence</summary><JsonEvidence value={auditPack} /></details>
             </div>
           ) : null}
-
-          <details className="automation-schedules-technical-details">
-            <summary>Stored schedule configuration and safety metadata</summary>
-            <div className="automation-schedules-evidence-grid">
-              <div><h4>Schedule configuration</h4><JsonEvidence value={selected.schedule_config} /></div>
-              <div><h4>Request defaults</h4><JsonEvidence value={selected.request_defaults} /></div>
-              <div><h4>Safety metadata</h4><JsonEvidence value={selected.safety} /></div>
-            </div>
-          </details>
         </section>
       ) : null}
 
-      <section className="automation-schedules-card automation-schedules-governance-card">
-        <button type="button" className="automation-schedules-governance-toggle" aria-expanded={governanceOpen} onClick={() => setGovernanceOpen((current) => !current)}>
-          <span><strong>Runner governance and technical evidence</strong><small>Readiness, request-creation controls, run ledger, anomaly evidence, and launch attestation</small></span>
-          <span>{governanceOpen ? 'Hide' : 'Show'}</span>
-        </button>
+      <section ref={safetyRef} id="automation-schedule-safety" className="app-panel automation-schedules-card automation-schedules-section-card automation-schedules-scroll-anchor">
+        <OperationalSectionHeader
+          iconPath="/reliability-command"
+          title="Automation safety"
+          description="Review whether schedules can prepare requests and see recent schedule activity. Technical runner diagnostics remain outside the normal tenant workflow."
+          actions={<button type="button" className="btn btn-secondary" aria-expanded={governanceOpen} onClick={() => setGovernanceOpen((current) => !current)}>{governanceOpen ? 'Hide details' : 'Show details'}</button>}
+        />
+
+        <div className="automation-schedules-safety-baseline">
+          <div><strong>Off</strong><span>Automatic execution</span><small>Schedules cannot approve or execute requests.</small></div>
+          <div><strong>{activeCount}</strong><span>Active schedules</span><small>Only active schedules can become due.</small></div>
+          <div><strong>{numberValue(runnerReadiness?.totals.due_schedule_count)}</strong><span>Due now</span><small>Schedules currently ready for review preparation.</small></div>
+        </div>
 
         {governanceOpen ? (
-          <div className="automation-schedules-governance-content">
-            {!governanceLoaded && governanceLoading ? <p className="automation-schedules-muted">Loading runner governance evidence…</p> : null}
-            {!governanceLoaded && !governanceLoading ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => void loadGovernance()}>Load governance evidence</button> : null}
+          <div className="automation-schedules-safety-content">
+            {!governanceLoaded && governanceLoading ? <p className="automation-schedules-muted">Loading automation safety status…</p> : null}
+            {!governanceLoaded && !governanceLoading ? <button type="button" className="btn btn-secondary" onClick={() => void loadGovernance()}>Load safety status</button> : null}
 
             {runnerStatus ? (
               <>
-                <div className="automation-schedules-section-heading">
-                  <div><h3>Runner status</h3><p>The runner may create reviewable requests only when all explicit safety flags are enabled. It cannot approve or execute them.</p></div>
-                  <StatusChip status={runnerStatus.request_creation_enabled ? 'watch' : 'pass'} />
-                </div>
-                <div className="automation-schedules-summary automation-schedules-summary--governance">
-                  <div><strong>{runnerStatus.enabled ? 'Enabled' : 'Disabled'}</strong><span>Runner flag</span></div>
-                  <div><strong>{runnerStatus.started ? 'Started' : 'Not started'}</strong><span>Process</span></div>
-                  <div><strong>{runnerStatus.request_creation_enabled ? 'Enabled' : 'Disabled'}</strong><span>Auto request creation</span></div>
-                  <div><strong>No</strong><span>Automatic execution</span></div>
-                  <div><strong>{numberValue(runnerStatus.failed_tick_count)}</strong><span>Failed ticks</span></div>
-                  <div><strong>{humanize(runnerStatus.last_tick_outcome)}</strong><span>Last tick</span></div>
+                <div className="automation-schedules-metrics automation-schedules-metrics--safety">
+                  <div><strong>{runnerStatus.request_creation_enabled ? 'Enabled' : 'Off'}</strong><span>Request preparation</span></div>
+                  <div><strong>{runnerStatus.started ? 'Running' : 'Not running'}</strong><span>Background scheduler</span></div>
+                  <div><strong>Off</strong><span>Automatic execution</span></div>
+                  <div><strong>{numberValue(runnerStatus.failed_tick_count)}</strong><span>Failed runs</span></div>
+                  <div><strong>{humanize(runnerStatus.last_tick_outcome)}</strong><span>Last activity</span></div>
                 </div>
 
                 {canCreateAutomationSchedules && canCreateExecutionRequests ? (
                   <div className="automation-schedules-actions">
-                    <button type="button" className="automation-schedules-button automation-schedules-button--primary" disabled={saving || !runnerStatus.request_creation_enabled} onClick={() => setConfirmation({ kind: 'run_due' })}>Run due schedules once</button>
-                    <span className="automation-schedules-muted">Available only when controlled request creation is explicitly enabled. It never approves or executes requests.</span>
+                    <button type="button" className="btn btn-primary" disabled={saving || !runnerStatus.request_creation_enabled} onClick={() => setConfirmation({ kind: 'run_due' })}>Process due schedules now</button>
+                    <span className="automation-schedules-muted">This can prepare reviewable requests only; it cannot approve or execute them.</span>
                   </div>
                 ) : null}
 
                 {runnerStatus.unsafe_runner_output_review_required ? (
                   <div className="automation-schedules-alert automation-schedules-alert--warning">
-                    <strong>Runner anomaly review is required.</strong> Evidence is preserved. A current timestamp, count, confirmation, and review note are required to acknowledge it.
-                    {canCreateAutomationSchedules && runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? <button type="button" className="automation-schedules-button automation-schedules-button--secondary" onClick={() => { setConfirmation({ kind: 'acknowledge_anomaly' }); setConfirmationText(''); }}>Acknowledge review</button> : null}
+                    <strong>Automation safety review required.</strong> A recorded anomaly needs acknowledgement before broader schedule use.
+                    {canCreateAutomationSchedules && runnerStatus.unsafe_runner_output_review_acknowledge_allowed ? <button type="button" className="btn btn-secondary" onClick={() => { setConfirmation({ kind: 'acknowledge_anomaly' }); setConfirmationText(''); }}>Acknowledge review</button> : null}
                   </div>
                 ) : null}
-
-                <ul className="automation-schedules-check-list">{runnerStatus.checks.slice(0, 12).map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
-                {runnerStatus.checks.length > 12 ? <details><summary>Show all {runnerStatus.checks.length} runner safety checks</summary><ul className="automation-schedules-check-list">{runnerStatus.checks.slice(12).map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul></details> : null}
               </>
             ) : null}
 
-            {runnerExecutiveSummary ? (
-              <div className="automation-schedules-governance-section">
-                <div className="automation-schedules-section-heading"><div><h3>Executive summary</h3><p>{runnerExecutiveSummary.recommendation}</p></div><StatusChip status={runnerExecutiveSummary.overall_posture} /></div>
-                <div className="automation-schedules-metrics">
-                  <div><strong>{humanize(String(runnerExecutiveSummary.summary.runner_mode))}</strong><span>Runner mode</span></div>
-                  <div><strong>{runnerExecutiveSummary.summary.due_schedule_count}</strong><span>Due schedules</span></div>
-                  <div><strong>{runnerExecutiveSummary.summary.schedule_created_request_count}</strong><span>Schedule requests</span></div>
-                  <div><strong>{runnerExecutiveSummary.execution_enabled ? 'Yes' : 'No'}</strong><span>Execution enabled</span></div>
-                </div>
-                <ul className="automation-schedules-check-list">{runnerExecutiveSummary.decision_rows.map((row) => <li key={row.key}><StatusChip status={row.status} /><span><strong>{row.label}</strong>{row.detail}</span></li>)}</ul>
-              </div>
-            ) : null}
-
-            {runnerLaunchAttestation ? (
-              <div className="automation-schedules-governance-section">
-                <div className="automation-schedules-section-heading"><div><h3>Launch attestation</h3><p>Read-only evidence only. This section cannot enable flags, create requests, approve, execute, or change inventory.</p></div><StatusChip status={runnerLaunchAttestation.launch_posture} /></div>
-                <div className="automation-schedules-metrics">
-                  <div><strong>{runnerLaunchAttestation.summary.failed_attestation_count}</strong><span>Failed checks</span></div>
-                  <div><strong>{runnerLaunchAttestation.summary.watch_attestation_count}</strong><span>Watch checks</span></div>
-                  <div><strong>{humanize(runnerLaunchAttestation.summary.certification_posture)}</strong><span>Certification</span></div>
-                  <div><strong>No</strong><span>Execution enabled</span></div>
-                </div>
-                <ul className="automation-schedules-check-list">{runnerLaunchAttestation.attestation_rows.map((row) => <li key={row.key}><StatusChip status={row.status} /><span><strong>{row.label}</strong>{row.detail}</span></li>)}</ul>
-              </div>
-            ) : null}
-
             {runEvents ? (
-              <div className="automation-schedules-governance-section">
-                <div className="automation-schedules-section-heading"><div><h3>Recent run ledger</h3><p>Latest manual or controlled due-processing attempts and their linked request evidence.</p></div><span>{runEvents.total} total</span></div>
+              <div className="automation-schedules-recent-activity">
+                <div className="automation-schedules-section-heading"><div><h4>Recent schedule activity</h4><p>Latest manual or scheduled processing attempts for this tenant.</p></div><span>{runEvents.total} total</span></div>
                 <div className="automation-schedules-table-wrap">
                   <table className="automation-schedules-table automation-schedules-table--compact">
-                    <thead><tr><th>Schedule</th><th>Mode</th><th>Outcome</th><th>Request</th><th>Time</th></tr></thead>
-                    <tbody>{runEvents.rows.map((event) => <tr key={event.id}><td>{event.schedule_name}</td><td>{humanize(event.run_mode)}</td><td><StatusChip status={event.status} /></td><td>{event.execution_request_id || 'None'}</td><td>{formatDateTime(event.created_at)}</td></tr>)}</tbody>
+                    <thead><tr><th>Schedule</th><th>Run type</th><th>Outcome</th><th>Request prepared</th><th>Time</th></tr></thead>
+                    <tbody>{runEvents.rows.map((event) => <tr key={event.id}><td>{event.schedule_name}</td><td>{humanize(event.run_mode)}</td><td><StatusChip status={event.status} /></td><td>{event.execution_request_id ? 'Yes' : 'No'}</td><td>{formatDateTime(event.created_at)}</td></tr>)}</tbody>
                   </table>
                 </div>
               </div>
@@ -1162,25 +1108,15 @@ export default function AutomationSchedulesPage() {
 
             {runnerRunOnceResult ? (
               <div className="automation-schedules-result-panel">
-                <h4>Latest run-once result</h4>
+                <h4>Latest processing result</h4>
                 <div className="automation-schedules-metrics">
                   <div><strong>{runnerRunOnceResult.processed_schedule_count}</strong><span>Processed</span></div>
-                  <div><strong>{runnerRunOnceResult.created_execution_request_count}</strong><span>Requests created</span></div>
+                  <div><strong>{runnerRunOnceResult.created_execution_request_count}</strong><span>Requests prepared</span></div>
                   <div><strong>{runnerRunOnceResult.skipped_schedule_count || 0}</strong><span>Skipped</span></div>
                   <div><strong>{runnerRunOnceResult.failed_schedule_count || 0}</strong><span>Failed</span></div>
                 </div>
               </div>
             ) : null}
-
-            <details className="automation-schedules-technical-details">
-              <summary>Complete raw runner evidence</summary>
-              <div className="automation-schedules-evidence-grid">
-                <div><h4>Runner status</h4><JsonEvidence value={runnerStatus} /></div>
-                <div><h4>Executive summary</h4><JsonEvidence value={runnerExecutiveSummary} /></div>
-                <div><h4>Launch attestation</h4><JsonEvidence value={runnerLaunchAttestation} /></div>
-                <div><h4>Run ledger</h4><JsonEvidence value={runEvents} /></div>
-              </div>
-            </details>
           </div>
         ) : null}
       </section>
@@ -1192,12 +1128,12 @@ export default function AutomationSchedulesPage() {
               {confirmation.kind === 'activate' ? 'Activate schedule' : null}
               {confirmation.kind === 'disable' ? 'Disable schedule' : null}
               {confirmation.kind === 'manual_run' ? 'Create execution request' : null}
-              {confirmation.kind === 'run_due' ? 'Run due schedules once' : null}
-              {confirmation.kind === 'acknowledge_anomaly' ? 'Acknowledge runner anomaly review' : null}
+              {confirmation.kind === 'run_due' ? 'Process due schedules now' : null}
+              {confirmation.kind === 'acknowledge_anomaly' ? 'Acknowledge automation safety review' : null}
             </h3>
             {confirmation.kind === 'activate' ? <p>Activate “{confirmation.schedule.name}”? Its next run will be recalculated from now. If controlled request creation is enabled, a due run may prepare a reviewable request but cannot approve or execute it.</p> : null}
             {confirmation.kind === 'manual_run' ? <p>Create one reviewable execution request from “{confirmation.schedule.name}”? Duplicate protection applies. Nothing will be approved or executed automatically.</p> : null}
-            {confirmation.kind === 'run_due' ? <p>Process currently due active schedules once for this tenant? This may create reviewable execution requests only.</p> : null}
+            {confirmation.kind === 'run_due' ? <p>Process currently due active schedules now? This may prepare reviewable execution requests only.</p> : null}
             {confirmation.kind === 'disable' ? (
               <label className="automation-schedules-field">
                 <span>Disable reason</span>
@@ -1208,7 +1144,7 @@ export default function AutomationSchedulesPage() {
               <label className="automation-schedules-field">
                 <span>Review note</span>
                 <textarea value={confirmationText} minLength={numberValue(runnerStatus?.unsafe_runner_output_review_note_min_length) || 10} maxLength={numberValue(runnerStatus?.unsafe_runner_output_review_note_max_length) || 1000} onChange={(event) => setConfirmationText(event.target.value)} placeholder="Record what was reviewed and why the evidence is understood." />
-                <small>The note body is not exposed in runner status. Evidence counts and timestamps remain preserved.</small>
+                <small>The review is recorded for audit purposes; raw technical evidence is not shown on the tenant page.</small>
               </label>
             ) : null}
             <div className="automation-schedules-modal-actions">
