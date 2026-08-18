@@ -646,7 +646,7 @@ export default function ReplenishmentPlanningPage() {
           <label className="replenishment-planning-field replenishment-planning-run-select">
             <span>Saved planning run</span>
             <select value={effectiveRunId} disabled={runsQuery.isLoading || !(runsQuery.data?.length)} onChange={(event) => changeRun(event.target.value)}>
-              <option value="">Select a run</option>
+              <option value="">{runsQuery.data?.length ? 'Select a run' : 'No saved runs'}</option>
               {runsQuery.data?.map((run) => (
                 <option key={run.id} value={run.id}>
                   {formatDateTime(run.created_at)} · {runStatusLabel(run.status)} · {formatNumber(run.target_coverage_days)} day target
@@ -840,14 +840,7 @@ export default function ReplenishmentPlanningPage() {
             {outcomesQuery.data.transfers.length ? <><div className="replenishment-planning-subsection-title"><strong>Transfer outcomes</strong><span>Current state of stock transfers created by the run.</span></div><div className="replenishment-planning-table-wrap"><table className="replenishment-planning-table"><thead><tr><th>Product</th><th>Route</th><th>Quantity</th><th>Status</th></tr></thead><tbody>{outcomesQuery.data.transfers.map((row) => <tr key={row.id}><td><strong>{row.product_name}</strong></td><td>{row.source_storage_location_name} → {row.destination_storage_location_name}</td><td>{formatNumber(row.final_quantity)}</td><td><StatusBadge value={row.stock_transfer_status} /></td></tr>)}</tbody></table></div></> : null}
           </> : <div className="replenishment-planning-empty-state replenishment-planning-empty-state--compact"><strong>Outcome data unavailable</strong><span>Refresh the page or try again later.</span></div>}
         </section> : null}
-      </> : (
-        <section className="app-panel replenishment-planning-card replenishment-planning-empty-workspace">
-          <div className="replenishment-planning-empty-state">
-            <strong>Start with a planning run</strong>
-            <span>Generate a new snapshot or select an existing run above. You will then review internal transfers first, followed by any remaining supplier purchase need.</span>
-          </div>
-        </section>
-      )}
+      </> : null}
 
       {confirmation ? <div style={styles.modalBackdrop} role="presentation" onMouseDown={() => !materializeMutation.isPending && setConfirmation(null)}><section style={styles.modal} role="dialog" aria-modal="true" aria-labelledby="replenishment-confirm-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="replenishment-confirm-title" style={styles.modalTitle}>{confirmation.title}</h2><p style={styles.modalText}>{confirmation.message}</p><div className="replenishment-planning-actions"><button type="button" className="app-button app-button--secondary" disabled={materializeMutation.isPending} onClick={() => setConfirmation(null)}>Cancel</button><button type="button" className="app-button app-button--primary" disabled={materializeMutation.isPending || !detail} onClick={() => detail && materializeMutation.mutate({ runId: detail.run.id, expectedRunVersion: numberValue(detail.run.version) })}>{materializeMutation.isPending ? 'Working…' : 'Create drafts'}</button></div></section></div> : null}
     </div>
