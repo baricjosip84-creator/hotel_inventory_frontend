@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { styles } from './inventoryUsageStyles';
@@ -373,17 +374,15 @@ export function InventoryUsageBulkRecorder({
 
   return (
     <section style={styles.card}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Bulk usage recorder</h2>
-          <p style={styles.sectionDescription}>
-            Record several consumption lines in one controlled transaction for events, housekeeping carts,
-            maintenance jobs, waste rounds, or department issue sheets.
-            {selectedTemplate ? ` Loaded template: ${selectedTemplate.name}.` : ''}
-          </p>
-        </div>
-        <span style={styles.filterPill}>{validLineCount} valid lines</span>
-      </div>
+      <OperationalSectionHeader
+        iconPath="/inventory-usage"
+        title="Bulk usage recorder"
+        description={<>
+          Record several consumption lines in one controlled transaction for events, housekeeping carts, maintenance jobs, waste rounds, or department issue sheets.
+          {selectedTemplate ? ` Loaded template: ${selectedTemplate.name}.` : ''}
+        </>}
+        actions={<span style={styles.filterPill}>{validLineCount} valid lines</span>}
+      />
 
       <div style={styles.filterGrid}>
         <label style={styles.fieldLabel}>

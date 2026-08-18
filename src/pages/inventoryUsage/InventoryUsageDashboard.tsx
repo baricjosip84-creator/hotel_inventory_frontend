@@ -1,4 +1,13 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs,
+} from "../../components/ui/OperationalWorkspace";
 import { InventoryUsageBulkRecorder } from "./InventoryUsageBulkRecorder";
 import { InventoryUsageQuickConsumePanel } from "./InventoryUsageQuickConsumePanel";
 import { InventoryUsageGovernancePanel } from "./InventoryUsageGovernancePanel";
@@ -50,6 +59,8 @@ import type {
   InventoryUsageTemplateReadiness,
   UsageFilters,
 } from "./inventoryUsageTypes";
+
+type UsageWorkspaceArea = "overview" | "record" | "templates" | "close" | "ledger";
 
 type InventoryUsageDashboardProps = {
   permissions: {
@@ -301,6 +312,17 @@ export function InventoryUsageDashboard({
   const [exportingImpact, setExportingImpact] = useState(false);
   const [exportingAnomalies, setExportingAnomalies] = useState(false);
   const [analyticsExportError, setAnalyticsExportError] = useState("");
+  const [activeArea, setActiveArea] = useState<UsageWorkspaceArea>("overview");
+
+  useEffect(() => {
+    if (activeArea === "record" && !permissions.canRecord && !permissions.canBulkRecord) {
+      setActiveArea("overview");
+      return;
+    }
+    if (activeArea === "close" && !permissions.canClosePeriods) {
+      setActiveArea("overview");
+    }
+  }, [activeArea, permissions.canBulkRecord, permissions.canClosePeriods, permissions.canRecord]);
 
   const escapeCsvCell = (value: unknown) => {
     const raw = value === null || value === undefined ? "" : String(value);
@@ -431,54 +453,147 @@ export function InventoryUsageDashboard({
   };
 
   return (
-    <div style={styles.page}>
-      <section style={styles.heroCard}>
-        <div>
-          <p style={styles.eyebrow}>Usage / consumption logging</p>
-          <h1 style={styles.title}>Inventory usage ledger</h1>
-          <p style={styles.subtitle}>
-            Track why stock leaves the business: guest use, internal use, waste,
-            damage, events, maintenance, and other operational consumption.
-          </p>
-        </div>
-        <div style={styles.heroActions}>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={onRefreshPage}
-            disabled={refreshingPage}
-          >
-            {refreshingPage ? "Refreshing..." : "Refresh page"}
-          </button>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={() => setFilters(DEFAULT_USAGE_FILTERS)}
-            disabled={activeFilterCount === 0}
-          >
-            Reset filters
-          </button>
-          <button
-            type="button"
-            style={styles.primaryButton}
-            onClick={onExportCsv}
-            disabled={!exportRowCount || exportingCsv}
-          >
-            {exportingCsv ? "Preparing CSV..." : "Export filtered CSV"}
-          </button>
-        </div>
-      </section>
-
-      <section style={styles.filterCard}>
-        <div style={styles.sectionHeader}>
-          <div>
-            <h2 style={styles.sectionTitle}>Operational filters</h2>
-            <p style={styles.sectionDescription}>
-              Filter by product, location, reason, department, date, and reversal status.
-            </p>
+    <div className="io-operational-page io-usage-ledger-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/inventory-usage"
+        eyebrow="Usage operations"
+        title="Inventory usage ledger"
+        description="Record and review why stock leaves the business, with operational attribution, stock impact, audit evidence, templates, and controlled period close."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Stock-linked audit trail</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{permissions.canRecord || permissions.canBulkRecord ? "Usage recording available" : "Review-only for current role"}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div style={styles.heroActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={onRefreshPage}
+              disabled={refreshingPage}
+            >
+              {refreshingPage ? "Refreshing..." : "Refresh page"}
+            </button>
+            <button
+              type="button"
+              style={styles.primaryButton}
+              onClick={onExportCsv}
+              disabled={!exportRowCount || exportingCsv}
+            >
+              {exportingCsv ? "Preparing CSV..." : "Export filtered CSV"}
+            </button>
           </div>
-          <span style={styles.filterPill}>{activeFilterCount} active</span>
-        </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Usage summary">
+        <OperationalWorkspaceStatCard
+          label="Usage events"
+          value={toNumber(totals?.usage_count)}
+          helper="Matching the current filters"
+          iconPath="/inventory-usage"
+          loading={summaryLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Quantity consumed"
+          value={toNumber(totals?.total_quantity)}
+          helper="May combine products measured in different units"
+          iconPath="/stock"
+          loading={summaryLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Estimated usage value"
+          value={formatMoney(totals?.estimated_usage_value, summary?.currency_code)}
+          helper="Estimated from available cost evidence"
+          tone="blue"
+          iconPath="/reports"
+          loading={summaryLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Missing cost entries"
+          value={toNumber(totals?.missing_cost_count)}
+          helper="Usage records without usable cost evidence"
+          tone={toNumber(totals?.missing_cost_count) > 0 ? "warn" : "good"}
+          iconPath="/alerts"
+          loading={summaryLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="First consumed"
+          value={formatDateTime(totals?.first_consumed_at)}
+          helper="Earliest matching usage event"
+          iconPath="/inventory-usage"
+          loading={summaryLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Last consumed"
+          value={formatDateTime(totals?.last_consumed_at)}
+          helper="Most recent matching usage event"
+          iconPath="/inventory-usage"
+          loading={summaryLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Usage ledger work areas" hint="Choose the part of usage operations you want to work in.">
+        <OperationalWorkspaceTab
+          active={activeArea === "overview"}
+          iconPath="/dashboard"
+          label="Overview"
+          count={toNumber(totals?.usage_count) || undefined}
+          onClick={() => setActiveArea("overview")}
+        />
+        {permissions.canRecord || permissions.canBulkRecord ? (
+          <OperationalWorkspaceTab
+            active={activeArea === "record"}
+            iconPath="/inventory-usage"
+            label="Record usage"
+            onClick={() => setActiveArea("record")}
+          />
+        ) : null}
+        <OperationalWorkspaceTab
+          active={activeArea === "templates"}
+          iconPath="/automation-schedules"
+          label="Templates"
+          count={templates.length || undefined}
+          onClick={() => setActiveArea("templates")}
+        />
+        {permissions.canClosePeriods ? (
+          <OperationalWorkspaceTab
+            active={activeArea === "close"}
+            iconPath="/audit"
+            label="Period close"
+            count={periodClosures.length || undefined}
+            onClick={() => setActiveArea("close")}
+          />
+        ) : null}
+        <OperationalWorkspaceTab
+          active={activeArea === "ledger"}
+          iconPath="/stock-movements"
+          label="Ledger"
+          count={ledgerTotal || undefined}
+          onClick={() => setActiveArea("ledger")}
+        />
+      </OperationalWorkspaceTabs>
+
+      {(activeArea === "overview" || activeArea === "ledger") ? (
+      <section style={styles.filterCard}>
+        <OperationalSectionHeader
+          iconPath="/stock-movements"
+          title="Operational filters"
+          description="Filter by product, location, reason, department, date, and reversal status."
+          actions={
+            <div style={styles.inlineActions}>
+              <span style={styles.filterPill}>{activeFilterCount} active</span>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setFilters(DEFAULT_USAGE_FILTERS)}
+                disabled={activeFilterCount === 0}
+              >
+                Reset filters
+              </button>
+            </div>
+          }
+        />
 
         <div style={styles.filterGrid}>
           <label style={styles.fieldLabel}>
@@ -616,8 +731,9 @@ export function InventoryUsageDashboard({
           </p>
         ) : null}
       </section>
+      ) : null}
 
-      {permissions.canRecord ? (
+      {activeArea === "record" && permissions.canRecord ? (
         <InventoryUsageQuickConsumePanel
           key={barcodeCompletionKey}
           completionMessage={barcodeCompletionMessage}
@@ -639,7 +755,7 @@ export function InventoryUsageDashboard({
         />
       ) : null}
 
-      {permissions.canBulkRecord ? (
+      {activeArea === "record" && permissions.canBulkRecord ? (
         <InventoryUsageBulkRecorder
           selectedTemplate={selectedTemplate}
           productOptions={productOptions}
@@ -656,6 +772,8 @@ export function InventoryUsageDashboard({
         />
       ) : null}
 
+      {activeArea === "templates" ? (
+        <>
       <InventoryUsageScheduledTemplatesPanel
         canRunDueTemplates={permissions.canRunScheduled}
         scheduled={scheduledTemplates}
@@ -691,48 +809,11 @@ export function InventoryUsageDashboard({
         onArchiveTemplate={onArchiveTemplate}
         onRecordTemplate={onRecordTemplate}
       />
+        </>
+      ) : null}
 
-      <section style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>Usage events</span>
-          <strong style={styles.statValue}>
-            {toNumber(totals?.usage_count)}
-          </strong>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>Quantity consumed</span>
-          <strong style={styles.statValue}>
-            {toNumber(totals?.total_quantity)}
-          </strong>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>Estimated usage value</span>
-          <strong style={styles.statValue}>
-            {formatMoney(totals?.estimated_usage_value, summary?.currency_code)}
-          </strong>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>Missing cost entries</span>
-          <strong style={styles.statValue}>
-            {toNumber(totals?.missing_cost_count)}
-          </strong>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>First consumed</span>
-          <strong style={styles.statValueSmall}>
-            {formatDateTime(totals?.first_consumed_at)}
-          </strong>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statLabel}>Last consumed</span>
-          <strong style={styles.statValueSmall}>
-            {formatDateTime(totals?.last_consumed_at)}
-          </strong>
-        </div>
-      </section>
-      <p style={styles.warningText}>
-        Quantity totals can combine products measured in different units. Filter to one product before treating the total as one directly comparable quantity.
-      </p>
+      {activeArea === "overview" ? (
+        <>
 
       <InventoryUsageGovernancePanel
         filters={filters}
@@ -1176,8 +1257,10 @@ export function InventoryUsageDashboard({
           )}
         </div>
       </section>
+        </>
+      ) : null}
 
-      {permissions.canClosePeriods ? (
+      {activeArea === "close" && permissions.canClosePeriods ? (
         <InventoryUsagePeriodClosuresPanel
           closures={periodClosures}
           loading={periodClosuresLoading}
@@ -1193,25 +1276,22 @@ export function InventoryUsageDashboard({
         />
       ) : null}
 
-      {selectedUsageLogId ? (
+      {activeArea === "ledger" && selectedUsageLogId ? (
         <section style={styles.card}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Usage log detail</h2>
-              <p style={styles.sectionDescription}>
-                Operational audit view for the selected consumption entry,
-                including stock movements, review state, reversal linkage, and
-                evidence attachments.
-              </p>
-            </div>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={onCloseUsageLogDetail}
-            >
-              Close detail
-            </button>
-          </div>
+          <OperationalSectionHeader
+            iconPath="/audit"
+            title="Usage log detail"
+            description="Operational audit view for the selected consumption entry, including stock movements, review state, reversal linkage, and evidence attachments."
+            actions={
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={onCloseUsageLogDetail}
+              >
+                Close detail
+              </button>
+            }
+          />
 
           {usageLogDetailLoading ? (
             <p style={styles.sectionDescription}>Loading usage detail...</p>
@@ -1377,37 +1457,36 @@ export function InventoryUsageDashboard({
         </section>
       ) : null}
 
+      {activeArea === "ledger" ? (
       <section style={styles.card}>
-        <div style={styles.sectionHeader}>
-          <div>
-            <h2 style={styles.sectionTitle}>Usage ledger</h2>
-            <p style={styles.sectionDescription}>
-              Filtered usage records linked to stock movement IDs for audit
-              traceability. Reversals restore stock through a compensating
-              movement instead of deleting history.
-            </p>
-            <p style={styles.sectionDescription}>
-              Showing {ledgerStart}-{ledgerEnd} of {ledgerTotal} matching usage records.
-            </p>
-            {reverseError ? (
-              <p style={styles.errorText}>
-                Usage reversal failed: {reverseError.message}
-              </p>
-            ) : null}
-          </div>
-          <label style={styles.fieldLabel}>
-            Rows per page
-            <select
-              style={styles.input}
-              value={ledgerPageSize}
-              onChange={(event) => onLedgerPageSizeChange(Number(event.target.value))}
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </label>
-        </div>
+        <OperationalSectionHeader
+          iconPath="/stock-movements"
+          title="Usage ledger"
+          description={<>
+            Filtered usage records linked to stock movement IDs for audit traceability. Reversals restore stock through a compensating movement instead of deleting history.
+            <br />
+            Showing {ledgerStart}-{ledgerEnd} of {ledgerTotal} matching usage records.
+          </>}
+          actions={
+            <label style={styles.fieldLabel}>
+              Rows per page
+              <select
+                style={styles.input}
+                value={ledgerPageSize}
+                onChange={(event) => onLedgerPageSizeChange(Number(event.target.value))}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+          }
+        />
+        {reverseError ? (
+          <p style={styles.errorText}>
+            Usage reversal failed: {reverseError.message}
+          </p>
+        ) : null}
 
         {logsLoading ? (
           <p style={styles.sectionDescription}>Loading usage ledger...</p>
@@ -1558,6 +1637,7 @@ export function InventoryUsageDashboard({
           </div>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }

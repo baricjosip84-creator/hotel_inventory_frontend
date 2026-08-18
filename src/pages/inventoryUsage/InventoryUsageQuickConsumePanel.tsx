@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
@@ -548,18 +549,16 @@ export function InventoryUsageQuickConsumePanel({
 
   return (
     <section style={styles.card}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Barcode quick consume</h2>
-          <p style={styles.sectionDescription}>
-            Scan a product, package, or inventory-label barcode with this device camera, or paste/type its value.
-            Package barcode quantity means packages; product and inventory-label quantity means base units.
-          </p>
-        </div>
-        <span style={canRecord ? styles.successPill : styles.warningPill}>
-          {canRecord ? 'Ready to record' : 'Record permission required'}
-        </span>
-      </div>
+      <OperationalSectionHeader
+        iconPath="/scanner"
+        title="Barcode quick consume"
+        description="Scan a product, package, or inventory-label barcode with this device camera, or paste/type its value. Package barcode quantity means packages; product and inventory-label quantity means base units."
+        actions={
+          <span style={canRecord ? styles.successPill : styles.warningPill}>
+            {canRecord ? 'Ready to record' : 'Record permission required'}
+          </span>
+        }
+      />
 
       <div style={styles.filterGrid}>
         <label style={styles.fieldLabel}>

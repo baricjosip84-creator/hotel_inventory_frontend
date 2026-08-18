@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { formatDateTime, formatUsageReason, toNumber } from './inventoryUsageFormatting';
@@ -139,16 +140,12 @@ export function InventoryUsageTemplatesPanel({
 
   return (
     <section style={styles.card}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Usage templates</h2>
-          <p style={styles.sectionDescription}>
-            Save repeatable consumption packs for recurring jobs, events, housekeeping carts, waste rounds,
-            or maintenance kits, then load them into the bulk recorder.
-          </p>
-        </div>
-        <span style={styles.filterPill}>{templates.length} templates</span>
-      </div>
+      <OperationalSectionHeader
+        iconPath="/automation-schedules"
+        title="Usage templates"
+        description="Save repeatable consumption packs for recurring jobs, events, housekeeping carts, waste rounds, or maintenance kits, then load them into the bulk recorder."
+        actions={<span style={styles.filterPill}>{templates.length} templates</span>}
+      />
 
       <div style={styles.templateGrid}>
         <div style={styles.templateBuilderCard}>

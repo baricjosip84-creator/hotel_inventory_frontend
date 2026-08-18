@@ -1,3 +1,4 @@
+import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 import { formatDateTime, formatUsageReason, toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageScheduledTemplateRunDueResponse, InventoryUsageScheduledTemplates } from './inventoryUsageTypes';
@@ -59,13 +60,11 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
 
   return (
     <section style={styles.card}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Scheduled usage templates</h2>
-          <p style={styles.sectionDescription}>
-            Monitor recurring usage packs before staff records them, with readiness and stock-risk status.
-          </p>
-        </div>
+      <OperationalSectionHeader
+        iconPath="/automation-schedules"
+        title="Scheduled usage templates"
+        description="Monitor recurring usage packs before staff records them, with readiness and stock-risk status."
+        actions={<>
         <div style={styles.templateMetrics}>
           <span style={styles.filterPill}>{toNumber(summary?.template_count)} scheduled</span>
           <span style={styles.warningPill}>{toNumber(summary?.due_count)} due</span>
@@ -82,7 +81,8 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
             </button>
           ) : null}
         </div>
-      </div>
+        </>}
+      />
 
       {runDueError ? <p style={styles.errorText}>Failed to record due templates: {runDueError.message}</p> : null}
       {runDueResult ? (

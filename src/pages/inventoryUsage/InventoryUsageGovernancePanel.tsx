@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { OperationalSectionHeader } from "../../components/ui/OperationalWorkspace";
 import { formatCodeLabel, formatUsageReason, toNumber } from "./inventoryUsageFormatting";
 import { fetchInventoryUsageExceptions } from "./inventoryUsageApi";
 import { styles } from "./inventoryUsageStyles";
@@ -183,14 +184,11 @@ export function InventoryUsageGovernancePanel({
 
   return (
     <section style={styles.cardWide}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Usage governance</h2>
-          <p style={styles.sectionDescription}>
-            Enterprise review signals for attribution quality, backdated usage,
-            and waste/damage exposure.
-          </p>
-        </div>
+      <OperationalSectionHeader
+        iconPath="/audit"
+        title="Usage governance"
+        description="Enterprise review signals for attribution quality, backdated usage, and waste/damage exposure."
+        actions={<>
         <div style={styles.inlineActions}>
           <button
             type="button"
@@ -214,7 +212,8 @@ export function InventoryUsageGovernancePanel({
             {loading ? "Reviewing..." : getRiskLevel(attentionCount)}
           </span>
         </div>
-      </div>
+        </>}
+      />
 
       {alertScanError ? (
         <p style={styles.errorText}>{alertScanError.message}</p>

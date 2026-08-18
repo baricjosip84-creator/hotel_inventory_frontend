@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { OperationalSectionHeader } from "../../components/ui/OperationalWorkspace";
 
 import {
   formatDateTime,
@@ -247,17 +248,11 @@ export function InventoryUsagePeriodClosuresPanel({
 
   return (
     <section style={styles.cardWide}>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Usage period close</h2>
-          <p style={styles.sectionDescription}>
-            Freeze a usage period into an audit-ready rollup with quantity,
-            estimated value, exceptions, reversals, and follow-up exposure.
-            Closed periods block new backdated usage and usage reversals inside
-            the closed range.
-          </p>
-        </div>
-      </div>
+      <OperationalSectionHeader
+        iconPath="/audit"
+        title="Usage period close"
+        description="Freeze a usage period into an audit-ready rollup with quantity, estimated value, exceptions, reversals, and follow-up exposure. Closed periods block new backdated usage and usage reversals inside the closed range."
+      />
 
       <div style={styles.formGrid}>
         <label style={styles.fieldLabel}>
