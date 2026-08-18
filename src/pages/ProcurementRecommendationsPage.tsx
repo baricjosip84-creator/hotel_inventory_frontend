@@ -1897,7 +1897,7 @@ export default function ProcurementRecommendationsPage() {
           loading={recommendationsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Estimated spend"
+          label="Recommendation spend"
           value={formatMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
           helper="Estimated value of the filtered recommendations"
           tone="neutral"
@@ -2485,7 +2485,7 @@ export default function ProcurementRecommendationsPage() {
         ) : null}
         <div style={styles.actionRow}>
           <button
-            style={styles.secondaryButton}
+            className="app-button app-button--secondary"
             type="button"
             disabled={
               !canApproveRecommendations ||
@@ -2501,7 +2501,7 @@ export default function ProcurementRecommendationsPage() {
             Preview approval readiness
           </button>
           <button
-            style={styles.primaryButton}
+            className="app-button app-button--primary"
             type="button"
             disabled={
               !canApproveRecommendations ||
@@ -2527,7 +2527,7 @@ export default function ProcurementRecommendationsPage() {
             Bulk approve
           </button>
           <button
-            style={styles.primaryButton}
+            className="app-button app-button--primary"
             type="button"
             disabled={
               !canCreatePurchaseOrderDrafts ||
@@ -2551,7 +2551,7 @@ export default function ProcurementRecommendationsPage() {
             Create PO draft(s)
           </button>
           <button
-            style={styles.secondaryButton}
+            className="app-button app-button--secondary"
             type="button"
             disabled={
               !canApproveRecommendations ||
@@ -2568,7 +2568,7 @@ export default function ProcurementRecommendationsPage() {
             Bulk defer
           </button>
           <button
-            style={styles.dangerButton}
+            className="app-button app-button--danger"
             type="button"
             disabled={
               !canApproveRecommendations ||
