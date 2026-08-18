@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 
 type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 
@@ -911,13 +912,16 @@ export default function StockTransfersPage() {
 
       <section id="stock-transfer-form" className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>{editingTransferId ? 'Edit Transfer Draft' : 'Create Transfer Draft'}</h3>
-            <p style={styles.panelSubtitle}>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>{editingTransferId ? 'Edit Transfer Draft' : 'Create Transfer Draft'}</h3>
+              <p style={styles.panelSubtitle}>
               {editingTransferId
                 ? 'Update the selected draft before execution. Editing a draft does not change stock.'
                 : 'Plan an internal move between two storage locations. Stock changes only after an authorized user executes the draft.'}
-            </p>
+              </p>
+            </div>
           </div>
           {editingTransferId ? <span style={styles.draftBadge}>EDITING DRAFT</span> : null}
         </div>
@@ -1092,9 +1096,12 @@ export default function StockTransfersPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.listHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Stock Transfers</h3>
-            <p style={styles.panelSubtitle}>Search drafts and completed transfers, then open one for execution, cancellation, print, export, or movement audit.</p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Stock Transfers</h3>
+              <p style={styles.panelSubtitle}>Search drafts and completed transfers, then open one for execution, cancellation, print, export, or movement audit.</p>
+            </div>
           </div>
           <div style={styles.filterActions}>
             <button type="button" style={styles.secondaryButton} onClick={refreshTransferBoard} disabled={isRefreshingTransfers}>
@@ -1230,9 +1237,12 @@ export default function StockTransfersPage() {
       {selectedTransferId ? (
         <section ref={detailSectionRef} className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.panelTitle}>Transfer Detail</h3>
-              <p style={styles.panelSubtitle}>Review the selected transfer’s route, lifecycle, items, source-stock check, and execution audit.</p>
+            <div className="io-section-heading-with-icon">
+              <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
+              <div className="io-section-heading-copy">
+                <h3 style={styles.panelTitle}>Transfer Detail</h3>
+                <p style={styles.panelSubtitle}>Review the selected transfer’s route, lifecycle, items, source-stock check, and execution audit.</p>
+              </div>
             </div>
             <button type="button" style={styles.secondaryButton} onClick={() => setSelectedTransferId(null)}>Close detail</button>
           </div>

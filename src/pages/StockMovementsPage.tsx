@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './StockMovementsPage.css';
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
@@ -494,18 +495,24 @@ export default function StockMovementsPage() {
   return (
     <div className="io-operational-page io-stock-movements-page" style={styles.page}>
       <header style={styles.header}>
-        <div>
-          <h2 style={styles.title}>Stock Movements</h2>
-          <p style={styles.description}>Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.</p>
+        <div className="io-page-intro">
+          <span className="io-page-intro__icon"><TenantNavIcon path="/stock-movements" size={24} /></span>
+          <div className="io-page-intro__copy">
+            <h2 style={styles.title}>Stock Movements</h2>
+            <p style={styles.description}>Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.</p>
+          </div>
         </div>
         <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching}>Refresh Ledger</button>
       </header>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Filters</h3>
-            <p style={styles.sectionDescription}>Filters work together and are preserved in the page link.</p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock-movements" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Filters</h3>
+              <p style={styles.sectionDescription}>Filters work together and are preserved in the page link.</p>
+            </div>
           </div>
           <button type="button" className="app-button app-button--secondary" onClick={() => pushState(EMPTY_FILTERS, { ...paging, page: 1 })} disabled={activeFilterCount === 0}>Clear Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</button>
         </div>
@@ -597,9 +604,12 @@ export default function StockMovementsPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Movement Ledger</h3>
-            <p style={styles.sectionDescription}>{totalRows ? `Showing ${firstRow}–${lastRow} of ${totalRows} filtered movements.` : 'No movements match the current filters.'}</p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock-movements" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Movement Ledger</h3>
+              <p style={styles.sectionDescription}>{totalRows ? `Showing ${firstRow}–${lastRow} of ${totalRows} filtered movements.` : 'No movements match the current filters.'}</p>
+            </div>
           </div>
           <div className="stock-movements-ledger-actions">
             <label>Rows per page

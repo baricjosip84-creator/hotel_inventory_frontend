@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './InventoryCapabilitiesPage.css';
 
 type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cost' | 'variants' | 'hierarchy' | 'bom' | 'mobile';
@@ -32,16 +33,16 @@ type Variant = { id: string; parent_product_id: string; parent_product_name: str
 type BomComponent = { id?: string; component_product_id?: string; product_id?: string; component_name?: string; component_sku?: string; quantity: number | string; waste_percent?: number | string };
 type Bom = { id: string; product_id: string; product_name: string; product_sku: string; name: string; output_quantity: number | string; is_active: boolean; components: BomComponent[] };
 
-const TABS: Array<{ key: TabKey; label: string; countKey: string; metricLabel: string }> = [
-  { key: 'integrations', label: 'APIs & integrations', countKey: 'api_clients', metricLabel: 'Active API keys' },
-  { key: 'serials', label: 'Serial tracking', countKey: 'active_serials', metricLabel: 'Active serial identities' },
-  { key: 'uom', label: 'Units of measure', countKey: 'uom_conversions', metricLabel: 'Saved conversions' },
-  { key: 'custom-fields', label: 'Custom fields', countKey: 'custom_fields', metricLabel: 'Active field definitions' },
-  { key: 'landed-cost', label: 'Landed cost', countKey: 'landed_cost_documents', metricLabel: 'Finalized cost records' },
-  { key: 'variants', label: 'Variants', countKey: 'variants', metricLabel: 'Variant products' },
-  { key: 'hierarchy', label: 'Location hierarchy', countKey: 'hierarchical_locations', metricLabel: 'Nested locations' },
-  { key: 'bom', label: 'BOM & assemblies', countKey: 'active_boms', metricLabel: 'Active BOMs' },
-  { key: 'mobile', label: 'Offline task mode', countKey: 'mobile_sync_batches', metricLabel: 'Offline sync batches' }
+const TABS: Array<{ key: TabKey; label: string; countKey: string; metricLabel: string; iconPath: string }> = [
+  { key: 'integrations', label: 'APIs & integrations', countKey: 'api_clients', metricLabel: 'Active API keys', iconPath: '/system-context' },
+  { key: 'serials', label: 'Serial tracking', countKey: 'active_serials', metricLabel: 'Active serial identities', iconPath: '/scanner' },
+  { key: 'uom', label: 'Units of measure', countKey: 'uom_conversions', metricLabel: 'Saved conversions', iconPath: '/stock' },
+  { key: 'custom-fields', label: 'Custom fields', countKey: 'custom_fields', metricLabel: 'Active field definitions', iconPath: '/tenant-settings' },
+  { key: 'landed-cost', label: 'Landed cost', countKey: 'landed_cost_documents', metricLabel: 'Finalized cost records', iconPath: '/reports' },
+  { key: 'variants', label: 'Variants', countKey: 'variants', metricLabel: 'Variant products', iconPath: '/products' },
+  { key: 'hierarchy', label: 'Location hierarchy', countKey: 'hierarchical_locations', metricLabel: 'Nested locations', iconPath: '/storage-locations' },
+  { key: 'bom', label: 'BOM & assemblies', countKey: 'active_boms', metricLabel: 'Active BOMs', iconPath: '/inventory-capabilities' },
+  { key: 'mobile', label: 'Offline task mode', countKey: 'mobile_sync_batches', metricLabel: 'Offline sync batches', iconPath: '/mobile-execution' }
 ];
 
 const panelStyle: CSSProperties = { display: 'grid', gap: 18 };
@@ -131,7 +132,12 @@ export default function InventoryCapabilitiesPage() {
   return (
     <div className="io-operational-page io-advanced-inventory-page" style={{ ...panelStyle, color: '#0f172a' }}>
       <section className="section capability-overview" style={{ marginTop: 0 }}>
-        <div className="section__title" style={{ fontSize: 24, letterSpacing: '-0.02em', marginBottom: 10 }}>Capability overview</div>
+        <div className="io-page-intro capability-overview-heading">
+          <span className="io-page-intro__icon"><TenantNavIcon path="/inventory-capabilities" size={24} /></span>
+          <div className="io-page-intro__copy">
+            <div className="section__title" style={{ fontSize: 24, letterSpacing: '-0.02em', marginBottom: 4 }}>Capability overview</div>
+          </div>
+        </div>
         <div className="card capability-overview-card">
           <p className="card__subtext" style={{ marginTop: 0, maxWidth: 920 }}>
             These are optional controls for more advanced inventory workflows. Use only the capabilities your operation needs; sections you cannot access are hidden automatically.
@@ -151,7 +157,7 @@ export default function InventoryCapabilitiesPage() {
       <div className="capability-tabs" style={tabRowStyle} data-global-action-feedback-scope="navigation" aria-label="Advanced inventory sections">
         {visibleTabs.map((item) => (
           <button key={item.key} className={tab === item.key ? 'button' : 'button button--secondary'} type="button" onClick={() => setTab(item.key)}>
-            {item.label}
+            <span className="io-tab-icon-label"><TenantNavIcon path={item.iconPath} size={15} /><span>{item.label}</span></span>
           </button>
         ))}
       </div>

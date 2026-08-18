@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './OutboundPage.css';
 
 type Customer = {
@@ -641,10 +642,13 @@ export default function OutboundPage() {
 
   return <div className="io-operational-page io-outbound-page">
     <section className="outbound-panel outbound-overview">
-      <div className="outbound-overview-copy">
-        <div className="outbound-eyebrow">Customer fulfillment</div>
-        <h2>From customer order to dispatched stock</h2>
-        <p>Confirming an order reserves stock. Warehouse staff then record what was physically picked, pack only those quantities, and dispatch only packed stock. Partial dispatches keep the remaining order reservation intact.</p>
+      <div className="outbound-overview-copy io-page-intro">
+        <span className="io-page-intro__icon"><TenantNavIcon path="/outbound" size={24} /></span>
+        <div className="io-page-intro__copy">
+          <div className="outbound-eyebrow">Customer fulfillment</div>
+          <h2>From customer order to dispatched stock</h2>
+          <p>Confirming an order reserves stock. Warehouse staff then record what was physically picked, pack only those quantities, and dispatch only packed stock. Partial dispatches keep the remaining order reservation intact.</p>
+        </div>
       </div>
       <div className="outbound-workflow-grid" aria-label="Outbound workflow">
         <div className="outbound-workflow-step"><strong>1. Draft</strong><span>Choose the customer, products, source locations, quantities, and requested date.</span></div>
@@ -659,7 +663,10 @@ export default function OutboundPage() {
 
     <section className="outbound-panel">
       <div className="outbound-section-heading">
-        <div><h3>Outbound status</h3><p>A quick operational view. Counts are used here instead of adding unrelated product units such as pieces, kilograms, or litres together.</p></div>
+        <div className="io-section-heading-with-icon">
+          <span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span>
+          <div className="io-section-heading-copy"><h3>Outbound status</h3><p>A quick operational view. Counts are used here instead of adding unrelated product units such as pieces, kilograms, or litres together.</p></div>
+        </div>
         <div className="outbound-section-heading-actions"><button type="button" className="outbound-button" onClick={() => { void summary.refetch(); void orders.refetch(); }} disabled={summary.isFetching || orders.isFetching}>{summary.isFetching || orders.isFetching ? 'Refreshing…' : 'Refresh status'}</button></div>
       </div>
       {summary.isLoading ? <div className="outbound-empty">Loading outbound status…</div> : summary.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(summary.error, 'Outbound status is unavailable.')}</div> : summary.data ? <div className="outbound-summary-grid">
@@ -675,17 +682,17 @@ export default function OutboundPage() {
 
     <section className="outbound-panel outbound-tabs-shell">
       <div className="outbound-tabs" role="tablist" aria-label="Outbound work areas">
-        <button type="button" className={`outbound-tab${activeTab === 'orders' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('orders')} role="tab" aria-selected={activeTab === 'orders'}>Orders<span className="outbound-tab-count">{activeOrderCount}</span></button>
-        {showCustomerTab ? <button type="button" className={`outbound-tab${activeTab === 'customers' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('customers')} role="tab" aria-selected={activeTab === 'customers'}>Customers</button> : null}
-        {showReturnTab ? <button type="button" className={`outbound-tab${activeTab === 'returns' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('returns')} role="tab" aria-selected={activeTab === 'returns'}>Customer returns{summary.data?.pending_customer_returns ? <span className="outbound-tab-count">{summary.data.pending_customer_returns}</span> : null}</button> : null}
-        <button type="button" className={`outbound-tab${activeTab === 'trace' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('trace')} role="tab" aria-selected={activeTab === 'trace'}>Dispatch trace</button>
+        <button type="button" className={`outbound-tab${activeTab === 'orders' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('orders')} role="tab" aria-selected={activeTab === 'orders'}><span className="io-tab-icon-label"><TenantNavIcon path="/outbound" size={15} /><span>Orders</span></span><span className="outbound-tab-count">{activeOrderCount}</span></button>
+        {showCustomerTab ? <button type="button" className={`outbound-tab${activeTab === 'customers' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('customers')} role="tab" aria-selected={activeTab === 'customers'}><span className="io-tab-icon-label"><TenantNavIcon path="/suppliers" size={15} /><span>Customers</span></span></button> : null}
+        {showReturnTab ? <button type="button" className={`outbound-tab${activeTab === 'returns' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('returns')} role="tab" aria-selected={activeTab === 'returns'}><span className="io-tab-icon-label"><TenantNavIcon path="/stock-transfers" size={15} /><span>Customer returns</span></span>{summary.data?.pending_customer_returns ? <span className="outbound-tab-count">{summary.data.pending_customer_returns}</span> : null}</button> : null}
+        <button type="button" className={`outbound-tab${activeTab === 'trace' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('trace')} role="tab" aria-selected={activeTab === 'trace'}><span className="io-tab-icon-label"><TenantNavIcon path="/stock-movements" size={15} /><span>Dispatch trace</span></span></button>
       </div>
     </section>
 
     {activeTab === 'orders' ? <>
       {(showOrderForm || editingOrder) ? <section className="outbound-panel">
         <div className="outbound-section-heading">
-          <div><h3>{editingOrder ? `Edit draft ${editingOrder.order_number}` : 'Create customer order'}</h3><p>Create a draft first. Stock is not reserved until the draft is confirmed.</p></div>
+          <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span><div className="io-section-heading-copy"><h3>{editingOrder ? `Edit draft ${editingOrder.order_number}` : 'Create customer order'}</h3><p>Create a draft first. Stock is not reserved until the draft is confirmed.</p></div></div>
           <button type="button" className="outbound-button" onClick={cancelOrderEdit}>Close form</button>
         </div>
         {!canUseOrderForm && !editingOrder ? <div className="outbound-alert outbound-alert--warning">Creating an order also requires read access to customers, products, and storage locations so the selections can be verified safely.</div> : null}
@@ -739,7 +746,7 @@ export default function OutboundPage() {
 
       <section className="outbound-panel">
         <div className="outbound-section-heading">
-          <div><h3>Customer orders</h3><p>Review the fulfillment state, open the warehouse picking workbench, and dispatch only packed stock.</p></div>
+          <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span><div className="io-section-heading-copy"><h3>Customer orders</h3><p>Review the fulfillment state, open the warehouse picking workbench, and dispatch only packed stock.</p></div></div>
           <div className="outbound-section-heading-actions">
             <button type="button" className="outbound-button" onClick={() => void orders.refetch()} disabled={orders.isFetching}>{orders.isFetching ? 'Refreshing…' : 'Refresh orders'}</button>
             {canCreate ? <button type="button" className="outbound-button-primary" onClick={() => { setEditingOrder(null); setOrderForm(emptyOrder); setShowOrderForm(true); }}>New customer order</button> : null}
@@ -834,7 +841,7 @@ export default function OutboundPage() {
 
     {activeTab === 'customers' ? <section className="outbound-panel">
       <div className="outbound-section-heading">
-        <div><h3>Customers</h3><p>Maintain customer contact data used by outbound orders. Archived customers remain visible in historical orders but cannot be used for new orders.</p></div>
+        <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/suppliers" size={18} /></span><div className="io-section-heading-copy"><h3>Customers</h3><p>Maintain customer contact data used by outbound orders. Archived customers remain visible in historical orders but cannot be used for new orders.</p></div></div>
         <div className="outbound-section-heading-actions">
           {canCustomerRead ? <label className="outbound-checkbox-label"><input type="checkbox" checked={includeArchivedCustomers} onChange={(event) => setIncludeArchivedCustomers(event.target.checked)} /> Include archived</label> : null}
           {canCustomerRead ? <button type="button" className="outbound-button" onClick={() => void customers.refetch()} disabled={customers.isFetching}>{customers.isFetching ? 'Refreshing…' : 'Refresh customers'}</button> : null}
@@ -870,7 +877,7 @@ export default function OutboundPage() {
 
     {activeTab === 'returns' ? <section className="outbound-panel">
       <div className="outbound-section-heading">
-        <div><h3>Customer returns</h3><p>Create returns only from stock that was actually dispatched. Receiving a return restores usable stock only when the selected condition is “Return to usable stock”.</p></div>
+        <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={18} /></span><div className="io-section-heading-copy"><h3>Customer returns</h3><p>Create returns only from stock that was actually dispatched. Receiving a return restores usable stock only when the selected condition is “Return to usable stock”.</p></div></div>
         <div className="outbound-section-heading-actions">{canReturnRead ? <button type="button" className="outbound-button" onClick={() => { void returns.refetch(); void trace.refetch(); }} disabled={returns.isFetching || trace.isFetching}>{returns.isFetching || trace.isFetching ? 'Refreshing…' : 'Refresh returns'}</button> : null}</div>
       </div>
       {trace.isLoading ? <div className="outbound-alert outbound-alert--info">Loading dispatched stock eligible for returns…</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, 'Dispatch history could not be loaded for returns.')}</div> : null}
@@ -945,7 +952,7 @@ export default function OutboundPage() {
 
     {activeTab === 'trace' ? <section className="outbound-panel">
       <div className="outbound-section-heading">
-        <div><h3>Dispatch trace</h3><p>Read-only proof of what stock actually left for which customer. Lot, batch, expiry, serial, and return status are shown when those identities exist.</p></div>
+        <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/stock-movements" size={18} /></span><div className="io-section-heading-copy"><h3>Dispatch trace</h3><p>Read-only proof of what stock actually left for which customer. Lot, batch, expiry, serial, and return status are shown when those identities exist.</p></div></div>
         <button type="button" className="outbound-button" onClick={() => void trace.refetch()} disabled={trace.isFetching}>{trace.isFetching ? 'Refreshing…' : 'Refresh trace'}</button>
       </div>
       <div className="outbound-filter-grid"><label className="outbound-field outbound-field--wide">Search dispatch trace<input placeholder="Order, customer, product, location, lot, batch, or serial" value={traceSearch} onChange={(event) => setTraceSearch(event.target.value)} /></label></div>

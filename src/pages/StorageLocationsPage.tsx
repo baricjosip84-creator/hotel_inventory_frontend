@@ -6,6 +6,7 @@ import { apiRequest, ApiError } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 
 type StorageLocationItem = {
   id: string;
@@ -457,12 +458,17 @@ export default function StorageLocationsPage() {
       />
 
       <section id="storage-location-form-panel" className="app-panel app-panel--padded" style={editingLocation ? styles.editPanel : styles.panel}>
-        <h3 style={styles.panelTitle}>{editingLocation ? 'Edit Storage Location' : 'Create Storage Location'}</h3>
-        <p style={styles.panelSubtitle}>
+        <div className="io-section-heading-with-icon">
+          <span className="io-section-heading-icon"><TenantNavIcon path="/storage-locations" size={17} /></span>
+          <div className="io-section-heading-copy">
+            <h3 style={styles.panelTitle}>{editingLocation ? 'Edit Storage Location' : 'Create Storage Location'}</h3>
+            <p style={styles.panelSubtitle}>
           {canManageStorageLocations
             ? 'Maintain receiving and storage areas used by stock, receiving, transfers, reservations, requisitions, usage, counts, and operational planning.'
             : 'This form remains visible for context, but its fields and write actions are disabled for your current role.'}
-        </p>
+            </p>
+          </div>
+        </div>
 
         {formError ? <div className="app-error-state" style={styles.errorBox}>{formError}</div> : null}
         {formMessage ? <div className="app-success-state" style={styles.successBox}>{formMessage}</div> : null}
@@ -528,11 +534,14 @@ export default function StorageLocationsPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Storage Location List</h3>
-            <p style={styles.panelSubtitle}>
-              Search and review active storage areas, stock usage, storage-condition classification, and retirement actions.
-            </p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/storage-locations" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Storage Location List</h3>
+              <p style={styles.panelSubtitle}>
+                Search and review active storage areas, stock usage, storage-condition classification, and retirement actions.
+              </p>
+            </div>
           </div>
           <button
             type="button"

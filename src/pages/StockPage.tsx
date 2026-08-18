@@ -11,6 +11,7 @@ import {
   TENANT_PERMISSIONS
 } from '../lib/permissions';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import './StockPage.css';
 
 type StockItem = {
@@ -1263,12 +1264,15 @@ export default function StockPage() {
   return (
     <div className="io-operational-page io-stock-page" style={styles.page}>
       <div style={styles.header}>
-        <div style={styles.headerTextBlock}>
-          <h2 style={styles.title}>Stock Operations</h2>
-          <p style={styles.description}>
-            Review stock by product and location, see quantities assigned to reservations, and post
-            controlled consumption, count, or adjustment actions.
-          </p>
+        <div className="io-page-intro" style={styles.headerTextBlock}>
+          <span className="io-page-intro__icon"><TenantNavIcon path="/stock" size={24} /></span>
+          <div className="io-page-intro__copy">
+            <h2 style={styles.title}>Stock Operations</h2>
+            <p style={styles.description}>
+              Review stock by product and location, see quantities assigned to reservations, and post
+              controlled consumption, count, or adjustment actions.
+            </p>
+          </div>
         </div>
         {canAdjust ? (
           <div style={styles.panelActions}>
@@ -1356,12 +1360,15 @@ export default function StockPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeaderWithActions}>
-          <div style={styles.panelHeaderText}>
-            <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
-            <p style={styles.panelSubtitle}>
+          <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
+              <p style={styles.panelSubtitle}>
               Optional detail for lot balances, expiry risk, blocked stock, and reconciliation checks.
-              Load it when you need to investigate expiry or stock-integrity questions.
-            </p>
+                Load it when you need to investigate expiry or stock-integrity questions.
+              </p>
+            </div>
           </div>
           <div style={styles.panelActions}>
             <button
@@ -1453,12 +1460,15 @@ export default function StockPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeaderWithActions}>
-          <div style={styles.panelHeaderText}>
-            <h3 style={styles.panelTitle}>Operational Workbench</h3>
-            <p style={styles.panelSubtitle}>
+          <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
+            <span className="io-section-heading-icon"><TenantNavIcon path="/stock" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Operational Workbench</h3>
+              <p style={styles.panelSubtitle}>
               Find the correct product and location, review its balance, post an authorized
-              stock action, and verify the result without leaving the page.
-            </p>
+                stock action, and verify the result without leaving the page.
+              </p>
+            </div>
           </div>
           <div style={styles.panelActions}>
             <button

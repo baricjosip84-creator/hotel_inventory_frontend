@@ -4,6 +4,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 
 /**
  * SUCCESS FEEDBACK (beep + vibration)
@@ -656,11 +657,14 @@ export default function ScannerPage() {
 
   return (
     <div className="io-scanner-page" style={styles.page}>
-      <section className="app-panel app-panel--padded" style={styles.heroPanel}>
+      <section className="app-panel app-panel--padded io-page-hero-panel" style={styles.heroPanel}>
         <div style={styles.heroHeader}>
-          <div style={styles.heroTextBlock}>
-            <h2 style={styles.title}>{modeLabel(mode)}</h2>
-            <p style={styles.description}>{modeDescription(mode)}</p>
+          <div className="io-page-intro" style={styles.heroTextBlock}>
+            <span className="io-page-intro__icon"><TenantNavIcon path="/scanner" size={24} /></span>
+            <div className="io-page-intro__copy">
+              <h2 style={styles.title}>{modeLabel(mode)}</h2>
+              <p style={styles.description}>{modeDescription(mode)}</p>
+            </div>
           </div>
 
           <span style={mode === 'product' ? styles.modeBadgeWarn : styles.modeBadgeInfo}>
@@ -821,11 +825,14 @@ export default function ScannerPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeader}>
-          <div style={styles.panelHeaderText}>
+          <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
+            <span className="io-section-heading-icon"><TenantNavIcon path="/scanner" size={17} /></span>
+            <div className="io-section-heading-copy">
               <h3 style={styles.panelTitle}>Manual Entry or Image</h3>
-            <p style={styles.panelSubtitle}>
-              Use a typed/scanned code or upload an image when the live camera is not practical.
-            </p>
+              <p style={styles.panelSubtitle}>
+                Use a typed/scanned code or upload an image when the live camera is not practical.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -913,11 +920,14 @@ export default function ScannerPage() {
       {result || resolvedShipmentId || resolvedShipmentItemId || resolvedProductName || resolvedPackageName || resolvedLabel ? (
         <section className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.panelHeader}>
-            <div style={styles.panelHeaderText}>
-              <h3 style={styles.panelTitle}>Latest Scan Result</h3>
-              <p style={styles.panelSubtitle}>
-                The last decoded value remains visible when resolution fails, so the operator can verify or correct it.
-              </p>
+            <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
+              <span className="io-section-heading-icon"><TenantNavIcon path="/scanner" size={17} /></span>
+              <div className="io-section-heading-copy">
+                <h3 style={styles.panelTitle}>Latest Scan Result</h3>
+                <p style={styles.panelSubtitle}>
+                  The last decoded value remains visible when resolution fails, so the operator can verify or correct it.
+                </p>
+              </div>
             </div>
           </div>
 

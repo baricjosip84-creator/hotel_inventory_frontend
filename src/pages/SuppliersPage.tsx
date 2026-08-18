@@ -7,6 +7,7 @@ import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
+import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 
 type SupplierFormState = {
   name: string;
@@ -562,14 +563,17 @@ export default function SuppliersPage() {
         />
       </div>
 
-      <section className="app-panel app-panel--padded" style={styles.workspaceBanner}>
+      <section className="app-panel app-panel--padded io-page-hero-panel" style={styles.workspaceBanner}>
         <div style={styles.workspaceBannerContent}>
-          <div>
-            <div style={styles.eyebrow}>SUPPLIER OPERATIONS</div>
-            <h3 style={styles.workspaceTitle}>Supplier workspace</h3>
-            <p style={styles.workspaceText}>
-              Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.
-            </p>
+          <div className="io-page-intro">
+            <span className="io-page-intro__icon"><TenantNavIcon path="/suppliers" size={24} /></span>
+            <div className="io-page-intro__copy">
+              <div style={styles.eyebrow}>SUPPLIER OPERATIONS</div>
+              <h3 style={styles.workspaceTitle}>Supplier workspace</h3>
+              <p style={styles.workspaceText}>
+                Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.
+              </p>
+            </div>
           </div>
           {canManageSuppliers ? (
             <button type="button" style={styles.primaryButton} onClick={handleStartCreate}>
@@ -587,11 +591,14 @@ export default function SuppliersPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Supplier List</h3>
-            <p style={styles.panelSubtitle}>
-              Search and review supplier records used by inventory, purchasing, shipment, email, SLA, and performance workflows.
-            </p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/suppliers" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Supplier List</h3>
+              <p style={styles.panelSubtitle}>
+                Search and review supplier records used by inventory, purchasing, shipment, email, SLA, and performance workflows.
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -767,7 +774,10 @@ export default function SuppliersPage() {
 
       {canManageSuppliers ? (
       <section id="supplier-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
-          <h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3>
+        <div className="io-section-heading-with-icon">
+          <span className="io-section-heading-icon"><TenantNavIcon path="/suppliers" size={17} /></span>
+          <div className="io-section-heading-copy"><h3 style={styles.panelTitle}>{editingSupplier ? 'Edit Supplier' : 'Create Supplier'}</h3></div>
+        </div>
           <p style={styles.panelSubtitle}>
             {canManageSuppliers
               ? 'Maintain supplier master records used across products, purchasing, shipments, receiving, and supplier communication.'
@@ -867,13 +877,16 @@ export default function SuppliersPage() {
       {selectedPerformanceSupplier ? (
         <section id="supplier-performance-panel" className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.performanceHeader}>
-            <div>
-              <h3 style={styles.panelTitle}>
-                Supplier Performance: {getPerformanceTitle(supplierPerformanceQuery.data, selectedPerformanceSupplier)}
-              </h3>
-              <p style={styles.panelSubtitle}>
-                Read-only shipment activity for this supplier. These figures do not change supplier, shipment, stock, or receiving records.
-              </p>
+            <div className="io-section-heading-with-icon">
+              <span className="io-section-heading-icon"><TenantNavIcon path="/insights" size={17} /></span>
+              <div className="io-section-heading-copy">
+                <h3 style={styles.panelTitle}>
+                  Supplier Performance: {getPerformanceTitle(supplierPerformanceQuery.data, selectedPerformanceSupplier)}
+                </h3>
+                <p style={styles.panelSubtitle}>
+                  Read-only shipment activity for this supplier. These figures do not change supplier, shipment, stock, or receiving records.
+                </p>
+              </div>
             </div>
             <div className="app-actions" style={styles.actionGroup}>
               <button
@@ -969,11 +982,14 @@ export default function SuppliersPage() {
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
-          <div>
-            <h3 style={styles.panelTitle}>Delivery Follow-up</h3>
-            <p style={styles.panelSubtitle}>
-              Late pending or partially received shipments grouped by supplier. Review these first when a delivery has missed its expected date.
-            </p>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/alerts" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>Delivery Follow-up</h3>
+              <p style={styles.panelSubtitle}>
+                Late pending or partially received shipments grouped by supplier. Review these first when a delivery has missed its expected date.
+              </p>
+            </div>
           </div>
           <button
             type="button"

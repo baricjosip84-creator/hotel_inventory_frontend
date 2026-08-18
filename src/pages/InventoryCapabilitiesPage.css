@@ -205,3 +205,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.io-advanced-inventory-page .capability-overview-heading {
+  margin-bottom: 12px;
+}
+
+.io-advanced-inventory-page .capability-tabs .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.io-advanced-inventory-page .capability-tabs .button svg {
+  color: currentColor;
+}

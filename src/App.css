@@ -540,6 +540,82 @@ kbd {
 }
 
 
+/* Shared page-heading icon treatment for the tenant operational workspace.
+   Hero icons use the 16px-radius tier, major section icons use 12px, and
+   normal panels remain on the existing 14px operational radius. */
+.io-page-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.io-page-intro__icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+.io-page-intro__copy {
+  min-width: 0;
+}
+
+.io-section-heading-with-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.io-section-heading-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: #2563eb;
+}
+
+.io-section-heading-copy {
+  min-width: 0;
+}
+
+.io-tab-icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.io-tab-icon-label svg {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .io-page-intro__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+  }
+
+  .io-section-heading-icon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+
 /* Inventory Operations visual system — second operational page rollout */
 .io-stock-movements-page,
 .io-stock-transfers-page,
@@ -741,4 +817,18 @@ kbd {
   border-color: var(--io-primary);
   outline: 2px solid rgba(37, 99, 235, 0.16);
   outline-offset: 1px;
+}
+
+/* Consistency pass: operational workspace panels use the 14px main-panel tier;
+   compact cards remain 12px and explicit hero surfaces remain 16px. */
+.io-stock-movements-page .app-panel,
+.io-stock-transfers-page .app-panel,
+.io-storage-locations-page .app-panel,
+.io-scanner-page .app-panel {
+  border-radius: 14px;
+}
+
+.io-operational-page .io-page-hero-panel,
+.io-scanner-page .io-page-hero-panel {
+  border-radius: 16px;
 }
