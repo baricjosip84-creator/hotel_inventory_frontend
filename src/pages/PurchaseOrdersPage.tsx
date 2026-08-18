@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -11,6 +11,16 @@ import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
+import './PurchaseOrdersPage.css';
 
 type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | string;
 
@@ -186,6 +196,7 @@ type Filters = {
 };
 
 type SortKey = 'created_desc' | 'created_asc' | 'expected_asc' | 'expected_desc' | 'cost_desc' | 'cost_asc' | 'received_percent_desc' | 'received_percent_asc';
+type PurchaseOrderWorkspaceSection = 'overview' | 'registry' | 'create' | 'detail';
 
 const EMPTY_FILTERS: Filters = {
   status: '',
@@ -778,6 +789,10 @@ export default function PurchaseOrdersPage() {
   const [currentPage, setCurrentPage] = useState<number>(() => pageFromSearchParams(searchParams));
   const [pageSize, setPageSize] = useState<number>(() => pageSizeFromSearchParams(searchParams));
   const [auditSearch, setAuditSearch] = useState('');
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<PurchaseOrderWorkspaceSection>('overview');
+  const registryRef = useRef<HTMLDivElement>(null);
+  const createRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   const subscriptionAccessQuery = useQuery({
     queryKey: ['tenant-subscription-access', 'purchase-orders'],
@@ -1568,6 +1583,7 @@ export default function PurchaseOrdersPage() {
     setEditingId(selectedDetail.id);
     setForm(detailToForm(selectedDetail));
     setFormError(null);
+    setActiveWorkspaceSection('create');
     scrollToFormSection('purchase-order-form');
   };
 
@@ -1620,6 +1636,11 @@ export default function PurchaseOrdersPage() {
 
   const selectedCostIssue = selectedDetail ? purchaseOrderCostIssue(selectedDetail) : null;
 
+  const navigateWorkspaceSection = (section: PurchaseOrderWorkspaceSection, target: HTMLElement | null) => {
+    setActiveWorkspaceSection(section);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const submitSelectedPurchaseOrder = () => {
     if (!selectedDetail) return;
     if (selectedCostIssue) {
@@ -1642,10 +1663,20 @@ export default function PurchaseOrdersPage() {
 
   if (subscriptionAccessQuery.isLoading) {
     return (
-      <div style={styles.page}>
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Purchase Orders</h2>
-          <p style={styles.muted}>Checking tenant plan access…</p>
+      <div className="purchase-orders-page io-operational-page io-workspace-page">
+        <OperationalWorkspaceHero
+          iconPath="/purchase-orders"
+          eyebrow="Procurement"
+          title="Purchase orders"
+          description="Create, approve, and track supplier orders through receiving."
+          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+        />
+        <section className="app-panel purchase-orders-card">
+          <OperationalSectionHeader
+            iconPath="/purchase-orders"
+            title="Checking purchase order access"
+            description="Loading tenant plan access and procurement permissions."
+          />
         </section>
       </div>
     );
@@ -1653,798 +1684,698 @@ export default function PurchaseOrdersPage() {
 
   if (purchaseOrdersEntitlement && !purchaseOrdersEntitlement.allowed) {
     return (
-      <div style={styles.page}>
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Purchase Orders</h2>
-          <p style={styles.muted}>Purchase Orders are not enabled for this tenant plan.</p>
-          <p style={styles.smallMuted}>Required feature flags: {(purchaseOrdersEntitlement.required_flags || ['purchase_orders', 'procurement']).join(', ')}.</p>
+      <div className="purchase-orders-page io-operational-page io-workspace-page">
+        <OperationalWorkspaceHero
+          iconPath="/purchase-orders"
+          eyebrow="Procurement"
+          title="Purchase orders"
+          description="Create, approve, and track supplier orders through receiving."
+          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+        />
+        <section className="app-panel purchase-orders-card">
+          <OperationalSectionHeader
+            iconPath="/purchase-orders"
+            title="Purchase orders are not included in this tenant plan"
+            description="This procurement feature is unavailable for the current tenant."
+          />
         </section>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <section style={styles.card}>
-        <div style={styles.headerRow}>
-          <div>
-            <h2 style={styles.h2}>Purchase Orders</h2>
-            <p style={styles.muted}>Create supplier purchase orders without affecting stock or receiving yet.</p>
-          </div>
-          <div style={styles.summaryGrid}>
-            <div style={styles.summaryBox}><strong>{summary.count}</strong><span>Total</span></div>
-            <div style={styles.summaryBox}><strong>{summary.draft}</strong><span>Draft</span></div>
-            <div style={styles.summaryBox}><strong>{summary.submitted}</strong><span>Submitted</span></div>
-            <div style={styles.summaryBox}><strong>{summary.completed}</strong><span>Completed</span></div>
-            <div style={styles.summaryBox}><strong>{summary.overdue}</strong><span>Overdue</span></div>
-            <div style={styles.summaryBox}><strong>{summary.needsAction}</strong><span>Needs action</span></div>
-            <div style={styles.summaryBox}><strong>{formatAggregateMoney(purchaseOrdersQuery.data || [], (row) => row.estimated_total_cost)}</strong><span>Est. cost</span></div>
-          </div>
-        </div>
+    <div className="purchase-orders-page io-operational-page io-workspace-page" id="purchase-orders-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/purchase-orders"
+        eyebrow="Procurement"
+        title="Purchase orders"
+        description="Create, approve, and track supplier orders from draft through receiving and completion. Stock changes only when linked shipments are received."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Approval workflow</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Receiving through shipments</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!capabilities.canCreatePurchaseOrders}
+            onClick={() => navigateWorkspaceSection('create', createRef.current)}
+          >
+            Create purchase order
+          </button>
+        }
+      />
 
-        <div style={styles.attentionPanel}>
-          <div style={styles.sectionHeaderCompact}>
+      <OperationalWorkspaceStats ariaLabel="Purchase order summary">
+        <OperationalWorkspaceStatCard
+          label="Total orders"
+          value={summary.count}
+          helper={`${summary.draft} drafts`}
+          tone="slate"
+          iconPath="/purchase-orders"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Awaiting approval"
+          value={summary.submitted}
+          helper="Submitted orders waiting for a decision"
+          tone={summary.submitted > 0 ? 'blue' : 'neutral'}
+          iconPath="/execution-requests"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Needs action"
+          value={summary.needsAction}
+          helper="Orders with a current procurement action"
+          tone={summary.needsAction > 0 ? 'warn' : 'good'}
+          iconPath="/alerts"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Overdue"
+          value={summary.overdue}
+          helper="Expected delivery date has passed"
+          tone={summary.overdue > 0 ? 'danger' : 'good'}
+          iconPath="/alerts"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Open receiving"
+          value={summary.openReceiving}
+          helper="Orders with a linked shipment ready to receive"
+          tone={summary.openReceiving > 0 ? 'blue' : 'neutral'}
+          iconPath="/shipments"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Estimated value"
+          value={formatAggregateMoney(purchaseOrdersQuery.data || [], (row) => row.estimated_total_cost)}
+          helper="Value of the currently filtered orders"
+          tone="neutral"
+          iconPath="/reports"
+          loading={purchaseOrdersQuery.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Purchase order work areas" hint="Jump to the part of the procurement workflow you need.">
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'overview'}
+          iconPath="/dashboard"
+          label="Overview"
+          onClick={() => navigateWorkspaceSection('overview', document.getElementById('purchase-orders-workspace-top'))}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'registry'}
+          iconPath="/purchase-orders"
+          label="Orders"
+          count={displayedPurchaseOrders.length}
+          onClick={() => navigateWorkspaceSection('registry', registryRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'create'}
+          iconPath="/purchase-orders"
+          label={editingId ? 'Edit draft' : 'Create order'}
+          disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
+          onClick={() => navigateWorkspaceSection('create', createRef.current)}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'detail'}
+          iconPath="/audit"
+          label="Order detail"
+          disabled={!selectedId}
+          onClick={() => navigateWorkspaceSection('detail', detailRef.current)}
+        />
+      </OperationalWorkspaceTabs>
+
+      <div ref={registryRef} id="purchase-order-registry" className="purchase-orders-scroll-anchor">
+        <section className="app-panel purchase-orders-card purchase-orders-section-card">
+          <OperationalSectionHeader
+            iconPath="/purchase-orders"
+            title="Purchase order registry"
+            description="Find supplier orders, review their current state, and open one for receiving or lifecycle actions."
+            actions={
+              <div className="purchase-orders-header-actions">
+                <button type="button" className="btn btn-secondary" onClick={exportVisiblePurchaseOrdersCsv} disabled={!displayedPurchaseOrders.length}>Export CSV</button>
+                <button type="button" className="btn btn-secondary" onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'Filtered purchase orders')} disabled={!displayedPurchaseOrders.length}>Print list</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear filters</button>
+              </div>
+            }
+          />
+
+          <div className={`purchase-orders-attention${summary.needsAction > 0 ? ' purchase-orders-attention--active' : ''}`}>
             <div>
-              <h3 style={styles.h3}>Procurement attention</h3>
-              <p style={styles.muted}>Quick view of purchase orders needing action.</p>
+              <strong>{summary.needsAction > 0 ? 'Procurement attention' : 'No urgent purchase order actions'}</strong>
+              <span>{summary.needsAction > 0 ? 'Use a quick filter to focus on orders that need work.' : 'The current filtered orders have no immediate procurement action.'}</span>
             </div>
-            <div style={styles.attentionStats}>
-              <button type="button" style={styles.quickFilterButton} onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'overdue', nextActionStatus: '' }))}>Overdue: {summary.overdue}</button>
-              <button type="button" style={styles.quickFilterButton} onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'due_today', nextActionStatus: '' }))}>Due today: {summary.dueToday}</button>
-              <button type="button" style={styles.quickFilterButton} onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'receive_open_shipment', deliveryStatus: '' }))}>Receive: {summary.openReceiving}</button>
-              <button type="button" style={styles.quickFilterButton} onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'approve_or_cancel', deliveryStatus: '' }))}>Approve: {summary.awaitingApproval}</button>
+            <div className="purchase-orders-attention-actions">
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'overdue', nextActionStatus: '' }))}>Overdue <span>{summary.overdue}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'due_today', nextActionStatus: '' }))}>Due today <span>{summary.dueToday}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'receive_open_shipment', deliveryStatus: '' }))}>Receive <span>{summary.openReceiving}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'approve_or_cancel', deliveryStatus: '' }))}>Approve <span>{summary.awaitingApproval}</span></button>
             </div>
           </div>
+
           {attentionPurchaseOrders.length ? (
-            <div style={styles.attentionList}>
+            <div className="purchase-orders-attention-list" aria-label="Purchase orders needing attention">
               {attentionPurchaseOrders.map((row) => (
                 <button
                   key={row.id}
                   type="button"
-                  style={styles.attentionItem}
-                  onClick={() => setSelectedId(row.id)}
+                  className="purchase-orders-attention-item"
+                  onClick={() => {
+                    setSelectedId(row.id);
+                    navigateWorkspaceSection('detail', detailRef.current);
+                  }}
                 >
-                  <span style={styles.attentionTitle}>{row.po_number}</span>
-                  <span>{row.supplier_name}</span>
+                  <span><strong>{row.po_number}</strong><small>{row.supplier_name}</small></span>
                   <span style={{ ...styles.badge, ...nextActionBadgeStyle(row.next_action_status) }}>{nextActionLabel(row.next_action_status)}</span>
-                  <span style={styles.smallMuted}>Expected {formatDate(row.expected_delivery_date)}</span>
+                  <small>Expected {formatDate(row.expected_delivery_date)}</small>
                 </button>
               ))}
             </div>
-          ) : (
-            <p style={styles.muted}>No purchase orders currently need action.</p>
-          )}
-        </div>
+          ) : null}
 
-        {activeFilterChips.length ? (
-          <div style={styles.activeFilters}>
-            <span style={styles.activeFiltersLabel}>Active filters</span>
-            {activeFilterChips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                style={styles.filterChip}
-                onClick={() => setFilters((current) => ({ ...current, [chip.key]: '' }))}
-                title="Remove filter"
-              >
-                {chip.label} ×
-              </button>
-            ))}
-            <button type="button" style={styles.clearInlineButton} onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear all</button>
-          </div>
-        ) : null}
-
-        <div style={styles.filterPanel}>
-          <div style={styles.filterSectionHeader}>
-            <div>
-              <strong>Filter purchase orders</strong>
-              <p style={styles.smallMuted}>Narrow the list by status, supplier, product, delivery state, dates, or next action.</p>
-            </div>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() => setFilters({ ...EMPTY_FILTERS })}
-            >
-              Clear filters
-            </button>
-          </div>
-
-          <div style={styles.primaryFilterGrid}>
-            <input
-              value={filters.search}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Search PO, supplier, notes…"
-              style={styles.input}
-            />
-            <select
-              value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="submitted">Submitted</option>
-              <option value="approved">Approved</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <select
-              value={filters.receivingStatus}
-              onChange={(event) => setFilters((current) => ({ ...current, receivingStatus: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All receiving</option>
-              <option value="not_applicable">N/A</option>
-              <option value="not_started">Not started</option>
-              <option value="partially_received">Partial</option>
-              <option value="received">Received</option>
-            </select>
-            <select
-              value={filters.varianceStatus}
-              onChange={(event) => setFilters((current) => ({ ...current, varianceStatus: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All variance</option>
-              <option value="not_applicable">N/A</option>
-              <option value="matched">Matched</option>
-              <option value="pending_receipt">Pending receipt</option>
-              <option value="open_short">Open short</option>
-              <option value="closed_short">Closed short</option>
-              <option value="over_received">Over received</option>
-            </select>
-            <select
-              value={filters.deliveryStatus}
-              onChange={(event) => setFilters((current) => ({ ...current, deliveryStatus: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All delivery</option>
-              <option value="no_date">No date</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="due_today">Due today</option>
-              <option value="overdue">Overdue</option>
-              <option value="fulfilled">Fulfilled</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <select
-              value={filters.nextActionStatus}
-              onChange={(event) => setFilters((current) => ({ ...current, nextActionStatus: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All next actions</option>
-              <option value="submit_for_approval">Submit for approval</option>
-              <option value="approve_or_cancel">Approve or cancel</option>
-              <option value="create_shipment">Create shipment</option>
-              <option value="receive_open_shipment">Receive shipment</option>
-              <option value="follow_up_overdue">Follow up overdue</option>
-              <option value="monitor_receiving">Monitor receiving</option>
-              <option value="none_completed">Completed</option>
-              <option value="none_cancelled">Cancelled</option>
-              <option value="none">No action</option>
-            </select>
-            <select
-              value={filters.supplierId}
-              onChange={(event) => setFilters((current) => ({ ...current, supplierId: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All suppliers</option>
-              {(suppliersQuery.data || []).map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-              ))}
-            </select>
-            <select
-              value={filters.productId}
-              onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}
-              style={styles.input}
-            >
-              <option value="">All products</option>
-              {(productsQuery.data || []).map((product) => (
-                <option key={product.id} value={product.id}>{product.name}</option>
-              ))}
-            </select>
-            <select
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value as SortKey)}
-              style={styles.input}
-              aria-label="Sort purchase orders"
-            >
-              <option value="created_desc">Newest first</option>
-              <option value="created_asc">Oldest first</option>
-              <option value="expected_asc">Expected soonest</option>
-              <option value="expected_desc">Expected latest</option>
-              <option value="cost_desc">Highest value</option>
-              <option value="cost_asc">Lowest value</option>
-              <option value="received_percent_desc">Most received</option>
-              <option value="received_percent_asc">Least received</option>
-            </select>
-          </div>
-
-          <div style={styles.dateFilterGrid}>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Expected from</span>
-              <input
-                type="date"
-                value={filters.expectedFrom}
-                onChange={(event) => setFilters((current) => ({ ...current, expectedFrom: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Expected to</span>
-              <input
-                type="date"
-                value={filters.expectedTo}
-                onChange={(event) => setFilters((current) => ({ ...current, expectedTo: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Created from</span>
-              <input
-                type="date"
-                value={filters.createdFrom}
-                onChange={(event) => setFilters((current) => ({ ...current, createdFrom: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Created to</span>
-              <input
-                type="date"
-                value={filters.createdTo}
-                onChange={(event) => setFilters((current) => ({ ...current, createdTo: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Approved from</span>
-              <input
-                type="date"
-                value={filters.approvedFrom}
-                onChange={(event) => setFilters((current) => ({ ...current, approvedFrom: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Approved to</span>
-              <input
-                type="date"
-                value={filters.approvedTo}
-                onChange={(event) => setFilters((current) => ({ ...current, approvedTo: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Completed from</span>
-              <input
-                type="date"
-                value={filters.completedFrom}
-                onChange={(event) => setFilters((current) => ({ ...current, completedFrom: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Completed to</span>
-              <input
-                type="date"
-                value={filters.completedTo}
-                onChange={(event) => setFilters((current) => ({ ...current, completedTo: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Cancelled from</span>
-              <input
-                type="date"
-                value={filters.cancelledFrom}
-                onChange={(event) => setFilters((current) => ({ ...current, cancelledFrom: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.compactField}>
-              <span style={styles.compactLabel}>Cancelled to</span>
-              <input
-                type="date"
-                value={filters.cancelledTo}
-                onChange={(event) => setFilters((current) => ({ ...current, cancelledTo: event.target.value }))}
-                style={styles.input}
-              />
-            </label>
-          </div>
-
-          <div style={styles.utilityActionRow}>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={copyCurrentViewLink}
-            >
-              Copy View Link
-            </button>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={exportVisiblePurchaseOrdersCsv}
-              disabled={!displayedPurchaseOrders.length}
-            >
-              Export All CSV
-            </button>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={exportCurrentPagePurchaseOrdersCsv}
-              disabled={!paginatedPurchaseOrders.length}
-            >
-              Export Page CSV
-            </button>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'All filtered purchase orders')}
-              disabled={!displayedPurchaseOrders.length}
-            >
-              Print All
-            </button>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)}
-              disabled={!paginatedPurchaseOrders.length}
-            >
-              Print Page
-            </button>
-          </div>
-        </div>
-
-        <div style={styles.dateShortcuts}>
-          <span style={styles.activeFiltersLabel}>Date shortcuts</span>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('expected_today')}>Expected today</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('expected_next_7')}>Expected next 7 days</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('created_last_7')}>Created last 7 days</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('created_last_30')}>Created last 30 days</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('approved_last_30')}>Approved last 30 days</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('completed_last_30')}>Completed last 30 days</button>
-          <button type="button" style={styles.quickFilterButton} onClick={() => applyDatePreset('cancelled_last_30')}>Cancelled last 30 days</button>
-          <button type="button" style={styles.clearInlineButton} onClick={clearOnlyDateFilters}>Clear date filters</button>
-        </div>
-
-        {purchaseOrdersQuery.isLoading ? <p>Loading purchase orders…</p> : null}
-        {purchaseOrdersQuery.error ? <p style={styles.error}>{normalizeError(purchaseOrdersQuery.error, 'Failed to load purchase orders.')}</p> : null}
-
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>PO Number</th>
-                <th style={styles.th}>Supplier</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Expected</th>
-                <th style={styles.th}>Delivery</th>
-                <th style={styles.th}>Next Action</th>
-                <th style={styles.th}>Items</th>
-                <th style={styles.th}>Receiving</th>
-                <th style={styles.th}>Variance</th>
-                <th style={styles.th}>Received</th>
-                <th style={styles.th}>Shipments</th>
-                <th style={styles.th}>Estimated Cost</th>
-                <th style={styles.th}>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedPurchaseOrders.map((row) => (
-                <tr
-                  key={row.id}
-                  style={row.id === selectedId ? styles.selectedRow : styles.clickableRow}
-                  onClick={() => setSelectedId(row.id)}
+          {activeFilterChips.length ? (
+            <div className="purchase-orders-active-filters">
+              <span>Active filters</span>
+              {activeFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setFilters((current) => ({ ...current, [chip.key]: '' }))}
+                  title="Remove filter"
                 >
-                  <td style={styles.td}>{row.po_number}</td>
-                  <td style={styles.td}>{row.supplier_name}</td>
-                  <td style={styles.td}><span style={{ ...styles.badge, ...badgeStyle(row.status) }}>{row.status}</span></td>
-                  <td style={styles.td}>{formatDate(row.expected_delivery_date)}</td>
-                  <td style={styles.td}><span style={{ ...styles.badge, ...deliveryBadgeStyle(row.delivery_status) }}>{deliveryStatusLabel(row.delivery_status)}</span></td>
-                  <td style={styles.td}><span style={{ ...styles.badge, ...nextActionBadgeStyle(row.next_action_status) }}>{nextActionLabel(row.next_action_status)}</span></td>
-                  <td style={styles.td}>{formatNumber(row.item_count)}</td>
-                  <td style={styles.td}><span style={{ ...styles.badge, ...receivingBadgeStyle(row.receiving_status) }}>{receivingStatusLabel(row.receiving_status)}</span></td>
-                  <td style={styles.td}>
-                    <span style={{ ...styles.badge, ...varianceBadgeStyle(row.variance_status) }}>{varianceStatusLabel(row.variance_status)}</span>
-                    <div style={styles.smallMuted}>{formatNumber(row.quantity_variance)}</div>
-                  </td>
-                  <td style={styles.td}>{formatNumber(row.total_received_quantity)}</td>
-                  <td style={styles.td}>{formatNumber(row.linked_shipment_count)}</td>
-                  <td style={styles.td}>{formatMoney(row.estimated_total_cost, row.currency)}</td>
-                  <td style={styles.td}>{formatDateTime(row.created_at)}</td>
-                </tr>
+                  {chip.label} ×
+                </button>
               ))}
-              {!purchaseOrdersQuery.isLoading && !displayedPurchaseOrders.length ? (
-                <tr><td style={styles.td} colSpan={13}>No purchase orders found.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+              <button type="button" className="purchase-orders-clear-link" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear all</button>
+            </div>
+          ) : null}
 
-        {displayedPurchaseOrders.length ? (
-          <div style={styles.listTotalsPanel}>
-            <div style={styles.listTotalsHeader}>
-              <strong>List totals</strong>
-              <span style={styles.smallMuted}>Filtered result and current page totals</span>
-            </div>
-            <div style={styles.listTotalsGrid}>
-              <div style={styles.totalBox}><span>Filtered POs</span><strong>{formatNumber(filteredTotals.count)}</strong></div>
-              <div style={styles.totalBox}><span>Page POs</span><strong>{formatNumber(pageTotals.count)}</strong></div>
-              <div style={styles.totalBox}><span>Ordered qty</span><strong>{formatNumber(filteredTotals.orderedQuantity)}</strong></div>
-              <div style={styles.totalBox}><span>Received qty</span><strong>{formatNumber(filteredTotals.receivedQuantity)}</strong></div>
-              <div style={styles.totalBox}><span>Remaining qty</span><strong>{formatNumber(filteredTotals.remainingQuantity)}</strong></div>
-              <div style={styles.totalBox}><span>Open shipments</span><strong>{formatNumber(filteredTotals.openLinkedShipmentCount)}</strong></div>
-              <div style={styles.totalBox}><span>Filtered value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.estimated_total_cost)}</strong></div>
-              <div style={styles.totalBox}><span>Remaining value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.remaining_estimated_cost)}</strong></div>
-            </div>
-          </div>
-        ) : null}
-
-        {displayedPurchaseOrders.length ? (
-          <div style={styles.breakdownPanel}>
-            <div style={styles.listTotalsHeader}>
-              <strong>List breakdown</strong>
-              <span style={styles.smallMuted}>Click a badge to apply that filter</span>
-            </div>
-            <div style={styles.breakdownGrid}>
-              <div style={styles.breakdownGroup}>
-                <strong>Status</strong>
-                <div style={styles.breakdownChips}>
-                  {['draft', 'submitted', 'approved', 'completed', 'cancelled'].map((status) => (
-                    <button key={status} type="button" style={styles.breakdownChip} onClick={() => setFilters((current) => ({ ...current, status }))}>
-                      {status}: {formatNumber(filteredBreakdowns.statuses[status] || 0)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={styles.breakdownGroup}>
-                <strong>Receiving</strong>
-                <div style={styles.breakdownChips}>
-                  {['not_applicable', 'not_started', 'partially_received', 'received'].map((status) => (
-                    <button key={status} type="button" style={styles.breakdownChip} onClick={() => setFilters((current) => ({ ...current, receivingStatus: status }))}>
-                      {receivingStatusLabel(status)}: {formatNumber(filteredBreakdowns.receivingStatuses[status] || 0)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={styles.breakdownGroup}>
-                <strong>Delivery</strong>
-                <div style={styles.breakdownChips}>
-                  {['no_date', 'upcoming', 'due_today', 'overdue', 'fulfilled', 'cancelled'].map((status) => (
-                    <button key={status} type="button" style={styles.breakdownChip} onClick={() => setFilters((current) => ({ ...current, deliveryStatus: status }))}>
-                      {deliveryStatusLabel(status)}: {formatNumber(filteredBreakdowns.deliveryStatuses[status] || 0)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={styles.breakdownGroup}>
-                <strong>Next action</strong>
-                <div style={styles.breakdownChips}>
-                  {['submit_for_approval', 'approve_or_cancel', 'create_shipment', 'receive_open_shipment', 'follow_up_overdue', 'monitor_receiving', 'none_completed', 'none_cancelled', 'none'].map((status) => (
-                    <button key={status} type="button" style={styles.breakdownChip} onClick={() => setFilters((current) => ({ ...current, nextActionStatus: status }))}>
-                      {nextActionLabel(status)}: {formatNumber(filteredBreakdowns.nextActions[status] || 0)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {displayedPurchaseOrders.length ? (
-          <div style={styles.paginationRow}>
-            <span style={styles.muted}>
-              Showing {formatNumber((Math.min(Math.max(currentPage, 1), totalPages) - 1) * pageSize + 1)}–{formatNumber(Math.min(Math.min(Math.max(currentPage, 1), totalPages) * pageSize, displayedPurchaseOrders.length))} of {formatNumber(displayedPurchaseOrders.length)} purchase orders
-            </span>
-            <div style={styles.paginationControls}>
-              <select
-                value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value))}
-                style={styles.inputCompact}
-                aria-label="Purchase orders per page"
-              >
-                <option value={10}>10 / page</option>
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={100}>100 / page</option>
+          <div className="purchase-orders-primary-filters">
+            <label className="purchase-orders-field purchase-orders-field--search">
+              <span>Search</span>
+              <input
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                placeholder="PO number, supplier, or notes"
+              />
+            </label>
+            <label className="purchase-orders-field">
+              <span>Status</span>
+              <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              >
-                Previous
-              </button>
-              <span style={styles.pageIndicator}>Page {formatNumber(Math.min(Math.max(currentPage, 1), totalPages))} of {formatNumber(totalPages)}</span>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section style={styles.twoColumn}>
-        <form id="purchase-order-form" style={styles.card} onSubmit={submitForm}>
-          <h3 style={styles.h3}>{editingId ? 'Edit Draft Purchase Order' : 'Create Purchase Order'}</h3>
-          <label style={styles.label}>Supplier</label>
-          <select
-            style={styles.input}
-            value={form.supplier_id}
-            onChange={(event) => setForm((current) => ({ ...current, supplier_id: event.target.value }))}
-            disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
-          >
-            <option value="">Select supplier</option>
-            {(suppliersQuery.data || []).map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
-          </select>
-
-          <div style={styles.inlineGrid}>
-            <div>
-              <label style={styles.label}>PO number</label>
-              <input
-                style={styles.input}
-                value={form.po_number}
-                onChange={(event) => setForm((current) => ({ ...current, po_number: event.target.value }))}
-                placeholder="Auto-generated if empty"
-              />
-            </div>
-            <div>
-              <label style={styles.label}>Expected delivery</label>
-              <input
-                style={styles.input}
-                type="date"
-                value={form.expected_delivery_date}
-                onChange={(event) => setForm((current) => ({ ...current, expected_delivery_date: event.target.value }))}
-              />
-            </div>
+            </label>
+            <label className="purchase-orders-field">
+              <span>Supplier</span>
+              <select value={filters.supplierId} onChange={(event) => setFilters((current) => ({ ...current, supplierId: event.target.value }))}>
+                <option value="">All suppliers</option>
+                {(suppliersQuery.data || []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+              </select>
+            </label>
+            <label className="purchase-orders-field">
+              <span>Next action</span>
+              <select value={filters.nextActionStatus} onChange={(event) => setFilters((current) => ({ ...current, nextActionStatus: event.target.value }))}>
+                <option value="">All next actions</option>
+                <option value="submit_for_approval">Submit for approval</option>
+                <option value="approve_or_cancel">Approve or cancel</option>
+                <option value="create_shipment">Create shipment</option>
+                <option value="receive_open_shipment">Receive shipment</option>
+                <option value="follow_up_overdue">Follow up overdue</option>
+                <option value="monitor_receiving">Monitor receiving</option>
+                <option value="none_completed">Completed</option>
+                <option value="none_cancelled">Cancelled</option>
+                <option value="none">No action</option>
+              </select>
+            </label>
           </div>
 
-          <label style={styles.label}>Notes</label>
-          <textarea
-            style={{ ...styles.input, minHeight: 72 }}
-            value={form.notes}
-            onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-            placeholder="Internal notes"
+          <details className="purchase-orders-advanced-filters">
+            <summary>Advanced filters and list tools</summary>
+            <div className="purchase-orders-advanced-content">
+              <div className="purchase-orders-secondary-filters">
+                <label className="purchase-orders-field">
+                  <span>Receiving</span>
+                  <select value={filters.receivingStatus} onChange={(event) => setFilters((current) => ({ ...current, receivingStatus: event.target.value }))}>
+                    <option value="">All receiving</option>
+                    <option value="not_applicable">N/A</option>
+                    <option value="not_started">Not started</option>
+                    <option value="partially_received">Partial</option>
+                    <option value="received">Received</option>
+                  </select>
+                </label>
+                <label className="purchase-orders-field">
+                  <span>Variance</span>
+                  <select value={filters.varianceStatus} onChange={(event) => setFilters((current) => ({ ...current, varianceStatus: event.target.value }))}>
+                    <option value="">All variance</option>
+                    <option value="not_applicable">N/A</option>
+                    <option value="matched">Matched</option>
+                    <option value="pending_receipt">Pending receipt</option>
+                    <option value="open_short">Open short</option>
+                    <option value="closed_short">Closed short</option>
+                    <option value="over_received">Over received</option>
+                  </select>
+                </label>
+                <label className="purchase-orders-field">
+                  <span>Delivery</span>
+                  <select value={filters.deliveryStatus} onChange={(event) => setFilters((current) => ({ ...current, deliveryStatus: event.target.value }))}>
+                    <option value="">All delivery</option>
+                    <option value="no_date">No date</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="due_today">Due today</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="fulfilled">Fulfilled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <label className="purchase-orders-field">
+                  <span>Product</span>
+                  <select value={filters.productId} onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}>
+                    <option value="">All products</option>
+                    {(productsQuery.data || []).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                  </select>
+                </label>
+                <label className="purchase-orders-field">
+                  <span>Sort</span>
+                  <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="Sort purchase orders">
+                    <option value="created_desc">Newest first</option>
+                    <option value="created_asc">Oldest first</option>
+                    <option value="expected_asc">Expected soonest</option>
+                    <option value="expected_desc">Expected latest</option>
+                    <option value="cost_desc">Highest value</option>
+                    <option value="cost_asc">Lowest value</option>
+                    <option value="received_percent_desc">Most received</option>
+                    <option value="received_percent_asc">Least received</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="purchase-orders-date-grid">
+                {([
+                  ['Expected from', 'expectedFrom'], ['Expected to', 'expectedTo'],
+                  ['Created from', 'createdFrom'], ['Created to', 'createdTo'],
+                  ['Approved from', 'approvedFrom'], ['Approved to', 'approvedTo'],
+                  ['Completed from', 'completedFrom'], ['Completed to', 'completedTo'],
+                  ['Cancelled from', 'cancelledFrom'], ['Cancelled to', 'cancelledTo']
+                ] as [string, keyof Filters][]).map(([label, key]) => (
+                  <label key={key} className="purchase-orders-field">
+                    <span>{label}</span>
+                    <input type="date" value={filters[key]} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.value }))} />
+                  </label>
+                ))}
+              </div>
+
+              <div className="purchase-orders-date-shortcuts">
+                <span>Date shortcuts</span>
+                <button type="button" onClick={() => applyDatePreset('expected_today')}>Expected today</button>
+                <button type="button" onClick={() => applyDatePreset('expected_next_7')}>Expected next 7 days</button>
+                <button type="button" onClick={() => applyDatePreset('created_last_7')}>Created last 7 days</button>
+                <button type="button" onClick={() => applyDatePreset('created_last_30')}>Created last 30 days</button>
+                <button type="button" onClick={() => applyDatePreset('approved_last_30')}>Approved last 30 days</button>
+                <button type="button" onClick={() => applyDatePreset('completed_last_30')}>Completed last 30 days</button>
+                <button type="button" onClick={() => applyDatePreset('cancelled_last_30')}>Cancelled last 30 days</button>
+                <button type="button" className="purchase-orders-clear-link" onClick={clearOnlyDateFilters}>Clear date filters</button>
+              </div>
+
+              <div className="purchase-orders-list-tools">
+                <button type="button" className="btn btn-secondary" onClick={copyCurrentViewLink}>Copy view link</button>
+                <button type="button" className="btn btn-secondary" onClick={exportCurrentPagePurchaseOrdersCsv} disabled={!paginatedPurchaseOrders.length}>Export current page</button>
+                <button type="button" className="btn btn-secondary" onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)} disabled={!paginatedPurchaseOrders.length}>Print current page</button>
+              </div>
+            </div>
+          </details>
+
+          {purchaseOrdersQuery.isLoading ? <p className="purchase-orders-muted">Loading purchase orders…</p> : null}
+          {purchaseOrdersQuery.error ? <p style={styles.error}>{normalizeError(purchaseOrdersQuery.error, 'Failed to load purchase orders.')}</p> : null}
+
+          <div className="purchase-orders-table-wrap">
+            <table className="purchase-orders-table">
+              <thead>
+                <tr>
+                  <th>Purchase order</th>
+                  <th>Supplier</th>
+                  <th>Status</th>
+                  <th>Expected</th>
+                  <th>Receiving</th>
+                  <th>Variance</th>
+                  <th>Next action</th>
+                  <th>Estimated cost</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedPurchaseOrders.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={row.id === selectedId ? 'purchase-orders-row--selected' : undefined}
+                    onClick={() => setSelectedId(row.id)}
+                  >
+                    <td>
+                      <button
+                        type="button"
+                        className="purchase-orders-po-link"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedId(row.id);
+                          navigateWorkspaceSection('detail', detailRef.current);
+                        }}
+                      >
+                        {row.po_number}
+                      </button>
+                      <small>Created {formatDate(row.created_at)}</small>
+                    </td>
+                    <td>{row.supplier_name}</td>
+                    <td><span style={{ ...styles.badge, ...badgeStyle(row.status) }}>{row.status}</span></td>
+                    <td>
+                      <strong>{formatDate(row.expected_delivery_date)}</strong>
+                      <span style={{ ...styles.badge, ...deliveryBadgeStyle(row.delivery_status) }}>{deliveryStatusLabel(row.delivery_status)}</span>
+                    </td>
+                    <td>
+                      <span style={{ ...styles.badge, ...receivingBadgeStyle(row.receiving_status) }}>{receivingStatusLabel(row.receiving_status)}</span>
+                      <small>{formatNumber(row.total_received_quantity)} / {formatNumber(row.total_quantity)} received · {formatNumber(row.linked_shipment_count)} shipment(s)</small>
+                    </td>
+                    <td>
+                      <span style={{ ...styles.badge, ...varianceBadgeStyle(row.variance_status) }}>{varianceStatusLabel(row.variance_status)}</span>
+                      <small>{formatNumber(row.quantity_variance)} quantity variance</small>
+                    </td>
+                    <td><span style={{ ...styles.badge, ...nextActionBadgeStyle(row.next_action_status) }}>{nextActionLabel(row.next_action_status)}</span></td>
+                    <td>{formatMoney(row.estimated_total_cost, row.currency)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary purchase-orders-view-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedId(row.id);
+                          navigateWorkspaceSection('detail', detailRef.current);
+                        }}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!purchaseOrdersQuery.isLoading && !displayedPurchaseOrders.length ? (
+                  <tr><td colSpan={9} className="purchase-orders-empty-cell">No purchase orders found.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          {displayedPurchaseOrders.length ? (
+            <details className="purchase-orders-list-analysis">
+              <summary>List analysis <span>Totals and filter breakdowns</span></summary>
+              <div className="purchase-orders-analysis-content">
+                <div className="purchase-orders-list-totals-grid">
+                  <div><span>Filtered POs</span><strong>{formatNumber(filteredTotals.count)}</strong></div>
+                  <div><span>Page POs</span><strong>{formatNumber(pageTotals.count)}</strong></div>
+                  <div><span>Ordered qty</span><strong>{formatNumber(filteredTotals.orderedQuantity)}</strong></div>
+                  <div><span>Received qty</span><strong>{formatNumber(filteredTotals.receivedQuantity)}</strong></div>
+                  <div><span>Remaining qty</span><strong>{formatNumber(filteredTotals.remainingQuantity)}</strong></div>
+                  <div><span>Open shipments</span><strong>{formatNumber(filteredTotals.openLinkedShipmentCount)}</strong></div>
+                  <div><span>Filtered value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.estimated_total_cost)}</strong></div>
+                  <div><span>Remaining value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.remaining_estimated_cost)}</strong></div>
+                </div>
+
+                <div className="purchase-orders-breakdown-grid">
+                  <div>
+                    <strong>Status</strong>
+                    <div className="purchase-orders-breakdown-chips">
+                      {['draft', 'submitted', 'approved', 'completed', 'cancelled'].map((status) => (
+                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, status }))}>{status}: {formatNumber(filteredBreakdowns.statuses[status] || 0)}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Receiving</strong>
+                    <div className="purchase-orders-breakdown-chips">
+                      {['not_applicable', 'not_started', 'partially_received', 'received'].map((status) => (
+                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, receivingStatus: status }))}>{receivingStatusLabel(status)}: {formatNumber(filteredBreakdowns.receivingStatuses[status] || 0)}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Delivery</strong>
+                    <div className="purchase-orders-breakdown-chips">
+                      {['no_date', 'upcoming', 'due_today', 'overdue', 'fulfilled', 'cancelled'].map((status) => (
+                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: status }))}>{deliveryStatusLabel(status)}: {formatNumber(filteredBreakdowns.deliveryStatuses[status] || 0)}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Next action</strong>
+                    <div className="purchase-orders-breakdown-chips">
+                      {['submit_for_approval', 'approve_or_cancel', 'create_shipment', 'receive_open_shipment', 'follow_up_overdue', 'monitor_receiving', 'none_completed', 'none_cancelled', 'none'].map((status) => (
+                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: status }))}>{nextActionLabel(status)}: {formatNumber(filteredBreakdowns.nextActions[status] || 0)}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          ) : null}
+
+          {displayedPurchaseOrders.length ? (
+            <div className="purchase-orders-pagination">
+              <span>Showing {formatNumber((Math.min(Math.max(currentPage, 1), totalPages) - 1) * pageSize + 1)}–{formatNumber(Math.min(Math.min(Math.max(currentPage, 1), totalPages) * pageSize, displayedPurchaseOrders.length))} of {formatNumber(displayedPurchaseOrders.length)} purchase orders</span>
+              <div>
+                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Purchase orders per page">
+                  <option value={10}>10 / page</option>
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
+                <button type="button" className="btn btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button>
+                <strong>Page {formatNumber(Math.min(Math.max(currentPage, 1), totalPages))} of {formatNumber(totalPages)}</strong>
+                <button type="button" className="btn btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      </div>
+
+      <div ref={createRef} id="purchase-order-create" className="purchase-orders-scroll-anchor">
+        <form id="purchase-order-form" className="app-panel purchase-orders-card purchase-orders-form-card" onSubmit={submitForm}>
+          <OperationalSectionHeader
+            iconPath="/purchase-orders"
+            title={editingId ? 'Edit purchase order draft' : 'Create purchase order'}
+            description={editingId ? 'Update the selected draft before it is submitted for approval.' : 'Create a draft supplier order. Submission, approval, shipment creation, and receiving remain separate steps.'}
+            actions={<button type="button" className="btn btn-secondary" onClick={addItem}>Add item</button>}
           />
 
-          <div style={styles.sectionHeader}>
-            <h4 style={styles.h4}>Items</h4>
-            <button type="button" style={styles.secondaryButton} onClick={addItem}>Add item</button>
+          <div className="purchase-orders-form-grid">
+            <label className="purchase-orders-field purchase-orders-field--wide">
+              <span>Supplier</span>
+              <select
+                value={form.supplier_id}
+                onChange={(event) => setForm((current) => ({ ...current, supplier_id: event.target.value }))}
+                disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
+              >
+                <option value="">Select supplier</option>
+                {(suppliersQuery.data || []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+              </select>
+            </label>
+            <label className="purchase-orders-field">
+              <span>PO number</span>
+              <input value={form.po_number} onChange={(event) => setForm((current) => ({ ...current, po_number: event.target.value }))} placeholder="Auto-generated if empty" />
+            </label>
+            <label className="purchase-orders-field">
+              <span>Expected delivery</span>
+              <input type="date" value={form.expected_delivery_date} onChange={(event) => setForm((current) => ({ ...current, expected_delivery_date: event.target.value }))} />
+            </label>
+            <label className="purchase-orders-field purchase-orders-field--full">
+              <span>Internal notes</span>
+              <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Optional notes for your team" />
+            </label>
           </div>
 
-          {form.items.map((item, index) => (
-            <div key={index} style={styles.itemBox}>
-              <select
-                style={styles.input}
-                value={item.product_id}
-                onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })}
-              >
-                <option value="">Select product</option>
-                {(productsQuery.data || []).map((product) => (
-                  <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>
-                ))}
-              </select>
-              <div style={styles.inlineGrid}>
-                <input
-                  style={styles.input}
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Quantity"
-                  value={item.quantity}
-                  onChange={(event) => updateItem(index, { quantity: event.target.value })}
-                />
-                <ProductUomSelect
-                  productId={item.product_id}
-                  value={item.uom_code}
-                  purpose="purchase"
-                  onChange={(value) => updateItem(index, { uom_code: value })}
-                  style={styles.input}
-                  ariaLabel={`Unit of measure for purchase order line ${index + 1}`}
-                />
-                <input
-                  style={styles.input}
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Cost per selected unit (optional)"
-                  value={item.unit_cost}
-                  onChange={(event) => updateItem(index, { unit_cost: event.target.value })}
-                />
+          <div className="purchase-orders-items-heading">
+            <div><strong>Order items</strong><span>Add the products, quantities, ordering units, and commercial cost for this supplier order.</span></div>
+          </div>
+
+          <div className="purchase-orders-item-list">
+            {form.items.map((item, index) => (
+              <div key={index} className="purchase-orders-item-card">
+                <div className="purchase-orders-item-card-header">
+                  <strong>Item {index + 1}</strong>
+                  <button type="button" className="purchase-orders-remove-button" onClick={() => removeItem(index)} disabled={form.items.length <= 1}>Remove</button>
+                </div>
+                <div className="purchase-orders-item-grid">
+                  <label className="purchase-orders-field purchase-orders-field--wide">
+                    <span>Product</span>
+                    <select value={item.product_id} onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })}>
+                      <option value="">Select product</option>
+                      {(productsQuery.data || []).map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
+                    </select>
+                  </label>
+                  <label className="purchase-orders-field">
+                    <span>Quantity</span>
+                    <input type="number" min="0" step="any" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} placeholder="0" />
+                  </label>
+                  <label className="purchase-orders-field">
+                    <span>Ordering unit</span>
+                    <ProductUomSelect
+                      productId={item.product_id}
+                      value={item.uom_code}
+                      purpose="purchase"
+                      onChange={(value) => updateItem(index, { uom_code: value })}
+                      ariaLabel={`Unit of measure for purchase order line ${index + 1}`}
+                    />
+                  </label>
+                  <label className="purchase-orders-field">
+                    <span>Cost per ordering unit</span>
+                    <input type="number" min="0" step="any" value={item.unit_cost} onChange={(event) => updateItem(index, { unit_cost: event.target.value })} placeholder="Required before submit" />
+                  </label>
+                  <label className="purchase-orders-field purchase-orders-field--full">
+                    <span>Item note</span>
+                    <input value={item.notes} onChange={(event) => updateItem(index, { notes: event.target.value })} placeholder="Optional item note" />
+                  </label>
+                </div>
               </div>
-              <input
-                style={styles.input}
-                placeholder="Item notes optional"
-                value={item.notes}
-                onChange={(event) => updateItem(index, { notes: event.target.value })}
-              />
-              <button type="button" style={styles.dangerButton} onClick={() => removeItem(index)}>Remove</button>
-            </div>
-          ))}
+            ))}
+          </div>
 
           {formError ? <p style={styles.error}>{formError}</p> : null}
           {(createMutation.error || updateMutation.error) ? <p style={styles.error}>{formMutationError}</p> : null}
 
-          <div style={styles.buttonRow}>
-            <button type="submit" style={styles.primaryButton} disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
-              {editingId ? 'Save Draft' : 'Create Draft'}
-            </button>
-            {editingId ? <button type="button" style={styles.secondaryButton} onClick={resetForm}>Cancel Edit</button> : null}
+          <div className="purchase-orders-form-footer">
+            <span>Draft purchase orders do not change stock. Stock is received later through linked shipments.</span>
+            <div>
+              {editingId ? <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel edit</button> : null}
+              <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
+                {editingId ? 'Save draft' : 'Create draft'}
+              </button>
+            </div>
           </div>
         </form>
+      </div>
 
-        <div style={styles.card}>
-          <h3 style={styles.h3}>Selected Purchase Order</h3>
-          {!selectedId ? <p style={styles.muted}>Select a purchase order to view detail.</p> : null}
-          {detailQuery.isLoading ? <p>Loading detail…</p> : null}
+      <div ref={detailRef} id="purchase-order-detail" className="purchase-orders-scroll-anchor">
+        <section className="app-panel purchase-orders-card purchase-orders-detail-card">
+          <OperationalSectionHeader
+            iconPath="/audit"
+            title={selectedDetail ? selectedDetail.po_number : 'Purchase order detail'}
+            description={selectedDetail ? `${selectedDetail.supplier_name} · review order progress, receiving, and available actions.` : 'Select an order from the registry to review its details and actions.'}
+            actions={selectedDetail ? (
+              <div className="purchase-orders-header-actions">
+                <button type="button" className="btn btn-secondary" onClick={exportSelectedPurchaseOrderCsv}>Export detail</button>
+                <button type="button" className="btn btn-secondary" onClick={printSelectedPurchaseOrderDetail}>Print detail</button>
+              </div>
+            ) : undefined}
+          />
+
+          {!selectedId ? <div className="purchase-orders-empty-state">Choose a purchase order from the registry above to review its status, items, shipments, and next action.</div> : null}
+          {detailQuery.isLoading ? <p className="purchase-orders-muted">Loading purchase order detail…</p> : null}
           {detailQuery.error ? <p style={styles.error}>{normalizeError(detailQuery.error, 'Failed to load purchase order.')}</p> : null}
+
           {selectedDetail ? (
             <>
-              <div style={styles.detailHeader}>
-                <div>
-                  <h4 style={styles.h4}>{selectedDetail.po_number}</h4>
-                  <p style={styles.muted}>{selectedDetail.supplier_name}</p>
-                </div>
-                <span style={{ ...styles.badge, ...badgeStyle(selectedDetail.status) }}>{selectedDetail.status}</span>
-                <span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span>
+              <div className="purchase-orders-detail-summary">
+                <div><span>Status</span><strong><span style={{ ...styles.badge, ...badgeStyle(selectedDetail.status) }}>{selectedDetail.status}</span></strong></div>
+                <div><span>Next action</span><strong><span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span></strong></div>
+                <div><span>Expected delivery</span><strong>{formatDate(selectedDetail.expected_delivery_date)}</strong></div>
+                <div><span>Estimated cost</span><strong>{formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency)}</strong></div>
+                <div><span>Receiving</span><strong>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)}</strong><small>{formatPercent(selectedDetail.receiving_summary?.receiving_percent)} received</small></div>
+                <div><span>Remaining</span><strong>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</strong><small>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency)} remaining value</small></div>
+                <div><span>Variance</span><strong><span style={{ ...styles.badge, ...varianceBadgeStyle(selectedDetail.receiving_summary?.variance_status) }}>{varianceStatusLabel(selectedDetail.receiving_summary?.variance_status)}</span></strong><small>{formatNumber(selectedDetail.receiving_summary?.quantity_variance)} quantity variance</small></div>
+                <div><span>Linked shipments</span><strong>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)}</strong><small>{formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count)} open</small></div>
+              </div>
+
+              <div className="purchase-orders-detail-status-row">
+                <span style={{ ...styles.badge, ...receivingBadgeStyle(selectedDetail.receiving_summary?.receiving_status) }}>{receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status)}</span>
+                <span style={{ ...styles.badge, ...deliveryBadgeStyle(selectedDetail.delivery_status) }}>{deliveryStatusLabel(selectedDetail.delivery_status)}</span>
                 {selectedIsLocked ? <span style={{ ...styles.badge, ...styles.lockedBadge }}>Locked</span> : null}
               </div>
-              <dl style={styles.detailGrid}>
-                <dt>Expected delivery</dt><dd>{formatDate(selectedDetail.expected_delivery_date)}</dd>
-                <dt>Estimated cost</dt><dd>{formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency)}</dd>
-                <dt>Estimated received value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost, selectedDetail.currency)}</dd>
-                <dt>Estimated remaining value</dt><dd>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency)}</dd>
-                <dt>Receiving status</dt><dd><span style={{ ...styles.badge, ...receivingBadgeStyle(selectedDetail.receiving_summary?.receiving_status) }}>{receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status)}</span></dd>
-                <dt>Variance status</dt><dd><span style={{ ...styles.badge, ...varianceBadgeStyle(selectedDetail.receiving_summary?.variance_status) }}>{varianceStatusLabel(selectedDetail.receiving_summary?.variance_status)}</span></dd>
-                <dt>Quantity variance</dt><dd>{formatNumber(selectedDetail.receiving_summary?.quantity_variance)}</dd>
-                <dt>Value variance</dt><dd>{formatMoney(selectedDetail.receiving_summary?.estimated_cost_variance, selectedDetail.currency)}</dd>
-                <dt>Next action</dt><dd><span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span></dd>
-                <dt>PO received</dt><dd>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)} ({formatPercent(selectedDetail.receiving_summary?.receiving_percent)})</dd>
-                <dt>Remaining</dt><dd>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</dd>
-                <dt>Linked shipments</dt><dd>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)} total / {formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count)} open</dd>
-                <dt>Created</dt><dd>{formatDateTime(selectedDetail.created_at)}</dd>
-                <dt>Submitted</dt><dd>{formatDateTime(selectedDetail.submitted_at)}</dd>
-                <dt>Approved</dt><dd>{formatDateTime(selectedDetail.approved_at)}</dd>
-                <dt>Completed</dt><dd>{formatDateTime(selectedDetail.completed_at)}</dd>
-                <dt>Completed by</dt><dd>{selectedDetail.completed_by_user_name || '-'}</dd>
-                <dt>Completion type</dt><dd>{completionTypeLabel(selectedDetail.completion_type)}</dd>
-                <dt>Completion reason</dt><dd>{selectedDetail.completion_reason || '-'}</dd>
-                <dt>Cancelled</dt><dd>{formatDateTime(selectedDetail.cancelled_at)}</dd>
-              </dl>
-              {selectedDetail.notes ? <p style={styles.notes}>{selectedDetail.notes}</p> : null}
 
-              <h4 style={styles.h4}>Lifecycle Timeline</h4>
-              <div style={styles.timeline}>
-                {selectedLifecycleEvents.map((event) => (
-                  <div key={event.label} style={styles.timelineItem}>
-                    <div style={styles.timelineDot} />
-                    <div>
-                      <strong>{event.label}</strong>
-                      <div style={styles.smallMuted}>{formatDateTime(event.value)}</div>
-                      {event.actor ? <div style={styles.smallMuted}>By {event.actor}</div> : null}
-                    </div>
-                  </div>
-                ))}
+              {selectedDetail.notes ? <div className="purchase-orders-note-box"><strong>Internal notes</strong><p>{selectedDetail.notes}</p></div> : null}
+
+              {selectedIsLocked ? <p className="purchase-orders-muted">This order is no longer an editable draft. Continue through shipment, receiving, or lifecycle actions instead.</p> : null}
+              {actionMutation.error ? <p style={styles.error}>{actionError}</p> : null}
+              {selectedCostIssue ? <div style={styles.commercialWarningBox}><strong>Commercial cost review required.</strong> {selectedCostIssue}</div> : null}
+
+              <div className="purchase-orders-primary-actions">
+                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" className="btn btn-secondary" onClick={startEdit}>Edit draft</button> : null}
+                {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
+                  <button type="button" className={`btn ${selectedCostIssue ? 'purchase-orders-blocked-action' : 'btn-primary'}`} disabled={actionMutation.isPending} aria-disabled={Boolean(selectedCostIssue)} title={selectedCostIssue || 'Submit this purchase order for approval'} onClick={submitSelectedPurchaseOrder}>
+                    {actionMutation.isPending ? 'Submitting…' : selectedCostIssue ? 'Submit blocked' : 'Submit for approval'}
+                  </button>
+                ) : null}
+                {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
+                  <button type="button" className={`btn ${selectedCostIssue || selectedSelfApprovalBlocked ? 'purchase-orders-blocked-action' : 'btn-primary'}`} disabled={actionMutation.isPending || selectedSelfApprovalBlocked} aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)} title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')} onClick={approveSelectedPurchaseOrder}>
+                    {actionMutation.isPending ? 'Approving…' : selectedCostIssue ? 'Approve blocked' : selectedSelfApprovalBlocked ? 'Different approver required' : 'Approve order'}
+                  </button>
+                ) : null}
               </div>
 
-              {capabilities.canViewAudit ? (
-                <>
-                  <div style={styles.sectionHeaderRow}>
-                    <h4 style={styles.h4}>Audit Events</h4>
-                    <button
-                      type="button"
-                      style={styles.secondaryButton}
-                      onClick={exportSelectedPurchaseOrderAuditCsv}
-                      disabled={auditQuery.isLoading || !selectedAuditEvents.length}
-                    >
-                      Export Audit CSV
-                    </button>
-                    <button
-                      type="button"
-                      style={styles.secondaryButton}
-                      onClick={printSelectedPurchaseOrderAudit}
-                      disabled={auditQuery.isLoading || !selectedAuditEvents.length}
-                    >
-                      Print Audit
-                    </button>
-                  </div>
-                  <div style={styles.auditPanel}>
-                    <div style={styles.auditToolbar}>
-                      <input
-                        style={styles.input}
-                        value={auditSearch}
-                        onChange={(event) => setAuditSearch(event.target.value)}
-                        placeholder="Search audit action, actor, entity, or metadata"
-                      />
-                      {auditSearch ? (
-                        <button type="button" style={styles.secondaryButton} onClick={() => setAuditSearch('')}>
-                          Clear Audit Search
-                        </button>
-                      ) : null}
-                    </div>
-                    {auditQuery.isLoading ? <p style={styles.muted}>Loading audit events…</p> : null}
-                    {auditQuery.error ? <p style={styles.error}>Failed to load PO audit events.</p> : null}
-                    {(auditQuery.data || []).length ? (
-                      selectedAuditEvents.length ? (
-                        <>
-                          <p style={styles.smallMuted}>Showing {selectedAuditEvents.length} of {(auditQuery.data || []).length} audit events.</p>
-                          <div style={styles.auditList}>
-                            {selectedAuditEvents.map((event) => (
-                              <div key={event.id} style={styles.auditItem}>
-                                <div>
-                                  <strong>{event.action}</strong>
-                                  <div style={styles.smallMuted}>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</div>
-                                </div>
-                                <div style={styles.auditMetadata}>{auditMetadataSummary(event.metadata)}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <p style={styles.muted}>No audit events match the current audit search.</p>
-                      )
-                    ) : !auditQuery.isLoading && !auditQuery.error ? (
-                      <p style={styles.muted}>No audit events found for this PO.</p>
-                    ) : null}
-                  </div>
-                </>
+              {selectedCanCreateShipment && capabilities.canManageShipments ? (
+                <div className="purchase-orders-action-panel">
+                  <div><strong>Create shipment</strong><span>Copy the remaining order quantity into a pending shipment. Stock is not changed until receiving.</span></div>
+                  <label className="purchase-orders-field"><span>Delivery date</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
+                  <button type="button" className="btn btn-primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>Create remaining shipment</button>
+                  {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
+                </div>
               ) : null}
 
-              <h4 style={styles.h4}>Items</h4>
-              <div style={styles.tableWrap}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Qty</th>
-                      <th style={styles.th}>Received</th>
-                      <th style={styles.th}>Remaining</th>
-                      <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Variance</th>
-                      <th style={styles.th}>Cost / Ordered Unit</th>
-                      <th style={styles.th}>Total</th>
-                      <th style={styles.th}>Received Value</th>
-                      <th style={styles.th}>Remaining Value</th>
-                    </tr>
-                  </thead>
+              {selectedCanCreateInboundReservation ? (
+                <div className="purchase-orders-action-panel">
+                  <div><strong>Create inbound reservation</strong><span>Track the expected inbound quantity without reserving current on-hand stock.</span></div>
+                  <button type="button" className="btn btn-secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? 'Creating reservation…' : 'Create inbound reservation'}</button>
+                  {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
+                </div>
+              ) : null}
+
+              {selectedCanClose && capabilities.canCancelPurchaseOrders ? (
+                <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
+                  <div><strong>Close order with remaining quantity</strong><span>Use this when the supplier will not deliver the remaining quantity. Existing stock and shipments are not changed.</span></div>
+                  <label className="purchase-orders-field"><span>Close reason</span><input value={closeReason} onChange={(event) => setCloseReason(event.target.value)} placeholder="Reason required" /></label>
+                  <button type="button" className="btn purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => {
+                    if (!closeReason.trim()) { showTenantActionError('Close reason is required.'); return; }
+                    if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
+                  }}>{actionMutation.isPending ? 'Closing…' : 'Close order'}</button>
+                </div>
+              ) : null}
+
+              {selectedCanReopen && capabilities.canCancelPurchaseOrders ? (
+                <div className="purchase-orders-action-panel">
+                  <div><strong>Reopen manually closed order</strong><span>Use this only when remaining quantity still needs to be received.</span></div>
+                  <button type="button" className="btn btn-secondary" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Reopen this manually closed purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Reopening…' : 'Reopen order'}</button>
+                </div>
+              ) : null}
+
+              {selectedCanCancel && capabilities.canCancelPurchaseOrders ? (
+                <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
+                  <div><strong>Cancel order</strong><span>Available while the order is still draft or submitted.</span></div>
+                  <label className="purchase-orders-field"><span>Cancellation reason</span><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Optional reason" /></label>
+                  <button type="button" className="btn purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Cancel this purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Cancelling…' : 'Cancel order'}</button>
+                </div>
+              ) : null}
+
+              <div className="purchase-orders-subsection-heading"><strong>Order items</strong><span>Ordered, received, remaining, and estimated value by product.</span></div>
+              <div className="purchase-orders-table-wrap">
+                <table className="purchase-orders-table purchase-orders-table--detail">
+                  <thead><tr><th>Product</th><th>Qty</th><th>Received</th><th>Remaining</th><th>Status</th><th>Variance</th><th>Cost / unit</th><th>Total</th><th>Received value</th><th>Remaining value</th></tr></thead>
                   <tbody>
                     {selectedDetail.items.map((item) => (
                       <tr key={item.id}>
-                        <td style={styles.td}>{item.product_name}</td>
-                        <td style={styles.td}>
-                          {formatNumber(item.entered_quantity ?? item.quantity)} {item.uom_code || item.product_unit}
-                          {String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? (
-                            <div style={styles.smallMuted}>{formatNumber(item.quantity)} {item.product_unit} base</div>
-                          ) : null}
-                        </td>
-                        <td style={styles.td}>{formatNumber(item.received_quantity)} {item.product_unit}</td>
-                        <td style={styles.td}>{formatNumber(item.remaining_quantity)} {item.product_unit}</td>
-                        <td style={styles.td}>
-                          <span style={{ ...styles.badge, ...receivingBadgeStyle(item.receiving_status) }}>
-                            {receivingStatusLabel(item.receiving_status)}
-                          </span>
-                          <div style={styles.smallMuted}>{formatPercent(item.receiving_percent)}</div>
-                        </td>
-                        <td style={styles.td}>
-                          <span style={{ ...styles.badge, ...varianceBadgeStyle(item.variance_status) }}>
-                            {varianceStatusLabel(item.variance_status)}
-                          </span>
-                          <div style={styles.smallMuted}>{formatNumber(item.quantity_variance)}</div>
-                        </td>
-                        <td style={styles.td}>
-                          {formatMoney(item.unit_cost, selectedDetail?.currency)}
-                          <div style={styles.smallMuted}>per {item.uom_code || item.product_unit}</div>
-                        </td>
-                        <td style={styles.td}>{formatMoney(item.estimated_line_total, selectedDetail?.currency)}</td>
-                        <td style={styles.td}>{formatMoney(item.received_estimated_cost, selectedDetail?.currency)}</td>
-                        <td style={styles.td}>{formatMoney(item.remaining_estimated_cost, selectedDetail?.currency)}</td>
+                        <td>{item.product_name}</td>
+                        <td>{formatNumber(item.entered_quantity ?? item.quantity)} {item.uom_code || item.product_unit}{String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? <small>{formatNumber(item.quantity)} {item.product_unit} base</small> : null}</td>
+                        <td>{formatNumber(item.received_quantity)} {item.product_unit}</td>
+                        <td>{formatNumber(item.remaining_quantity)} {item.product_unit}</td>
+                        <td><span style={{ ...styles.badge, ...receivingBadgeStyle(item.receiving_status) }}>{receivingStatusLabel(item.receiving_status)}</span><small>{formatPercent(item.receiving_percent)}</small></td>
+                        <td><span style={{ ...styles.badge, ...varianceBadgeStyle(item.variance_status) }}>{varianceStatusLabel(item.variance_status)}</span><small>{formatNumber(item.quantity_variance)}</small></td>
+                        <td>{formatMoney(item.unit_cost, selectedDetail.currency)}<small>per {item.uom_code || item.product_unit}</small></td>
+                        <td>{formatMoney(item.estimated_line_total, selectedDetail.currency)}</td>
+                        <td>{formatMoney(item.received_estimated_cost, selectedDetail.currency)}</td>
+                        <td>{formatMoney(item.remaining_estimated_cost, selectedDetail.currency)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2453,37 +2384,18 @@ export default function PurchaseOrdersPage() {
 
               {(selectedDetail.linked_shipments || []).length ? (
                 <>
-                  <h4 style={{ ...styles.h4, marginTop: 16 }}>Linked Shipments</h4>
-                  <div style={styles.tableWrap}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Shipment</th>
-                          <th style={styles.th}>Status</th>
-                          <th style={styles.th}>Delivery</th>
-                          <th style={styles.th}>Received</th>
-                          <th style={styles.th}>Action</th>
-                        </tr>
-                      </thead>
+                  <div className="purchase-orders-subsection-heading"><strong>Linked shipments</strong><span>Receiving records created from this purchase order.</span></div>
+                  <div className="purchase-orders-table-wrap">
+                    <table className="purchase-orders-table purchase-orders-table--compact">
+                      <thead><tr><th>Shipment</th><th>Status</th><th>Delivery</th><th>Received</th><th>Action</th></tr></thead>
                       <tbody>
                         {(selectedDetail.linked_shipments || []).map((shipment) => (
                           <tr key={shipment.id}>
-                            <td style={styles.td}>{shipment.po_number || shipment.qr_code || shipment.id}</td>
-                            <td style={styles.td}>{shipment.status}</td>
-                            <td style={styles.td}>{formatDate(shipment.delivery_date)}</td>
-                            <td style={styles.td}>{formatNumber(shipment.received_quantity)} / {formatNumber(shipment.ordered_quantity)}</td>
-                            <td style={styles.td}>
-                              <button
-                                type="button"
-                                style={styles.secondaryButton}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`);
-                                }}
-                              >
-                                Open
-                              </button>
-                            </td>
+                            <td>{shipment.po_number || shipment.qr_code || shipment.id}</td>
+                            <td>{shipment.status}</td>
+                            <td>{formatDate(shipment.delivery_date)}</td>
+                            <td>{formatNumber(shipment.received_quantity)} / {formatNumber(shipment.ordered_quantity)}</td>
+                            <td><button type="button" className="btn btn-secondary" onClick={() => navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`)}>Open shipment</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -2492,233 +2404,60 @@ export default function PurchaseOrdersPage() {
                 </>
               ) : null}
 
-              {selectedIsLocked ? (
-                <p style={styles.muted}>This purchase order is locked because it is no longer a draft. Create follow-up shipments or receive linked shipments instead of editing the order.</p>
-              ) : null}
-
-              {actionMutation.error ? <p style={styles.error}>{actionError}</p> : null}
-
-              {selectedCostIssue ? (
-                <div style={styles.commercialWarningBox}>
-                  <strong>Commercial cost review required.</strong> {selectedCostIssue}
-                </div>
-              ) : null}
-
-              <div style={styles.buttonRow}>
-                <button type="button" style={styles.secondaryButton} onClick={exportSelectedPurchaseOrderCsv}>Export Detail CSV</button>
-                <button type="button" style={styles.secondaryButton} onClick={printSelectedPurchaseOrderDetail}>Print Detail</button>
-                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" style={styles.secondaryButton} onClick={startEdit}>Edit Draft</button> : null}
-                {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
-                  <button
-                    type="button"
-                    style={selectedCostIssue ? styles.blockedActionButton : styles.primaryButton}
-                    disabled={actionMutation.isPending}
-                    aria-disabled={Boolean(selectedCostIssue)}
-                    title={selectedCostIssue || 'Submit this purchase order for approval'}
-                    onClick={submitSelectedPurchaseOrder}
-                  >
-                    {actionMutation.isPending ? 'Submitting...' : selectedCostIssue ? 'Submit blocked' : 'Submit'}
-                  </button>
-                ) : null}
-                {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
-                  <button
-                    type="button"
-                    style={selectedCostIssue || selectedSelfApprovalBlocked ? styles.blockedActionButton : styles.primaryButton}
-                    disabled={actionMutation.isPending || selectedSelfApprovalBlocked}
-                    aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)}
-                    title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')}
-                    onClick={approveSelectedPurchaseOrder}
-                  >
-                    {actionMutation.isPending ? 'Approving...' : selectedCostIssue ? 'Approve blocked' : selectedSelfApprovalBlocked ? 'Different approver required' : 'Approve'}
-                  </button>
-                ) : null}
+              <div className="purchase-orders-subsection-heading"><strong>Lifecycle</strong><span>Who moved this order through its procurement states and when.</span></div>
+              <div className="purchase-orders-lifecycle">
+                {selectedLifecycleEvents.map((event) => (
+                  <div key={event.label}><span>{event.label}</span><strong>{formatDateTime(event.value)}</strong>{event.actor ? <small>By {event.actor}</small> : <small>Actor not recorded</small>}</div>
+                ))}
               </div>
 
-              {selectedCanCreateShipment && capabilities.canManageShipments ? (
-                <div style={styles.bridgeBox}>
-                  <div>
-                    <h4 style={styles.h4}>Create shipment from this PO</h4>
-                    <p style={styles.muted}>Copies only remaining PO quantities into a pending shipment. Stock is not changed.</p>
-                    {selectedHasOpenShipment ? <p style={styles.muted}>An open linked shipment exists; receive or close it before creating another remaining shipment.</p> : null}
+              {selectedDetail.status === 'completed' ? (
+                <div className="purchase-orders-completion-note">
+                  <strong>{completionTypeLabel(selectedDetail.completion_type)}</strong>
+                  <span>{selectedDetail.completion_reason || 'No completion reason recorded.'}</span>
+                  <small>{selectedDetail.completed_by_user_name ? `Completed by ${selectedDetail.completed_by_user_name}` : 'Completing user not recorded'}</small>
+                </div>
+              ) : null}
+
+              {capabilities.canViewAudit ? (
+                <details className="purchase-orders-audit-details">
+                  <summary>Audit history <span>{(auditQuery.data || []).length} event(s)</span></summary>
+                  <div className="purchase-orders-audit-content">
+                    <div className="purchase-orders-audit-toolbar">
+                      <label className="purchase-orders-field purchase-orders-field--search"><span>Search audit history</span><input value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Action, person, or date" /></label>
+                      <button type="button" className="btn btn-secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Export audit CSV</button>
+                      <button type="button" className="btn btn-secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Print audit</button>
+                      {auditSearch ? <button type="button" className="btn btn-secondary" onClick={() => setAuditSearch('')}>Clear search</button> : null}
+                    </div>
+                    {auditQuery.isLoading ? <p className="purchase-orders-muted">Loading audit history…</p> : null}
+                    {auditQuery.error ? <p style={styles.error}>Failed to load purchase order audit history.</p> : null}
+                    {selectedAuditEvents.length ? (
+                      <div className="purchase-orders-audit-list">
+                        {selectedAuditEvents.map((event) => {
+                          const metadataSummary = auditMetadataSummary(event.metadata);
+                          return (
+                            <div key={event.id} className="purchase-orders-audit-item">
+                              <div><strong>{event.action}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
+                              {metadataSummary !== '-' ? <details><summary>Event details</summary><p>{metadataSummary}</p></details> : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : !auditQuery.isLoading && !auditQuery.error ? <p className="purchase-orders-muted">No audit events match the current search.</p> : null}
                   </div>
-                  <input
-                    style={styles.input}
-                    type="date"
-                    value={shipmentDeliveryDate}
-                    onChange={(event) => setShipmentDeliveryDate(event.target.value)}
-                    placeholder="Delivery date"
-                  />
-                  <button
-                    type="button"
-                    style={styles.primaryButton}
-                    disabled={createShipmentMutation.isPending || selectedHasOpenShipment}
-                    onClick={() => createShipmentMutation.mutate({
-                      id: selectedDetail.id,
-                      deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null,
-                      version: selectedDetail.version
-                    })}
-                  >
-                    Create Remaining Shipment
-                  </button>
-                  {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
-                </div>
+                </details>
               ) : null}
 
-              {selectedCanCreateInboundReservation ? (
-                <div style={styles.bridgeBox}>
-                  <div>
-                    <h4 style={styles.h4}>Create inbound reservation from this PO</h4>
-                    <p style={styles.muted}>Tracks the open inbound purchase order quantity without deducting or reserving current on-hand stock. Receive the actual stock through Shipments.</p>
-                  </div>
-                  <button
-                    type="button"
-                    style={styles.primaryButton}
-                    disabled={createInboundReservationMutation.isPending}
-                    onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}
-                  >
-                    {createInboundReservationMutation.isPending ? 'Creating reservation...' : 'Create Inbound Reservation'}
-                  </button>
-                  {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
-                </div>
-              ) : null}
-
-              {selectedCanClose && capabilities.canCancelPurchaseOrders ? (
-                <div style={styles.cancelBox}>
-                  <div>
-                    <h4 style={styles.h4}>Close PO / cancel remaining quantity</h4>
-                    <p style={styles.muted}>Use this when the supplier will not deliver the remaining quantity. This does not change stock or shipment records.</p>
-                  </div>
-                  <input
-                    style={styles.input}
-                    value={closeReason}
-                    onChange={(event) => setCloseReason(event.target.value)}
-                    placeholder="Close reason required"
-                  />
-                  <button
-                    type="button"
-                    style={styles.dangerButton}
-                    disabled={actionMutation.isPending}
-                    onClick={() => {
-                      if (!closeReason.trim()) {
-                        showTenantActionError('Close reason is required.');
-                        return;
-                      }
-                      if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
-                      }
-                    }}
-                  >
-                    {actionMutation.isPending ? 'Closing...' : 'Close PO'}
-                  </button>
-                </div>
-              ) : null}
-
-              {selectedCanReopen && capabilities.canCancelPurchaseOrders ? (
-                <div style={styles.cancelBox}>
-                  <div>
-                    <h4 style={styles.h4}>Reopen manually closed PO</h4>
-                    <p style={styles.muted}>Use this if the PO was closed early but remaining quantity still needs to be received. This does not change stock or shipment records.</p>
-                  </div>
-                  <button
-                    type="button"
-                    style={styles.secondaryButton}
-                    disabled={actionMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm('Reopen this manually closed purchase order?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version });
-                      }
-                    }}
-                  >
-                    {actionMutation.isPending ? 'Reopening...' : 'Reopen PO'}
-                  </button>
-                </div>
-              ) : null}
-
-              {selectedCanCancel && capabilities.canCancelPurchaseOrders ? (
-                <div style={styles.cancelBox}>
-                  <input
-                    style={styles.input}
-                    value={cancelReason}
-                    onChange={(event) => setCancelReason(event.target.value)}
-                    placeholder="Cancellation reason optional"
-                  />
-                  <button
-                    type="button"
-                    style={styles.dangerButton}
-                    disabled={actionMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm('Cancel this purchase order?')) {
-                        actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version });
-                      }
-                    }}
-                  >
-                    {actionMutation.isPending ? 'Cancelling...' : 'Cancel PO'}
-                  </button>
-                </div>
-              ) : null}
-
-              {isEditingSelectedDraft ? <p style={styles.muted}>Editing this draft on the left.</p> : null}
+              {isEditingSelectedDraft ? <p className="purchase-orders-muted">This draft is currently open in the edit form above.</p> : null}
             </>
           ) : null}
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)' },
-  h2: { margin: 0, fontSize: 24, lineHeight: 1.2, color: '#0f172a' },
-  h3: { margin: '0 0 14px', fontSize: 18, color: '#0f172a' },
-  h4: { margin: '0 0 8px', fontSize: 15, color: '#0f172a' },
-  muted: { margin: '6px 0 0', color: '#64748b', fontSize: 14 },
-  smallMuted: { marginTop: 4, color: '#64748b', fontSize: 12 },
-  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(90px, 1fr))', gap: 10 },
-  summaryBox: { border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 4, color: '#475569', background: '#fff' },
-  attentionPanel: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, marginTop: 18, background: '#f8fafc' },
-  attentionStats: { display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' },
-  attentionList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 12 },
-  attentionItem: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fff', display: 'grid', gap: 6, textAlign: 'left', cursor: 'pointer', color: '#334155' },
-  attentionTitle: { fontWeight: 800, color: '#0f172a' },
-  quickFilterButton: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '8px 10px', background: '#fff', color: '#0f172a', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  sectionHeaderCompact: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
-  sectionHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 16 },
-  activeFilters: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 14, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' },
-  activeFiltersLabel: { color: '#475569', fontSize: 13, fontWeight: 700 },
-  filterChip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '6px 10px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  clearInlineButton: { border: 'none', background: 'transparent', color: '#2563eb', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  filters: { display: 'grid', gridTemplateColumns: 'minmax(180px, 1.5fr) repeat(7, minmax(150px, 1fr)) auto auto', gap: 10, marginTop: 18 },
-  filterPanel: { display: 'grid', gap: 12, marginTop: 18, padding: 14, border: '1px solid #e2e8f0', borderRadius: 12, background: '#f8fafc' },
-  filterSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
-  primaryFilterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, alignItems: 'end' },
-  dateFilterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 10, alignItems: 'end' },
-  utilityActionRow: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-start' },
-  compactField: { display: 'flex', flexDirection: 'column', gap: 4 },
-  compactLabel: { color: '#475569', fontSize: 12, fontWeight: 700 },
-  dateShortcuts: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 12 },
-  paginationRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 14 },
-  paginationControls: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  listTotalsPanel: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 12, marginTop: 14, background: '#f8fafc' },
-  listTotalsHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline', marginBottom: 10 },
-  listTotalsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 },
-  totalBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, background: '#fff', display: 'flex', flexDirection: 'column', gap: 4, color: '#475569' },
-  breakdownPanel: { border: '1px solid #e5e7eb', borderRadius: 14, padding: 12, marginTop: 14, background: '#fff' },
-  breakdownGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  breakdownGroup: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, display: 'grid', gap: 8, alignContent: 'start' },
-  breakdownChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  breakdownChip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '6px 9px', background: '#f8fafc', color: '#334155', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  pageIndicator: { color: '#475569', fontSize: 13, fontWeight: 700 },
-  input: { width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', background: '#fff', color: '#111827' },
-  inputCompact: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', background: '#fff', color: '#111827' },
-  label: { display: 'block', fontSize: 13, color: '#475569', margin: '12px 0 6px' },
-  tableWrap: { width: '100%', overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
-  th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#475569', whiteSpace: 'nowrap', background: '#f8fafc', fontSize: 12, fontWeight: 700 },
-  td: { padding: '10px 8px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
-  clickableRow: { cursor: 'pointer' },
-  selectedRow: { cursor: 'pointer', background: '#eff6ff' },
   badge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' },
   draftBadge: { background: '#f1f5f9', color: '#334155' },
   submittedBadge: { background: '#fef3c7', color: '#92400e' },
@@ -2733,28 +2472,6 @@ const styles: Record<string, CSSProperties> = {
   overdueBadge: { background: '#fee2e2', color: '#991b1b' },
   dueTodayBadge: { background: '#fef3c7', color: '#92400e' },
   upcomingBadge: { background: '#e0f2fe', color: '#075985' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(360px, 1.05fr)', gap: 20, alignItems: 'start' },
-  inlineGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16 },
-  itemBox: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, display: 'grid', gap: 10, marginBottom: 10 },
-  buttonRow: { display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 8, padding: '10px 14px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' },
-  blockedActionButton: { border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', background: '#fff7ed', color: '#9a3412', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
-  dangerButton: { border: '1px solid #ef4444', borderRadius: 8, padding: '10px 14px', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer' },
   error: { color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
-  commercialWarningBox: { color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, marginTop: 12, lineHeight: 1.5 },
-  detailHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  detailGrid: { display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 12px', margin: '16px 0', fontSize: 14 },
-  notes: { whiteSpace: 'pre-wrap', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, color: '#334155' },
-  timeline: { display: 'grid', gap: 10, margin: '10px 0 18px', padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' },
-  timelineItem: { display: 'grid', gridTemplateColumns: '14px 1fr', gap: 10, alignItems: 'start' },
-  timelineDot: { width: 10, height: 10, borderRadius: 999, background: '#2563eb', marginTop: 4 },
-  auditPanel: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, margin: '10px 0 18px', background: '#fff' },
-  auditToolbar: { display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) auto', gap: 10, marginBottom: 10, alignItems: 'center' },
-  auditList: { display: 'grid', gap: 10 },
-  auditItem: { border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, display: 'grid', gap: 6, background: '#f8fafc' },
-  auditMetadata: { color: '#475569', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-word' },
-  bridgeBox: { border: '1px solid #dbeafe', borderRadius: 12, padding: 12, display: 'grid', gap: 10, marginTop: 14, background: '#eff6ff' },
-  cancelBox: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginTop: 14 }
+  commercialWarningBox: { color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, lineHeight: 1.5 }
 };
