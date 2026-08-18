@@ -5,7 +5,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './ReliabilityCommandPage.css';
 
 type ReliabilityView = 'posture' | 'review-path' | 'limits';
@@ -186,15 +186,14 @@ function ReliabilitySummaryCard({
   status?: string | null;
 }) {
   return (
-    <article className="card reliability-summary-card" data-tone={tone}>
-      <div className="reliability-summary-card__topline">
-        <span className="reliability-summary-icon"><TenantNavIcon path={iconPath} size={18} /></span>
-        <span className="card__label">{label}</span>
-      </div>
-      <div className="card__value reliability-summary-value">{value}</div>
-      {status ? <span className={`reliability-badge ${toneClass(status)}`}>{formatIdentifier(status, 'Not assessed')}</span> : null}
-      <div className="card__subtext">{copy}</div>
-    </article>
+    <OperationalWorkspaceStatCard
+      label={label}
+      value={value}
+      helper={copy}
+      tone={tone}
+      iconPath={iconPath}
+      badge={status ? <span className={`reliability-badge ${toneClass(status)}`}>{formatIdentifier(status, 'Not assessed')}</span> : null}
+    />
   );
 }
 

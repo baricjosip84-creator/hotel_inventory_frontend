@@ -253,6 +253,92 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
 }
 
+/* Primary KPI cards are deliberately owned here rather than by page-level
+   style objects. Operational pages may choose the metric content and tone, but
+   label, value, helper, icon, spacing and typography remain consistent. */
+.io-workspace-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 14px 15px;
+  border: 1px solid var(--io-workspace-border);
+  border-radius: var(--io-workspace-card-radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.io-workspace-stat__topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.io-workspace-stat__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #f8fbff;
+  color: var(--io-workspace-blue);
+}
+
+.io-workspace-stat__label {
+  min-width: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.io-workspace-stat__value {
+  color: var(--io-workspace-ink);
+  font-size: clamp(25px, 2vw, 30px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.io-workspace-stat__helper {
+  margin-top: auto;
+  color: var(--io-workspace-muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.io-workspace-stat__badge {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+}
+
+.io-workspace-stat[data-tone='blue'] .io-workspace-stat__value { color: var(--io-workspace-blue-dark); }
+.io-workspace-stat[data-tone='good'] .io-workspace-stat__value,
+.io-workspace-stat[data-tone='green'] .io-workspace-stat__value { color: #15803d; }
+.io-workspace-stat[data-tone='warn'] .io-workspace-stat__value,
+.io-workspace-stat[data-tone='amber'] .io-workspace-stat__value { color: #b45309; }
+.io-workspace-stat[data-tone='danger'] .io-workspace-stat__value,
+.io-workspace-stat[data-tone='bad'] .io-workspace-stat__value,
+.io-workspace-stat[data-tone='red'] .io-workspace-stat__value { color: #b91c1c; }
+
+.io-workspace-stat[data-tone='good'] .io-workspace-stat__icon,
+.io-workspace-stat[data-tone='green'] .io-workspace-stat__icon { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+.io-workspace-stat[data-tone='warn'] .io-workspace-stat__icon,
+.io-workspace-stat[data-tone='amber'] .io-workspace-stat__icon { border-color: #fde68a; background: #fffbeb; color: #b45309; }
+.io-workspace-stat[data-tone='danger'] .io-workspace-stat__icon,
+.io-workspace-stat[data-tone='bad'] .io-workspace-stat__icon,
+.io-workspace-stat[data-tone='red'] .io-workspace-stat__icon { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+.io-workspace-stat[data-tone='neutral'] .io-workspace-stat__icon,
+.io-workspace-stat[data-tone='slate'] .io-workspace-stat__icon { border-color: #e2e8f0; background: #f8fafc; color: #475569; }
+
 .io-workspace-page .app-panel,
 .io-workspace-page .outbound-panel {
   border-radius: var(--io-workspace-panel-radius) !important;

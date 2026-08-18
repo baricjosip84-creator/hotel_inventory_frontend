@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './InventoryCapabilitiesPage.css';
 
 type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cost' | 'variants' | 'hierarchy' | 'bom' | 'mobile';
@@ -143,6 +143,17 @@ export default function InventoryCapabilitiesPage() {
         aside={<OperationalWorkspaceStatus value={visibleTabs.length} label="capability areas available to this role" />}
       />
 
+      <div className="card-grid capability-summary-grid io-workspace-stats" aria-label="Advanced inventory capability summary">
+        {visibleTabs.map((item) => (
+          <OperationalWorkspaceStatCard
+            key={item.key}
+            label={item.label}
+            value={overviewQuery.isLoading || !Object.prototype.hasOwnProperty.call(counts, item.countKey) ? '—' : String(counts[item.countKey] ?? 0)}
+            helper={item.metricLabel}
+          />
+        ))}
+      </div>
+
       <OperationalWorkspaceTabs ariaLabel="Advanced inventory sections" hint="Select a capability area to configure or review.">
         {visibleTabs.map((item) => (
           <OperationalWorkspaceTab
@@ -155,16 +166,6 @@ export default function InventoryCapabilitiesPage() {
           />
         ))}
       </OperationalWorkspaceTabs>
-
-      <div className="card-grid capability-summary-grid io-workspace-stats" aria-label="Advanced inventory capability summary">
-        {visibleTabs.map((item) => (
-          <div key={item.key} className="card capability-summary-card">
-            <div className="card__label">{item.label}</div>
-            <div className="card__value" style={{ fontSize: 22 }}>{overviewQuery.isLoading || !Object.prototype.hasOwnProperty.call(counts, item.countKey) ? '—' : String(counts[item.countKey] ?? 0)}</div>
-            <div className="card__subtext">{item.metricLabel}</div>
-          </div>
-        ))}
-      </div>
 
       {tab === 'integrations' && canReadIntegrations && <IntegrationsPanel canWrite={canGovernIntegrations} />}
       {tab === 'serials' && <SerialsPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWriteTracking={canWriteProducts} canReadStock={canReadStock} canRegisterSerial={canWriteProducts && canAdjustStock && canReadLocations} />}

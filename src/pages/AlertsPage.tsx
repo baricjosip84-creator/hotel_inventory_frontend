@@ -9,6 +9,7 @@ import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
   OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
 import {
@@ -497,26 +498,10 @@ export default function AlertsPage() {
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
-        <div style={styles.statCard} className="alerts-summary-card" data-tone="blue">
-          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon"><TenantNavIcon path="/alerts" size={18} /></span><div style={styles.statTitle}>Visible results</div></div>
-          <div style={styles.statValue}>{summary.total}</div>
-          <div style={styles.statSubtitle}>Up to {filters.limit} alerts matching the applied filters</div>
-        </div>
-        <div style={styles.statCard} className="alerts-summary-card" data-tone="amber">
-          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--amber"><TenantNavIcon path="/action-center" size={18} /></span><div style={styles.statTitle}>Open</div></div>
-          <div style={styles.statValueWarn}>{summary.unresolved}</div>
-          <div style={styles.statSubtitle}>Still requiring review or action</div>
-        </div>
-        <div style={styles.statCard} className="alerts-summary-card" data-tone="red">
-          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--red"><TenantNavIcon path="/reliability-command" size={18} /></span><div style={styles.statTitle}>Critical open</div></div>
-          <div style={styles.statValueDanger}>{summary.critical}</div>
-          <div style={styles.statSubtitle}>Blocks protected stock and shipment operations until resolved</div>
-        </div>
-        <div style={styles.statCard} className="alerts-summary-card" data-tone="slate">
-          <div className="alerts-summary-card__topline"><span className="alerts-summary-icon alerts-summary-icon--slate"><TenantNavIcon path="/collaboration" size={18} /></span><div style={styles.statTitle}>Unacknowledged open</div></div>
-          <div style={styles.statValue}>{summary.unacknowledged}</div>
-          <div style={styles.statSubtitle}>No operator has taken ownership yet</div>
-        </div>
+        <OperationalWorkspaceStatCard label="Visible results" value={summary.total} helper={<>Up to {filters.limit} alerts matching the applied filters</>} tone="blue" iconPath="/alerts" />
+        <OperationalWorkspaceStatCard label="Open" value={summary.unresolved} helper="Still requiring review or action" tone="amber" iconPath="/action-center" />
+        <OperationalWorkspaceStatCard label="Critical open" value={summary.critical} helper="Blocks protected stock and shipment operations until resolved" tone="red" iconPath="/reliability-command" />
+        <OperationalWorkspaceStatCard label="Unacknowledged open" value={summary.unacknowledged} helper="No operator has taken ownership yet" tone="slate" iconPath="/collaboration" />
       </div>
 
       {!canManageAlerts ? (

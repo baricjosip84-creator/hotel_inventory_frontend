@@ -6,7 +6,7 @@ import { apiRequest } from '../lib/api';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import './StockMovementsPage.css';
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
@@ -521,7 +521,7 @@ export default function StockMovementsPage() {
           ['Cost Captured', summaryAvailable ? toNumber(summary.costed_rows) : '—', 'Rows with cost evidence'],
           ['Received Cost', summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', 'Inbound receipt cost grouped by currency; currencies are never added together']
         ].map(([label, value, helper]) => (
-          <article key={String(label)} style={styles.summaryCard}><div style={styles.summaryLabel}>{label}</div><div style={styles.summaryValue}>{value}</div><div style={styles.summaryHelper}>{helper}</div></article>
+          <OperationalWorkspaceStatCard key={String(label)} label={label} value={value} helper={helper} />
         ))}
       </section>
 

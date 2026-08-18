@@ -12,7 +12,7 @@ import {
 } from '../lib/permissions';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import './StockPage.css';
 
 type StockItem = {
@@ -483,20 +483,7 @@ function StatCard(props: {
   subtitle: string;
   tone?: 'default' | 'good' | 'warn';
 }) {
-  const toneStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : styles.statValue;
-
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={props.title} value={props.value} helper={props.subtitle} tone={props.tone} />;
 }
 
 export default function StockPage() {

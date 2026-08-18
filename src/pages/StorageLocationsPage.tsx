@@ -7,7 +7,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 
 type StorageLocationItem = {
   id: string;
@@ -168,20 +168,7 @@ function StatCard(props: {
   subtitle: string;
   tone?: 'default' | 'good' | 'warn';
 }) {
-  const valueStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : styles.statValue;
-
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={valueStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={props.title} value={props.value} helper={props.subtitle} tone={props.tone} />;
 }
 
 export default function StorageLocationsPage() {

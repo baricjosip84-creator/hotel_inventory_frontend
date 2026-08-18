@@ -10,6 +10,7 @@ import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
   OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
 import './InsightsPage.css';
@@ -559,26 +560,14 @@ function StatCard(props: {
   tone?: 'default' | 'warn' | 'bad' | 'good';
   iconPath?: string;
 }) {
-  const valueStyle =
-    props.tone === 'bad'
-      ? styles.statValueBad
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : props.tone === 'good'
-          ? styles.statValueGood
-          : styles.statValue;
-
   return (
-    <div className="insights-stat-card" data-tone={props.tone ?? 'default'} style={styles.statCard}>
-      <div className="insights-stat-card__header">
-        <span className="insights-stat-card__icon" aria-hidden="true">
-          <TenantNavIcon path={props.iconPath ?? '/insights'} size={18} />
-        </span>
-        <div style={styles.statTitle}>{props.title}</div>
-      </div>
-      <div style={valueStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
+    <OperationalWorkspaceStatCard
+      label={props.title}
+      value={props.value}
+      helper={props.subtitle}
+      tone={props.tone}
+      iconPath={props.iconPath ?? '/insights'}
+    />
   );
 }
 

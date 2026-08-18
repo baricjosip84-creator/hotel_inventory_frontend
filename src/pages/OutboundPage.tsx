@@ -4,7 +4,7 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './OutboundPage.css';
 
 type Customer = {
@@ -240,11 +240,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function StatCard({ label, value, help, tone = 'default' }: { label: string; value: number | string; help: string; tone?: 'default' | 'good' | 'warn' | 'danger' }) {
-  return <div className="outbound-stat-card">
-    <div className="outbound-stat-label">{label}</div>
-    <div className={`outbound-stat-value${tone === 'default' ? '' : ` outbound-stat-value--${tone}`}`}>{value}</div>
-    <div className="outbound-stat-help">{help}</div>
-  </div>;
+  return <OperationalWorkspaceStatCard label={label} value={value} helper={help} tone={tone} />;
 }
 
 function EmptyState({ title, text, action }: { title: string; text: string; action?: React.ReactNode }) {

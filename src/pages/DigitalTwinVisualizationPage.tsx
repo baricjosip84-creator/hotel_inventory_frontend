@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './DigitalTwinVisualizationPage.css';
 
 type DigitalTwinView = 'context' | 'limits';
@@ -212,14 +212,7 @@ function DigitalTwinSummaryCard({
   tone?: 'blue' | 'slate' | 'amber' | 'red';
 }) {
   return (
-    <article className="card digital-twin-summary-card" data-tone={tone}>
-      <div className="digital-twin-summary-card__topline">
-        <span className="digital-twin-summary-icon"><TenantNavIcon path={iconPath} size={18} /></span>
-        <span className="card__label">{label}</span>
-      </div>
-      <div className="card__value digital-twin-summary-value">{value}</div>
-      <div className="card__subtext">{copy}</div>
-    </article>
+    <OperationalWorkspaceStatCard label={label} value={value} helper={copy} tone={tone} iconPath={iconPath} />
   );
 }
 

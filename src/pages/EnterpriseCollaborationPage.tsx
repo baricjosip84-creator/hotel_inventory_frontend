@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './EnterpriseCollaborationPage.css';
 
 type CollaborationView = 'recommendations' | 'limits';
@@ -255,14 +255,7 @@ function SummaryCard({ iconPath, label, value, description, tone = 'blue' }: {
   tone?: 'blue' | 'amber' | 'red' | 'slate';
 }) {
   return (
-    <article className="card collaboration-summary-card" data-tone={tone}>
-      <div className="collaboration-summary-card__topline">
-        <span className="collaboration-summary-icon"><TenantNavIcon path={iconPath} size={18} /></span>
-        <span className="card__label">{label}</span>
-      </div>
-      <div className="card__value collaboration-summary-value">{value}</div>
-      <div className="card__subtext">{description}</div>
-    </article>
+    <OperationalWorkspaceStatCard label={label} value={value} helper={description} tone={tone} iconPath={iconPath} />
   );
 }
 

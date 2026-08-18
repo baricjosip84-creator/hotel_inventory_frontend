@@ -6,7 +6,7 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 
 type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 
@@ -322,11 +322,7 @@ async function cancelTransfer(input: { id: string; reason?: string }): Promise<{
 
 function StatCard(props: { title: string; value: number | string; subtitle: string; loading?: boolean }) {
   return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={styles.statValue}>{props.loading ? '—' : formatNumber(props.value)}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
+    <OperationalWorkspaceStatCard label={props.title} value={formatNumber(props.value)} helper={props.subtitle} loading={props.loading} />
   );
 }
 

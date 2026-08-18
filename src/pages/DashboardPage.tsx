@@ -6,7 +6,7 @@ import { apiRequest } from '../lib/api';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 
 /**
  * ============================================================================
@@ -476,24 +476,14 @@ function StatCard(props: {
   tone?: 'default' | 'good' | 'warn' | 'danger';
   iconPath: string;
 }) {
-  const toneStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : props.tone === 'danger'
-          ? styles.statValueDanger
-          : styles.statValue;
-
   return (
-    <div style={styles.statCard}>
-      <DashboardIconBadge path={props.iconPath} tone={props.tone} size={21} />
-      <div style={styles.statContent}>
-        <div style={styles.statTitle}>{props.title}</div>
-        <div style={toneStyle}>{props.value}</div>
-        <div style={styles.statSubtitle}>{props.subtitle}</div>
-      </div>
-    </div>
+    <OperationalWorkspaceStatCard
+      label={props.title}
+      value={props.value}
+      helper={props.subtitle}
+      tone={props.tone}
+      iconPath={props.iconPath}
+    />
   );
 }
 
@@ -646,31 +636,6 @@ export default function DashboardPage() {
         </>}
       />
 
-      {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
-        <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div><strong>Getting started</strong><div style={{ marginTop: 4, opacity: 0.75 }}>Complete these basics first. {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} done.</div></div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #cbd5e1', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
-          </div>
-        </section>
-      ) : null}
-
-      <div style={styles.quickActionRow}>
-        {canViewStock ? <ActionLink to="/stock" label="Open Stock" iconPath="/stock" /> : null}
-        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" iconPath="/shipments" /> : null}
-        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" iconPath="/alerts" /> : null}
-        {canViewProducts ? (
-          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} iconPath="/products" />
-        ) : null}
-        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" iconPath="/suppliers" /> : null}
-        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" iconPath="/storage-locations" /> : null}
-        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" iconPath="/outbound" /> : null}
-        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" iconPath="/reports" /> : null}
-        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" iconPath="/insights" /> : null}
-      </div>
-
       <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
         <StatCard
           title="Products"
@@ -743,6 +708,31 @@ export default function DashboardPage() {
           subtitle="Highest priority"
           tone={summary.alerts.critical_unresolved_alerts > 0 ? 'danger' : 'good'}
         />
+      </div>
+
+      {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
+        <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div><strong>Getting started</strong><div style={{ marginTop: 4, opacity: 0.75 }}>Complete these basics first. {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} done.</div></div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #cbd5e1', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
+          </div>
+        </section>
+      ) : null}
+
+      <div style={styles.quickActionRow}>
+        {canViewStock ? <ActionLink to="/stock" label="Open Stock" iconPath="/stock" /> : null}
+        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" iconPath="/shipments" /> : null}
+        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" iconPath="/alerts" /> : null}
+        {canViewProducts ? (
+          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} iconPath="/products" />
+        ) : null}
+        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" iconPath="/suppliers" /> : null}
+        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" iconPath="/storage-locations" /> : null}
+        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" iconPath="/outbound" /> : null}
+        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" iconPath="/reports" /> : null}
+        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" iconPath="/insights" /> : null}
       </div>
 
       <div className="app-grid-stats" style={styles.kpiGrid}>

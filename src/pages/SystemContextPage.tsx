@@ -8,6 +8,7 @@ import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
   OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus,
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs
@@ -81,16 +82,7 @@ function toneForStatus(value: string | null | undefined): Tone {
 }
 
 function MetricCard(props: { iconPath: string; label: string; value: string; detail: string; tone?: Tone }) {
-  return (
-    <article className={`system-context-metric system-context-metric--${props.tone ?? 'neutral'}`}>
-      <div className="system-context-metric__topline">
-        <span className="system-context-icon-box"><TenantNavIcon path={props.iconPath} size={18} /></span>
-        <span>{props.label}</span>
-      </div>
-      <strong className="system-context-metric__value">{props.value}</strong>
-      <span className="system-context-muted">{props.detail}</span>
-    </article>
-  );
+  return <OperationalWorkspaceStatCard label={props.label} value={props.value} helper={props.detail} tone={props.tone} iconPath={props.iconPath} />;
 }
 
 function PanelHeading(props: { iconPath: string; title: string; subtitle: string }) {
@@ -350,6 +342,14 @@ export default function SystemContextPage() {
 
       {data ? (
         <>
+          <section className="system-context-metrics io-workspace-stats">
+            <MetricCard iconPath="/system-context" label="Context status" value={humanize(data.status)} detail="Overall posture of the information available to the system." tone={toneForStatus(data.status)} />
+            <MetricCard iconPath="/alerts" label="Risk signals" value={formatNumber(riskCount)} detail={`${criticalCount} critical signal${criticalCount === 1 ? '' : 's'}.`} tone={criticalCount ? 'bad' : riskCount ? 'warn' : 'good'} />
+            <MetricCard iconPath="/action-center" label="Recommended actions" value={formatNumber(recommendationCount)} detail={`${highPriorityRecommendationCount} high-priority item${highPriorityRecommendationCount === 1 ? '' : 's'}.`} tone={highPriorityRecommendationCount ? 'bad' : recommendationCount ? 'warn' : 'good'} />
+            <MetricCard iconPath="/insights" label="Data quality" value={`${formatNumber(contextQualityScore)}%`} detail={humanize(data.context_quality?.status)} tone={toneForStatus(data.context_quality?.status)} />
+            <MetricCard iconPath="/reliability-command" label="Planning readiness" value={`${formatNumber(automationReadinessScore)}%`} detail={`${formatNumber(data.automation_readiness?.failed_checks)} blocker${toNumber(data.automation_readiness?.failed_checks) === 1 ? '' : 's'}.`} tone={toneForStatus(data.automation_readiness?.status)} />
+          </section>
+
           <OperationalWorkspaceTabs ariaLabel="System Context views">
             <OperationalWorkspaceTab active={activeView === 'overview'} iconPath="/system-context" label="Overview" onClick={() => setView('overview')} />
             <OperationalWorkspaceTab active={activeView === 'history'} iconPath="/probabilistic-forecasting" label="Planning history" onClick={() => setView('history')} />
@@ -360,14 +360,6 @@ export default function SystemContextPage() {
 
           {activeView === 'overview' ? (
             <div className="system-context-view">
-              <section className="system-context-metrics io-workspace-stats">
-                <MetricCard iconPath="/system-context" label="Context status" value={humanize(data.status)} detail="Overall posture of the information available to the system." tone={toneForStatus(data.status)} />
-                <MetricCard iconPath="/alerts" label="Risk signals" value={formatNumber(riskCount)} detail={`${criticalCount} critical signal${criticalCount === 1 ? '' : 's'}.`} tone={criticalCount ? 'bad' : riskCount ? 'warn' : 'good'} />
-                <MetricCard iconPath="/action-center" label="Recommended actions" value={formatNumber(recommendationCount)} detail={`${highPriorityRecommendationCount} high-priority item${highPriorityRecommendationCount === 1 ? '' : 's'}.`} tone={highPriorityRecommendationCount ? 'bad' : recommendationCount ? 'warn' : 'good'} />
-                <MetricCard iconPath="/insights" label="Data quality" value={`${formatNumber(contextQualityScore)}%`} detail={humanize(data.context_quality?.status)} tone={toneForStatus(data.context_quality?.status)} />
-                <MetricCard iconPath="/reliability-command" label="Planning readiness" value={`${formatNumber(automationReadinessScore)}%`} detail={`${formatNumber(data.automation_readiness?.failed_checks)} blocker${toNumber(data.automation_readiness?.failed_checks) === 1 ? '' : 's'}.`} tone={toneForStatus(data.automation_readiness?.status)} />
-              </section>
-
               <section className="app-panel app-panel--padded system-context-panel">
                 <PanelHeading iconPath="/action-center" title="What needs attention" subtitle="These are the current tenant issues System Context believes deserve human review. The source workflow remains authoritative." />
                 {data.risk_signals.length ? (

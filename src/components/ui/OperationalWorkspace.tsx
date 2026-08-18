@@ -120,6 +120,57 @@ export function OperationalWorkspaceStats({
   );
 }
 
+export type OperationalWorkspaceStatTone =
+  | 'default'
+  | 'neutral'
+  | 'slate'
+  | 'blue'
+  | 'good'
+  | 'green'
+  | 'warn'
+  | 'amber'
+  | 'danger'
+  | 'bad'
+  | 'red';
+
+type OperationalWorkspaceStatCardProps = {
+  label: ReactNode;
+  value: ReactNode;
+  helper?: ReactNode;
+  tone?: OperationalWorkspaceStatTone;
+  iconPath?: string;
+  badge?: ReactNode;
+  loading?: boolean;
+  className?: string;
+};
+
+export function OperationalWorkspaceStatCard({
+  label,
+  value,
+  helper,
+  tone = 'default',
+  iconPath,
+  badge,
+  loading = false,
+  className = ''
+}: OperationalWorkspaceStatCardProps) {
+  return (
+    <article className={`io-workspace-stat${className ? ` ${className}` : ''}`} data-tone={tone}>
+      <div className="io-workspace-stat__topline">
+        {iconPath ? (
+          <span className="io-workspace-stat__icon" aria-hidden="true">
+            <TenantNavIcon path={iconPath} size={18} />
+          </span>
+        ) : null}
+        <span className="io-workspace-stat__label">{label}</span>
+      </div>
+      <div className="io-workspace-stat__value">{loading ? '—' : value}</div>
+      {badge ? <div className="io-workspace-stat__badge">{badge}</div> : null}
+      {helper ? <div className="io-workspace-stat__helper">{helper}</div> : null}
+    </article>
+  );
+}
+
 type OperationalSectionHeaderProps = {
   iconPath: string;
   title: ReactNode;

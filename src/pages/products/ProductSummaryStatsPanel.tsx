@@ -1,6 +1,6 @@
 import { formatMoney } from './productFormatting';
 import { styles } from './productStyles';
-import { StatCard } from './productSummaryComponents';
+import { OperationalWorkspaceStatCard } from '../../components/ui/OperationalWorkspace';
 import type { ProductSummary } from './productDerivedState';
 
 type ProductSummaryStatsPanelProps = {
@@ -10,38 +10,38 @@ type ProductSummaryStatsPanelProps = {
 export function ProductSummaryStatsPanel({ summary }: ProductSummaryStatsPanelProps) {
   return (
     <div className="io-workspace-stats" style={styles.statsGrid}>
-      <StatCard
-        title="Products"
+      <OperationalWorkspaceStatCard
+        label="Products"
         value={summary.total}
-        subtitle="Visible product records"
+        helper="Visible product records"
       />
-      <StatCard
-        title="Supplier Linked"
+      <OperationalWorkspaceStatCard
+        label="Supplier Linked"
         value={summary.linkedSupplierCount}
-        subtitle="Products already linked to suppliers"
+        helper="Products already linked to suppliers"
         tone="good"
       />
-      <StatCard
-        title="Min Stock Set"
+      <OperationalWorkspaceStatCard
+        label="Min Stock Set"
         value={summary.thresholdConfiguredCount}
-        subtitle="Products with a configured reorder threshold"
+        helper="Products with a configured reorder threshold"
       />
-      <StatCard
-        title="Barcoded"
+      <OperationalWorkspaceStatCard
+        label="Barcoded"
         value={summary.barcodeCount}
-        subtitle="Products with a default barcode package"
+        helper="Products with a default barcode package"
         tone="good"
       />
-      <StatCard
-        title="Costed"
+      <OperationalWorkspaceStatCard
+        label="Costed"
         value={summary.productsWithCostCount}
-        subtitle={`Effective cost: ${summary.productsWithReceivedCostCount} received, ${summary.productsWithStandardFallbackCount} standard`}
+        helper={`Effective cost: ${summary.productsWithReceivedCostCount} received, ${summary.productsWithStandardFallbackCount} standard`}
         tone={summary.productsWithCostCount > 0 ? 'good' : 'warn'}
       />
-      <StatCard
-        title="Inventory Value"
+      <OperationalWorkspaceStatCard
+        label="Inventory Value"
         value={formatMoney(summary.estimatedInventoryValue)}
-        subtitle="Estimated from received cost, then standard fallback"
+        helper="Estimated from received cost, then standard fallback"
       />
     </div>
   );

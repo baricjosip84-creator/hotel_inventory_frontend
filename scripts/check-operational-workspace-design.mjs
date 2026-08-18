@@ -69,6 +69,24 @@ const statsPages = [
   'src/pages/products/ProductSummaryStatsPanel.tsx'
 ];
 
+const topOrderStatsMarkers = new Map([
+  ['src/pages/DashboardPage.tsx', 'io-workspace-stats'],
+  ['src/pages/EnterpriseCollaborationPage.tsx', 'io-workspace-stats'],
+  ['src/pages/DigitalTwinVisualizationPage.tsx', 'io-workspace-stats'],
+  ['src/pages/ReliabilityCommandPage.tsx', 'io-workspace-stats'],
+  ['src/pages/AlertsPage.tsx', 'io-workspace-stats'],
+  ['src/pages/InsightsPage.tsx', 'io-workspace-stats'],
+  ['src/pages/SystemContextPage.tsx', 'io-workspace-stats'],
+  ['src/pages/products/ProductPageContent.tsx', '<ProductSummaryStatsPanel'],
+  ['src/pages/SuppliersPage.tsx', 'io-workspace-stats'],
+  ['src/pages/StockPage.tsx', 'io-workspace-stats'],
+  ['src/pages/StockMovementsPage.tsx', 'io-workspace-stats'],
+  ['src/pages/StockTransfersPage.tsx', 'io-workspace-stats'],
+  ['src/pages/StorageLocationsPage.tsx', 'io-workspace-stats'],
+  ['src/pages/InventoryCapabilitiesPage.tsx', 'io-workspace-stats'],
+  ['src/pages/OutboundPage.tsx', 'io-workspace-stats']
+]);
+
 const requiredSharedFiles = [
   'src/components/ui/OperationalWorkspace.tsx',
   'src/components/ui/OperationalWorkspace.css'
@@ -132,6 +150,41 @@ for (const relative of statsPages) {
   }
 }
 
+for (const relative of statsPages) {
+  const source = fs.readFileSync(path.join(root, relative), 'utf8');
+  if (!source.includes('<OperationalWorkspaceStatCard')) {
+    failures.push(`${relative}: primary KPI cards do not delegate to OperationalWorkspaceStatCard`);
+  }
+}
+
+for (const [relative, statsMarker] of topOrderStatsMarkers) {
+  const source = fs.readFileSync(path.join(root, relative), 'utf8');
+  const heroIndex = source.indexOf('<OperationalWorkspaceHero');
+  const statsIndex = source.indexOf(statsMarker, Math.max(heroIndex, 0));
+  if (heroIndex < 0 || statsIndex < 0 || statsIndex < heroIndex) {
+    failures.push(`${relative}: canonical top order must start Hero -> primary KPIs`);
+    continue;
+  }
+
+  if (tabbedPages.includes(relative)) {
+    const tabsIndex = source.indexOf('<OperationalWorkspaceTabs', heroIndex);
+    if (tabsIndex < 0 || statsIndex > tabsIndex) {
+      failures.push(`${relative}: canonical tabbed top order must be Hero -> primary KPIs -> Tabs`);
+    }
+  }
+}
+
+const sharedWorkspaceSource = fs.readFileSync(path.join(root, 'src/components/ui/OperationalWorkspace.tsx'), 'utf8');
+const sharedWorkspaceCss = fs.readFileSync(path.join(root, 'src/components/ui/OperationalWorkspace.css'), 'utf8');
+if (!sharedWorkspaceSource.includes('export function OperationalWorkspaceStatCard')) {
+  failures.push('src/components/ui/OperationalWorkspace.tsx: shared primary KPI card component is missing');
+}
+for (const token of ['.io-workspace-stat__label', '.io-workspace-stat__value', '.io-workspace-stat__helper']) {
+  if (!sharedWorkspaceCss.includes(token)) {
+    failures.push(`src/components/ui/OperationalWorkspace.css: shared KPI typography token ${token} is missing`);
+  }
+}
+
 const productsCss = fs.readFileSync(path.join(root, 'src/pages/products/ProductsPage.css'), 'utf8');
 for (const legacySelector of ['products-hero', 'products-workspace-tabs', 'products-workspace-tab']) {
   if (productsCss.includes(legacySelector)) {
@@ -145,4 +198,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Operational workspace design consistency check passed (${operationalPages.length} pages, ${tabbedPages.length} shared tab surfaces).`);
+console.log(`Operational workspace design consistency check passed (${operationalPages.length} pages, ${tabbedPages.length} shared tab surfaces, shared primary KPI cards, canonical Hero -> KPI -> Tabs order).`);

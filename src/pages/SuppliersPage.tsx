@@ -8,7 +8,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 
 type SupplierFormState = {
   name: string;
@@ -249,22 +249,7 @@ function StatCard(props: {
   subtitle: string;
   tone?: 'default' | 'good' | 'warn' | 'bad';
 }) {
-  const toneStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : props.tone === 'bad'
-          ? styles.statValueBad
-          : styles.statValue;
-
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={props.title} value={props.value} helper={props.subtitle} tone={props.tone} />;
 }
 
 export default function SuppliersPage() {

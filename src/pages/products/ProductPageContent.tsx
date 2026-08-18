@@ -39,6 +39,8 @@ export function ProductPageContent(props: ProductPageContentProps) {
         aside={<OperationalWorkspaceStatus value={props.totalProductsCount.toLocaleString()} label="products in the current catalog scope" />}
       />
 
+      <ProductSummaryStatsPanel summary={props.summary} />
+
       <OperationalWorkspaceTabs ariaLabel="Product workspace views" hint={activeTab.hint}>
         {tabs.map((tab) => (
           <OperationalWorkspaceTab
@@ -55,10 +57,7 @@ export function ProductPageContent(props: ProductPageContentProps) {
       <ProductDetailSectionsPanel {...props} />
 
       {props.workspaceView === 'catalog' ? (
-        <>
-          <ProductSummaryStatsPanel summary={props.summary} />
-          <ProductManagementSectionsPanel {...props} />
-        </>
+        <ProductManagementSectionsPanel {...props} />
       ) : (
         <ProductCostAnalyticsSectionsPanel {...props} />
       )}
