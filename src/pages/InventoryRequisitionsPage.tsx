@@ -7,6 +7,13 @@ import { getRoleCapabilities } from '../lib/permissions';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+} from '../components/ui/OperationalWorkspace';
 
 type RequisitionProductOption = {
   id: string;
@@ -2390,15 +2397,19 @@ export default function InventoryRequisitionsPage() {
   const mutationError = saveDraftMutation.error || workflowMutation.error || createLinkedReservationMutation.error || fulfillMutation.error || bulkFulfillmentMutation.error || bulkReadinessQuery.error || commentMutation.error;
 
   return (
-    <div style={styles.page}>
-      <section style={styles.headerGrid}>
-        <div style={styles.card}>
-          <p style={styles.kicker}>Operations workflow</p>
-          <h2 style={styles.title}>Internal stock requests</h2>
-          <p style={styles.muted}>
-            Create, approve, and fulfill internal stock requests. Fulfillment checks current stock, protects quantities already promised to reservations, and records an audit trail.
-          </p>
-          <div style={styles.actionsRow}>
+    <div className="io-operational-page io-requisitions-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/inventory-requisitions"
+        eyebrow="Requisition operations"
+        title="Internal stock requests"
+        description="Create, approve, and fulfill internal stock requests while protecting reservation commitments and preserving an auditable stock trail."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Reservation-aware fulfillment</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{capabilities.canFulfillInventoryRequisitions ? 'Fulfillment access' : capabilities.canApproveInventoryRequisitions ? 'Approval access' : capabilities.canCreateInventoryRequisitions ? 'Request creation access' : 'Review-only access'}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div style={styles.inlineActions}>
             <button
               type="button"
               style={styles.secondaryButton}
@@ -2408,21 +2419,52 @@ export default function InventoryRequisitionsPage() {
               {isManualRefresh ? 'Refreshing…' : 'Refresh page'}
             </button>
             {(summaryQuery.isFetching || requisitionsQuery.isFetching || optionsQuery.isFetching || detailQuery.isFetching) && (
-              <span style={styles.muted}>Refreshing current requisition data…</span>
+              <span style={styles.muted}>Refreshing current data…</span>
             )}
           </div>
-        </div>
-        <div style={styles.metricCard}>
-          <span style={styles.metricLabel}>Open requests</span>
-          <strong style={styles.metricValue}>{formatNumber(summaryQuery.data?.open_request_count)}</strong>
-          <span style={styles.muted}>{formatNumber(summaryQuery.data?.open_remaining_quantity)} units remaining</span>
-        </div>
-        <div style={styles.metricCard}>
-          <span style={styles.metricLabel}>Action needed</span>
-          <strong style={styles.metricValue}>{formatNumber(summaryQuery.data?.actionable_count)}</strong>
-          <span style={styles.muted}>{formatNumber(summaryQuery.data?.overdue_count)} overdue · {formatNumber(summaryQuery.data?.urgent_open_count)} urgent</span>
-        </div>
-      </section>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Requisition summary">
+        <OperationalWorkspaceStatCard
+          label="Open requests"
+          value={formatNumber(summaryQuery.data?.open_request_count)}
+          helper="Requests still moving through the workflow"
+          iconPath="/inventory-requisitions"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Units remaining"
+          value={formatNumber(summaryQuery.data?.open_remaining_quantity)}
+          helper="Outstanding quantity across open requests"
+          iconPath="/stock"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Action needed"
+          value={formatNumber(summaryQuery.data?.actionable_count)}
+          helper="Requests needing workflow attention"
+          tone={Number(summaryQuery.data?.actionable_count || 0) > 0 ? 'warn' : 'good'}
+          iconPath="/alerts"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Overdue"
+          value={formatNumber(summaryQuery.data?.overdue_count)}
+          helper="Open requests past their needed-by date"
+          tone={Number(summaryQuery.data?.overdue_count || 0) > 0 ? 'danger' : 'good'}
+          iconPath="/alerts"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Urgent"
+          value={formatNumber(summaryQuery.data?.urgent_open_count)}
+          helper="Open requests marked urgent"
+          tone={Number(summaryQuery.data?.urgent_open_count || 0) > 0 ? 'warn' : 'good'}
+          iconPath="/inventory-requisitions"
+          loading={summaryQuery.isLoading}
+        />
+      </OperationalWorkspaceStats>
 
       {queryError && <div style={styles.errorBox}>Some requisition data could not be loaded: {errorMessage(queryError)}</div>}
       {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError)}</div>}
@@ -2462,8 +2504,11 @@ export default function InventoryRequisitionsPage() {
 
       <details style={styles.analyticsDetails}>
         <summary style={styles.analyticsSummary}>
-          <span>Planning and governance analysis</span>
-          <span style={styles.muted}>Demand, approvals, value, backlog, and SLA breakdowns</span>
+          <OperationalSectionHeader
+            iconPath="/insights"
+            title="Planning and governance analysis"
+            description="Demand, approvals, value, backlog, and SLA breakdowns"
+          />
         </summary>
         <p style={styles.analyticsIntro}>Open this section when you need management analysis. Day-to-day request creation, approval, and fulfillment remain directly below.</p>
         <section style={styles.summaryGrid}>
@@ -3125,10 +3170,14 @@ export default function InventoryRequisitionsPage() {
 
       <section style={styles.grid}>
         {capabilities.canCreateInventoryRequisitions ? (
-        <form id="inventory-requisition-form" style={styles.sideCard} onSubmit={handleSaveDraft}>
-          <div style={styles.lineHeader}>
-            <h3 style={styles.sectionTitle}>{editingDraftId ? 'Edit draft request' : 'Create request'}</h3>
-            {editingDraftId && <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>Cancel edit</button>}
+        <form id="inventory-requisition-form" className="app-panel app-panel--padded" style={styles.sideCard} onSubmit={handleSaveDraft}>
+          <div style={styles.sectionHeaderBlock}>
+            <OperationalSectionHeader
+              iconPath="/inventory-requisitions"
+              title={editingDraftId ? 'Edit draft request' : 'Create request'}
+              description="Build an internal demand request with department, location, priority, date, and product quantities."
+              actions={editingDraftId ? <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>Cancel edit</button> : undefined}
+            />
           </div>
           <div style={styles.twoColumns}>
             <label style={styles.field}>
@@ -3266,16 +3315,24 @@ export default function InventoryRequisitionsPage() {
           </button>
         </form>
         ) : (
-          <section style={styles.sideCard}>
-            <h3 style={styles.sectionTitle}>Request creation</h3>
-            <p style={styles.muted}>You have read-only requisition access. You can review requests and their audit history, but you cannot create or edit drafts.</p>
+          <section className="app-panel app-panel--padded" style={styles.sideCard}>
+            <OperationalSectionHeader
+              iconPath="/inventory-requisitions"
+              title="Request creation"
+              description="You have read-only requisition access. You can review requests and their audit history, but you cannot create or edit drafts."
+            />
           </section>
         )}
 
-        <section style={styles.queueCard}>
-          <div style={styles.lineHeader}>
-            <h3 style={styles.sectionTitle}>Request queue</h3>
-            <div style={styles.queueFilterPanel}>
+        <section className="app-panel app-panel--padded" style={styles.queueCard}>
+          <div style={styles.sectionHeaderBlock}>
+            <OperationalSectionHeader
+              iconPath="/inventory-requisitions"
+              title="Request queue"
+              description="Search and review requisitions, then open one for approval, fulfillment, cancellation, or audit work."
+            />
+          </div>
+          <div style={styles.queueFilterPanel}>
               <div style={styles.quickFilterGroup}>
                 <input
                   style={styles.smallInput}
@@ -3434,7 +3491,6 @@ export default function InventoryRequisitionsPage() {
                   </select>
                 </div>
               )}
-            </div>
           </div>
           {queueFilterError && <p style={styles.errorBox}>{queueFilterError}</p>}
           {capabilities.canFulfillInventoryRequisitions && bulkEligibleRequisitions.length > 0 && (
@@ -3627,8 +3683,14 @@ export default function InventoryRequisitionsPage() {
         </section>
       </section>
 
-      <section style={styles.card}>
-        <h3 style={styles.sectionTitle}>Selected request</h3>
+      <section className="app-panel app-panel--padded" style={styles.card}>
+        <div style={styles.sectionHeaderBlock}>
+          <OperationalSectionHeader
+            iconPath="/inventory-requisitions"
+            title="Selected request"
+            description="Review request details, workflow history, reservation protection, fulfillment readiness, and available actions."
+          />
+        </div>
         {!selected && <p style={styles.muted}>Select a requisition to review details and actions.</p>}
         {selected && (
           <div>
@@ -4000,8 +4062,8 @@ export default function InventoryRequisitionsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 },
-  headerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16 },
+  page: { display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 },
+  sectionHeaderBlock: { marginBottom: 16 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16, alignItems: 'stretch' },
   compactMetrics: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 12 },
   analyticsDetails: { border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', overflow: 'hidden' },
@@ -4012,11 +4074,6 @@ const styles: Record<string, CSSProperties> = {
   queueCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)', order: 1 },
   sideCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)', order: 2 },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)' },
-  metricCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column', gap: 8 },
-  metricLabel: { color: '#64748b', fontSize: 13 },
-  metricValue: { fontSize: 24 },
-  kicker: { margin: 0, color: '#2563eb', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8 },
-  title: { margin: '4px 0 8px', fontSize: 24, lineHeight: 1.2, color: '#0f172a' },
   sectionTitle: { margin: '0 0 14px', fontSize: 18, color: '#0f172a' },
   subsectionTitle: { margin: 0, fontSize: 15 },
   muted: { color: '#64748b', fontSize: 13 },

@@ -21,6 +21,7 @@ const operationalPages = [
   'src/pages/ScannerPage.tsx',
   'src/pages/OutboundPage.tsx',
   'src/pages/inventoryUsage/InventoryUsageDashboard.tsx',
+  'src/pages/InventoryRequisitionsPage.tsx',
 ];
 
 const tabbedPages = [
@@ -51,7 +52,8 @@ const pageRootTokens = new Map([
   ['src/pages/InventoryCapabilitiesPage.tsx', 'io-advanced-inventory-page'],
   ['src/pages/ScannerPage.tsx', 'io-scanner-page'],
   ['src/pages/OutboundPage.tsx', 'io-outbound-page'],
-  ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', 'io-usage-ledger-page']
+  ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', 'io-usage-ledger-page'],
+  ['src/pages/InventoryRequisitionsPage.tsx', 'io-requisitions-page']
 ]);
 
 const statsPages = [
@@ -70,6 +72,7 @@ const statsPages = [
   'src/pages/InventoryCapabilitiesPage.tsx',
   'src/pages/OutboundPage.tsx',
   'src/pages/inventoryUsage/InventoryUsageDashboard.tsx',
+  'src/pages/InventoryRequisitionsPage.tsx',
   'src/pages/products/ProductSummaryStatsPanel.tsx'
 ];
 
@@ -89,7 +92,8 @@ const topOrderStatsMarkers = new Map([
   ['src/pages/StorageLocationsPage.tsx', 'io-workspace-stats'],
   ['src/pages/InventoryCapabilitiesPage.tsx', 'io-workspace-stats'],
   ['src/pages/OutboundPage.tsx', 'io-workspace-stats'],
-  ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', '<OperationalWorkspaceStats']
+  ['src/pages/inventoryUsage/InventoryUsageDashboard.tsx', '<OperationalWorkspaceStats'],
+  ['src/pages/InventoryRequisitionsPage.tsx', '<OperationalWorkspaceStats']
 ]);
 
 const requiredSharedFiles = [
