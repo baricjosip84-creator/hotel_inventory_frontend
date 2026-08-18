@@ -523,6 +523,7 @@ export function InventoryUsageDashboard({
           helper="Earliest matching usage event"
           iconPath="/inventory-usage"
           loading={summaryLoading}
+          className="io-workspace-stat--timestamp"
         />
         <OperationalWorkspaceStatCard
           label="Last consumed"
@@ -530,6 +531,7 @@ export function InventoryUsageDashboard({
           helper="Most recent matching usage event"
           iconPath="/inventory-usage"
           loading={summaryLoading}
+          className="io-workspace-stat--timestamp"
         />
       </OperationalWorkspaceStats>
 
@@ -975,7 +977,10 @@ export function InventoryUsageDashboard({
         ) : null}
 
         <div style={styles.cardWide}>
-          <h2 style={styles.sectionTitle}>Daily usage trend</h2>
+          <OperationalSectionHeader
+            iconPath="/reports"
+            title="Daily usage trend"
+          />
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
               Loading daily usage trend...
@@ -1006,24 +1011,21 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.cardWide}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Usage stock impact</h2>
-              <p style={styles.sectionDescription}>
-                Shows consumed products whose current stock may now be depleted,
-                below minimum, or lower than the quantity consumed in the
-                selected period.
-              </p>
-            </div>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={exportImpactCsv}
-              disabled={exportingImpact || !impact?.rows?.length}
-            >
-              {exportingImpact ? "Preparing impact CSV..." : "Export filtered impact CSV"}
-            </button>
-          </div>
+          <OperationalSectionHeader
+            iconPath="/stock"
+            title="Usage stock impact"
+            description="Shows consumed products whose current stock may now be depleted, below minimum, or lower than the quantity consumed in the selected period."
+            actions={
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={exportImpactCsv}
+                disabled={exportingImpact || !impact?.rows?.length}
+              >
+                {exportingImpact ? "Preparing impact CSV..." : "Export filtered impact CSV"}
+              </button>
+            }
+          />
           {impactLoading ? (
             <p style={styles.sectionDescription}>
               Loading usage stock impact...
@@ -1126,23 +1128,21 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.cardWide}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Usage anomaly watch</h2>
-              <p style={styles.sectionDescription}>
-                Flags products whose highest daily usage in the selected period
-                is more than 2× their observed daily average.
-              </p>
-            </div>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={exportAnomaliesCsv}
-              disabled={exportingAnomalies || !anomalies?.rows?.length}
-            >
-              {exportingAnomalies ? "Preparing anomalies CSV..." : "Export filtered anomalies CSV"}
-            </button>
-          </div>
+          <OperationalSectionHeader
+            iconPath="/alerts"
+            title="Usage anomaly watch"
+            description="Flags products whose highest daily usage in the selected period is more than 2× their observed daily average."
+            actions={
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={exportAnomaliesCsv}
+                disabled={exportingAnomalies || !anomalies?.rows?.length}
+              >
+                {exportingAnomalies ? "Preparing anomalies CSV..." : "Export filtered anomalies CSV"}
+              </button>
+            }
+          />
           {anomaliesLoading ? (
             <p style={styles.sectionDescription}>Loading anomaly watch...</p>
           ) : !anomalies?.rows?.length ? (
@@ -1210,7 +1210,10 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.cardWide}>
-          <h2 style={styles.sectionTitle}>Top consumed products</h2>
+          <OperationalSectionHeader
+            iconPath="/products"
+            title="Top consumed products"
+          />
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
               Loading product breakdown...
