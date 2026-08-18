@@ -924,12 +924,12 @@
     flex-direction: column;
   }
 
-  .purchase-orders-header-actions .btn,
-  .purchase-orders-primary-actions .btn,
-  .purchase-orders-list-tools .btn,
-  .purchase-orders-audit-toolbar .btn,
-  .purchase-orders-form-footer .btn,
-  .purchase-orders-action-panel .btn {
+  .purchase-orders-header-actions .app-button,
+  .purchase-orders-primary-actions .app-button,
+  .purchase-orders-list-tools .app-button,
+  .purchase-orders-audit-toolbar .app-button,
+  .purchase-orders-form-footer .app-button,
+  .purchase-orders-action-panel .app-button {
     width: 100%;
   }
 

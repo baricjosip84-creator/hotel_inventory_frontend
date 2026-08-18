@@ -1720,7 +1720,7 @@ export default function PurchaseOrdersPage() {
         aside={
           <button
             type="button"
-            className="btn btn-primary"
+            className="app-button app-button--primary"
             disabled={!capabilities.canCreatePurchaseOrders}
             onClick={() => navigateWorkspaceSection('create', createRef.current)}
           >
@@ -1818,9 +1818,9 @@ export default function PurchaseOrdersPage() {
             description="Find supplier orders, review their current state, and open one for receiving or lifecycle actions."
             actions={
               <div className="purchase-orders-header-actions">
-                <button type="button" className="btn btn-secondary" onClick={exportVisiblePurchaseOrdersCsv} disabled={!displayedPurchaseOrders.length}>Export CSV</button>
-                <button type="button" className="btn btn-secondary" onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'Filtered purchase orders')} disabled={!displayedPurchaseOrders.length}>Print list</button>
-                <button type="button" className="btn btn-secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear filters</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportVisiblePurchaseOrdersCsv} disabled={!displayedPurchaseOrders.length}>Export CSV</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'Filtered purchase orders')} disabled={!displayedPurchaseOrders.length}>Print list</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear filters</button>
               </div>
             }
           />
@@ -2007,9 +2007,9 @@ export default function PurchaseOrdersPage() {
               </div>
 
               <div className="purchase-orders-list-tools">
-                <button type="button" className="btn btn-secondary" onClick={copyCurrentViewLink}>Copy view link</button>
-                <button type="button" className="btn btn-secondary" onClick={exportCurrentPagePurchaseOrdersCsv} disabled={!paginatedPurchaseOrders.length}>Export current page</button>
-                <button type="button" className="btn btn-secondary" onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)} disabled={!paginatedPurchaseOrders.length}>Print current page</button>
+                <button type="button" className="app-button app-button--secondary" onClick={copyCurrentViewLink}>Copy view link</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportCurrentPagePurchaseOrdersCsv} disabled={!paginatedPurchaseOrders.length}>Export current page</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)} disabled={!paginatedPurchaseOrders.length}>Print current page</button>
               </div>
             </div>
           </details>
@@ -2072,7 +2072,7 @@ export default function PurchaseOrdersPage() {
                     <td>
                       <button
                         type="button"
-                        className="btn btn-secondary purchase-orders-view-button"
+                        className="app-button app-button--secondary purchase-orders-view-button"
                         onClick={(event) => {
                           event.stopPropagation();
                           setSelectedId(row.id);
@@ -2154,9 +2154,9 @@ export default function PurchaseOrdersPage() {
                   <option value={50}>50 / page</option>
                   <option value={100}>100 / page</option>
                 </select>
-                <button type="button" className="btn btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button>
+                <button type="button" className="app-button app-button--secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button>
                 <strong>Page {formatNumber(Math.min(Math.max(currentPage, 1), totalPages))} of {formatNumber(totalPages)}</strong>
-                <button type="button" className="btn btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button>
+                <button type="button" className="app-button app-button--secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button>
               </div>
             </div>
           ) : null}
@@ -2169,7 +2169,7 @@ export default function PurchaseOrdersPage() {
             iconPath="/purchase-orders"
             title={editingId ? 'Edit purchase order draft' : 'Create purchase order'}
             description={editingId ? 'Update the selected draft before it is submitted for approval.' : 'Create a draft supplier order. Submission, approval, shipment creation, and receiving remain separate steps.'}
-            actions={<button type="button" className="btn btn-secondary" onClick={addItem}>Add item</button>}
+            actions={<button type="button" className="app-button app-button--secondary" onClick={addItem}>Add item</button>}
           />
 
           <div className="purchase-orders-form-grid">
@@ -2250,8 +2250,8 @@ export default function PurchaseOrdersPage() {
           <div className="purchase-orders-form-footer">
             <span>Draft purchase orders do not change stock. Stock is received later through linked shipments.</span>
             <div>
-              {editingId ? <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel edit</button> : null}
-              <button type="submit" className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
+              {editingId ? <button type="button" className="app-button app-button--secondary" onClick={resetForm}>Cancel edit</button> : null}
+              <button type="submit" className="app-button app-button--primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
                 {editingId ? 'Save draft' : 'Create draft'}
               </button>
             </div>
@@ -2267,8 +2267,8 @@ export default function PurchaseOrdersPage() {
             description={selectedDetail ? `${selectedDetail.supplier_name} · review order progress, receiving, and available actions.` : 'Select an order from the registry to review its details and actions.'}
             actions={selectedDetail ? (
               <div className="purchase-orders-header-actions">
-                <button type="button" className="btn btn-secondary" onClick={exportSelectedPurchaseOrderCsv}>Export detail</button>
-                <button type="button" className="btn btn-secondary" onClick={printSelectedPurchaseOrderDetail}>Print detail</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderCsv}>Export detail</button>
+                <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderDetail}>Print detail</button>
               </div>
             ) : undefined}
           />
@@ -2303,14 +2303,14 @@ export default function PurchaseOrdersPage() {
               {selectedCostIssue ? <div style={styles.commercialWarningBox}><strong>Commercial cost review required.</strong> {selectedCostIssue}</div> : null}
 
               <div className="purchase-orders-primary-actions">
-                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" className="btn btn-secondary" onClick={startEdit}>Edit draft</button> : null}
+                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" className="app-button app-button--secondary" onClick={startEdit}>Edit draft</button> : null}
                 {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
-                  <button type="button" className={`btn ${selectedCostIssue ? 'purchase-orders-blocked-action' : 'btn-primary'}`} disabled={actionMutation.isPending} aria-disabled={Boolean(selectedCostIssue)} title={selectedCostIssue || 'Submit this purchase order for approval'} onClick={submitSelectedPurchaseOrder}>
+                  <button type="button" className={`app-button ${selectedCostIssue ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending} aria-disabled={Boolean(selectedCostIssue)} title={selectedCostIssue || 'Submit this purchase order for approval'} onClick={submitSelectedPurchaseOrder}>
                     {actionMutation.isPending ? 'Submitting…' : selectedCostIssue ? 'Submit blocked' : 'Submit for approval'}
                   </button>
                 ) : null}
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
-                  <button type="button" className={`btn ${selectedCostIssue || selectedSelfApprovalBlocked ? 'purchase-orders-blocked-action' : 'btn-primary'}`} disabled={actionMutation.isPending || selectedSelfApprovalBlocked} aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)} title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')} onClick={approveSelectedPurchaseOrder}>
+                  <button type="button" className={`app-button ${selectedCostIssue || selectedSelfApprovalBlocked ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending || selectedSelfApprovalBlocked} aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)} title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')} onClick={approveSelectedPurchaseOrder}>
                     {actionMutation.isPending ? 'Approving…' : selectedCostIssue ? 'Approve blocked' : selectedSelfApprovalBlocked ? 'Different approver required' : 'Approve order'}
                   </button>
                 ) : null}
@@ -2320,7 +2320,7 @@ export default function PurchaseOrdersPage() {
                 <div className="purchase-orders-action-panel">
                   <div><strong>Create shipment</strong><span>Copy the remaining order quantity into a pending shipment. Stock is not changed until receiving.</span></div>
                   <label className="purchase-orders-field"><span>Delivery date</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
-                  <button type="button" className="btn btn-primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>Create remaining shipment</button>
+                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>Create remaining shipment</button>
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
                 </div>
               ) : null}
@@ -2328,7 +2328,7 @@ export default function PurchaseOrdersPage() {
               {selectedCanCreateInboundReservation ? (
                 <div className="purchase-orders-action-panel">
                   <div><strong>Create inbound reservation</strong><span>Track the expected inbound quantity without reserving current on-hand stock.</span></div>
-                  <button type="button" className="btn btn-secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? 'Creating reservation…' : 'Create inbound reservation'}</button>
+                  <button type="button" className="app-button app-button--secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? 'Creating reservation…' : 'Create inbound reservation'}</button>
                   {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
                 </div>
               ) : null}
@@ -2337,7 +2337,7 @@ export default function PurchaseOrdersPage() {
                 <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
                   <div><strong>Close order with remaining quantity</strong><span>Use this when the supplier will not deliver the remaining quantity. Existing stock and shipments are not changed.</span></div>
                   <label className="purchase-orders-field"><span>Close reason</span><input value={closeReason} onChange={(event) => setCloseReason(event.target.value)} placeholder="Reason required" /></label>
-                  <button type="button" className="btn purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => {
+                  <button type="button" className="app-button purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => {
                     if (!closeReason.trim()) { showTenantActionError('Close reason is required.'); return; }
                     if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
                   }}>{actionMutation.isPending ? 'Closing…' : 'Close order'}</button>
@@ -2347,7 +2347,7 @@ export default function PurchaseOrdersPage() {
               {selectedCanReopen && capabilities.canCancelPurchaseOrders ? (
                 <div className="purchase-orders-action-panel">
                   <div><strong>Reopen manually closed order</strong><span>Use this only when remaining quantity still needs to be received.</span></div>
-                  <button type="button" className="btn btn-secondary" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Reopen this manually closed purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Reopening…' : 'Reopen order'}</button>
+                  <button type="button" className="app-button app-button--secondary" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Reopen this manually closed purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Reopening…' : 'Reopen order'}</button>
                 </div>
               ) : null}
 
@@ -2355,7 +2355,7 @@ export default function PurchaseOrdersPage() {
                 <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
                   <div><strong>Cancel order</strong><span>Available while the order is still draft or submitted.</span></div>
                   <label className="purchase-orders-field"><span>Cancellation reason</span><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Optional reason" /></label>
-                  <button type="button" className="btn purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Cancel this purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Cancelling…' : 'Cancel order'}</button>
+                  <button type="button" className="app-button purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Cancel this purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Cancelling…' : 'Cancel order'}</button>
                 </div>
               ) : null}
 
@@ -2395,7 +2395,7 @@ export default function PurchaseOrdersPage() {
                             <td>{shipment.status}</td>
                             <td>{formatDate(shipment.delivery_date)}</td>
                             <td>{formatNumber(shipment.received_quantity)} / {formatNumber(shipment.ordered_quantity)}</td>
-                            <td><button type="button" className="btn btn-secondary" onClick={() => navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`)}>Open shipment</button></td>
+                            <td><button type="button" className="app-button app-button--secondary" onClick={() => navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`)}>Open shipment</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -2425,9 +2425,9 @@ export default function PurchaseOrdersPage() {
                   <div className="purchase-orders-audit-content">
                     <div className="purchase-orders-audit-toolbar">
                       <label className="purchase-orders-field purchase-orders-field--search"><span>Search audit history</span><input value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Action, person, or date" /></label>
-                      <button type="button" className="btn btn-secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Export audit CSV</button>
-                      <button type="button" className="btn btn-secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Print audit</button>
-                      {auditSearch ? <button type="button" className="btn btn-secondary" onClick={() => setAuditSearch('')}>Clear search</button> : null}
+                      <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Export audit CSV</button>
+                      <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Print audit</button>
+                      {auditSearch ? <button type="button" className="app-button app-button--secondary" onClick={() => setAuditSearch('')}>Clear search</button> : null}
                     </div>
                     {auditQuery.isLoading ? <p className="purchase-orders-muted">Loading audit history…</p> : null}
                     {auditQuery.error ? <p style={styles.error}>Failed to load purchase order audit history.</p> : null}
