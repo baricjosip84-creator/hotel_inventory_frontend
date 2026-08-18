@@ -6,6 +6,15 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs,
+} from '../components/ui/OperationalWorkspace';
 
 
 type ReservationProductOption = Pick<ProductItem, 'id' | 'name' | 'unit' | 'barcode'> & {
@@ -182,10 +191,12 @@ type ReservationDraft = {
   items: ReservationDraftLine[];
 };
 
+type ReservationWorkspaceSection = 'overview' | 'create' | 'queue' | 'capacity';
+
 const pageStyles: Record<string, React.CSSProperties> = {
   page: { display: 'grid', gap: '1rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' },
-  card: { border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', background: '#fff', boxShadow: '0 2px 10px rgba(15,23,42,0.04)' },
+  card: { padding: '1.25rem', background: '#fff' },
   sectionTitle: { margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#0f172a' },
   muted: { color: '#64748b', fontSize: '0.875rem' },
   tableWrap: { overflowX: 'auto' },
@@ -520,6 +531,7 @@ export default function InventoryReservationsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [pageSize, setPageSize] = useState(25);
   const [offset, setOffset] = useState(0);
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ReservationWorkspaceSection>('overview');
 
   useEffect(() => {
     const reservationIdFromUrl = searchParams.get('reservationId') || searchParams.get('reservation_id') || '';
@@ -728,16 +740,6 @@ export default function InventoryReservationsPage() {
   const reservationRows = reservationsQuery.data || [];
   const reservations = reservationRows.slice(0, pageSize);
   const selectedReservation = detailQuery.data;
-  const summaryCards = useMemo(() => {
-    const summary = summaryQuery.data;
-    return [
-      ['Open reservations', summary?.active_reservations ?? 0],
-      ['Draft', summary?.draft_reservations ?? 0],
-      ['Expired', summary?.expired_reservations ?? 0],
-      ['Expiration attention', summary?.expiration_attention_count ?? 0],
-      ['Open reserved quantity', summary?.open_reserved_quantity_total ?? 0]
-    ];
-  }, [summaryQuery.data]);
 
   const latestError = createMutation.error || updateDraftMutation.error || actionMutation.error || fulfillSelectedMutation.error || expireDueMutation.error || conflictResolutionMutation.error || optionsQuery.error || reservationsQuery.error || summaryQuery.error || sourceSummaryQuery.error || projectedFreeStockQuery.error || conflictsQuery.error || detailQuery.error || auditTrailQuery.error;
   const selectedActionState = selectedReservation ? getReservationActionState(selectedReservation) : null;
@@ -794,6 +796,13 @@ export default function InventoryReservationsPage() {
     setFilters((current) => ({ ...current, ...patch }));
   };
 
+  const navigateWorkspaceSection = (section: ReservationWorkspaceSection, targetId: string) => {
+    setActiveWorkspaceSection(section);
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const runLifecycleAction = (action: 'activate' | 'allocate' | 'release' | 'cancel' | 'expire' | 'fulfill') => {
     if (!selectedReservation) return;
     if (action === 'cancel' && !actionNote.trim()) {
@@ -828,28 +837,107 @@ export default function InventoryReservationsPage() {
   const canGoNext = reservationRows.length > pageSize;
 
   return (
-    <div style={pageStyles.page}>
-      <section style={pageStyles.grid} aria-label="Reservation summary">
-        {summaryCards.map(([label, value]) => (
-          <article key={String(label)} style={pageStyles.card}>
-            <p style={pageStyles.muted}>{label}</p>
-            <strong style={{ fontSize: '1.6rem' }}>{formatNumber(value)}</strong>
-          </article>
-        ))}
-      </section>
+    <div className="io-operational-page io-reservations-page io-workspace-page" id="reservation-workspace-top" style={pageStyles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/inventory-reservations"
+        eyebrow="Reservation operations"
+        title="Stock reservations"
+        description="Reserve future stock, allocate available inventory, protect commitments, and preserve a traceable lifecycle through fulfillment, release, expiration, or cancellation."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Stock-protected allocation</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{permissions.canCreateInventoryReservations ? 'Reservation write access' : 'Review-only for current role'}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div style={pageStyles.buttonRow}>
+            <button type="button" style={pageStyles.secondaryButton} disabled={summaryQuery.isFetching || reservationsQuery.isFetching} onClick={refreshReservationQueries}>
+              {(summaryQuery.isFetching || reservationsQuery.isFetching) ? 'Refreshing…' : 'Refresh page'}
+            </button>
+          </div>
+        }
+      />
 
-      <div style={pageStyles.buttonRow}>
-        <button type="button" style={pageStyles.secondaryButton} onClick={refreshReservationQueries}>Refresh page</button>
-        <span style={pageStyles.muted}>Refreshes the queue, stock protection, conflicts, options, details, and audit history.</span>
-      </div>
+      <OperationalWorkspaceStats ariaLabel="Reservation summary">
+        <OperationalWorkspaceStatCard
+          label="Open reservations"
+          value={formatNumber(summaryQuery.data?.active_reservations)}
+          helper="Active commitments still moving through allocation or fulfillment"
+          iconPath="/inventory-reservations"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Drafts"
+          value={formatNumber(summaryQuery.data?.draft_reservations)}
+          helper="Reservation drafts not yet activated"
+          iconPath="/inventory-requisitions"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Reserved quantity"
+          value={formatNumber(summaryQuery.data?.open_reserved_quantity_total)}
+          helper="Open quantity currently protected from other demand"
+          tone="blue"
+          iconPath="/stock"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Expiration attention"
+          value={formatNumber(summaryQuery.data?.expiration_attention_count)}
+          helper="Reservations due for expiration review"
+          tone={toNumber(summaryQuery.data?.expiration_attention_count) > 0 ? 'warn' : 'good'}
+          iconPath="/alerts"
+          loading={summaryQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Expired"
+          value={formatNumber(summaryQuery.data?.expired_reservations)}
+          helper="Reservations already closed by expiration"
+          tone={toNumber(summaryQuery.data?.expired_reservations) > 0 ? 'neutral' : 'good'}
+          iconPath="/inventory-reservations"
+          loading={summaryQuery.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="Reservation work areas" hint="Jump to the part of reservation operations you want to review.">
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'overview'}
+          iconPath="/dashboard"
+          label="Overview"
+          onClick={() => navigateWorkspaceSection('overview', 'reservation-workspace-top')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'create'}
+          iconPath="/inventory-reservations"
+          label="Create reservation"
+          onClick={() => navigateWorkspaceSection('create', 'reservation-create')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'queue'}
+          iconPath="/execution-tasks"
+          label="Reservation queue"
+          count={toNumber(summaryQuery.data?.active_reservations) || undefined}
+          onClick={() => navigateWorkspaceSection('queue', 'reservation-queue')}
+        />
+        <OperationalWorkspaceTab
+          active={activeWorkspaceSection === 'capacity'}
+          iconPath="/insights"
+          label="Capacity & conflicts"
+          count={(conflictsQuery.data || []).length || undefined}
+          onClick={() => navigateWorkspaceSection('capacity', 'reservation-capacity')}
+        />
+      </OperationalWorkspaceTabs>
 
       {feedback ? <div style={pageStyles.success}>{feedback}</div> : null}
       {localError ? <div style={pageStyles.error}>{localError}</div> : latestError ? <div style={pageStyles.error}>{getErrorMessage(latestError)}</div> : null}
 
       {permissions.canCreateInventoryReservations ? (
-        <section style={pageStyles.card}>
-          <h2 style={pageStyles.sectionTitle}>Create draft reservation</h2>
-          <div style={pageStyles.formGrid}>
+        <section className="app-panel" id="reservation-create" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+          <OperationalSectionHeader
+            iconPath="/inventory-reservations"
+            title="Create draft reservation"
+            description="Create a manual, event, department, or forecast reservation. Linked requisition and purchase-order commitments stay owned by their source workflows."
+          />
+          <div style={{ ...pageStyles.formGrid, marginTop: '1rem' }}>
             <label style={pageStyles.label}>Source type
               <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : draft.source_id })}>
                 <option value="manual">Manual</option>
@@ -947,15 +1035,38 @@ export default function InventoryReservationsPage() {
           </div>
         </section>
       ) : (
-        <section style={pageStyles.card}>
-          <h2 style={pageStyles.sectionTitle}>Create draft reservation</h2>
-          <p style={pageStyles.muted}>You can review reservations, but your role does not allow creating or editing reservation drafts.</p>
+        <section className="app-panel" id="reservation-create" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+          <OperationalSectionHeader
+            iconPath="/inventory-reservations"
+            title="Create draft reservation"
+            description="Your current role can review reservation commitments but cannot create or edit reservation drafts."
+          />
+          <div className="app-empty-state" style={{ marginTop: '0.85rem' }}>Creation controls are hidden for this role. Use the queue and reservation detail to review existing commitments.</div>
         </section>
       )}
 
-      <section style={pageStyles.card}>
-        <h2 style={pageStyles.sectionTitle}>Reservation queue</h2>
-        <div style={pageStyles.formGrid}>
+      <section className="app-panel" id="reservation-queue" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+        <OperationalSectionHeader
+          iconPath="/execution-tasks"
+          title="Reservation queue"
+          description="Filter and review reservations, then open one for lifecycle, fulfillment, or audit work."
+          actions={
+            <div style={pageStyles.buttonRow}>
+              <button type="button" style={pageStyles.secondaryButton} disabled={isExporting} onClick={handleExportCsv}>
+                {isExporting ? 'Exporting…' : 'Export filtered CSV'}
+              </button>
+              <button type="button" style={pageStyles.secondaryButton} onClick={() => { setFilters(defaultFilters); setOffset(0); }}>Clear filters</button>
+              {permissions.canExpireInventoryReservations ? (
+                <button type="button" style={pageStyles.secondaryButton} disabled={expireDueMutation.isPending || !toNumber(summaryQuery.data?.expiration_attention_count)} onClick={() => {
+                  if (window.confirm('Expire all currently due reservations in this tenant? Open reserved quantities will be released.')) expireDueMutation.mutate();
+                }}>
+                  {expireDueMutation.isPending ? 'Expiring due…' : 'Expire due reservations'}
+                </button>
+              ) : null}
+            </div>
+          }
+        />
+        <div style={{ ...pageStyles.formGrid, marginTop: '1rem' }}>
           <label style={pageStyles.label}>Status
             <select style={pageStyles.input} value={filters.status} onChange={(event) => updateFilters({ status: event.target.value })}>
               <option value="">All</option>
@@ -1012,19 +1123,6 @@ export default function InventoryReservationsPage() {
           </label>
         </div>
 
-        <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
-          <button type="button" style={pageStyles.secondaryButton} disabled={isExporting} onClick={handleExportCsv}>
-            {isExporting ? 'Exporting…' : 'Export filtered CSV'}
-          </button>
-          <button type="button" style={pageStyles.secondaryButton} onClick={() => { setFilters(defaultFilters); setOffset(0); }}>Clear filters</button>
-          {permissions.canExpireInventoryReservations ? (
-            <button type="button" style={pageStyles.secondaryButton} disabled={expireDueMutation.isPending || !toNumber(summaryQuery.data?.expiration_attention_count)} onClick={() => {
-              if (window.confirm('Expire all currently due reservations in this tenant? Open reserved quantities will be released.')) expireDueMutation.mutate();
-            }}>
-              {expireDueMutation.isPending ? 'Expiring due…' : 'Expire due reservations'}
-            </button>
-          ) : null}
-        </div>
 
         <div style={{ ...pageStyles.tableWrap, marginTop: '0.75rem' }}>
           <table style={pageStyles.table}>
@@ -1063,9 +1161,13 @@ export default function InventoryReservationsPage() {
         </div>
       </section>
 
-      <section style={pageStyles.card}>
-        <h2 style={pageStyles.sectionTitle}>Reservation detail</h2>
-        {!selectedReservationId ? <p style={pageStyles.muted}>Open a reservation to inspect lines and run lifecycle actions.</p> : null}
+      <section className="app-panel" id="reservation-detail" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+        <OperationalSectionHeader
+          iconPath="/inventory-reservations"
+          title="Reservation detail"
+          description="Inspect reservation lines, protected quantity, lifecycle actions, fulfillment readiness, and audit history."
+        />
+        {!selectedReservationId ? <div className="app-empty-state" style={{ marginTop: '1rem' }}>Open a reservation from the queue to inspect its lines and available lifecycle actions.</div> : null}
         {selectedReservation ? (
           <div style={pageStyles.page}>
             <div style={pageStyles.buttonRow}>
@@ -1289,10 +1391,13 @@ export default function InventoryReservationsPage() {
       </section>
 
 
-      <section style={pageStyles.card}>
-        <h2 style={pageStyles.sectionTitle}>Source / department reservation demand</h2>
-        <p style={pageStyles.muted}>Groups reservation demand by source type, source ID, requesting department, and target department so event and department commitments are visible before conflicts appear.</p>
-        <div style={pageStyles.tableWrap}>
+      <section className="app-panel" id="reservation-capacity" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+        <OperationalSectionHeader
+          iconPath="/insights"
+          title="Source / department reservation demand"
+          description="Groups reservation demand by source type, source ID, requesting department, and target department so commitments are visible before conflicts appear."
+        />
+        <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
             <thead><tr><th style={pageStyles.th}>Source</th><th style={pageStyles.th}>Requesting → Target</th><th style={pageStyles.th}>Reservations</th><th style={pageStyles.th}>Active</th><th style={pageStyles.th}>Draft</th><th style={pageStyles.th}>Expiration attention</th><th style={pageStyles.th}>Requested</th><th style={pageStyles.th}>Open reserved</th></tr></thead>
             <tbody>
@@ -1314,10 +1419,13 @@ export default function InventoryReservationsPage() {
         </div>
       </section>
 
-      <section style={pageStyles.card}>
-        <h2 style={pageStyles.sectionTitle}>Allocation conflict queue</h2>
-        <p style={pageStyles.muted}>Shows active reservation lines where remaining demand or open reservations exceed projected free stock.</p>
-        <div style={pageStyles.tableWrap}>
+      <section className="app-panel" style={pageStyles.card}>
+        <OperationalSectionHeader
+          iconPath="/alerts"
+          title="Allocation conflict queue"
+          description="Active reservation lines where remaining demand or open reservations exceed projected free stock."
+        />
+        <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
             <thead><tr><th style={pageStyles.th}>Reservation</th><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>Reason</th><th style={pageStyles.th}>Remaining</th><th style={pageStyles.th}>Projected free</th><th style={pageStyles.th}>Conflict qty</th><th style={pageStyles.th}></th></tr></thead>
             <tbody>
@@ -1346,10 +1454,13 @@ export default function InventoryReservationsPage() {
         </div>
       </section>
 
-      <section style={pageStyles.card}>
-        <h2 style={pageStyles.sectionTitle}>Projected free stock</h2>
-        <p style={pageStyles.muted}>Projected free = current stock minus open reserved quantity. Showing up to 500 stock positions; use the queue Product filter to narrow this table.</p>
-        <div style={pageStyles.tableWrap}>
+      <section className="app-panel" style={pageStyles.card}>
+        <OperationalSectionHeader
+          iconPath="/stock"
+          title="Projected free stock"
+          description="Current stock minus open reserved quantity. Showing up to 500 stock positions; use the queue Product filter to narrow this table."
+        />
+        <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
             <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>On hand</th><th style={pageStyles.th}>Reserved</th><th style={pageStyles.th}>Projected free</th></tr></thead>
             <tbody>
