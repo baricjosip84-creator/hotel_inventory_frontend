@@ -201,13 +201,15 @@ const pageStyles: Record<string, React.CSSProperties> = {
   muted: { color: '#64748b', fontSize: '0.875rem' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' },
-  lineTable: { width: '100%', minWidth: '1080px', borderCollapse: 'collapse', fontSize: '0.875rem' },
+  lineTable: { width: '100%', minWidth: '1120px', borderCollapse: 'collapse', fontSize: '0.875rem' },
   th: { textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #e2e8f0', color: '#475569' },
   td: { padding: '0.6rem', borderBottom: '1px solid #eef2f7', verticalAlign: 'top' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem' },
   label: { display: 'grid', gap: '0.25rem', fontSize: '0.8rem', color: '#475569', fontWeight: 600 },
   input: { width: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.6rem 0.7rem', font: 'inherit', background: '#fff', color: '#111827' },
   buttonRow: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
+  pageSizeControl: { display: 'flex', gap: '0.45rem', alignItems: 'center', fontSize: '0.8rem', color: '#475569', fontWeight: 600 },
+  pageSizeSelect: { width: 'auto', minWidth: '4rem' },
   button: { border: '1px solid #2563eb', borderRadius: '8px', padding: '0.6rem 0.85rem', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700 },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.6rem 0.85rem', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   dangerButton: { border: '1px solid #ef4444', borderRadius: '8px', padding: '0.6rem 0.85rem', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 700 },
@@ -984,7 +986,7 @@ export default function InventoryReservationsPage() {
           <div style={pageStyles.tableWrap}>
             <table style={pageStyles.lineTable}>
               <thead>
-                <tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr>
+                <tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Unit</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr>
               </thead>
               <tbody>
                 {draft.items.map((item, index) => (
@@ -1010,7 +1012,7 @@ export default function InventoryReservationsPage() {
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
                         <option value="specific_location">Specific location</option>
-                        <option value="any_location">Choose one best available location</option>
+                        <option value="any_location">Best available location</option>
                         <option value="inbound">Inbound stock commitment</option>
                       </select>
                     </td>
@@ -1148,8 +1150,9 @@ export default function InventoryReservationsPage() {
         <div style={pageStyles.pagination}>
           <span style={pageStyles.muted}>Showing {visibleStart}–{visibleEnd}</span>
           <div style={pageStyles.buttonRow}>
-            <label style={pageStyles.label}>Rows
-              <select style={pageStyles.input} value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setOffset(0); }}>
+            <label style={pageStyles.pageSizeControl}>
+              <span>Rows per page</span>
+              <select style={{ ...pageStyles.input, ...pageStyles.pageSizeSelect }} value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setOffset(0); }}>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
@@ -1268,7 +1271,7 @@ export default function InventoryReservationsPage() {
                 </div>
                 <div style={{ ...pageStyles.tableWrap, marginTop: '0.75rem' }}>
                   <table style={pageStyles.lineTable}>
-                    <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr></thead>
+                    <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Unit</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr></thead>
                     <tbody>
                       {editDraft.items.map((item, index) => (
                         <tr key={index}>
@@ -1295,7 +1298,7 @@ export default function InventoryReservationsPage() {
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateEditDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
                               <option value="specific_location">Specific location</option>
-                              <option value="any_location">Choose one best available location</option>
+                              <option value="any_location">Best available location</option>
                               <option value="inbound">Inbound stock commitment</option>
                             </select>
                           </td>
