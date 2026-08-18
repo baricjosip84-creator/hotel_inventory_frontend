@@ -7,6 +7,11 @@ import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import {
   TENANT_PERMISSIONS,
   getCurrentAccessRoleLabel,
   getRoleCapabilities,
@@ -464,35 +469,34 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="alerts-page" style={styles.page} data-alerts-refined="true">
-      <section className="app-panel app-panel--padded alerts-hero" style={styles.workflowPanel}>
-        <div style={styles.workflowHeader}>
-          <div style={styles.headerTextBlock} className="alerts-hero__content">
-            <span className="alerts-hero-icon"><TenantNavIcon path="/alerts" size={24} /></span>
-            <div className="alerts-hero__copy">
-              <div className="alerts-eyebrow">Operational alert control</div>
-              <h2 style={styles.workflowTitle}>Recommended alert workflow</h2>
-              <p style={styles.workflowText}>
-                Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.
-              </p>
-              <div className="alerts-hero-badges">
-                <span>Open → acknowledge → resolve</span>
-                <span>Source workflow stays authoritative</span>
-              </div>
-            </div>
-          </div>
-          <div style={styles.refreshCard} className="alerts-refresh-card">
-            <span style={styles.refreshLabel}>Last refreshed</span>
-            <strong>{alertsQuery.dataUpdatedAt ? new Date(alertsQuery.dataUpdatedAt).toLocaleString() : 'Not loaded yet'}</strong>
-            <span style={styles.refreshMeta}>Maximum visible results: {filters.limit}</span>
-            <button type="button" style={styles.secondaryButton} onClick={() => alertsQuery.refetch()} disabled={alertsQuery.isFetching}>
+    <div className="io-operational-page alerts-page io-workspace-page" style={styles.page} data-alerts-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/alerts"
+        eyebrow="Operational alert control"
+        title="Alert workspace"
+        description={
+          <p>
+            Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.
+          </p>
+        }
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Open → acknowledge → resolve</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Source workflow stays authoritative</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <>
+            <OperationalWorkspaceStatus value={summary.unresolved} label={`open alert${summary.unresolved === 1 ? '' : 's'} in the current view`} />
+            <button type="button" className="app-button app-button--secondary" onClick={() => alertsQuery.refetch()} disabled={alertsQuery.isFetching}>
               {alertsQuery.isFetching ? 'Refreshing…' : 'Refresh alerts'}
             </button>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
-      <div className="app-grid-stats" style={styles.statsGrid}>
+      <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <div style={styles.statCard} className="alerts-summary-card" data-tone="blue">
           <div className="alerts-summary-card__topline"><span className="alerts-summary-icon"><TenantNavIcon path="/alerts" size={18} /></span><div style={styles.statTitle}>Visible results</div></div>
           <div style={styles.statValue}>{summary.total}</div>

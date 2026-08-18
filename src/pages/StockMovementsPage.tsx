@@ -6,6 +6,7 @@ import { apiRequest } from '../lib/api';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
 import './StockMovementsPage.css';
 
 type PackageAuditFilter = 'all' | 'true' | 'false';
@@ -493,17 +494,37 @@ export default function StockMovementsPage() {
   const options = filterOptionsQuery.data ?? {};
 
   return (
-    <div className="io-operational-page io-stock-movements-page" style={styles.page}>
-      <header style={styles.header}>
-        <div className="io-page-intro">
-          <span className="io-page-intro__icon"><TenantNavIcon path="/stock-movements" size={24} /></span>
-          <div className="io-page-intro__copy">
-            <h2 style={styles.title}>Stock Movements</h2>
-            <p style={styles.description}>Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.</p>
-          </div>
-        </div>
-        <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching}>Refresh Ledger</button>
-      </header>
+    <div className="io-operational-page io-stock-movements-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/stock-movements"
+        eyebrow="Stock audit"
+        title="Stock movement ledger"
+        description="Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Read-only ledger</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Audit evidence</OperationalWorkspaceMetaPill>
+        </>}
+        aside={(
+          <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching}>
+            {movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching ? 'Refreshing…' : 'Refresh ledger'}
+          </button>
+        )}
+      />
+
+      <section className="stock-movements-summary-grid io-workspace-stats" aria-label="Filtered stock movement summary">
+        {[
+          ['Movements', summaryAvailable ? toNumber(summary.total_rows) : '—', summaryAvailable && toNumber(summary.no_change_rows) > 0 ? `${toNumber(summary.no_change_rows)} event(s) did not change usable stock` : 'All rows matching the current filters'],
+          ['Stock Added', summaryAvailable ? toNumber(summary.inbound_rows) : '—', 'Movement events that increased stock'],
+          ['Stock Removed', summaryAvailable ? toNumber(summary.outbound_rows) : '—', 'Movement events that reduced stock'],
+          ['Package Audited', summaryAvailable ? toNumber(summary.package_audited_rows) : '—', 'Rows with package receiving evidence'],
+          ['Cost Captured', summaryAvailable ? toNumber(summary.costed_rows) : '—', 'Rows with cost evidence'],
+          ['Received Cost', summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', 'Inbound receipt cost grouped by currency; currencies are never added together']
+        ].map(([label, value, helper]) => (
+          <article key={String(label)} style={styles.summaryCard}><div style={styles.summaryLabel}>{label}</div><div style={styles.summaryValue}>{value}</div><div style={styles.summaryHelper}>{helper}</div></article>
+        ))}
+      </section>
+
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
@@ -587,19 +608,6 @@ export default function StockMovementsPage() {
             </select>
           </label>
         </div> : null}
-      </section>
-
-      <section className="stock-movements-summary-grid" aria-label="Filtered stock movement summary">
-        {[
-          ['Movements', summaryAvailable ? toNumber(summary.total_rows) : '—', summaryAvailable && toNumber(summary.no_change_rows) > 0 ? `${toNumber(summary.no_change_rows)} event(s) did not change usable stock` : 'All rows matching the current filters'],
-          ['Stock Added', summaryAvailable ? toNumber(summary.inbound_rows) : '—', 'Movement events that increased stock'],
-          ['Stock Removed', summaryAvailable ? toNumber(summary.outbound_rows) : '—', 'Movement events that reduced stock'],
-          ['Package Audited', summaryAvailable ? toNumber(summary.package_audited_rows) : '—', 'Rows with package receiving evidence'],
-          ['Cost Captured', summaryAvailable ? toNumber(summary.costed_rows) : '—', 'Rows with cost evidence'],
-          ['Received Cost', summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', 'Inbound receipt cost grouped by currency; currencies are never added together']
-        ].map(([label, value, helper]) => (
-          <article key={String(label)} style={styles.summaryCard}><div style={styles.summaryLabel}>{label}</div><div style={styles.summaryValue}>{value}</div><div style={styles.summaryHelper}>{helper}</div></article>
-        ))}
       </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>

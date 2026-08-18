@@ -6,6 +6,7 @@ import { apiRequest } from '../lib/api';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
 
 /**
  * ============================================================================
@@ -615,7 +616,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isLoading) {
     return (
-      <div className="io-operational-page io-dashboard-page" style={styles.page}>
+      <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
         <div className="app-panel app-panel--padded">Loading dashboard...</div>
       </div>
     );
@@ -623,7 +624,7 @@ export default function DashboardPage() {
 
   if (summaryQuery.isError || !summary) {
     return (
-      <div className="io-operational-page io-dashboard-page" style={styles.page}>
+      <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
         <SectionError
           message={`Failed to load dashboard summary: ${(summaryQuery.error as Error)?.message || 'Unknown error'}`}
         />
@@ -632,7 +633,19 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="io-operational-page io-dashboard-page" style={styles.page}>
+    <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/dashboard"
+        eyebrow="Operations overview"
+        title="Operations workspace"
+        description="Monitor stock, shipments, alerts, outbound work, supplier pressure, and operational health from one tenant-level overview."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Permission-aware</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Live operational summary</OperationalWorkspaceMetaPill>
+        </>}
+      />
+
       {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
         <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -658,7 +671,7 @@ export default function DashboardPage() {
         {canViewInsights ? <ActionLink to="/insights" label="Open Insights" iconPath="/insights" /> : null}
       </div>
 
-      <div className="app-grid-stats" style={styles.kpiGrid}>
+      <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
         <StatCard
           title="Products"
           iconPath="/products"

@@ -5,6 +5,13 @@ import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import type {
   SystemContextExecutionGateResponse,
   SystemContextForecastScenarioCaptureResponse,
@@ -310,29 +317,32 @@ export default function SystemContextPage() {
   };
 
   return (
-    <div className="io-system-context-page system-context-page">
-      <section className="system-context-hero">
-        <div className="system-context-hero__icon"><TenantNavIcon path="/system-context" size={27} /></div>
-        <div className="system-context-hero__copy">
-          <span className="system-context-eyebrow">Operational intelligence</span>
-          <h1>System Context</h1>
+    <div className="io-operational-page io-workspace-page io-system-context-page system-context-page">
+      <OperationalWorkspaceHero
+        iconPath="/system-context"
+        eyebrow="Operational intelligence"
+        title="System Context workspace"
+        description={
           <p>
             See what the system currently knows about your operation, what needs attention, and whether the available data is safe to use for planning. This page does not change stock or execute actions.
           </p>
-          <div className="system-context-hero__badges">
-            <StatusPill tone="good">Read-only</StatusPill>
-            <StatusPill>Tenant-scoped</StatusPill>
-            <StatusPill tone={toneForStatus(data?.status)}>{data ? humanize(data.status) : 'Loading'}</StatusPill>
-          </div>
-        </div>
-        <div className="system-context-hero__actions">
-          <button className="button button--secondary" type="button" onClick={refreshSystemContextPage} disabled={refreshingPage}>
-            <TenantNavIcon path="/system-context" size={16} />
-            {refreshingPage ? 'Refreshing…' : 'Refresh context'}
-          </button>
-          <span>Last refreshed: {formatDateTime(contextQuery.dataUpdatedAt || null)}</span>
-        </div>
-      </section>
+        }
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Read-only</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{data ? humanize(data.status) : 'Loading'}</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <>
+            <OperationalWorkspaceStatus value={riskCount} label={`risk signal${riskCount === 1 ? '' : 's'} · refreshed ${formatDateTime(contextQuery.dataUpdatedAt || null)}`} />
+            <button className="app-button app-button--secondary" type="button" onClick={refreshSystemContextPage} disabled={refreshingPage}>
+              {refreshingPage ? 'Refreshing…' : 'Refresh context'}
+            </button>
+          </>
+        }
+      />
 
       {refreshMessage ? <div className="app-info-state">{refreshMessage}</div> : null}
       {contextQuery.error ? <ErrorNotice title="System Context failed to load" error={contextQuery.error} /> : null}
@@ -340,23 +350,17 @@ export default function SystemContextPage() {
 
       {data ? (
         <>
-          <nav className="system-context-tabs" aria-label="System Context views">
-            <button type="button" className={activeView === 'overview' ? 'is-active' : ''} onClick={() => setView('overview')}>
-              <TenantNavIcon path="/system-context" size={16} /> Overview
-            </button>
-            <button type="button" className={activeView === 'history' ? 'is-active' : ''} onClick={() => setView('history')}>
-              <TenantNavIcon path="/probabilistic-forecasting" size={16} /> Planning history
-            </button>
+          <OperationalWorkspaceTabs ariaLabel="System Context views">
+            <OperationalWorkspaceTab active={activeView === 'overview'} iconPath="/system-context" label="Overview" onClick={() => setView('overview')} />
+            <OperationalWorkspaceTab active={activeView === 'history'} iconPath="/probabilistic-forecasting" label="Planning history" onClick={() => setView('history')} />
             {canViewTenantDiagnostics ? (
-              <button type="button" className={activeView === 'diagnostics' ? 'is-active' : ''} onClick={() => setView('diagnostics')}>
-                <TenantNavIcon path="/admin-system" size={16} /> Diagnostics
-              </button>
+              <OperationalWorkspaceTab active={activeView === 'diagnostics'} iconPath="/admin-system" label="Diagnostics" onClick={() => setView('diagnostics')} />
             ) : null}
-          </nav>
+          </OperationalWorkspaceTabs>
 
           {activeView === 'overview' ? (
             <div className="system-context-view">
-              <section className="system-context-metrics">
+              <section className="system-context-metrics io-workspace-stats">
                 <MetricCard iconPath="/system-context" label="Context status" value={humanize(data.status)} detail="Overall posture of the information available to the system." tone={toneForStatus(data.status)} />
                 <MetricCard iconPath="/alerts" label="Risk signals" value={formatNumber(riskCount)} detail={`${criticalCount} critical signal${criticalCount === 1 ? '' : 's'}.`} tone={criticalCount ? 'bad' : riskCount ? 'warn' : 'good'} />
                 <MetricCard iconPath="/action-center" label="Recommended actions" value={formatNumber(recommendationCount)} detail={`${highPriorityRecommendationCount} high-priority item${highPriorityRecommendationCount === 1 ? '' : 's'}.`} tone={highPriorityRecommendationCount ? 'bad' : recommendationCount ? 'warn' : 'good'} />

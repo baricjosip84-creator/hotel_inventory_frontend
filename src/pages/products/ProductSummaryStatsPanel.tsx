@@ -9,7 +9,7 @@ type ProductSummaryStatsPanelProps = {
 
 export function ProductSummaryStatsPanel({ summary }: ProductSummaryStatsPanelProps) {
   return (
-    <div style={styles.statsGrid}>
+    <div className="io-workspace-stats" style={styles.statsGrid}>
       <StatCard
         title="Products"
         value={summary.total}

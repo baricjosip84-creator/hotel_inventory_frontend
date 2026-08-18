@@ -456,9 +456,10 @@ kbd {
 }
 
 /* ==========================================================================
-   Inventory Operations visual system — operational page rollout
-   Scope: real tenant Dashboard, Products, Suppliers, and Stock pages.
-   This layer is presentation-only and intentionally does not alter workflows.
+   Inventory Operations visual foundation — controls and generic surfaces.
+   Shared operational workspace hierarchy (hero, tabs, KPIs, section headers,
+   spacing and panel radii) is owned by components/ui/OperationalWorkspace.css.
+   Keep page-specific workflow behavior out of both presentation layers.
    ========================================================================== */
 
 .io-operational-page {

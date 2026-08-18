@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
-import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './InventoryCapabilitiesPage.css';
 
 type TabKey = 'integrations' | 'serials' | 'uom' | 'custom-fields' | 'landed-cost' | 'variants' | 'hierarchy' | 'bom' | 'mobile';
@@ -49,7 +49,6 @@ const panelStyle: CSSProperties = { display: 'grid', gap: 18 };
 const formGridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' };
 const tableWrapStyle: CSSProperties = { overflowX: 'auto', borderRadius: 12 };
 const badgeStyle: CSSProperties = { display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 800 };
-const tabRowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18, padding: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 14, maxWidth: '100%' };
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
@@ -130,35 +129,40 @@ export default function InventoryCapabilitiesPage() {
   const counts = overviewQuery.data?.counts || {};
 
   return (
-    <div className="io-operational-page io-advanced-inventory-page" style={{ ...panelStyle, color: '#0f172a' }}>
-      <section className="section capability-overview" style={{ marginTop: 0 }}>
-        <div className="io-page-intro capability-overview-heading">
-          <span className="io-page-intro__icon"><TenantNavIcon path="/inventory-capabilities" size={24} /></span>
-          <div className="io-page-intro__copy">
-            <div className="section__title" style={{ fontSize: 24, letterSpacing: '-0.02em', marginBottom: 4 }}>Capability overview</div>
-          </div>
-        </div>
-        <div className="card capability-overview-card">
-          <p className="card__subtext" style={{ marginTop: 0, maxWidth: 920 }}>
-            These are optional controls for more advanced inventory workflows. Use only the capabilities your operation needs; sections you cannot access are hidden automatically.
-          </p>
-          <div className="card-grid capability-summary-grid">
-            {visibleTabs.map((item) => (
-              <div key={item.key} className="card capability-summary-card">
-                <div className="card__label">{item.label}</div>
-                <div className="card__value" style={{ fontSize: 22 }}>{overviewQuery.isLoading || !Object.prototype.hasOwnProperty.call(counts, item.countKey) ? '—' : String(counts[item.countKey] ?? 0)}</div>
-                <div className="card__subtext">{item.metricLabel}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+    <div className="io-operational-page io-advanced-inventory-page io-workspace-page" style={{ ...panelStyle, color: '#0f172a' }}>
+      <OperationalWorkspaceHero
+        iconPath="/inventory-capabilities"
+        eyebrow="Advanced inventory"
+        title="Advanced inventory workspace"
+        description="Optional controls for advanced inventory workflows. Use only the capabilities your operation needs; sections you cannot access are hidden automatically."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Permission-aware</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Configure only what you use</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<OperationalWorkspaceStatus value={visibleTabs.length} label="capability areas available to this role" />}
+      />
 
-      <div className="capability-tabs" style={tabRowStyle} data-global-action-feedback-scope="navigation" aria-label="Advanced inventory sections">
+      <OperationalWorkspaceTabs ariaLabel="Advanced inventory sections" hint="Select a capability area to configure or review.">
         {visibleTabs.map((item) => (
-          <button key={item.key} className={tab === item.key ? 'button' : 'button button--secondary'} type="button" onClick={() => setTab(item.key)}>
-            <span className="io-tab-icon-label"><TenantNavIcon path={item.iconPath} size={15} /><span>{item.label}</span></span>
-          </button>
+          <OperationalWorkspaceTab
+            key={item.key}
+            active={tab === item.key}
+            iconPath={item.iconPath}
+            label={item.label}
+            onClick={() => setTab(item.key)}
+            data-global-action-feedback-scope="navigation"
+          />
+        ))}
+      </OperationalWorkspaceTabs>
+
+      <div className="card-grid capability-summary-grid io-workspace-stats" aria-label="Advanced inventory capability summary">
+        {visibleTabs.map((item) => (
+          <div key={item.key} className="card capability-summary-card">
+            <div className="card__label">{item.label}</div>
+            <div className="card__value" style={{ fontSize: 22 }}>{overviewQuery.isLoading || !Object.prototype.hasOwnProperty.call(counts, item.countKey) ? '—' : String(counts[item.countKey] ?? 0)}</div>
+            <div className="card__subtext">{item.metricLabel}</div>
+          </div>
         ))}
       </div>
 

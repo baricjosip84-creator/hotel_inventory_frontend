@@ -12,6 +12,7 @@ import {
 } from '../lib/permissions';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
 import './StockPage.css';
 
 type StockItem = {
@@ -1262,66 +1263,29 @@ export default function StockPage() {
   }
 
   return (
-    <div className="io-operational-page io-stock-page" style={styles.page}>
-      <div style={styles.header}>
-        <div className="io-page-intro" style={styles.headerTextBlock}>
-          <span className="io-page-intro__icon"><TenantNavIcon path="/stock" size={24} /></span>
-          <div className="io-page-intro__copy">
-            <h2 style={styles.title}>Stock Operations</h2>
-            <p style={styles.description}>
-              Review stock by product and location, see quantities assigned to reservations, and post
-              controlled consumption, count, or adjustment actions.
-            </p>
-          </div>
-        </div>
-        {canAdjust ? (
-          <div style={styles.panelActions}>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() => setShowOpeningStockImport((current) => !current)}
-            >
-              {showOpeningStockImport ? 'Hide opening stock setup' : 'Opening stock setup'}
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      {canAdjust && showOpeningStockImport ? (
-        <InventoryCsvImportPanel
-          importType="opening_stock"
-          title="Opening Stock Import"
-          description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
-          templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
-          templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
-          canImport={canAdjust}
-          disabledReason="Stock-adjust permission is required for opening-stock import."
-          onCommitted={async () => {
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ['stock'] }),
-              queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-              queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-              queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
-              queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
-              queryClient.invalidateQueries({ queryKey: ['products'] })
-            ]);
-          }}
-        />
-      ) : null}
-
-      <section style={styles.workflowGuideGrid}>
-        {stockWorkflowSteps.map((step) => (
-          <article
-            key={step.label}
-            style={step.complete ? styles.workflowStepCardComplete : styles.workflowStepCard}
+    <div className="io-operational-page io-stock-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/stock"
+        eyebrow="Stock operations"
+        title="Stock workspace"
+        description="Review stock by product and location, see quantities assigned to reservations, and post controlled consumption, count, or adjustment actions."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canAdjust ? 'Count and adjust access' : 'Stock review access'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canConsume ? 'Consumption enabled' : 'Consumption restricted by role'}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={canAdjust ? (
+          <button
+            type="button"
+            className="app-button app-button--secondary"
+            onClick={() => setShowOpeningStockImport((current) => !current)}
           >
-            <div style={styles.workflowStepLabel}>{step.label}</div>
-            <div style={styles.workflowStepText}>{step.detail}</div>
-          </article>
-        ))}
-      </section>
+            {showOpeningStockImport ? 'Hide opening stock setup' : 'Opening stock setup'}
+          </button>
+        ) : undefined}
+      />
 
-      <div className="app-grid-stats stock-page__summary-stats" style={styles.statsGrid}>
+      <div className="app-grid-stats io-workspace-stats stock-page__summary-stats" style={styles.statsGrid}>
         <StatCard
           title="Stock Positions"
           value={summary.totalRows}
@@ -1357,6 +1321,41 @@ export default function StockPage() {
           tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
         />
       </div>
+
+
+      {canAdjust && showOpeningStockImport ? (
+        <InventoryCsvImportPanel
+          importType="opening_stock"
+          title="Opening Stock Import"
+          description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
+          templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
+          templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
+          canImport={canAdjust}
+          disabledReason="Stock-adjust permission is required for opening-stock import."
+          onCommitted={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['stock'] }),
+              queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+              queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+              queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+              queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+              queryClient.invalidateQueries({ queryKey: ['products'] })
+            ]);
+          }}
+        />
+      ) : null}
+
+      <section style={styles.workflowGuideGrid}>
+        {stockWorkflowSteps.map((step) => (
+          <article
+            key={step.label}
+            style={step.complete ? styles.workflowStepCardComplete : styles.workflowStepCard}
+          >
+            <div style={styles.workflowStepLabel}>{step.label}</div>
+            <div style={styles.workflowStepText}>{step.detail}</div>
+          </article>
+        ))}
+      </section>
 
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.panelHeaderWithActions}>

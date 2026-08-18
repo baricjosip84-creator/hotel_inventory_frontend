@@ -7,6 +7,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 
 type StorageLocationItem = {
   id: string;
@@ -407,8 +408,21 @@ export default function StorageLocationsPage() {
   };
 
   return (
-    <div className="io-operational-page io-storage-locations-page" style={styles.page}>
-      <div className="app-grid-stats" style={styles.statsGrid}>
+    <div className="io-operational-page io-storage-locations-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/storage-locations"
+        eyebrow="Storage operations"
+        title="Storage location workspace"
+        description="Maintain operational storage areas, review where stock is held, and keep location condition labels ready for receiving, transfers, reservations, counts, and scanning."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canManageStorageLocations ? 'Location write access' : 'Location read-only'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Retirement is dependency-checked</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<OperationalWorkspaceStatus value={locationsQuery.isLoading ? '—' : summary.active} label="active storage locations" />}
+      />
+
+      <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <StatCard
           title="Active Locations"
           value={locationsQuery.isLoading ? '—' : summary.active}

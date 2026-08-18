@@ -8,6 +8,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
 
 type SupplierFormState = {
   name: string;
@@ -536,8 +537,22 @@ export default function SuppliersPage() {
   const supplierWord = summary.slaBreachSuppliers === 1 ? 'supplier' : 'suppliers';
 
   return (
-    <div className="io-operational-page io-suppliers-page" style={styles.page}>
-      <div className="app-grid-stats" style={styles.statsGrid}>
+    <div className="io-operational-page io-suppliers-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/suppliers"
+        eyebrow="Supplier operations"
+        title="Supplier workspace"
+        description="Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canManageSuppliers ? 'Supplier write access' : 'Supplier read-only'}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={canManageSuppliers ? (
+          <button type="button" className="app-button app-button--primary" onClick={handleStartCreate}>Add supplier</button>
+        ) : undefined}
+      />
+
+      <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <StatCard
           title="Suppliers"
           value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.total}
@@ -562,26 +577,6 @@ export default function SuppliersPage() {
           tone={!slaBreachesQuery.isLoading && summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
-
-      <section className="app-panel app-panel--padded io-page-hero-panel" style={styles.workspaceBanner}>
-        <div style={styles.workspaceBannerContent}>
-          <div className="io-page-intro">
-            <span className="io-page-intro__icon"><TenantNavIcon path="/suppliers" size={24} /></span>
-            <div className="io-page-intro__copy">
-              <div style={styles.eyebrow}>SUPPLIER OPERATIONS</div>
-              <h3 style={styles.workspaceTitle}>Supplier workspace</h3>
-              <p style={styles.workspaceText}>
-                Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.
-              </p>
-            </div>
-          </div>
-          {canManageSuppliers ? (
-            <button type="button" style={styles.primaryButton} onClick={handleStartCreate}>
-              Add supplier
-            </button>
-          ) : null}
-        </div>
-      </section>
 
       {!canManageSuppliers ? (
         <div className="app-warning-state" style={styles.warningBox}>

@@ -4,6 +4,7 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './OutboundPage.css';
 
 type Customer = {
@@ -640,26 +641,21 @@ export default function OutboundPage() {
     setActiveTab(tab);
   };
 
-  return <div className="io-operational-page io-outbound-page">
-    <section className="outbound-panel outbound-overview">
-      <div className="outbound-overview-copy io-page-intro">
-        <span className="io-page-intro__icon"><TenantNavIcon path="/outbound" size={24} /></span>
-        <div className="io-page-intro__copy">
-          <div className="outbound-eyebrow">Customer fulfillment</div>
-          <h2>From customer order to dispatched stock</h2>
-          <p>Confirming an order reserves stock. Warehouse staff then record what was physically picked, pack only those quantities, and dispatch only packed stock. Partial dispatches keep the remaining order reservation intact.</p>
-        </div>
-      </div>
-      <div className="outbound-workflow-grid" aria-label="Outbound workflow">
-        <div className="outbound-workflow-step"><strong>1. Draft</strong><span>Choose the customer, products, source locations, quantities, and requested date.</span></div>
-        <div className="outbound-workflow-step"><strong>2. Confirm</strong><span>Reserve usable stock so another workflow cannot consume the same free quantity.</span></div>
-        <div className="outbound-workflow-step"><strong>3. Pick</strong><span>Record the stock actually taken from shelves, including lot/batch or serial identity when required.</span></div>
-        <div className="outbound-workflow-step"><strong>4. Pack</strong><span>Mark only the currently picked quantities as packed and ready for dispatch.</span></div>
-        <div className="outbound-workflow-step"><strong>5. Dispatch</strong><span>Reduce inventory only when packed stock leaves the business. Returns are handled separately.</span></div>
-      </div>
-      {message ? <div className="outbound-alert outbound-alert--success" role="status">{message}</div> : null}
-      {error ? <div className="outbound-alert outbound-alert--error" role="alert">{error}</div> : null}
-    </section>
+  return <div className="io-operational-page io-outbound-page io-workspace-page">
+    <OperationalWorkspaceHero
+      iconPath="/outbound"
+      eyebrow="Customer fulfillment"
+      title="Outbound workspace"
+      description="Confirming an order reserves stock. Warehouse staff then record what was physically picked, pack only those quantities, and dispatch only packed stock. Partial dispatches keep the remaining order reservation intact."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Reserve on confirmation</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Dispatch reduces stock</OperationalWorkspaceMetaPill>
+      </>}
+    />
+
+    {message ? <div className="outbound-alert outbound-alert--success" role="status">{message}</div> : null}
+    {error ? <div className="outbound-alert outbound-alert--error" role="alert">{error}</div> : null}
 
     <section className="outbound-panel">
       <div className="outbound-section-heading">
@@ -669,7 +665,7 @@ export default function OutboundPage() {
         </div>
         <div className="outbound-section-heading-actions"><button type="button" className="outbound-button" onClick={() => { void summary.refetch(); void orders.refetch(); }} disabled={summary.isFetching || orders.isFetching}>{summary.isFetching || orders.isFetching ? 'Refreshing…' : 'Refresh status'}</button></div>
       </div>
-      {summary.isLoading ? <div className="outbound-empty">Loading outbound status…</div> : summary.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(summary.error, 'Outbound status is unavailable.')}</div> : summary.data ? <div className="outbound-summary-grid">
+      {summary.isLoading ? <div className="outbound-empty">Loading outbound status…</div> : summary.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(summary.error, 'Outbound status is unavailable.')}</div> : summary.data ? <div className="outbound-summary-grid io-workspace-stats">
         <StatCard label="Open orders" value={summary.data.open_orders} help="Confirmed through partially dispatched" tone={summary.data.open_orders > 0 ? 'warn' : 'default'} />
         <StatCard label="Ready to pick" value={summary.data.confirmed_orders} help="Confirmed and reserved" tone={summary.data.confirmed_orders > 0 ? 'warn' : 'default'} />
         <StatCard label="Picking" value={summary.data.picking_orders} help="Warehouse work in progress" tone={summary.data.picking_orders > 0 ? 'warn' : 'default'} />
@@ -680,14 +676,27 @@ export default function OutboundPage() {
       </div> : null}
     </section>
 
-    <section className="outbound-panel outbound-tabs-shell">
-      <div className="outbound-tabs" role="tablist" aria-label="Outbound work areas">
-        <button type="button" className={`outbound-tab${activeTab === 'orders' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('orders')} role="tab" aria-selected={activeTab === 'orders'}><span className="io-tab-icon-label"><TenantNavIcon path="/outbound" size={15} /><span>Orders</span></span><span className="outbound-tab-count">{activeOrderCount}</span></button>
-        {showCustomerTab ? <button type="button" className={`outbound-tab${activeTab === 'customers' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('customers')} role="tab" aria-selected={activeTab === 'customers'}><span className="io-tab-icon-label"><TenantNavIcon path="/suppliers" size={15} /><span>Customers</span></span></button> : null}
-        {showReturnTab ? <button type="button" className={`outbound-tab${activeTab === 'returns' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('returns')} role="tab" aria-selected={activeTab === 'returns'}><span className="io-tab-icon-label"><TenantNavIcon path="/stock-transfers" size={15} /><span>Customer returns</span></span>{summary.data?.pending_customer_returns ? <span className="outbound-tab-count">{summary.data.pending_customer_returns}</span> : null}</button> : null}
-        <button type="button" className={`outbound-tab${activeTab === 'trace' ? ' outbound-tab--active' : ''}`} onClick={() => setTab('trace')} role="tab" aria-selected={activeTab === 'trace'}><span className="io-tab-icon-label"><TenantNavIcon path="/stock-movements" size={15} /><span>Dispatch trace</span></span></button>
+    <section className="outbound-panel outbound-workflow-panel">
+      <OperationalSectionHeader
+        iconPath="/outbound"
+        title="Outbound workflow"
+        description="The same controlled sequence is used for every customer order."
+      />
+      <div className="outbound-workflow-grid" aria-label="Outbound workflow">
+        <div className="outbound-workflow-step"><strong>1. Draft</strong><span>Choose the customer, products, source locations, quantities, and requested date.</span></div>
+        <div className="outbound-workflow-step"><strong>2. Confirm</strong><span>Reserve usable stock so another workflow cannot consume the same free quantity.</span></div>
+        <div className="outbound-workflow-step"><strong>3. Pick</strong><span>Record the stock actually taken from shelves, including lot/batch or serial identity when required.</span></div>
+        <div className="outbound-workflow-step"><strong>4. Pack</strong><span>Mark only the currently picked quantities as packed and ready for dispatch.</span></div>
+        <div className="outbound-workflow-step"><strong>5. Dispatch</strong><span>Reduce inventory only when packed stock leaves the business. Returns are handled separately.</span></div>
       </div>
     </section>
+
+    <OperationalWorkspaceTabs ariaLabel="Outbound work areas" hint="Choose the part of the fulfillment workflow you want to work in.">
+      <OperationalWorkspaceTab active={activeTab === 'orders'} iconPath="/outbound" label="Orders" count={activeOrderCount} onClick={() => setTab('orders')} />
+      {showCustomerTab ? <OperationalWorkspaceTab active={activeTab === 'customers'} iconPath="/suppliers" label="Customers" onClick={() => setTab('customers')} /> : null}
+      {showReturnTab ? <OperationalWorkspaceTab active={activeTab === 'returns'} iconPath="/stock-transfers" label="Customer returns" count={summary.data?.pending_customer_returns || undefined} onClick={() => setTab('returns')} /> : null}
+      <OperationalWorkspaceTab active={activeTab === 'trace'} iconPath="/stock-movements" label="Dispatch trace" onClick={() => setTab('trace')} />
+    </OperationalWorkspaceTabs>
 
     {activeTab === 'orders' ? <>
       {(showOrderForm || editingOrder) ? <section className="outbound-panel">

@@ -1,0 +1,398 @@
+/*
+ * Inventory Operations workspace design system.
+ *
+ * This is the single presentation source for the tenant operational pages that
+ * share the same visual language. Page files provide content and business
+ * behavior; spacing, hierarchy, hero treatment, tabs, KPI framing and section
+ * headings live here so they cannot drift page-by-page.
+ */
+
+.io-workspace-page {
+  --io-workspace-gap: 16px;
+  --io-workspace-panel-radius: 14px;
+  --io-workspace-card-radius: 12px;
+  --io-workspace-hero-radius: 16px;
+  --io-workspace-blue: var(--io-primary, #2563eb);
+  --io-workspace-blue-dark: var(--io-primary-dark, #1d4ed8);
+  --io-workspace-blue-soft: #eff6ff;
+  --io-workspace-ink: var(--io-navy, #0f172a);
+  --io-workspace-muted: var(--io-slate, #64748b);
+  --io-workspace-border: var(--io-border, #e2e8f0);
+
+  display: grid !important;
+  gap: var(--io-workspace-gap) !important;
+  min-width: 0;
+}
+
+.io-workspace-page > * {
+  min-width: 0;
+}
+
+.io-workspace-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--io-workspace-border);
+  border-left: 4px solid var(--io-workspace-blue);
+  border-radius: var(--io-workspace-hero-radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035);
+}
+
+.io-workspace-hero__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: var(--io-workspace-blue-soft);
+  color: var(--io-workspace-blue);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+.io-workspace-hero__copy {
+  min-width: 0;
+}
+
+.io-workspace-hero__eyebrow {
+  margin-bottom: 4px;
+  color: var(--io-workspace-blue-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.io-workspace-hero h2 {
+  margin: 0 0 5px;
+  color: var(--io-workspace-ink);
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.io-workspace-hero__description {
+  max-width: 900px;
+  color: var(--io-workspace-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.io-workspace-hero__description > p,
+.io-workspace-section-header__description > p {
+  margin: 0;
+}
+
+.io-workspace-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.io-workspace-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 9px;
+  border: 1px solid var(--io-workspace-border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.io-workspace-hero__aside {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.io-workspace-hero__status {
+  display: grid;
+  gap: 4px;
+  min-width: 170px;
+  max-width: 230px;
+  padding: 12px 14px;
+  border: 1px solid var(--io-workspace-border);
+  border-radius: var(--io-workspace-card-radius);
+  background: #f8fafc;
+}
+
+.io-workspace-hero__status strong {
+  color: var(--io-workspace-ink);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.io-workspace-hero__status span {
+  color: var(--io-workspace-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.io-workspace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--io-workspace-border);
+  border-radius: var(--io-workspace-panel-radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+}
+
+.io-workspace-tabs__items {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.io-workspace-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.io-workspace-tab:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.io-workspace-tab.is-active {
+  border-color: #dbeafe;
+  background: var(--io-workspace-blue-soft);
+  color: var(--io-workspace-blue-dark);
+}
+
+.io-workspace-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.io-workspace-tab.is-active .io-workspace-tab__count {
+  background: #dbeafe;
+  color: var(--io-workspace-blue-dark);
+}
+
+.io-workspace-tabs__hint {
+  margin-left: auto;
+  padding: 0 7px;
+  color: var(--io-workspace-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.io-workspace-stats,
+.io-workspace-page .io-workspace-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px !important;
+  min-width: 0;
+  margin: 0 !important;
+}
+
+.io-workspace-page > .app-panel,
+.io-workspace-page > .outbound-panel,
+.io-workspace-page > .card,
+.io-workspace-page > .io-workspace-tabs,
+.io-workspace-page > .io-workspace-stats {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.io-workspace-page > .card {
+  border-color: var(--io-workspace-border) !important;
+  border-radius: var(--io-workspace-panel-radius) !important;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+}
+
+.io-workspace-stats > * {
+  min-width: 0;
+  min-height: 112px;
+  border-color: var(--io-workspace-border) !important;
+  border-radius: var(--io-workspace-card-radius) !important;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+
+.io-workspace-page .app-panel,
+.io-workspace-page .outbound-panel {
+  border-radius: var(--io-workspace-panel-radius) !important;
+}
+
+.io-workspace-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.io-workspace-section-header__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.io-workspace-section-header__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: var(--io-workspace-blue);
+}
+
+.io-workspace-section-header__copy {
+  min-width: 0;
+}
+
+.io-workspace-section-header h3 {
+  margin: 0 0 3px;
+  color: var(--io-workspace-ink);
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.io-workspace-section-header__description {
+  color: var(--io-workspace-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.io-workspace-section-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+
+/* Legacy section-heading markup is intentionally normalized here as well.
+   This lets older operational pages use the same visual contract while they
+   are gradually migrated to OperationalSectionHeader. */
+.io-workspace-page .io-section-heading-with-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.io-workspace-page .io-section-heading-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: var(--io-workspace-blue);
+  box-shadow: none;
+}
+
+.io-workspace-page .io-section-heading-copy h2,
+.io-workspace-page .io-section-heading-copy h3 {
+  margin: 0 0 3px !important;
+  color: var(--io-workspace-ink) !important;
+  font-size: 17px !important;
+  line-height: 1.3 !important;
+}
+
+.io-workspace-page .io-section-heading-copy p {
+  margin: 0 !important;
+  color: var(--io-workspace-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+@media (max-width: 1050px) {
+  .io-workspace-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .io-workspace-hero__aside {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .io-workspace-tabs__hint {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .io-workspace-hero {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .io-workspace-hero__icon,
+  .io-workspace-hero__aside {
+    grid-column: 1;
+  }
+
+  .io-workspace-hero__aside {
+    width: 100%;
+  }
+
+  .io-workspace-hero__status {
+    width: 100%;
+    max-width: none;
+  }
+
+  .io-workspace-tabs {
+    align-items: stretch;
+  }
+
+  .io-workspace-section-header {
+    flex-direction: column;
+  }
+
+  .io-workspace-section-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

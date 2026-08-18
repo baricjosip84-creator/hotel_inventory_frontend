@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
 
 /**
  * SUCCESS FEEDBACK (beep + vibration)
@@ -656,21 +657,25 @@ export default function ScannerPage() {
   }, []);
 
   return (
-    <div className="io-scanner-page" style={styles.page}>
-      <section className="app-panel app-panel--padded io-page-hero-panel" style={styles.heroPanel}>
-        <div style={styles.heroHeader}>
-          <div className="io-page-intro" style={styles.heroTextBlock}>
-            <span className="io-page-intro__icon"><TenantNavIcon path="/scanner" size={24} /></span>
-            <div className="io-page-intro__copy">
-              <h2 style={styles.title}>{modeLabel(mode)}</h2>
-              <p style={styles.description}>{modeDescription(mode)}</p>
-            </div>
-          </div>
+    <div className="io-operational-page io-scanner-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/scanner"
+        eyebrow="Scanning"
+        title={modeLabel(mode)}
+        description={modeDescription(mode)}
+        meta={<>
+          <OperationalWorkspaceMetaPill>{mode === 'product' ? 'Receiving mode' : 'Shipment mode'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{liveCameraUnavailableReason ? 'Camera unavailable' : 'Camera ready'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Manual and image fallback</OperationalWorkspaceMetaPill>
+        </>}
+      />
 
-          <span style={mode === 'product' ? styles.modeBadgeWarn : styles.modeBadgeInfo}>
-            {mode === 'product' ? 'RECEIVING MODE' : 'SHIPMENT MODE'}
-          </span>
-        </div>
+      <section className="app-panel app-panel--padded" style={styles.heroPanel}>
+        <OperationalSectionHeader
+          iconPath="/scanner"
+          title="Scan controls"
+          description={mode === 'product' ? 'Scan a product or package barcode inside the selected shipment receiving context.' : 'Scan a shipment QR code to open the matching shipment without changing stock.'}
+        />
 
         {mode === 'product' ? (
           <div style={styles.contextPanel}>

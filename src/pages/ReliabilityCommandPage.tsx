@@ -5,6 +5,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './ReliabilityCommandPage.css';
 
 type ReliabilityView = 'posture' | 'review-path' | 'limits';
@@ -255,7 +256,7 @@ export default function ReliabilityCommandPage() {
 
   if (commandQuery.isLoading) {
     return (
-      <div className="reliability-page" data-reliability-refined="true">
+      <div className="io-operational-page io-workspace-page reliability-page" data-reliability-refined="true">
         <section className="card reliability-state reliability-state--loading" aria-live="polite">
           <span className="reliability-state-icon"><TenantNavIcon path="/reliability-command" size={22} /></span>
           <div>
@@ -269,7 +270,7 @@ export default function ReliabilityCommandPage() {
 
   if (commandQuery.error) {
     return (
-      <div className="reliability-page" data-reliability-refined="true">
+      <div className="io-operational-page io-workspace-page reliability-page" data-reliability-refined="true">
         <section className="card reliability-state reliability-state--error">
           <span className="reliability-state-icon reliability-state-icon--error"><TenantNavIcon path="/alerts" size={22} /></span>
           <div>
@@ -297,32 +298,24 @@ export default function ReliabilityCommandPage() {
   };
 
   return (
-    <div className="reliability-page" data-reliability-refined="true">
-      <section className="card reliability-intro">
-        <div className="reliability-intro__content">
-          <span className="reliability-hero-icon"><TenantNavIcon path="/reliability-command" size={24} /></span>
-          <div className="reliability-intro__copy">
-            <div className="reliability-eyebrow">Read-only operational reliability review</div>
-            <h2>Review current pressure, safety checks, and the manual follow-up path</h2>
-            <p className="card__subtext">
-              Reliability Command combines permitted Action Center, Workspace, mobile execution, Operations Feed, Workflow Composer, Intelligence Review, Collaboration, and Digital Twin context. It provides advisory guidance only and never closes a risk, records approval, starts monitoring, opens an incident, sends a notification, or changes a source workflow.
-            </p>
-            <div className="reliability-hero-badges" aria-label="Reliability Command guardrails">
-              <span><TenantNavIcon path="/reliability-command" size={14} /> Read-only guidance</span>
-              <span><TenantNavIcon path="/workflow-composer" size={14} /> Manual follow-up</span>
-              <span><TenantNavIcon path="/action-center" size={14} /> Source workflows authoritative</span>
-            </div>
-          </div>
-        </div>
-        <div className="reliability-refresh">
-          <span className="reliability-refresh__label">Last refreshed</span>
-          <strong>{formatDateTime(response?.generated_at)}</strong>
-          <button className="button button--secondary reliability-link-button" type="button" onClick={() => commandQuery.refetch()} disabled={commandQuery.isFetching}>
-            <TenantNavIcon path="/reliability-command" size={16} />
-            <span>{commandQuery.isFetching ? 'Refreshing…' : 'Refresh review'}</span>
+    <div className="io-operational-page io-workspace-page reliability-page" data-reliability-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/reliability-command"
+        eyebrow="Read-only operational reliability review"
+        title="Review current pressure, safety checks, and the manual follow-up path"
+        description="Reliability Command combines permitted operational context into advisory guidance only. It never closes a risk, records approval, starts monitoring, opens an incident, sends a notification, or changes a source workflow."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Read-only guidance</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Manual follow-up</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Source workflows authoritative</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div style={{ display: 'grid', gap: 8 }}>
+          <OperationalWorkspaceStatus value={risks.length} label={`review risk${risks.length === 1 ? '' : 's'} · refreshed ${formatDateTime(response?.generated_at)}`} />
+          <button className="app-button app-button--secondary" type="button" onClick={() => commandQuery.refetch()} disabled={commandQuery.isFetching}>
+            {commandQuery.isFetching ? 'Refreshing…' : 'Refresh review'}
           </button>
-        </div>
-      </section>
+        </div>}
+      />
 
       <section className="card reliability-filters" aria-labelledby="reliability-filter-title">
         <div className="reliability-section-heading">
@@ -362,7 +355,7 @@ export default function ReliabilityCommandPage() {
         </div>
       </section>
 
-      <section className="reliability-summary-grid" aria-label="Reliability summary">
+      <section className="reliability-summary-grid io-workspace-stats" aria-label="Reliability summary">
         <ReliabilitySummaryCard iconPath="/reliability-command" label="Advisory reliability score" value={formatScore(overview.reliability_score)} copy="Average of current operational pressure and read-only safety checks—not an uptime percentage." tone="blue" />
         <ReliabilitySummaryCard iconPath="/action-center" label="Overall posture" value={formatIdentifier(overview.readiness, 'Not assessed')} copy="Current advisory posture across the nine reliability dimensions." tone="green" status={overview.readiness} />
         <ReliabilitySummaryCard iconPath="/alerts" label="Review risks" value={formatNumber(overview.risk_count ?? risks.length)} copy="Non-ready dimensions matching the selected thresholds." tone="amber" />
@@ -371,11 +364,11 @@ export default function ReliabilityCommandPage() {
 
       <div className="reliability-scoring-note"><TenantNavIcon path="/reliability-command" size={18} /><span>{overview.scoring_note}</span></div>
 
-      <div className="reliability-view-switch" role="tablist" aria-label="Reliability Command views">
-        <button type="button" role="tab" aria-selected={view === 'posture'} className={view === 'posture' ? 'is-active' : ''} onClick={() => setView('posture')}><TenantNavIcon path="/reliability-command" size={16} /><span>Posture and risks</span></button>
-        <button type="button" role="tab" aria-selected={view === 'review-path'} className={view === 'review-path' ? 'is-active' : ''} onClick={() => setView('review-path')}><TenantNavIcon path="/workflow-composer" size={16} /><span>Manual review path</span></button>
-        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}><TenantNavIcon path="/reliability-command" size={16} /><span>Safety and limits</span></button>
-      </div>
+      <OperationalWorkspaceTabs ariaLabel="Reliability Command views">
+        <OperationalWorkspaceTab active={view === 'posture'} iconPath="/reliability-command" label="Posture and risks" onClick={() => setView('posture')} />
+        <OperationalWorkspaceTab active={view === 'review-path'} iconPath="/workflow-composer" label="Manual review path" onClick={() => setView('review-path')} />
+        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/reliability-command" label="Safety and limits" onClick={() => setView('limits')} />
+      </OperationalWorkspaceTabs>
 
       {view === 'posture' ? (
         <section className="reliability-posture" aria-labelledby="reliability-posture-title">

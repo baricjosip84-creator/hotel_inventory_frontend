@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './DigitalTwinVisualizationPage.css';
 
 type DigitalTwinView = 'context' | 'limits';
@@ -249,7 +250,7 @@ export default function DigitalTwinVisualizationPage() {
 
   if (digitalTwinQuery.isLoading) {
     return (
-      <div className="digital-twin-page" data-digital-twin-refined="true">
+      <div className="io-operational-page io-workspace-page digital-twin-page" data-digital-twin-refined="true">
         <section className="card digital-twin-state digital-twin-state--loading" aria-live="polite">
           <span className="digital-twin-state-icon"><TenantNavIcon path="/digital-twin" size={22} /></span>
           <div>
@@ -263,7 +264,7 @@ export default function DigitalTwinVisualizationPage() {
 
   if (digitalTwinQuery.error) {
     return (
-      <div className="digital-twin-page" data-digital-twin-refined="true">
+      <div className="io-operational-page io-workspace-page digital-twin-page" data-digital-twin-refined="true">
         <section className="card digital-twin-state digital-twin-state--error" role="alert">
           <span className="digital-twin-state-icon digital-twin-state-icon--danger"><TenantNavIcon path="/alerts" size={22} /></span>
           <div className="digital-twin-state-copy">
@@ -296,31 +297,23 @@ export default function DigitalTwinVisualizationPage() {
   const hasContext = nodes.length > 0 || edges.length > 0 || overlays.length > 0;
 
   return (
-    <div className="digital-twin-page" data-digital-twin-refined="true">
-      <section className="card digital-twin-intro">
-        <div className="digital-twin-intro__content">
-          <span className="digital-twin-hero-icon"><TenantNavIcon path="/digital-twin" size={24} /></span>
-          <div className="digital-twin-intro__copy">
-            <div className="digital-twin-eyebrow">Read-only operational context</div>
-            <h2>Review relationships, dependencies, risks, and operational pressure</h2>
-            <p className="card__subtext">
-              This page automatically connects permitted products, suppliers, locations, stock, purchase orders, shipments, reservations, requisitions, transfers, execution tasks, alerts, stored graph evidence, and current operational context. It is not a live simulation and does not change stock, routes, labor, tasks, rooms, or source records.
-            </p>
-            <div className="digital-twin-hero-badges" aria-label="Digital Twin safeguards">
-              <span><TenantNavIcon path="/permissions" size={14} /> Source permissions apply</span>
-              <span><TenantNavIcon path="/action-center" size={14} /> Source workflows remain authoritative</span>
-            </div>
-          </div>
-        </div>
-        <div className="digital-twin-refresh">
-          <span className="digital-twin-refresh__label">Last refreshed</span>
-          <strong>{formatDateTime(response?.generated_at)}</strong>
-          <button className="button button--secondary digital-twin-link-button" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>
-            <TenantNavIcon path="/real-time-operations-feed" size={16} />
+    <div className="io-operational-page io-workspace-page digital-twin-page" data-digital-twin-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/digital-twin"
+        eyebrow="Read-only operational context"
+        title="Review relationships, dependencies, risks, and operational pressure"
+        description="This page connects permitted products, suppliers, locations, stock, purchase orders, shipments, reservations, requisitions, transfers, execution tasks, alerts, stored graph evidence, and current operational context. It is not a live simulation and does not change source records."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Source permissions apply</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Source workflows remain authoritative</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div style={{ display: 'grid', gap: 8 }}>
+          <OperationalWorkspaceStatus value={nodes.length} label={`context node${nodes.length === 1 ? '' : 's'} · refreshed ${formatDateTime(response?.generated_at)}`} />
+          <button className="app-button app-button--secondary" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>
             {digitalTwinQuery.isFetching ? 'Refreshing…' : 'Refresh context'}
           </button>
-        </div>
-      </section>
+        </div>}
+      />
 
       <section className="card digital-twin-filters" aria-labelledby="digital-twin-filter-title">
         <div className="digital-twin-section-heading">
@@ -367,7 +360,7 @@ export default function DigitalTwinVisualizationPage() {
         </div>
       </section>
 
-      <section className="digital-twin-summary-grid" aria-label="Digital Twin summary">
+      <section className="digital-twin-summary-grid io-workspace-stats" aria-label="Digital Twin summary">
         <DigitalTwinSummaryCard
           iconPath="/digital-twin"
           label="Topology points"
@@ -397,14 +390,10 @@ export default function DigitalTwinVisualizationPage() {
         />
       </section>
 
-      <div className="digital-twin-view-switch" role="tablist" aria-label="Digital Twin views">
-        <button type="button" role="tab" aria-selected={view === 'context'} className={view === 'context' ? 'is-active' : ''} onClick={() => setView('context')}>
-          <TenantNavIcon path="/digital-twin" size={16} /> Operational context
-        </button>
-        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>
-          <TenantNavIcon path="/permissions" size={16} /> Safety and limits
-        </button>
-      </div>
+      <OperationalWorkspaceTabs ariaLabel="Digital Twin views">
+        <OperationalWorkspaceTab active={view === 'context'} iconPath="/digital-twin" label="Operational context" onClick={() => setView('context')} />
+        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/permissions" label="Safety and limits" onClick={() => setView('limits')} />
+      </OperationalWorkspaceTabs>
 
       {view === 'context' ? (
         <section aria-labelledby="digital-twin-context-title">

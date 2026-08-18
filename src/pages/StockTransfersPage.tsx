@@ -6,6 +6,7 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 
 type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 
@@ -892,8 +893,21 @@ export default function StockTransfersPage() {
   );
 
   return (
-    <div className="io-operational-page io-stock-transfers-page" style={styles.page}>
-      <div className="app-grid-stats" style={styles.statsGrid}>
+    <div className="io-operational-page io-stock-transfers-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/stock-transfers"
+        eyebrow="Internal logistics"
+        title="Stock transfer workspace"
+        description="Plan controlled moves between storage locations, keep drafts separate from execution, and preserve a complete movement audit trail."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Draft before execution</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canExecuteStockTransfers ? 'Execution access' : `${accessRoleLabel} review access`}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading ? '—' : summary.transfer_count} label="transfers matching the current filters" />}
+      />
+
+      <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <StatCard title="Transfers" value={summary.transfer_count} subtitle="Matching the current filters" loading={transferSummaryQuery.isLoading} />
         <StatCard title="Drafts" value={summary.draft_count} subtitle="Waiting for execution or cancellation" loading={transferSummaryQuery.isLoading} />
         <StatCard title="Executed" value={summary.executed_count} subtitle="Stock already moved" loading={transferSummaryQuery.isLoading} />

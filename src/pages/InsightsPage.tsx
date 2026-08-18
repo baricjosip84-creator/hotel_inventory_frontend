@@ -7,6 +7,11 @@ import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFee
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './InsightsPage.css';
 
 type DepletionRiskResponse = {
@@ -1294,43 +1299,42 @@ export default function InsightsPage() {
   }
 
   return (
-    <div className="insights-page" style={styles.page}>
-      <section className="app-panel app-panel--padded insights-hero">
-        <div className="insights-hero__main">
-          <div className="insights-hero__content">
-            <span className="insights-hero__icon" aria-hidden="true">
-              <TenantNavIcon path="/insights" size={24} />
-            </span>
-            <div className="insights-hero__copy">
-              <div className="insights-eyebrow">Management intelligence</div>
-              <h2>Turn operational signals into a clear next-action view</h2>
-              <p>
-                Review tenant health, supplier performance, depletion pressure, reorder needs, and unusual movement evidence in one place.
-                Insights remain read-only; operational changes stay in their authoritative source workflows.
-              </p>
-              <div className="insights-hero__badges" aria-label="Insights operating safeguards">
-                <span>Read-only intelligence</span>
-                <span>Tenant-scoped evidence</span>
-                <span>Source workflows stay authoritative</span>
-              </div>
-            </div>
-          </div>
-          <aside className="insights-refresh-card" aria-label="Insight refresh status">
-            <span>Last refreshed</span>
-            <strong>{lastRefreshedAt ? formatDateTime(lastRefreshedAt) : 'Not loaded yet'}</strong>
+    <div className="io-operational-page insights-page io-workspace-page" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/insights"
+        eyebrow="Management intelligence"
+        title="Insights workspace"
+        description={
+          <p>
+            Review tenant health, supplier performance, depletion pressure, reorder needs, and unusual movement evidence in one place. Insights remain read-only; operational changes stay in their authoritative source workflows.
+          </p>
+        }
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Read-only intelligence</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Tenant-scoped evidence</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Source workflows stay authoritative</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <>
+            <OperationalWorkspaceStatus
+              value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '—'}
+              label={lastRefreshedAt ? `health score · refreshed ${formatDateTime(lastRefreshedAt)}` : 'tenant health score · not loaded yet'}
+            />
             <button
               type="button"
-              className="app-button app-button--primary insights-refresh-button"
+              className="app-button app-button--secondary"
               onClick={() => void refreshAllInsights()}
               disabled={isRefreshingAll}
             >
-              {isRefreshingAll ? 'Refreshing insights…' : 'Refresh all insights'}
+              {isRefreshingAll ? 'Refreshing…' : 'Refresh insights'}
             </button>
-          </aside>
-        </div>
-      </section>
+          </>
+        }
+      />
 
-      <section className="app-grid-stats insights-summary-grid" style={styles.statsGrid}>
+      <section className="app-grid-stats insights-summary-grid io-workspace-stats" style={styles.statsGrid}>
         <StatCard
           title="Operational Health"
           value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}

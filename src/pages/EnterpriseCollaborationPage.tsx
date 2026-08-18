@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './EnterpriseCollaborationPage.css';
 
 type CollaborationView = 'recommendations' | 'limits';
@@ -297,7 +298,7 @@ export default function EnterpriseCollaborationPage() {
 
   if (collaborationQuery.isLoading) {
     return (
-      <div className="collaboration-page">
+      <div className="io-operational-page io-workspace-page collaboration-page">
         <section className="card collaboration-state collaboration-state--loading" aria-live="polite">
           <span className="collaboration-state-icon"><TenantNavIcon path="/collaboration" size={22} /></span>
           <div>
@@ -311,7 +312,7 @@ export default function EnterpriseCollaborationPage() {
 
   if (collaborationQuery.error) {
     return (
-      <div className="collaboration-page">
+      <div className="io-operational-page io-workspace-page collaboration-page">
         <section className="card collaboration-state collaboration-state--error" role="alert">
           <span className="collaboration-state-icon collaboration-state-icon--danger"><TenantNavIcon path="/alerts" size={22} /></span>
           <div className="collaboration-state-copy">
@@ -329,31 +330,23 @@ export default function EnterpriseCollaborationPage() {
   }
 
   return (
-    <div className="collaboration-page" data-collaboration-refined="true">
-      <section className="card collaboration-intro">
-        <div className="collaboration-intro__content">
-          <span className="collaboration-hero-icon"><TenantNavIcon path="/collaboration" size={24} /></span>
-          <div className="collaboration-intro__copy">
-            <div className="collaboration-eyebrow">Read-only coordination guidance</div>
-            <h2>Coordinate work in the source workflow</h2>
-            <p className="card__subtext">
-              This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.
-            </p>
-            <div className="collaboration-hero-badges" aria-label="Collaboration safeguards">
-              <span><TenantNavIcon path="/permissions" size={14} /> Source permissions apply</span>
-              <span><TenantNavIcon path="/action-center" size={14} /> Source workflow stays authoritative</span>
-            </div>
-          </div>
-        </div>
-        <div className="collaboration-refresh">
-          <span className="collaboration-refresh__label">Last refreshed</span>
-          <strong>{formatDateTime(response?.generated_at)}</strong>
-          <button className="button button--secondary collaboration-link-button" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
-            <TenantNavIcon path="/real-time-operations-feed" size={16} />
+    <div className="io-operational-page io-workspace-page collaboration-page" data-collaboration-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/collaboration"
+        eyebrow="Read-only coordination guidance"
+        title="Coordinate work in the source workflow"
+        description="This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Source permissions apply</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Source workflow stays authoritative</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div style={{ display: 'grid', gap: 8 }}>
+          <OperationalWorkspaceStatus value={threads.length} label={`coordination recommendation${threads.length === 1 ? '' : 's'} · refreshed ${formatDateTime(response?.generated_at)}`} />
+          <button className="app-button app-button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
             {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh recommendations'}
           </button>
-        </div>
-      </section>
+        </div>}
+      />
 
       <section className="card collaboration-filters" aria-labelledby="collaboration-filter-title">
         <div className="collaboration-section-heading">
@@ -394,7 +387,7 @@ export default function EnterpriseCollaborationPage() {
         </div>
       </section>
 
-      <section className="collaboration-summary-grid" aria-label="Collaboration summary">
+      <section className="collaboration-summary-grid io-workspace-stats" aria-label="Collaboration summary">
         <SummaryCard
           iconPath="/collaboration"
           label="Coordination recommendations"
@@ -424,14 +417,10 @@ export default function EnterpriseCollaborationPage() {
         />
       </section>
 
-      <div className="collaboration-view-switch" role="tablist" aria-label="Collaboration views">
-        <button type="button" role="tab" aria-selected={view === 'recommendations'} className={view === 'recommendations' ? 'is-active' : ''} onClick={() => setView('recommendations')}>
-          <TenantNavIcon path="/collaboration" size={16} /> Coordination recommendations
-        </button>
-        <button type="button" role="tab" aria-selected={view === 'limits'} className={view === 'limits' ? 'is-active' : ''} onClick={() => setView('limits')}>
-          <TenantNavIcon path="/permissions" size={16} /> Safety and limits
-        </button>
-      </div>
+      <OperationalWorkspaceTabs ariaLabel="Collaboration views">
+        <OperationalWorkspaceTab active={view === 'recommendations'} iconPath="/collaboration" label="Coordination recommendations" onClick={() => setView('recommendations')} />
+        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/permissions" label="Safety and limits" onClick={() => setView('limits')} />
+      </OperationalWorkspaceTabs>
 
       {view === 'recommendations' ? (
         <section aria-labelledby="coordination-recommendations-title">
