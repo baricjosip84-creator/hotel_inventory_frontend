@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
+import './UsersPage.css';
 
 type UserRole = 'admin' | 'manager' | 'staff';
 type RoleSelection = '' | UserRole | `custom:${string}`;
@@ -46,6 +57,8 @@ type UserFormState = {
   roleSelection: RoleSelection;
   password: string;
 };
+
+type UserFormFieldErrors = Partial<Record<'name' | 'email' | 'roleSelection' | 'password', string>>;
 
 function emptyForm(): UserFormState {
   return {
@@ -129,38 +142,38 @@ function formatLastLogin(value?: string | null): string {
   return value ? formatDateTime(value) : 'Never';
 }
 
-function useIsMobile(breakpoint = 960): boolean {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [breakpoint]);
+function getMutationFieldErrors(error: unknown): UserFormFieldErrors {
+  if (!(error instanceof ApiError)) return {};
 
-  return isMobile;
+  const message = error.message.toLowerCase();
+  if (error.code === 'UNIQUE_CONSTRAINT_VIOLATION' || message.includes('same unique value') || message.includes('email already')) {
+    return { email: 'This email is already used by another tenant user.' };
+  }
+  if (error.code === 'INVALID_USER_ROLE' || error.code?.includes('CUSTOM_ROLE') || message.includes('role')) {
+    return { roleSelection: error.message };
+  }
+  if (message.includes('password')) {
+    return { password: error.message };
+  }
+  if (message.includes('email')) {
+    return { email: error.message };
+  }
+  return {};
 }
 
-function StatCard(props: {
-  title: string;
-  value: number | string;
-  subtitle: string;
-  tone?: 'default' | 'good' | 'warn';
-}) {
-  const valueStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : styles.statValue;
+function validateUserForm(values: UserFormState, editing: boolean): UserFormFieldErrors {
+  const errors: UserFormFieldErrors = {};
+  const email = values.email.trim();
 
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={valueStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+  if (!values.name.trim()) errors.name = "Enter the user's name.";
+  if (!email || !email.includes('@') || !email.includes('.')) errors.email = 'Enter a valid email address.';
+  if (!values.roleSelection) errors.roleSelection = 'Select an access role.';
+  if ((!editing || values.password) && values.password.length < 10) {
+    errors.password = 'Password must contain at least 10 characters.';
+  }
+
+  return errors;
 }
 
 export default function UsersPage() {
@@ -172,7 +185,6 @@ export default function UsersPage() {
     available but can be rejected when historical records retain the user.
   */
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
   const { canManageUsers } = getRoleCapabilities();
   const canWrite = canManageUsers;
   const currentUserId = getCurrentTenantUserId();
@@ -183,6 +195,9 @@ export default function UsersPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<UserFormFieldErrors>({});
+  const [workspaceSection, setWorkspaceSection] = useState<'directory' | 'form'>('directory');
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -213,6 +228,9 @@ export default function UsersPage() {
       setEditingUser(null);
       setPageError(null);
       setPageMessage('User created successfully.');
+      setFieldErrors({});
+      setShowPassword(false);
+      setWorkspaceSection('directory');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['users'] }),
         queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
@@ -221,6 +239,7 @@ export default function UsersPage() {
     onError: (error) => {
       setPageMessage(null);
       setPageError(error instanceof ApiError ? error.message : 'Failed to create user.');
+      setFieldErrors(getMutationFieldErrors(error));
     }
   });
 
@@ -231,6 +250,9 @@ export default function UsersPage() {
       setEditingUser(null);
       setPageError(null);
       setPageMessage('User updated successfully.');
+      setFieldErrors({});
+      setShowPassword(false);
+      setWorkspaceSection('directory');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['users'] }),
         queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
@@ -239,6 +261,7 @@ export default function UsersPage() {
     onError: (error) => {
       setPageMessage(null);
       setPageError(error instanceof ApiError ? error.message : 'Failed to update user.');
+      setFieldErrors(getMutationFieldErrors(error));
     }
   });
 
@@ -354,6 +377,10 @@ export default function UsersPage() {
       return;
     }
 
+    const validationErrors = validateUserForm(form, Boolean(editingUser));
+    setFieldErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) return;
+
     if (editingUser) {
       updateMutation.mutate({
         id: editingUser.id,
@@ -374,6 +401,9 @@ export default function UsersPage() {
     setEditingUser(user);
     setPageError(null);
     setPageMessage(null);
+    setFieldErrors({});
+    setShowPassword(false);
+    setWorkspaceSection('form');
     setForm({
       name: user.name,
       email: user.email,
@@ -445,6 +475,32 @@ export default function UsersPage() {
     setForm(emptyForm());
     setPageError(null);
     setPageMessage(null);
+    setFieldErrors({});
+    setShowPassword(false);
+    setWorkspaceSection('directory');
+  };
+
+  const handleStartCreate = () => {
+    if (!canWrite) return;
+    setEditingUser(null);
+    setForm(emptyForm());
+    setFieldErrors({});
+    setPageError(null);
+    setPageMessage(null);
+    setShowPassword(false);
+    setWorkspaceSection('form');
+    scrollToFormSection('tenant-user-form-panel');
+  };
+
+  const handleOpenDirectory = () => {
+    setWorkspaceSection('directory');
+    scrollToFormSection('tenant-user-directory-panel');
+  };
+
+  const handleOpenForm = () => {
+    if (!canWrite) return;
+    setWorkspaceSection('form');
+    scrollToFormSection('tenant-user-form-panel');
   };
 
   if (usersQuery.isLoading) {
@@ -456,199 +512,92 @@ export default function UsersPage() {
   }
 
   return (
-    <div style={styles.page}>
-      <div className="app-grid-stats" style={styles.summaryGrid}>
-        <StatCard title="Users" value={summary.total} subtitle={`${summary.active} active · ${summary.inactive} inactive`} />
-        <StatCard title="Admins" value={summary.admins} subtitle="Full tenant control" tone="warn" />
-        <StatCard title="Managers" value={summary.managers} subtitle="Operational supervisors" />
-        <StatCard title="Staff" value={summary.staff} subtitle="Built-in daily execution users" tone="good" />
-        <StatCard title="Custom roles" value={summary.custom} subtitle="Specialized tenant assignments" />
-      </div>
-
-      <div
-        style={{
-          ...styles.contentGrid,
-          ...(isMobile ? styles.contentGridMobile : styles.contentGridDesktop)
-        }}
-      >
-        <section id="tenant-user-form-panel" className="app-panel app-panel--padded" style={styles.panel}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionHeaderText}>
-              <h2 style={styles.sectionTitle}>{editingUser ? 'Edit User' : 'Create User'}</h2>
-              <p style={styles.sectionDescription}>
-                {canWrite
-                  ? 'Create and maintain tenant users with controlled roles.'
-                  : 'You can review tenant users, but only tenant admins can change accounts or access.'}
-              </p>
-            </div>
-          </div>
-
-          {!canWrite ? (
-            <div className="app-warning-state" style={styles.infoBanner}>
-              You can review tenant users here, but only admins can create, edit, or delete accounts.
-            </div>
-          ) : null}
-
-          {pageMessage ? (
-            <div className="app-success-state" style={styles.successBanner}>
-              {pageMessage}
-            </div>
-          ) : null}
-
-          {pageError ? (
-            <div className="app-error-state" style={styles.errorBanner}>
-              {pageError}
-            </div>
-          ) : null}
-
-          <form style={styles.form} onSubmit={handleSubmit}>
-            <div style={styles.formField}>
-              <label htmlFor="user-name" style={styles.label}>
-                Name
-              </label>
-              <input
-                id="user-name"
-                style={styles.input}
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Full user name"
-                required
-                disabled={!canWrite}
-              />
-            </div>
-
-            <div style={styles.formField}>
-              <label htmlFor="user-email" style={styles.label}>
-                Email
-              </label>
-              <input
-                id="user-email"
-                type="email"
-                style={styles.input}
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                placeholder="user@example.com"
-                required
-                disabled={!canWrite}
-              />
-            </div>
-
-            <div style={styles.formField}>
-              <label htmlFor="user-role" style={styles.label}>
-                Role
-              </label>
-              <select
-                id="user-role"
-                style={styles.select}
-                value={form.roleSelection}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, roleSelection: event.target.value as RoleSelection }))
-                }
-                disabled={!canWrite || roleOptionsQuery.isLoading || roleAssignmentLocked}
-              >
-                {!editingUser ? <option value="">Select a role…</option> : null}
-                <optgroup label="Built-in roles">
-                  {(roleOptionsQuery.data?.built_in_roles || [
-                    { key: 'staff', role: 'staff', label: 'Staff', kind: 'built_in' as const },
-                    { key: 'manager', role: 'manager', label: 'Manager', kind: 'built_in' as const },
-                    { key: 'admin', role: 'admin', label: 'Admin', kind: 'built_in' as const }
-                  ]).map((option) => (
-                    <option key={option.key} value={option.key}>{option.label}</option>
-                  ))}
-                </optgroup>
-                {roleOptionsQuery.data?.custom_roles.length ? (
-                  <optgroup label="Custom roles">
-                    {roleOptionsQuery.data.custom_roles.map((option) => (
-                      <option key={option.key} value={option.key}>{option.label} · {option.permission_count || 0} permissions</option>
-                    ))}
-                  </optgroup>
-                ) : null}
-              </select>
-              {editingOwnRole ? <small style={styles.fieldHelp}>Your own role assignment cannot be changed from this form.</small> : null}
-              {!editingOwnRole && editingOnlyActiveAdmin ? <small style={styles.fieldHelp}>This is the tenant's only active admin. Assign another active admin before changing this role.</small> : null}
-              {!editingUser ? <small style={styles.fieldHelp}>Choose access deliberately. Use a custom role when this employee needs narrower job-specific access than the built-in Staff role.</small> : null}
-              {roleOptionsQuery.isError ? <small style={styles.fieldHelp}>Custom roles could not be loaded. Built-in roles remain available.</small> : null}
-            </div>
-
-            <div style={styles.formField}>
-              <label htmlFor="user-password" style={styles.label}>
-                {editingUser ? 'New Password (optional)' : 'Password'}
-              </label>
-              <input
-                id="user-password"
-                type="password"
-                style={styles.input}
-                value={form.password}
-                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                placeholder={editingUser ? 'Leave blank to keep current password' : 'Create a password'}
-                required={!editingUser}
-                minLength={10}
-                maxLength={256}
-                disabled={!canWrite}
-              />
-              <small style={styles.fieldHelp}>
-                {editingUser
-                  ? currentUserId && editingUser.id === currentUserId
-                    ? 'Leave blank to keep the current password. Changing it revokes your other active sessions. Minimum 10 characters.'
-                    : 'Leave blank to keep the current password. Changing it signs this user out of all active sessions. Minimum 10 characters.'
-                  : 'Minimum 10 characters.'}
-              </small>
-            </div>
-
-            <div className="app-actions" style={styles.formActions}>
-              <button
-                type="submit"
-                style={styles.primaryButton}
-                disabled={!formReady || createMutation.isPending || updateMutation.isPending}
-              >
-                {editingUser
-                  ? updateMutation.isPending
-                    ? 'Saving…'
-                    : 'Save User'
-                  : createMutation.isPending
-                    ? 'Creating…'
-                    : 'Create User'}
-              </button>
-
-              {editingUser ? (
-                <button type="button" style={styles.secondaryButton} onClick={handleCancelEdit}>
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </section>
-
-        <section className="app-panel app-panel--padded" style={styles.panel}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionHeaderText}>
-              <h2 style={styles.sectionTitle}>Tenant Users</h2>
-              <p style={styles.sectionDescription}>
-                Review all user accounts for the current tenant and filter by name, email, or role.
-              </p>
-            </div>
+    <div className="users-page io-operational-page io-workspace-page" id="tenant-users-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/users"
+        eyebrow="People & access"
+        title="Tenant user management"
+        description="Create, review, and maintain tenant user accounts and access roles. Deactivation is the normal way to remove access while preserving business history."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Role-based access</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Session revocation on deactivation</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          canWrite ? (
             <button
               type="button"
-              style={styles.secondaryButton}
+              className="app-button app-button--primary"
+              onClick={handleStartCreate}
+            >
+              Create user
+            </button>
+          ) : <OperationalWorkspaceStatus value={summary.active} label="active tenant users" />
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Tenant user overview">
+        <OperationalWorkspaceStatCard label="Total users" value={summary.total} helper={`${summary.active} active · ${summary.inactive} inactive`} tone="slate" iconPath="/users" />
+        <OperationalWorkspaceStatCard label="Active users" value={summary.active} helper="Accounts currently allowed to sign in" tone="good" iconPath="/sessions" />
+        <OperationalWorkspaceStatCard label="Inactive users" value={summary.inactive} helper="Access removed; history retained" tone={summary.inactive > 0 ? 'neutral' : 'good'} iconPath="/sessions" />
+        <OperationalWorkspaceStatCard label="Admins" value={summary.admins} helper={`${summary.activeAdmins} active tenant administrators`} tone="warn" iconPath="/permissions" />
+        <OperationalWorkspaceStatCard label="Managers" value={summary.managers} helper="Built-in operational supervisors" tone="blue" iconPath="/users" />
+        <OperationalWorkspaceStatCard label="Custom-role users" value={summary.custom} helper="Users assigned job-specific tenant roles" tone="neutral" iconPath="/permissions" />
+      </OperationalWorkspaceStats>
+
+      <OperationalWorkspaceTabs ariaLabel="User management work areas" hint="Review accounts or jump directly to the user form.">
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'directory'}
+          iconPath="/users"
+          label="User directory"
+          count={filteredUsers.length}
+          onClick={handleOpenDirectory}
+        />
+        <OperationalWorkspaceTab
+          active={workspaceSection === 'form'}
+          iconPath="/permissions"
+          label={editingUser ? 'Edit user' : 'Create user'}
+          disabled={!canWrite}
+          onClick={handleOpenForm}
+        />
+      </OperationalWorkspaceTabs>
+
+      {pageMessage ? <div className="app-success-state users-page-message" role="status">{pageMessage}</div> : null}
+      {pageError ? <div className="app-error-state users-page-message" role="alert">{pageError}</div> : null}
+
+      <section id="tenant-user-directory-panel" className="app-panel users-panel users-directory-panel">
+        <OperationalSectionHeader
+          iconPath="/users"
+          title="Tenant user directory"
+          description="Find user accounts, review their access model and activity, and manage the account lifecycle."
+          actions={
+            <button
+              type="button"
+              className="app-button app-button--secondary"
               onClick={handleRefreshUsers}
               disabled={usersQuery.isFetching}
-              title="Reload tenant users from the server"
             >
               {usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}
             </button>
-          </div>
+          }
+        />
 
-          <div className="app-grid-toolbar" style={styles.toolbarGrid}>
+        <div className="users-toolbar">
+          <label className="users-field users-field--search">
+            <span>Search users</span>
             <input
               aria-label="Search tenant users"
-              style={{ ...styles.input, ...styles.searchInput }}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, email, or role"
+              placeholder="Name, email, or role"
             />
+          </label>
+          <label className="users-field users-field--status">
+            <span>Account status</span>
             <select
               aria-label="Filter users by status"
-              style={styles.select}
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
             >
@@ -656,475 +605,237 @@ export default function UsersPage() {
               <option value="active">Active accounts</option>
               <option value="inactive">Inactive accounts</option>
             </select>
-            <span style={styles.refreshMeta}>{lastRefreshedText}</span>
+          </label>
+          <div className="users-refresh-meta">{lastRefreshedText}</div>
+        </div>
+
+        {filteredUsers.length === 0 ? (
+          <div className="app-empty-state users-empty-state">
+            {users.length === 0
+              ? canWrite
+                ? 'No tenant users exist yet. Create the first tenant user below.'
+                : 'No tenant users exist yet. Ask a tenant admin to create user accounts.'
+              : 'No users matched the current search and status filters.'}
           </div>
+        ) : (
+          <div className="users-card-grid">
+            {filteredUsers.map((user) => {
+              const self = Boolean(currentUserId && user.id === currentUserId);
+              const active = isUserActive(user);
+              const onlyActiveAdmin = user.role === 'admin' && active && summary.activeAdmins === 1;
 
-          {filteredUsers.length === 0 ? (
-            <div className="app-empty-state" style={styles.emptyState}>
-              {users.length === 0
-                ? canWrite
-                  ? 'No tenant users exist yet. Create the first tenant user from the form.'
-                  : 'No tenant users exist yet. Ask a tenant admin to create user accounts.'
-                : 'No users matched the current search and status filters. Clear or change the filters to see loaded users.'}
-            </div>
-          ) : (
-            <div style={styles.userList}>
-              {filteredUsers.map((user) => (
-                <article key={user.id} style={styles.userCard}>
-                  <div style={styles.userCardTop}>
-                    <div style={styles.userCardIdentity}>
-                      <div style={styles.userName}>{user.name}</div>
-                      <div style={styles.userEmail}>{user.email}</div>
+              return (
+                <article key={user.id} className={`users-card${active ? '' : ' users-card--inactive'}`}>
+                  <div className="users-card__top">
+                    <div className="users-card__identity">
+                      <strong>{user.name}</strong>
+                      <span>{user.email}</span>
                     </div>
-
-                    <div style={styles.badgeGroup}>
-                      <span
-                        style={{
-                          ...styles.roleBadge,
-                          ...(user.custom_role_id
-                            ? styles.roleBadgeCustom
-                            : user.role === 'admin'
-                              ? styles.roleBadgeAdmin
-                              : user.role === 'manager'
-                                ? styles.roleBadgeManager
-                                : styles.roleBadgeStaff)
-                        }}
-                      >
+                    <div className="users-card__badges">
+                      <span className={`users-badge users-badge--role users-badge--${user.custom_role_id ? 'custom' : user.role}`}>
                         {(user.access_role_label || user.custom_role_name || user.role).toUpperCase()}
                       </span>
-                      {currentUserId && user.id === currentUserId ? <span style={styles.selfBadge}>YOU</span> : null}
-                      <span style={{ ...styles.statusBadge, ...(isUserActive(user) ? styles.statusBadgeActive : styles.statusBadgeInactive) }}>
-                        {isUserActive(user) ? 'ACTIVE' : 'INACTIVE'}
-                      </span>
+                      {self ? <span className="users-badge users-badge--self">YOU</span> : null}
+                      <span className={`users-badge users-badge--${active ? 'active' : 'inactive'}`}>{active ? 'ACTIVE' : 'INACTIVE'}</span>
                     </div>
                   </div>
 
-                  <div style={styles.userMetaGrid}>
-                    <div style={styles.metaItem}>
-                      <div style={styles.metaLabel}>Created</div>
-                      <div style={styles.metaValue}>{formatDateTime(user.created_at)}</div>
-                    </div>
-
-                    <div style={styles.metaItem}>
-                      <div style={styles.metaLabel}>Last login</div>
-                      <div style={styles.metaValue}>{formatLastLogin(user.last_login_at)}</div>
-                    </div>
-
-                    <div style={styles.metaItem}>
-                      <div style={styles.metaLabel}>Access model</div>
-                      <div style={styles.metaValue}>{user.custom_role_id ? 'Tenant custom role' : 'Built-in role'}</div>
-                    </div>
+                  <div className="users-card__meta">
+                    <div><span>Created</span><strong>{formatDateTime(user.created_at)}</strong></div>
+                    <div><span>Last login</span><strong>{formatLastLogin(user.last_login_at)}</strong></div>
+                    <div><span>Access model</span><strong>{user.custom_role_id ? 'Tenant custom role' : 'Built-in role'}</strong></div>
                   </div>
 
-                  <div className="app-actions" style={styles.userCardActions}>
-                    <button
-                      type="button"
-                      style={styles.secondaryButton}
-                      onClick={() => handleEdit(user)}
-                      disabled={!canWrite}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      type="button"
-                      style={isUserActive(user) ? styles.deactivateButton : styles.activateButton}
-                      onClick={() => handleStatusChange(user)}
-                      disabled={
-                        !canWrite ||
-                        statusMutation.isPending ||
-                        Boolean(currentUserId && user.id === currentUserId && isUserActive(user))
-                      }
-                      title={currentUserId && user.id === currentUserId && isUserActive(user) ? 'You cannot deactivate your own account' : undefined}
-                    >
-                      {statusMutation.isPending && statusMutation.variables?.id === user.id
-                        ? 'Updating…'
-                        : isUserActive(user)
-                          ? 'Deactivate'
-                          : 'Activate'}
-                    </button>
-
-                    <button
-                      type="button"
-                      style={styles.deleteButton}
-                      onClick={() => handleDelete(user)}
-                      disabled={
-                        !canWrite ||
-                        deleteMutation.isPending ||
-                        isUserActive(user) ||
-                        Boolean(currentUserId && user.id === currentUserId)
-                      }
-                      title={
-                        currentUserId && user.id === currentUserId
-                          ? 'You cannot delete your own account'
-                          : isUserActive(user)
-                            ? 'Deactivate this account before permanent deletion'
-                            : 'Permanently delete this inactive account when retention constraints allow it'
-                      }
-                    >
-                      {deleteMutation.isPending && deleteMutation.variables === user.id ? 'Deleting…' : 'Delete'}
-                    </button>
+                  <div className="users-card__actions">
+                    <button type="button" className="app-button app-button--secondary users-action-button" onClick={() => handleEdit(user)} disabled={!canWrite}>Edit</button>
+                    {!self ? (
+                      active ? (
+                        <button
+                          type="button"
+                          className="app-button app-button--secondary users-action-button users-action-button--warn"
+                          onClick={() => handleStatusChange(user)}
+                          disabled={!canWrite || statusMutation.isPending || onlyActiveAdmin}
+                          title={onlyActiveAdmin ? 'Assign another active admin before deactivating this account' : undefined}
+                        >
+                          {statusMutation.isPending && statusMutation.variables?.id === user.id ? 'Updating…' : 'Deactivate'}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="app-button app-button--secondary users-action-button users-action-button--activate"
+                            onClick={() => handleStatusChange(user)}
+                            disabled={!canWrite || statusMutation.isPending}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.id === user.id ? 'Updating…' : 'Reactivate'}
+                          </button>
+                          <button
+                            type="button"
+                            className="app-button app-button--danger users-action-button"
+                            onClick={() => handleDelete(user)}
+                            disabled={!canWrite || deleteMutation.isPending}
+                            title="Permanently delete this inactive account when retention constraints allow it"
+                          >
+                            {deleteMutation.isPending && deleteMutation.variables === user.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </>
+                      )
+                    ) : (
+                      <span className="users-self-note">Current account · destructive actions are unavailable here</span>
+                    )}
                   </div>
                 </article>
-              ))}
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section id="tenant-user-form-panel" className="app-panel users-panel users-form-panel">
+        <OperationalSectionHeader
+          iconPath="/permissions"
+          title={editingUser ? `Edit ${editingUser.name}` : 'Create tenant user'}
+          description={canWrite
+            ? editingUser
+              ? 'Update profile details, access assignment, or credentials. Role and password changes are security-sensitive actions.'
+              : 'Create a tenant account and assign the access model the employee needs for their job.'
+            : 'You can review tenant users, but only tenant admins can change accounts or access.'}
+          actions={editingUser ? <button type="button" className="app-button app-button--secondary" onClick={handleCancelEdit}>Cancel edit</button> : undefined}
+        />
+
+        {!canWrite ? <div className="app-warning-state users-form-banner">Only tenant admins can create or edit user accounts.</div> : null}
+
+        <form className="users-form" onSubmit={handleSubmit} noValidate>
+          <div className="users-form-group">
+            <div className="users-form-group__heading">
+              <h4>Profile</h4>
+              <p>Basic identity used across operational history, approvals, and audit records.</p>
             </div>
-          )}
-        </section>
-      </div>
+            <div className="users-form-grid">
+              <label className="users-field">
+                <span>Name</span>
+                <input
+                  id="user-name"
+                  value={form.name}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, name: event.target.value }));
+                    setFieldErrors((current) => ({ ...current, name: undefined }));
+                  }}
+                  placeholder="Full user name"
+                  disabled={!canWrite}
+                  aria-invalid={Boolean(fieldErrors.name)}
+                />
+                {fieldErrors.name ? <small className="users-field-error">{fieldErrors.name}</small> : null}
+              </label>
+
+              <label className="users-field">
+                <span>Email</span>
+                <input
+                  id="user-email"
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, email: event.target.value }));
+                    setFieldErrors((current) => ({ ...current, email: undefined }));
+                  }}
+                  placeholder="user@example.com"
+                  disabled={!canWrite}
+                  aria-invalid={Boolean(fieldErrors.email || (form.email && (!form.email.includes('@') || !form.email.includes('.'))))}
+                />
+                {fieldErrors.email ? <small className="users-field-error">{fieldErrors.email}</small> : form.email && (!form.email.includes('@') || !form.email.includes('.')) ? <small className="users-field-error">Enter a valid email address.</small> : null}
+              </label>
+            </div>
+          </div>
+
+          <div className="users-form-group">
+            <div className="users-form-group__heading">
+              <h4>Access & credentials</h4>
+              <p>Choose access deliberately. Use a custom role when this employee needs narrower job-specific access than the built-in Staff role.</p>
+            </div>
+            <div className="users-form-grid">
+              <label className="users-field">
+                <span>Role</span>
+                <select
+                  id="user-role"
+                  value={form.roleSelection}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, roleSelection: event.target.value as RoleSelection }));
+                    setFieldErrors((current) => ({ ...current, roleSelection: undefined }));
+                  }}
+                  disabled={!canWrite || roleOptionsQuery.isLoading || roleAssignmentLocked}
+                  aria-invalid={Boolean(fieldErrors.roleSelection)}
+                >
+                  {!editingUser ? <option value="">Select a role…</option> : null}
+                  <optgroup label="Built-in roles">
+                    {(roleOptionsQuery.data?.built_in_roles || [
+                      { key: 'staff', role: 'staff', label: 'Staff', kind: 'built_in' as const },
+                      { key: 'manager', role: 'manager', label: 'Manager', kind: 'built_in' as const },
+                      { key: 'admin', role: 'admin', label: 'Admin', kind: 'built_in' as const }
+                    ]).map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                  </optgroup>
+                  {roleOptionsQuery.data?.custom_roles.length ? (
+                    <optgroup label="Custom roles">
+                      {roleOptionsQuery.data.custom_roles.map((option) => (
+                        <option key={option.key} value={option.key}>{option.label} · {option.permission_count || 0} permissions</option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
+                {fieldErrors.roleSelection ? <small className="users-field-error">{fieldErrors.roleSelection}</small> : null}
+                {editingOwnRole ? <small>Your own role assignment cannot be changed from this form.</small> : null}
+                {!editingOwnRole && editingOnlyActiveAdmin ? <small>This is the tenant&apos;s only active admin. Assign another active admin before changing this role.</small> : null}
+                {roleOptionsQuery.isError ? <small>Custom roles could not be loaded. Built-in roles remain available.</small> : null}
+              </label>
+
+              <label className="users-field">
+                <span>{editingUser ? 'New password (optional)' : 'Password'}</span>
+                <div className="users-password-input">
+                  <input
+                    id="user-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(event) => {
+                      setForm((current) => ({ ...current, password: event.target.value }));
+                      setFieldErrors((current) => ({ ...current, password: undefined }));
+                    }}
+                    placeholder={editingUser ? 'Leave blank to keep current password' : 'Create a password'}
+                    minLength={10}
+                    maxLength={256}
+                    disabled={!canWrite}
+                    aria-invalid={Boolean(fieldErrors.password || (form.password && form.password.length < 10))}
+                  />
+                  <button type="button" className="users-password-toggle" onClick={() => setShowPassword((current) => !current)} disabled={!canWrite} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {fieldErrors.password ? <small className="users-field-error">{fieldErrors.password}</small> : form.password && form.password.length < 10 ? <small className="users-field-error">Password must contain at least 10 characters.</small> : null}
+                {!fieldErrors.password && !(form.password && form.password.length < 10) ? (
+                  <small>
+                    {editingUser
+                      ? currentUserId && editingUser.id === currentUserId
+                        ? 'Leave blank to keep the current password. Changing it revokes your other active sessions.'
+                        : 'Leave blank to keep the current password. Changing it signs this user out of all active sessions.'
+                      : 'Minimum 10 characters.'}
+                  </small>
+                ) : null}
+              </label>
+            </div>
+          </div>
+
+          <div className="users-form-footer">
+            <button
+              type="submit"
+              className="app-button app-button--primary"
+              disabled={!formReady || createMutation.isPending || updateMutation.isPending}
+            >
+              {editingUser
+                ? updateMutation.isPending ? 'Saving…' : 'Save user'
+                : createMutation.isPending ? 'Creating…' : 'Create user'}
+            </button>
+            {editingUser ? <button type="button" className="app-button app-button--secondary" onClick={handleCancelEdit}>Cancel</button> : null}
+          </div>
+        </form>
+      </section>
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: {
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0
-  },
-  summaryGrid: {
-    marginBottom: '20px',
-    minWidth: 0
-  },
-  statCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '16px',
-    padding: '16px',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
-  },
-  statTitle: {
-    fontSize: '12px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    fontWeight: 700,
-    color: '#64748b',
-    marginBottom: '8px'
-  },
-  statValue: {
-    fontSize: '30px',
-    fontWeight: 800,
-    color: '#0f172a'
-  },
-  statValueGood: {
-    fontSize: '30px',
-    fontWeight: 800,
-    color: '#047857'
-  },
-  statValueWarn: {
-    fontSize: '30px',
-    fontWeight: 800,
-    color: '#b45309'
-  },
-  statSubtitle: {
-    marginTop: '8px',
-    fontSize: '13px',
-    color: '#64748b',
-    lineHeight: 1.4
-  },
-  contentGrid: {
-    display: 'grid',
-    gap: '20px',
-    width: '100%',
-    minWidth: 0,
-    alignItems: 'start'
-  },
-  contentGridDesktop: {
-    gridTemplateColumns: 'minmax(0, 380px) minmax(0, 1fr)'
-  },
-  contentGridMobile: {
-    gridTemplateColumns: '1fr'
-  },
-  panel: {
-    minWidth: 0,
-    overflow: 'hidden'
-  },
-  sectionHeader: {
-    display: 'flex',
-    gap: '14px',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    marginBottom: '16px',
-    minWidth: 0
-  },
-  sectionHeaderText: {
-    minWidth: 0
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: '22px',
-    lineHeight: 1.1
-  },
-  sectionDescription: {
-    margin: '8px 0 0 0',
-    color: '#475569',
-    lineHeight: 1.5,
-    wordBreak: 'break-word'
-  },
-  infoBanner: {
-    marginBottom: '14px'
-  },
-  successBanner: {
-    marginBottom: '14px'
-  },
-  errorBanner: {
-    marginBottom: '14px'
-  },
-  form: {
-    display: 'grid',
-    gap: '14px',
-    width: '100%',
-    minWidth: 0
-  },
-  formField: {
-    display: 'grid',
-    gap: '8px',
-    minWidth: 0
-  },
-  fieldHelp: { color: '#64748b', fontWeight: 500, lineHeight: 1.4 },
-  label: {
-    fontWeight: 700,
-    color: '#334155'
-  },
-  input: {
-    width: '100%',
-    minWidth: 0,
-    maxWidth: '100%',
-    padding: '12px 14px',
-    borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    background: '#ffffff',
-    fontSize: '15px',
-    boxSizing: 'border-box'
-  },
-  select: {
-    width: '100%',
-    minWidth: 0,
-    maxWidth: '100%',
-    padding: '12px 14px',
-    borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    background: '#ffffff',
-    fontSize: '15px',
-    boxSizing: 'border-box'
-  },
-  formActions: {
-    marginTop: '4px',
-    minWidth: 0
-  },
-  primaryButton: {
-    border: 'none',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    background: '#2563eb',
-    color: '#ffffff',
-    fontWeight: 700,
-    cursor: 'pointer'
-  },
-  secondaryButton: {
-    border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    background: '#ffffff',
-    color: '#0f172a',
-    fontWeight: 700,
-    cursor: 'pointer'
-  },
-  activateButton: {
-    border: '1px solid #86efac',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    background: '#f0fdf4',
-    color: '#047857',
-    fontWeight: 700,
-    cursor: 'pointer'
-  },
-  deactivateButton: {
-    border: '1px solid #fbbf24',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    background: '#fffbeb',
-    color: '#92400e',
-    fontWeight: 700,
-    cursor: 'pointer'
-  },
-  deleteButton: {
-    border: 'none',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    background: '#ef4444',
-    color: '#ffffff',
-    fontWeight: 700,
-    cursor: 'pointer'
-  },
-  toolbarGrid: {
-    /*
-      What changed:
-      - Added a dedicated toolbar row for the search control.
-
-      Why:
-      - The search field was previously packed directly into the section header,
-        which made this page feel less consistent than Products / Suppliers / Storage.
-
-      What problem this solves:
-      - Gives the list area the same visual rhythm as the other master-data pages
-        without changing any filtering behavior.
-    */
-    marginBottom: '16px',
-    minWidth: 0
-  },
-  searchInput: {
-    /*
-      What changed:
-      - Removed the hard max-width cap from the search field.
-
-      Why:
-      - The page already sits inside the shared centered content container.
-
-      What problem this solves:
-      - Prevents the search control from looking artificially narrow and improves consistency with the other pages.
-    */
-    maxWidth: '100%'
-  },
-  refreshMeta: {
-    color: '#64748b',
-    fontSize: '13px',
-    lineHeight: 1.4,
-    alignSelf: 'center'
-  },
-  emptyState: {
-    margin: 0
-  },
-  userList: {
-    display: 'grid',
-    gap: '14px'
-  },
-  userCard: {
-    border: '1px solid #e2e8f0',
-    borderRadius: '16px',
-    padding: '16px',
-    background: '#ffffff',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-    minWidth: 0
-  },
-  userCardTop: {
-    /*
-      What changed:
-      - Allowed the identity block and role badge to wrap more safely.
-
-      Why:
-      - On narrower widths, the badge could crowd the name/email block.
-
-      What problem this solves:
-      - Improves mobile and tablet resilience without changing the card structure.
-    */
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    marginBottom: '14px'
-  },
-  userCardIdentity: {
-    minWidth: 0,
-    flex: '1 1 220px'
-  },
-  userName: {
-    fontSize: '18px',
-    fontWeight: 800,
-    color: '#0f172a',
-    wordBreak: 'break-word'
-  },
-  userEmail: {
-    marginTop: '6px',
-    color: '#475569',
-    wordBreak: 'break-word'
-  },
-  badgeGroup: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
-    maxWidth: '100%'
-  },
-  roleBadge: {
-    padding: '8px 10px',
-    borderRadius: '999px',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: '0.06em',
-    flexShrink: 0,
-    maxWidth: '100%',
-    overflowWrap: 'anywhere',
-    textAlign: 'center'
-  },
-  roleBadgeAdmin: {
-    background: '#fee2e2',
-    color: '#b91c1c'
-  },
-  roleBadgeManager: {
-    background: '#fef3c7',
-    color: '#b45309'
-  },
-  roleBadgeStaff: {
-    background: '#dcfce7',
-    color: '#047857'
-  },
-  roleBadgeCustom: {
-    background: '#dbeafe',
-    color: '#1d4ed8'
-  },
-  selfBadge: {
-    padding: '8px 10px',
-    borderRadius: '999px',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: '0.06em',
-    background: '#ede9fe',
-    color: '#6d28d9',
-    flexShrink: 0
-  },
-  statusBadge: {
-    padding: '8px 10px',
-    borderRadius: '999px',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: '0.06em',
-    flexShrink: 0
-  },
-  statusBadgeActive: {
-    background: '#dcfce7',
-    color: '#047857'
-  },
-  statusBadgeInactive: {
-    background: '#e2e8f0',
-    color: '#475569'
-  },
-  userMetaGrid: {
-    display: 'grid',
-    gap: '10px',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    marginBottom: '14px',
-    minWidth: 0
-  },
-  metaItem: {
-    minWidth: 0
-  },
-  metaLabel: {
-    fontSize: '12px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color: '#64748b',
-    marginBottom: '6px',
-    fontWeight: 700
-  },
-  metaValue: {
-    color: '#0f172a',
-    lineHeight: 1.45,
-    wordBreak: 'break-word'
-  },
-  userCardActions: {
-    minWidth: 0
-  }
-};
