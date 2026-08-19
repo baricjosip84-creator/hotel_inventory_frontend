@@ -1,0 +1,364 @@
+.admin-system-page {
+  width: 100%;
+}
+
+.admin-system-message {
+  margin: 0;
+}
+
+.admin-system-hero-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-system-hero-actions .app-button {
+  min-height: 42px;
+}
+
+.admin-system-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 18px;
+  border: 1px solid var(--io-workspace-border, #e2e8f0);
+  border-radius: var(--io-workspace-panel-radius, 14px);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03), 0 8px 24px rgba(15, 23, 42, .035);
+}
+
+.admin-system-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.admin-system-status-item {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-system-status-item--tenant {
+  grid-column: span 2;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.admin-system-status-item > span:first-child {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.admin-system-status-item > strong {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-system-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px !important;
+  color: #334155 !important;
+}
+
+.admin-system-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-system-badge--neutral {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.admin-system-badge--blue {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.admin-system-badge--good {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.admin-system-badge--warn {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.admin-system-badge--danger {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.admin-system-diagnostics {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-system-diagnostic-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.admin-system-diagnostic-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-system-diagnostic-heading h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.admin-system-diagnostic-heading p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.admin-system-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.admin-system-diagnostic-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-system-diagnostic-card--blocking {
+  border-left: 3px solid #f59e0b;
+}
+
+.admin-system-diagnostic-card__topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-system-diagnostic-card__topline > div {
+  min-width: 0;
+}
+
+.admin-system-diagnostic-card__topline strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-system-diagnostic-card__topline p,
+.admin-system-override-box p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.admin-system-diagnostic-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: #64748b;
+  font-size: 10.75px;
+  line-height: 1.4;
+}
+
+.admin-system-diagnostic-meta span {
+  position: relative;
+}
+
+.admin-system-diagnostic-meta span + span::before {
+  content: '•';
+  position: absolute;
+  left: -8px;
+  color: #cbd5e1;
+}
+
+.admin-system-action-block {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.admin-system-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.admin-system-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.admin-system-field textarea:focus {
+  outline: 2px solid rgba(37, 99, 235, .16);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+
+.admin-system-field textarea:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.admin-system-field small {
+  color: #64748b;
+  font-size: 10.25px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.admin-system-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-system-override-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+
+.admin-system-override-box > div > strong {
+  color: #92400e;
+  font-size: 12px;
+}
+
+.admin-system-empty-good {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px dashed #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+}
+
+.admin-system-empty-good strong {
+  color: #166534;
+  font-size: 12px;
+}
+
+.admin-system-empty-good span {
+  color: #4b5563;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1100px) {
+  .admin-system-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-system-status-item--tenant {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-system-hero-actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .admin-system-hero-actions > * {
+    width: 100%;
+  }
+
+  .admin-system-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-system-status-item--tenant {
+    grid-column: auto;
+  }
+
+  .admin-system-diagnostic-heading,
+  .admin-system-diagnostic-card__topline {
+    flex-direction: column;
+  }
+
+  .admin-system-count {
+    align-self: flex-start;
+  }
+}

@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './AdminSystemPage.css';
 
 type BlockingAlertRow = {
   id: string;
@@ -93,9 +101,9 @@ function readableError(error: unknown): string {
 }
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '-';
+  if (!value) return '—';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString();
 }
 
 function formatUpdatedAt(value: number): string {
@@ -103,13 +111,8 @@ function formatUpdatedAt(value: number): string {
   return formatDateTime(new Date(value).toISOString());
 }
 
-function formatCount(count: number | undefined, isLoading: boolean): string {
-  if (isLoading) return 'loading';
-  return String(count ?? 0);
-}
-
 function shortId(value: string | null | undefined): string {
-  if (!value) return '-';
+  if (!value) return '—';
   return value.length > 12 ? `${value.slice(0, 8)}…` : value;
 }
 
@@ -127,25 +130,12 @@ function toCount(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function Section(props: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <section className="app-panel app-panel--padded" style={styles.panel}>
-      <h3 style={styles.panelTitle}>{props.title}</h3>
-      <p style={styles.panelSubtitle}>{props.subtitle}</p>
-      {props.children}
-    </section>
-  );
+function StatusBadge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'good' | 'warn' | 'danger' | 'blue' }) {
+  return <span className={`admin-system-badge admin-system-badge--${tone}`}>{children}</span>;
 }
 
-function StatCard(props: { title: string; value: string; subtitle: string; tone?: 'default' | 'warn' | 'bad' }) {
-  const valueStyle = props.tone === 'bad' ? styles.statValueBad : props.tone === 'warn' ? styles.statValueWarn : styles.statValue;
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={valueStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+function DiagnosticCount({ children }: { children: React.ReactNode }) {
+  return <span className="admin-system-count">{children}</span>;
 }
 
 export default function AdminSystemPage() {
@@ -225,8 +215,7 @@ export default function AdminSystemPage() {
 
   const refreshAdminAlertData = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['admin-system', 'system-status'] }),
-      queryClient.invalidateQueries({ queryKey: ['admin-system', 'blocking-alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-system'] }),
       queryClient.invalidateQueries({ queryKey: ['alerts'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
@@ -284,91 +273,203 @@ export default function AdminSystemPage() {
   });
 
   const statusUnavailable = systemStatusQuery.isError && !systemStatusQuery.data;
-  const effectiveWriteLocked = Boolean(
-    systemStatusQuery.data?.write_locked ??
-    systemStatusQuery.data?.write_lock ??
-    systemStatusQuery.data?.system_write_locked ??
-    systemStatusQuery.data?.tenant_write_locked
-  );
   const systemWriteLocked = Boolean(systemStatusQuery.data?.system_write_locked);
   const tenantWriteLocked = Boolean(systemStatusQuery.data?.tenant_write_locked);
+  const effectiveWriteLocked = Boolean(
+    systemStatusQuery.data?.write_locked ??
+      systemStatusQuery.data?.write_lock ??
+      (systemWriteLocked || tenantWriteLocked)
+  );
   const maintenanceEnabled = Boolean(systemStatusQuery.data?.maintenance_mode);
   const blockingCount = toCount(systemStatusQuery.data?.unresolved_blocking_alerts);
+  const loadedBlockingCount = blockingAlertsQuery.data?.length ?? 0;
+  const loadedStockIssueCount = stockIntegrityQuery.data?.length ?? 0;
+  const loadedBrokenShipmentCount = brokenShipmentsQuery.data?.length ?? 0;
+  const loadedIntegrityIssueCount = loadedStockIssueCount + loadedBrokenShipmentCount;
 
   const writeStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : effectiveWriteLocked ? 'Locked' : 'Open';
   const maintenanceStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : maintenanceEnabled ? 'Enabled' : 'Disabled';
   const blockingStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : String(blockingCount);
+  const diagnosticAccessStatus = canViewTenantDiagnostics ? 'Available' : 'Restricted';
+  const pageHealth = systemStatusQuery.isLoading
+    ? 'Loading…'
+    : statusUnavailable
+      ? 'Unavailable'
+      : effectiveWriteLocked
+        ? 'Write locked'
+        : maintenanceEnabled
+          ? 'Maintenance'
+          : blockingCount > 0
+            ? 'Attention'
+            : 'Operational';
+  const pageHealthLabel = `tenant administrative health · refreshed ${formatUpdatedAt(lastUpdatedAt)}`;
+  const blockingHeaderCount = statusUnavailable ? loadedBlockingCount : blockingCount;
+  const alertActionsBlockedByWriteLock = effectiveWriteLocked;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.toolbar}>
-        <div style={styles.toolbarText}>Last refreshed: {formatUpdatedAt(lastUpdatedAt)}</div>
-        <button
-          type="button"
-          className="app-button app-button--secondary"
-          style={styles.secondaryButton}
-          onClick={() => void handleManualRefresh()}
-          disabled={isAdminSystemRefreshing}
-        >
-          {isAdminSystemRefreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
+    <div className="admin-system-page io-operational-page io-workspace-page" id="admin-system-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/admin-system"
+        eyebrow="Administration & integrity"
+        title="Admin system"
+        description="Review tenant operational posture, write-lock and maintenance signals, blocking alerts, and tenant-scoped integrity diagnostics. Platform controls remain read-only from this tenant page."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Platform signals read-only</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Diagnostics permission-gated</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Alert actions permission-gated</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div className="admin-system-hero-actions">
+            <OperationalWorkspaceStatus value={pageHealth} label={pageHealthLabel} />
+            <button
+              type="button"
+              className="app-button app-button--secondary"
+              onClick={() => void handleManualRefresh()}
+              disabled={isAdminSystemRefreshing}
+            >
+              {isAdminSystemRefreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        }
+      />
 
-      <section className="app-grid-stats" style={styles.statsGrid}>
-        <StatCard
-          title="Effective Write Status"
+      <OperationalWorkspaceStats ariaLabel="Admin system overview">
+        <OperationalWorkspaceStatCard
+          label="Effective write status"
           value={writeStatus}
-          subtitle="Writes are blocked if either the platform or this tenant is write-locked."
-          tone={!systemStatusQuery.isLoading && !statusUnavailable && effectiveWriteLocked ? 'bad' : 'default'}
+          helper="Platform and tenant write locks combined"
+          tone={!systemStatusQuery.isLoading && !statusUnavailable && effectiveWriteLocked ? 'danger' : 'good'}
+          iconPath="/admin-system"
+          loading={systemStatusQuery.isLoading}
         />
-        <StatCard
-          title="Maintenance"
+        <OperationalWorkspaceStatCard
+          label="Maintenance"
           value={maintenanceStatus}
-          subtitle="Platform maintenance-mode signal visible to this tenant."
-          tone={!systemStatusQuery.isLoading && !statusUnavailable && maintenanceEnabled ? 'warn' : 'default'}
+          helper="Platform maintenance signal visible to this tenant"
+          tone={!systemStatusQuery.isLoading && !statusUnavailable && maintenanceEnabled ? 'warn' : 'neutral'}
+          iconPath="/reliability-command"
+          loading={systemStatusQuery.isLoading}
         />
-        <StatCard
-          title="Blocking Alerts"
+        <OperationalWorkspaceStatCard
+          label="Blocking alerts"
           value={blockingStatus}
-          subtitle="Unresolved tenant blockers that can stop protected operations."
-          tone={!systemStatusQuery.isLoading && !statusUnavailable && blockingCount > 0 ? 'bad' : 'default'}
+          helper="Unresolved tenant blockers affecting protected operations"
+          tone={!systemStatusQuery.isLoading && !statusUnavailable && blockingCount > 0 ? 'danger' : 'good'}
+          iconPath="/alerts"
+          loading={systemStatusQuery.isLoading}
         />
+        <OperationalWorkspaceStatCard
+          label="Tenant diagnostics"
+          value={diagnosticAccessStatus}
+          helper={canViewTenantDiagnostics ? `${loadedIntegrityIssueCount} loaded stock / shipment issue${loadedIntegrityIssueCount === 1 ? '' : 's'} · up to 100 per category` : 'Tenant Diagnostics · Read permission required'}
+          tone={canViewTenantDiagnostics ? (loadedIntegrityIssueCount > 0 ? 'warn' : 'blue') : 'neutral'}
+          iconPath="/audit"
+        />
+      </OperationalWorkspaceStats>
+
+      {actionMessage ? <div className="app-success-state admin-system-message" role="status">{actionMessage}</div> : null}
+      {actionError ? <div className="app-error-state admin-system-message" role="alert">{actionError}</div> : null}
+
+      <section className="app-panel admin-system-panel">
+        <OperationalSectionHeader
+          iconPath="/admin-system"
+          title="Operational posture"
+          description="Current tenant write availability and platform maintenance signals. This page reports these controls; it does not change platform or tenant lock settings."
+          actions={
+            statusUnavailable
+              ? <StatusBadge tone="danger">STATUS UNAVAILABLE</StatusBadge>
+              : effectiveWriteLocked
+                ? <StatusBadge tone="danger">WRITES BLOCKED</StatusBadge>
+                : <StatusBadge tone="good">WRITES OPEN</StatusBadge>
+          }
+        />
+
+        {systemStatusQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading system status…</div> : null}
+        {systemStatusQuery.error ? <div className="app-error-state admin-system-message">{readableError(systemStatusQuery.error)}</div> : null}
+
+        {systemStatusQuery.data ? (
+          <div className="admin-system-status-grid">
+            <div className="admin-system-status-item admin-system-status-item--tenant">
+              <span>Tenant ID</span>
+              <strong className="admin-system-mono">{systemStatusQuery.data.tenant_id ?? '—'}</strong>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Reported at</span>
+              <strong>{formatDateTime(systemStatusQuery.data.generated_at ?? systemStatusQuery.data.timestamp)}</strong>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Platform write lock</span>
+              <strong>{systemWriteLocked ? 'Enabled' : 'Disabled'}</strong>
+              <StatusBadge tone={systemWriteLocked ? 'danger' : 'good'}>{systemWriteLocked ? 'LOCKED' : 'CLEAR'}</StatusBadge>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Tenant write lock</span>
+              <strong>{tenantWriteLocked ? 'Enabled' : 'Disabled'}</strong>
+              <StatusBadge tone={tenantWriteLocked ? 'danger' : 'good'}>{tenantWriteLocked ? 'LOCKED' : 'CLEAR'}</StatusBadge>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Effective write status</span>
+              <strong>{effectiveWriteLocked ? 'Locked' : 'Open'}</strong>
+              <StatusBadge tone={effectiveWriteLocked ? 'danger' : 'good'}>{effectiveWriteLocked ? 'BLOCKED' : 'OPEN'}</StatusBadge>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Maintenance mode</span>
+              <strong>{maintenanceEnabled ? 'Enabled' : 'Disabled'}</strong>
+              <StatusBadge tone={maintenanceEnabled ? 'warn' : 'neutral'}>{maintenanceEnabled ? 'ACTIVE' : 'OFF'}</StatusBadge>
+            </div>
+            <div className="admin-system-status-item">
+              <span>Unresolved blocking alerts</span>
+              <strong>{blockingCount}</strong>
+              <StatusBadge tone={blockingCount > 0 ? 'danger' : 'good'}>{blockingCount > 0 ? 'ATTENTION' : 'CLEAR'}</StatusBadge>
+            </div>
+          </div>
+        ) : null}
+
+        {effectiveWriteLocked ? (
+          <div className="app-warning-state admin-system-message">
+            <strong>Protected write operations are currently blocked.</strong>{' '}
+            The active source is {systemWriteLocked && tenantWriteLocked ? 'both the platform and tenant write locks' : systemWriteLocked ? 'the platform write lock' : 'the tenant write lock'}. Alert acknowledge, resolve, and override actions are disabled here until the lock is cleared.
+          </div>
+        ) : null}
       </section>
 
-      {actionMessage ? <div className="app-success-state">{actionMessage}</div> : null}
-      {actionError ? <div className="app-error-state">{actionError}</div> : null}
+      <section className="app-panel admin-system-panel">
+        <OperationalSectionHeader
+          iconPath="/audit"
+          title="Tenant diagnostics"
+          description="Restricted tenant-scoped integrity checks. Each diagnostic list loads up to 100 current rows; the Blocking alerts KPI above remains the authoritative total blocker count."
+          actions={
+            canViewTenantDiagnostics
+              ? <StatusBadge tone={canManageAlerts || canOverrideAlerts ? 'blue' : 'neutral'}>{canManageAlerts || canOverrideAlerts ? 'ACTIONS AVAILABLE' : 'READ ONLY'}</StatusBadge>
+              : <StatusBadge tone="neutral">PERMISSION REQUIRED</StatusBadge>
+          }
+        />
 
-      <div style={styles.grid}>
-        <Section title="System Status" subtitle="Operational lock and maintenance signals for the current tenant context.">
-          {systemStatusQuery.isLoading ? <div className="app-empty-state">Loading system status…</div> : null}
-          {systemStatusQuery.error ? <div className="app-error-state">{readableError(systemStatusQuery.error)}</div> : null}
-          {systemStatusQuery.data ? (
-            <div style={styles.list}>
-              <div style={styles.keyValueRow}><strong>Tenant ID</strong><span style={styles.monoValue}>{systemStatusQuery.data.tenant_id ?? '-'}</span></div>
-              <div style={styles.keyValueRow}><strong>Reported at</strong><span>{formatDateTime(systemStatusQuery.data.generated_at ?? systemStatusQuery.data.timestamp)}</span></div>
-              <div style={styles.keyValueRow}><strong>Platform Write Lock</strong><span>{systemWriteLocked ? 'Enabled' : 'Disabled'}</span></div>
-              <div style={styles.keyValueRow}><strong>Tenant Write Lock</strong><span>{tenantWriteLocked ? 'Enabled' : 'Disabled'}</span></div>
-              <div style={styles.keyValueRow}><strong>Effective Write Status</strong><span>{effectiveWriteLocked ? 'Locked' : 'Open'}</span></div>
-              <div style={styles.keyValueRow}><strong>Maintenance Mode</strong><span>{maintenanceEnabled ? 'Enabled' : 'Disabled'}</span></div>
-              <div style={styles.keyValueRow}><strong>Unresolved Blocking Alerts</strong><span>{blockingCount}</span></div>
-              {effectiveWriteLocked ? (
-                <div className="app-warning-state">Protected write operations are currently blocked by {systemWriteLocked && tenantWriteLocked ? 'both the platform and tenant write locks' : systemWriteLocked ? 'the platform write lock' : 'the tenant write lock'}.</div>
-              ) : null}
-            </div>
-          ) : null}
-        </Section>
+        {!canViewTenantDiagnostics ? (
+          <div className="app-warning-state admin-system-message">Diagnostics require Tenant Diagnostics · Read permission.</div>
+        ) : (
+          <div className="admin-system-diagnostics">
+            {!canManageAlerts && !canOverrideAlerts ? (
+              <div className="app-empty-state admin-system-message">Diagnostics are read-only for your current permission set.</div>
+            ) : null}
+            {alertActionsBlockedByWriteLock && (canManageAlerts || canOverrideAlerts) ? (
+              <div className="app-warning-state admin-system-message">Alert actions are disabled while the effective write status is locked.</div>
+            ) : null}
 
-        <Section title="Tenant Diagnostics" subtitle="Restricted integrity checks scoped to the current tenant.">
-          {!canViewTenantDiagnostics ? <div className="app-warning-state">Diagnostics require Tenant Diagnostics · Read permission.</div> : null}
-          {canViewTenantDiagnostics ? (
-            <div style={styles.list}>
-              {!canManageAlerts && !canOverrideAlerts ? (
-                <div className="app-empty-state">Diagnostics are read-only for your current permission set.</div>
-              ) : null}
+            <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-blocking-heading">
+              <div className="admin-system-diagnostic-heading">
+                <div>
+                  <h4 id="admin-system-blocking-heading">Blocking alerts</h4>
+                  <p>Unresolved blocking alerts that can stop protected tenant operations.</p>
+                </div>
+                <DiagnosticCount>{blockingAlertsQuery.isLoading ? 'Loading…' : blockingHeaderCount}</DiagnosticCount>
+              </div>
 
-              <h4 style={styles.sectionSubheading}>Blocking Diagnostics <span style={styles.countLabel}>{formatCount(blockingAlertsQuery.data?.length, blockingAlertsQuery.isLoading)}</span></h4>
-              {blockingAlertsQuery.error ? <div className="app-error-state">{readableError(blockingAlertsQuery.error)}</div> : null}
-              {blockingAlertsQuery.isLoading ? <div className="app-empty-state">Loading blocking diagnostics…</div> : null}
+              {blockingAlertsQuery.error ? <div className="app-error-state admin-system-message">{readableError(blockingAlertsQuery.error)}</div> : null}
+              {blockingAlertsQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading blocking diagnostics…</div> : null}
               {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => {
                 const alertTitle = formatAlertType(row.type);
                 const resolutionNote = resolutionNoteByAlertId[row.id] ?? '';
@@ -376,24 +477,28 @@ export default function AdminSystemPage() {
                 const isAcknowledging = acknowledgeMutation.isPending && acknowledgeMutation.variables === row.id;
                 const isResolving = resolveMutation.isPending && resolveMutation.variables?.id === row.id;
                 const isOverriding = overrideMutation.isPending && overrideMutation.variables?.id === row.id;
-                const isBusy = isAcknowledging || isResolving || isOverriding;
+                const isBusy = isAcknowledging || isResolving || isOverriding || alertActionsBlockedByWriteLock;
 
                 return (
-                  <article key={row.id} style={styles.itemCard}>
-                    <div style={styles.itemTitle}>{alertTitle}</div>
-                    <div style={styles.itemText}>{row.message}</div>
-                    <div style={styles.itemMeta}>
-                      {row.severity.toUpperCase()} · {formatDateTime(row.created_at)}
-                      {row.product_name ? ` · ${row.product_name}` : ''}
-                      {row.acknowledged ? ' · Acknowledged' : ' · Not acknowledged'}
+                  <article key={row.id} className="admin-system-diagnostic-card admin-system-diagnostic-card--blocking">
+                    <div className="admin-system-diagnostic-card__topline">
+                      <div>
+                        <strong>{alertTitle}</strong>
+                        <p>{row.message}</p>
+                      </div>
+                      <StatusBadge tone={row.severity.toLowerCase() === 'critical' || row.severity.toLowerCase() === 'high' ? 'danger' : 'warn'}>{row.severity.toUpperCase()}</StatusBadge>
+                    </div>
+                    <div className="admin-system-diagnostic-meta">
+                      <span>{formatDateTime(row.created_at)}</span>
+                      {row.product_name ? <span>{row.product_name}</span> : null}
+                      <span>{row.acknowledged ? 'Acknowledged' : 'Not acknowledged'}</span>
                     </div>
 
                     {canManageAlerts ? (
-                      <>
-                        <label style={styles.fieldLabel}>
+                      <div className="admin-system-action-block">
+                        <label className="admin-system-field">
                           <span>Resolution note</span>
                           <textarea
-                            style={styles.textareaNeutral}
                             value={resolutionNote}
                             onChange={(event) => setResolutionNoteByAlertId((current) => ({ ...current, [row.id]: event.target.value }))}
                             placeholder="Explain what was checked and why this blocker can be closed."
@@ -401,14 +506,13 @@ export default function AdminSystemPage() {
                             maxLength={2000}
                             disabled={isBusy}
                           />
-                          <small style={styles.fieldHelp}>At least 3 characters are required before Resolve is enabled.</small>
+                          <small>At least 3 characters are required before Resolve is enabled.</small>
                         </label>
-                        <div style={styles.actions}>
+                        <div className="admin-system-actions">
                           {!row.acknowledged ? (
                             <button
                               type="button"
                               className="app-button app-button--secondary"
-                              style={styles.secondaryButton}
                               onClick={() => acknowledgeMutation.mutate(row.id)}
                               disabled={isBusy}
                             >
@@ -418,24 +522,24 @@ export default function AdminSystemPage() {
                           <button
                             type="button"
                             className="app-button app-button--primary"
-                            style={styles.primaryButton}
                             onClick={() => resolveMutation.mutate({ id: row.id, resolutionNote: resolutionNote.trim() })}
                             disabled={isBusy || resolutionNote.trim().length < 3}
                           >
                             {isResolving ? 'Resolving…' : 'Resolve'}
                           </button>
                         </div>
-                      </>
+                      </div>
                     ) : null}
 
                     {canOverrideAlerts ? (
-                      <div className="app-warning-state" style={styles.overrideBox}>
-                        <strong>Emergency blocking-alert override</strong>
-                        <span>Use only after the underlying issue has been independently checked and normal resolution is not appropriate.</span>
-                        <label style={styles.fieldLabel}>
+                      <div className="admin-system-override-box">
+                        <div>
+                          <strong>Emergency blocking-alert override</strong>
+                          <p>Use only after the underlying issue has been independently checked and normal resolution is not appropriate.</p>
+                        </div>
+                        <label className="admin-system-field">
                           <span>Mandatory override reason</span>
                           <textarea
-                            style={styles.textareaNeutral}
                             value={overrideReason}
                             onChange={(event) => setOverrideReasonByAlertId((current) => ({ ...current, [row.id]: event.target.value }))}
                             placeholder="Why is an emergency override justified?"
@@ -447,7 +551,6 @@ export default function AdminSystemPage() {
                         <button
                           type="button"
                           className="app-button app-button--danger"
-                          style={styles.dangerButton}
                           onClick={() => {
                             const cleanReason = overrideReason.trim();
                             if (cleanReason.length < 3) {
@@ -467,69 +570,84 @@ export default function AdminSystemPage() {
                     ) : null}
                   </article>
                 );
-              }) : !blockingAlertsQuery.isLoading && !blockingAlertsQuery.error ? <div className="app-empty-state">No unresolved blocking diagnostics returned.</div> : null}
+              }) : !blockingAlertsQuery.isLoading && !blockingAlertsQuery.error ? (
+                <div className="admin-system-empty-good">
+                  <strong>No unresolved blocking diagnostics.</strong>
+                  <span>No tenant blocker rows were returned in the current diagnostic scope.</span>
+                </div>
+              ) : null}
+            </section>
 
-              <h4 style={styles.sectionSubheading}>Stock Integrity <span style={styles.countLabel}>{formatCount(stockIntegrityQuery.data?.length, stockIntegrityQuery.isLoading)}</span></h4>
-              {stockIntegrityQuery.error ? <div className="app-error-state">{readableError(stockIntegrityQuery.error)}</div> : null}
-              {stockIntegrityQuery.isLoading ? <div className="app-empty-state">Loading stock integrity issues…</div> : null}
+            <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-stock-heading">
+              <div className="admin-system-diagnostic-heading">
+                <div>
+                  <h4 id="admin-system-stock-heading">Stock integrity</h4>
+                  <p>Negative stock balances that require operational investigation.</p>
+                </div>
+                <DiagnosticCount>{stockIntegrityQuery.isLoading ? 'Loading…' : `${loadedStockIssueCount} loaded`}</DiagnosticCount>
+              </div>
+
+              {stockIntegrityQuery.error ? <div className="app-error-state admin-system-message">{readableError(stockIntegrityQuery.error)}</div> : null}
+              {stockIntegrityQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading stock integrity issues…</div> : null}
               {stockIntegrityQuery.data?.length ? stockIntegrityQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.product_name || `Product ${shortId(row.product_id)}`}</div>
-                  <div style={styles.itemText}>Negative stock at {row.storage_location_name || `location ${shortId(row.storage_location_id)}`}.</div>
-                  <div style={styles.itemMeta}>Quantity {row.quantity}{row.product_unit ? ` ${row.product_unit}` : ''} · Updated {formatDateTime(row.updated_at)}</div>
-                </article>
-              )) : !stockIntegrityQuery.isLoading && !stockIntegrityQuery.error ? <div className="app-empty-state">No negative stock integrity issues returned.</div> : null}
-
-              <h4 style={styles.sectionSubheading}>Broken Shipments <span style={styles.countLabel}>{formatCount(brokenShipmentsQuery.data?.length, brokenShipmentsQuery.isLoading)}</span></h4>
-              {brokenShipmentsQuery.error ? <div className="app-error-state">{readableError(brokenShipmentsQuery.error)}</div> : null}
-              {brokenShipmentsQuery.isLoading ? <div className="app-empty-state">Loading broken shipments…</div> : null}
-              {brokenShipmentsQuery.data?.length ? brokenShipmentsQuery.data.map((row) => (
-                <article key={row.id} style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.po_number ? `PO ${row.po_number}` : `Shipment ${shortId(row.id)}`}</div>
-                  <div style={styles.itemText}>{row.supplier_name ? `${row.supplier_name} · ` : ''}Finalized shipment contains an undocumented receiving shortage.</div>
-                  <div style={styles.itemMeta}>
-                    Ordered {row.total_ordered_quantity} · Received {row.total_received_quantity} · Undocumented shortage lines {toCount(row.undocumented_shortage_line_count)} · Shipment {shortId(row.id)}
+                <article key={row.id} className="admin-system-diagnostic-card">
+                  <div className="admin-system-diagnostic-card__topline">
+                    <div>
+                      <strong>{row.product_name || `Product ${shortId(row.product_id)}`}</strong>
+                      <p>Negative stock at {row.storage_location_name || `location ${shortId(row.storage_location_id)}`}.</p>
+                    </div>
+                    <StatusBadge tone="danger">NEGATIVE STOCK</StatusBadge>
+                  </div>
+                  <div className="admin-system-diagnostic-meta">
+                    <span>Quantity {row.quantity}{row.product_unit ? ` ${row.product_unit}` : ''}</span>
+                    <span>Updated {formatDateTime(row.updated_at)}</span>
                   </div>
                 </article>
-              )) : !brokenShipmentsQuery.isLoading && !brokenShipmentsQuery.error ? <div className="app-empty-state">No invalid finalized shipments returned. Documented receiving shortages are allowed by the current finalization workflow.</div> : null}
-            </div>
-          ) : null}
-        </Section>
-      </div>
+              )) : !stockIntegrityQuery.isLoading && !stockIntegrityQuery.error ? (
+                <div className="admin-system-empty-good">
+                  <strong>No negative stock integrity issues.</strong>
+                  <span>All loaded tenant stock balances are non-negative.</span>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-shipments-heading">
+              <div className="admin-system-diagnostic-heading">
+                <div>
+                  <h4 id="admin-system-shipments-heading">Shipment integrity</h4>
+                  <p>Finalized receiving records with undocumented shortages.</p>
+                </div>
+                <DiagnosticCount>{brokenShipmentsQuery.isLoading ? 'Loading…' : `${loadedBrokenShipmentCount} loaded`}</DiagnosticCount>
+              </div>
+
+              {brokenShipmentsQuery.error ? <div className="app-error-state admin-system-message">{readableError(brokenShipmentsQuery.error)}</div> : null}
+              {brokenShipmentsQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading shipment integrity issues…</div> : null}
+              {brokenShipmentsQuery.data?.length ? brokenShipmentsQuery.data.map((row) => (
+                <article key={row.id} className="admin-system-diagnostic-card">
+                  <div className="admin-system-diagnostic-card__topline">
+                    <div>
+                      <strong>{row.po_number ? `PO ${row.po_number}` : `Shipment ${shortId(row.id)}`}</strong>
+                      <p>{row.supplier_name ? `${row.supplier_name} · ` : ''}Finalized shipment contains an undocumented receiving shortage.</p>
+                    </div>
+                    <StatusBadge tone="danger">UNDOCUMENTED SHORTAGE</StatusBadge>
+                  </div>
+                  <div className="admin-system-diagnostic-meta">
+                    <span>Ordered {row.total_ordered_quantity}</span>
+                    <span>Received {row.total_received_quantity}</span>
+                    <span>Undocumented shortage lines {toCount(row.undocumented_shortage_line_count)}</span>
+                    <span>Shipment {shortId(row.id)}</span>
+                  </div>
+                </article>
+              )) : !brokenShipmentsQuery.isLoading && !brokenShipmentsQuery.error ? (
+                <div className="admin-system-empty-good">
+                  <strong>No invalid finalized shipments.</strong>
+                  <span>Documented receiving shortages are allowed by the current finalization workflow.</span>
+                </div>
+              ) : null}
+            </section>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: '20px', width: '100%', minWidth: 0 },
-  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%', minWidth: 0 },
-  toolbarText: { color: '#475569', fontSize: '0.9rem', fontWeight: 700 },
-  statsGrid: { width: '100%', minWidth: 0 },
-  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', minWidth: 0 },
-  statTitle: { color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  statValue: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#0f172a' },
-  statValueWarn: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#b45309' },
-  statValueBad: { marginTop: '10px', fontSize: '1.8rem', fontWeight: 800, color: '#b91c1c' },
-  statSubtitle: { marginTop: '8px', color: '#475569', lineHeight: 1.5 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: '20px', width: '100%', minWidth: 0 },
-  panel: { minWidth: 0, overflow: 'hidden' },
-  panelTitle: { margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' },
-  panelSubtitle: { margin: '8px 0 16px', color: '#475569', lineHeight: 1.5, wordBreak: 'break-word' },
-  list: { display: 'grid', gap: '12px', minWidth: 0 },
-  itemCard: { border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'grid', gap: '10px', minWidth: 0 },
-  itemTitle: { fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' },
-  itemText: { color: '#334155', lineHeight: 1.5, wordBreak: 'break-word' },
-  itemMeta: { color: '#64748b', fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word' },
-  sectionSubheading: { color: '#0f172a', fontWeight: 800, margin: '4px 0 0' },
-  countLabel: { display: 'inline-flex', marginLeft: '6px', padding: '0.1rem 0.45rem', borderRadius: '999px', background: '#f1f5f9', color: '#475569', fontSize: '0.78rem', fontWeight: 800, verticalAlign: 'middle' },
-  keyValueRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', minWidth: 0 },
-  monoValue: { fontFamily: 'monospace', overflowWrap: 'anywhere', textAlign: 'right' },
-  actions: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: '12px', background: '#2563eb', color: '#fff', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: '12px', background: '#ffffff', color: '#0f172a', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
-  dangerButton: { border: '1px solid #dc2626', borderRadius: '12px', background: '#dc2626', color: '#fff', padding: '0.7rem 0.9rem', fontWeight: 800, cursor: 'pointer' },
-  overrideBox: { display: 'grid', gap: '10px', marginTop: '4px' },
-  fieldLabel: { display: 'grid', gap: '6px', color: '#0f172a', fontWeight: 700 },
-  fieldHelp: { color: '#64748b', fontWeight: 500, lineHeight: 1.4 },
-  textareaNeutral: { width: '100%', padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontWeight: 500 }
-};
