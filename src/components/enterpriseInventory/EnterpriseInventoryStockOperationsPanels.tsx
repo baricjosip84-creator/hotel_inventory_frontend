@@ -14,8 +14,6 @@ export function EnterpriseInventoryStockOperationsPanels({
     parLevelForm,
     setCycleCountForm,
     setParLevelForm,
-    setStockAdjustmentForm,
-    stockAdjustmentForm,
   } = formState;
 
   const { queries, stableData } = pageData;
@@ -23,12 +21,10 @@ export function EnterpriseInventoryStockOperationsPanels({
   const { products, storageLocations } = stableData;
 
   const {
-    adjustStockMutation,
     createCycleCountMutation,
     createParLevelMutation,
     handleCycleCountSubmit,
     handleParLevelSubmit,
-    handleStockAdjustmentSubmit,
     reconcileCycleCountMutation,
     submitCycleCountMutation,
   } = actions;
@@ -54,10 +50,6 @@ export function EnterpriseInventoryStockOperationsPanels({
           onCycleCountFormChange={setCycleCountForm}
           onCycleCountSubmit={handleCycleCountSubmit}
           isCreatingCycleCount={createCycleCountMutation.isPending}
-          stockAdjustmentForm={stockAdjustmentForm}
-          onStockAdjustmentFormChange={setStockAdjustmentForm}
-          onStockAdjustmentSubmit={handleStockAdjustmentSubmit}
-          isAdjustingStock={adjustStockMutation.isPending}
           products={products}
           storageLocations={storageLocations}
           cycleCounts={cycleCountsQuery.data ?? []}

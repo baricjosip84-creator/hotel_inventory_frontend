@@ -75,7 +75,7 @@ function nonNegative(value: string, required = false): boolean {
 }
 
 function amount(value: number | string | null | undefined, currency?: string | null): string {
-  return formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 4);
+  return formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 2);
 }
 
 export function InvoicesTab({
@@ -190,8 +190,7 @@ export function InvoicesTab({
 
   return (
     <section style={styles.stack}>
-      <div className="inventory-controls-grid" style={styles.grid}>
-        <form onSubmit={handleSupplierInvoiceSubmit} style={styles.card} data-skip-global-action-feedback="true">
+      <form onSubmit={handleSupplierInvoiceSubmit} style={styles.card} data-skip-global-action-feedback="true">
           <h2 style={styles.cardTitle}>{editingInvoiceId ? 'Edit supplier invoice draft' : 'Create supplier invoice draft'}</h2>
           <div style={styles.formGrid}>
             <SelectField disabled={!canWriteInvoices || invoiceBusy || Boolean(editingInvoiceId)} label="Supplier" value={supplierInvoiceForm.supplier_id} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, supplier_id: value, purchase_order_id: '', shipment_id: '' }))} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} required />
@@ -228,8 +227,7 @@ export function InvoicesTab({
             <button type="submit" disabled={!canSaveInvoice} style={canSaveInvoice ? styles.primaryButton : styles.disabledButton}>{invoiceBusy ? 'Saving…' : editingInvoiceId ? 'Save draft changes' : 'Create draft'}</button>
             {editingInvoiceId ? <button type="button" style={styles.secondaryButton} disabled={invoiceBusy} onClick={cancelEdit}>Cancel edit</button> : null}
           </div>
-        </form>
-      </div>
+      </form>
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Supplier invoices</h2>

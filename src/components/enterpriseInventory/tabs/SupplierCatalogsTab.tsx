@@ -31,6 +31,12 @@ function money(value: number | string | null | undefined, currency?: string | nu
   return formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 4);
 }
 
+function tenantFacingProductSku(value: string | null | undefined): string | null {
+  const normalized = String(value || '').trim();
+  if (!normalized || /^LEGACY[-_]/i.test(normalized)) return null;
+  return normalized;
+}
+
 export function SupplierCatalogsTab({
   createSupplierCatalogMutation,
   deactivateSupplierCatalogMutation,
@@ -102,12 +108,31 @@ export function SupplierCatalogsTab({
         <SupplierCatalogImportPanel suppliers={suppliers} canImport={canWrite} canCreateProducts={canCreateProducts} />
       </div>
 
-      <div className="inventory-controls-grid" style={styles.grid}>
-        <form onSubmit={submit} style={styles.card} data-skip-global-action-feedback="true">
-          <h2 style={styles.cardTitle}>Manual supplier-product link</h2>
-          <p style={styles.helper}>Use this for one-off maintenance. Bulk supplier files should use the reviewed catalog import above.</p>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Catalog filters</h2>
+        <div style={styles.formGrid}>
+          <InputField label="Search catalog" value={search} onChange={setSearch} />
+          <SelectField label="Supplier" value={supplierFilter} onChange={setSupplierFilter} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} />
+        </div>
+        <p style={styles.helper}>Search supplier name, supplier SKU/item name, product name, product SKU, or barcode.</p>
+      </div>
+
+      <form onSubmit={submit} style={styles.card} data-skip-global-action-feedback="true">
+        <h2 style={styles.cardTitle}>Manual supplier-product link</h2>
+        <p style={{ ...styles.helper, marginBottom: 12 }}>Use this for one-off maintenance. Bulk supplier files should use the reviewed catalog import above.</p>
+        <div style={styles.formGrid}>
           <SelectField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Supplier" value={supplierCatalogForm.supplier_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_id: value }))} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} required />
-          <SelectField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Internal Product" value={supplierCatalogForm.product_id} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: `${product.sku ? `${product.sku} · ` : ''}${product.name}` }))} required />
+          <SelectField
+            disabled={!canWrite || createSupplierCatalogMutation.isPending}
+            label="Product"
+            value={supplierCatalogForm.product_id}
+            onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, product_id: value }))}
+            options={products.map((product) => {
+              const productSku = tenantFacingProductSku(product.sku);
+              return { value: product.id, label: `${productSku ? `${productSku} · ` : ''}${product.name}` };
+            })}
+            required
+          />
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Supplier SKU" value={supplierCatalogForm.supplier_sku} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_sku: value }))} />
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Supplier product name" value={supplierCatalogForm.supplier_product_name} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, supplier_product_name: value }))} />
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Lead time days" type="number" min="0" value={supplierCatalogForm.lead_time_days} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, lead_time_days: value }))} />
@@ -115,38 +140,38 @@ export function SupplierCatalogsTab({
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Unit cost" type="number" min="0" value={supplierCatalogForm.unit_cost} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, unit_cost: value }))} />
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Currency" value={supplierCatalogForm.currency} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} />
           <InputField disabled={!canWrite || createSupplierCatalogMutation.isPending} label="Effective from" type="date" value={supplierCatalogForm.effective_from} onChange={(value) => setSupplierCatalogForm((current) => ({ ...current, effective_from: value }))} />
-          <label style={styles.checkboxRow}><input type="checkbox" disabled={!canWrite || createSupplierCatalogMutation.isPending} checked={supplierCatalogForm.preferred} onChange={(event) => setSupplierCatalogForm((current) => ({ ...current, preferred: event.target.checked }))} />Preferred supplier for this Product</label>
-          <p style={styles.helper}>Only one active supplier catalog item can be preferred for a Product. Saving a new preferred supplier automatically demotes the previous preferred item.</p>
-          {!canWrite ? <p style={styles.helper}>Requires {TENANT_PERMISSIONS.SUPPLIER_CATALOG_WRITE} permission.</p> : null}
-          <button type="submit" disabled={!canSave} style={canSave ? styles.primaryButton : styles.disabledButton}>{createSupplierCatalogMutation.isPending ? 'Saving…' : 'Save supplier catalog item'}</button>
-        </form>
-
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Catalog filters</h2>
-          <InputField label="Search catalog" value={search} onChange={setSearch} />
-          <SelectField label="Supplier" value={supplierFilter} onChange={setSupplierFilter} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} />
-          <p style={styles.helper}>Searches supplier name/SKU/item name plus internal Product SKU/name/barcode.</p>
         </div>
-      </div>
+        <label style={styles.checkboxRow}><input type="checkbox" disabled={!canWrite || createSupplierCatalogMutation.isPending} checked={supplierCatalogForm.preferred} onChange={(event) => setSupplierCatalogForm((current) => ({ ...current, preferred: event.target.checked }))} />Preferred supplier for this product</label>
+        <p style={{ ...styles.helper, marginBottom: 12 }}>Only one active supplier catalog item can be preferred for a product. Saving a new preferred supplier automatically demotes the previous preferred item.</p>
+        {!canWrite ? <p style={styles.helper}>Requires {TENANT_PERMISSIONS.SUPPLIER_CATALOG_WRITE} permission.</p> : null}
+        <button type="submit" disabled={!canSave} style={canSave ? styles.primaryButton : styles.disabledButton}>{createSupplierCatalogMutation.isPending ? 'Saving…' : 'Save supplier catalog item'}</button>
+      </form>
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Active supplier catalog</h2>
         {!canRead ? <p style={styles.helper}>Requires {TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ} permission.</p> : supplierCatalogQuery.isLoading ? <p style={styles.helper}>Loading…</p> : !rows.length ? <p style={styles.helper}>No matching supplier catalog items.</p> : (
           <div style={styles.tableWrap}>
             <table style={styles.table}>
-              <thead><tr>{['Supplier','Internal Product','Supplier item','Terms','Price','Preferred','Actions'].map((header) => <th key={header} style={styles.th}>{header}</th>)}</tr></thead>
+              <thead><tr>{['Supplier','Product','Supplier item','Terms','Price','Preferred','Actions'].map((header) => <th key={header} style={styles.th}>{header}</th>)}</tr></thead>
               <tbody>
-                {rows.map((item) => (
-                  <tr key={item.id}>
-                    <td style={styles.td}>{item.supplier_name || item.supplier_id}</td>
-                    <td style={styles.td}><strong>{item.product_sku || '-'}</strong><br />{item.product_name || item.product_id}<br /><span style={styles.muted}>{item.product_barcode || ''}</span></td>
-                    <td style={styles.td}><strong>{item.supplier_sku || '-'}</strong><br />{item.supplier_product_name || '-'}</td>
-                    <td style={styles.td}>{formatNumber(item.lead_time_days)} days<br />MOQ {formatNumber(item.min_order_quantity)}</td>
-                    <td style={styles.td}>{money(item.latest_unit_cost, item.latest_currency)}<br /><span style={styles.muted}>{item.latest_price_effective_from ? `from ${formatDate(item.latest_price_effective_from)}` : ''}</span></td>
-                    <td style={styles.td}>{item.preferred ? 'Yes' : 'No'}</td>
-                    <td style={styles.td}><div style={styles.actions}><button type="button" style={styles.secondarySmallButton} disabled={!canWrite} onClick={() => edit(item)}>Edit</button><button type="button" style={styles.dangerButton} disabled={!canWrite || deactivateSupplierCatalogMutation.isPending} onClick={() => deactivate(item)}>Deactivate</button></div></td>
-                  </tr>
-                ))}
+                {rows.map((item) => {
+                  const productSku = tenantFacingProductSku(item.product_sku);
+                  return (
+                    <tr key={item.id}>
+                      <td style={styles.td}>{item.supplier_name || 'Supplier'}</td>
+                      <td style={styles.td}>
+                        <strong>{item.product_name || 'Unnamed product'}</strong>
+                        {productSku ? <div style={styles.muted}>SKU {productSku}</div> : null}
+                        {item.product_barcode ? <div style={styles.muted}>Barcode {item.product_barcode}</div> : null}
+                      </td>
+                      <td style={styles.td}><strong>{item.supplier_sku || '-'}</strong><br />{item.supplier_product_name || '-'}</td>
+                      <td style={styles.td}>{formatNumber(item.lead_time_days)} days<br />MOQ {formatNumber(item.min_order_quantity)}</td>
+                      <td style={styles.td}>{money(item.latest_unit_cost, item.latest_currency)}<br /><span style={styles.muted}>{item.latest_price_effective_from ? `from ${formatDate(item.latest_price_effective_from)}` : ''}</span></td>
+                      <td style={styles.td}>{item.preferred ? 'Yes' : 'No'}</td>
+                      <td style={styles.td}><div style={styles.actions}><button type="button" style={styles.secondarySmallButton} disabled={!canWrite} onClick={() => edit(item)}>Edit</button><button type="button" style={styles.dangerButton} disabled={!canWrite || deactivateSupplierCatalogMutation.isPending} onClick={() => deactivate(item)}>Deactivate</button></div></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

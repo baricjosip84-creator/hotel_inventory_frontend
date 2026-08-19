@@ -15,11 +15,16 @@
 }
 
 .inventory-controls-page .io-workspace-tabs__items {
+  flex: 1 1 auto;
   padding-bottom: 1px;
 }
 
 .inventory-controls-page .io-workspace-tab {
   min-height: 38px;
+}
+
+.inventory-controls-page .io-workspace-tabs__hint {
+  display: none;
 }
 
 .inventory-controls-page .inventory-controls-grid {

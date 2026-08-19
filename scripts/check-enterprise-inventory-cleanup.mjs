@@ -7,6 +7,15 @@ const queries = read('src/components/enterpriseInventory/EnterpriseInventoryQuer
 const navigation = read('src/app/navigationRegistry.ts');
 const page = read('src/pages/EnterpriseInventoryPage.tsx');
 const tabUi = read('src/components/enterpriseInventory/EnterpriseInventoryTabs.tsx');
+const cycleCounts = read('src/components/enterpriseInventory/tabs/CycleCountsTab.tsx');
+const parLevels = read('src/components/enterpriseInventory/tabs/ParLevelsTab.tsx');
+const stockPanels = read('src/components/enterpriseInventory/EnterpriseInventoryStockOperationsPanels.tsx');
+const approvals = read('src/components/enterpriseInventory/tabs/ApprovalsTab.tsx');
+const supplierCatalogs = read('src/components/enterpriseInventory/tabs/SupplierCatalogsTab.tsx');
+const invoices = read('src/components/enterpriseInventory/tabs/InvoicesTab.tsx');
+const notifications = read('src/components/enterpriseInventory/tabs/NotificationsTab.tsx');
+const compliancePanels = read('src/components/enterpriseInventory/EnterpriseInventoryCompliancePanels.tsx');
+const pageCss = read('src/pages/InventoryControlsPage.css');
 
 const retainedTabs = [
   'par-levels', 'cycle-counts', 'supplier-returns', 'approvals', 'supplier-catalog',
@@ -51,5 +60,52 @@ if (!navigation.includes("label: 'Inventory Controls'")) throw new Error('Tenant
 if (!page.includes("activeTab === 'par-levels'")) throw new Error('Evaluate par levels remains visible outside the par-level tab.');
 if (!tabUi.includes('const visibleTabs = enterpriseInventoryTabs.filter')) throw new Error('Unavailable Enterprise Inventory tabs are not hidden.');
 if (tabUi.includes('disabled={!canOpenTab}')) throw new Error('Permission-blocked Enterprise Inventory tabs are still rendered as disabled clutter.');
+if (tabUi.includes('hint=')) throw new Error('Inventory Controls tabs still reserve width for a redundant hint.');
+if (!pageCss.includes('.inventory-controls-page .io-workspace-tabs__hint')) throw new Error('Inventory Controls tab hint is not defensively hidden.');
+if (!pageCss.includes('flex: 1 1 auto')) throw new Error('Inventory Controls tab list does not use the available width.');
+
+if (parLevels.includes('Legacy reorder quantity') || !parLevels.includes('label="Reorder quantity"')) {
+  throw new Error('Par-level form still exposes legacy implementation terminology.');
+}
+
+if (cycleCounts.includes('Manual inventory adjustment') || cycleCounts.includes('StockAdjustmentForm')) {
+  throw new Error('Duplicate manual stock adjustment UI still appears under Cycle counts.');
+}
+if (stockPanels.includes('stockAdjustmentForm') || stockPanels.includes('adjustStockMutation')) {
+  throw new Error('Cycle-count panel still wires the duplicate stock adjustment workflow.');
+}
+
+if (!approvals.includes('{entitySupportsScope ? (') || !approvals.includes('{entityUsesAmount ? (')) {
+  throw new Error('Approval-rule fields are not conditionally scoped by rule type.');
+}
+if (!approvals.includes("amountBased ? formatCurrency(item.min_amount, item.currency) : '-'")) {
+  throw new Error('Scope-based approval rules still present irrelevant amount values in the table.');
+}
+
+if (!supplierCatalogs.includes('tenantFacingProductSku')) throw new Error('Supplier catalog does not filter tenant-facing SKUs.');
+if (!supplierCatalogs.includes('/^LEGACY[-_]/i')) throw new Error('Legacy generated product identifiers can still surface in the supplier catalog.');
+if (supplierCatalogs.includes("<strong>{item.product_sku || '-'}</strong>")) throw new Error('Supplier catalog still promotes raw internal product SKU values.');
+if (supplierCatalogs.includes('label="Internal product"')) throw new Error('Supplier catalog still uses internal-facing product terminology.');
+if (!supplierCatalogs.includes('tenantFacingProductSku(product.sku)')) throw new Error('Supplier-product selector can still expose generated legacy SKUs.');
+
+if (!invoices.includes('formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 2)')) {
+  throw new Error('Invoice money formatting is not normalized to tenant-facing currency precision.');
+}
+if (invoices.includes('className="inventory-controls-grid" style={styles.grid}')) {
+  throw new Error('Invoice form is still trapped in a half-empty two-column grid.');
+}
+
+if (notifications.includes('Process due deliveries now') || notifications.includes('onProcessNotificationDeliveries')) {
+  throw new Error('Background delivery processing is still exposed as a normal tenant action.');
+}
+if (!notifications.includes('humanizeToken') || !notifications.includes('humanizeToken(item.event_type)')) {
+  throw new Error('Notification event codes are still exposed as raw implementation tokens.');
+}
+if (!notifications.includes('<section style={styles.stack}>') || !notifications.includes('<h2 style={styles.cardTitle}>Notification events</h2>')) {
+  throw new Error('Notification controls are not using the cleaned full-width section structure.');
+}
+if (compliancePanels.includes('processNotificationDeliveriesMutation')) {
+  throw new Error('Notification panel still wires the hidden background-processing action.');
+}
 
 console.log('Enterprise Inventory cleanup contract passed.');

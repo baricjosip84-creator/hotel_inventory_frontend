@@ -64,6 +64,9 @@ const roleLabels: Record<string, string> = {
 const displayLabel = (value: string, labels: Record<string, string>) =>
   labels[value] ?? value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 
+const usesAmountThresholds = (entityType: string) =>
+  ['purchase_order', 'supplier_invoice', 'supplier_return'].includes(entityType);
+
 export function ApprovalsTab({
   approvalQueue,
   approvalRuleForm,
@@ -75,15 +78,19 @@ export function ApprovalsTab({
 }: ApprovalsTabProps) {
   const canWriteApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_WRITE);
   const canExecuteApprovals = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const entitySupportsScope = ['department_requisition', 'cycle_count'].includes(approvalRuleForm.entity_type);
+  const entityUsesAmount = usesAmountThresholds(approvalRuleForm.entity_type);
   const minimumAmount = Number(approvalRuleForm.min_amount);
   const maximumAmount = approvalRuleForm.max_amount === '' ? null : Number(approvalRuleForm.max_amount);
-  const amountRangeValid = Number.isFinite(minimumAmount)
+  const amountRangeValid = !entityUsesAmount || (
+    Number.isFinite(minimumAmount)
     && minimumAmount >= 0
-    && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount));
-  const currencyValid = /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
-  const entitySupportsScope = ['department_requisition', 'cycle_count'].includes(approvalRuleForm.entity_type);
-  const entityUsesAmount = ['purchase_order', 'supplier_invoice', 'supplier_return'].includes(approvalRuleForm.entity_type);
-  const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role && approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid)
+    && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount))
+  );
+  const currencyValid = !entityUsesAmount || /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
+  const canSaveRule = canWriteApprovalRules
+    && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role)
+    && (entityUsesAmount ? approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid : true)
     && !createApprovalRuleMutation.isPending;
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
 
@@ -123,11 +130,22 @@ export function ApprovalsTab({
           ]}
           required
         />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entitySupportsScope} label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
-        <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entitySupportsScope} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entityUsesAmount} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending || !entityUsesAmount} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
-        <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Currency" value={approvalRuleForm.currency} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
+
+        {entitySupportsScope ? (
+          <>
+            <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Department" value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
+            <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Storage location" value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
+          </>
+        ) : null}
+
+        {entityUsesAmount ? (
+          <>
+            <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Minimum amount" type="number" min="0" value={approvalRuleForm.min_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, min_amount: value }))} required />
+            <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Maximum amount" type="number" min="0" value={approvalRuleForm.max_amount} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, max_amount: value }))} />
+            <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label="Currency" value={approvalRuleForm.currency} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
+          </>
+        ) : null}
+
         <SelectField
           disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending}
           label="Required role"
@@ -140,10 +158,10 @@ export function ApprovalsTab({
           required
         />
         {!canWriteApprovalRules ? <p style={styles.helper}>Creating approval rules requires {TENANT_PERMISSIONS.APPROVAL_RULES_WRITE} permission.</p> : null}
-        {!entitySupportsScope ? <p style={styles.helper}>Purchase-order, supplier-invoice, and supplier-return approvals are amount/role based and apply tenant-wide.</p> : null}
-        {!entityUsesAmount ? <p style={styles.helper}>Department-requisition and cycle-count approvals use department/location scope and role; amount thresholds do not apply.</p> : null}
-        {!amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
-        {!currencyValid ? <p style={styles.helper}>Currency must be a three-letter ISO code.</p> : null}
+        {entityUsesAmount ? <p style={styles.helper}>This rule applies tenant-wide and uses invoice/order value plus the required role.</p> : null}
+        {entitySupportsScope ? <p style={styles.helper}>This rule uses department/location scope and role. Amount thresholds do not apply.</p> : null}
+        {entityUsesAmount && !amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
+        {entityUsesAmount && !currencyValid ? <p style={styles.helper}>Currency must be a three-letter ISO code.</p> : null}
         <button type="submit" disabled={!canSaveRule} style={canSaveRule ? styles.primaryButton : styles.disabledButton}>
           {createApprovalRuleMutation.isPending ? 'Saving…' : 'Save approval rule'}
         </button>
@@ -210,16 +228,19 @@ export function ApprovalsTab({
             loading={approvalRulesQuery.isLoading}
             empty="No approval rules configured yet."
             headers={['Entity', 'Department', 'Location', 'Min amount', 'Max amount', 'Currency', 'Required role', 'Active']}
-            rows={(approvalRulesQuery.data ?? []).map((item) => [
-              displayLabel(item.entity_type, entityTypeLabels),
-              item.department || '-',
-              item.storage_location_id ? storageLocationNames.get(item.storage_location_id) || 'Unknown location' : 'All locations',
-              formatCurrency(item.min_amount, item.currency),
-              item.max_amount === null || item.max_amount === undefined ? 'No maximum' : formatCurrency(item.max_amount, item.currency),
-              item.currency || '-',
-              displayLabel(item.required_role, roleLabels),
-              item.active ? 'Yes' : 'No'
-            ])}
+            rows={(approvalRulesQuery.data ?? []).map((item) => {
+              const amountBased = usesAmountThresholds(item.entity_type);
+              return [
+                displayLabel(item.entity_type, entityTypeLabels),
+                item.department || '-',
+                item.storage_location_id ? storageLocationNames.get(item.storage_location_id) || 'Unknown location' : 'All locations',
+                amountBased ? formatCurrency(item.min_amount, item.currency) : '-',
+                amountBased ? (item.max_amount === null || item.max_amount === undefined ? 'No maximum' : formatCurrency(item.max_amount, item.currency)) : '-',
+                amountBased ? item.currency || '-' : '-',
+                displayLabel(item.required_role, roleLabels),
+                item.active ? 'Yes' : 'No'
+              ];
+            })}
           />
         </section>
       </div>

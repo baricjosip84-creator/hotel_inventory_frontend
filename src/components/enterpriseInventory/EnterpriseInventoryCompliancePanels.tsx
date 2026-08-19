@@ -12,7 +12,6 @@ export function EnterpriseInventoryCompliancePanels({
   const { notificationsQuery, notificationDeliveriesQuery } = pageData.queries;
   const {
     handleNotificationDeliverySubmit,
-    processNotificationDeliveriesMutation,
     queueNotificationDeliveryMutation,
   } = actions;
 
@@ -25,10 +24,8 @@ export function EnterpriseInventoryCompliancePanels({
         isLoading={notificationsQuery.isLoading}
         deliveriesLoading={notificationDeliveriesQuery.isLoading}
         isQueueingDelivery={queueNotificationDeliveryMutation.isPending}
-        isProcessingDeliveries={processNotificationDeliveriesMutation.isPending}
         onNotificationDeliveryFormChange={setNotificationDeliveryForm}
         onNotificationDeliverySubmit={handleNotificationDeliverySubmit}
-        onProcessNotificationDeliveries={() => processNotificationDeliveriesMutation.mutate()}
       />
     </EnterpriseInventoryTabPanel>
   );

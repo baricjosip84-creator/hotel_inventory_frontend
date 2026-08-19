@@ -28,7 +28,6 @@ export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAcces
   return (
     <OperationalWorkspaceTabs
       ariaLabel="Inventory control work areas"
-      hint="Choose the specialized inventory control you need."
     >
       {visibleTabs.map(([key, label]) => (
         <OperationalWorkspaceTab
