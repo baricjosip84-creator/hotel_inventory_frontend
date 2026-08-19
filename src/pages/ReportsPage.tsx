@@ -168,7 +168,7 @@ const REPORT_DESCRIPTIONS: Record<ReportTab, string> = {
   'usage-summary': 'Non-reversed inventory consumption summarized by product for the selected period.',
   'supplier-performance': 'Supplier delivery reliability, fulfillment, discrepancy, return, and shipment performance for the selected period.',
   'expiry-risk': 'Positive-balance lots that are already expired or will expire within the selected horizon.',
-  forecast: 'Usage-based demand forecast from recent outbound stock movements over the last 30 days.'
+  forecast: 'Demand forecast from recent consumption and fulfillment stock movements over the last 30 days.'
 };
 
 function getReportLabel(report: ReportTab): string {
@@ -621,7 +621,7 @@ async function fetchSlowMoving(filters: Pick<TextFilters, 'category' | 'product'
 async function fetchUsageSummary(filters: DateRangeFilters & Pick<TextFilters, 'category' | 'product' | 'location'> & { days: number }): Promise<UsageSummaryRow[]> {
   return apiRequest<UsageSummaryRow[]>(`/reports/usage-summary${buildQueryString(filters)}`);
 }
-async function fetchSupplierPerformance(filters: DateRangeFilters & Pick<TextFilters, 'supplier'>): Promise<SupplierPerformanceRow[]> {
+async function fetchSupplierPerformance(filters: DateRangeFilters & Pick<TextFilters, 'supplier'> & { limit: number }): Promise<SupplierPerformanceRow[]> {
   return apiRequest<SupplierPerformanceRow[]>(`/reports/supplier-performance${buildQueryString(filters)}`);
 }
 async function fetchExpiryRisk(filters: Pick<TextFilters, 'category' | 'location'> & { days: number }): Promise<ExpiryRiskRow[]> {
@@ -780,7 +780,7 @@ export default function ReportsPage() {
   const [lowStockFilters, setLowStockFilters] = useState({ category: '', supplier: '', location: '', scope: 'both' as 'product' | 'par' | 'both' });
   const [slowFilters, setSlowFilters] = useState({ days: 90, category: '', product: '', limit: 100 });
   const [usageFilters, setUsageFilters] = useState({ days: 30, from: '', to: '', category: '', product: '', location: '' });
-  const [supplierFilters, setSupplierFilters] = useState({ from: '', to: '', supplier: '' });
+  const [supplierFilters, setSupplierFilters] = useState({ from: '', to: '', supplier: '', limit: 100 });
   const [expiryFilters, setExpiryFilters] = useState({ days: 90, category: '', location: '' });
   const [downloadingReport, setDownloadingReport] = useState<ReportTab | null>(null);
   const [downloadFormat, setDownloadFormat] = useState<ExportFormat | null>(null);
@@ -1093,7 +1093,7 @@ export default function ReportsPage() {
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching} onClick={() => refreshReport(report)}>
         {isFetching ? 'Refreshing…' : 'Refresh'}
       </button>
-      <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled} onClick={() => printReport(report)}>
+      <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching} onClick={() => printReport(report)}>
         Print
       </button>
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled} aria-busy={downloadingReport === report && downloadFormat === 'pdf'} onClick={() => downloadReport(report, 'pdf')}>
@@ -1548,6 +1548,7 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={supplierFilters.from} to={supplierFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSupplierFilters, 'from', value)} onToChange={(value) => updateAndClear(setSupplierFilters, 'to', value)} />
               <ChoiceFilterField label="Supplier" value={supplierFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={supplierFilters.limit} onChange={(event) => updateAndClear(setSupplierFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
               <div className="reports-filter-note">Date range filters shipment and supplier-return activity by creation date.</div>
             </>
           }
