@@ -111,6 +111,11 @@ export function getCurrentTenantUserId(): string | null {
   return null;
 }
 
+export function getCurrentTenantSessionId(): string | null {
+  const payload = decodeJwtPayload(getAccessToken());
+  return typeof payload?.sid === 'string' ? payload.sid : null;
+}
+
 export function getTenantObservabilityIdentity(token: string | null): { area: 'tenant'; userId?: string; tenantId?: string; role?: string; supportSession?: boolean } | null {
   const payload = decodeJwtPayload(token);
   if (!payload) return null;

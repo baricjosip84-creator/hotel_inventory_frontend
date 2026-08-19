@@ -1,9 +1,21 @@
-import { useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
-import { clearAuthTokens, isSupportSessionAccess } from '../lib/auth';
+import {
+  clearAuthTokens,
+  getCurrentTenantSessionId,
+  isSupportSessionAccess
+} from '../lib/auth';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './SessionsPage.css';
 
 type SessionStatusFilter = 'active' | 'revoked' | 'expired' | 'all';
 
@@ -65,13 +77,15 @@ async function fetchSessions(options: {
 
 async function revokeSession(sessionId: string): Promise<RevokeSessionResponse> {
   return apiRequest<RevokeSessionResponse>(`/auth/sessions/${sessionId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    skipMutationFeedback: true
   });
 }
 
 async function revokeAllSessions(): Promise<RevokeAllResponse> {
   return apiRequest<RevokeAllResponse>('/auth/sessions', {
-    method: 'DELETE'
+    method: 'DELETE',
+    skipMutationFeedback: true
   });
 }
 
@@ -153,37 +167,30 @@ function shortenId(value: string): string {
 
 function formatLastRefreshed(timestamp: number): string {
   if (!timestamp) return 'Not refreshed yet';
-  return `Last refreshed ${new Date(timestamp).toLocaleString()}`;
+  return new Date(timestamp).toLocaleString();
 }
 
-function StatCard(props: {
-  title: string;
-  value: number | string;
-  subtitle: string;
-  tone?: 'default' | 'good' | 'warn' | 'danger';
-}) {
-  const toneStyle =
-    props.tone === 'good'
-      ? styles.statValueGood
-      : props.tone === 'warn'
-        ? styles.statValueWarn
-        : props.tone === 'danger'
-          ? styles.statValueDanger
-          : styles.statValue;
+function sessionStatusLabel(status: SessionStatusFilter): string {
+  if (status === 'all') return 'ALL SESSIONS';
+  return `${status.toUpperCase()} SESSIONS`;
+}
 
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statTitle}>{props.title}</div>
-      <div style={toneStyle}>{props.value}</div>
-      <div style={styles.statSubtitle}>{props.subtitle}</div>
-    </div>
-  );
+function StatusBadge({
+  children,
+  tone = 'neutral'
+}: {
+  children: React.ReactNode;
+  tone?: 'neutral' | 'good' | 'warn' | 'danger' | 'blue';
+}) {
+  return <span className={`sessions-badge sessions-badge--${tone}`}>{children}</span>;
 }
 
 export default function SessionsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const supportSession = isSupportSessionAccess();
+  const currentTenantSessionId = getCurrentTenantSessionId();
+  const currentBrowserTracked = supportSession || Boolean(currentTenantSessionId);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -202,6 +209,11 @@ export default function SessionsPage() {
   const sessions = sessionsQuery.data?.rows ?? [];
   const summary = sessionsQuery.data?.summary ?? { total: 0, active: 0, revoked: 0, expired: 0 };
   const hasNext = sessionsQuery.data?.has_next === true;
+
+  useEffect(() => {
+    if (!sessionsQuery.data || sessionsQuery.isFetching || page <= 1 || sessions.length > 0 || hasNext) return;
+    setPage((current) => Math.max(1, current - 1));
+  }, [hasNext, page, sessions.length, sessionsQuery.data, sessionsQuery.isFetching]);
 
   const revokeOneMutation = useMutation({
     mutationFn: revokeSession,
@@ -292,16 +304,21 @@ export default function SessionsPage() {
   };
 
   if (sessionsQuery.isLoading) {
-    return <div className="app-loading-state" style={styles.statePanel}>Loading sessions…</div>;
+    return <div className="app-loading-state sessions-state-panel">Loading sessions…</div>;
   }
 
   if (sessionsQuery.isError) {
     return (
-      <div style={styles.page}>
-        <div className="app-error-state" style={styles.statePanel}>
+      <div className="sessions-page io-operational-page io-workspace-page">
+        <div className="app-error-state sessions-state-panel">
           <strong>Failed to load sessions.</strong>
-          <p style={styles.stateText}>{(sessionsQuery.error as Error).message || 'Unknown error'}</p>
-          <button type="button" style={styles.secondaryButton} onClick={handleRefresh} disabled={sessionsQuery.isFetching}>
+          <p>{(sessionsQuery.error as Error).message || 'Unknown error'}</p>
+          <button
+            type="button"
+            className="app-button app-button--secondary"
+            onClick={() => void handleRefresh()}
+            disabled={sessionsQuery.isFetching}
+          >
             {sessionsQuery.isFetching ? 'Retrying…' : 'Retry'}
           </button>
         </div>
@@ -309,75 +326,124 @@ export default function SessionsPage() {
     );
   }
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div style={styles.headerTextBlock}>
-          <h2 style={styles.title}>Sessions</h2>
-          <p style={styles.description}>
-            Review your account sessions, identify the current browser, and revoke stale access.
-          </p>
-        </div>
+  const heroStatus = supportSession
+    ? 'Platform managed'
+    : !currentBrowserTracked
+      ? 'Tracking unavailable'
+      : summary.active > 0
+        ? `${summary.active} active`
+        : 'Attention';
+  const heroStatusLabel = supportSession
+    ? `support-session access · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`
+    : !currentBrowserTracked
+      ? 'current access token is not linked to a tracked browser session'
+      : `account session posture · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`;
 
-        <div style={styles.headerActions}>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={handleRefresh}
-            disabled={sessionsQuery.isFetching || revokeAllMutation.isPending}
-          >
-            {sessionsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-          {!supportSession ? (
+  return (
+    <div className="sessions-page io-operational-page io-workspace-page" id="sessions-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/sessions"
+        eyebrow="Account access & security"
+        title="Sessions"
+        description="Review browser sessions for your account, identify the current browser, and revoke stale access without affecting other tenant users."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Account-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Current browser protected</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{supportSession ? 'Platform-managed support access' : 'Revoke actions audited'}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Historical records retained</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div className="sessions-hero-actions">
+            <OperationalWorkspaceStatus value={heroStatus} label={heroStatusLabel} />
             <button
               type="button"
-              style={revokeAllMutation.isPending || summary.active === 0 ? styles.disabledDangerButton : styles.dangerButton}
-              onClick={handleRevokeAll}
-              disabled={revokeAllMutation.isPending || summary.active === 0}
-              title="Revokes every active account session, including this browser."
+              className="app-button app-button--secondary"
+              onClick={() => void handleRefresh()}
+              disabled={sessionsQuery.isFetching || revokeAllMutation.isPending}
             >
-              {revokeAllMutation.isPending ? 'Revoking…' : 'Revoke All Sessions'}
+              {sessionsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
             </button>
-          ) : null}
-        </div>
-      </div>
+            {!supportSession ? (
+              <button
+                type="button"
+                className="app-button app-button--danger"
+                onClick={handleRevokeAll}
+                disabled={revokeAllMutation.isPending || summary.active === 0}
+                title="Revokes every active account session, including this browser."
+              >
+                {revokeAllMutation.isPending ? 'Revoking…' : 'Revoke all sessions'}
+              </button>
+            ) : null}
+          </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Account session overview">
+        <OperationalWorkspaceStatCard
+          label="Total sessions"
+          value={summary.total}
+          helper="Historical session records retained for this account"
+          tone="neutral"
+          iconPath="/sessions"
+        />
+        <OperationalWorkspaceStatCard
+          label="Active sessions"
+          value={summary.active}
+          helper="Currently usable refresh sessions"
+          tone={summary.active > 0 ? 'blue' : 'neutral'}
+          iconPath="/admin-system"
+        />
+        <OperationalWorkspaceStatCard
+          label="Revoked sessions"
+          value={summary.revoked}
+          helper="Sessions explicitly disabled before expiry"
+          tone="neutral"
+          iconPath="/audit"
+        />
+        <OperationalWorkspaceStatCard
+          label="Expired sessions"
+          value={summary.expired}
+          helper="Sessions that ended naturally without revocation"
+          tone="neutral"
+          iconPath="/reliability-command"
+        />
+      </OperationalWorkspaceStats>
+
+      {pageError ? <div className="app-error-state sessions-message" role="alert">{pageError}</div> : null}
+      {pageMessage ? <div className="app-success-state sessions-message" role="status">{pageMessage}</div> : null}
 
       {supportSession ? (
-        <div style={styles.infoBox}>
-          This is platform support-session access. It is read-only here and must be ended from the platform Support Sessions page.
+        <div className="app-info-state sessions-guidance" role="status">
+          <strong>Platform support access is read-only here.</strong>
+          <span>This support session must be ended from the platform Support Sessions page.</span>
+        </div>
+      ) : !currentBrowserTracked ? (
+        <div className="app-warning-state sessions-guidance" role="alert">
+          <strong>Current browser session tracking is unavailable.</strong>
+          <span>This browser is using an older access token that is not linked to a tracked refresh session. Sign out and sign back in once to bring this browser under Sessions management.</span>
         </div>
       ) : (
-        <div style={styles.warningBox}>
-          <strong>Sign out everywhere:</strong> Revoke All Sessions revokes only currently active sessions, including this browser. Historical revoked and expired records are preserved.
+        <div className="app-warning-state sessions-guidance">
+          <strong>Sign out everywhere.</strong>
+          <span>Revoke all sessions disables every currently active session, including this browser, and returns you to login. Revoked and expired history is preserved.</span>
         </div>
       )}
 
-      <div style={styles.metaText}>{formatLastRefreshed(sessionsQuery.dataUpdatedAt)}</div>
+      <section className="app-panel sessions-panel">
+        <OperationalSectionHeader
+          iconPath="/sessions"
+          title="Session inventory"
+          description="Active sessions are shown by default. The current browser is pinned first when it matches the selected status."
+          actions={<StatusBadge tone="blue">{sessionStatusLabel(statusFilter)}</StatusBadge>}
+        />
 
-      {pageError ? <div className="app-error-state" style={styles.messageBox}>{pageError}</div> : null}
-      {pageMessage ? <div className="app-success-state" style={styles.messageBox}>{pageMessage}</div> : null}
-
-      <div className="app-grid-stats" style={styles.statsGrid}>
-        <StatCard title="Total Sessions" value={summary.total} subtitle="Historical sessions retained for this account" />
-        <StatCard title="Active Sessions" value={summary.active} subtitle="Currently usable refresh sessions" tone={summary.active > 0 ? 'good' : 'warn'} />
-        <StatCard title="Revoked Sessions" value={summary.revoked} subtitle="Explicitly disabled sessions" />
-        <StatCard title="Expired Sessions" value={summary.expired} subtitle="Ended naturally without revocation" tone={summary.expired > 0 ? 'warn' : 'good'} />
-      </div>
-
-      <section className="app-panel" style={styles.panel}>
-        <div style={styles.panelHeader}>
-          <div style={styles.panelHeaderText}>
-            <h3 style={styles.panelTitle}>Session Inventory</h3>
-            <p style={styles.panelSubtitle}>
-              Active sessions are shown by default. The current browser is pinned first when it matches the selected status.
-            </p>
-          </div>
-
-          <div style={styles.filters}>
-            <label style={styles.filterLabel}>
+        <div className="sessions-toolbar">
+          <div className="sessions-filters" aria-label="Session inventory filters">
+            <label className="sessions-filter-field">
               <span>Status</span>
               <select
-                style={styles.select}
                 value={statusFilter}
                 onChange={(event) => changeStatus(event.target.value as SessionStatusFilter)}
                 disabled={sessionsQuery.isFetching}
@@ -389,10 +455,9 @@ export default function SessionsPage() {
               </select>
             </label>
 
-            <label style={styles.filterLabel}>
+            <label className="sessions-filter-field">
               <span>Rows</span>
               <select
-                style={styles.select}
                 value={pageSize}
                 onChange={(event) => changePageSize(Number(event.target.value))}
                 disabled={sessionsQuery.isFetching}
@@ -403,31 +468,32 @@ export default function SessionsPage() {
               </select>
             </label>
           </div>
+
+          <div className="sessions-list-meta" aria-live="polite">
+            <span>{rangeLabel}</span>
+            <span>Page {page}</span>
+          </div>
         </div>
 
-        <div style={styles.listMetaRow}>
-          <span>{rangeLabel}</span>
-          <span>Page {page}</span>
-        </div>
-
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
+        <div className="sessions-table-wrapper">
+          <table className="sessions-table">
             <thead>
               <tr>
-                <th style={{ ...styles.th, ...styles.statusColumn }}>Status</th>
-                <th style={{ ...styles.th, ...styles.networkColumn }}>Network</th>
-                <th style={styles.th}>Device</th>
-                <th style={{ ...styles.th, ...styles.dateColumn }}>Created</th>
-                <th style={{ ...styles.th, ...styles.dateColumn }}>Last Used</th>
-                <th style={{ ...styles.th, ...styles.dateColumn }}>Expires</th>
-                <th style={{ ...styles.th, ...styles.actionColumn }}>Action</th>
+                <th className="sessions-col-status">Status</th>
+                <th className="sessions-col-network">Network</th>
+                <th>Device</th>
+                <th className="sessions-col-date">Created</th>
+                <th className="sessions-col-date">Last used</th>
+                <th className="sessions-col-date">Expires</th>
+                <th className="sessions-col-action">Action</th>
               </tr>
             </thead>
             <tbody>
               {sessions.length === 0 ? (
                 <tr>
-                  <td style={styles.emptyCell} colSpan={7}>
-                    No {statusFilter === 'all' ? '' : `${statusFilter} `}sessions found.
+                  <td className="sessions-empty-cell" colSpan={7}>
+                    <strong>No {statusFilter === 'all' ? '' : `${statusFilter} `}sessions found.</strong>
+                    <span>{statusFilter === 'active' ? 'There are no tracked active sessions for this account in the current view.' : 'Choose another status to review the retained session history.'}</span>
                   </td>
                 </tr>
               ) : (
@@ -443,7 +509,7 @@ export default function SessionsPage() {
                   const revokeTitle = supportSession
                     ? 'Support sessions must be ended from the platform Support Sessions page.'
                     : isCurrent
-                      ? 'Current session cannot be revoked individually. Use Revoke All Sessions to sign out everywhere.'
+                      ? 'Current session cannot be revoked individually. Use Revoke all sessions to sign out everywhere.'
                       : session.revoked
                         ? 'Session is already revoked.'
                         : isExpired
@@ -451,40 +517,38 @@ export default function SessionsPage() {
                           : 'Revoke this active session.';
 
                   return (
-                    <tr key={session.id}>
-                      <td style={{ ...styles.td, ...styles.statusColumn }}>
-                        <div style={styles.statusStack}>
-                          <span style={session.revoked ? styles.badgeMuted : isExpired ? styles.badgeWarning : styles.badgeOk}>
+                    <tr key={session.id} className={isCurrent ? 'sessions-row sessions-row--current' : 'sessions-row'}>
+                      <td className="sessions-col-status">
+                        <div className="sessions-status-stack">
+                          <StatusBadge tone={session.revoked ? 'neutral' : isExpired ? 'warn' : 'good'}>
                             {session.revoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
-                          </span>
-                          {isCurrent ? <span style={styles.badgeInfo}>CURRENT</span> : null}
-                          {session.session_type ? <span style={styles.badgeNeutral}>{formatSessionType(session.session_type)}</span> : null}
+                          </StatusBadge>
+                          {isCurrent ? <StatusBadge tone="blue">CURRENT</StatusBadge> : null}
+                          {session.session_type ? <StatusBadge tone="neutral">{formatSessionType(session.session_type)}</StatusBadge> : null}
                         </div>
                       </td>
 
-                      <td style={{ ...styles.td, ...styles.networkColumn }}>
-                        <div style={styles.rowTitle} title={network.detail}>
-                          {network.label}
-                        </div>
-                        {network.detail ? <div style={styles.rowSubtle}>Reported {network.detail}</div> : null}
-                        <div style={styles.rowSubtle} title={session.id}>Session {shortenId(session.id)}</div>
+                      <td className="sessions-col-network">
+                        <div className="sessions-row-title" title={network.detail}>{network.label}</div>
+                        {network.detail ? <div className="sessions-row-subtle">Reported {network.detail}</div> : null}
+                        <div className="sessions-row-subtle" title={session.id}>Session {shortenId(session.id)}</div>
                       </td>
 
-                      <td style={styles.tdWide} title={session.user_agent || undefined}>
-                        <div style={styles.rowTitle}>{describeDevice(session.user_agent)}</div>
-                        <div style={styles.rowSubtle}>Hover for full browser signature</div>
+                      <td className="sessions-device-cell" title={session.user_agent || undefined}>
+                        <div className="sessions-row-title">{describeDevice(session.user_agent)}</div>
+                        <div className="sessions-row-subtle">Hover for full browser signature</div>
                       </td>
-                      <td style={{ ...styles.td, ...styles.dateColumn }}>{formatDateTime(session.created_at)}</td>
-                      <td style={{ ...styles.td, ...styles.dateColumn }}>{formatDateTime(session.last_used_at)}</td>
-                      <td style={{ ...styles.td, ...styles.dateColumn }}>{formatDateTime(session.expires_at)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.created_at)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.last_used_at)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.expires_at)}</td>
 
-                      <td style={{ ...styles.td, ...styles.actionColumn }}>
+                      <td className="sessions-col-action">
                         {supportSession ? (
-                          <span style={styles.managedText}>Platform managed</span>
+                          <span className="sessions-managed-text">Platform managed</span>
                         ) : (
                           <button
                             type="button"
-                            style={revokeDisabled ? styles.disabledButton : styles.secondaryButton}
+                            className="app-button app-button--secondary app-button--compact"
                             onClick={() => handleRevokeOne(session.id)}
                             disabled={revokeDisabled}
                             title={revokeTitle}
@@ -501,19 +565,19 @@ export default function SessionsPage() {
           </table>
         </div>
 
-        <div style={styles.pagination}>
+        <div className="sessions-pagination">
           <button
             type="button"
-            style={page <= 1 ? styles.disabledButton : styles.secondaryButton}
+            className="app-button app-button--secondary"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1 || sessionsQuery.isFetching}
           >
             Previous
           </button>
-          <span style={styles.pageLabel}>Page {page}</span>
+          <span>Page {page}</span>
           <button
             type="button"
-            style={!hasNext ? styles.disabledButton : styles.secondaryButton}
+            className="app-button app-button--secondary"
             onClick={() => setPage((current) => current + 1)}
             disabled={!hasNext || sessionsQuery.isFetching}
           >
@@ -524,235 +588,3 @@ export default function SessionsPage() {
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { width: '100%', minWidth: 0 },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '16px',
-    alignItems: 'flex-start',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    minWidth: 0
-  },
-  headerTextBlock: { minWidth: 0 },
-  headerActions: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: '28px', fontWeight: 800, color: '#0f172a' },
-  description: { margin: '8px 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '760px' },
-  statsGrid: { marginBottom: '20px', width: '100%', minWidth: 0 },
-  statCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '16px',
-    padding: '18px',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-    minWidth: 0
-  },
-  statTitle: { fontSize: '14px', fontWeight: 600, color: '#64748b', marginBottom: '10px' },
-  statValue: { fontSize: '32px', fontWeight: 700, marginBottom: '8px', lineHeight: 1.2 },
-  statValueGood: { fontSize: '32px', fontWeight: 700, marginBottom: '8px', color: '#166534', lineHeight: 1.2 },
-  statValueWarn: { fontSize: '32px', fontWeight: 700, marginBottom: '8px', color: '#92400e', lineHeight: 1.2 },
-  statValueDanger: { fontSize: '32px', fontWeight: 700, marginBottom: '8px', color: '#991b1b', lineHeight: 1.2 },
-  statSubtitle: { fontSize: '13px', color: '#64748b', lineHeight: 1.4 },
-  messageBox: { marginBottom: '16px' },
-  warningBox: {
-    marginBottom: '12px',
-    border: '1px solid #fde68a',
-    background: '#fffbeb',
-    color: '#92400e',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    fontSize: '14px',
-    lineHeight: 1.5
-  },
-  infoBox: {
-    marginBottom: '12px',
-    border: '1px solid #bfdbfe',
-    background: '#eff6ff',
-    color: '#1e40af',
-    borderRadius: '12px',
-    padding: '12px 14px',
-    fontSize: '14px',
-    lineHeight: 1.5
-  },
-  metaText: { margin: '0 0 16px', color: '#64748b', fontSize: '13px' },
-  statePanel: { padding: '20px', borderRadius: '12px', marginBottom: '16px' },
-  stateText: { margin: '8px 0 14px', lineHeight: 1.5 },
-  panel: { minWidth: 0, overflow: 'hidden' },
-  panelHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    gap: '16px',
-    padding: '20px 20px 14px',
-    flexWrap: 'wrap',
-    minWidth: 0
-  },
-  panelHeaderText: { minWidth: 0, flex: '1 1 440px' },
-  panelTitle: { margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' },
-  panelSubtitle: { margin: '6px 0 0', color: '#64748b', fontSize: '14px', lineHeight: 1.5 },
-  filters: { display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' },
-  filterLabel: { display: 'grid', gap: '6px', color: '#334155', fontSize: '12px', fontWeight: 700 },
-  select: {
-    minWidth: '150px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    background: '#ffffff',
-    color: '#0f172a',
-    padding: '9px 12px',
-    font: 'inherit'
-  },
-  listMetaRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px',
-    padding: '0 20px 12px',
-    color: '#64748b',
-    fontSize: '12px'
-  },
-  tableWrapper: { overflowX: 'auto', minWidth: 0 },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1040px' },
-  th: {
-    textAlign: 'left',
-    padding: '14px 16px',
-    borderBottom: '1px solid #e5e7eb',
-    fontSize: '12px',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    color: '#64748b',
-    background: '#f8fafc',
-    whiteSpace: 'nowrap'
-  },
-  td: {
-    padding: '16px',
-    borderBottom: '1px solid #f1f5f9',
-    verticalAlign: 'top',
-    color: '#0f172a',
-    fontSize: '14px'
-  },
-  tdWide: {
-    padding: '16px',
-    borderBottom: '1px solid #f1f5f9',
-    verticalAlign: 'top',
-    color: '#0f172a',
-    fontSize: '14px',
-    minWidth: '220px',
-    lineHeight: 1.5
-  },
-  statusColumn: { width: '132px', minWidth: '132px' },
-  networkColumn: { width: '190px', minWidth: '190px' },
-  dateColumn: { width: '150px', minWidth: '150px' },
-  actionColumn: { width: '112px', minWidth: '112px' },
-  rowTitle: { fontWeight: 700, color: '#0f172a' },
-  rowSubtle: { marginTop: '5px', color: '#64748b', fontSize: '12px', lineHeight: 1.4 },
-  statusStack: { display: 'flex', flexDirection: 'column', gap: '7px', alignItems: 'flex-start' },
-  badgeOk: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: '999px',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: 700,
-    background: '#dcfce7',
-    color: '#166534',
-    whiteSpace: 'nowrap'
-  },
-  badgeWarning: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: '999px',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: 700,
-    background: '#fef3c7',
-    color: '#92400e',
-    whiteSpace: 'nowrap'
-  },
-  badgeMuted: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: '999px',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: 700,
-    background: '#e5e7eb',
-    color: '#334155',
-    whiteSpace: 'nowrap'
-  },
-  badgeInfo: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: '999px',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: 700,
-    background: '#dbeafe',
-    color: '#1d4ed8',
-    whiteSpace: 'nowrap'
-  },
-  badgeNeutral: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: '999px',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: 700,
-    background: '#f1f5f9',
-    color: '#334155',
-    whiteSpace: 'nowrap'
-  },
-  secondaryButton: {
-    border: '1px solid #cbd5e1',
-    background: '#ffffff',
-    color: '#0f172a',
-    borderRadius: '12px',
-    padding: '10px 14px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    minWidth: '88px'
-  },
-  disabledButton: {
-    border: '1px solid #e2e8f0',
-    background: '#f8fafc',
-    color: '#9ca3af',
-    borderRadius: '12px',
-    padding: '10px 14px',
-    fontWeight: 700,
-    cursor: 'not-allowed',
-    whiteSpace: 'nowrap',
-    minWidth: '88px'
-  },
-  dangerButton: {
-    border: 'none',
-    background: '#dc2626',
-    color: '#ffffff',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap'
-  },
-  disabledDangerButton: {
-    border: '1px solid #e2e8f0',
-    background: '#f8fafc',
-    color: '#9ca3af',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    fontWeight: 700,
-    cursor: 'not-allowed',
-    whiteSpace: 'nowrap'
-  },
-  managedText: { color: '#64748b', fontSize: '12px', fontWeight: 700 },
-  emptyCell: { padding: '32px 16px', textAlign: 'center', color: '#64748b' },
-  pagination: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '16px 20px 20px',
-    borderTop: '1px solid #f1f5f9'
-  },
-  pageLabel: { minWidth: '72px', textAlign: 'center', color: '#4b5563', fontSize: '13px', fontWeight: 700 }
-};
