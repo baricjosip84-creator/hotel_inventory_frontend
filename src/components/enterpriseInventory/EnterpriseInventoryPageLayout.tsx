@@ -57,9 +57,9 @@ export function EnterpriseInventoryPageLayout({
 
       {!activeTab ? (
         <section style={styles.card}>
-          <h2 style={styles.cardTitle}>No Enterprise Inventory workspace available</h2>
+          <h2 style={styles.cardTitle}>No inventory controls available</h2>
           <p style={styles.helper}>
-            None of the Enterprise Inventory tabs are available with the current permission set and tenant subscription.
+            Your current permissions do not include any of these specialized inventory controls.
           </p>
         </section>
       ) : children}

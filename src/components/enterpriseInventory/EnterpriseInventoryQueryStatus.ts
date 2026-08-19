@@ -9,91 +9,15 @@ type EnterpriseInventoryQueryLike = {
 type EnterpriseInventoryQueryRecord = Record<string, EnterpriseInventoryQueryLike | undefined>;
 
 const TAB_QUERY_MAP: Record<string, string[]> = {
-  'operations-dashboard': [
-    'dashboardSummaryQuery',
-    'dashboardLowStockQuery',
-    'dashboardOverdueShipmentsQuery',
-    'dashboardUnresolvedAlertsQuery',
-    'dashboardRecentActivityQuery',
-    'dashboardSupplierPerformanceQuery',
-    'stockOverviewQuery'
-  ],
-  'par-levels': ['parLevelsQuery'],
-  'cycle-counts': ['cycleCountsQuery'],
-  'stock-risk': ['lowStockQuery', 'stockMovementsQuery'],
-  insights: [
-    'operationalHealthQuery',
-    'inventoryAnomaliesQuery',
-    'reorderRecommendationsQuery',
-    'depletionRiskQuery',
-    'supplierTrustScoresQuery'
-  ],
-  forecast: [
-    'tenantSubscriptionAccessQuery',
-    'demandForecastQuery',
-    'forecastAccuracyBacktestQuery',
-    'forecastCalibrationReviewQuery',
-    'forecastDataQualityReviewQuery',
-    'forecastReliabilityMatrixQuery'
-  ],
-  reports: [
-    'tenantSubscriptionAccessQuery',
-    'inventoryValuationReportQuery',
-    'stockByLocationReportQuery',
-    'productMovementReportQuery',
-    'procurementSummaryReportQuery'
-  ],
-  automation: [
-    'tenantSubscriptionAccessQuery',
-    'automationTypesQuery',
-    'automationSchedulesQuery',
-    'automationRunnerReadinessQuery',
-    'automationRunnerStatusQuery',
-    'automationRunEventsQuery',
-    'automationRunnerSafetyReportQuery',
-    'automationRunnerGovernancePackQuery',
-    'automationRunnerOperationsReviewQuery',
-    'automationRunnerAccountabilityDigestQuery',
-    'automationRunnerPolicyMatrixQuery'
-  ],
-  execution: ['systemStatusQuery', 'executionAdaptersQuery', 'executionHardeningQuery', 'executionRequestsQuery'],
-  'system-context': [
-    'systemContextQuery',
-    'systemExecutionGateQuery',
-    'systemContextSnapshotsQuery',
-    'systemContextSnapshotComparisonQuery',
-    'systemContextForecastRiskQuery',
-    'supportContextQuery',
-    'maintenanceContextQuery',
-    'announcementContextQuery',
-    'incidentContextQuery'
-  ],
-  'cost-control': [
-    'productCostRiskSummaryQuery',
-    'productCostValuationSummaryQuery',
-    'productCostActionSummaryQuery',
-    'productCostGovernanceSummaryQuery',
-    'productCostHardeningSummaryQuery',
-    'carryingCostProductionReviewQuery',
-    'deadStockProductionReviewQuery',
-    'marginAwareProductionReviewQuery',
-    'procurementSpendProductionReviewQuery'
-  ],
-  'stock-transfers': ['stockTransfersQuery'],
-  products: ['productsQuery'],
-  suppliers: ['suppliersQuery', 'availableSuppliersQuery', 'supplierSlaBreachesQuery', 'supplierPerformanceQuery'],
-  locations: ['storageLocationsQuery'],
-  alerts: ['alertsQuery'],
-  audit: ['auditLogsQuery'],
-  'procurement-match': ['tenantSubscriptionAccessQuery', 'purchaseOrdersQuery', 'shipmentsQuery', 'invoicesQuery'],
-  receiving: ['shipmentsQuery', 'shipmentItemsQuery'],
-  requisitions: ['requisitionsQuery'],
-  approvals: ['approvalRulesQuery'],
-  invoices: ['invoicesQuery', 'supplierCatalogQuery'],
-  labels: ['barcodeLabelsQuery'],
-  packages: ['productPackagesQuery'],
-  attachments: ['attachmentsQuery'],
-  notifications: ['notificationsQuery']
+  'par-levels': ['productsQuery', 'storageLocationsQuery', 'parLevelsQuery'],
+  'cycle-counts': ['productsQuery', 'storageLocationsQuery', 'cycleCountsQuery'],
+  'supplier-returns': [],
+  approvals: ['approvalRulesQuery', 'storageLocationsQuery', 'cycleCountsQuery', 'invoicesQuery', 'supplierReturnsQuery', 'requisitionsQuery'],
+  'supplier-catalog': ['productsQuery', 'suppliersQuery', 'supplierCatalogQuery'],
+  invoices: ['tenantSubscriptionAccessQuery', 'productsQuery', 'suppliersQuery', 'purchaseOrdersQuery', 'shipmentsQuery', 'invoicesQuery'],
+  labels: ['productsQuery', 'barcodeLabelsQuery'],
+  attachments: ['tenantSubscriptionAccessQuery', 'productsQuery', 'suppliersQuery', 'purchaseOrdersQuery', 'shipmentsQuery', 'invoicesQuery', 'requisitionsQuery', 'supplierReturnsQuery', 'attachmentsQuery'],
+  notifications: ['notificationsQuery', 'notificationDeliveriesQuery']
 };
 
 export function getEnterpriseInventoryActiveTabLastUpdatedAt(

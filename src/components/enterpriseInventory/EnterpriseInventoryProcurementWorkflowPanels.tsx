@@ -1,7 +1,6 @@
 import { ApprovalsTab } from "./tabs/ApprovalsTab";
 import { InvoicesTab } from "./tabs/InvoicesTab";
 import { SupplierCatalogsTab } from "./tabs/SupplierCatalogsTab";
-import { RequisitionsTab } from "./tabs/RequisitionsTab";
 import { SupplierReturnsTab } from "./tabs/SupplierReturnsTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
 import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
@@ -14,9 +13,7 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
 }: EnterpriseInventoryPanelBaseProps) {
   const {
     approvalRuleForm,
-    requisitionForm,
     setApprovalRuleForm,
-    setRequisitionForm,
     setSupplierCatalogForm,
     setSupplierInvoiceForm,
     supplierCatalogForm,
@@ -28,7 +25,6 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
   const {
     approvalRulesQuery,
     invoicesQuery,
-    requisitionsQuery,
     supplierCatalogQuery,
   } = queries;
 
@@ -39,8 +35,6 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
 
   const {
     createApprovalRuleMutation,
-    createRequisitionMutation,
-    submitRequisitionMutation,
     createSupplierCatalogMutation,
     deactivateSupplierCatalogMutation,
     createSupplierInvoiceMutation,
@@ -54,18 +48,6 @@ export function EnterpriseInventoryProcurementWorkflowPanels({
 
       <EnterpriseInventoryTabPanel activeTab={activeTab} tab="supplier-returns">
         <SupplierReturnsTab />
-      </EnterpriseInventoryTabPanel>
-
-      <EnterpriseInventoryTabPanel activeTab={activeTab} tab="requisitions">
-        <RequisitionsTab
-          createRequisitionMutation={createRequisitionMutation}
-          submitRequisitionMutation={submitRequisitionMutation}
-          products={products}
-          requisitionForm={requisitionForm}
-          requisitionsQuery={requisitionsQuery}
-          setRequisitionForm={setRequisitionForm}
-          storageLocations={storageLocations}
-        />
       </EnterpriseInventoryTabPanel>
 
       <EnterpriseInventoryTabPanel activeTab={activeTab} tab="approvals">

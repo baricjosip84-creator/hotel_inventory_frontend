@@ -59,6 +59,7 @@ export function useEnterpriseInventoryPageController() {
   } = formState;
 
   const pageData = useEnterpriseInventoryPageData({
+    activeTab,
     productSearch,
     productPackageProductId: productPackageForm.product_id,
     supplierSearch,

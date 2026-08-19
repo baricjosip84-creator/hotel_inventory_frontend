@@ -1,8 +1,6 @@
 import { AttachmentsTab } from "./tabs/AttachmentsTab";
 import { LabelsTab } from "./tabs/LabelsTab";
-import { PackagesTab } from "./tabs/PackagesTab";
 import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import { emptyProductPackageForm } from "./EnterpriseInventoryForms";
 import type {
   EnterpriseInventoryPanelBaseProps,
 } from "./EnterpriseInventoryPanelTypes";
@@ -16,35 +14,25 @@ export function EnterpriseInventoryCatalogSupportPanels({
   const {
     attachmentForm,
     barcodeLabelForm,
-    editingProductPackageId,
-    productPackageForm,
     setAttachmentForm,
     setBarcodeLabelForm,
-    setEditingProductPackageId,
-    setProductPackageForm,
   } = formState;
 
-  const { queries, stableData, viewData } = pageData;
+  const { queries, stableData } = pageData;
 
-  const { attachmentsQuery, barcodeLabelsQuery, productPackagesQuery, invoicesQuery, requisitionsQuery, supplierReturnsQuery } = queries;
 
   const { products, suppliers, purchaseOrders, shipments } = stableData;
 
-  const { selectedProductPackages } = viewData;
+  const { attachmentsQuery, barcodeLabelsQuery, invoicesQuery, requisitionsQuery, supplierReturnsQuery } = queries;
+
 
   const {
-    beginEditProductPackage,
-    cancelEditProductPackage,
     createAttachmentMutation,
     deleteAttachmentMutation,
     createBarcodeLabelMutation,
     recordBarcodeLabelPrintsMutation,
     deleteBarcodeLabelMutation,
-    createProductPackageMutation,
-    deleteProductPackageMutation,
     handleBarcodeLabelSubmit,
-    handleProductPackageSubmit,
-    updateProductPackageMutation,
   } = actions;
 
   return (
@@ -59,25 +47,6 @@ export function EnterpriseInventoryCatalogSupportPanels({
           products={products}
           setBarcodeLabelForm={setBarcodeLabelForm}
           onBarcodeLabelSubmit={handleBarcodeLabelSubmit}
-        />
-      </EnterpriseInventoryTabPanel>
-
-      <EnterpriseInventoryTabPanel activeTab={activeTab} tab="packages">
-        <PackagesTab
-          editingProductPackageId={editingProductPackageId}
-          emptyProductPackageForm={emptyProductPackageForm}
-          productPackageForm={productPackageForm}
-          productPackagesQuery={productPackagesQuery}
-          products={products}
-          selectedProductPackages={selectedProductPackages}
-          createProductPackageMutation={createProductPackageMutation}
-          updateProductPackageMutation={updateProductPackageMutation}
-          deleteProductPackageMutation={deleteProductPackageMutation}
-          beginEditProductPackage={beginEditProductPackage}
-          cancelEditProductPackage={cancelEditProductPackage}
-          setEditingProductPackageId={setEditingProductPackageId}
-          setProductPackageForm={setProductPackageForm}
-          onProductPackageSubmit={handleProductPackageSubmit}
         />
       </EnterpriseInventoryTabPanel>
 

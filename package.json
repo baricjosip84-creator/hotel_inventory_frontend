@@ -40,6 +40,7 @@
     "check:button-action-ux-audit": "node scripts/check-button-action-ux-audit.mjs",
     "check:inventory-usage-quick-consume-draft-preservation": "node scripts/check-inventory-usage-quick-consume-draft-preservation.mjs",
     "check:inventory-usage-reversal-feedback": "node scripts/check-inventory-usage-reversal-feedback.mjs",
+    "check:enterprise-inventory-cleanup": "node scripts/check-enterprise-inventory-cleanup.mjs",
     "check:role-permission-management": "node scripts/check-role-permission-management.mjs",
     "check:tenant-permissions-page-hardening": "node scripts/check-tenant-permissions-page-hardening.mjs",
     "check:tenant-custom-role-management": "node scripts/check-tenant-custom-role-management.mjs",

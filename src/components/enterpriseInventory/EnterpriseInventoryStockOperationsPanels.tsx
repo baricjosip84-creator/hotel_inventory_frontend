@@ -1,8 +1,7 @@
-import { CycleCountsTab } from "./tabs/CycleCountsTab";
-import { ParLevelsTab } from "./tabs/ParLevelsTab";
-import { StockRiskTab } from "./tabs/StockRiskTab";
-import { EnterpriseInventoryTabPanel } from "./EnterpriseInventoryTabPanel";
-import type { EnterpriseInventoryPanelBaseProps } from "./EnterpriseInventoryPanelTypes";
+import { CycleCountsTab } from './tabs/CycleCountsTab';
+import { ParLevelsTab } from './tabs/ParLevelsTab';
+import { EnterpriseInventoryTabPanel } from './EnterpriseInventoryTabPanel';
+import type { EnterpriseInventoryPanelBaseProps } from './EnterpriseInventoryPanelTypes';
 
 export function EnterpriseInventoryStockOperationsPanels({
   activeTab,
@@ -19,23 +18,9 @@ export function EnterpriseInventoryStockOperationsPanels({
     stockAdjustmentForm,
   } = formState;
 
-  const { queries, stableData, viewData } = pageData;
-
-  const {
-    cycleCountsQuery,
-    lowStockQuery,
-    parLevelsQuery,
-    stockMovementsQuery,
-  } = queries;
-
-  const {
-    lowStockItems,
-    products,
-    recentStockMovements,
-    storageLocations,
-  } = stableData;
-
-  const { stockRiskSummary } = viewData;
+  const { queries, stableData } = pageData;
+  const { cycleCountsQuery, parLevelsQuery } = queries;
+  const { products, storageLocations } = stableData;
 
   const {
     adjustStockMutation,
@@ -81,16 +66,6 @@ export function EnterpriseInventoryStockOperationsPanels({
           onSubmit={(id) => submitCycleCountMutation.mutate(id)}
           isReconciling={reconcileCycleCountMutation.isPending}
           onReconcile={(id) => reconcileCycleCountMutation.mutate(id)}
-        />
-      </EnterpriseInventoryTabPanel>
-
-      <EnterpriseInventoryTabPanel activeTab={activeTab} tab="stock-risk">
-        <StockRiskTab
-          lowStockItems={lowStockItems}
-          lowStockLoading={lowStockQuery.isLoading}
-          recentStockMovements={recentStockMovements}
-          stockMovementsLoading={stockMovementsQuery.isLoading}
-          stockRiskSummary={stockRiskSummary}
         />
       </EnterpriseInventoryTabPanel>
     </>

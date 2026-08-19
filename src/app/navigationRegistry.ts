@@ -330,8 +330,8 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       },
       {
         to: '/enterprise-inventory',
-        label: 'Enterprise Inventory',
-        description: 'Manage par levels, cycle counts, department requisitions, approvals, invoices, notifications, and labels.',
+        label: 'Inventory Controls',
+        description: 'Specialized inventory controls for par levels, cycle counts, supplier returns, approvals, catalogs, invoices, labels, attachments, and notifications.',
         section: 'Procurement',
         requiredAnyPermissions: [...enterpriseInventoryReadPermissions]
       }

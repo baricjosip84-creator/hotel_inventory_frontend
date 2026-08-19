@@ -26,7 +26,7 @@ function EnterpriseInventoryPage() {
       onEvaluateParLevels={() => actions.evaluateParLevelsMutation.mutate()}
       evaluatingParLevels={actions.evaluateParLevelsMutation.isPending}
       subscriptionAccess={pageData.queries.tenantSubscriptionAccessQuery.data}
-      canEvaluateParLevels={hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_WRITE)}
+      canEvaluateParLevels={activeTab === 'par-levels' && hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_WRITE)}
     >
       <EnterpriseInventoryPagePanels
         activeTab={activeTab}
