@@ -332,6 +332,7 @@ export default function TenantPermissionsPage() {
                 key={role.role}
                 type="button"
                 className={`tenant-permissions-role-card${role.role === selectedRole ? ' is-active' : ''}${role.is_active === false ? ' is-inactive' : ''}`}
+                aria-pressed={role.role === selectedRole}
                 onClick={() => selectRole(role)}
               >
                 <span className="tenant-permissions-role-card__topline">
@@ -339,7 +340,12 @@ export default function TenantPermissionsPage() {
                   <em>{role.is_active === false ? 'Inactive' : 'Active'}</em>
                 </span>
                 <span>{role.effective_permissions.length} permissions · {role.user_count || 0} assigned users</span>
-                <small>Starting point: {role.source_template_name || 'Blank role'}</small>
+                <span className="tenant-permissions-role-card__footer">
+                  <small>Starting point: {role.source_template_name || 'Blank role'}</small>
+                  <span className="tenant-permissions-role-card__manage">
+                    {role.role === selectedRole ? 'Selected' : 'Manage →'}
+                  </span>
+                </span>
               </button>
             ))}
           </div>

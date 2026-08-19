@@ -113,7 +113,14 @@
 }
 
 .role-permission-editor--operational .role-permission-editor__groups {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 10px !important;
+}
+
+.role-permission-editor--operational .role-permission-editor__group-card.is-expanded,
+.role-permission-editor--operational .role-permission-editor__empty-search {
+  grid-column: 1 / -1;
 }
 
 .role-permission-editor--operational .role-permission-editor__group-card {
@@ -229,6 +236,10 @@
 }
 
 @media (max-width: 980px) {
+  .role-permission-editor--operational .role-permission-editor__groups {
+    grid-template-columns: 1fr;
+  }
+
   .role-permission-editor--operational .role-permission-editor__toolbar {
     display: grid !important;
   }

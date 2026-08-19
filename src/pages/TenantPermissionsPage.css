@@ -36,9 +36,9 @@
 }
 
 .tenant-permissions-role-card.is-active {
-  border-color: #93c5fd;
+  border-color: #60a5fa;
   background: #eff6ff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, .08);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .12);
 }
 
 .tenant-permissions-role-card.is-inactive {
@@ -81,6 +81,28 @@
 .tenant-permissions-role-card small {
   color: #64748b;
   font-size: 10.5px;
+}
+
+.tenant-permissions-role-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.tenant-permissions-role-card__manage {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.tenant-permissions-role-card.is-active .tenant-permissions-role-card__manage {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .tenant-permissions-template-count {
