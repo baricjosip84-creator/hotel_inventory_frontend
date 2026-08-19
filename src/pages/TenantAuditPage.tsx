@@ -380,7 +380,6 @@ export default function TenantAuditPage() {
 
     try {
       const params = new URLSearchParams(filterParams);
-      params.set('limit', '5000');
       await apiDownloadFile(`/audit/export.csv?${params.toString()}`, `tenant-audit-${new Date().toISOString().slice(0, 10)}.csv`);
       setRefreshMessage('Audit CSV export downloaded.');
       await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
@@ -474,6 +473,8 @@ export default function TenantAuditPage() {
               type="date"
               value={draftFilters.from}
               onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
+              aria-invalid={draftDateRangeInvalid}
+              aria-describedby={draftDateRangeInvalid ? 'tenant-audit-date-range-error' : undefined}
             />
           </label>
           <label className="tenant-audit-field">
@@ -483,7 +484,13 @@ export default function TenantAuditPage() {
               value={draftFilters.to}
               onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
               aria-invalid={draftDateRangeInvalid}
+              aria-describedby={draftDateRangeInvalid ? 'tenant-audit-date-range-error' : undefined}
             />
+            {draftDateRangeInvalid ? (
+              <span id="tenant-audit-date-range-error" className="tenant-audit-field-error" role="alert">
+                From date must be before or equal to To date.
+              </span>
+            ) : null}
           </label>
           <label className="tenant-audit-field">
             <span>Events per page</span>

@@ -18,6 +18,8 @@ const requiredPageTokens = [
   '/audit/export.csv?',
   'Search audit history',
   'Support-session actions only',
+  'tenant-audit-date-range-error',
+  'From date must be before or equal to To date.',
   'Show technical details',
   'Raw metadata',
   'apiDownloadFile'
@@ -27,12 +29,17 @@ for (const token of requiredPageTokens) {
   if (!page.includes(token)) failures.push(`TenantAuditPage.tsx is missing ${token}`);
 }
 
-for (const forbidden of ['style={styles.', 'const styles: Record<string, CSSProperties>']) {
-  if (page.includes(forbidden)) failures.push(`TenantAuditPage.tsx still uses legacy inline styling: ${forbidden}`);
+for (const forbidden of [
+  'style={styles.',
+  'const styles: Record<string, CSSProperties>',
+  "params.set('limit', '5000')"
+]) {
+  if (page.includes(forbidden)) failures.push(`TenantAuditPage.tsx contains forbidden pattern: ${forbidden}`);
 }
 
 const requiredCssTokens = [
   '.tenant-audit-filter-grid',
+  '.tenant-audit-field-error',
   '.tenant-audit-table-wrap',
   '.tenant-audit-evidence-grid',
   '.tenant-audit-metadata-pre',
