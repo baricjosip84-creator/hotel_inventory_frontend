@@ -1,6 +1,7 @@
 import type { CSSProperties, FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBlocker } from 'react-router';
 import { ApiError, apiRequest } from '../lib/api';
 import {
   TENANT_PERMISSIONS,
@@ -87,7 +88,7 @@ const INVENTORY_CURRENCY_HELP =
   'This is the tenant base currency used for product standard costs, inventory valuation, and tenant-base cost analytics. Supplier prices, invoices, and purchase orders can keep their own explicit currencies. The application does not automatically convert foreign exchange.';
 
 const LEGACY_CURRENCY_HELP =
-  'This tenant existed before currency tracking. Correct the displayed code first if needed, then confirm the currency that existing inventory standard costs already use. Changing the code also counts as confirmation. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists so historical amounts are never silently relabelled or converted.';
+  'This tenant existed before currency tracking. Correct the displayed code first if needed, then explicitly confirm the currency that existing inventory standard costs already use. If you change the code, you must confirm the new code before saving. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists so historical amounts are never silently relabelled or converted.';
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) {
@@ -199,26 +200,43 @@ export default function TenantSettingsPage() {
   const currentTenant = tenantsQuery.data?.[0] ?? null;
   const latestFormState = useMemo(() => createFormState(currentTenant), [currentTenant]);
 
+  const normalizedInventoryCurrency = formState.inventory_currency.trim().toUpperCase();
+  const currentInventoryCurrency = currentTenant
+    ? normalizeCurrencyCode(currentTenant.inventory_currency)
+    : DEFAULT_INVENTORY_CURRENCY;
+  const nameInvalid = !formState.name.trim();
+  const organizationTypeInvalid = !formState.organization_type.trim();
+  const businessEmailInvalid = Boolean(
+    formState.business_email.trim()
+    && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.business_email.trim())
+  );
   const dateRangeInvalid = Boolean(
     formState.season_start
     && formState.season_end
     && formState.season_start > formState.season_end
   );
-  const currencyCodeValid = /^[A-Z]{3}$/.test(formState.inventory_currency.trim().toUpperCase());
+  const currencyCodeValid = /^[A-Z]{3}$/.test(normalizedInventoryCurrency);
+  const legacyCurrencyChangeNeedsConfirmation = Boolean(
+    currentTenant
+    && !currentTenant.inventory_currency_configured_at
+    && normalizedInventoryCurrency !== currentInventoryCurrency
+    && !confirmInventoryCurrency
+  );
   const formValid = Boolean(
-    formState.name.trim()
+    !nameInvalid
     && formState.name.trim().length <= 160
     && formState.location.trim().length <= 255
-    && formState.organization_type.trim()
+    && !organizationTypeInvalid
     && formState.organization_type.trim().length <= 80
     && formState.legal_name.trim().length <= 255
     && formState.business_address.trim().length <= 2000
     && formState.business_email.trim().length <= 255
-    && (!formState.business_email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.business_email.trim()))
+    && !businessEmailInvalid
     && formState.business_phone.trim().length <= 100
     && formState.tax_id.trim().length <= 100
     && formState.default_purchase_order_payment_terms.trim().length <= 1000
     && currencyCodeValid
+    && !legacyCurrencyChangeNeedsConfirmation
     && !dateRangeInvalid
   );
   const isDirty = Boolean(
@@ -258,7 +276,29 @@ export default function TenantSettingsPage() {
   const isRefreshing = tenantsQuery.isFetching && !tenantsQuery.isLoading;
   const isWriteLocked = Boolean(currentTenant?.write_locked);
   const canEdit = canUpdateTenants && !isWriteLocked && !isSaving;
+  const shouldBlockNavigation = isDirty && !isSaving;
+  const blocker = useBlocker(shouldBlockNavigation);
   const lastRefreshedLabel = formatTimestamp(tenantsQuery.dataUpdatedAt);
+
+  useEffect(() => {
+    if (!shouldBlockNavigation) return undefined;
+
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [shouldBlockNavigation]);
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+
+    const shouldDiscard = window.confirm('Discard unsaved tenant settings and leave this page?');
+    if (shouldDiscard) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   const updateField = <K extends keyof TenantSettingsFormState>(field: K, value: TenantSettingsFormState[K]) => {
     setFormState((current) => ({
@@ -326,9 +366,21 @@ export default function TenantSettingsPage() {
       return null;
     }
 
+    if (businessEmailInvalid) {
+      setSuccessMessage(null);
+      setFormError('Business email must be a valid email address.');
+      return null;
+    }
+
     if (!currencyCodeValid) {
       setSuccessMessage(null);
       setFormError('Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.');
+      return null;
+    }
+
+    if (legacyCurrencyChangeNeedsConfirmation) {
+      setSuccessMessage(null);
+      setFormError('Confirm the inventory currency before saving this currency change.');
       return null;
     }
 
@@ -482,13 +534,15 @@ export default function TenantSettingsPage() {
               <label style={styles.field}>
                 <span style={styles.label}>Name</span>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, ...(nameInvalid ? styles.invalidInput : {}) }}
                   value={formState.name}
                   onChange={(event) => updateField('name', event.target.value)}
                   disabled={!canEdit}
                   maxLength={160}
                   required
+                  aria-invalid={nameInvalid}
                 />
+                {nameInvalid ? <span style={styles.fieldError}>Company name is required.</span> : null}
               </label>
 
               <label style={styles.field}>
@@ -506,13 +560,15 @@ export default function TenantSettingsPage() {
               <label style={styles.field}>
                 <span style={styles.label}>Organization Type</span>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, ...(organizationTypeInvalid ? styles.invalidInput : {}) }}
                   value={formState.organization_type}
                   onChange={(event) => updateField('organization_type', event.target.value)}
                   disabled={!canEdit}
                   maxLength={80}
                   required
+                  aria-invalid={organizationTypeInvalid}
                 />
+                {organizationTypeInvalid ? <span style={styles.fieldError}>Organization type is required.</span> : null}
               </label>
 
               <div style={{ ...styles.fullWidth, ...styles.documentDetailsHeader }}>
@@ -527,7 +583,17 @@ export default function TenantSettingsPage() {
 
               <label style={styles.field}>
                 <span style={styles.label}>Business Email</span>
-                <input style={styles.input} type="email" value={formState.business_email} onChange={(event) => updateField('business_email', event.target.value)} disabled={!canEdit} maxLength={255} placeholder="purchasing@company.com" />
+                <input
+                  style={{ ...styles.input, ...(businessEmailInvalid ? styles.invalidInput : {}) }}
+                  type="email"
+                  value={formState.business_email}
+                  onChange={(event) => updateField('business_email', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={255}
+                  placeholder="purchasing@company.com"
+                  aria-invalid={businessEmailInvalid}
+                />
+                {businessEmailInvalid ? <span style={styles.fieldError}>Enter a valid business email address.</span> : null}
               </label>
 
               <label style={styles.field}>
@@ -577,16 +643,21 @@ export default function TenantSettingsPage() {
                   </span>
                 </span>
                 <input
-                  style={styles.input}
+                  style={{ ...styles.input, ...(!currencyCodeValid ? styles.invalidInput : {}) }}
                   value={formState.inventory_currency}
-                  onChange={(event) => updateField('inventory_currency', event.target.value.toUpperCase())}
+                  onChange={(event) => {
+                    updateField('inventory_currency', event.target.value.toUpperCase());
+                    if (!currentTenant.inventory_currency_configured_at) setConfirmInventoryCurrency(false);
+                  }}
                   disabled={!canEdit}
                   maxLength={3}
                   pattern="[A-Za-z]{3}"
                   placeholder={DEFAULT_INVENTORY_CURRENCY}
                   required
+                  aria-invalid={!currencyCodeValid}
                 />
                 <span style={styles.helperText}>Tenant-base costs and valuation. No automatic FX conversion.</span>
+                {!currencyCodeValid ? <span style={styles.fieldError}>Enter a 3-letter currency code such as EUR, USD, or GBP.</span> : null}
               </label>
 
               {!currentTenant.inventory_currency_configured_at ? (
@@ -618,6 +689,9 @@ export default function TenantSettingsPage() {
                     />
                     Confirm that <strong>{formState.inventory_currency || 'this currency'}</strong> is the currency of existing inventory standard costs
                   </label>
+                  {legacyCurrencyChangeNeedsConfirmation ? (
+                    <span style={styles.fieldError}>You changed the currency. Confirm it above before saving.</span>
+                  ) : null}
                 </div>
               ) : (
                 <div style={{ ...styles.currencyStatus, ...styles.fullWidth }}>

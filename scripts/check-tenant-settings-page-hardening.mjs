@@ -16,6 +16,11 @@ const required = [
   "Season end cannot be before season start.",
   "Tenant-base costs and valuation. No automatic FX conversion.",
   "Legacy currency confirmation required",
+  "Discard unsaved tenant settings and leave this page?",
+  "window.addEventListener('beforeunload', warnBeforeUnload)",
+  "Confirm the inventory currency before saving this currency change.",
+  "You changed the currency. Confirm it above before saving.",
+  "Enter a valid business email address.",
   "disabled={!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid}",
   "queryClient.setQueryData<TenantSettingsRow[]>(['tenants'], [tenant])"
 ];
