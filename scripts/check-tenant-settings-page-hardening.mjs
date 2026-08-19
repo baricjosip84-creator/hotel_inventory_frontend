@@ -30,7 +30,12 @@ const required = [
   "OperationalSectionHeader",
   "tenant-settings-page io-operational-page io-workspace-page",
   "Supplier document identity",
-  "Governance & accounting controls"
+  "Governance & accounting controls",
+  "Tenant-managed",
+  "Tenant settings only",
+  "formatOrganizationTypeLabel",
+  "tenant-settings-current-card__organization-type",
+  "tenant-settings-organization-type-input"
 ];
 
 for (const anchor of required) {
@@ -45,6 +50,9 @@ const requiredCss = [
   '.tenant-settings-form-group',
   '.tenant-settings-control-grid',
   '.tenant-settings-currency-block',
+  '.tenant-settings-record-item--id > strong',
+  '.tenant-settings-page .app-button:disabled',
+  'text-transform: capitalize',
   '@media (max-width: 820px)'
 ];
 
@@ -59,7 +67,9 @@ const forbidden = [
   'Metadata JSON',
   'selectedTenantId',
   'setSelectedTenantId',
-  "setSuccessMessage('Tenant settings updated. Inventory currency"
+  "setSuccessMessage('Tenant settings updated. Inventory currency",
+  'Platform controls excluded',
+  "? 'Editable'"
 ];
 
 for (const anchor of forbidden) {

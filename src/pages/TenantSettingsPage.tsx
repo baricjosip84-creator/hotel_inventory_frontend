@@ -118,6 +118,15 @@ function formatTimestamp(value: string | number | null | undefined): string {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 }
 
+function formatOrganizationTypeLabel(value: string | null | undefined): string {
+  const normalized = String(value || 'facility').trim();
+  if (!normalized) return 'Facility';
+
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormState {
   if (!tenant) return emptyFormState;
 
@@ -463,7 +472,7 @@ export default function TenantSettingsPage() {
     : isWriteLocked
       ? 'Write locked'
       : canUpdateTenants
-        ? 'Editable'
+        ? 'Tenant-managed'
         : 'Read only';
 
   if (!canReadTenants) {
@@ -494,7 +503,7 @@ export default function TenantSettingsPage() {
             <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>Supplier document identity</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>Currency safety protected</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Platform controls excluded</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Tenant settings only</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
@@ -582,7 +591,7 @@ export default function TenantSettingsPage() {
               </div>
               <strong>{currentTenant.name}</strong>
               <span>{currentTenant.location || 'No location configured'}</span>
-              <span>{currentTenant.organization_type || 'facility'}</span>
+              <span className="tenant-settings-current-card__organization-type">{formatOrganizationTypeLabel(currentTenant.organization_type)}</span>
             </div>
             <div className="tenant-settings-record-item tenant-settings-record-item--id">
               <span>Tenant ID</span>
@@ -635,7 +644,7 @@ export default function TenantSettingsPage() {
               <label className="tenant-settings-field">
                 <span>Organization type</span>
                 <input
-                  className={organizationTypeInvalid ? 'is-invalid' : undefined}
+                  className={`tenant-settings-organization-type-input${organizationTypeInvalid ? ' is-invalid' : ''}`}
                   value={formState.organization_type}
                   onChange={(event) => updateField('organization_type', event.target.value)}
                   disabled={!canEdit}
