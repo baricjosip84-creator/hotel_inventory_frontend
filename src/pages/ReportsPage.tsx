@@ -1190,7 +1190,7 @@ export default function ReportsPage() {
               aria-controls={getReportPanelId(tab.key)}
               tabIndex={activeTab === tab.key ? 0 : -1}
               disabled={isExporting || forecastDisabled}
-              title={forecastDisabled ? forecastUnavailableReason || undefined : `Show ${tab.label} report.`}
+              title={forecastDisabled ? forecastUnavailableReason || undefined : undefined}
               onClick={() => changeActiveTab(tab.key)}
               onKeyDown={(event) => handleReportTabKeyDown(event, tab.key)}
             />
@@ -1589,7 +1589,7 @@ export default function ReportsPage() {
 
       {activeTab === 'forecast' ? (
         <ReportPanel tab="forecast" actions={actionButtons('forecast', forecastQuery.isFetching, !forecastFeatureReady)}>
-          <p className="reports-note">Forecast is read-only for inventory changes. PDF and CSV exports are also read-only. Access requires Forecasting subscription access plus Reports - Read and Insights - Read permissions.</p>
+          <p className="reports-note">Forecast is read-only. When forecasting access is enabled, you can print it or export it as PDF or CSV.</p>
           {forecastUnavailableReason ? <ErrorState message={forecastUnavailableReason} /> : null}
           {forecastFeatureReady ? <LastRefreshed timestamp={forecastQuery.dataUpdatedAt} /> : null}
           {forecastFeatureReady && forecastQuery.isLoading ? <div>Loading forecast…</div> : null}

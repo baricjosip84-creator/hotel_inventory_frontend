@@ -344,7 +344,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/reports',
         label: 'Reports',
-        description: 'Management reporting for valuation, procurement, stock distribution, and forecast.',
+        description: 'Operational and management reporting across inventory, procurement, usage, suppliers, costs, and forecasting.',
         section: 'Reporting',
         permission: TENANT_PERMISSIONS.REPORTS_READ
       }

@@ -312,11 +312,15 @@
    Keep the shared workspace component untouched and wrap only this page's report tabs. */
 .reports-page > .io-workspace-tabs {
   align-items: flex-start;
+  padding: 7px 8px;
 }
 
 .reports-page > .io-workspace-tabs .io-workspace-tabs__items {
   flex: 1 1 100%;
   flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 4px;
+  row-gap: 6px;
   overflow-x: visible;
 }
 
