@@ -21,8 +21,12 @@ type ReportTab =
   | 'inventory-valuation'
   | 'stock-by-location'
   | 'product-movements'
+  | 'movement-ledger'
+  | 'inventory-variance'
   | 'procurement-summary'
+  | 'purchasing-spend'
   | 'low-stock'
+  | 'slow-moving'
   | 'usage-summary'
   | 'supplier-performance'
   | 'expiry-risk'
@@ -30,16 +34,48 @@ type ReportTab =
 
 type ExportFormat = 'csv' | 'pdf';
 
+type DateRangeFilters = { from: string; to: string };
+type TextFilters = { category: string; product: string; location: string; supplier: string };
+
 const MAX_REPORT_FILTER_LENGTH = 120;
 const PRODUCT_MOVEMENT_LIMIT_OPTIONS = [25, 50, 100, 200, 500] as const;
+const REPORT_RESULT_LIMIT_OPTIONS = [50, 100, 200, 500] as const;
 const USAGE_PERIOD_OPTIONS = [7, 30, 90, 180, 365] as const;
 const EXPIRY_HORIZON_OPTIONS = [30, 60, 90, 180, 365] as const;
+const SLOW_MOVING_DAYS_OPTIONS = [30, 60, 90, 180, 365] as const;
+const MOVEMENT_TYPE_OPTIONS = [
+  ['', 'All movement types'],
+  ['shipment_receive', 'Shipment receipt'],
+  ['usage', 'Usage'],
+  ['usage_reversal', 'Usage reversal'],
+  ['stock_transfer_out', 'Transfer out'],
+  ['stock_transfer_in', 'Transfer in'],
+  ['reservation_fulfillment', 'Reservation fulfillment'],
+  ['requisition_fulfillment', 'Requisition fulfillment'],
+  ['cycle_count_reconciliation', 'Cycle count reconciliation'],
+  ['stock_count', 'Stock count'],
+  ['manual_adjustment', 'Manual adjustment'],
+  ['opening_stock', 'Opening stock'],
+  ['expiry_writeoff', 'Expiry write-off'],
+  ['quarantine_release', 'Quarantine release'],
+  ['stock_hold', 'Stock hold'],
+  ['stock_hold_release', 'Stock hold release'],
+  ['outbound_dispatch', 'Outbound dispatch'],
+  ['customer_return', 'Customer return'],
+  ['supplier_return_dispatch', 'Supplier return dispatch'],
+  ['other', 'Other']
+] as const;
+
 const REPORT_TABS: Array<{ key: ReportTab; label: string }> = [
   { key: 'inventory-valuation', label: 'Inventory Valuation' },
   { key: 'stock-by-location', label: 'Stock by Location' },
   { key: 'product-movements', label: 'Product Movements' },
+  { key: 'movement-ledger', label: 'Movement Ledger' },
+  { key: 'inventory-variance', label: 'Count Variance' },
   { key: 'procurement-summary', label: 'Procurement Summary' },
+  { key: 'purchasing-spend', label: 'Purchasing & Spend' },
   { key: 'low-stock', label: 'Low Stock' },
+  { key: 'slow-moving', label: 'Slow / Non-moving' },
   { key: 'usage-summary', label: 'Usage & Consumption' },
   { key: 'supplier-performance', label: 'Supplier Performance' },
   { key: 'expiry-risk', label: 'Expiry & Lot Risk' },
@@ -50,8 +86,12 @@ const REPORT_ICONS: Record<ReportTab, string> = {
   'inventory-valuation': '/reports',
   'stock-by-location': '/storage-locations',
   'product-movements': '/stock-movements',
+  'movement-ledger': '/stock-movements',
+  'inventory-variance': '/inventory-controls',
   'procurement-summary': '/shipments',
+  'purchasing-spend': '/purchase-orders',
   'low-stock': '/replenishment-planning',
+  'slow-moving': '/replenishment-planning',
   'usage-summary': '/inventory-usage',
   'supplier-performance': '/suppliers',
   'expiry-risk': '/alerts',
@@ -62,8 +102,12 @@ const REPORT_LABELS: Record<ReportTab, string> = {
   'inventory-valuation': 'Inventory valuation report',
   'stock-by-location': 'Stock by location report',
   'product-movements': 'Product movements report',
+  'movement-ledger': 'Stock movement ledger report',
+  'inventory-variance': 'Count and adjustment variance report',
   'procurement-summary': 'Procurement summary report',
+  'purchasing-spend': 'Purchasing and spend report',
   'low-stock': 'Low stock and reorder report',
+  'slow-moving': 'Slow and non-moving stock report',
   'usage-summary': 'Usage and consumption report',
   'supplier-performance': 'Supplier performance report',
   'expiry-risk': 'Expiry and lot risk report',
@@ -73,11 +117,15 @@ const REPORT_LABELS: Record<ReportTab, string> = {
 const REPORT_DESCRIPTIONS: Record<ReportTab, string> = {
   'inventory-valuation': 'Estimated stock value by product and storage location in the tenant inventory currency.',
   'stock-by-location': 'Stock positions grouped by storage location, with quantities kept separate by product unit.',
-  'product-movements': 'Product-level movement counts and quantity increases/decreases from the stock movement ledger.',
-  'procurement-summary': 'Shipment status, receiving totals, and discrepancy quantities across procurement activity.',
+  'product-movements': 'Product-level movement counts and quantity increases/decreases for the selected filters.',
+  'movement-ledger': 'Chronological stock transactions with location, actor, movement type, reason, and source reference.',
+  'inventory-variance': 'Cycle-count variances and posted manual stock adjustments for inventory accuracy review.',
+  'procurement-summary': 'Shipment status, receiving totals, and discrepancy quantities across the selected procurement activity.',
+  'purchasing-spend': 'Approved, matched, and paid supplier-invoice lines with quantities, costs, and currencies kept explicit.',
   'low-stock': 'Products currently below their configured minimum stock level, including shortage and supplier context.',
+  'slow-moving': 'Positive stock that has had no stock-movement activity within the selected inactivity threshold.',
   'usage-summary': 'Non-reversed inventory consumption summarized by product for the selected period.',
-  'supplier-performance': 'Supplier shipment volumes, receiving status, overdue deliveries, and latest delivery date.',
+  'supplier-performance': 'Supplier shipment volumes, receiving status, overdue deliveries, and latest delivery date for the selected period.',
   'expiry-risk': 'Positive-balance lots that are already expired or will expire within the selected horizon.',
   forecast: 'Usage-based demand forecast from recent outbound stock movements over the last 30 days.'
 };
@@ -86,7 +134,7 @@ function getReportLabel(report: ReportTab): string {
   return REPORT_LABELS[report];
 }
 
-function getReportFilename(report: ReportTab, format: ExportFormat = 'csv'): string {
+function getReportFilename(report: ReportTab, format: ExportFormat): string {
   const stem = getReportLabel(report).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return `${stem}.${format}`;
 }
@@ -102,7 +150,8 @@ function getReportPanelId(tab: ReportTab): string {
 function buildQueryString(params: Record<string, string | number | null | undefined>): string {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') searchParams.set(key, String(value));
+    const normalized = typeof value === 'string' ? value.trim() : value;
+    if (normalized !== null && normalized !== undefined && normalized !== '') searchParams.set(key, String(normalized));
   });
   const query = searchParams.toString();
   return query ? `?${query}` : '';
@@ -119,6 +168,12 @@ function toNumber(value: number | string | null | undefined): number {
 
 function formatNumber(value: number | string | null | undefined, maximumFractionDigits = 2): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(toNumber(value));
+}
+
+function formatSignedQuantity(value: number | string | null | undefined, unit?: string | null): string {
+  const numeric = toNumber(value);
+  const prefix = numeric > 0 ? '+' : '';
+  return `${prefix}${formatNumber(numeric)} ${unit || 'units'}`;
 }
 
 function formatCostAmount(value: number | string | null | undefined, currency?: string | null): string {
@@ -177,6 +232,19 @@ function isPermissionDeniedError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403 && !isFeatureEntitlementError(error);
 }
 
+function humanizeMovementType(value: string | null | undefined): string {
+  if (!value) return '-';
+  const configured = MOVEMENT_TYPE_OPTIONS.find(([key]) => key === value);
+  if (configured) return configured[1];
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatReference(type: string | null | undefined, id: string | null | undefined): string {
+  if (!id) return '-';
+  const label = type === 'shipment' ? 'Shipment' : type === 'stock_transfer' ? 'Transfer' : 'Reference';
+  return `${label}: ${id.slice(0, 8)}…`;
+}
+
 type InventoryValuationRow = {
   product_id: string;
   product_name: string;
@@ -217,6 +285,40 @@ type ProductMovementRow = {
   last_movement_at?: string | null;
 };
 
+type MovementLedgerRow = {
+  movement_id: string;
+  created_at: string;
+  product_id: string;
+  product_name: string;
+  product_category?: string | null;
+  product_unit?: string | null;
+  storage_location_name?: string | null;
+  quantity_change: number | string;
+  movement_type?: string | null;
+  reason?: string | null;
+  receiving_note?: string | null;
+  actor_name?: string | null;
+  reference_type?: string | null;
+  reference_id?: string | null;
+};
+
+type InventoryVarianceRow = {
+  record_type: string;
+  record_id: string;
+  product_id: string;
+  product_name: string;
+  product_category?: string | null;
+  product_unit?: string | null;
+  storage_location_name?: string | null;
+  expected_quantity?: number | string | null;
+  counted_quantity?: number | string | null;
+  variance_quantity?: number | string | null;
+  status?: string | null;
+  reason?: string | null;
+  actor_name?: string | null;
+  created_at: string;
+};
+
 type ProcurementQuantityByUnit = Record<string, {
   ordered_quantity: number | string;
   received_quantity: number | string;
@@ -240,6 +342,23 @@ type ProcurementSummaryReport = {
   };
 };
 
+type PurchasingSpendRow = {
+  invoice_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  invoice_status: string;
+  supplier_id: string;
+  supplier_name: string;
+  product_id: string;
+  product_name: string;
+  product_category?: string | null;
+  product_unit?: string | null;
+  quantity: number | string;
+  unit_cost: number | string;
+  line_amount: number | string;
+  currency?: string | null;
+};
+
 type LowStockRow = {
   product_id: string;
   product_name: string;
@@ -249,6 +368,18 @@ type LowStockRow = {
   current_stock: number | string;
   shortage_quantity: number | string;
   supplier_name?: string | null;
+};
+
+type SlowMovingRow = {
+  product_id: string;
+  product_name: string;
+  product_category?: string | null;
+  product_unit?: string | null;
+  current_stock: number | string;
+  last_movement_at?: string | null;
+  days_since_movement?: number | string | null;
+  supplier_name?: string | null;
+  stock_updated_at?: string | null;
 };
 
 type UsageSummaryRow = {
@@ -297,29 +428,41 @@ type ForecastRow = {
   avg_daily_usage: number | string;
 };
 
-async function fetchInventoryValuation(): Promise<InventoryValuationReport> {
-  return apiRequest<InventoryValuationReport>('/reports/inventory-valuation');
+async function fetchInventoryValuation(filters: Pick<TextFilters, 'category' | 'location'> = { category: '', location: '' }): Promise<InventoryValuationReport> {
+  return apiRequest<InventoryValuationReport>(`/reports/inventory-valuation${buildQueryString(filters)}`);
 }
-async function fetchStockByLocation(category: string): Promise<StockByLocationRow[]> {
-  return apiRequest<StockByLocationRow[]>(`/reports/stock-by-location${buildQueryString({ category })}`);
+async function fetchStockByLocation(filters: Pick<TextFilters, 'category' | 'location'>): Promise<StockByLocationRow[]> {
+  return apiRequest<StockByLocationRow[]>(`/reports/stock-by-location${buildQueryString(filters)}`);
 }
-async function fetchProductMovements(limit: number): Promise<ProductMovementRow[]> {
-  return apiRequest<ProductMovementRow[]>(`/reports/product-movements${buildQueryString({ limit })}`);
+async function fetchProductMovements(filters: DateRangeFilters & Pick<TextFilters, 'category' | 'product'> & { limit: number }): Promise<ProductMovementRow[]> {
+  return apiRequest<ProductMovementRow[]>(`/reports/product-movements${buildQueryString(filters)}`);
 }
-async function fetchProcurementSummary(): Promise<ProcurementSummaryReport> {
-  return apiRequest<ProcurementSummaryReport>('/reports/procurement-summary');
+async function fetchMovementLedger(filters: DateRangeFilters & Pick<TextFilters, 'product' | 'location'> & { movement_type: string; limit: number }): Promise<MovementLedgerRow[]> {
+  return apiRequest<MovementLedgerRow[]>(`/reports/movement-ledger${buildQueryString(filters)}`);
 }
-async function fetchLowStock(): Promise<LowStockRow[]> {
-  return apiRequest<LowStockRow[]>('/reports/low-stock');
+async function fetchInventoryVariance(filters: DateRangeFilters & Pick<TextFilters, 'product' | 'location'> & { limit: number }): Promise<InventoryVarianceRow[]> {
+  return apiRequest<InventoryVarianceRow[]>(`/reports/inventory-variance${buildQueryString(filters)}`);
 }
-async function fetchUsageSummary(days: number): Promise<UsageSummaryRow[]> {
-  return apiRequest<UsageSummaryRow[]>(`/reports/usage-summary${buildQueryString({ days })}`);
+async function fetchProcurementSummary(filters: DateRangeFilters & Pick<TextFilters, 'supplier'> = { from: '', to: '', supplier: '' }): Promise<ProcurementSummaryReport> {
+  return apiRequest<ProcurementSummaryReport>(`/reports/procurement-summary${buildQueryString(filters)}`);
 }
-async function fetchSupplierPerformance(): Promise<SupplierPerformanceRow[]> {
-  return apiRequest<SupplierPerformanceRow[]>('/reports/supplier-performance');
+async function fetchPurchasingSpend(filters: DateRangeFilters & Pick<TextFilters, 'supplier' | 'category' | 'product'> & { limit: number }): Promise<PurchasingSpendRow[]> {
+  return apiRequest<PurchasingSpendRow[]>(`/reports/purchasing-spend${buildQueryString(filters)}`);
 }
-async function fetchExpiryRisk(days: number): Promise<ExpiryRiskRow[]> {
-  return apiRequest<ExpiryRiskRow[]>(`/reports/expiry-risk${buildQueryString({ days })}`);
+async function fetchLowStock(filters: Pick<TextFilters, 'category' | 'supplier'> = { category: '', supplier: '' }): Promise<LowStockRow[]> {
+  return apiRequest<LowStockRow[]>(`/reports/low-stock${buildQueryString(filters)}`);
+}
+async function fetchSlowMoving(filters: Pick<TextFilters, 'category' | 'product'> & { days: number; limit: number }): Promise<SlowMovingRow[]> {
+  return apiRequest<SlowMovingRow[]>(`/reports/slow-moving${buildQueryString(filters)}`);
+}
+async function fetchUsageSummary(filters: DateRangeFilters & Pick<TextFilters, 'category' | 'product' | 'location'> & { days: number }): Promise<UsageSummaryRow[]> {
+  return apiRequest<UsageSummaryRow[]>(`/reports/usage-summary${buildQueryString(filters)}`);
+}
+async function fetchSupplierPerformance(filters: DateRangeFilters & Pick<TextFilters, 'supplier'>): Promise<SupplierPerformanceRow[]> {
+  return apiRequest<SupplierPerformanceRow[]>(`/reports/supplier-performance${buildQueryString(filters)}`);
+}
+async function fetchExpiryRisk(filters: Pick<TextFilters, 'category' | 'location'> & { days: number }): Promise<ExpiryRiskRow[]> {
+  return apiRequest<ExpiryRiskRow[]>(`/reports/expiry-risk${buildQueryString(filters)}`);
 }
 async function fetchForecast(): Promise<ForecastRow[]> {
   return apiRequest<ForecastRow[]>('/reports/forecast');
@@ -351,6 +494,49 @@ function ReportPanel({ tab, actions, filters, children }: {
   );
 }
 
+function TextFilterField({ label, value, placeholder, onChange, disabled, compact = true }: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <label className={`reports-field${compact ? ' reports-field--compact' : ''}`}>
+      <span>{label}</span>
+      <input
+        value={value}
+        maxLength={MAX_REPORT_FILTER_LENGTH}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+      />
+    </label>
+  );
+}
+
+function DateRangeFields({ from, to, onFromChange, onToChange, disabled }: {
+  from: string;
+  to: string;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <>
+      <label className="reports-field reports-field--date">
+        <span>From</span>
+        <input type="date" value={from} max={to || undefined} onChange={(event) => onFromChange(event.target.value)} disabled={disabled} />
+      </label>
+      <label className="reports-field reports-field--date">
+        <span>To</span>
+        <input type="date" value={to} min={from || undefined} onChange={(event) => onToChange(event.target.value)} disabled={disabled} />
+      </label>
+    </>
+  );
+}
+
 function EmptyState({ message }: { message: string }) {
   return <div className="app-empty-state reports-empty">{message}</div>;
 }
@@ -370,15 +556,22 @@ function RiskBadge({ status }: { status: string }) {
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
-  const [locationCategoryFilter, setLocationCategoryFilter] = useState('');
-  const [movementLimit, setMovementLimit] = useState(50);
-  const [usageDays, setUsageDays] = useState(30);
-  const [expiryDays, setExpiryDays] = useState(90);
+  const [inventoryFilters, setInventoryFilters] = useState({ category: '', location: '' });
+  const [stockFilters, setStockFilters] = useState({ category: '', location: '' });
+  const [movementFilters, setMovementFilters] = useState({ from: '', to: '', category: '', product: '', limit: 50 });
+  const [ledgerFilters, setLedgerFilters] = useState({ from: '', to: '', product: '', location: '', movement_type: '', limit: 100 });
+  const [varianceFilters, setVarianceFilters] = useState({ from: '', to: '', product: '', location: '', limit: 100 });
+  const [procurementFilters, setProcurementFilters] = useState({ from: '', to: '', supplier: '' });
+  const [spendFilters, setSpendFilters] = useState({ from: '', to: '', supplier: '', category: '', product: '', limit: 100 });
+  const [lowStockFilters, setLowStockFilters] = useState({ category: '', supplier: '' });
+  const [slowFilters, setSlowFilters] = useState({ days: 90, category: '', product: '', limit: 100 });
+  const [usageFilters, setUsageFilters] = useState({ days: 30, from: '', to: '', category: '', product: '', location: '' });
+  const [supplierFilters, setSupplierFilters] = useState({ from: '', to: '', supplier: '' });
+  const [expiryFilters, setExpiryFilters] = useState({ days: 90, category: '', location: '' });
   const [downloadingReport, setDownloadingReport] = useState<ReportTab | null>(null);
   const [downloadFormat, setDownloadFormat] = useState<ExportFormat | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadInfo, setDownloadInfo] = useState<{ report: ReportTab; format: ExportFormat; metadata: ApiDownloadMetadata } | null>(null);
-  const normalizedLocationCategoryFilter = useMemo(() => locationCategoryFilter.trim(), [locationCategoryFilter]);
 
   const { canViewInsights } = getRoleCapabilities();
   const currentAccessRoleLabel = getCurrentAccessRoleLabel();
@@ -399,20 +592,105 @@ export default function ReportsPage() {
   const forecastFeatureReady = reportsFeatureReady && canViewInsights &&
     (subscriptionAccessQuery.isSuccess ? forecastingFeatureAllowed : true);
 
-  const inventoryValuationQuery = useQuery({ queryKey: ['reports', 'inventory-valuation'], queryFn: fetchInventoryValuation, enabled: reportsFeatureReady });
-  const stockByLocationQuery = useQuery({ queryKey: ['reports', 'stock-by-location', normalizedLocationCategoryFilter], queryFn: () => fetchStockByLocation(normalizedLocationCategoryFilter), enabled: reportsFeatureReady && activeTab === 'stock-by-location' });
-  const productMovementsQuery = useQuery({ queryKey: ['reports', 'product-movements', movementLimit], queryFn: () => fetchProductMovements(movementLimit), enabled: reportsFeatureReady && activeTab === 'product-movements' });
-  const procurementSummaryQuery = useQuery({ queryKey: ['reports', 'procurement-summary'], queryFn: fetchProcurementSummary, enabled: reportsFeatureReady });
-  const lowStockQuery = useQuery({ queryKey: ['reports', 'low-stock'], queryFn: fetchLowStock, enabled: reportsFeatureReady });
-  const usageSummaryQuery = useQuery({ queryKey: ['reports', 'usage-summary', usageDays], queryFn: () => fetchUsageSummary(usageDays), enabled: reportsFeatureReady && activeTab === 'usage-summary' });
-  const supplierPerformanceQuery = useQuery({ queryKey: ['reports', 'supplier-performance'], queryFn: fetchSupplierPerformance, enabled: reportsFeatureReady && activeTab === 'supplier-performance' });
-  const expiryRiskQuery = useQuery({ queryKey: ['reports', 'expiry-risk', expiryDays], queryFn: () => fetchExpiryRisk(expiryDays), enabled: reportsFeatureReady && activeTab === 'expiry-risk' });
-  const forecastQuery = useQuery({ queryKey: ['reports', 'forecast'], queryFn: fetchForecast, enabled: forecastFeatureReady && activeTab === 'forecast' });
+  // Overview cards deliberately use unfiltered queries so report filters never distort page-level KPIs.
+  const inventoryOverviewQuery = useQuery({
+    queryKey: ['reports', 'overview', 'inventory-valuation'],
+    queryFn: () => fetchInventoryValuation(),
+    enabled: reportsFeatureReady
+  });
+  const procurementOverviewQuery = useQuery({
+    queryKey: ['reports', 'overview', 'procurement-summary'],
+    queryFn: () => fetchProcurementSummary(),
+    enabled: reportsFeatureReady
+  });
+  const lowStockOverviewQuery = useQuery({
+    queryKey: ['reports', 'overview', 'low-stock'],
+    queryFn: () => fetchLowStock(),
+    enabled: reportsFeatureReady
+  });
+
+  const inventoryValuationQuery = useQuery({
+    queryKey: ['reports', 'inventory-valuation', inventoryFilters],
+    queryFn: () => fetchInventoryValuation(inventoryFilters),
+    enabled: reportsFeatureReady && activeTab === 'inventory-valuation'
+  });
+  const stockByLocationQuery = useQuery({
+    queryKey: ['reports', 'stock-by-location', stockFilters],
+    queryFn: () => fetchStockByLocation(stockFilters),
+    enabled: reportsFeatureReady && activeTab === 'stock-by-location'
+  });
+  const productMovementsQuery = useQuery({
+    queryKey: ['reports', 'product-movements', movementFilters],
+    queryFn: () => fetchProductMovements(movementFilters),
+    enabled: reportsFeatureReady && activeTab === 'product-movements'
+  });
+  const movementLedgerQuery = useQuery({
+    queryKey: ['reports', 'movement-ledger', ledgerFilters],
+    queryFn: () => fetchMovementLedger(ledgerFilters),
+    enabled: reportsFeatureReady && activeTab === 'movement-ledger'
+  });
+  const inventoryVarianceQuery = useQuery({
+    queryKey: ['reports', 'inventory-variance', varianceFilters],
+    queryFn: () => fetchInventoryVariance(varianceFilters),
+    enabled: reportsFeatureReady && activeTab === 'inventory-variance'
+  });
+  const procurementSummaryQuery = useQuery({
+    queryKey: ['reports', 'procurement-summary', procurementFilters],
+    queryFn: () => fetchProcurementSummary(procurementFilters),
+    enabled: reportsFeatureReady && activeTab === 'procurement-summary'
+  });
+  const purchasingSpendQuery = useQuery({
+    queryKey: ['reports', 'purchasing-spend', spendFilters],
+    queryFn: () => fetchPurchasingSpend(spendFilters),
+    enabled: reportsFeatureReady && activeTab === 'purchasing-spend'
+  });
+  const lowStockQuery = useQuery({
+    queryKey: ['reports', 'low-stock', lowStockFilters],
+    queryFn: () => fetchLowStock(lowStockFilters),
+    enabled: reportsFeatureReady && activeTab === 'low-stock'
+  });
+  const slowMovingQuery = useQuery({
+    queryKey: ['reports', 'slow-moving', slowFilters],
+    queryFn: () => fetchSlowMoving(slowFilters),
+    enabled: reportsFeatureReady && activeTab === 'slow-moving'
+  });
+  const usageSummaryQuery = useQuery({
+    queryKey: ['reports', 'usage-summary', usageFilters],
+    queryFn: () => fetchUsageSummary(usageFilters),
+    enabled: reportsFeatureReady && activeTab === 'usage-summary'
+  });
+  const supplierPerformanceQuery = useQuery({
+    queryKey: ['reports', 'supplier-performance', supplierFilters],
+    queryFn: () => fetchSupplierPerformance(supplierFilters),
+    enabled: reportsFeatureReady && activeTab === 'supplier-performance'
+  });
+  const expiryRiskQuery = useQuery({
+    queryKey: ['reports', 'expiry-risk', expiryFilters],
+    queryFn: () => fetchExpiryRisk(expiryFilters),
+    enabled: reportsFeatureReady && activeTab === 'expiry-risk'
+  });
+  const forecastQuery = useQuery({
+    queryKey: ['reports', 'forecast'],
+    queryFn: fetchForecast,
+    enabled: forecastFeatureReady && activeTab === 'forecast'
+  });
 
   const reportErrors = [
-    inventoryValuationQuery.error, stockByLocationQuery.error, productMovementsQuery.error,
-    procurementSummaryQuery.error, lowStockQuery.error, usageSummaryQuery.error,
-    supplierPerformanceQuery.error, expiryRiskQuery.error
+    inventoryOverviewQuery.error,
+    procurementOverviewQuery.error,
+    lowStockOverviewQuery.error,
+    inventoryValuationQuery.error,
+    stockByLocationQuery.error,
+    productMovementsQuery.error,
+    movementLedgerQuery.error,
+    inventoryVarianceQuery.error,
+    procurementSummaryQuery.error,
+    purchasingSpendQuery.error,
+    lowStockQuery.error,
+    slowMovingQuery.error,
+    usageSummaryQuery.error,
+    supplierPerformanceQuery.error,
+    expiryRiskQuery.error
   ];
   const reportsDeniedByFeature = reportErrors.some(isFeatureEntitlementError);
   const anyForbidden = reportErrors.some(isPermissionDeniedError);
@@ -427,7 +705,11 @@ export default function ReportsPage() {
   const inventoryRows = inventoryValuationQuery.data?.rows ?? [];
   const locationRows = stockByLocationQuery.data ?? [];
   const movementRows = productMovementsQuery.data ?? [];
+  const ledgerRows = movementLedgerQuery.data ?? [];
+  const varianceRows = inventoryVarianceQuery.data ?? [];
+  const spendRows = purchasingSpendQuery.data ?? [];
   const lowStockRows = lowStockQuery.data ?? [];
+  const slowRows = slowMovingQuery.data ?? [];
   const usageRows = usageSummaryQuery.data ?? [];
   const supplierRows = supplierPerformanceQuery.data ?? [];
   const expiryRows = expiryRiskQuery.data ?? [];
@@ -437,6 +719,10 @@ export default function ReportsPage() {
   const availableReportCount = forecastFeatureReady ? REPORT_TABS.length : REPORT_TABS.length - 1;
   const activeLabel = REPORT_TABS.find((item) => item.key === activeTab)?.label || 'Report';
   const isExporting = downloadingReport !== null;
+  const keyboardTabs = useMemo(
+    () => REPORT_TABS.filter((item) => item.key !== 'forecast' || forecastFeatureReady),
+    [forecastFeatureReady]
+  );
 
   const clearDownloadStatus = () => {
     setDownloadError(null);
@@ -445,6 +731,7 @@ export default function ReportsPage() {
 
   const changeActiveTab = (tab: ReportTab) => {
     if (isExporting) return;
+    if (tab === 'forecast' && !forecastFeatureReady) return;
     clearDownloadStatus();
     setActiveTab(tab);
   };
@@ -455,32 +742,35 @@ export default function ReportsPage() {
 
   const handleReportTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: ReportTab) => {
     if (isExporting) return;
-    const currentIndex = REPORT_TABS.findIndex((item) => item.key === tab);
+    const currentIndex = keyboardTabs.findIndex((item) => item.key === tab);
     if (currentIndex < 0) return;
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % REPORT_TABS.length;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + REPORT_TABS.length) % REPORT_TABS.length;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % keyboardTabs.length;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + keyboardTabs.length) % keyboardTabs.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = REPORT_TABS.length - 1;
+    if (event.key === 'End') nextIndex = keyboardTabs.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    const nextTab = REPORT_TABS[nextIndex].key;
+    const nextTab = keyboardTabs[nextIndex].key;
     changeActiveTab(nextTab);
     focusReportTab(nextTab);
   };
 
   const getExportPath = (report: ReportTab, format: ExportFormat): string => {
-    const common = { format };
     switch (report) {
-      case 'inventory-valuation': return `/reports/inventory-valuation${buildQueryString(common)}`;
-      case 'stock-by-location': return `/reports/stock-by-location${buildQueryString({ category: normalizedLocationCategoryFilter, ...common })}`;
-      case 'product-movements': return `/reports/product-movements${buildQueryString({ limit: movementLimit, ...common })}`;
-      case 'procurement-summary': return `/reports/procurement-summary${buildQueryString(common)}`;
-      case 'low-stock': return `/reports/low-stock${buildQueryString(common)}`;
-      case 'usage-summary': return `/reports/usage-summary${buildQueryString({ days: usageDays, ...common })}`;
-      case 'supplier-performance': return `/reports/supplier-performance${buildQueryString(common)}`;
-      case 'expiry-risk': return `/reports/expiry-risk${buildQueryString({ days: expiryDays, ...common })}`;
-      case 'forecast': return `/reports/forecast${buildQueryString(common)}`;
+      case 'inventory-valuation': return `/reports/inventory-valuation${buildQueryString({ ...inventoryFilters, format })}`;
+      case 'stock-by-location': return `/reports/stock-by-location${buildQueryString({ ...stockFilters, format })}`;
+      case 'product-movements': return `/reports/product-movements${buildQueryString({ ...movementFilters, format })}`;
+      case 'movement-ledger': return `/reports/movement-ledger${buildQueryString({ ...ledgerFilters, format })}`;
+      case 'inventory-variance': return `/reports/inventory-variance${buildQueryString({ ...varianceFilters, format })}`;
+      case 'procurement-summary': return `/reports/procurement-summary${buildQueryString({ ...procurementFilters, format })}`;
+      case 'purchasing-spend': return `/reports/purchasing-spend${buildQueryString({ ...spendFilters, format })}`;
+      case 'low-stock': return `/reports/low-stock${buildQueryString({ ...lowStockFilters, format })}`;
+      case 'slow-moving': return `/reports/slow-moving${buildQueryString({ ...slowFilters, format })}`;
+      case 'usage-summary': return `/reports/usage-summary${buildQueryString({ ...usageFilters, format })}`;
+      case 'supplier-performance': return `/reports/supplier-performance${buildQueryString({ ...supplierFilters, format })}`;
+      case 'expiry-risk': return `/reports/expiry-risk${buildQueryString({ ...expiryFilters, format })}`;
+      case 'forecast': return `/reports/forecast${buildQueryString({ format })}`;
     }
   };
 
@@ -536,8 +826,12 @@ export default function ReportsPage() {
       case 'inventory-valuation': void inventoryValuationQuery.refetch(); break;
       case 'stock-by-location': void stockByLocationQuery.refetch(); break;
       case 'product-movements': void productMovementsQuery.refetch(); break;
+      case 'movement-ledger': void movementLedgerQuery.refetch(); break;
+      case 'inventory-variance': void inventoryVarianceQuery.refetch(); break;
       case 'procurement-summary': void procurementSummaryQuery.refetch(); break;
+      case 'purchasing-spend': void purchasingSpendQuery.refetch(); break;
       case 'low-stock': void lowStockQuery.refetch(); break;
+      case 'slow-moving': void slowMovingQuery.refetch(); break;
       case 'usage-summary': void usageSummaryQuery.refetch(); break;
       case 'supplier-performance': void supplierPerformanceQuery.refetch(); break;
       case 'expiry-risk': void expiryRiskQuery.refetch(); break;
@@ -561,6 +855,11 @@ export default function ReportsPage() {
       </button>
     </>
   );
+
+  const updateAndClear = <T extends object>(setter: (value: T | ((previous: T) => T)) => void, key: keyof T, value: T[keyof T]) => {
+    clearDownloadStatus();
+    setter((previous) => ({ ...previous, [key]: value }));
+  };
 
   if (anyForbidden) {
     return (
@@ -591,7 +890,7 @@ export default function ReportsPage() {
         iconPath="/reports"
         eyebrow="Reporting & exports"
         title="Management reporting workspace"
-        description="Run tenant-scoped inventory, procurement, usage, supplier, expiry, and forecasting reports from live database records. Every report can be printed or exported for offline business use."
+        description="Run tenant-scoped inventory, procurement, usage, supplier, expiry, variance, spend, and forecasting reports from live database records. Every report can be printed or exported for offline business use."
         meta={
           <>
             <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
@@ -606,33 +905,30 @@ export default function ReportsPage() {
         <OperationalWorkspaceStatCard label="Available reports" value={availableReportCount} helper="Operational and management report types" iconPath="/reports" tone="blue" />
         <OperationalWorkspaceStatCard
           label="Estimated inventory value"
-          value={formatCostAmount(inventoryValuationQuery.data?.totals.estimated_inventory_value, inventoryValuationQuery.data?.totals.currency_code)}
-          helper={`${inventoryValuationQuery.data?.totals.row_count ?? 0} valuation rows`}
+          value={formatCostAmount(inventoryOverviewQuery.data?.totals.estimated_inventory_value, inventoryOverviewQuery.data?.totals.currency_code)}
+          helper={`${inventoryOverviewQuery.data?.totals.row_count ?? 0} valuation rows`}
           iconPath="/stock"
-          loading={inventoryValuationQuery.isLoading}
+          loading={inventoryOverviewQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
           label="Low-stock products"
-          value={lowStockRows.length}
+          value={lowStockOverviewQuery.data?.length ?? 0}
           helper="Products below configured minimum"
           iconPath="/replenishment-planning"
-          tone={lowStockRows.length > 0 ? 'warn' : 'good'}
-          loading={lowStockQuery.isLoading}
+          tone={(lowStockOverviewQuery.data?.length ?? 0) > 0 ? 'warn' : 'good'}
+          loading={lowStockOverviewQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
           label="Overdue shipments"
-          value={formatNumber(procurementSummary?.shipments.overdue_shipments, 0)}
+          value={formatNumber(procurementOverviewQuery.data?.shipments.overdue_shipments, 0)}
           helper="Pending or partial past delivery date"
           iconPath="/shipments"
-          tone={toNumber(procurementSummary?.shipments.overdue_shipments) > 0 ? 'warn' : 'good'}
-          loading={procurementSummaryQuery.isLoading}
+          tone={toNumber(procurementOverviewQuery.data?.shipments.overdue_shipments) > 0 ? 'warn' : 'good'}
+          loading={procurementOverviewQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs
-        ariaLabel="Reports"
-        hint={isExporting ? `Exporting ${getReportLabel(downloadingReport)}…` : 'Choose the report you need.'}
-      >
+      <OperationalWorkspaceTabs ariaLabel="Reports">
         {REPORT_TABS.map((tab) => {
           const forecastDisabled = tab.key === 'forecast' && !forecastFeatureReady;
           return (
@@ -673,12 +969,22 @@ export default function ReportsPage() {
       ) : null}
 
       {activeTab === 'inventory-valuation' ? (
-        <ReportPanel tab="inventory-valuation" actions={actionButtons('inventory-valuation', inventoryValuationQuery.isFetching)}>
+        <ReportPanel
+          tab="inventory-valuation"
+          actions={actionButtons('inventory-valuation', inventoryValuationQuery.isFetching)}
+          filters={
+            <>
+              <TextFilterField label="Category" value={inventoryFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'category', value)} />
+              <TextFilterField label="Location" value={inventoryFilters.location} placeholder="All locations" disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'location', value)} />
+              <div className="reports-filter-note">Filters apply to the on-screen report and PDF/CSV exports.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={inventoryValuationQuery.dataUpdatedAt} />
           <p className="reports-note">Foreign-currency receipt costs are preserved separately and are not silently converted.</p>
           {inventoryValuationQuery.isLoading ? <div>Loading inventory valuation…</div> : null}
           {inventoryValuationQuery.isError ? <ErrorState message={`Failed to load inventory valuation: ${getReadableError(inventoryValuationQuery.error)}`} /> : null}
-          {!inventoryValuationQuery.isLoading && !inventoryValuationQuery.isError && inventoryRows.length === 0 ? <EmptyState message="No stocked inventory rows are available for valuation." /> : null}
+          {!inventoryValuationQuery.isLoading && !inventoryValuationQuery.isError && inventoryRows.length === 0 ? <EmptyState message="No stocked inventory rows matched these filters." /> : null}
           {inventoryRows.length > 0 ? (
             <div className="reports-table-wrap"><table className="reports-table"><thead><tr>
               <th>Product</th><th>Category</th><th>Location</th><th>Quantity</th><th>Unit cost</th><th>Cost source</th><th>Estimated value</th><th>Updated</th>
@@ -695,12 +1001,17 @@ export default function ReportsPage() {
         <ReportPanel
           tab="stock-by-location"
           actions={actionButtons('stock-by-location', stockByLocationQuery.isFetching)}
-          filters={<label className="reports-field"><span>Category filter</span><input value={locationCategoryFilter} maxLength={MAX_REPORT_FILTER_LENGTH} placeholder="All categories" onChange={(event) => { clearDownloadStatus(); setLocationCategoryFilter(event.target.value); }} disabled={isExporting} /><small>Optional. Exact category match; maximum {MAX_REPORT_FILTER_LENGTH} characters.</small></label>}
+          filters={
+            <>
+              <TextFilterField label="Category" value={stockFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'category', value)} />
+              <TextFilterField label="Location" value={stockFilters.location} placeholder="All locations" disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'location', value)} />
+            </>
+          }
         >
           <LastRefreshed timestamp={stockByLocationQuery.dataUpdatedAt} />
           {stockByLocationQuery.isLoading ? <div>Loading stock by location…</div> : null}
           {stockByLocationQuery.isError ? <ErrorState message={`Failed to load stock by location: ${getReadableError(stockByLocationQuery.error)}`} /> : null}
-          {!stockByLocationQuery.isLoading && !stockByLocationQuery.isError && locationRows.length === 0 ? <EmptyState message="No stock locations matched this report." /> : null}
+          {!stockByLocationQuery.isLoading && !stockByLocationQuery.isError && locationRows.length === 0 ? <EmptyState message="No stock locations matched these filters." /> : null}
           {locationRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Location</th><th>Temperature zone</th><th>Stock rows</th><th>Quantity by unit</th></tr></thead><tbody>
             {locationRows.map((row) => <tr key={row.storage_location_id}><td className="reports-strong">{row.storage_location_name}</td><td>{row.temperature_zone || '-'}</td><td>{formatNumber(row.stock_row_count, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)}</td></tr>)}
           </tbody></table></div> : null}
@@ -711,20 +1022,85 @@ export default function ReportsPage() {
         <ReportPanel
           tab="product-movements"
           actions={actionButtons('product-movements', productMovementsQuery.isFetching)}
-          filters={<label className="reports-field reports-field--compact"><span>Result limit</span><select value={movementLimit} onChange={(event) => { clearDownloadStatus(); setMovementLimit(Number(event.target.value)); }} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select><small>Maximum 500 product rows per report.</small></label>}
+          filters={
+            <>
+              <DateRangeFields from={movementFilters.from} to={movementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setMovementFilters, 'from', value)} onToChange={(value) => updateAndClear(setMovementFilters, 'to', value)} />
+              <TextFilterField label="Category" value={movementFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'category', value)} />
+              <TextFilterField label="Product" value={movementFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={movementFilters.limit} onChange={(event) => updateAndClear(setMovementFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            </>
+          }
         >
           <LastRefreshed timestamp={productMovementsQuery.dataUpdatedAt} />
           {productMovementsQuery.isLoading ? <div>Loading product movements…</div> : null}
           {productMovementsQuery.isError ? <ErrorState message={`Failed to load product movements: ${getReadableError(productMovementsQuery.error)}`} /> : null}
-          {!productMovementsQuery.isLoading && !productMovementsQuery.isError && movementRows.length === 0 ? <EmptyState message="No products are available for the movement report." /> : null}
+          {!productMovementsQuery.isLoading && !productMovementsQuery.isError && movementRows.length === 0 ? <EmptyState message="No products matched the movement report filters." /> : null}
           {movementRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Category</th><th>Movements</th><th>Total increase</th><th>Total decrease</th><th>Last movement</th></tr></thead><tbody>
             {movementRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.movement_count, 0)}</td><td>{formatNumber(row.total_increase)} {row.product_unit || 'units'}</td><td>{formatNumber(row.total_decrease)} {row.product_unit || 'units'}</td><td>{formatDateTime(row.last_movement_at)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
 
+      {activeTab === 'movement-ledger' ? (
+        <ReportPanel
+          tab="movement-ledger"
+          actions={actionButtons('movement-ledger', movementLedgerQuery.isFetching)}
+          filters={
+            <>
+              <DateRangeFields from={ledgerFilters.from} to={ledgerFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setLedgerFilters, 'from', value)} onToChange={(value) => updateAndClear(setLedgerFilters, 'to', value)} />
+              <label className="reports-field reports-field--compact"><span>Movement type</span><select value={ledgerFilters.movement_type} onChange={(event) => updateAndClear(setLedgerFilters, 'movement_type', event.target.value)} disabled={isExporting}>{MOVEMENT_TYPE_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{label}</option>)}</select></label>
+              <TextFilterField label="Product" value={ledgerFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'product', value)} />
+              <TextFilterField label="Location" value={ledgerFilters.location} placeholder="Any location" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={ledgerFilters.limit} onChange={(event) => updateAndClear(setLedgerFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            </>
+          }
+        >
+          <LastRefreshed timestamp={movementLedgerQuery.dataUpdatedAt} />
+          {movementLedgerQuery.isLoading ? <div>Loading movement ledger…</div> : null}
+          {movementLedgerQuery.isError ? <ErrorState message={`Failed to load movement ledger: ${getReadableError(movementLedgerQuery.error)}`} /> : null}
+          {!movementLedgerQuery.isLoading && !movementLedgerQuery.isError && ledgerRows.length === 0 ? <EmptyState message="No stock movements matched these filters." /> : null}
+          {ledgerRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Date / time</th><th>Product</th><th>Location</th><th>Change</th><th>Movement</th><th>Actor</th><th>Reason / reference</th></tr></thead><tbody>
+            {ledgerRows.map((row) => <tr key={row.movement_id}><td>{formatDateTime(row.created_at)}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{row.storage_location_name || '-'}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, row.product_unit)}</td><td>{humanizeMovementType(row.movement_type)}</td><td>{row.actor_name || 'System / unknown'}</td><td>{row.reason || row.receiving_note || '-'}<span className="reports-subtext">{formatReference(row.reference_type, row.reference_id)}</span></td></tr>)}
+          </tbody></table></div> : null}
+        </ReportPanel>
+      ) : null}
+
+      {activeTab === 'inventory-variance' ? (
+        <ReportPanel
+          tab="inventory-variance"
+          actions={actionButtons('inventory-variance', inventoryVarianceQuery.isFetching)}
+          filters={
+            <>
+              <DateRangeFields from={varianceFilters.from} to={varianceFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setVarianceFilters, 'from', value)} onToChange={(value) => updateAndClear(setVarianceFilters, 'to', value)} />
+              <TextFilterField label="Product" value={varianceFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
+              <TextFilterField label="Location" value={varianceFilters.location} placeholder="Any location" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            </>
+          }
+        >
+          <LastRefreshed timestamp={inventoryVarianceQuery.dataUpdatedAt} />
+          <p className="reports-note">Cycle counts show expected versus counted stock. Manual adjustments are shown as posted variance records.</p>
+          {inventoryVarianceQuery.isLoading ? <div>Loading count and adjustment variance…</div> : null}
+          {inventoryVarianceQuery.isError ? <ErrorState message={`Failed to load count variance: ${getReadableError(inventoryVarianceQuery.error)}`} /> : null}
+          {!inventoryVarianceQuery.isLoading && !inventoryVarianceQuery.isError && varianceRows.length === 0 ? <EmptyState message="No cycle-count or manual-adjustment records matched these filters." /> : null}
+          {varianceRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Date / time</th><th>Record</th><th>Product</th><th>Location</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status / actor</th></tr></thead><tbody>
+            {varianceRows.map((row) => <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at)}</td><td>{row.record_type === 'cycle_count' ? 'Cycle count' : 'Manual adjustment'}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name || '-'}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : `${formatNumber(row.expected_quantity)} ${row.product_unit || 'units'}`}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : `${formatNumber(row.counted_quantity)} ${row.product_unit || 'units'}`}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, row.product_unit)}</td><td>{row.status || '-'}<span className="reports-subtext">{row.actor_name || 'System / unknown'}</span></td></tr>)}
+          </tbody></table></div> : null}
+        </ReportPanel>
+      ) : null}
+
       {activeTab === 'procurement-summary' ? (
-        <ReportPanel tab="procurement-summary" actions={actionButtons('procurement-summary', procurementSummaryQuery.isFetching)}>
+        <ReportPanel
+          tab="procurement-summary"
+          actions={actionButtons('procurement-summary', procurementSummaryQuery.isFetching)}
+          filters={
+            <>
+              <DateRangeFields from={procurementFilters.from} to={procurementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setProcurementFilters, 'from', value)} onToChange={(value) => updateAndClear(setProcurementFilters, 'to', value)} />
+              <TextFilterField label="Supplier" value={procurementFilters.supplier} placeholder="Any supplier" disabled={isExporting} onChange={(value) => updateAndClear(setProcurementFilters, 'supplier', value)} />
+              <div className="reports-filter-note">Date range filters shipments by creation date.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={procurementSummaryQuery.dataUpdatedAt} />
           {procurementSummaryQuery.isLoading ? <div>Loading procurement summary…</div> : null}
           {procurementSummaryQuery.isError ? <ErrorState message={`Failed to load procurement summary: ${getReadableError(procurementSummaryQuery.error)}`} /> : null}
@@ -745,24 +1121,96 @@ export default function ReportsPage() {
         </ReportPanel>
       ) : null}
 
+      {activeTab === 'purchasing-spend' ? (
+        <ReportPanel
+          tab="purchasing-spend"
+          actions={actionButtons('purchasing-spend', purchasingSpendQuery.isFetching)}
+          filters={
+            <>
+              <DateRangeFields from={spendFilters.from} to={spendFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSpendFilters, 'from', value)} onToChange={(value) => updateAndClear(setSpendFilters, 'to', value)} />
+              <TextFilterField label="Supplier" value={spendFilters.supplier} placeholder="Any supplier" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
+              <TextFilterField label="Category" value={spendFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
+              <TextFilterField label="Product" value={spendFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={spendFilters.limit} onChange={(event) => updateAndClear(setSpendFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            </>
+          }
+        >
+          <LastRefreshed timestamp={purchasingSpendQuery.dataUpdatedAt} />
+          <p className="reports-note">Only approved, matched, or paid supplier invoices count as recognized purchasing spend. Currencies remain explicit and are never silently combined.</p>
+          {purchasingSpendQuery.isLoading ? <div>Loading purchasing and spend…</div> : null}
+          {purchasingSpendQuery.isError ? <ErrorState message={`Failed to load purchasing spend: ${getReadableError(purchasingSpendQuery.error)}`} /> : null}
+          {!purchasingSpendQuery.isLoading && !purchasingSpendQuery.isError && spendRows.length === 0 ? <EmptyState message="No recognized supplier-invoice lines matched these filters." /> : null}
+          {spendRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Invoice</th><th>Supplier</th><th>Product</th><th>Quantity</th><th>Unit cost</th><th>Line amount</th><th>Status</th></tr></thead><tbody>
+            {spendRows.map((row) => <tr key={`${row.invoice_id}-${row.product_id}`}><td className="reports-strong">{row.invoice_number}<span className="reports-subtext">{formatDate(row.invoice_date)}</span></td><td>{row.supplier_name}</td><td>{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{formatNumber(row.quantity)} {row.product_unit || 'units'}</td><td>{formatCostAmount(row.unit_cost, row.currency)}</td><td className="reports-strong">{formatCostAmount(row.line_amount, row.currency)}</td><td>{row.invoice_status}</td></tr>)}
+          </tbody></table></div> : null}
+        </ReportPanel>
+      ) : null}
+
       {activeTab === 'low-stock' ? (
-        <ReportPanel tab="low-stock" actions={actionButtons('low-stock', lowStockQuery.isFetching)}>
+        <ReportPanel
+          tab="low-stock"
+          actions={actionButtons('low-stock', lowStockQuery.isFetching)}
+          filters={
+            <>
+              <TextFilterField label="Category" value={lowStockFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
+              <TextFilterField label="Supplier" value={lowStockFilters.supplier} placeholder="Any supplier" disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
+              <div className="reports-filter-note">Minimum stock is configured at product level, so this report does not apply a location filter.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={lowStockQuery.dataUpdatedAt} />
           {lowStockQuery.isLoading ? <div>Loading low-stock report…</div> : null}
           {lowStockQuery.isError ? <ErrorState message={`Failed to load low-stock report: ${getReadableError(lowStockQuery.error)}`} /> : null}
-          {!lowStockQuery.isLoading && !lowStockQuery.isError && lowStockRows.length === 0 ? <EmptyState message="No products are below their configured minimum stock." /> : null}
+          {!lowStockQuery.isLoading && !lowStockQuery.isError && lowStockRows.length === 0 ? <EmptyState message="No products matched these filters below their configured minimum stock." /> : null}
           {lowStockRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Category</th><th>Current stock</th><th>Minimum</th><th>Shortage</th><th>Supplier</th></tr></thead><tbody>
             {lowStockRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.current_stock)} {row.product_unit || 'units'}</td><td>{formatNumber(row.minimum_stock)} {row.product_unit || 'units'}</td><td className="reports-warning-text">{formatNumber(row.shortage_quantity)} {row.product_unit || 'units'}</td><td>{row.supplier_name || 'Not assigned'}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
 
+      {activeTab === 'slow-moving' ? (
+        <ReportPanel
+          tab="slow-moving"
+          actions={actionButtons('slow-moving', slowMovingQuery.isFetching)}
+          filters={
+            <>
+              <label className="reports-field reports-field--compact"><span>Inactive for</span><select value={slowFilters.days} onChange={(event) => updateAndClear(setSlowFilters, 'days', Number(event.target.value))} disabled={isExporting}>{SLOW_MOVING_DAYS_OPTIONS.map((days) => <option key={days} value={days}>{days}+ days</option>)}</select></label>
+              <TextFilterField label="Category" value={slowFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'category', value)} />
+              <TextFilterField label="Product" value={slowFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={slowFilters.limit} onChange={(event) => updateAndClear(setSlowFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            </>
+          }
+        >
+          <LastRefreshed timestamp={slowMovingQuery.dataUpdatedAt} />
+          <p className="reports-note">Only products with a positive current stock balance are included. Products with no recorded movement are treated as non-moving.</p>
+          {slowMovingQuery.isLoading ? <div>Loading slow and non-moving stock…</div> : null}
+          {slowMovingQuery.isError ? <ErrorState message={`Failed to load slow-moving stock: ${getReadableError(slowMovingQuery.error)}`} /> : null}
+          {!slowMovingQuery.isLoading && !slowMovingQuery.isError && slowRows.length === 0 ? <EmptyState message={`No positive stock has been inactive for ${slowFilters.days} days or more.`} /> : null}
+          {slowRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Category</th><th>Current stock</th><th>Last movement</th><th>Idle days</th><th>Supplier</th></tr></thead><tbody>
+            {slowRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.current_stock)} {row.product_unit || 'units'}</td><td>{row.last_movement_at ? formatDateTime(row.last_movement_at) : 'Never recorded'}</td><td className="reports-warning-text">{row.days_since_movement === null || row.days_since_movement === undefined ? 'No movement history' : `${formatNumber(row.days_since_movement, 0)} days`}</td><td>{row.supplier_name || 'Not assigned'}</td></tr>)}
+          </tbody></table></div> : null}
+        </ReportPanel>
+      ) : null}
+
       {activeTab === 'usage-summary' ? (
-        <ReportPanel tab="usage-summary" actions={actionButtons('usage-summary', usageSummaryQuery.isFetching)} filters={<label className="reports-field reports-field--compact"><span>Reporting period</span><select value={usageDays} onChange={(event) => { clearDownloadStatus(); setUsageDays(Number(event.target.value)); }} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>Last {days} days</option>)}</select><small>Reversed usage entries are excluded.</small></label>}>
+        <ReportPanel
+          tab="usage-summary"
+          actions={actionButtons('usage-summary', usageSummaryQuery.isFetching)}
+          filters={
+            <>
+              <label className="reports-field reports-field--compact"><span>Quick period</span><select value={usageFilters.days} onChange={(event) => updateAndClear(setUsageFilters, 'days', Number(event.target.value))} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>Last {days} days</option>)}</select></label>
+              <DateRangeFields from={usageFilters.from} to={usageFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setUsageFilters, 'from', value)} onToChange={(value) => updateAndClear(setUsageFilters, 'to', value)} />
+              <TextFilterField label="Category" value={usageFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
+              <TextFilterField label="Product" value={usageFilters.product} placeholder="Any product name" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} />
+              <TextFilterField label="Location" value={usageFilters.location} placeholder="Any location" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'location', value)} />
+              <div className="reports-filter-note">A From/To date range overrides the quick-period window. Reversed usage entries are excluded.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={usageSummaryQuery.dataUpdatedAt} />
           {usageSummaryQuery.isLoading ? <div>Loading usage report…</div> : null}
           {usageSummaryQuery.isError ? <ErrorState message={`Failed to load usage report: ${getReadableError(usageSummaryQuery.error)}`} /> : null}
-          {!usageSummaryQuery.isLoading && !usageSummaryQuery.isError && usageRows.length === 0 ? <EmptyState message={`No non-reversed usage was recorded in the last ${usageDays} days.`} /> : null}
+          {!usageSummaryQuery.isLoading && !usageSummaryQuery.isError && usageRows.length === 0 ? <EmptyState message="No non-reversed usage matched the selected period and filters." /> : null}
           {usageRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Entries</th><th>Total consumed</th><th>Guest use</th><th>Internal use</th><th>Damage / waste</th><th>Last use</th></tr></thead><tbody>
             {usageRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{formatNumber(row.usage_count, 0)}</td><td>{formatNumber(row.total_consumed)} {row.product_unit || 'units'}</td><td>{formatNumber(row.guest_use_quantity)} {row.product_unit || 'units'}</td><td>{formatNumber(row.internal_use_quantity)} {row.product_unit || 'units'}</td><td>{formatNumber(row.damage_waste_quantity)} {row.product_unit || 'units'}</td><td>{formatDateTime(row.last_consumed_at)}</td></tr>)}
           </tbody></table></div> : null}
@@ -770,11 +1218,21 @@ export default function ReportsPage() {
       ) : null}
 
       {activeTab === 'supplier-performance' ? (
-        <ReportPanel tab="supplier-performance" actions={actionButtons('supplier-performance', supplierPerformanceQuery.isFetching)}>
+        <ReportPanel
+          tab="supplier-performance"
+          actions={actionButtons('supplier-performance', supplierPerformanceQuery.isFetching)}
+          filters={
+            <>
+              <DateRangeFields from={supplierFilters.from} to={supplierFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSupplierFilters, 'from', value)} onToChange={(value) => updateAndClear(setSupplierFilters, 'to', value)} />
+              <TextFilterField label="Supplier" value={supplierFilters.supplier} placeholder="Any supplier" disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
+              <div className="reports-filter-note">Date range filters the supplier's shipment activity.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={supplierPerformanceQuery.dataUpdatedAt} />
           {supplierPerformanceQuery.isLoading ? <div>Loading supplier performance…</div> : null}
           {supplierPerformanceQuery.isError ? <ErrorState message={`Failed to load supplier performance: ${getReadableError(supplierPerformanceQuery.error)}`} /> : null}
-          {!supplierPerformanceQuery.isLoading && !supplierPerformanceQuery.isError && supplierRows.length === 0 ? <EmptyState message="No active suppliers are available for this report." /> : null}
+          {!supplierPerformanceQuery.isLoading && !supplierPerformanceQuery.isError && supplierRows.length === 0 ? <EmptyState message="No active suppliers matched these filters." /> : null}
           {supplierRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Supplier</th><th>Total shipments</th><th>Pending</th><th>Partial</th><th>Received</th><th>Overdue</th><th>Last received</th></tr></thead><tbody>
             {supplierRows.map((row) => <tr key={row.supplier_id}><td className="reports-strong">{row.supplier_name}</td><td>{formatNumber(row.total_shipments, 0)}</td><td>{formatNumber(row.pending_shipments, 0)}</td><td>{formatNumber(row.partial_shipments, 0)}</td><td>{formatNumber(row.received_shipments, 0)}</td><td className={toNumber(row.overdue_shipments) > 0 ? 'reports-warning-text' : ''}>{formatNumber(row.overdue_shipments, 0)}</td><td>{formatDate(row.last_received_date)}</td></tr>)}
           </tbody></table></div> : null}
@@ -782,11 +1240,22 @@ export default function ReportsPage() {
       ) : null}
 
       {activeTab === 'expiry-risk' ? (
-        <ReportPanel tab="expiry-risk" actions={actionButtons('expiry-risk', expiryRiskQuery.isFetching)} filters={<label className="reports-field reports-field--compact"><span>Expiry horizon</span><select value={expiryDays} onChange={(event) => { clearDownloadStatus(); setExpiryDays(Number(event.target.value)); }} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>Next {days} days</option>)}</select><small>Already expired positive-balance lots are always included.</small></label>}>
+        <ReportPanel
+          tab="expiry-risk"
+          actions={actionButtons('expiry-risk', expiryRiskQuery.isFetching)}
+          filters={
+            <>
+              <label className="reports-field reports-field--compact"><span>Expiry horizon</span><select value={expiryFilters.days} onChange={(event) => updateAndClear(setExpiryFilters, 'days', Number(event.target.value))} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>Next {days} days</option>)}</select></label>
+              <TextFilterField label="Category" value={expiryFilters.category} placeholder="All categories" disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'category', value)} />
+              <TextFilterField label="Location" value={expiryFilters.location} placeholder="Any location" disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
+              <div className="reports-filter-note">Already expired positive-balance lots are always included.</div>
+            </>
+          }
+        >
           <LastRefreshed timestamp={expiryRiskQuery.dataUpdatedAt} />
           {expiryRiskQuery.isLoading ? <div>Loading expiry risk…</div> : null}
           {expiryRiskQuery.isError ? <ErrorState message={`Failed to load expiry risk: ${getReadableError(expiryRiskQuery.error)}`} /> : null}
-          {!expiryRiskQuery.isLoading && !expiryRiskQuery.isError && expiryRows.length === 0 ? <EmptyState message={`No positive-balance lots expire within the next ${expiryDays} days.`} /> : null}
+          {!expiryRiskQuery.isLoading && !expiryRiskQuery.isError && expiryRows.length === 0 ? <EmptyState message={`No matching positive-balance lots expire within the next ${expiryFilters.days} days.`} /> : null}
           {expiryRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Location</th><th>Lot / batch</th><th>Expiry</th><th>Quantity</th><th>Condition</th><th>Risk</th></tr></thead><tbody>
             {expiryRows.map((row) => <tr key={row.inventory_lot_id}><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name}</td><td>{row.lot_number || '-'}{row.batch_number ? <span className="reports-subtext">Batch: {row.batch_number}</span> : null}</td><td>{formatDate(row.expiry_date)}</td><td>{formatNumber(row.quantity)} {row.product_unit || 'units'}</td><td>{row.condition}</td><td><RiskBadge status={row.risk_status} /></td></tr>)}
           </tbody></table></div> : null}

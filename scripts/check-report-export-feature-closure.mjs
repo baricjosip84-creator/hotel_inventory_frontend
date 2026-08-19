@@ -19,6 +19,10 @@ const required = [
   "| 'usage-summary'",
   "| 'supplier-performance'",
   "| 'expiry-risk'",
+  "| 'movement-ledger'",
+  "| 'inventory-variance'",
+  "| 'purchasing-spend'",
+  "| 'slow-moving'",
   'aria-controls={getReportPanelId(tab.key)}',
   'onKeyDown={(event) => handleReportTabKeyDown(event, tab.key)}',
   'tabIndex={activeTab === tab.key ? 0 : -1}',
@@ -36,7 +40,7 @@ const forbidden = [
 
 const missing = required.filter((token) => !reports.includes(token));
 const presentForbidden = forbidden.filter((token) => reports.includes(token));
-if (!css.includes('.reports-table-wrap') || !css.includes('.reports-filter-bar')) {
+if (!css.includes('.reports-table-wrap') || !css.includes('.reports-filter-bar') || !css.includes('flex-wrap: wrap') || !css.includes('.reports-filter-note')) {
   missing.push('report-specific responsive table/filter styling');
 }
 if (missing.length || presentForbidden.length) {

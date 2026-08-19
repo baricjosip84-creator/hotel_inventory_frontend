@@ -307,3 +307,67 @@
     flex: 1 1 calc(50% - 8px);
   }
 }
+
+/* Reports have enough destinations that clipping the tab strip makes navigation ambiguous.
+   Keep the shared workspace component untouched and wrap only this page's report tabs. */
+.reports-page > .io-workspace-tabs {
+  align-items: flex-start;
+}
+
+.reports-page > .io-workspace-tabs .io-workspace-tabs__items {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.reports-filter-bar {
+  flex-wrap: wrap;
+}
+
+.reports-field--date {
+  width: min(180px, 100%);
+}
+
+.reports-filter-note {
+  flex: 1 1 260px;
+  align-self: center;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.reports-positive-text {
+  color: #047857 !important;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .reports-page > .io-workspace-tabs .io-workspace-tabs__items {
+    gap: 5px;
+  }
+
+  .reports-field,
+  .reports-field--compact,
+  .reports-field--date {
+    flex: 1 1 210px;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .reports-page > .io-workspace-tabs .io-workspace-tab {
+    flex: 1 1 auto;
+  }
+
+  .reports-filter-bar {
+    align-items: stretch;
+  }
+
+  .reports-field,
+  .reports-field--compact,
+  .reports-field--date,
+  .reports-filter-note {
+    flex-basis: 100%;
+  }
+}

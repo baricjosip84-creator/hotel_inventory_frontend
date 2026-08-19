@@ -25,6 +25,13 @@ const requiredReportsSnippets = [
   "fetchUsageSummary",
   "fetchSupplierPerformance",
   "fetchExpiryRisk",
+  "fetchMovementLedger",
+  "fetchInventoryVariance",
+  "fetchPurchasingSpend",
+  "fetchSlowMoving",
+  "recognized purchasing spend",
+  "Products with no recorded movement are treated as non-moving.",
+  "Overview cards deliberately use unfiltered queries",
   "OperationalWorkspaceHero",
   "Print + PDF + CSV"
 ];
