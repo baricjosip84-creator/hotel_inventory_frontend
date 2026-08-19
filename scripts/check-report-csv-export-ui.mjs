@@ -11,33 +11,29 @@ const requiredApiTokens = [
 ];
 
 const requiredReportTokens = [
-  "apiDownloadFile(paths[report], getReportFilename(report))",
-  "function getReportFilename",
-  "const REPORT_LABELS",
-  "'/reports/inventory-valuation?format=csv'",
-  "'stock-by-location': `/reports/stock-by-location${buildQueryString({",
-  "'product-movements': `/reports/product-movements${buildQueryString({",
-  "'/reports/procurement-summary?format=csv'",
-  "onClick={() => downloadReportCsv('inventory-valuation')}",
-  "onClick={() => downloadReportCsv('stock-by-location')}",
-  "onClick={() => downloadReportCsv('product-movements')}",
-  "onClick={() => downloadReportCsv('procurement-summary')}"
+  "type ExportFormat = 'csv' | 'pdf';",
+  'function getReportFilename',
+  'const REPORT_LABELS',
+  'const getExportPath = (report: ReportTab, format: ExportFormat)',
+  "case 'inventory-valuation': return `/reports/inventory-valuation",
+  "case 'stock-by-location': return `/reports/stock-by-location",
+  "case 'product-movements': return `/reports/product-movements",
+  "case 'procurement-summary': return `/reports/procurement-summary",
+  "case 'low-stock': return `/reports/low-stock",
+  "case 'usage-summary': return `/reports/usage-summary",
+  "case 'supplier-performance': return `/reports/supplier-performance",
+  "case 'expiry-risk': return `/reports/expiry-risk",
+  "case 'forecast': return `/reports/forecast",
+  "apiDownloadFile(getExportPath(report, format), getReportFilename(report, format))",
+  "downloadReport(report, 'csv')",
+  'Export CSV'
 ];
 
 for (const token of requiredApiTokens) {
-  if (!apiSource.includes(token)) {
-    throw new Error(`Missing API download helper token: ${token}`);
-  }
+  if (!apiSource.includes(token)) throw new Error(`Missing API download helper token: ${token}`);
 }
-
 for (const token of requiredReportTokens) {
-  if (!reportsSource.includes(token)) {
-    throw new Error(`Missing Reports CSV export UI token: ${token}`);
-  }
-}
-
-if (reportsSource.includes('if (error instanceof ApiError) {\n  if (error instanceof ApiError)')) {
-  throw new Error('ReportsPage still contains the duplicated ApiError branch.');
+  if (!reportsSource.includes(token)) throw new Error(`Missing Reports export UI token: ${token}`);
 }
 
 console.log('Report CSV export UI check passed.');

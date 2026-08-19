@@ -20,7 +20,13 @@ const requiredReportsSnippets = [
   'formatCurrencyAmount',
   'Foreign-currency receipt costs are preserved separately and are not silently converted.',
   "row.product_unit || 'units'",
-  'Forecasting is not enabled for this tenant subscription.'
+  'Forecasting is not enabled for this tenant subscription.',
+  "fetchLowStock",
+  "fetchUsageSummary",
+  "fetchSupplierPerformance",
+  "fetchExpiryRisk",
+  "OperationalWorkspaceHero",
+  "Print + PDF + CSV"
 ];
 
 const requiredEnterpriseSnippets = [
