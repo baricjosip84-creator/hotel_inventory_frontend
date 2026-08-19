@@ -12,6 +12,7 @@ const parLevels = read('src/components/enterpriseInventory/tabs/ParLevelsTab.tsx
 const stockPanels = read('src/components/enterpriseInventory/EnterpriseInventoryStockOperationsPanels.tsx');
 const approvals = read('src/components/enterpriseInventory/tabs/ApprovalsTab.tsx');
 const supplierCatalogs = read('src/components/enterpriseInventory/tabs/SupplierCatalogsTab.tsx');
+const supplierCatalogImport = read('src/components/imports/SupplierCatalogImportPanel.tsx');
 const invoices = read('src/components/enterpriseInventory/tabs/InvoicesTab.tsx');
 const notifications = read('src/components/enterpriseInventory/tabs/NotificationsTab.tsx');
 const compliancePanels = read('src/components/enterpriseInventory/EnterpriseInventoryCompliancePanels.tsx');
@@ -82,11 +83,20 @@ if (!approvals.includes("amountBased ? formatCurrency(item.min_amount, item.curr
   throw new Error('Scope-based approval rules still present irrelevant amount values in the table.');
 }
 
+if (!approvals.includes('marginTop: 12')) {
+  throw new Error('Approval-rule helper text still sits against the save action without deliberate spacing.');
+}
+
 if (!supplierCatalogs.includes('tenantFacingProductSku')) throw new Error('Supplier catalog does not filter tenant-facing SKUs.');
 if (!supplierCatalogs.includes('/^LEGACY[-_]/i')) throw new Error('Legacy generated product identifiers can still surface in the supplier catalog.');
 if (supplierCatalogs.includes("<strong>{item.product_sku || '-'}</strong>")) throw new Error('Supplier catalog still promotes raw internal product SKU values.');
 if (supplierCatalogs.includes('label="Internal product"')) throw new Error('Supplier catalog still uses internal-facing product terminology.');
 if (!supplierCatalogs.includes('tenantFacingProductSku(product.sku)')) throw new Error('Supplier-product selector can still expose generated legacy SKUs.');
+
+if (!supplierCatalogImport.includes("alignItems: 'flex-end'")) {
+  throw new Error('Supplier catalog import actions are not aligned to the supplier control baseline.');
+}
+
 
 if (!invoices.includes('formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 2)')) {
   throw new Error('Invoice money formatting is not normalized to tenant-facing currency precision.');
@@ -100,6 +110,13 @@ if (notifications.includes('Process due deliveries now') || notifications.includ
 }
 if (!notifications.includes('humanizeToken') || !notifications.includes('humanizeToken(item.event_type)')) {
   throw new Error('Notification event codes are still exposed as raw implementation tokens.');
+}
+
+if (!notifications.includes('tenantFacingNotificationDescription') || !notifications.includes("headers={['Severity', 'Event', 'Description', 'Created']}")) {
+  throw new Error('Notification events still expose technical message content instead of tenant-facing descriptions.');
+}
+if (notifications.includes("item.message || '-'")) {
+  throw new Error('Notification event table still renders raw backend message strings containing internal record IDs.');
 }
 if (!notifications.includes('<section style={styles.stack}>') || !notifications.includes('<h2 style={styles.cardTitle}>Notification events</h2>')) {
   throw new Error('Notification controls are not using the cleaned full-width section structure.');

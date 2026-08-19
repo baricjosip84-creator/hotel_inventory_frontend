@@ -162,7 +162,11 @@ export function ApprovalsTab({
         {entitySupportsScope ? <p style={styles.helper}>This rule uses department/location scope and role. Amount thresholds do not apply.</p> : null}
         {entityUsesAmount && !amountRangeValid ? <p style={styles.helper}>Maximum amount must be greater than or equal to minimum amount.</p> : null}
         {entityUsesAmount && !currencyValid ? <p style={styles.helper}>Currency must be a three-letter ISO code.</p> : null}
-        <button type="submit" disabled={!canSaveRule} style={canSaveRule ? styles.primaryButton : styles.disabledButton}>
+        <button
+          type="submit"
+          disabled={!canSaveRule}
+          style={{ ...(canSaveRule ? styles.primaryButton : styles.disabledButton), marginTop: 12 }}
+        >
           {createApprovalRuleMutation.isPending ? 'Saving…' : 'Save approval rule'}
         </button>
       </form>

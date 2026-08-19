@@ -37,7 +37,7 @@ type Props = {
 };
 
 const panel: CSSProperties = { border: '1px solid var(--border-color, #d9dde5)', borderRadius: 12, padding: 16 };
-const rowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 12 };
+const rowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginTop: 12 };
 const button: CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1px solid #aab2c0', cursor: 'pointer', background: 'transparent' };
 const primaryButton: CSSProperties = { ...button, fontWeight: 700 };
 const disabledButton: CSSProperties = { ...button, opacity: 0.55, cursor: 'not-allowed' };

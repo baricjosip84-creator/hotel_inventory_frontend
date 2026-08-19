@@ -36,6 +36,22 @@ const deliveryStatusLabel = (delivery: NotificationDelivery) => {
   return delivery.status || '-';
 };
 
+const tenantFacingNotificationDescription = (item: NotificationEvent) => {
+  const entityLabel = item.entity_type ? humanizeToken(item.entity_type) : '';
+  const normalizedTitle = String(item.title || '').trim();
+  const lowerTitle = normalizedTitle.toLowerCase();
+
+  if (item.event_type === 'approval_action' && entityLabel) {
+    if (lowerTitle.includes('approved')) return `${entityLabel} was approved.`;
+    if (lowerTitle.includes('rejected')) return `${entityLabel} was rejected.`;
+    return `${entityLabel} approval status changed.`;
+  }
+
+  if (normalizedTitle) return `${normalizedTitle.replace(/[.!?]+$/, '')}.`;
+  const eventLabel = humanizeToken(item.event_type);
+  return eventLabel === '-' ? 'Inventory notification recorded.' : `${eventLabel}.`;
+};
+
 export function NotificationsTab({
   notificationDeliveryForm,
   notifications,
@@ -62,7 +78,7 @@ export function NotificationsTab({
             label="Notification event"
             value={notificationDeliveryForm.notification_event_id}
             onChange={(value) => onNotificationDeliveryFormChange((current) => ({ ...current, notification_event_id: value }))}
-            options={notifications.map((event) => ({ value: event.id, label: `${event.severity}: ${event.title}` }))}
+            options={notifications.map((event) => ({ value: event.id, label: `${humanizeToken(event.severity)}: ${tenantFacingNotificationDescription(event).replace(/\.$/, '')}` }))}
             required
             disabled={!canWriteNotifications}
           />
@@ -113,8 +129,13 @@ export function NotificationsTab({
         <DataTable
           loading={isLoading}
           empty="No notification events yet."
-          headers={['Severity', 'Event', 'Title', 'Message', 'Created']}
-          rows={notifications.map((item) => [humanizeToken(item.severity), humanizeToken(item.event_type), item.title, item.message || '-', formatDateTime(item.created_at)])}
+          headers={['Severity', 'Event', 'Description', 'Created']}
+          rows={notifications.map((item) => [
+            humanizeToken(item.severity),
+            humanizeToken(item.event_type),
+            tenantFacingNotificationDescription(item),
+            formatDateTime(item.created_at)
+          ])}
         />
       </section>
     </section>
