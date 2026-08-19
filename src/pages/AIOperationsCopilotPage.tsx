@@ -8,6 +8,13 @@ import { showTenantActionError } from '../lib/actionFeedback';
 import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import type { ProductItem } from '../types/inventory';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './AIOperationsCopilotPage.css';
 
 type CopilotIntent =
@@ -592,62 +599,55 @@ export default function AIOperationsCopilotPage() {
     : '/execution-requests';
 
   return (
-    <div className="ai-copilot-page" style={styles.page}>
-      <header className="ai-copilot-hero" style={styles.hero}>
-        <div style={styles.heroTitleRow}>
-          <span style={styles.heroIcon}><TenantNavIcon path="/ai-copilot" size={24} /></span>
-          <div>
-            <div style={styles.eyebrow}>Governed tenant intelligence</div>
-            <h1 style={styles.title}>Inventory analysis and proposal assistant</h1>
-            <p style={styles.subtitle}>
-              Choose a defined inventory analysis or prepare a product proposal for human review. It explains information but cannot change inventory or approve work.
-            </p>
-          </div>
-        </div>
-        <div style={styles.heroBadges}>
-          <Badge tone="good">Tenant scoped</Badge>
-          <Badge tone="good">No autonomous execution</Badge>
-          <Badge tone="good">Human review required</Badge>
-        </div>
-      </header>
+    <div className="ai-copilot-page io-operational-page io-workspace-page io-workspace-legacy-normalized" style={styles.page}>
+      <OperationalWorkspaceHero
+        iconPath="/ai-copilot"
+        eyebrow="Governed tenant intelligence"
+        title="AI Copilot"
+        description="Choose a defined inventory analysis or prepare a product proposal for human review. The Copilot explains information but cannot change inventory, submit approvals, or execute work."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>No autonomous execution</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human review required</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value={modeDetails.label} label="current analysis mode" />}
+      />
 
       {capabilitiesQuery.isError ? <div style={styles.error}>{readableError(capabilitiesQuery.error)}</div> : null}
       {actionMessage ? <div style={styles.info}>{actionMessage}</div> : null}
 
-      <div className="ai-copilot-summary-grid" style={styles.summaryGrid}>
-        <div style={styles.summaryCard}>
-          <span style={{ ...styles.summaryIcon, ...styles.summaryIconBlue }}><TenantNavIcon path="/ai-copilot" size={20} /></span>
-          <div style={styles.summaryContent}>
-            <div style={styles.summaryLabel}>How results are produced</div>
-            <div style={styles.summaryValue}>{modeDetails.label}</div>
-            <div style={styles.summaryHelp}>{provider?.model && provider?.effective_mode === 'openai_responses' ? `Model: ${provider.model}` : modeDetails.explanation}</div>
-          </div>
-        </div>
-        <div style={styles.summaryCard}>
-          <span style={{ ...styles.summaryIcon, ...styles.summaryIconPurple }}><TenantNavIcon path="/system-context" size={20} /></span>
-          <div style={styles.summaryContent}>
-            <div style={styles.summaryLabel}>External data sharing</div>
-            <div style={styles.summaryValue}>{provider?.external_provider_ready ? 'Configured' : 'Not active'}</div>
-            <div style={styles.summaryHelp}>Each completed run records whether tenant evidence was shared externally.</div>
-          </div>
-        </div>
-        <div style={styles.summaryCard}>
-          <span style={{ ...styles.summaryIcon, ...styles.summaryIconGreen }}><TenantNavIcon path="/reliability-command" size={20} /></span>
-          <div style={styles.summaryContent}>
-            <div style={styles.summaryLabel}>What it can change</div>
-            <div style={styles.summaryValue}>None</div>
-            <div style={styles.summaryHelp}>The Copilot cannot submit, approve, or execute an Execution Request.</div>
-          </div>
-        </div>
-        <div style={styles.summaryCard}>
-          <span style={{ ...styles.summaryIcon, ...styles.summaryIconAmber }}><TenantNavIcon path="/automation-schedules" size={20} /></span>
-          <div style={styles.summaryContent}>
-            <div style={styles.summaryLabel}>Runs this hour</div>
-            <div style={styles.summaryValue}>{capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}</div>
-            <div style={styles.summaryHelp}>User runs used. Tenant usage: {capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}.</div>
-          </div>
-        </div>
-      </div>
+      <OperationalWorkspaceStats ariaLabel="AI Copilot overview">
+        <OperationalWorkspaceStatCard
+          label="How results are produced"
+          value={modeDetails.label}
+          helper={provider?.model && provider?.effective_mode === 'openai_responses' ? `Model: ${provider.model}` : modeDetails.explanation}
+          iconPath="/ai-copilot"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="External data sharing"
+          value={provider?.external_provider_ready ? 'Configured' : 'Not active'}
+          helper="Each completed run records whether tenant evidence was shared externally"
+          iconPath="/system-context"
+          tone={provider?.external_provider_ready ? 'warn' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="What it can change"
+          value="None"
+          helper="The Copilot cannot submit, approve, or execute an Execution Request"
+          iconPath="/reliability-command"
+          tone="good"
+        />
+        <OperationalWorkspaceStatCard
+          label="Runs this hour"
+          value={capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}
+          helper={`Tenant usage: ${capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}`}
+          iconPath="/automation-schedules"
+          tone="neutral"
+        />
+      </OperationalWorkspaceStats>
 
       <div style={provider?.effective_mode === 'openai_responses' ? styles.externalModeNotice : styles.modeNotice}>
         <strong>{modeDetails.label}.</strong> {modeDetails.explanation}

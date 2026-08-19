@@ -4,6 +4,15 @@ import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './decisionIntelligencePages.css';
 import './DecisionLearningFeedbackPage.css';
 
@@ -1719,15 +1728,7 @@ function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState): stri
 }
 
 function StatCard({ label, value, iconPath, tone = 'blue' }: { label: string; value: unknown; iconPath?: string; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate' }) {
-  return (
-    <div className={'card learning-feedback-stat-card'} data-tone={tone} style={{ minWidth: 170, flex: '1 1 170px' }}>
-      <div className={'learning-feedback-stat-card__top'}>
-        {iconPath ? <span className={'learning-feedback-stat-card__icon'}><TenantNavIcon path={iconPath} size={18} /></span> : null}
-        <div className="card__label">{label}</div>
-      </div>
-      <div className="card__value">{formatLabel(value)}</div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={label} value={formatLabel(value)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 
@@ -4489,27 +4490,16 @@ export default function DecisionLearningFeedbackPage() {
   };
 
   return (
-    <div className="decision-intelligence-page">
+    <div className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <div className={'learning-feedback-page'}>
-      <div className="page-header">
-        <div className={'learning-feedback-page-header__content'}>
-          <span className={'learning-feedback-page-header__icon'}><TenantNavIcon path="/decision-learning-feedback" size={24} /></span>
-          <div>
-          <p className="eyebrow">Decision Intelligence</p>
-          <h1>Learning Feedback</h1>
-          <p className="page-subtitle">
-            Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.
-          </p>
-          </div>
-        </div>
-        <div className={'learning-feedback-refresh'}>
-          <button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
-            <TenantNavIcon path="/decision-learning-feedback" size={16} />
-            {summaryQuery.isFetching ? 'Refreshing…' : 'Refresh summary'}
-          </button>
-          <span className="card__subtext">Last refreshed: {formatTimestamp(summaryQuery.dataUpdatedAt)}</span>
-        </div>
-      </div>
+      <OperationalWorkspaceHero
+        iconPath="/decision-learning-feedback"
+        eyebrow="Decision intelligence & learning"
+        title="Learning Feedback"
+        description="Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model."
+        meta={<><OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Audited feedback</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Human-recorded outcomes</OperationalWorkspaceMetaPill></>}
+        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? formatLabel(governance.continuous_learning_posture) : summaryQuery.isLoading ? 'Loading' : 'Unknown'} label={`continuous learning posture · refreshed ${formatTimestamp(summaryQuery.dataUpdatedAt)}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? 'Refreshing…' : 'Refresh summary'}</button></>}
+      />
 
       {summaryQuery.isError ? (
         <section className="card card--danger">
@@ -4523,38 +4513,18 @@ export default function DecisionLearningFeedbackPage() {
         </section>
       ) : null}
 
-      <div className={'learning-feedback-summary-grid'}>
+      <OperationalWorkspaceStats ariaLabel="Learning feedback summary">
         <StatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
         <StatCard label="Outcomes" value={governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
         <StatCard label="Forecast evidence" value={governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
         <StatCard label="Policy evidence" value={governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
         <StatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
-      </div>
+      </OperationalWorkspaceStats>
 
-      <div className="learning-feedback-view-switch" role="tablist" aria-label="Learning Feedback view">
-        <button
-          className={`learning-feedback-view-switch__button${view === 'feedback' ? ' is-active' : ''}`}
-          type="button"
-          role="tab"
-          aria-selected={view === 'feedback'}
-          onClick={() => setView('feedback')}
-        >
-          <TenantNavIcon path="/decision-learning-feedback" size={16} />
-          Feedback records
-        </button>
-        {canViewDiagnostics ? (
-          <button
-            className={`learning-feedback-view-switch__button${view === 'readiness' ? ' is-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={view === 'readiness'}
-            onClick={() => setView('readiness')}
-          >
-            <TenantNavIcon path="/reliability-command" size={16} />
-            Readiness checks
-          </button>
-        ) : null}
-      </div>
+      <OperationalWorkspaceTabs ariaLabel="Learning Feedback view">
+        <OperationalWorkspaceTab active={view === 'feedback'} iconPath="/decision-learning-feedback" label="Feedback records" onClick={() => setView('feedback')} />
+        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Readiness checks" onClick={() => setView('readiness')} /> : null}
+      </OperationalWorkspaceTabs>
 
       {view === 'feedback' ? (canGovern ? (
       <section className={'card learning-feedback-form-card'}>

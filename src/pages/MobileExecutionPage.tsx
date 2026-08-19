@@ -5,6 +5,13 @@ import { ApiError, apiRequest } from '../lib/api';
 import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './OperationalExperiencePages.css';
 import './MobileExecutionPage.css';
 
@@ -344,41 +351,52 @@ export default function MobileExecutionPage() {
   const usingOfflineSnapshot = !mobileExecutionQuery.data && Boolean(cachedResponse);
 
   return (
-    <div className="mobile-execution-page mobile-execution-page--refined">
-      <div className="mobile-execution-summary-grid">
-        <div className="card mobile-execution-summary-card">
-          <span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/mobile-execution" size={18} /></span>
-          <div className="mobile-execution-summary-copy">
-            <div className="card__label">Mobile queue</div>
-            <div className="card__value">{numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}</div>
-            <div className="card__subtext">Execution tasks prepared for touch-first warehouse work.</div>
-          </div>
-        </div>
-        <div className="card mobile-execution-summary-card">
-          <span className="mobile-execution-icon mobile-execution-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
-          <div className="mobile-execution-summary-copy">
-            <div className="card__label">Critical tasks</div>
-            <div className="card__value">{numberValue(summary.critical_mobile_tasks)}</div>
-            <div className="card__subtext">Highest urgency items requiring operator attention.</div>
-          </div>
-        </div>
-        <div className="card mobile-execution-summary-card">
-          <span className={`mobile-execution-icon ${online ? 'mobile-execution-icon--green' : 'mobile-execution-icon--warning'}`}><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
-          <div className="mobile-execution-summary-copy">
-            <div className="card__label">Connection</div>
-            <div className={`card__value mobile-execution-summary-text-value ${online ? 'mobile-execution-value--healthy' : 'mobile-execution-value--warning'}`}>{online ? 'Online' : 'Offline'}</div>
-            <div className="card__subtext">{pending.length} action{pending.length === 1 ? '' : 's'} waiting to synchronize.</div>
-          </div>
-        </div>
-        <div className="card mobile-execution-summary-card">
-          <span className="mobile-execution-icon mobile-execution-icon--violet"><TenantNavIcon path="/execution-tasks" size={18} /></span>
-          <div className="mobile-execution-summary-copy">
-            <div className="card__label">Execution mode</div>
-            <div className="card__value mobile-execution-summary-text-value">{formatLabel(response?.definition?.execution_mode)}</div>
-            <div className="card__subtext">Only execution-task lifecycle changes are allowed from this mobile surface.</div>
-          </div>
-        </div>
-      </div>
+    <div className="mobile-execution-page mobile-execution-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/mobile-execution"
+        eyebrow="Mobile & warehouse execution"
+        title="Mobile Execution"
+        description="Touch-first execution queue for permitted warehouse work, with safe offline queuing and audited synchronization when connectivity returns."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Touch-first</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Offline queue protected</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value={online ? 'Online' : 'Offline'} label={`${pending.length} queued action${pending.length === 1 ? '' : 's'} awaiting synchronization`} />}
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Mobile execution overview">
+        <OperationalWorkspaceStatCard
+          label="Mobile queue"
+          value={numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}
+          helper="Execution tasks prepared for touch-first warehouse work"
+          iconPath="/mobile-execution"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Critical tasks"
+          value={numberValue(summary.critical_mobile_tasks)}
+          helper="Highest urgency items requiring operator attention"
+          iconPath="/alerts"
+          tone={numberValue(summary.critical_mobile_tasks) > 0 ? 'danger' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Connection"
+          value={online ? 'Online' : 'Offline'}
+          helper={`${pending.length} action${pending.length === 1 ? '' : 's'} waiting to synchronize`}
+          iconPath="/real-time-operations-feed"
+          tone={online ? 'good' : 'warn'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Execution mode"
+          value={formatLabel(response?.definition?.execution_mode)}
+          helper="Only execution-task lifecycle changes are allowed from this surface"
+          iconPath="/execution-tasks"
+          tone="neutral"
+        />
+      </OperationalWorkspaceStats>
 
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">

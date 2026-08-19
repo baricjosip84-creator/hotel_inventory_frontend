@@ -1134,7 +1134,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="io-workspace-page reports-page">
+    <div className="reports-page io-operational-page io-workspace-page">
       <OperationalWorkspaceHero
         iconPath="/reports"
         eyebrow="Reporting & exports"

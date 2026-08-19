@@ -5,6 +5,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './HumanInLoopAIReviewPage.css';
 
 
@@ -4469,45 +4478,46 @@ export default function HumanInLoopAIReviewPage() {
   };
 
   return (
-    <div className="ai-review-page ai-review-page--refined">
-      <div className="card ai-review-page__intro" style={{ marginBottom: 16 }}>
-        <div className="ai-review-page__intro-heading">
-          <span className="ai-review-page__intro-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={20} /></span>
-          <div>
-            <div className="card__label">Intelligence review</div>
-            <h2 className="ai-review-page__intro-title">Review recommendations and technical readiness separately</h2>
-          </div>
-        </div>
-        <p className="card__subtext ai-review-page__intro-copy">
-          Not every item on this page was produced by an AI model. Recommendation reviews can come from rule-based calculations, simulations, optimisation logic, governance findings, or an optional AI-assisted Copilot. Readiness checks are technical, read-only controls.
-        </p>
-        <div className="ai-review-page__view-switch" role="group" aria-label="Intelligence review view">
-          <button
-            className={`button ${activeView === 'recommendations' ? 'button--primary' : 'button--secondary'}`}
-            type="button"
-            aria-pressed={activeView === 'recommendations'}
-            onClick={() => selectView('recommendations')}
-          >
-            <TenantNavIcon path="/intelligence-review" size={16} />
-            Recommendation reviews
-          </button>
-          <button
-            className={`button ${activeView === 'readiness' ? 'button--primary' : 'button--secondary'}`}
-            type="button"
-            aria-pressed={activeView === 'readiness'}
-            onClick={() => selectView('readiness')}
-          >
-            <TenantNavIcon path="/reliability-command" size={16} />
-            Readiness &amp; governance
-          </button>
-        </div>
+    <div className="ai-review-page ai-review-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/intelligence-review"
+        eyebrow="Decision intelligence & governance"
+        title="Intelligence Review"
+        description="Review actionable recommendations separately from technical readiness and governance checks. Results may come from rules, simulations, optimization logic, governance findings, or optional AI-assisted analysis; human review remains authoritative."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human decision required</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>No recommendation auto-execution</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value={activeView === 'readiness' ? 'Readiness' : 'Human review'} label="current intelligence review view" />}
+      />
+
+      {activeView === 'recommendations' ? (
+        <OperationalWorkspaceStats ariaLabel="Recommendation review summary">
+          <OperationalWorkspaceStatCard label="Recommendation reviews" value={numberValue(summary.total_reviews ?? reviews.length)} helper="Rule-based and optional AI-assisted proposals waiting for human review" iconPath="/intelligence-review" tone="blue" />
+          <OperationalWorkspaceStatCard label="Approval required" value={numberValue(summary.approval_required_reviews)} helper="Items that remain inside a governed approval workflow" iconPath="/permissions" tone={numberValue(summary.approval_required_reviews) > 0 ? 'warn' : 'good'} />
+          <OperationalWorkspaceStatCard label="Escalated" value={numberValue(summary.escalated_reviews)} helper="High-attention items requiring management or governance follow-up" iconPath="/alerts" tone={numberValue(summary.escalated_reviews) > 0 ? 'danger' : 'good'} />
+          <OperationalWorkspaceStatCard label="Safety rule" value="Human decision only" helper="Review decisions never execute the underlying recommendation" iconPath="/reliability-command" tone="good" />
+        </OperationalWorkspaceStats>
+      ) : (
+        <OperationalWorkspaceStats ariaLabel="Intelligence readiness summary">
+          <OperationalWorkspaceStatCard label="Tracked intelligence features" value={numberValue(readinessSummary.total_features)} helper="Registered intelligence and AI-assisted modules" iconPath="/intelligence-review" tone="blue" />
+          <OperationalWorkspaceStatCard label="Production candidates" value={numberValue(readinessSummary.production_candidates)} helper="Implemented features still requiring hardening evidence" iconPath="/reliability-command" tone="warn" />
+          <OperationalWorkspaceStatCard label="Tenant-data backed" value={numberValue(readinessSummary.tenant_data_backed_features)} helper="Features with current tenant evidence rows" iconPath="/system-context" tone="blue" />
+          <OperationalWorkspaceStatCard label="Average readiness" value={`${numberValue(readinessSummary.average_readiness_score)}%`} helper="Production-readiness score across tracked features" iconPath="/reports" tone="neutral" />
+        </OperationalWorkspaceStats>
+      )}
+
+      <OperationalWorkspaceTabs ariaLabel="Intelligence review view">
+        <OperationalWorkspaceTab active={activeView === 'recommendations'} iconPath="/intelligence-review" label="Recommendation reviews" onClick={() => selectView('recommendations')} />
+        <OperationalWorkspaceTab active={activeView === 'readiness'} iconPath="/reliability-command" label="Readiness & governance" onClick={() => selectView('readiness')} />
+      </OperationalWorkspaceTabs>
+
+      <div className="card ai-review-page__mode-bar">
         <div style={toolbarStyle}>
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={refreshActiveView}
-            disabled={isRefreshingActiveView}
-          >
+          <button className="button button--secondary" type="button" onClick={refreshActiveView} disabled={isRefreshingActiveView}>
             <TenantNavIcon path="/intelligence-review" size={16} />
             {isRefreshingActiveView
               ? activeView === 'readiness' ? 'Refreshing readiness checks…' : 'Refreshing recommendation reviews…'
@@ -4523,35 +4533,6 @@ export default function HumanInLoopAIReviewPage() {
         </p>
       </div>
 
-      {activeView === 'recommendations' ? (
-        <div className="card-grid ai-review-page__summary-grid" style={gridStyle}>
-          <div className="card ai-review-page__summary-card">
-            <span className="ai-review-page__summary-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={19} /></span>
-            <div className="ai-review-page__summary-copy"><div className="card__label">Recommendation reviews</div>
-            <div className="card__value">{numberValue(summary.total_reviews ?? reviews.length)}</div>
-            <div className="card__subtext">Rule-based and optional AI-assisted proposals waiting for human review.</div></div>
-          </div>
-          <div className="card ai-review-page__summary-card">
-            <span className="ai-review-page__summary-icon ai-review-page__icon--amber"><TenantNavIcon path="/permissions" size={19} /></span>
-            <div className="ai-review-page__summary-copy"><div className="card__label">Approval required</div>
-            <div className="card__value">{numberValue(summary.approval_required_reviews)}</div>
-            <div className="card__subtext">Items that must remain inside an existing governed approval workflow.</div></div>
-          </div>
-          <div className="card ai-review-page__summary-card">
-            <span className="ai-review-page__summary-icon ai-review-page__icon--red"><TenantNavIcon path="/alerts" size={19} /></span>
-            <div className="ai-review-page__summary-copy"><div className="card__label">Escalated</div>
-            <div className="card__value">{numberValue(summary.escalated_reviews)}</div>
-            <div className="card__subtext">High-attention items requiring management or governance follow-up.</div></div>
-          </div>
-          <div className="card ai-review-page__summary-card">
-            <span className="ai-review-page__summary-icon ai-review-page__icon--green"><TenantNavIcon path="/reliability-command" size={19} /></span>
-            <div className="ai-review-page__summary-copy"><div className="card__label">Safety rule</div>
-            <div className="card__value" style={{ fontSize: 18 }}>Human decision only</div>
-            <div className="card__subtext">This page records a review; it does not execute the recommendation.</div></div>
-          </div>
-        </div>
-      ) : null}
-
 
       {activeView === 'readiness' ? (
       <section className="section">
@@ -4559,30 +4540,7 @@ export default function HumanInLoopAIReviewPage() {
         <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
           <strong>What this means:</strong> these checks govern rule-based intelligence and optional AI-assisted capabilities. They measure evidence and operational safety, not whether every feature uses a machine-learning model.
         </div>
-        <div className="card-grid" style={gridStyle}>
-          <div className="card">
-            <div className="card__label">Tracked intelligence features</div>
-            <div className="card__value">{numberValue(readinessSummary.total_features)}</div>
-            <div className="card__subtext">Existing intelligence and AI-assisted modules registered from the current backend surfaces.</div>
-          </div>
-          <div className="card">
-            <div className="card__label">Production candidates</div>
-            <div className="card__value">{numberValue(readinessSummary.production_candidates)}</div>
-            <div className="card__subtext">Features that have implementation and tenant data, but still need test/hardening evidence.</div>
-          </div>
-          <div className="card">
-            <div className="card__label">Tenant-data backed</div>
-            <div className="card__value">{numberValue(readinessSummary.tenant_data_backed_features)}</div>
-            <div className="card__subtext">Features whose evidence tables currently contain rows for this tenant.</div>
-          </div>
-          <div className="card">
-            <div className="card__label">Average readiness score</div>
-            <div className="card__value">{numberValue(readinessSummary.average_readiness_score)}%</div>
-            <div className="card__subtext">Current production-readiness score across tracked intelligence and AI-assisted features.</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card">
           {readinessQuery.isLoading ? (
             <p className="card__subtext">Loading intelligence and AI-assisted production readiness…</p>
           ) : readinessQuery.error ? (

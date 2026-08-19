@@ -11,6 +11,13 @@ import {
 } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './RoleAwareWorkspacePage.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -415,41 +422,52 @@ export default function RoleAwareWorkspacePage() {
   const shownActions = actions.slice(0, 12);
 
   return (
-    <div className="workspace-page">
-      <div className="workspace-page__summary-grid">
-        <div className="card workspace-page__summary-card">
-          <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/workspace" size={18} /></span>
-          <div className="workspace-page__summary-copy">
-            <div className="card__label">Workspace</div>
-            <div className="card__value workspace-page__summary-text-value">{workspace.workspace_name || 'Role workspace'}</div>
-            <div className="card__subtext">Prepared for the current access role: {accessRoleLabel}.</div>
-          </div>
-        </div>
-        <div className="card workspace-page__summary-card">
-          <span className="workspace-page__icon workspace-page__icon--violet"><TenantNavIcon path="/action-center" size={18} /></span>
-          <div className="workspace-page__summary-copy">
-            <div className="card__label">Actions available</div>
-            <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
-            <div className="card__subtext">Open work currently returned for the selected filters.</div>
-          </div>
-        </div>
-        <div className="card workspace-page__summary-card">
-          <span className="workspace-page__icon workspace-page__icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
-          <div className="workspace-page__summary-copy">
-            <div className="card__label">Critical actions</div>
-            <div className="card__value">{numberValue(summary.critical_actions)}</div>
-            <div className="card__subtext">Items that need the fastest attention.</div>
-          </div>
-        </div>
-        <div className="card workspace-page__summary-card">
-          <span className="workspace-page__icon workspace-page__icon--green"><TenantNavIcon path="/permissions" size={18} /></span>
-          <div className="workspace-page__summary-copy">
-            <div className="card__label">Role filtering</div>
-            <div className="card__value workspace-page__summary-text-value">Active</div>
-            <div className="card__subtext">Only work that this role is allowed to read is included.</div>
-          </div>
-        </div>
-      </div>
+    <div className="workspace-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/workspace"
+        eyebrow="Role-aware command workspace"
+        title="Workspace"
+        description="A simplified operational view filtered to the work this signed-in role is allowed to see. It guides users to the right source workflow without changing inventory itself."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Role-filtered</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Source actions linked</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value={accessRoleLabel} label="current access role" />}
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Workspace overview">
+        <OperationalWorkspaceStatCard
+          label="Workspace"
+          value={workspace.workspace_name || 'Role workspace'}
+          helper={`Prepared for the current access role: ${accessRoleLabel}.`}
+          iconPath="/workspace"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Actions available"
+          value={numberValue(summary.total_actions ?? actions.length)}
+          helper="Open work currently returned for the selected filters"
+          iconPath="/action-center"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Critical actions"
+          value={numberValue(summary.critical_actions)}
+          helper="Items that need the fastest attention"
+          iconPath="/alerts"
+          tone={numberValue(summary.critical_actions) > 0 ? 'danger' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Role filtering"
+          value="Active"
+          helper="Only work this role is allowed to read is included"
+          iconPath="/permissions"
+          tone="good"
+        />
+      </OperationalWorkspaceStats>
 
       <div className="card workspace-page__info-card">
         <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>

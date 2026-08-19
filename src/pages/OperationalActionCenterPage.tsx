@@ -6,6 +6,13 @@ import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './OperationalExperiencePages.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -515,41 +522,52 @@ export default function OperationalActionCenterPage() {
   }
 
   return (
-    <div className="operational-action-center-page">
-      <div className="action-center-summary-grid">
-        <div className="card action-center-summary-card">
-          <span className="action-center-icon action-center-icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
-          <div className="action-center-summary-copy">
-            <div className="card__label">Open actions shown</div>
-            <div className="card__value">{numberValue(summary.total_actions ?? actions.length)}</div>
-            <div className="card__subtext">The highest-priority actions currently returned for your access.</div>
-          </div>
-        </div>
-        <div className="card action-center-summary-card">
-          <span className={`action-center-icon ${urgencyToneClass(summary.highest_urgency)}`}><TenantNavIcon path="/alerts" size={18} /></span>
-          <div className="action-center-summary-copy">
-            <div className="card__label">Highest urgency</div>
-            <div className="card__value action-center-summary-text-value">{summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}</div>
-            <div className="card__subtext">The most urgent level among the actions shown.</div>
-          </div>
-        </div>
-        <div className="card action-center-summary-card">
-          <span className="action-center-icon action-center-icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span>
-          <div className="action-center-summary-copy">
-            <div className="card__label">Approval gated</div>
-            <div className="card__value">{numberValue(summary.approval_required_count)}</div>
-            <div className="card__subtext">Items requiring human governance review.</div>
-          </div>
-        </div>
-        <div className="card action-center-summary-card">
-          <span className="action-center-icon action-center-icon--green"><TenantNavIcon path="/execution-tasks" size={18} /></span>
-          <div className="action-center-summary-copy">
-            <div className="card__label">Execution mode</div>
-            <div className="card__value action-center-summary-text-value">{executionModeLabel(response?.definition?.execution_mode)}</div>
-            <div className="card__subtext">This page guides people to source workflows but does not change records itself.</div>
-          </div>
-        </div>
-      </div>
+    <div className="operational-action-center-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/action-center"
+        eyebrow="Command & prioritization"
+        title="Action Center"
+        description="Prioritized, tenant-scoped operational work gathered from authoritative source workflows. Review what needs attention here, then complete the real work on its source page."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Read-only guidance</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Source workflows authoritative</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value="Read-only" label="prioritization and routing workspace" />}
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Action Center overview">
+        <OperationalWorkspaceStatCard
+          label="Open actions shown"
+          value={numberValue(summary.total_actions ?? actions.length)}
+          helper="Highest-priority actions currently returned for your access"
+          iconPath="/action-center"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Highest urgency"
+          value={summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}
+          helper="Most urgent level among the actions shown"
+          iconPath="/alerts"
+          tone={['critical'].includes(String(summary.highest_urgency || '').toLowerCase()) ? 'danger' : ['high', 'medium'].includes(String(summary.highest_urgency || '').toLowerCase()) ? 'warn' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Approval gated"
+          value={numberValue(summary.approval_required_count)}
+          helper="Items requiring human governance review"
+          iconPath="/intelligence-review"
+          tone={numberValue(summary.approval_required_count) > 0 ? 'warn' : 'neutral'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Execution mode"
+          value={executionModeLabel(response?.definition?.execution_mode)}
+          helper="Guidance only; this page does not change source records"
+          iconPath="/execution-tasks"
+          tone="neutral"
+        />
+      </OperationalWorkspaceStats>
 
       <div className="card action-center-info-card">
         <span className="action-center-icon action-center-icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>

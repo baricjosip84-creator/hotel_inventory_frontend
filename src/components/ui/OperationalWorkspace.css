@@ -492,3 +492,68 @@
     justify-content: flex-start;
   }
 }
+
+/* Final compatibility layer for the small set of tenant pages that were
+   originally built on an older card/page shell. These pages now use the same
+   hero, KPI and tab components as the rest of the tenant workspace; the rules
+   below normalize their remaining legacy body surfaces without changing any
+   business behavior. */
+.io-workspace-page.io-workspace-legacy-normalized .card {
+  border-color: var(--io-workspace-border) !important;
+  border-radius: var(--io-workspace-card-radius) !important;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized > .card,
+.io-workspace-page.io-workspace-legacy-normalized > section.card,
+.io-workspace-page.io-workspace-legacy-normalized > .section > .card,
+.io-workspace-page.io-workspace-legacy-normalized .learning-feedback-page > .card {
+  border-radius: var(--io-workspace-panel-radius) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035) !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .section {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .section__title {
+  margin: 0 0 10px !important;
+  color: var(--io-workspace-ink) !important;
+  font-size: 17px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .card-grid {
+  gap: 14px !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .button {
+  min-height: 36px;
+  border-radius: 9px !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .input,
+.io-workspace-page.io-workspace-legacy-normalized input:not([type='checkbox']):not([type='radio']),
+.io-workspace-page.io-workspace-legacy-normalized select,
+.io-workspace-page.io-workspace-legacy-normalized textarea {
+  border-radius: 9px !important;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .learning-feedback-page {
+  display: grid;
+  gap: var(--io-workspace-gap) !important;
+  min-width: 0;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .ai-review-page__mode-bar {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.io-workspace-page.io-workspace-legacy-normalized .ai-review-page__mode-bar .ai-review-page__mode-explanation {
+  margin: 0;
+}

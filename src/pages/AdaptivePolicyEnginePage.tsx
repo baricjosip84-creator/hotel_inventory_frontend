@@ -3,6 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './decisionIntelligencePages.css';
 import './AdaptivePolicyEnginePage.css';
 
@@ -360,13 +369,12 @@ function MetricCard({
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
 }) {
   return (
-    <div className={`adaptive-policy-metric ${iconPath ? 'adaptive-policy-metric--with-icon' : ''}`} data-tone={tone}>
-      {iconPath ? <span className="adaptive-policy-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
-      <div className="adaptive-policy-metric__copy">
-        <span className="adaptive-policy-metric__label">{label}</span>
-        <strong className="adaptive-policy-metric__value">{metricValue(value, format)}</strong>
-      </div>
-    </div>
+    <OperationalWorkspaceStatCard
+      label={label}
+      value={metricValue(value, format)}
+      iconPath={iconPath}
+      tone={tone === 'violet' ? 'blue' : tone}
+    />
   );
 }
 
@@ -520,7 +528,7 @@ export default function AdaptivePolicyEnginePage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
+      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
         <section className="card adaptive-policy-state-card"><span className="adaptive-policy-state-icon"><TenantNavIcon path="/adaptive-policy-engine" size={18} /></span><p>Loading adaptive policy evidence…</p></section>
       </main>
     );
@@ -528,7 +536,7 @@ export default function AdaptivePolicyEnginePage() {
 
   if (error) {
     return (
-      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
+      <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
         <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger">
           <span className="adaptive-policy-state-icon adaptive-policy-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span><div><h2>Adaptive policy evidence could not be loaded</h2>
           <p>Check your Decision Intelligence access and try the read-only request again.</p>
@@ -539,30 +547,41 @@ export default function AdaptivePolicyEnginePage() {
   }
 
   return (
-    <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined">
-      <section className="card adaptive-policy-intro">
-        <div className="adaptive-policy-intro__content">
-          <span className="adaptive-policy-hero-icon"><TenantNavIcon path="/adaptive-policy-engine" size={24} /></span>
-          <div className="adaptive-policy-intro__copy">
-            <span className="eyebrow">Read-only policy review</span>
-            <h2>Understand how policy ideas are performing before people reuse or change them</h2>
-            <p className="card__subtext">
-            This page brings together policy records, observed signals, recommendations, and measured outcomes. It does not create,
-            approve, apply, promote, roll back, or retire policies.
-          </p>
-          <div className="adaptive-policy-hero-badges">
-            <span className="adaptive-policy-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-governed decisions</span>
-            <span className="adaptive-policy-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />Evidence only</span>
-          </div>
-          </div>
-        </div>
-        <div className="adaptive-policy-refresh">
-          <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            <TenantNavIcon path="/adaptive-policy-engine" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
-          </button>
-          <span>Last refreshed: {lastRefreshed}</span>
-        </div>
-      </section>
+    <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/adaptive-policy-engine"
+        eyebrow="Decision intelligence & policy review"
+        title="Adaptive Policy Engine"
+        description="Review stored policy records, observed signals, recommendations, and measured outcomes before people reuse or change a policy. This workspace does not create, approve, apply, promote, roll back, or retire policies."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human-governed decisions</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Read-only evidence</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<><OperationalWorkspaceStatus value={formatLabel(data?.governance?.adaptive_policy_posture)} label={`policy review posture · refreshed ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}</button></>}
+      />
+
+<OperationalWorkspaceStats ariaLabel="Adaptive policy evidence summary">
+        <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
+        <MetricCard label="Signals" value={signalCount} iconPath="/insights" tone="violet" />
+        <MetricCard label="Recommendations" value={recommendationCount} iconPath="/intelligence-review" tone="amber" />
+        <MetricCard label="Measurements" value={measurementCount} iconPath="/reports" tone="green" />
+        <OperationalWorkspaceStatCard
+          label="Current posture"
+          value={formatLabel(data?.governance?.adaptive_policy_posture)}
+          helper="Current evidence and governance posture"
+          iconPath="/permissions"
+          tone="slate"
+        />
+      </OperationalWorkspaceStats>
+
+<OperationalWorkspaceTabs ariaLabel="Adaptive policy page views">
+        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/adaptive-policy-engine" label="Policy evidence" onClick={() => setView('evidence')} />
+        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Readiness checks" onClick={() => setView('readiness')} />
+        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label="Diagnostics" onClick={() => setView('diagnostics')} /> : null}
+      </OperationalWorkspaceTabs>
 
       <section className="card adaptive-policy-filters" aria-label="Adaptive policy filters">
         <div className="card__header">
@@ -615,35 +634,9 @@ export default function AdaptivePolicyEnginePage() {
         </div>
       </section>
 
-      <div className="adaptive-policy-view-switch" role="tablist" aria-label="Adaptive policy page views">
-        <button className={`adaptive-policy-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}>
-          <TenantNavIcon path="/adaptive-policy-engine" size={14} />Policy evidence
-        </button>
-        <button className={`adaptive-policy-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}>
-          <TenantNavIcon path="/reliability-command" size={14} />Readiness checks
-        </button>
-        {canViewDiagnostics ? (
-          <button className={`adaptive-policy-view-switch__button ${view === 'diagnostics' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'diagnostics'} onClick={() => setView('diagnostics')}>
-            <TenantNavIcon path="/admin-system" size={14} />Diagnostics
-          </button>
-        ) : null}
-      </div>
+      
 
-      <section className="adaptive-policy-summary-grid" aria-label="Adaptive policy evidence summary">
-        <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
-        <MetricCard label="Signals" value={signalCount} iconPath="/insights" tone="violet" />
-        <MetricCard label="Recommendations" value={recommendationCount} iconPath="/intelligence-review" tone="amber" />
-        <MetricCard label="Measurements" value={measurementCount} iconPath="/reports" tone="green" />
-        <div className="adaptive-policy-metric adaptive-policy-metric--wide adaptive-policy-metric--with-icon" data-tone="slate">
-          <span className="adaptive-policy-metric__icon"><TenantNavIcon path="/permissions" size={18} /></span>
-          <div className="adaptive-policy-metric__copy">
-            <span className="adaptive-policy-metric__label">Current posture</span>
-            <strong className="adaptive-policy-metric__value adaptive-policy-metric__value--text">
-              {formatLabel(data?.governance?.adaptive_policy_posture)}
-            </strong>
-          </div>
-        </div>
-      </section>
+      
 
       {!hasEvidence ? (
         <section className="card adaptive-policy-empty-state">

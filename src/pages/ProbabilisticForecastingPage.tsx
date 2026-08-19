@@ -3,6 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './decisionIntelligencePages.css';
 import './ProbabilisticForecastingPage.css';
 
@@ -463,15 +472,7 @@ function MetricCard({
   iconPath?: string;
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
 }) {
-  return (
-    <div className={`forecast-metric ${iconPath ? 'forecast-metric--with-icon' : ''}`} data-tone={tone}>
-      {iconPath ? <span className="forecast-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
-      <div className="forecast-metric__copy">
-        <span className="forecast-metric__label">{label}</span>
-        <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
-      </div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={label} value={formatMetric(value, format)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 function EvidenceSection({
@@ -623,7 +624,7 @@ export default function ProbabilisticForecastingPage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
+      <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
         <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/probabilistic-forecasting" size={18} /></span><p>Loading probabilistic forecast evidence…</p></section>
       </main>
     );
@@ -631,7 +632,7 @@ export default function ProbabilisticForecastingPage() {
 
   if (error) {
     return (
-      <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
+      <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
         <section className="card card--danger forecast-state-card forecast-state-card--error">
           <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
           <div>
@@ -645,29 +646,29 @@ export default function ProbabilisticForecastingPage() {
   }
 
   return (
-    <main className="decision-intelligence-page" data-probabilistic-forecasting-refined="true">
-      <section className="card forecast-intro">
-        <div className="forecast-intro__content">
-          <span className="forecast-hero-icon"><TenantNavIcon path="/probabilistic-forecasting" size={24} /></span>
-          <div className="forecast-intro__copy">
-            <span className="eyebrow">Read-only forecast review</span>
-            <h2>Compare forecast ranges and probabilities with what actually happened</h2>
-            <p className="card__subtext">
-              This page shows stored forecast models, uncertainty ranges, risk probabilities, and outcome measurements. It helps people judge whether a forecast deserves more or less trust. It does not create forecasts, change confidence, retire models, or apply predictions to business operations.
-            </p>
-            <div className="forecast-hero-badges" aria-label="Forecast review guardrails">
-              <span className="forecast-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-reviewed evidence</span>
-              <span className="forecast-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />No automatic business action</span>
-            </div>
-          </div>
-        </div>
-        <div className="forecast-refresh">
-          <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            <TenantNavIcon path="/probabilistic-forecasting" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
-          </button>
-          <span>Last refreshed: {lastRefreshed}</span>
-        </div>
-      </section>
+    <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/probabilistic-forecasting"
+        eyebrow="Decision intelligence & forecasting"
+        title="Probabilistic Forecasting"
+        description="Review stored forecast models, uncertainty ranges, risk probabilities, and actual outcomes to judge whether a forecast deserves more or less trust. This workspace cannot create forecasts, alter confidence, retire models, or apply predictions to operations."
+        meta={<><OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Human-reviewed evidence</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>No automatic business action</OperationalWorkspaceMetaPill></>}
+        aside={<><OperationalWorkspaceStatus value={formatLabel(data?.governance?.probabilistic_forecasting_posture)} label={`forecast review posture · refreshed ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}</button></>}
+      />
+
+<OperationalWorkspaceStats ariaLabel="Probabilistic forecast evidence summary">
+        <MetricCard label="Models" value={modelCount} iconPath="/probabilistic-forecasting" tone="blue" />
+        <MetricCard label="Uncertainty ranges" value={intervalCount} iconPath="/insights" tone="violet" />
+        <MetricCard label="Risk probabilities" value={riskCount} iconPath="/alerts" tone="amber" />
+        <MetricCard label="Outcome observations" value={calibrationCount} iconPath="/decision-learning-feedback" tone="green" />
+        <OperationalWorkspaceStatCard label="Current posture" value={formatLabel(data?.governance?.probabilistic_forecasting_posture)} helper="Current evidence and governance posture" iconPath="/reliability-command" tone="slate" />
+      </OperationalWorkspaceStats>
+
+<OperationalWorkspaceTabs ariaLabel="Probabilistic forecasting page views">
+        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/probabilistic-forecasting" label="Forecast evidence" onClick={() => setView('evidence')} />
+        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Review checks" onClick={() => setView('readiness')} />
+        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label="Diagnostics" onClick={() => setView('diagnostics')} /> : null}
+      </OperationalWorkspaceTabs>
 
       <section className="card forecast-filters" aria-label="Probabilistic forecast filters">
         <div className="card__header">
@@ -734,33 +735,9 @@ export default function ProbabilisticForecastingPage() {
         </div>
       </section>
 
-      <div className="forecast-view-switch" role="tablist" aria-label="Probabilistic forecasting page views">
-        <button className={`forecast-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}>
-          <TenantNavIcon path="/probabilistic-forecasting" size={14} />Forecast evidence
-        </button>
-        <button className={`forecast-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}>
-          <TenantNavIcon path="/reliability-command" size={14} />Review checks
-        </button>
-        {canViewDiagnostics ? (
-          <button className={`forecast-view-switch__button ${view === 'diagnostics' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'diagnostics'} onClick={() => setView('diagnostics')}>
-            <TenantNavIcon path="/admin-system" size={14} />Diagnostics
-          </button>
-        ) : null}
-      </div>
+      
 
-      <section className="forecast-summary-grid" aria-label="Probabilistic forecast evidence summary">
-        <MetricCard label="Models" value={modelCount} iconPath="/probabilistic-forecasting" tone="blue" />
-        <MetricCard label="Uncertainty ranges" value={intervalCount} iconPath="/insights" tone="violet" />
-        <MetricCard label="Risk probabilities" value={riskCount} iconPath="/alerts" tone="amber" />
-        <MetricCard label="Outcome observations" value={calibrationCount} iconPath="/decision-learning-feedback" tone="green" />
-        <div className="forecast-metric forecast-metric--wide forecast-metric--with-icon" data-tone="slate">
-          <span className="forecast-metric__icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
-          <div className="forecast-metric__copy">
-            <span className="forecast-metric__label">Current posture</span>
-            <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.probabilistic_forecasting_posture)}</strong>
-          </div>
-        </div>
-      </section>
+      
 
       {!hasEvidence ? (
         <section className="card forecast-empty-state">

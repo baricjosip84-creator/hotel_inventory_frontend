@@ -2,6 +2,15 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../components/ui/OperationalWorkspace';
 import './decisionIntelligencePages.css';
 import './CrossDomainOptimizationPage.css';
 
@@ -379,15 +388,7 @@ function MetricCard({
   iconPath?: string;
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
 }) {
-  return (
-    <div className={`forecast-metric ${iconPath ? 'forecast-metric--with-icon' : ''}`} data-tone={tone}>
-      {iconPath ? <span className="forecast-metric__icon"><TenantNavIcon path={iconPath} size={18} /></span> : null}
-      <div className="forecast-metric__copy">
-        <span className="forecast-metric__label">{label}</span>
-        <strong className="forecast-metric__value">{formatMetric(value, format)}</strong>
-      </div>
-    </div>
-  );
+  return <OperationalWorkspaceStatCard label={label} value={formatMetric(value, format)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 function EvidenceSection({
@@ -540,7 +541,7 @@ export default function CrossDomainOptimizationPage() {
 
   if (isLoading) {
     return (
-      <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
+      <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-cross-domain-optimization-refined="true">
         <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/cross-domain-optimization" size={18} /></span><p>Loading cross-area optimization evidence…</p></section>
       </main>
     );
@@ -548,7 +549,7 @@ export default function CrossDomainOptimizationPage() {
 
   if (error) {
     return (
-      <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
+      <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-cross-domain-optimization-refined="true">
         <section className="card card--danger forecast-state-card forecast-state-card--error">
           <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
           <div>
@@ -562,29 +563,31 @@ export default function CrossDomainOptimizationPage() {
   }
 
   return (
-    <main className="decision-intelligence-page" data-cross-domain-optimization-refined="true">
-      <section className="card forecast-intro">
-        <div className="forecast-intro__content">
-          <span className="forecast-hero-icon"><TenantNavIcon path="/cross-domain-optimization" size={24} /></span>
-          <div className="forecast-intro__copy">
-            <span className="eyebrow">Read-only cross-area planning review</span>
-            <h2>Compare planning options, tradeoffs, and actual trial outcomes across business areas</h2>
-            <p className="card__subtext">
-              This page shows stored optimization runs, business objectives, proposed options, tradeoffs, and outcomes recorded through Learning Feedback. It helps people decide whether a manual trial has enough evidence for further review. It does not create options, approve plans, change objective weights, apply a plan, or scale a pattern automatically.
-            </p>
-            <div className="forecast-hero-badges" aria-label="Cross-domain optimization guardrails">
-              <span className="forecast-hero-badge"><TenantNavIcon path="/permissions" size={13} />Human-governed planning</span>
-              <span className="forecast-hero-badge"><TenantNavIcon path="/reliability-command" size={13} />No automatic plan execution</span>
-            </div>
-          </div>
-        </div>
-        <div className="forecast-refresh">
-          <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>
-            <TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}
-          </button>
-          <span>Last refreshed: {lastRefreshed}</span>
-        </div>
-      </section>
+    <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-cross-domain-optimization-refined="true">
+      <OperationalWorkspaceHero
+        iconPath="/cross-domain-optimization"
+        eyebrow="Decision intelligence & planning"
+        title="Cross-Domain Optimization"
+        description="Compare stored planning runs, business objectives, proposed options, tradeoffs, and recorded outcomes across business areas. This workspace supports human planning review only and cannot approve, apply, or scale a plan automatically."
+        meta={<><OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Human-governed planning</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>No automatic plan execution</OperationalWorkspaceMetaPill></>}
+        aside={<><OperationalWorkspaceStatus value={formatLabel(data?.governance?.cross_domain_optimization_posture)} label={`planning review posture · refreshed ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}</button></>}
+      />
+
+<OperationalWorkspaceStats ariaLabel="Cross-domain optimization evidence summary">
+        <MetricCard label="Runs" value={runCount} iconPath="/cross-domain-optimization" tone="blue" />
+        <MetricCard label="Objectives" value={objectiveCount} iconPath="/system-context" tone="violet" />
+        <MetricCard label="Options" value={optionCount} iconPath="/workflow-composer" tone="blue" />
+        <MetricCard label="Tradeoffs" value={tradeoffCount} iconPath="/alerts" tone="amber" />
+        <MetricCard label="Recorded outcomes" value={resultCount} iconPath="/decision-learning-feedback" tone="slate" />
+        <MetricCard label="Confirmed outcomes" value={data?.governance?.confirmed_result_count} iconPath="/reliability-command" tone="green" />
+        <MetricCard label="Adverse outcomes" value={data?.governance?.adverse_result_count} iconPath="/alerts" tone="amber" />
+        <OperationalWorkspaceStatCard label="Current posture" value={formatLabel(data?.governance?.cross_domain_optimization_posture)} helper="Current evidence and governance posture" iconPath="/reliability-command" tone="slate" />
+      </OperationalWorkspaceStats>
+
+<OperationalWorkspaceTabs ariaLabel="Cross-domain optimization page views">
+        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/cross-domain-optimization" label="Optimization evidence" onClick={() => setView('evidence')} />
+        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Review checks" onClick={() => setView('readiness')} />
+      </OperationalWorkspaceTabs>
 
       <section className="card forecast-filters" aria-label="Cross-domain optimization filters">
         <div className="card__header">
@@ -649,27 +652,9 @@ export default function CrossDomainOptimizationPage() {
         </div>
       </section>
 
-      <div className="forecast-view-switch" role="tablist" aria-label="Cross-domain optimization page views">
-        <button className={`forecast-view-switch__button ${view === 'evidence' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'evidence'} onClick={() => setView('evidence')}><TenantNavIcon path="/cross-domain-optimization" size={14} />Optimization evidence</button>
-        <button className={`forecast-view-switch__button ${view === 'readiness' ? 'is-active' : ''}`} type="button" role="tab" aria-selected={view === 'readiness'} onClick={() => setView('readiness')}><TenantNavIcon path="/reliability-command" size={14} />Review checks</button>
-      </div>
+      
 
-      <section className="forecast-summary-grid" aria-label="Cross-domain optimization evidence summary">
-        <MetricCard label="Runs" value={runCount} iconPath="/cross-domain-optimization" tone="blue" />
-        <MetricCard label="Objectives" value={objectiveCount} iconPath="/system-context" tone="violet" />
-        <MetricCard label="Options" value={optionCount} iconPath="/workflow-composer" tone="blue" />
-        <MetricCard label="Tradeoffs" value={tradeoffCount} iconPath="/alerts" tone="amber" />
-        <MetricCard label="Recorded outcomes" value={resultCount} iconPath="/decision-learning-feedback" tone="slate" />
-        <MetricCard label="Confirmed outcomes" value={data?.governance?.confirmed_result_count} iconPath="/reliability-command" tone="green" />
-        <MetricCard label="Adverse outcomes" value={data?.governance?.adverse_result_count} iconPath="/alerts" tone="amber" />
-        <div className="forecast-metric forecast-metric--wide forecast-metric--with-icon" data-tone="slate">
-          <span className="forecast-metric__icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
-          <div className="forecast-metric__copy">
-            <span className="forecast-metric__label">Current posture</span>
-            <strong className="forecast-metric__value forecast-metric__value--text">{formatLabel(data?.governance?.cross_domain_optimization_posture)}</strong>
-          </div>
-        </div>
-      </section>
+      
 
       {!hasEvidence ? (
         <section className="card forecast-empty-state">

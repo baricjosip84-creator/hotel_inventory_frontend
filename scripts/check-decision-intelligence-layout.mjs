@@ -10,7 +10,7 @@ const pages = [
 ];
 const stylePath = 'src/pages/decisionIntelligencePages.css';
 const allowedClasses = new Set([
-  'decision-intelligence-page',
+  'decision-intelligence-page', 'io-operational-page', 'io-workspace-page', 'io-workspace-legacy-normalized',
   'button', 'button--secondary',
   'card', 'card--danger', 'card__header', 'card__label', 'card__subtext', 'card__value',
   'data-table', 'eyebrow', 'form-label', 'input', 'page-header', 'page-subtitle',
@@ -63,7 +63,7 @@ for (const relativePath of pages) {
   if (!source.includes("import './decisionIntelligencePages.css';")) {
     fail(`${relativePath} must import the shared Decision Intelligence styles.`);
   }
-  if (!source.includes('className="decision-intelligence-page"')) {
+  if (!/className="[^"]*\bdecision-intelligence-page\b[^"]*"/.test(source)) {
     fail(`${relativePath} must use the scoped Decision Intelligence page root.`);
   }
   if (relativePath === 'src/pages/DecisionLearningFeedbackPage.tsx') {

@@ -4,6 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './WorkflowAutomationComposerPage.css';
 
 type WorkflowDomain =
@@ -397,43 +404,52 @@ export default function WorkflowAutomationComposerPage() {
   };
 
   return (
-    <div className="workflow-composer-page workflow-composer-page--refined">
-      <div className="workflow-composer-page__summary-grid">
-        <div className="card workflow-composer-page__summary-card">
-          <span className="workflow-composer-page__icon workflow-composer-page__icon--blue"><TenantNavIcon path="/workflow-composer" size={18} /></span>
-          <div className="workflow-composer-page__summary-copy">
-            <div className="card__label">Plans shown</div>
-            <div className="card__value">{summaryValue(summary.total_blueprints ?? blueprints.length)}</div>
-            <div className="card__subtext">Suggested human workflow plans matching the current filters.</div>
-          </div>
-        </div>
-        <div className="card workflow-composer-page__summary-card">
-          <span className="workflow-composer-page__icon workflow-composer-page__icon--violet"><TenantNavIcon path="/permissions" size={18} /></span>
-          <div className="workflow-composer-page__summary-copy">
-            <div className="card__label">Multi-step approval plans</div>
-            <div className="card__value">{summaryValue(summary.approval_chain_blueprints)}</div>
-            <div className="card__subtext">Plans that suggest more than one human review or approval step.</div>
-          </div>
-        </div>
-        <div className="card workflow-composer-page__summary-card">
-          <span className="workflow-composer-page__icon workflow-composer-page__icon--amber"><TenantNavIcon path="/system-context" size={18} /></span>
-          <div className="workflow-composer-page__summary-copy">
-            <div className="card__label">External integration plans</div>
-            <div className="card__value">{summaryValue(summary.integration_routing_blueprints)}</div>
-            <div className="card__subtext">Read-only plans connected to permitted external integration contracts.</div>
-          </div>
-        </div>
-        <div className="card workflow-composer-page__summary-card">
-          <span className="workflow-composer-page__icon workflow-composer-page__icon--green"><TenantNavIcon path="/workspace" size={18} /></span>
-          <div className="workflow-composer-page__summary-copy">
-            <div className="card__label">Page mode</div>
-            <div className="card__value workflow-composer-page__mode-value">
-              {composerQuery.isLoading || composerQuery.error ? '—' : executionModeLabel(response?.definition?.execution_mode)}
-            </div>
-            <div className="card__subtext">This page suggests a process but cannot create or run automation.</div>
-          </div>
-        </div>
-      </div>
+    <div className="workflow-composer-page workflow-composer-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/workflow-composer"
+        eyebrow="Human workflow planning"
+        title="Workflow Composer"
+        description="Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Human-reviewed</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>No autonomous execution</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value="Guidance only" label="source workflows remain authoritative" />}
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Workflow Composer overview">
+        <OperationalWorkspaceStatCard
+          label="Plans shown"
+          value={summaryValue(summary.total_blueprints ?? blueprints.length)}
+          helper="Suggested human workflow plans matching current filters"
+          iconPath="/workflow-composer"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Multi-step approval plans"
+          value={summaryValue(summary.approval_chain_blueprints)}
+          helper="Plans suggesting more than one human review or approval step"
+          iconPath="/permissions"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="External integration plans"
+          value={summaryValue(summary.integration_routing_blueprints)}
+          helper="Read-only plans connected to permitted integration contracts"
+          iconPath="/system-context"
+          tone="warn"
+        />
+        <OperationalWorkspaceStatCard
+          label="Page mode"
+          value={composerQuery.isLoading || composerQuery.error ? '—' : executionModeLabel(response?.definition?.execution_mode)}
+          helper="This page suggests a process but cannot create or run automation"
+          iconPath="/workspace"
+          tone="neutral"
+        />
+      </OperationalWorkspaceStats>
 
       <section className="section workflow-composer-page__section">
         <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/workflow-composer" size={16} /></span><span>Suggested workflow plans</span></div>

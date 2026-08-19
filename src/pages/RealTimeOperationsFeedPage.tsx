@@ -4,6 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
 import './RealTimeOperationsFeedPage.css';
 
 type EventUrgency = 'critical' | 'high' | 'medium' | 'low';
@@ -348,41 +355,52 @@ export default function RealTimeOperationsFeedPage() {
   }, [availableDomains, eventDomain]);
 
   return (
-    <div className="operations-feed-page operations-feed-page--refined">
-      <div className="operations-feed-page__summary-grid">
-        <div className="card operations-feed-page__card operations-feed-page__summary-card">
-          <span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
-          <div className="operations-feed-page__summary-copy">
-            <div className="card__label">Items shown</div>
-            <div className="card__value">{numberValue(summary.total_timeline_items ?? timeline.length)}</div>
-            <div className="card__subtext">Open work, permitted integration events, and current delivery problems matching the filters.</div>
-          </div>
-        </div>
-        <div className="card operations-feed-page__card operations-feed-page__summary-card">
-          <span className="operations-feed-page__icon operations-feed-page__icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
-          <div className="operations-feed-page__summary-copy">
-            <div className="card__label">Critical items</div>
-            <div className="card__value operations-feed-page__value--danger">{numberValue(summary.critical_events)}</div>
-            <div className="card__subtext">Items that need the fastest human review.</div>
-          </div>
-        </div>
-        <div className="card operations-feed-page__card operations-feed-page__summary-card">
-          <span className="operations-feed-page__icon operations-feed-page__icon--warning"><TenantNavIcon path="/reliability-command" size={18} /></span>
-          <div className="operations-feed-page__summary-copy">
-            <div className="card__label">Blocked or failed</div>
-            <div className="card__value operations-feed-page__value--warning">{numberValue(summary.blocked_or_failed_events)}</div>
-            <div className="card__subtext">Work or integration events reporting a disruption.</div>
-          </div>
-        </div>
-        <div className="card operations-feed-page__card operations-feed-page__summary-card">
-          <span className="operations-feed-page__icon operations-feed-page__icon--green"><TenantNavIcon path="/workspace" size={18} /></span>
-          <div className="operations-feed-page__summary-copy">
-            <div className="card__label">Page mode</div>
-            <div className="card__value operations-feed-page__mode-value">Guidance only</div>
-            <div className="card__subtext">Use the source page to perform the real follow-up.</div>
-          </div>
-        </div>
-      </div>
+    <div className="operations-feed-page operations-feed-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      <OperationalWorkspaceHero
+        iconPath="/real-time-operations-feed"
+        eyebrow="Operational coordination"
+        title="Operations Feed"
+        description="A tenant-scoped coordination feed for current open work, permitted integration events, and disruption follow-up. Review context here and use the authoritative source page for action."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Read-only coordination</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Source workflows linked</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value="Snapshot" label="refresh to load the latest permitted operational events" />}
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Operations feed overview">
+        <OperationalWorkspaceStatCard
+          label="Items shown"
+          value={numberValue(summary.total_timeline_items ?? timeline.length)}
+          helper="Open work, integration events, and delivery problems matching filters"
+          iconPath="/real-time-operations-feed"
+          tone="blue"
+        />
+        <OperationalWorkspaceStatCard
+          label="Critical items"
+          value={numberValue(summary.critical_events)}
+          helper="Items that need the fastest human review"
+          iconPath="/alerts"
+          tone={numberValue(summary.critical_events) > 0 ? 'danger' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Blocked or failed"
+          value={numberValue(summary.blocked_or_failed_events)}
+          helper="Work or integration events reporting a disruption"
+          iconPath="/reliability-command"
+          tone={numberValue(summary.blocked_or_failed_events) > 0 ? 'warn' : 'good'}
+        />
+        <OperationalWorkspaceStatCard
+          label="Page mode"
+          value="Guidance only"
+          helper="Use the source page to perform the real follow-up"
+          iconPath="/workspace"
+          tone="neutral"
+        />
+      </OperationalWorkspaceStats>
 
       <section className="section operations-feed-page__section">
         <div className="section__title operations-feed-page__section-title">
