@@ -170,7 +170,8 @@ function formatLastRefreshed(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-function sessionStatusLabel(status: SessionStatusFilter): string {
+function sessionStatusLabel(status: SessionStatusFilter, summary: SessionSummary): string {
+  if (status === 'active' && summary.active === 0) return 'NO ACTIVE SESSIONS';
   if (status === 'all') return 'ALL SESSIONS';
   return `${status.toUpperCase()} SESSIONS`;
 }
@@ -190,7 +191,6 @@ export default function SessionsPage() {
   const queryClient = useQueryClient();
   const supportSession = isSupportSessionAccess();
   const currentTenantSessionId = getCurrentTenantSessionId();
-  const currentBrowserTracked = supportSession || Boolean(currentTenantSessionId);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -209,6 +209,7 @@ export default function SessionsPage() {
   const sessions = sessionsQuery.data?.rows ?? [];
   const summary = sessionsQuery.data?.summary ?? { total: 0, active: 0, revoked: 0, expired: 0 };
   const hasNext = sessionsQuery.data?.has_next === true;
+  const currentBrowserTrackingUnavailable = !supportSession && (!currentTenantSessionId || summary.active === 0);
 
   useEffect(() => {
     if (!sessionsQuery.data || sessionsQuery.isFetching || page <= 1 || sessions.length > 0 || hasNext) return;
@@ -328,15 +329,13 @@ export default function SessionsPage() {
 
   const heroStatus = supportSession
     ? 'Platform managed'
-    : !currentBrowserTracked
-      ? 'Tracking unavailable'
-      : summary.active > 0
-        ? `${summary.active} active`
-        : 'Attention';
+    : currentBrowserTrackingUnavailable
+      ? 'Attention'
+      : `${summary.active} active`;
   const heroStatusLabel = supportSession
     ? `support-session access · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`
-    : !currentBrowserTracked
-      ? 'current access token is not linked to a tracked browser session'
+    : currentBrowserTrackingUnavailable
+      ? 'current browser is not represented by an active tracked session'
       : `account session posture · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`;
 
   return (
@@ -419,10 +418,10 @@ export default function SessionsPage() {
           <strong>Platform support access is read-only here.</strong>
           <span>This support session must be ended from the platform Support Sessions page.</span>
         </div>
-      ) : !currentBrowserTracked ? (
-        <div className="app-warning-state sessions-guidance" role="alert">
-          <strong>Current browser session tracking is unavailable.</strong>
-          <span>This browser is using an older access token that is not linked to a tracked refresh session. Sign out and sign back in once to bring this browser under Sessions management.</span>
+      ) : currentBrowserTrackingUnavailable ? (
+        <div className="app-info-state sessions-guidance" role="status">
+          <strong>Current browser is not yet tracked.</strong>
+          <span>This signed-in browser is not represented by an active tracked session. Sign out and sign back in once to create a tracked session and bring this browser under Sessions management.</span>
         </div>
       ) : (
         <div className="app-warning-state sessions-guidance">
@@ -436,7 +435,7 @@ export default function SessionsPage() {
           iconPath="/sessions"
           title="Session inventory"
           description="Active sessions are shown by default. The current browser is pinned first when it matches the selected status."
-          actions={<StatusBadge tone="blue">{sessionStatusLabel(statusFilter)}</StatusBadge>}
+          actions={<StatusBadge tone={statusFilter === 'active' && summary.active === 0 ? 'neutral' : 'blue'}>{sessionStatusLabel(statusFilter, summary)}</StatusBadge>}
         />
 
         <div className="sessions-toolbar">
