@@ -298,11 +298,21 @@ export default function UsersPage() {
       active: users.filter(isUserActive).length,
       inactive: users.filter((user) => !isUserActive(user)).length,
       admins: users.filter((user) => user.role === 'admin').length,
+      activeAdmins: users.filter((user) => user.role === 'admin' && isUserActive(user)).length,
       managers: users.filter((user) => user.role === 'manager').length,
       staff: users.filter((user) => user.role === 'staff' && !user.custom_role_id).length,
       custom: users.filter((user) => Boolean(user.custom_role_id)).length
     };
   }, [users]);
+
+  const editingOwnRole = Boolean(editingUser && currentUserId && editingUser.id === currentUserId);
+  const editingOnlyActiveAdmin = Boolean(
+    editingUser &&
+    editingUser.role === 'admin' &&
+    isUserActive(editingUser) &&
+    summary.activeAdmins === 1
+  );
+  const roleAssignmentLocked = editingOwnRole || editingOnlyActiveAdmin;
 
   const lastRefreshedText = usersQuery.dataUpdatedAt
     ? `Last refreshed ${formatDateTime(new Date(usersQuery.dataUpdatedAt).toISOString())}`
@@ -407,12 +417,18 @@ export default function UsersPage() {
 
     if (currentUserId && user.id === currentUserId) {
       setPageMessage(null);
-      setPageError('You cannot delete your own user account. Backend rejects self-delete to prevent account lockout.');
+      setPageError('You cannot delete your own user account.');
+      return;
+    }
+
+    if (isUserActive(user)) {
+      setPageMessage(null);
+      setPageError('Deactivate this user before permanently deleting the account.');
       return;
     }
 
     const confirmed = window.confirm(
-      `Permanently delete user "${user.name}"? This is not the normal way to remove access. Deactivate the account instead when history must be preserved.`
+      `Permanently delete inactive user "${user.name}"? This cannot be undone and may still be blocked when business history references this account.`
     );
 
     if (!confirmed) {
@@ -528,7 +544,7 @@ export default function UsersPage() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, roleSelection: event.target.value as RoleSelection }))
                 }
-                disabled={!canWrite || roleOptionsQuery.isLoading || Boolean(editingUser && currentUserId && editingUser.id === currentUserId)}
+                disabled={!canWrite || roleOptionsQuery.isLoading || roleAssignmentLocked}
               >
                 {!editingUser ? <option value="">Select a role…</option> : null}
                 <optgroup label="Built-in roles">
@@ -548,7 +564,8 @@ export default function UsersPage() {
                   </optgroup>
                 ) : null}
               </select>
-              {editingUser && currentUserId && editingUser.id === currentUserId ? <small style={styles.fieldHelp}>Your own role assignment cannot be changed from this form.</small> : null}
+              {editingOwnRole ? <small style={styles.fieldHelp}>Your own role assignment cannot be changed from this form.</small> : null}
+              {!editingOwnRole && editingOnlyActiveAdmin ? <small style={styles.fieldHelp}>This is the tenant's only active admin. Assign another active admin before changing this role.</small> : null}
               {!editingUser ? <small style={styles.fieldHelp}>Choose access deliberately. Use a custom role when this employee needs narrower job-specific access than the built-in Staff role.</small> : null}
               {roleOptionsQuery.isError ? <small style={styles.fieldHelp}>Custom roles could not be loaded. Built-in roles remain available.</small> : null}
             </div>
@@ -570,7 +587,11 @@ export default function UsersPage() {
                 disabled={!canWrite}
               />
               <small style={styles.fieldHelp}>
-                {editingUser ? 'Leave blank to keep the current password. New passwords must be at least 10 characters.' : 'Minimum 10 characters.'}
+                {editingUser
+                  ? currentUserId && editingUser.id === currentUserId
+                    ? 'Leave blank to keep the current password. Changing it revokes your other active sessions. Minimum 10 characters.'
+                    : 'Leave blank to keep the current password. Changing it signs this user out of all active sessions. Minimum 10 characters.'
+                  : 'Minimum 10 characters.'}
               </small>
             </div>
 
@@ -727,8 +748,19 @@ export default function UsersPage() {
                       type="button"
                       style={styles.deleteButton}
                       onClick={() => handleDelete(user)}
-                      disabled={!canWrite || deleteMutation.isPending || Boolean(currentUserId && user.id === currentUserId)}
-                      title={currentUserId && user.id === currentUserId ? 'You cannot delete your own account' : 'Permanently delete this account when retention constraints allow it'}
+                      disabled={
+                        !canWrite ||
+                        deleteMutation.isPending ||
+                        isUserActive(user) ||
+                        Boolean(currentUserId && user.id === currentUserId)
+                      }
+                      title={
+                        currentUserId && user.id === currentUserId
+                          ? 'You cannot delete your own account'
+                          : isUserActive(user)
+                            ? 'Deactivate this account before permanent deletion'
+                            : 'Permanently delete this inactive account when retention constraints allow it'
+                      }
                     >
                       {deleteMutation.isPending && deleteMutation.variables === user.id ? 'Deleting…' : 'Delete'}
                     </button>
