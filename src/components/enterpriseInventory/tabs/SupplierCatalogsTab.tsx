@@ -102,7 +102,7 @@ export function SupplierCatalogsTab({
         <SupplierCatalogImportPanel suppliers={suppliers} canImport={canWrite} canCreateProducts={canCreateProducts} />
       </div>
 
-      <div style={styles.grid}>
+      <div className="inventory-controls-grid" style={styles.grid}>
         <form onSubmit={submit} style={styles.card} data-skip-global-action-feedback="true">
           <h2 style={styles.cardTitle}>Manual supplier-product link</h2>
           <p style={styles.helper}>Use this for one-off maintenance. Bulk supplier files should use the reviewed catalog import above.</p>

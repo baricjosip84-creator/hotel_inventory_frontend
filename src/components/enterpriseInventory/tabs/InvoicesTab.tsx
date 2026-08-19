@@ -190,7 +190,7 @@ export function InvoicesTab({
 
   return (
     <section style={styles.stack}>
-      <div style={styles.grid}>
+      <div className="inventory-controls-grid" style={styles.grid}>
         <form onSubmit={handleSupplierInvoiceSubmit} style={styles.card} data-skip-global-action-feedback="true">
           <h2 style={styles.cardTitle}>{editingInvoiceId ? 'Edit supplier invoice draft' : 'Create supplier invoice draft'}</h2>
           <div style={styles.formGrid}>

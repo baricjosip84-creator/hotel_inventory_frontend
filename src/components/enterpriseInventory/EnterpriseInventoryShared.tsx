@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 import { styles } from './EnterpriseInventoryStyles';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+} from '../ui/OperationalWorkspace';
 
 export function MetricCard({ label, value, helper }: { label: string; value: string | number; helper?: string }) {
   return (
@@ -124,33 +128,42 @@ export function DataTable({ loading, empty, headers, rows }: { loading: boolean;
 export function EnterpriseInventoryHero({
   onEvaluateParLevels,
   evaluating,
-  canEvaluate
+  canEvaluate,
+  lastRefreshedAt
 }: {
   onEvaluateParLevels: () => void;
   evaluating: boolean;
   canEvaluate: boolean;
+  lastRefreshedAt: number | null;
 }) {
   return (
-    <section style={styles.hero}>
-      <div>
-        <p style={styles.eyebrow}>Advanced inventory controls</p>
-        <h1 style={styles.title}>Specialized inventory workflows</h1>
-        <p style={styles.subtitle}>
-          Manage the inventory controls that do not already have a dedicated tenant page: par levels,
-          cycle counts, supplier returns, approvals, supplier catalogs, invoices, labels, attachments, and notifications.
-        </p>
-      </div>
-      {canEvaluate ? (
+    <OperationalWorkspaceHero
+      iconPath="/enterprise-inventory"
+      eyebrow="Inventory operations"
+      title="Specialized inventory workflows"
+      description="Manage the inventory controls that do not already have a dedicated tenant page: par levels, cycle counts, supplier returns, approvals, supplier catalogs, invoices, labels, attachments, and notifications."
+      meta={
+        <>
+          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Permission-aware</OperationalWorkspaceMetaPill>
+          {lastRefreshedAt ? (
+            <OperationalWorkspaceMetaPill>
+              Refreshed {new Date(lastRefreshedAt).toLocaleString()}
+            </OperationalWorkspaceMetaPill>
+          ) : null}
+        </>
+      }
+      aside={canEvaluate ? (
         <button
           type="button"
           onClick={onEvaluateParLevels}
           disabled={evaluating}
-          style={styles.primaryButton}
+          className="app-button app-button--primary"
         >
           {evaluating ? 'Evaluating…' : 'Evaluate par levels'}
         </button>
-      ) : null}
-    </section>
+      ) : undefined}
+    />
   );
 }
 

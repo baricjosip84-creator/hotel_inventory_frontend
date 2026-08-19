@@ -1,7 +1,15 @@
 import { hasPermission } from '../../lib/permissions';
 import { getTenantFeatureEntitlement, type TenantSubscriptionAccess } from '../../lib/tenantSubscriptionAccess';
-import { styles } from './EnterpriseInventoryStyles';
-import { enterpriseInventoryTabFeatures, enterpriseInventoryTabs, type EnterpriseInventoryTabKey } from './EnterpriseInventoryTabConfig';
+import {
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs,
+} from '../ui/OperationalWorkspace';
+import {
+  enterpriseInventoryTabFeatures,
+  enterpriseInventoryTabIconPaths,
+  enterpriseInventoryTabs,
+  type EnterpriseInventoryTabKey,
+} from './EnterpriseInventoryTabConfig';
 
 type EnterpriseInventoryTabsProps = {
   activeTab: string;
@@ -18,19 +26,21 @@ export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAcces
   });
 
   return (
-    <div style={styles.tabs}>
+    <OperationalWorkspaceTabs
+      ariaLabel="Inventory control work areas"
+      hint="Choose the specialized inventory control you need."
+    >
       {visibleTabs.map(([key, label]) => (
-        <button
+        <OperationalWorkspaceTab
           key={key}
-          type="button"
-          style={activeTab === key ? styles.activeTab : styles.tab}
+          active={activeTab === key}
+          iconPath={enterpriseInventoryTabIconPaths[key]}
+          label={label}
           onClick={() => onChange(key)}
           title={label}
           data-skip-global-action-feedback="true"
-        >
-          {label}
-        </button>
+        />
       ))}
-    </div>
+    </OperationalWorkspaceTabs>
   );
 }

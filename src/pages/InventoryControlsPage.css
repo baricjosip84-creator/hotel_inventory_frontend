@@ -1,0 +1,104 @@
+.inventory-controls-page {
+  --inventory-controls-panel-gap: 16px;
+}
+
+.inventory-controls-page .io-workspace-hero {
+  margin: 0;
+}
+
+.inventory-controls-page .io-workspace-hero__description {
+  max-width: 860px;
+}
+
+.inventory-controls-page .io-workspace-tabs {
+  margin: 0;
+}
+
+.inventory-controls-page .io-workspace-tabs__items {
+  padding-bottom: 1px;
+}
+
+.inventory-controls-page .io-workspace-tab {
+  min-height: 38px;
+}
+
+.inventory-controls-page .inventory-controls-grid {
+  min-width: 0;
+}
+
+.inventory-controls-page table {
+  font-size: 13px;
+}
+
+.inventory-controls-page table tbody tr:hover td {
+  background: #fbfdff;
+}
+
+.inventory-controls-page input[type='file'] {
+  width: 100%;
+  min-height: 42px;
+  padding: 7px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.inventory-controls-page input[type='file']::file-selector-button {
+  min-height: 30px;
+  margin-right: 10px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inventory-controls-page input[type='checkbox'] {
+  accent-color: #2563eb;
+}
+
+.inventory-controls-page button:focus-visible,
+.inventory-controls-page input:focus-visible,
+.inventory-controls-page select:focus-visible,
+.inventory-controls-page textarea:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .inventory-controls-page > section:hover,
+  .inventory-controls-page .inventory-controls-grid > section:hover,
+  .inventory-controls-page .inventory-controls-grid > form:hover,
+  .inventory-controls-page .inventory-controls-grid > div > section:hover,
+  .inventory-controls-page .inventory-controls-grid > div > form:hover {
+    border-color: #d7e0ec !important;
+  }
+}
+
+@media (max-width: 1050px) {
+  .inventory-controls-page .inventory-controls-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .inventory-controls-page .io-workspace-tabs {
+    padding: 5px;
+  }
+
+  .inventory-controls-page .io-workspace-tab {
+    min-height: 36px;
+    padding-inline: 9px;
+  }
+}
+
+.inventory-controls-page .inventory-controls-stat--text .io-workspace-stat__value {
+  font-size: clamp(18px, 1.55vw, 22px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}

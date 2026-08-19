@@ -2,6 +2,7 @@ import { EnterpriseInventoryPageLayout } from "../components/enterpriseInventory
 import { EnterpriseInventoryPagePanels } from "../components/enterpriseInventory/EnterpriseInventoryPagePanels";
 import { useEnterpriseInventoryPageController } from "../components/enterpriseInventory/EnterpriseInventoryPageController";
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import './InventoryControlsPage.css';
 
 function EnterpriseInventoryPage() {
   const {

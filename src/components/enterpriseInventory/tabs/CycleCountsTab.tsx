@@ -47,7 +47,7 @@ export function CycleCountsTab({
   const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
 
   return (
-    <section style={styles.grid}>
+    <section className="inventory-controls-grid" style={styles.grid}>
       <div style={styles.stack}>
         <form onSubmit={onCycleCountSubmit} style={styles.card}>
           <h2 style={styles.cardTitle}>Create cycle count</h2>

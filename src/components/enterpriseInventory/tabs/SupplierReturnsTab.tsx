@@ -275,7 +275,7 @@ export function SupplierReturnsTab() {
       {message ? <div style={styles.success}>{message}</div> : null}
       {error ? <div style={styles.error}>{error}</div> : null}
 
-      <section style={styles.grid}>
+      <section className="inventory-controls-grid" style={styles.grid}>
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Create supplier return</h2>
           <p style={styles.helper}>Return received stock to its original supplier. Items in one return must belong to the same supplier.</p>

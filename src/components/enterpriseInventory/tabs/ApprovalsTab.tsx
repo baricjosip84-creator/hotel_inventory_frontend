@@ -101,7 +101,7 @@ export function ApprovalsTab({
   };
 
   return (
-    <section style={styles.grid}>
+    <section className="inventory-controls-grid" style={styles.grid}>
       <form onSubmit={handleApprovalRuleSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>Create approval rule</h2>
         <SelectField

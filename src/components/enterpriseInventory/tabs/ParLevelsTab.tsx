@@ -29,7 +29,7 @@ export function ParLevelsTab({
   const canWriteParLevels = hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_WRITE);
 
   return (
-    <section style={styles.grid}>
+    <section className="inventory-controls-grid" style={styles.grid}>
       <form onSubmit={onSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>Create / update par level</h2>
         <SelectField

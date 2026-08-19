@@ -46,7 +46,7 @@ export function NotificationsTab({
   const queueDisabled = isQueueingDelivery || !canWriteNotifications || !notificationDeliveryForm.notification_event_id || !notificationDeliveryForm.channel || (destinationRequired && !notificationDeliveryForm.recipient.trim());
 
   return (
-    <section style={styles.grid}>
+    <section className="inventory-controls-grid" style={styles.grid}>
       <form onSubmit={onNotificationDeliverySubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>Queue notification delivery</h2>
         <p style={styles.helper}>

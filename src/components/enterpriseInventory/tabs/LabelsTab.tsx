@@ -204,7 +204,7 @@ export function LabelsTab({
 
   return (
     <section style={styles.stack}>
-      <section style={styles.grid}>
+      <section className="inventory-controls-grid" style={styles.grid}>
         <form onSubmit={handleSubmit} style={styles.card} data-skip-global-action-feedback="true">
           <h2 style={styles.cardTitle}>Create printable barcode label</h2>
           <p style={{ ...styles.helper, marginBottom: 14 }}>
