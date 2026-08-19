@@ -539,15 +539,15 @@ export default function UsersPage() {
       />
 
       <OperationalWorkspaceStats ariaLabel="Tenant user overview">
-        <OperationalWorkspaceStatCard label="Total users" value={summary.total} helper={`${summary.active} active · ${summary.inactive} inactive`} tone="slate" iconPath="/users" />
-        <OperationalWorkspaceStatCard label="Active users" value={summary.active} helper="Accounts currently allowed to sign in" tone="good" iconPath="/sessions" />
+        <OperationalWorkspaceStatCard label="Active users" value={summary.active} helper={`${summary.total} total · ${summary.inactive} inactive`} tone="good" iconPath="/sessions" />
         <OperationalWorkspaceStatCard label="Inactive users" value={summary.inactive} helper="Access removed; history retained" tone={summary.inactive > 0 ? 'neutral' : 'good'} iconPath="/sessions" />
-        <OperationalWorkspaceStatCard label="Admins" value={summary.admins} helper={`${summary.activeAdmins} active tenant administrators`} tone="warn" iconPath="/permissions" />
+        <OperationalWorkspaceStatCard label="Admins" value={summary.admins} helper={`${summary.activeAdmins} active tenant administrator${summary.activeAdmins === 1 ? '' : 's'}`} tone="warn" iconPath="/permissions" />
         <OperationalWorkspaceStatCard label="Managers" value={summary.managers} helper="Built-in operational supervisors" tone="blue" iconPath="/users" />
+        <OperationalWorkspaceStatCard label="Staff" value={summary.staff} helper="Built-in daily execution users" tone="good" iconPath="/users" />
         <OperationalWorkspaceStatCard label="Custom-role users" value={summary.custom} helper="Users assigned job-specific tenant roles" tone="neutral" iconPath="/permissions" />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="User management work areas" hint="Review accounts or jump directly to the user form.">
+      <OperationalWorkspaceTabs ariaLabel="User management work areas" hint="Switch between the user directory and account form.">
         <OperationalWorkspaceTab
           active={workspaceSection === 'directory'}
           iconPath="/users"
@@ -567,6 +567,7 @@ export default function UsersPage() {
       {pageMessage ? <div className="app-success-state users-page-message" role="status">{pageMessage}</div> : null}
       {pageError ? <div className="app-error-state users-page-message" role="alert">{pageError}</div> : null}
 
+      {workspaceSection === 'directory' ? (
       <section id="tenant-user-directory-panel" className="app-panel users-panel users-directory-panel">
         <OperationalSectionHeader
           iconPath="/users"
@@ -613,7 +614,7 @@ export default function UsersPage() {
           <div className="app-empty-state users-empty-state">
             {users.length === 0
               ? canWrite
-                ? 'No tenant users exist yet. Create the first tenant user below.'
+                ? 'No tenant users exist yet. Open Create user to add the first tenant user.'
                 : 'No tenant users exist yet. Ask a tenant admin to create user accounts.'
               : 'No users matched the current search and status filters.'}
           </div>
@@ -690,7 +691,9 @@ export default function UsersPage() {
           </div>
         )}
       </section>
+      ) : null}
 
+      {workspaceSection === 'form' ? (
       <section id="tenant-user-form-panel" className="app-panel users-panel users-form-panel">
         <OperationalSectionHeader
           iconPath="/permissions"
@@ -836,6 +839,7 @@ export default function UsersPage() {
           </div>
         </form>
       </section>
+      ) : null}
     </div>
   );
 }
