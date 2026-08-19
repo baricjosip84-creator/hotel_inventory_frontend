@@ -149,7 +149,7 @@ const editor = read('src/components/permissions/RolePermissionEditor.tsx');
 const appLayout = read('src/layouts/AppLayout.tsx');
 const roleAwareWorkspace = read('src/pages/RoleAwareWorkspacePage.tsx');
 const customRolePermissionSurfaces = [
-  ['Shipments', read('src/pages/ShipmentsPage.tsx'), 'shipments.receive'],
+  ['Shipments', read('src/pages/ShipmentsPage.tsx'), 'This role cannot change ordered shipment lines.'],
   ['Alerts', read('src/pages/AlertsPage.tsx'), 'Alerts write permission'],
   ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'cannot create stock transfer drafts'],
   ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'storage_locations.write'],
@@ -170,18 +170,22 @@ assertIncludes(policyClient, [
 assertIncludes(tenantPage, [
   'Create custom role',
   'Starting template',
-  'Manage selected custom role',
+  'Custom role library',
+  'Manage ${roleName(activeRole)}',
   "setErrorMessage('Reassign all users before deactivating this custom role.')",
   "setErrorMessage('Reassign all users before deleting this custom role.')",
-  'Reassign all users before deleting this role',
+  'Reassign all users before deleting this role.',
+  'activeRole.can_deactivate === false',
+  'activeRole.can_delete === false',
   'Required Read permissions are added automatically',
-  'Custom roles cannot be named Admin, Manager, or Staff',
+  'Custom roles cannot use the protected Admin, Manager, or Staff names',
   'RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE'
 ], 'tenant permissions custom role UI');
-assertNotIncludes(tenantPage, [
-  'disabled={managing || (activeRole.is_active !== false && !activeRole.can_deactivate)}',
-  'disabled={managing || !activeRole.can_delete}'
-], 'tenant custom-role lifecycle feedback');
+assertIncludes(tenantPage, [
+  'disabled={managing || (activeRole.is_active === false ? activeRole.can_activate === false : activeRole.can_deactivate === false)}',
+  'disabled={managing || activeRole.can_delete === false}',
+  'discardDraftForRole(roleKey)'
+], 'tenant custom-role lifecycle safety');
 assertIncludes(usersPage, [
   "'/users/role-options'",
   'roleSelection',
@@ -196,7 +200,7 @@ assertIncludes(permissionSnapshot, [
   'export function getCurrentAccessRoleLabel()'
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');
-assertIncludes(appLayout, ['getCurrentAccessRoleLabel', 'accessRoleLabel.toUpperCase()'], 'custom role shell label');
+assertIncludes(appLayout, ['getCurrentAccessRoleLabel', "{accessRoleLabel || 'Tenant user'}"], 'custom role shell label');
 assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleLabel', 'getTenantPermissionSnapshot', 'custom_role_name', 'Prepared for the current access role:'], 'custom role workspace label');
 for (const [label, source, feedbackMarker] of customRolePermissionSurfaces) {
   assertIncludes(source, ['Current access role:', feedbackMarker], `${label} custom role feedback`);
@@ -210,9 +214,9 @@ for (const [label, source, feedbackMarker] of customRolePermissionSurfaces) {
 
 const shipmentsPage = customRolePermissionSurfaces.find(([label]) => label === 'Shipments')?.[1] || '';
 assertIncludes(shipmentsPage, [
-  'Ordered shipment-line changes require shipment_items.write.',
-  'Receiving remains available through shipments.receive.',
-  'canManageShipmentItems ? ('
+  'This role cannot change ordered shipment lines.',
+  'Receiving is available.',
+  'canManageShipmentItems && selectedShipmentIsPending ? ('
 ], 'Shipments least-privilege action gating');
 
 console.log(`Tenant custom role contract passed (${templates.CUSTOM_ROLE_TEMPLATES.length} templates, tenant isolation, reserved-right protection, backend enforcement, user assignment, and frontend integration verified).`);

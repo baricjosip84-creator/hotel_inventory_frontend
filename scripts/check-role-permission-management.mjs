@@ -114,7 +114,7 @@ for (const [source, values, label] of [
   [navigationSource, ["to: '/permissions'", "label: 'Permissions'", 'ROLE_PERMISSIONS_READ'], 'tenant navigation'],
   [platformLayoutSource, ['to="/platform/permissions"', 'Platform Permissions', 'PLATFORM_ROLE_PERMISSIONS_READ'], 'platform navigation'],
   [policiesSource, ['/permissions/me', '/platform/permissions/me', 'saveTenantRolePermissionPolicy', 'savePlatformRolePermissionPolicy'], 'permission API client'],
-  [tenantPageSource, ['Tenant Permissions', 'hardcoded default permissions'], 'tenant permission page'],
+  [tenantPageSource, ['Tenant permission management', 'hardcoded default permissions', 'operationalWorkspace'], 'tenant permission page'],
   [platformPageSource, ['Platform Permissions', 'Superadmin remains immutable'], 'platform permission page'],
   [editorSource, ['Enable group', 'Disable group', 'Save role permissions', 'Reset to defaults', 'Locked', 'reservedLabel', 'beforeunload'], 'shared role permission editor']
 ]) {

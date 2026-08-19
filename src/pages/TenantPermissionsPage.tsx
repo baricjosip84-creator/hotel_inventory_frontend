@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import RolePermissionEditor from '../components/permissions/RolePermissionEditor';
+import { OperationalSectionHeader } from '../components/ui/OperationalWorkspace';
 import {
   createTenantCustomRole,
   deleteTenantCustomRole,
@@ -20,6 +21,7 @@ import {
   type TenantRolePolicyKey
 } from '../lib/permissionPolicies';
 import type { TenantPermission } from '../lib/permissions';
+import './TenantPermissionsPage.css';
 
 function roleName(role: TenantRolePermissionPolicy): string {
   return role.display_name || role.role;
@@ -52,6 +54,10 @@ export default function TenantPermissionsPage() {
     () => query.data?.roles.find((role) => role.role === selectedRole),
     [query.data, selectedRole]
   );
+  const customRoles = useMemo(
+    () => query.data?.roles.filter((role) => role.role_kind === 'custom') ?? [],
+    [query.data]
+  );
   const draftPermissions = draftByRole[selectedRole] ?? activeRole?.effective_permissions ?? [];
   const createNameValid = createName.trim().length >= 2;
   const metadataNameValid = metadataName.trim().length >= 2;
@@ -66,14 +72,27 @@ export default function TenantPermissionsPage() {
     setDraftByRole((current) => ({ ...current, [selectedRole]: permissions }));
   };
 
+  const discardDraftForRole = (roleKey: TenantRolePolicyKey) => {
+    setDraftByRole((current) => {
+      if (!(roleKey in current)) return current;
+      const next = { ...current };
+      delete next[roleKey];
+      return next;
+    });
+  };
+
+  const selectRole = (role: TenantRolePermissionPolicy) => {
+    setSelectedRole(role.role);
+    setMetadataName(role.role_kind === 'custom' ? role.display_name || '' : '');
+    setMetadataDescription(role.role_kind === 'custom' ? role.description || '' : '');
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  };
+
   const reloadAndSelect = async (roleKey?: TenantRolePolicyKey) => {
     const result = await query.refetch();
     const nextRole = roleKey ? result.data?.roles.find((role) => role.role === roleKey) : undefined;
-    if (nextRole) {
-      setSelectedRole(nextRole.role);
-      setMetadataName(nextRole.role_kind === 'custom' ? nextRole.display_name || '' : '');
-      setMetadataDescription(nextRole.role_kind === 'custom' ? nextRole.description || '' : '');
-    }
+    if (nextRole) selectRole(nextRole);
   };
 
   const save = async () => {
@@ -205,20 +224,22 @@ export default function TenantPermissionsPage() {
     if (!id || !activeRole || managing) return;
     const nextActive = activeRole.is_active === false;
     const action = nextActive ? 'activate' : 'deactivate';
-    const assignedUsers = Number(activeRole.user_count || 0);
 
-    if (!nextActive && assignedUsers > 0) {
+    if (!nextActive && activeRole.can_deactivate === false) {
       setSuccessMessage(null);
       setErrorMessage('Reassign all users before deactivating this custom role.');
       return;
     }
+    if (nextActive && activeRole.can_activate === false) return;
 
     if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${roleName(activeRole)}?`)) return;
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
     try {
+      const roleKey = activeRole.role;
       const updated = await updateTenantCustomRole({ id, version: activeRole.version || 1, is_active: nextActive });
+      discardDraftForRole(roleKey);
       await reloadAndSelect(updated.role);
       setSuccessMessage(`${roleName(updated)} ${nextActive ? 'activated' : 'deactivated'} successfully.`);
     } catch (error) {
@@ -262,24 +283,21 @@ export default function TenantPermissionsPage() {
     const id = customRoleId(activeRole);
     if (!id || !activeRole || managing) return;
 
-    if (Number(activeRole.user_count || 0) > 0) {
+    if (activeRole.can_delete === false) {
       setSuccessMessage(null);
       setErrorMessage('Reassign all users before deleting this custom role.');
       return;
     }
 
-    if (!window.confirm(`Delete ${roleName(activeRole)}? This is allowed only after every assigned user is reassigned.`)) return;
+    if (!window.confirm(`Delete ${roleName(activeRole)}? This permanently removes the role definition after all users have been reassigned.`)) return;
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
     try {
+      const roleKey = activeRole.role;
       const deletedName = roleName(activeRole);
       await deleteTenantCustomRole({ id, version: activeRole.version || 1 });
-      setDraftByRole((current) => {
-        const next = { ...current };
-        delete next[activeRole.role];
-        return next;
-      });
+      discardDraftForRole(roleKey);
       setSelectedRole('admin');
       await reloadAndSelect('admin');
       setSuccessMessage(`${deletedName} deleted successfully.`);
@@ -300,115 +318,163 @@ export default function TenantPermissionsPage() {
   }
 
   const customRolePanel = (
-    <div style={styles.customRoleArea}>
-      <form onSubmit={createCustomRole} data-skip-global-action-feedback="true" style={styles.createCard}>
-        <div style={styles.cardHeading}>
-          <div>
-            <h2 style={styles.cardTitle}>Create custom role</h2>
-            <p style={styles.cardDescription}>Start blank, copy the safe Manager or Staff baseline, or use a real-world operational template. The new role is isolated to this tenant.</p>
+    <div className="tenant-permissions-custom-role-area">
+      <section className="app-panel tenant-permissions-panel">
+        <OperationalSectionHeader
+          iconPath="/users"
+          title="Custom role library"
+          description="Select a tenant-specific role to review its lifecycle, assignment status, and starting template."
+        />
+        {customRoles.length ? (
+          <div className="tenant-permissions-role-grid" aria-label="Tenant custom roles">
+            {customRoles.map((role) => (
+              <button
+                key={role.role}
+                type="button"
+                className={`tenant-permissions-role-card${role.role === selectedRole ? ' is-active' : ''}${role.is_active === false ? ' is-inactive' : ''}`}
+                onClick={() => selectRole(role)}
+              >
+                <span className="tenant-permissions-role-card__topline">
+                  <strong>{roleName(role)}</strong>
+                  <em>{role.is_active === false ? 'Inactive' : 'Active'}</em>
+                </span>
+                <span>{role.effective_permissions.length} permissions · {role.user_count || 0} assigned users</span>
+                <small>Starting point: {role.source_template_name || 'Blank role'}</small>
+              </button>
+            ))}
           </div>
-          <span style={styles.templateCount}>{query.data.custom_role_templates.length} templates</span>
-        </div>
-        <div style={styles.createGrid}>
-          <label style={styles.field}>
+        ) : (
+          <div className="app-empty-state tenant-permissions-empty-role-state">
+            No tenant custom roles have been created yet.
+          </div>
+        )}
+      </section>
+
+      <form onSubmit={createCustomRole} data-skip-global-action-feedback="true" className="app-panel tenant-permissions-panel tenant-permissions-create-panel">
+        <OperationalSectionHeader
+          iconPath="/permissions"
+          title="Create custom role"
+          description="Start blank, copy a protected baseline, or use an operational template. The new role belongs only to this tenant."
+          actions={<span className="tenant-permissions-template-count">{query.data.custom_role_templates.length} templates</span>}
+        />
+        <div className="tenant-permissions-form-grid">
+          <label className="tenant-permissions-field">
             <span>Role name</span>
-            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={80} required style={styles.input} placeholder="Example: Receiving Clerk" />
+            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={80} required placeholder="Example: Receiving Clerk" />
           </label>
-          <label style={styles.field}>
+          <label className="tenant-permissions-field">
             <span>Starting template</span>
-            <select value={createTemplateKey} onChange={(event) => setCreateTemplateKey(event.target.value)} style={styles.input}>
+            <select value={createTemplateKey} onChange={(event) => setCreateTemplateKey(event.target.value)}>
               <option value="">Blank role — dashboard only</option>
               {query.data.custom_role_templates.map((template) => (
                 <option key={template.key} value={template.key}>{template.name} · {template.permission_count} permissions</option>
               ))}
             </select>
           </label>
-          <label style={{ ...styles.field, ...styles.descriptionField }}>
+          <label className="tenant-permissions-field tenant-permissions-field--wide">
             <span>Description (optional)</span>
-            <input value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} maxLength={500} style={styles.input} placeholder="What this role is responsible for" />
+            <input value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} maxLength={500} placeholder="What this role is responsible for" />
           </label>
-          <button type="submit" style={{ ...styles.primaryButton, ...((creating || !createNameValid) ? styles.disabled : {}) }} disabled={creating || !createNameValid}>
+        </div>
+        {selectedTemplate ? (
+          <div className="tenant-permissions-template-preview">
+            <strong>{selectedTemplate.name}</strong>
+            <span>{selectedTemplate.description}</span>
+          </div>
+        ) : null}
+        <div className="tenant-permissions-safety-note">
+          Custom roles cannot use the protected Admin, Manager, or Staff names and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when an operational action depends on them.
+        </div>
+        <div className="tenant-permissions-panel-actions">
+          <button type="submit" className="app-button app-button--primary" disabled={creating || !createNameValid}>
             {creating ? 'Creating…' : 'Create custom role'}
           </button>
         </div>
-        {selectedTemplate ? (
-          <p style={styles.templatePreview}>
-            <strong>{selectedTemplate.name}:</strong> {selectedTemplate.description}
-          </p>
-        ) : null}
-        <p style={styles.safetyNote}>Custom roles cannot be named Admin, Manager, or Staff and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when operational actions depend on them.</p>
       </form>
 
       {activeRole?.role_kind === 'custom' ? (
-        <div data-skip-global-action-feedback="true" style={styles.manageCard}>
-          <div style={styles.cardHeading}>
-            <div>
-              <h2 style={styles.cardTitle}>Manage selected custom role</h2>
-              <p style={styles.cardDescription}>{activeRole.user_count || 0} assigned users · {activeRole.is_active === false ? 'Inactive' : 'Active'} · starting point: {activeRole.source_template_name || 'Blank role'}</p>
-            </div>
+        <section data-skip-global-action-feedback="true" className="app-panel tenant-permissions-panel tenant-permissions-manage-panel">
+          <OperationalSectionHeader
+            iconPath="/permissions"
+            title={`Manage ${roleName(activeRole)}`}
+            description={`${activeRole.user_count || 0} assigned users · ${activeRole.is_active === false ? 'Inactive' : 'Active'} · starting point: ${activeRole.source_template_name || 'Blank role'}`}
+          />
+          <div className="tenant-permissions-form-grid tenant-permissions-form-grid--manage">
+            <label className="tenant-permissions-field">
+              <span>Name</span>
+              <input value={metadataName} onChange={(event) => setMetadataName(event.target.value)} maxLength={80} />
+            </label>
+            <label className="tenant-permissions-field">
+              <span>Description</span>
+              <input value={metadataDescription} onChange={(event) => setMetadataDescription(event.target.value)} maxLength={500} />
+            </label>
           </div>
-          <div style={styles.manageGrid}>
-            <label style={styles.field}><span>Name</span><input value={metadataName} onChange={(event) => setMetadataName(event.target.value)} maxLength={80} style={styles.input} /></label>
-            <label style={styles.field}><span>Description</span><input value={metadataDescription} onChange={(event) => setMetadataDescription(event.target.value)} maxLength={500} style={styles.input} /></label>
+          <div className="tenant-permissions-lifecycle-note">
+            {activeRole.user_count
+              ? `${activeRole.user_count} user${activeRole.user_count === 1 ? '' : 's'} must be reassigned before this role can be deactivated or deleted.`
+              : activeRole.is_active === false
+                ? 'Inactive roles retain their definition but cannot be assigned or edited until reactivated.'
+                : 'No users are assigned. This role can be safely deactivated if it is no longer needed.'}
           </div>
-          <div style={styles.actions}>
+          <div className="tenant-permissions-panel-actions tenant-permissions-panel-actions--manage">
             <button
               type="button"
-              style={{ ...styles.secondaryButton, ...((managing || !metadataNameValid || !metadataDirty) ? styles.disabled : {}) }}
+              className="app-button app-button--secondary"
               disabled={managing || !metadataNameValid || !metadataDirty}
               onClick={() => void updateMetadata()}
             >
               Save details
             </button>
-            <button type="button" style={styles.secondaryButton} disabled={managing} onClick={() => void duplicateCustomRole()}>Duplicate</button>
+            <button type="button" className="app-button app-button--secondary" disabled={managing} onClick={() => void duplicateCustomRole()}>
+              Duplicate
+            </button>
             <button
               type="button"
-              style={styles.secondaryButton}
-              disabled={managing}
+              className="app-button app-button--secondary"
+              disabled={managing || (activeRole.is_active === false ? activeRole.can_activate === false : activeRole.can_deactivate === false)}
               onClick={() => void toggleCustomRoleActive()}
-              title={activeRole.user_count ? 'Reassign all users before deactivating this role.' : undefined}
+              title={activeRole.is_active !== false && activeRole.can_deactivate === false ? 'Reassign all users before deactivating this role.' : undefined}
             >
               {activeRole.is_active === false ? 'Activate' : 'Deactivate'}
             </button>
             <button
               type="button"
-              style={styles.dangerButton}
-              disabled={managing}
+              className="app-button app-button--danger"
+              disabled={managing || activeRole.can_delete === false}
               onClick={() => void removeCustomRole()}
-              title={activeRole.user_count ? 'Reassign all users before deleting this role.' : undefined}
+              title={activeRole.can_delete === false ? 'Reassign all users before deleting this role.' : undefined}
             >
               Delete role
             </button>
           </div>
-        </div>
-      ) : null}
+        </section>
+      ) : (
+        customRoles.length ? (
+          <div className="app-empty-state tenant-permissions-custom-role-prompt">
+            Select a custom role above to manage its name, lifecycle, and assignment safety.
+          </div>
+        ) : null
+      )}
     </div>
   );
 
   return (
     <RolePermissionEditor
-      title="Tenant Permissions"
-      description="Control protected built-in roles and tenant-specific custom roles. Backend enforcement, tenant isolation, audit logging, reserved administration rights, and reset baselines remain mandatory."
+      title="Tenant permission management"
+      description="Control built-in role access and tenant-specific custom roles without exposing users to unnecessary technical detail. Protected administration rights and tenant isolation remain enforced by the backend."
       scopeLabel="Tenant"
       reservedLabel="Tenant Admin only"
+      operationalWorkspace
+      workspaceIconPath="/permissions"
+      workspaceEyebrow="People & access"
       roles={query.data.roles}
       catalog={query.data.permission_catalog}
       permissionDependencies={query.data.permission_dependencies}
       selectedRole={selectedRole}
-      onDiscardDraft={() => {
-        setDraftByRole((current) => {
-          const next = { ...current };
-          delete next[selectedRole];
-          return next;
-        });
-      }}
+      onDiscardDraft={() => discardDraftForRole(selectedRole)}
       onSelectedRoleChange={(role) => {
         const nextRole = query.data.roles.find((item) => item.role === role);
-        setSelectedRole(role);
-        setMetadataName(nextRole?.role_kind === 'custom' ? nextRole.display_name || '' : '');
-        setMetadataDescription(nextRole?.role_kind === 'custom' ? nextRole.description || '' : '');
-        setSuccessMessage(null);
-        setErrorMessage(null);
+        if (nextRole) selectRole(nextRole);
       }}
       draftPermissions={draftPermissions}
       onDraftPermissionsChange={updateDraft}
@@ -422,25 +488,3 @@ export default function TenantPermissionsPage() {
     />
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  customRoleArea: { display: 'grid', gap: 14 },
-  createCard: { display: 'grid', gap: 16, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' },
-  manageCard: { display: 'grid', gap: 14, background: '#fff', border: '1px solid #bfdbfe', borderRadius: 16, padding: 18, boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' },
-  cardHeading: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  cardTitle: { margin: 0, fontSize: 20 },
-  cardDescription: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.45, maxWidth: 820 },
-  templateCount: { background: '#eff6ff', color: '#1d4ed8', borderRadius: 999, padding: '7px 10px', fontWeight: 700 },
-  createGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  manageGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  descriptionField: { gridColumn: 'span 1' },
-  field: { display: 'grid', gap: 6, fontWeight: 700, color: '#334155' },
-  input: { width: '100%', minHeight: 42, border: '1px solid #cbd5e1', borderRadius: 12, padding: '0 12px', fontSize: 14, boxSizing: 'border-box', background: '#fff' },
-  templatePreview: { margin: 0, color: '#334155', lineHeight: 1.5, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 12 },
-  safetyNote: { margin: 0, color: '#475569', lineHeight: 1.5, background: '#f8fafc', borderRadius: 12, padding: 12 },
-  actions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  primaryButton: { minHeight: 42, border: 0, borderRadius: 12, background: '#2563eb', color: '#fff', padding: '0 15px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { minHeight: 40, border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', color: '#0f172a', padding: '0 13px', fontWeight: 750, cursor: 'pointer' },
-  dangerButton: { minHeight: 40, border: '1px solid #fecaca', borderRadius: 12, background: '#fff1f2', color: '#be123c', padding: '0 13px', fontWeight: 800, cursor: 'pointer' },
-  disabled: { opacity: 0.55, cursor: 'not-allowed' }
-};

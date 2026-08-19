@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { PermissionCatalogItem, RolePermissionPolicy } from '../../lib/permissionPolicies';
+import {
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus,
+  OperationalWorkspaceTab,
+  OperationalWorkspaceTabs
+} from '../ui/OperationalWorkspace';
+import './RolePermissionEditor.css';
 
 export type RolePermissionEditorProps<Role extends string, Permission extends string> = {
   title: string;
@@ -22,7 +32,12 @@ export type RolePermissionEditorProps<Role extends string, Permission extends st
   scopeLabel: string;
   reservedLabel?: string;
   headerAddon?: ReactNode;
+  operationalWorkspace?: boolean;
+  workspaceIconPath?: string;
+  workspaceEyebrow?: string;
 };
+
+type WorkspaceView = 'role-permissions' | 'custom-roles';
 
 function roleLabel(role: string): string {
   return role
@@ -57,9 +72,15 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   errorMessage,
   scopeLabel,
   reservedLabel = 'Admin only',
-  headerAddon
+  headerAddon,
+  operationalWorkspace = false,
+  workspaceIconPath = '/permissions',
+  workspaceEyebrow
 }: RolePermissionEditorProps<Role, Permission>) {
   const [search, setSearch] = useState('');
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('role-permissions');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const [showTechnicalKeys, setShowTechnicalKeys] = useState(false);
   const activeRole = roles.find((role) => role.role === selectedRole) || roles[0];
   const builtInRoles = roles.filter((role) => role.role_kind !== 'custom');
   const customRoles = roles.filter((role) => role.role_kind === 'custom');
@@ -108,6 +129,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [dirty]);
 
+  useEffect(() => {
+    if (!operationalWorkspace) return;
+    setExpandedGroups(new Set());
+  }, [operationalWorkspace, selectedRole]);
+
   const filteredCatalog = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     if (!normalized) return catalog;
@@ -127,6 +153,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     }
     return [...map.entries()].sort(([left], [right]) => left.localeCompare(right));
   }, [filteredCatalog]);
+
+  const allGroupNames = useMemo(
+    () => [...new Set(catalog.map((item) => item.group))].sort((left, right) => left.localeCompare(right)),
+    [catalog]
+  );
 
   const normalizeDraft = (values: Set<Permission>, explicitlyDisabled: Permission[] = []) => {
     const next = new Set(values);
@@ -190,61 +221,73 @@ export default function RolePermissionEditor<Role extends string, Permission ext
       onDiscardDraft?.();
     }
     setSearch('');
+    setExpandedGroups(new Set());
     onSelectedRoleChange(role);
   };
 
+  const requestWorkspaceView = (nextView: WorkspaceView) => {
+    if (nextView === workspaceView) return;
+    if (dirty) {
+      if (!window.confirm('Discard unsaved permission changes and leave the role editor?')) return;
+      onDiscardDraft?.();
+    }
+    setSearch('');
+    setExpandedGroups(new Set());
+    setWorkspaceView(nextView);
+  };
+
   const filtering = search.trim().length > 0;
+  const groupExpanded = (group: string) => !operationalWorkspace || filtering || expandedGroups.has(group);
+  const toggleGroupExpanded = (group: string) => {
+    if (!operationalWorkspace || filtering) return;
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
 
-  return (
-    <section style={styles.page} data-skip-global-action-feedback="true">
-      <header style={styles.hero}>
-        <div>
-          <div style={styles.eyebrow}>{scopeLabel} access governance</div>
-          <h1 style={styles.title}>{title}</h1>
-          <p style={styles.description}>{description}</p>
-        </div>
-        <div style={styles.heroMetrics}>
-          <span style={styles.metric}>{catalog.length} permissions</span>
-          <span style={styles.metric}>{roles.length} roles</span>
-        </div>
-      </header>
-
-      {successMessage ? <div style={styles.success}>{successMessage}</div> : null}
-      {errorMessage ? <div style={styles.error}>{errorMessage}</div> : null}
-      {headerAddon}
-
-      <div style={styles.roleCollections}>
-        <div style={styles.roleCollection}>
-          <div style={styles.roleCollectionHeader}><strong>{scopeLabel} roles</strong><span>Protected role baselines</span></div>
-          <div style={styles.roleTabs}>
+  const editorContent = (
+    <>
+      <div style={styles.roleCollections} className="role-permission-editor__role-collections">
+        <div style={styles.roleCollection} className="role-permission-editor__role-collection">
+          <div style={styles.roleCollectionHeader} className="role-permission-editor__role-collection-header">
+            <strong>{scopeLabel} roles</strong><span>Protected role baselines</span>
+          </div>
+          <div style={styles.roleTabs} className="role-permission-editor__role-cards">
             {builtInRoles.map((role) => (
               <button
                 key={role.role}
                 type="button"
                 onClick={() => requestRoleChange(role.role)}
                 style={{ ...styles.roleTab, ...(role.role === activeRole?.role ? styles.roleTabActive : {}) }}
+                className={`role-permission-editor__role-card${role.role === activeRole?.role ? ' is-active' : ''}`}
               >
                 <strong>{role.display_name || roleLabel(role.role)}</strong>
                 <span>{role.effective_permissions.length} enabled</span>
-                <small>{role.editable ? (role.is_default ? 'Default' : `${role.override_count} overrides`) : 'Protected'}</small>
+                <small>{role.editable ? (role.is_default ? 'Default baseline' : `${role.override_count} saved overrides`) : 'Protected'}</small>
               </button>
             ))}
           </div>
         </div>
         {customRoles.length ? (
-          <div style={styles.roleCollection}>
-            <div style={styles.roleCollectionHeader}><strong>Custom roles</strong><span>Tenant-specific operational roles</span></div>
-            <div style={styles.roleTabs}>
+          <div style={styles.roleCollection} className="role-permission-editor__role-collection">
+            <div style={styles.roleCollectionHeader} className="role-permission-editor__role-collection-header">
+              <strong>Custom roles</strong><span>Tenant-specific operational roles</span>
+            </div>
+            <div style={styles.roleTabs} className="role-permission-editor__role-cards">
               {customRoles.map((role) => (
                 <button
                   key={role.role}
                   type="button"
                   onClick={() => requestRoleChange(role.role)}
                   style={{ ...styles.roleTab, ...(role.role === activeRole?.role ? styles.roleTabActive : {}), ...(role.is_active === false ? styles.roleTabInactive : {}) }}
+                  className={`role-permission-editor__role-card${role.role === activeRole?.role ? ' is-active' : ''}${role.is_active === false ? ' is-inactive' : ''}`}
                 >
                   <strong>{role.display_name || roleLabel(role.role)}</strong>
                   <span>{role.effective_permissions.length} enabled · {role.user_count || 0} users</span>
-                  <small>{role.is_active === false ? 'Inactive' : role.is_default ? `Template: ${role.source_template_name || 'Blank'}` : `${role.override_count} changes`}</small>
+                  <small>{role.is_active === false ? 'Inactive' : role.is_default ? `Template: ${role.source_template_name || 'Blank'}` : `${role.override_count} changes from template`}</small>
                 </button>
               ))}
             </div>
@@ -254,8 +297,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
       {activeRole ? (
         <>
-          <div style={styles.toolbar}>
-            <div style={styles.toolbarCopy}>
+          <div style={styles.toolbar} className="role-permission-editor__toolbar app-panel">
+            <div style={styles.toolbarCopy} className="role-permission-editor__toolbar-copy">
               <h2 style={styles.roleTitle}>{activeRole.display_name || roleLabel(activeRole.role)}</h2>
               <p style={styles.roleHelp}>
                 {activeRole.editable
@@ -265,21 +308,36 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                   : 'This role is protected and cannot be edited.'}
               </p>
             </div>
-            <div style={styles.toolbarControls}>
+            <div style={styles.toolbarControls} className="role-permission-editor__toolbar-controls">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search permissions"
                 aria-label="Search permissions"
                 style={styles.search}
+                className="role-permission-editor__search"
               />
-              <div style={styles.actionButtons}>
+              <div style={styles.actionButtons} className="role-permission-editor__toolbar-actions">
+                {operationalWorkspace ? (
+                  <>
+                    <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setShowTechnicalKeys((current) => !current)}>
+                      {showTechnicalKeys ? 'Hide technical keys' : 'Show technical keys'}
+                    </button>
+                    <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setExpandedGroups(new Set(allGroupNames))} disabled={filtering || expandedGroups.size === allGroupNames.length}>
+                      Expand all
+                    </button>
+                    <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setExpandedGroups(new Set())} disabled={filtering || expandedGroups.size === 0}>
+                      Collapse all
+                    </button>
+                  </>
+                ) : null}
                 <button
                   type="button"
-                  style={{
+                  style={operationalWorkspace ? undefined : {
                     ...styles.secondaryButton,
                     ...((!activeRole.editable || resetting || saving || activeRole.is_default) ? styles.buttonDisabled : {})
                   }}
+                  className={operationalWorkspace ? 'app-button app-button--secondary' : undefined}
                   disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                   onClick={() => void onReset()}
                 >
@@ -287,10 +345,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 </button>
                 <button
                   type="button"
-                  style={{
+                  style={operationalWorkspace ? undefined : {
                     ...styles.primaryButton,
                     ...((!activeRole.editable || !dirty || saving || resetting) ? styles.buttonDisabled : {})
                   }}
+                  className={operationalWorkspace ? 'app-button app-button--primary' : undefined}
                   disabled={!activeRole.editable || !dirty || saving || resetting}
                   onClick={() => void onSave()}
                 >
@@ -300,21 +359,23 @@ export default function RolePermissionEditor<Role extends string, Permission ext
             </div>
           </div>
 
-          <div style={styles.summaryGrid}>
-            <div style={styles.summaryCard}><strong>{draftSet.size}</strong><span>Enabled</span></div>
-            <div style={styles.summaryCard}><strong>{catalog.length - draftSet.size}</strong><span>Disabled</span></div>
-            <div style={styles.summaryCard}><strong>{lockedSet.size}</strong><span>Locked</span></div>
-            <div style={styles.summaryCard}>
-              <strong>{activeRole.override_count}</strong>
-              <span>{isCustomRole ? 'Changes from template' : 'Saved overrides'}</span>
+          {!operationalWorkspace ? (
+            <div style={styles.summaryGrid}>
+              <div style={styles.summaryCard}><strong>{draftSet.size}</strong><span>Enabled</span></div>
+              <div style={styles.summaryCard}><strong>{catalog.length - draftSet.size}</strong><span>Disabled</span></div>
+              <div style={styles.summaryCard}><strong>{lockedSet.size}</strong><span>Locked</span></div>
+              <div style={styles.summaryCard}>
+                <strong>{activeRole.override_count}</strong>
+                <span>{isCustomRole ? 'Changes from template' : 'Saved overrides'}</span>
+              </div>
             </div>
-          </div>
+          ) : null}
 
-          <div style={styles.groups}>
+          <div style={styles.groups} className="role-permission-editor__groups">
             {grouped.length === 0 ? (
-              <div style={styles.emptySearch}>
+              <div style={styles.emptySearch} className="app-empty-state role-permission-editor__empty-search">
                 <strong>No permissions match “{search.trim()}”.</strong>
-                <button type="button" style={styles.secondaryButton} onClick={() => setSearch('')}>Clear search</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => setSearch('')}>Clear search</button>
               </div>
             ) : null}
             {grouped.map(([group, items]) => {
@@ -323,18 +384,36 @@ export default function RolePermissionEditor<Role extends string, Permission ext
               const enabledEditableCount = editableItems.filter((item) => draftSet.has(item.permission)).length;
               const enableDisabled = saving || resetting || enabledEditableCount === editableItems.length;
               const disableDisabled = saving || resetting || enabledEditableCount === 0;
+              const expanded = groupExpanded(group);
               return (
-                <article key={group} style={styles.groupCard}>
-                  <div style={styles.groupHeader}>
-                    <div>
-                      <h3 style={styles.groupTitle}>{groupLabel(group)}</h3>
-                      <span style={styles.groupCount}>{enabledCount} of {items.length} enabled</span>
-                    </div>
-                    {activeRole.editable && editableItems.length ? (
-                      <div style={styles.groupActions}>
+                <article key={group} style={styles.groupCard} className={`role-permission-editor__group-card app-panel${expanded ? ' is-expanded' : ''}`}>
+                  <div style={styles.groupHeader} className="role-permission-editor__group-header">
+                    {operationalWorkspace ? (
+                      <button
+                        type="button"
+                        className="role-permission-editor__group-toggle"
+                        onClick={() => toggleGroupExpanded(group)}
+                        aria-expanded={expanded}
+                        aria-controls={`permission-group-${group}`}
+                      >
+                        <span className="role-permission-editor__group-chevron" aria-hidden="true">{expanded ? '−' : '+'}</span>
+                        <span>
+                          <strong>{groupLabel(group)}</strong>
+                          <small>{enabledCount} of {items.length} enabled</small>
+                        </span>
+                      </button>
+                    ) : (
+                      <div>
+                        <h3 style={styles.groupTitle}>{groupLabel(group)}</h3>
+                        <span style={styles.groupCount}>{enabledCount} of {items.length} enabled</span>
+                      </div>
+                    )}
+                    {expanded && activeRole.editable && editableItems.length ? (
+                      <div style={styles.groupActions} className="role-permission-editor__group-actions">
                         <button
                           type="button"
-                          style={{ ...styles.smallButton, ...(enableDisabled ? styles.buttonDisabled : {}) }}
+                          style={operationalWorkspace ? undefined : { ...styles.smallButton, ...(enableDisabled ? styles.buttonDisabled : {}) }}
+                          className={operationalWorkspace ? 'app-button app-button--secondary role-permission-editor__group-action' : undefined}
                           disabled={enableDisabled}
                           onClick={() => setGroup(items, true)}
                         >
@@ -342,7 +421,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                         </button>
                         <button
                           type="button"
-                          style={{ ...styles.smallButton, ...(disableDisabled ? styles.buttonDisabled : {}) }}
+                          style={operationalWorkspace ? undefined : { ...styles.smallButton, ...(disableDisabled ? styles.buttonDisabled : {}) }}
+                          className={operationalWorkspace ? 'app-button app-button--secondary role-permission-editor__group-action' : undefined}
                           disabled={disableDisabled}
                           onClick={() => setGroup(items, false)}
                         >
@@ -352,45 +432,48 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                     ) : null}
                   </div>
 
-                  <div style={styles.permissionList}>
-                    {items.map((item) => {
-                      const locked = lockedSet.has(item.permission);
-                      const forbidden = forbiddenSet.has(item.permission);
-                      const checked = draftSet.has(item.permission);
-                      const differsFromDefault = checked !== defaultSet.has(item.permission);
-                      return (
-                        <label
-                          key={item.permission}
-                          style={{ ...styles.permissionRow, ...(forbidden ? styles.permissionForbidden : {}) }}
-                          title={(dependencyMap.get(item.permission) || []).length
-                            ? `Requires: ${(dependencyMap.get(item.permission) || []).join(', ')}`
-                            : undefined}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!activeRole.editable || locked || forbidden || saving || resetting}
-                            onChange={(event) => togglePermission(item.permission, event.target.checked)}
-                          />
-                          <span style={styles.permissionText}>
-                            <strong>{item.label}</strong>
-                            <code style={styles.permissionCode}>{item.permission}</code>
-                          </span>
-                          <span style={styles.badges}>
-                            {locked ? <em style={styles.lockedBadge}>Locked</em> : null}
-                            {forbidden ? <em style={styles.reservedBadge}>{reservedLabel}</em> : null}
-                            {differsFromDefault ? <em style={styles.overrideBadge}>Override</em> : <em style={styles.defaultBadge}>Default</em>}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {expanded ? (
+                    <div id={`permission-group-${group}`} style={styles.permissionList} className="role-permission-editor__permission-list">
+                      {items.map((item) => {
+                        const locked = lockedSet.has(item.permission);
+                        const forbidden = forbiddenSet.has(item.permission);
+                        const checked = draftSet.has(item.permission);
+                        const differsFromDefault = checked !== defaultSet.has(item.permission);
+                        return (
+                          <label
+                            key={item.permission}
+                            style={{ ...styles.permissionRow, ...(forbidden ? styles.permissionForbidden : {}) }}
+                            className={`role-permission-editor__permission-row${forbidden ? ' is-reserved' : ''}`}
+                            title={(dependencyMap.get(item.permission) || []).length
+                              ? `Requires: ${(dependencyMap.get(item.permission) || []).join(', ')}`
+                              : undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!activeRole.editable || locked || forbidden || saving || resetting}
+                              onChange={(event) => togglePermission(item.permission, event.target.checked)}
+                            />
+                            <span style={styles.permissionText} className="role-permission-editor__permission-text">
+                              <strong>{item.label}</strong>
+                              {(!operationalWorkspace || showTechnicalKeys) ? <code style={styles.permissionCode}>{item.permission}</code> : null}
+                            </span>
+                            <span style={styles.badges} className="role-permission-editor__badges">
+                              {locked ? <em style={styles.lockedBadge}>Locked</em> : null}
+                              {forbidden ? <em style={styles.reservedBadge}>{reservedLabel}</em> : null}
+                              {differsFromDefault ? <em style={styles.overrideBadge}>Override</em> : <em style={styles.defaultBadge}>Default</em>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
           </div>
 
-          <footer style={styles.actionBar}>
+          <footer style={styles.actionBar} className="role-permission-editor__action-bar app-panel">
             <div>
               <strong>{dirty ? 'Unsaved permission changes' : activeRole.is_default ? baselineStatus : 'Saved custom policy active'}</strong>
               <span style={styles.actionHelp}>{baselineHelp}</span>
@@ -398,10 +481,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
             <div style={styles.actionButtons}>
               <button
                 type="button"
-                style={{
+                style={operationalWorkspace ? undefined : {
                   ...styles.secondaryButton,
                   ...((!activeRole.editable || resetting || saving || activeRole.is_default) ? styles.buttonDisabled : {})
                 }}
+                className={operationalWorkspace ? 'app-button app-button--secondary' : undefined}
                 disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                 onClick={() => void onReset()}
               >
@@ -409,10 +493,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
               </button>
               <button
                 type="button"
-                style={{
+                style={operationalWorkspace ? undefined : {
                   ...styles.primaryButton,
                   ...((!activeRole.editable || !dirty || saving || resetting) ? styles.buttonDisabled : {})
                 }}
+                className={operationalWorkspace ? 'app-button app-button--primary' : undefined}
                 disabled={!activeRole.editable || !dirty || saving || resetting}
                 onClick={() => void onSave()}
               >
@@ -422,6 +507,93 @@ export default function RolePermissionEditor<Role extends string, Permission ext
           </footer>
         </>
       ) : null}
+    </>
+  );
+
+  return (
+    <section
+      style={operationalWorkspace ? undefined : styles.page}
+      className={operationalWorkspace ? 'role-permission-editor role-permission-editor--operational io-operational-page io-workspace-page' : undefined}
+      data-skip-global-action-feedback="true"
+    >
+      {operationalWorkspace ? (
+        <>
+          <OperationalWorkspaceHero
+            iconPath={workspaceIconPath}
+            eyebrow={workspaceEyebrow || `${scopeLabel} access governance`}
+            title={title}
+            description={description}
+            meta={
+              <>
+                <OperationalWorkspaceMetaPill>{scopeLabel}-scoped</OperationalWorkspaceMetaPill>
+                <OperationalWorkspaceMetaPill>Protected safety baseline</OperationalWorkspaceMetaPill>
+                <OperationalWorkspaceMetaPill>Permission changes audited</OperationalWorkspaceMetaPill>
+              </>
+            }
+            aside={<OperationalWorkspaceStatus value={roles.length} label="roles available in this access workspace" />}
+          />
+
+          <OperationalWorkspaceStats ariaLabel={`${scopeLabel} permission overview`}>
+            <OperationalWorkspaceStatCard label="Permissions" value={catalog.length} helper={`${allGroupNames.length} permission groups`} tone="blue" iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label="Built-in roles" value={builtInRoles.length} helper="Protected Admin, Manager and Staff baselines" tone="neutral" iconPath="/users" />
+            <OperationalWorkspaceStatCard label="Custom roles" value={customRoles.length} helper="Tenant-specific job access profiles" tone={customRoles.length ? 'blue' : 'neutral'} iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label="Selected enabled" value={draftSet.size} helper={activeRole ? `${activeRole.display_name || roleLabel(activeRole.role)}${dirty ? ' · unsaved draft' : ''}` : 'No role selected'} tone={dirty ? 'warn' : 'good'} iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label="Locked" value={lockedSet.size} helper="Safety permissions that cannot be removed" tone="warn" iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label={isCustomRole ? 'Template changes' : 'Saved overrides'} value={activeRole?.override_count || 0} helper={activeRole?.is_default ? 'Using baseline permissions' : 'Tenant-specific permission changes'} tone={(activeRole?.override_count || 0) > 0 ? 'warn' : 'neutral'} iconPath="/audit" />
+          </OperationalWorkspaceStats>
+
+          <OperationalWorkspaceTabs ariaLabel={`${scopeLabel} permission work areas`} hint="Edit role access or manage tenant custom roles.">
+            <OperationalWorkspaceTab
+              active={workspaceView === 'role-permissions'}
+              iconPath="/permissions"
+              label="Role permissions"
+              count={roles.length}
+              onClick={() => requestWorkspaceView('role-permissions')}
+            />
+            {headerAddon ? (
+              <OperationalWorkspaceTab
+                active={workspaceView === 'custom-roles'}
+                iconPath="/users"
+                label="Custom roles"
+                count={customRoles.length}
+                onClick={() => requestWorkspaceView('custom-roles')}
+              />
+            ) : null}
+          </OperationalWorkspaceTabs>
+        </>
+      ) : (
+        <header style={styles.hero}>
+          <div>
+            <div style={styles.eyebrow}>{scopeLabel} access governance</div>
+            <h1 style={styles.title}>{title}</h1>
+            <p style={styles.description}>{description}</p>
+          </div>
+          <div style={styles.heroMetrics}>
+            <span style={styles.metric}>{catalog.length} permissions</span>
+            <span style={styles.metric}>{roles.length} roles</span>
+          </div>
+        </header>
+      )}
+
+      {successMessage ? (
+        <div style={operationalWorkspace ? undefined : styles.success} className={operationalWorkspace ? 'app-success-state role-permission-editor__message' : undefined} role="status">
+          {successMessage}
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <div style={operationalWorkspace ? undefined : styles.error} className={operationalWorkspace ? 'app-error-state role-permission-editor__message' : undefined} role="alert">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {operationalWorkspace ? (
+        workspaceView === 'custom-roles' ? headerAddon : editorContent
+      ) : (
+        <>
+          {headerAddon}
+          {editorContent}
+        </>
+      )}
     </section>
   );
 }
