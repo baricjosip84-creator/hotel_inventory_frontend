@@ -5,6 +5,8 @@ import process from 'node:process';
 const root = process.cwd();
 const pagePath = path.join(root, 'src/pages/TenantSettingsPage.tsx');
 const source = fs.readFileSync(pagePath, 'utf8');
+const cssPath = path.join(root, 'src/pages/TenantSettingsPage.css');
+const cssSource = fs.readFileSync(cssPath, 'utf8');
 
 const required = [
   "refetchOnWindowFocus: false",
@@ -22,12 +24,33 @@ const required = [
   "You changed the currency. Confirm it above before saving.",
   "Enter a valid business email address.",
   "disabled={!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid}",
-  "queryClient.setQueryData<TenantSettingsRow[]>(['tenants'], [tenant])"
+  "queryClient.setQueryData<TenantSettingsRow[]>(['tenants'], [tenant])",
+  "OperationalWorkspaceHero",
+  "OperationalWorkspaceStats",
+  "OperationalSectionHeader",
+  "tenant-settings-page io-operational-page io-workspace-page",
+  "Supplier document identity",
+  "Governance & accounting controls"
 ];
 
 for (const anchor of required) {
   if (!source.includes(anchor)) {
     console.error(`[tenant-settings-hardening] missing required anchor: ${anchor}`);
+    process.exit(1);
+  }
+}
+
+const requiredCss = [
+  '.tenant-settings-record',
+  '.tenant-settings-form-group',
+  '.tenant-settings-control-grid',
+  '.tenant-settings-currency-block',
+  '@media (max-width: 820px)'
+];
+
+for (const anchor of requiredCss) {
+  if (!cssSource.includes(anchor)) {
+    console.error(`[tenant-settings-hardening] missing required UI CSS anchor: ${anchor}`);
     process.exit(1);
   }
 }

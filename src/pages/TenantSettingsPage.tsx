@@ -1,8 +1,17 @@
-import type { CSSProperties, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker } from 'react-router';
 import { ApiError, apiRequest } from '../lib/api';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './TenantSettingsPage.css';
 import {
   TENANT_PERMISSIONS,
   getCurrentUserRole,
@@ -433,108 +442,175 @@ export default function TenantSettingsPage() {
     });
   };
 
+  const seasonStatus = !currentTenant
+    ? '—'
+    : currentTenant.season_start && currentTenant.season_end
+      ? 'Configured'
+      : currentTenant.season_start || currentTenant.season_end
+        ? 'Partial'
+        : 'Not set';
+  const seasonHelper = currentTenant?.season_start || currentTenant?.season_end
+    ? `${normalizeDateInput(currentTenant.season_start) || 'No start'} → ${normalizeDateInput(currentTenant.season_end) || 'No end'}`
+    : 'Optional operating-season window';
+  const draftSeasonStatus = formState.season_start && formState.season_end
+    ? 'Configured'
+    : formState.season_start || formState.season_end
+      ? 'Partial'
+      : 'Not set';
+  const approvalSeparationEnabled = currentTenant?.require_separate_purchase_order_approver !== false;
+  const tenantStatus = !currentTenant
+    ? 'Unavailable'
+    : isWriteLocked
+      ? 'Write locked'
+      : canUpdateTenants
+        ? 'Editable'
+        : 'Read only';
+
   if (!canReadTenants) {
     return (
-      <div style={styles.page}>
-        <section style={styles.panel}>
-          <h2 style={styles.title}>Tenant Settings</h2>
-          <div style={styles.error}>Your current role cannot read tenant settings.</div>
-        </section>
+      <div className="tenant-settings-page io-operational-page io-workspace-page" id="tenant-settings-workspace-top">
+        <OperationalWorkspaceHero
+          iconPath="/tenant-settings"
+          eyebrow="Administration & policy"
+          title="Tenant settings"
+          description="Manage tenant-owned company profile, purchasing identity, operating-season, and inventory accounting context."
+          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+          aside={<OperationalWorkspaceStatus value="Read blocked" label="tenant settings access" />}
+        />
+        <div className="app-error-state tenant-settings-message">Your current role cannot read tenant settings.</div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Tenant scoped</p>
-          <h2 style={styles.title}>Tenant Settings</h2>
-          <p style={styles.subtitle}>
-            Manage profile, operating-season, and inventory-currency settings for the current tenant. Tenant creation, deletion, locking, billing, and plan controls remain platform responsibilities.
-          </p>
-        </div>
-        <div style={styles.headerActions}>
-          <span style={styles.refreshMeta}>Last refreshed: {lastRefreshedLabel}</span>
-          <button
-            type="button"
-            style={{
-              ...styles.secondaryButton,
-              ...((tenantsQuery.isFetching || isDirty) ? styles.disabledButton : {})
-            }}
-            onClick={handleRefresh}
-            disabled={tenantsQuery.isFetching || isDirty}
-            title={isDirty ? 'Save or reset your unsaved changes before refreshing.' : undefined}
-          >
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
+    <div className="tenant-settings-page io-operational-page io-workspace-page" id="tenant-settings-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/tenant-settings"
+        eyebrow="Administration & policy"
+        title="Tenant settings"
+        description="Maintain the current tenant's company profile, supplier-facing document details, operating-season, and inventory accounting context. Platform-owned creation, deletion, locking, billing, and plan controls stay outside this page."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Supplier document identity</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Currency safety protected</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Platform controls excluded</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={
+          <div className="tenant-settings-hero-actions">
+            <OperationalWorkspaceStatus value={tenantStatus} label="tenant configuration status" />
+            <button
+              type="button"
+              className="app-button app-button--secondary"
+              onClick={handleRefresh}
+              disabled={tenantsQuery.isFetching || isDirty}
+              title={isDirty ? 'Save or reset your unsaved changes before refreshing.' : undefined}
+            >
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        }
+      />
 
-      {tenantsQuery.isLoading ? <div style={styles.panel}>Loading tenant settings…</div> : null}
-      {tenantsQuery.error ? <div style={styles.error}>{readableError(tenantsQuery.error)}</div> : null}
-      {formError ? <div style={styles.error}>{formError}</div> : null}
-      {successMessage ? <div style={styles.success}>{successMessage}</div> : null}
+      <OperationalWorkspaceStats ariaLabel="Tenant settings overview">
+        <OperationalWorkspaceStatCard
+          label="Inventory currency"
+          value={currentTenant ? normalizeCurrencyCode(currentTenant.inventory_currency) : '—'}
+          helper="Tenant-base costing and valuation"
+          tone="blue"
+          iconPath="/reports"
+          loading={tenantsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="PO approval separation"
+          value={currentTenant ? (approvalSeparationEnabled ? 'Required' : 'Self-approval') : '—'}
+          helper={approvalSeparationEnabled ? 'Creator and approver must differ' : 'Creator may approve when permitted'}
+          tone={approvalSeparationEnabled ? 'good' : 'warn'}
+          iconPath="/permissions"
+          loading={tenantsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Operating season"
+          value={seasonStatus}
+          helper={seasonHelper}
+          tone={seasonStatus === 'Partial' ? 'warn' : 'neutral'}
+          iconPath="/automation-schedules"
+          loading={tenantsQuery.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          label="Last updated"
+          value={currentTenant ? formatTimestamp(currentTenant.updated_at) : '—'}
+          helper={`Settings data refreshed ${lastRefreshedLabel}`}
+          tone="neutral"
+          iconPath="/audit"
+          loading={tenantsQuery.isLoading}
+          className="io-workspace-stat--timestamp"
+        />
+      </OperationalWorkspaceStats>
+
+      {tenantsQuery.isLoading ? <div className="app-empty-state tenant-settings-message">Loading tenant settings…</div> : null}
+      {tenantsQuery.error ? <div className="app-error-state tenant-settings-message">Failed to load tenant settings: {readableError(tenantsQuery.error)}</div> : null}
+      {formError ? <div className="app-error-state tenant-settings-message" role="alert">{formError}</div> : null}
+      {successMessage ? <div className="app-success-state tenant-settings-message" role="status">{successMessage}</div> : null}
       {isWriteLocked ? (
-        <div style={styles.warning}>
+        <div className="app-warning-state tenant-settings-message">
           <strong>Tenant write lock is active.</strong> These settings are read-only until a platform administrator removes the lock.
         </div>
       ) : null}
 
       {!tenantsQuery.isLoading && !tenantsQuery.error && !currentTenant ? (
-        <div style={styles.error}>The backend did not return the current tenant.</div>
+        <div className="app-error-state tenant-settings-message">The backend did not return the current tenant.</div>
       ) : null}
 
       {currentTenant ? (
-        <div style={styles.twoColumn}>
-          <section style={styles.panel}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>Current Tenant</h3>
-              <span style={isWriteLocked ? styles.lockedBadge : styles.openBadge}>
-                {isWriteLocked ? 'WRITE LOCKED' : 'OPEN'}
-              </span>
-            </div>
+        <form className="app-panel tenant-settings-panel tenant-settings-form" onSubmit={handleSubmit} noValidate>
+          <OperationalSectionHeader
+            iconPath="/tenant-settings"
+            title="Tenant configuration"
+            description="Edit only tenant-owned settings. Changes are validated before they can be saved and apply only to the current tenant."
+            actions={isDirty ? <span className="tenant-settings-badge tenant-settings-badge--unsaved">UNSAVED CHANGES</span> : <span className="tenant-settings-badge tenant-settings-badge--saved">SAVED</span>}
+          />
 
-            <div style={styles.currentTenantCard}>
-              <span style={styles.tenantName}>{currentTenant.name}</span>
-              <span style={styles.tenantMeta}>{currentTenant.location || 'No location configured'}</span>
-              <span style={styles.tenantMeta}>{currentTenant.organization_type || 'facility'}</span>
+          <section className="tenant-settings-record" aria-label="Current tenant record">
+            <div className="tenant-settings-current-card">
+              <div className="tenant-settings-current-card__topline">
+                <span className="tenant-settings-current-card__eyebrow">Current Tenant</span>
+                <span className={`tenant-settings-badge ${isWriteLocked ? 'tenant-settings-badge--locked' : 'tenant-settings-badge--open'}`}>
+                  {isWriteLocked ? 'WRITE LOCKED' : 'OPEN'}
+                </span>
+              </div>
+              <strong>{currentTenant.name}</strong>
+              <span>{currentTenant.location || 'No location configured'}</span>
+              <span>{currentTenant.organization_type || 'facility'}</span>
             </div>
-
-            <dl style={styles.summaryList}>
-              <div style={styles.summaryRow}>
-                <dt style={styles.summaryLabel}>Tenant ID</dt>
-                <dd style={styles.summaryValueCode}>{currentTenant.id}</dd>
-              </div>
-              <div style={styles.summaryRow}>
-                <dt style={styles.summaryLabel}>Inventory currency</dt>
-                <dd style={styles.summaryValue}>{normalizeCurrencyCode(currentTenant.inventory_currency)}</dd>
-              </div>
-              <div style={styles.summaryRow}>
-                <dt style={styles.summaryLabel}>Created</dt>
-                <dd style={styles.summaryValue}>{formatTimestamp(currentTenant.created_at)}</dd>
-              </div>
-              <div style={styles.summaryRow}>
-                <dt style={styles.summaryLabel}>Last updated</dt>
-                <dd style={styles.summaryValue}>{formatTimestamp(currentTenant.updated_at)}</dd>
-              </div>
-            </dl>
+            <div className="tenant-settings-record-item tenant-settings-record-item--id">
+              <span>Tenant ID</span>
+              <strong>{currentTenant.id}</strong>
+            </div>
+            <div className="tenant-settings-record-item">
+              <span>Created</span>
+              <strong>{formatTimestamp(currentTenant.created_at)}</strong>
+            </div>
+            <div className="tenant-settings-record-item">
+              <span>Last updated</span>
+              <strong>{formatTimestamp(currentTenant.updated_at)}</strong>
+            </div>
           </section>
 
-          <form style={styles.panel} onSubmit={handleSubmit}>
-            <div style={styles.sectionHeader}>
+          <section className="tenant-settings-form-group">
+            <div className="tenant-settings-form-group__heading">
               <div>
-                <h3 style={styles.sectionTitle}>Edit Tenant Settings</h3>
-                <p style={styles.sectionSubtitle}>Only tenant-owned profile and accounting context can be changed here.</p>
+                <h4>Organization profile</h4>
+                <p>Core tenant identity shown throughout the operational workspace.</p>
               </div>
-              {isDirty ? <span style={styles.unsavedBadge}>UNSAVED CHANGES</span> : null}
+              <span className="tenant-settings-form-group__tag">Profile</span>
             </div>
-
-            <div style={styles.grid}>
-              <label style={styles.field}>
-                <span style={styles.label}>Name</span>
+            <div className="tenant-settings-grid tenant-settings-grid--three">
+              <label className="tenant-settings-field">
+                <span>Name</span>
                 <input
-                  style={{ ...styles.input, ...(nameInvalid ? styles.invalidInput : {}) }}
+                  className={nameInvalid ? 'is-invalid' : undefined}
                   value={formState.name}
                   onChange={(event) => updateField('name', event.target.value)}
                   disabled={!canEdit}
@@ -542,13 +618,12 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={nameInvalid}
                 />
-                {nameInvalid ? <span style={styles.fieldError}>Company name is required.</span> : null}
+                {nameInvalid ? <small className="tenant-settings-field-error">Company name is required.</small> : null}
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Location</span>
+              <label className="tenant-settings-field">
+                <span>Location</span>
                 <input
-                  style={styles.input}
                   value={formState.location}
                   onChange={(event) => updateField('location', event.target.value)}
                   disabled={!canEdit}
@@ -557,10 +632,10 @@ export default function TenantSettingsPage() {
                 />
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Organization Type</span>
+              <label className="tenant-settings-field">
+                <span>Organization type</span>
                 <input
-                  style={{ ...styles.input, ...(organizationTypeInvalid ? styles.invalidInput : {}) }}
+                  className={organizationTypeInvalid ? 'is-invalid' : undefined}
                   value={formState.organization_type}
                   onChange={(event) => updateField('organization_type', event.target.value)}
                   disabled={!canEdit}
@@ -568,23 +643,35 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={organizationTypeInvalid}
                 />
-                {organizationTypeInvalid ? <span style={styles.fieldError}>Organization type is required.</span> : null}
+                {organizationTypeInvalid ? <small className="tenant-settings-field-error">Organization type is required.</small> : null}
               </label>
+            </div>
+          </section>
 
-              <div style={{ ...styles.fullWidth, ...styles.documentDetailsHeader }}>
-                <strong>Supplier document details</strong>
-                <span style={styles.helperText}>Used on Purchase Order / Receiving Reference PDFs and supplier emails.</span>
+          <section className="tenant-settings-form-group">
+            <div className="tenant-settings-form-group__heading">
+              <div>
+                <h4>Supplier document identity</h4>
+                <p>Used on Purchase Order / Receiving Reference PDFs and supplier emails. Optional fields fall back safely where applicable.</p>
               </div>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Legal / Company Name</span>
-                <input style={styles.input} value={formState.legal_name} onChange={(event) => updateField('legal_name', event.target.value)} disabled={!canEdit} maxLength={255} placeholder="Optional; tenant name is used as fallback" />
+              <span className="tenant-settings-form-group__tag">Purchasing</span>
+            </div>
+            <div className="tenant-settings-grid tenant-settings-grid--three">
+              <label className="tenant-settings-field">
+                <span>Legal / company name</span>
+                <input
+                  value={formState.legal_name}
+                  onChange={(event) => updateField('legal_name', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={255}
+                  placeholder="Optional; tenant name is used as fallback"
+                />
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Business Email</span>
+              <label className="tenant-settings-field">
+                <span>Business email</span>
                 <input
-                  style={{ ...styles.input, ...(businessEmailInvalid ? styles.invalidInput : {}) }}
+                  className={businessEmailInvalid ? 'is-invalid' : undefined}
                   type="email"
                   value={formState.business_email}
                   onChange={(event) => updateField('business_email', event.target.value)}
@@ -593,57 +680,136 @@ export default function TenantSettingsPage() {
                   placeholder="purchasing@company.com"
                   aria-invalid={businessEmailInvalid}
                 />
-                {businessEmailInvalid ? <span style={styles.fieldError}>Enter a valid business email address.</span> : null}
+                {businessEmailInvalid ? <small className="tenant-settings-field-error">Enter a valid business email address.</small> : null}
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Business Phone</span>
-                <input style={styles.input} value={formState.business_phone} onChange={(event) => updateField('business_phone', event.target.value)} disabled={!canEdit} maxLength={100} placeholder="Optional" />
+              <label className="tenant-settings-field">
+                <span>Business phone</span>
+                <input
+                  value={formState.business_phone}
+                  onChange={(event) => updateField('business_phone', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={100}
+                  placeholder="Optional"
+                />
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Tax / VAT ID</span>
-                <input style={styles.input} value={formState.tax_id} onChange={(event) => updateField('tax_id', event.target.value)} disabled={!canEdit} maxLength={100} placeholder="Optional" />
+              <label className="tenant-settings-field">
+                <span>Tax / VAT ID</span>
+                <input
+                  value={formState.tax_id}
+                  onChange={(event) => updateField('tax_id', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={100}
+                  placeholder="Optional"
+                />
               </label>
 
-              <label style={{ ...styles.field, ...styles.fullWidth }}>
-                <span style={styles.label}>Business / Delivery Address</span>
-                <textarea style={{ ...styles.input, minHeight: 82, resize: 'vertical' }} value={formState.business_address} onChange={(event) => updateField('business_address', event.target.value)} disabled={!canEdit} maxLength={2000} placeholder="Street, postal code, city, country" />
+              <label className="tenant-settings-field tenant-settings-field--span-two">
+                <span>Business / delivery address</span>
+                <textarea
+                  value={formState.business_address}
+                  onChange={(event) => updateField('business_address', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={2000}
+                  placeholder="Street, postal code, city, country"
+                />
               </label>
 
-              <label style={{ ...styles.field, ...styles.fullWidth }}>
-                <span style={styles.label}>Default Purchase Order Payment Terms</span>
-                <textarea style={{ ...styles.input, minHeight: 68, resize: 'vertical' }} value={formState.default_purchase_order_payment_terms} onChange={(event) => updateField('default_purchase_order_payment_terms', event.target.value)} disabled={!canEdit} maxLength={1000} placeholder="Example: Net 30 days from invoice date" />
+              <label className="tenant-settings-field tenant-settings-field--full">
+                <span>Default purchase order payment terms</span>
+                <textarea
+                  value={formState.default_purchase_order_payment_terms}
+                  onChange={(event) => updateField('default_purchase_order_payment_terms', event.target.value)}
+                  disabled={!canEdit}
+                  maxLength={1000}
+                  placeholder="Example: Net 30 days from invoice date"
+                />
+                <small>Used as the tenant default when purchase documents need payment terms.</small>
               </label>
+            </div>
+          </section>
 
-              <div style={{ ...styles.field, ...styles.fullWidth }}>
-                <span style={styles.label}>Purchase order approval separation</span>
-                <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <section className="tenant-settings-form-group">
+            <div className="tenant-settings-form-group__heading">
+              <div>
+                <h4>Governance & accounting controls</h4>
+                <p>Controls that affect purchase approvals, inventory valuation context, and seasonal operating dates.</p>
+              </div>
+              <span className="tenant-settings-form-group__tag">Controls</span>
+            </div>
+
+            <div className="tenant-settings-control-grid">
+              <div className="tenant-settings-control-card tenant-settings-control-card--approval">
+                <div className="tenant-settings-control-card__heading">
+                  <div>
+                    <strong>Purchase order approval separation</strong>
+                    <p>Keep purchasing approval independent from the employee who created the order.</p>
+                  </div>
+                  <span className={`tenant-settings-badge ${formState.require_separate_purchase_order_approver ? 'tenant-settings-badge--open' : 'tenant-settings-badge--warning'}`}>
+                    {formState.require_separate_purchase_order_approver ? 'REQUIRED' : 'SELF-APPROVAL'}
+                  </span>
+                </div>
+                <label className="tenant-settings-checkbox">
                   <input
                     type="checkbox"
                     checked={formState.require_separate_purchase_order_approver}
                     onChange={(event) => updateField('require_separate_purchase_order_approver', event.target.checked)}
                     disabled={!canEdit}
-                    style={{ marginTop: 3 }}
                   />
-                  <span style={styles.fieldHelp}>Require a different employee to approve a purchase order than the employee who created it. Recommended and enabled by default; turn this off only when a small team must allow self-approval.</span>
+                  <span>Require a different employee to approve a purchase order than the employee who created it. Recommended and enabled by default; turn this off only when a small team must allow self-approval.</span>
                 </label>
               </div>
 
-              <label style={styles.field}>
-                <span style={styles.labelRow}>
-                  <span style={styles.label}>Inventory Currency</span>
-                  <span
-                    style={styles.infoIcon}
-                    title={INVENTORY_CURRENCY_HELP}
-                    aria-label={INVENTORY_CURRENCY_HELP}
-                    tabIndex={0}
-                  >
-                    i
-                  </span>
-                </span>
+              <div className="tenant-settings-control-card tenant-settings-control-card--season">
+                <div className="tenant-settings-control-card__heading">
+                  <div>
+                    <strong>Operating season</strong>
+                    <p>Optional date range used as tenant operating context.</p>
+                  </div>
+                  <span className="tenant-settings-badge tenant-settings-badge--neutral">{draftSeasonStatus.toUpperCase()}</span>
+                </div>
+                <div className="tenant-settings-grid tenant-settings-grid--two tenant-settings-grid--compact">
+                  <label className="tenant-settings-field">
+                    <span>Season start</span>
+                    <input
+                      type="date"
+                      value={formState.season_start}
+                      onChange={(event) => updateField('season_start', event.target.value)}
+                      disabled={!canEdit}
+                    />
+                  </label>
+
+                  <label className="tenant-settings-field">
+                    <span>Season end</span>
+                    <input
+                      className={dateRangeInvalid ? 'is-invalid' : undefined}
+                      type="date"
+                      value={formState.season_end}
+                      onChange={(event) => updateField('season_end', event.target.value)}
+                      disabled={!canEdit}
+                      min={formState.season_start || undefined}
+                      aria-invalid={dateRangeInvalid}
+                    />
+                    {dateRangeInvalid ? <small className="tenant-settings-field-error">Season end cannot be before season start.</small> : null}
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="tenant-settings-currency-block">
+              <div className="tenant-settings-currency-copy">
+                <div className="tenant-settings-label-row">
+                  <strong>Inventory currency</strong>
+                  <span className="tenant-settings-info-icon" title={INVENTORY_CURRENCY_HELP} aria-label={INVENTORY_CURRENCY_HELP} tabIndex={0}>i</span>
+                </div>
+                <p>Tenant-base costs and valuation. No automatic FX conversion.</p>
+              </div>
+
+              <label className="tenant-settings-field tenant-settings-currency-field">
+                <span>Currency code</span>
                 <input
-                  style={{ ...styles.input, ...(!currencyCodeValid ? styles.invalidInput : {}) }}
+                  className={!currencyCodeValid ? 'is-invalid' : undefined}
                   value={formState.inventory_currency}
                   onChange={(event) => {
                     updateField('inventory_currency', event.target.value.toUpperCase());
@@ -656,27 +822,19 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={!currencyCodeValid}
                 />
-                <span style={styles.helperText}>Tenant-base costs and valuation. No automatic FX conversion.</span>
-                {!currencyCodeValid ? <span style={styles.fieldError}>Enter a 3-letter currency code such as EUR, USD, or GBP.</span> : null}
+                {!currencyCodeValid ? <small className="tenant-settings-field-error">Enter a 3-letter currency code such as EUR, USD, or GBP.</small> : null}
               </label>
 
               {!currentTenant.inventory_currency_configured_at ? (
-                <div style={{ ...styles.currencyNotice, ...styles.fullWidth }}>
-                  <div style={styles.noticeHeader}>
+                <div className="tenant-settings-currency-notice">
+                  <div className="tenant-settings-notice-heading">
                     <div>
                       <strong>Legacy currency confirmation required</strong>
-                      <div style={styles.helperText}>Confirm which currency the tenant's existing inventory standard costs already use.</div>
+                      <p>Confirm which currency the tenant's existing inventory standard costs already use.</p>
                     </div>
-                    <span
-                      style={styles.infoIcon}
-                      title={LEGACY_CURRENCY_HELP}
-                      aria-label={LEGACY_CURRENCY_HELP}
-                      tabIndex={0}
-                    >
-                      i
-                    </span>
+                    <span className="tenant-settings-info-icon" title={LEGACY_CURRENCY_HELP} aria-label={LEGACY_CURRENCY_HELP} tabIndex={0}>i</span>
                   </div>
-                  <label style={styles.checkboxLabel}>
+                  <label className="tenant-settings-checkbox">
                     <input
                       type="checkbox"
                       checked={confirmInventoryCurrency}
@@ -687,58 +845,30 @@ export default function TenantSettingsPage() {
                       }}
                       disabled={!canEdit}
                     />
-                    Confirm that <strong>{formState.inventory_currency || 'this currency'}</strong> is the currency of existing inventory standard costs
+                    <span>Confirm that <strong>{formState.inventory_currency || 'this currency'}</strong> is the currency of existing inventory standard costs</span>
                   </label>
                   {legacyCurrencyChangeNeedsConfirmation ? (
-                    <span style={styles.fieldError}>You changed the currency. Confirm it above before saving.</span>
+                    <small className="tenant-settings-field-error">You changed the currency. Confirm it above before saving.</small>
                   ) : null}
                 </div>
               ) : (
-                <div style={{ ...styles.currencyStatus, ...styles.fullWidth }}>
-                  <div>
-                    <strong>Inventory currency confirmed</strong>
-                    <div style={styles.helperText}>
-                      Confirmed {formatTimestamp(currentTenant.inventory_currency_configured_at)}. A later change is blocked if it would relabel existing currency-dependent financial evidence.
-                    </div>
-                  </div>
+                <div className="tenant-settings-currency-status">
+                  <strong>Inventory currency confirmed</strong>
+                  <p>Confirmed {formatTimestamp(currentTenant.inventory_currency_configured_at)}. A later change is blocked if it would relabel existing currency-dependent financial evidence.</p>
                 </div>
               )}
-
-              <label style={styles.field}>
-                <span style={styles.label}>Season Start</span>
-                <input
-                  style={styles.input}
-                  type="date"
-                  value={formState.season_start}
-                  onChange={(event) => updateField('season_start', event.target.value)}
-                  disabled={!canEdit}
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Season End</span>
-                <input
-                  style={{
-                    ...styles.input,
-                    ...(dateRangeInvalid ? styles.invalidInput : {})
-                  }}
-                  type="date"
-                  value={formState.season_end}
-                  onChange={(event) => updateField('season_end', event.target.value)}
-                  disabled={!canEdit}
-                  min={formState.season_start || undefined}
-                />
-                {dateRangeInvalid ? <span style={styles.fieldError}>Season end cannot be before season start.</span> : null}
-              </label>
             </div>
+          </section>
 
-            <div style={styles.actions}>
+          <div className="tenant-settings-form-footer">
+            <div className="tenant-settings-form-footer__copy">
+              {!canUpdateTenants ? <strong>Your role can read tenant settings but cannot update them.</strong> : <strong>Only saved changes affect tenant operations.</strong>}
+              <span>{isWriteLocked ? 'The platform write lock currently prevents changes.' : isDirty ? 'Review the highlighted settings, then save or reset your changes.' : 'No unsaved tenant-setting changes.'}</span>
+            </div>
+            <div className="tenant-settings-form-footer__actions">
               <button
                 type="button"
-                style={{
-                  ...styles.secondaryButton,
-                  ...((!isDirty || isSaving) ? styles.disabledButton : {})
-                }}
+                className="app-button app-button--secondary"
                 onClick={handleResetForm}
                 disabled={!isDirty || isSaving}
               >
@@ -746,320 +876,15 @@ export default function TenantSettingsPage() {
               </button>
               <button
                 type="submit"
-                style={{
-                  ...styles.primaryButton,
-                  ...((!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid) ? styles.disabledPrimaryButton : {})
-                }}
+                className="app-button app-button--primary"
                 disabled={!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid}
               >
                 {isSaving ? 'Saving…' : 'Save tenant settings'}
               </button>
             </div>
-
-            {!canUpdateTenants ? (
-              <p style={styles.permissionHint}>Your role can read tenant settings but cannot update them.</p>
-            ) : null}
-          </form>
-        </div>
+          </div>
+        </form>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '16px',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap'
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end'
-  },
-  refreshMeta: {
-    color: '#64748b',
-    fontSize: '13px',
-    fontWeight: 700
-  },
-  eyebrow: {
-    margin: 0,
-    color: '#2563eb',
-    fontWeight: 800,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    fontSize: '12px'
-  },
-  title: {
-    margin: '4px 0 0',
-    fontSize: '30px',
-    color: '#0f172a'
-  },
-  subtitle: {
-    margin: '8px 0 0',
-    color: '#64748b',
-    maxWidth: '900px',
-    lineHeight: 1.5
-  },
-  twoColumn: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(280px, 340px) minmax(0, 1fr)',
-    gap: '20px',
-    alignItems: 'start'
-  },
-  panel: {
-    background: '#fff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '16px',
-    padding: '20px',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-    minWidth: 0
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '12px',
-    marginBottom: '16px'
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: '18px'
-  },
-  sectionSubtitle: {
-    margin: '5px 0 0',
-    color: '#64748b',
-    fontSize: '13px',
-    lineHeight: 1.4
-  },
-  currentTenantCard: {
-    display: 'grid',
-    gap: '4px',
-    border: '1px solid #bfdbfe',
-    borderRadius: '14px',
-    background: '#eff6ff',
-    padding: '14px'
-  },
-  tenantName: {
-    fontWeight: 900,
-    color: '#0f172a'
-  },
-  tenantMeta: {
-    color: '#64748b',
-    fontSize: '13px'
-  },
-  summaryList: {
-    display: 'grid',
-    gap: '0',
-    margin: '16px 0 0'
-  },
-  summaryRow: {
-    display: 'grid',
-    gap: '4px',
-    padding: '10px 0',
-    borderBottom: '1px solid #e2e8f0'
-  },
-  summaryLabel: {
-    color: '#64748b',
-    fontSize: '12px',
-    fontWeight: 800,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em'
-  },
-  summaryValue: {
-    margin: 0,
-    color: '#0f172a',
-    fontWeight: 700,
-    overflowWrap: 'anywhere'
-  },
-  summaryValueCode: {
-    margin: 0,
-    color: '#334155',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    fontSize: '12px',
-    overflowWrap: 'anywhere'
-  },
-  openBadge: {
-    background: '#dcfce7',
-    color: '#166534',
-    borderRadius: '999px',
-    padding: '5px 9px',
-    fontSize: '11px',
-    fontWeight: 900
-  },
-  lockedBadge: {
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '999px',
-    padding: '5px 9px',
-    fontSize: '11px',
-    fontWeight: 900
-  },
-  unsavedBadge: {
-    background: '#fef3c7',
-    color: '#92400e',
-    borderRadius: '999px',
-    padding: '5px 9px',
-    fontSize: '11px',
-    fontWeight: 900,
-    whiteSpace: 'nowrap'
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '16px',
-    alignItems: 'start'
-  },
-  field: {
-    display: 'grid',
-    gap: '8px',
-    alignContent: 'start',
-    minWidth: 0
-  },
-  documentDetailsHeader: { display: 'grid', gap: 4, paddingTop: 8, borderTop: '1px solid #e2e8f0' },
-  fullWidth: {
-    gridColumn: '1 / -1'
-  },
-  labelRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '7px'
-  },
-  label: {
-    fontWeight: 800,
-    color: '#334155'
-  },
-  infoIcon: {
-    display: 'inline-flex',
-    width: '18px',
-    height: '18px',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '999px',
-    border: '1px solid #93c5fd',
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    fontSize: '12px',
-    fontWeight: 900,
-    cursor: 'help',
-    userSelect: 'none'
-  },
-  input: {
-    boxSizing: 'border-box',
-    width: '100%',
-    minHeight: '46px',
-    padding: '0.85rem 0.95rem',
-    borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    background: '#fff',
-    font: 'inherit'
-  },
-  invalidInput: {
-    borderColor: '#ef4444'
-  },
-  fieldError: {
-    color: '#b91c1c',
-    fontSize: '12px',
-    fontWeight: 700
-  },
-  helperText: {
-    color: '#64748b',
-    fontSize: '13px',
-    lineHeight: 1.45
-  },
-  currencyNotice: {
-    border: '1px solid #fde68a',
-    borderRadius: '14px',
-    background: '#fffbeb',
-    padding: '14px',
-    display: 'grid',
-    gap: '12px'
-  },
-  currencyStatus: {
-    border: '1px solid #bbf7d0',
-    borderRadius: '14px',
-    background: '#f0fdf4',
-    padding: '14px'
-  },
-  noticeHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px',
-    alignItems: 'flex-start'
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '9px',
-    color: '#334155',
-    lineHeight: 1.4
-  },
-  actions: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginTop: '20px'
-  },
-  primaryButton: {
-    border: 0,
-    borderRadius: '12px',
-    padding: '0.9rem 1.1rem',
-    background: '#2563eb',
-    color: '#fff',
-    fontWeight: 900,
-    cursor: 'pointer'
-  },
-  secondaryButton: {
-    border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    padding: '0.9rem 1.1rem',
-    background: '#fff',
-    color: '#0f172a',
-    fontWeight: 900,
-    cursor: 'pointer'
-  },
-  disabledButton: {
-    opacity: 0.55,
-    cursor: 'not-allowed'
-  },
-  disabledPrimaryButton: {
-    background: '#93b4f4',
-    opacity: 0.75,
-    cursor: 'not-allowed'
-  },
-  error: {
-    background: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '12px',
-    padding: '12px'
-  },
-  success: {
-    background: '#dcfce7',
-    color: '#166534',
-    borderRadius: '12px',
-    padding: '12px',
-    fontWeight: 800
-  },
-  warning: {
-    background: '#fff7ed',
-    color: '#9a3412',
-    border: '1px solid #fed7aa',
-    borderRadius: '12px',
-    padding: '12px',
-    lineHeight: 1.45
-  },
-  permissionHint: {
-    color: '#64748b',
-    margin: '16px 0 0'
-  }
-};
