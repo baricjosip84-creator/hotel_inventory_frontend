@@ -22,6 +22,11 @@ const requiredPageAnchors = [
   'Alert actions are disabled while the effective write status is locked.',
   'Override and close',
   'Each diagnostic list loads up to 100 current rows',
+  "'Healthy'",
+  'No blocking, stock, or shipment integrity issues detected',
+  'DIAGNOSTICS AVAILABLE',
+  "loadedStockIssueCount === 1 ? 'issue' : 'issues'",
+  "loadedBrokenShipmentCount === 1 ? 'issue' : 'issues'",
   'Documented receiving shortages are allowed by the current finalization workflow.',
   "'/admin/diagnostics/blocking-alerts?limit=100'",
   "'/admin/diagnostics/stock-integrity?limit=100'",
@@ -36,6 +41,14 @@ for (const anchor of requiredPageAnchors) {
 
 if (page.includes('blocking_alerts?: BlockingAlertRow[]')) {
   throw new Error('Admin System hardening check failed: system-status must not expose detailed blocking-alert rows.');
+}
+
+if (page.includes('ACTIONS AVAILABLE')) {
+  throw new Error('Admin System hardening check failed: diagnostic header must not imply alert actions when no alert rows exist.');
+}
+
+if (page.includes('`${loadedStockIssueCount} loaded`') || page.includes('`${loadedBrokenShipmentCount} loaded`')) {
+  throw new Error('Admin System hardening check failed: integrity counters must describe issues, not technical loaded-row wording.');
 }
 
 for (const cssAnchor of ['.admin-system-status-grid', '.admin-system-diagnostic-group', '.admin-system-empty-good']) {

@@ -290,7 +290,31 @@ export default function AdminSystemPage() {
   const writeStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : effectiveWriteLocked ? 'Locked' : 'Open';
   const maintenanceStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : maintenanceEnabled ? 'Enabled' : 'Disabled';
   const blockingStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : String(blockingCount);
-  const diagnosticAccessStatus = canViewTenantDiagnostics ? 'Available' : 'Restricted';
+  const diagnosticsLoading = canViewTenantDiagnostics && (
+    blockingAlertsQuery.isLoading || stockIntegrityQuery.isLoading || brokenShipmentsQuery.isLoading
+  );
+  const diagnosticsUnavailable = canViewTenantDiagnostics && (
+    blockingAlertsQuery.isError || stockIntegrityQuery.isError || brokenShipmentsQuery.isError
+  );
+  const diagnosticIssueCount = blockingCount + loadedIntegrityIssueCount;
+  const diagnosticAccessStatus = !canViewTenantDiagnostics
+    ? 'Restricted'
+    : diagnosticsLoading
+      ? 'Loading…'
+      : diagnosticsUnavailable
+        ? 'Unavailable'
+        : diagnosticIssueCount > 0
+          ? 'Attention'
+          : 'Healthy';
+  const diagnosticHelper = !canViewTenantDiagnostics
+    ? 'Tenant Diagnostics · Read permission required'
+    : diagnosticsLoading
+      ? 'Loading blocking, stock, and shipment integrity checks'
+      : diagnosticsUnavailable
+        ? 'One or more tenant diagnostic checks could not be loaded'
+        : diagnosticIssueCount > 0
+          ? `${blockingCount} blocker${blockingCount === 1 ? '' : 's'} · ${loadedIntegrityIssueCount} loaded stock / shipment issue${loadedIntegrityIssueCount === 1 ? '' : 's'}`
+          : 'No blocking, stock, or shipment integrity issues detected';
   const pageHealth = systemStatusQuery.isLoading
     ? 'Loading…'
     : statusUnavailable
@@ -364,8 +388,8 @@ export default function AdminSystemPage() {
         <OperationalWorkspaceStatCard
           label="Tenant diagnostics"
           value={diagnosticAccessStatus}
-          helper={canViewTenantDiagnostics ? `${loadedIntegrityIssueCount} loaded stock / shipment issue${loadedIntegrityIssueCount === 1 ? '' : 's'} · up to 100 per category` : 'Tenant Diagnostics · Read permission required'}
-          tone={canViewTenantDiagnostics ? (loadedIntegrityIssueCount > 0 ? 'warn' : 'blue') : 'neutral'}
+          helper={diagnosticHelper}
+          tone={!canViewTenantDiagnostics || diagnosticsLoading || diagnosticsUnavailable ? 'neutral' : diagnosticIssueCount > 0 ? 'warn' : 'good'}
           iconPath="/audit"
         />
       </OperationalWorkspaceStats>
@@ -443,7 +467,7 @@ export default function AdminSystemPage() {
           description="Restricted tenant-scoped integrity checks. Each diagnostic list loads up to 100 current rows; the Blocking alerts KPI above remains the authoritative total blocker count."
           actions={
             canViewTenantDiagnostics
-              ? <StatusBadge tone={canManageAlerts || canOverrideAlerts ? 'blue' : 'neutral'}>{canManageAlerts || canOverrideAlerts ? 'ACTIONS AVAILABLE' : 'READ ONLY'}</StatusBadge>
+              ? <StatusBadge tone={canManageAlerts || canOverrideAlerts ? 'blue' : 'neutral'}>{canManageAlerts || canOverrideAlerts ? 'DIAGNOSTICS AVAILABLE' : 'READ ONLY'}</StatusBadge>
               : <StatusBadge tone="neutral">PERMISSION REQUIRED</StatusBadge>
           }
         />
@@ -584,7 +608,7 @@ export default function AdminSystemPage() {
                   <h4 id="admin-system-stock-heading">Stock integrity</h4>
                   <p>Negative stock balances that require operational investigation.</p>
                 </div>
-                <DiagnosticCount>{stockIntegrityQuery.isLoading ? 'Loading…' : `${loadedStockIssueCount} loaded`}</DiagnosticCount>
+                <DiagnosticCount>{stockIntegrityQuery.isLoading ? 'Loading…' : `${loadedStockIssueCount} ${loadedStockIssueCount === 1 ? 'issue' : 'issues'}`}</DiagnosticCount>
               </div>
 
               {stockIntegrityQuery.error ? <div className="app-error-state admin-system-message">{readableError(stockIntegrityQuery.error)}</div> : null}
@@ -617,7 +641,7 @@ export default function AdminSystemPage() {
                   <h4 id="admin-system-shipments-heading">Shipment integrity</h4>
                   <p>Finalized receiving records with undocumented shortages.</p>
                 </div>
-                <DiagnosticCount>{brokenShipmentsQuery.isLoading ? 'Loading…' : `${loadedBrokenShipmentCount} loaded`}</DiagnosticCount>
+                <DiagnosticCount>{brokenShipmentsQuery.isLoading ? 'Loading…' : `${loadedBrokenShipmentCount} ${loadedBrokenShipmentCount === 1 ? 'issue' : 'issues'}`}</DiagnosticCount>
               </div>
 
               {brokenShipmentsQuery.error ? <div className="app-error-state admin-system-message">{readableError(brokenShipmentsQuery.error)}</div> : null}
