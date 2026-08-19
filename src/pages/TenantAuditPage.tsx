@@ -1,7 +1,15 @@
 import { Fragment, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ApiError, apiRequest } from '../lib/api';
+import { ApiError, apiDownloadFile, apiRequest } from '../lib/api';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './TenantAuditPage.css';
 
 type TenantAuditRow = {
   id: string;
@@ -23,8 +31,20 @@ type TenantAuditPageResponse = {
   offset: number;
 };
 
+type TenantAuditSummary = {
+  total_events: number;
+  tenant_events: number;
+  support_events: number;
+  unique_actors: number;
+  first_event_at: string | null;
+  last_event_at: string | null;
+};
+
 type AuditFilters = {
   limit: '25' | '50' | '100';
+  search: string;
+  from: string;
+  to: string;
   action: string;
   entityType: string;
   supportOnly: boolean;
@@ -32,12 +52,28 @@ type AuditFilters = {
 
 const DEFAULT_FILTERS: AuditFilters = {
   limit: '50',
+  search: '',
+  from: '',
+  to: '',
   action: '',
   entityType: '',
   supportOnly: false
 };
 
 const GENERIC_ACTIONS = new Set(['create', 'update', 'delete', 'replace', 'write']);
+const TECHNICAL_METADATA_KEYS = new Set([
+  'actor_type',
+  'method',
+  'path',
+  'status_code',
+  'request_id',
+  'ip',
+  'user_agent',
+  'support_session_id',
+  'platform_user_id',
+  'support_expires_at',
+  'support_tenant_name'
+]);
 
 const PATH_ACTION_LABELS: Record<string, string> = {
   acknowledge: 'Acknowledged',
@@ -94,7 +130,7 @@ function formatLabel(value: string | null | undefined): string {
     .split(' ')
     .map((part) => {
       const upper = part.toUpperCase();
-      if (['ID', 'API', 'PO', 'IP', 'SLA'].includes(upper)) return upper;
+      if (['ID', 'API', 'PO', 'IP', 'SLA', 'AI'].includes(upper)) return upper;
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
     })
     .join(' ');
@@ -120,9 +156,7 @@ function pathOperation(row: TenantAuditRow): string | null {
 }
 
 function operationLabel(row: TenantAuditRow): string {
-  if (row.action && !GENERIC_ACTIONS.has(row.action)) {
-    return formatLabel(row.action);
-  }
+  if (row.action && !GENERIC_ACTIONS.has(row.action)) return formatLabel(row.action);
 
   const fromPath = pathOperation(row);
   if (fromPath) return fromPath;
@@ -168,18 +202,59 @@ function requestSummary(row: TenantAuditRow): {
   status: string | null;
   supportReason: string | null;
   requestId: string | null;
+  source: string | null;
 } {
   return {
     method: metadataValue(row.metadata, 'method'),
     path: metadataValue(row.metadata, 'path'),
     status: metadataValue(row.metadata, 'status_code'),
     supportReason: metadataValue(row.metadata, 'support_reason'),
-    requestId: metadataValue(row.metadata, 'request_id')
+    requestId: metadataValue(row.metadata, 'request_id'),
+    source: metadataValue(row.metadata, 'source')
   };
+}
+
+function statusTone(status: string | null): string {
+  const code = Number(status);
+  if (!Number.isFinite(code)) return 'neutral';
+  if (code >= 500) return 'bad';
+  if (code >= 400) return 'warn';
+  if (code >= 200 && code < 400) return 'good';
+  return 'neutral';
+}
+
+function metadataDisplayValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function visibleEvidenceEntries(metadata: Record<string, unknown> | null): Array<[string, unknown]> {
+  return Object.entries(metadata || {}).filter(([key, value]) => !TECHNICAL_METADATA_KEYS.has(key) && value !== null && value !== undefined && value !== '');
+}
+
+function buildAppliedFilterParams(filters: AuditFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.search.trim()) params.set('search', filters.search.trim());
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
+  if (filters.action.trim()) params.set('action', filters.action.trim());
+  if (filters.entityType.trim()) params.set('entity_type', filters.entityType.trim());
+  if (filters.supportOnly) params.set('support_only', 'true');
+  return params;
 }
 
 async function fetchAuditPage(queryString: string): Promise<TenantAuditPageResponse> {
   return apiRequest<TenantAuditPageResponse>(`/audit?${queryString}`);
+}
+
+async function fetchAuditSummary(queryString: string): Promise<TenantAuditSummary> {
+  return apiRequest<TenantAuditSummary>(`/audit/summary?${queryString}`);
 }
 
 async function fetchAuditDetail(id: string): Promise<TenantAuditRow> {
@@ -191,25 +266,36 @@ export default function TenantAuditPage() {
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [filterError, setFilterError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const filterParams = useMemo(() => buildAppliedFilterParams(appliedFilters), [appliedFilters]);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(filterParams);
     const limit = Number(appliedFilters.limit);
     params.set('limit', String(limit));
     params.set('offset', String(pageIndex * limit));
     params.set('response_mode', 'page');
     params.set('metadata_mode', 'summary');
-    if (appliedFilters.action.trim()) params.set('action', appliedFilters.action.trim());
-    if (appliedFilters.entityType.trim()) params.set('entity_type', appliedFilters.entityType.trim());
-    if (appliedFilters.supportOnly) params.set('support_only', 'true');
     return params.toString();
-  }, [appliedFilters, pageIndex]);
+  }, [appliedFilters.limit, filterParams, pageIndex]);
+
+  const summaryQueryString = useMemo(() => filterParams.toString(), [filterParams]);
 
   const auditQuery = useQuery({
     queryKey: ['tenant', 'audit', queryString],
     queryFn: () => fetchAuditPage(queryString),
+    staleTime: 15_000,
+    refetchOnWindowFocus: false
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: ['tenant', 'audit', 'summary', summaryQueryString],
+    queryFn: () => fetchAuditSummary(summaryQueryString),
     staleTime: 15_000,
     refetchOnWindowFocus: false
   });
@@ -225,26 +311,39 @@ export default function TenantAuditPage() {
 
   const rows = auditQuery.data?.rows || [];
   const hasMore = Boolean(auditQuery.data?.has_more);
+  const summary = summaryQuery.data;
   const lastRefreshedText = auditQuery.dataUpdatedAt
     ? `Last refreshed ${formatDateTime(new Date(auditQuery.dataUpdatedAt).toISOString())}`
     : 'Not refreshed yet';
 
   const filtersChanged = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
   const anyFilterApplied = Boolean(
+    appliedFilters.search.trim() ||
+    appliedFilters.from ||
+    appliedFilters.to ||
     appliedFilters.action.trim() ||
     appliedFilters.entityType.trim() ||
     appliedFilters.supportOnly ||
     appliedFilters.limit !== DEFAULT_FILTERS.limit
   );
 
+  const draftDateRangeInvalid = Boolean(draftFilters.from && draftFilters.to && draftFilters.from > draftFilters.to);
+
   const applyFilters = () => {
+    if (draftDateRangeInvalid) {
+      setFilterError('From date must be before or equal to To date.');
+      return;
+    }
+
     setAppliedFilters({
       ...draftFilters,
+      search: draftFilters.search.trim(),
       action: draftFilters.action.trim(),
       entityType: draftFilters.entityType.trim()
     });
     setPageIndex(0);
     setSelectedAuditId(null);
+    setFilterError(null);
     setRefreshMessage(null);
     setRefreshError(null);
   };
@@ -254,6 +353,7 @@ export default function TenantAuditPage() {
     setAppliedFilters(DEFAULT_FILTERS);
     setPageIndex(0);
     setSelectedAuditId(null);
+    setFilterError(null);
     setRefreshMessage(null);
     setRefreshError(null);
   };
@@ -262,14 +362,33 @@ export default function TenantAuditPage() {
     setRefreshMessage(null);
     setRefreshError(null);
 
-    const result = await auditQuery.refetch();
-
-    if (result.error) {
-      setRefreshError(readableError(result.error));
+    const [listResult, summaryResult] = await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
+    const error = listResult.error || summaryResult.error;
+    if (error) {
+      setRefreshError(readableError(error));
       return;
     }
 
     setRefreshMessage('Tenant audit refreshed.');
+  };
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setRefreshError(null);
+    setRefreshMessage(null);
+
+    try {
+      const params = new URLSearchParams(filterParams);
+      params.set('limit', '5000');
+      await apiDownloadFile(`/audit/export.csv?${params.toString()}`, `tenant-audit-${new Date().toISOString().slice(0, 10)}.csv`);
+      setRefreshMessage('Audit CSV export downloaded.');
+      await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
+    } catch (error) {
+      setRefreshError(readableError(error));
+    } finally {
+      setExporting(false);
+    }
   };
 
   const goToPreviousPage = () => {
@@ -284,115 +403,176 @@ export default function TenantAuditPage() {
   };
 
   return (
-    <div style={styles.page}>
-      <header>
-        <h1 style={styles.title}>Tenant Audit</h1>
-        <p style={styles.subtitle}>Tenant-scoped write history, including support-session activity performed through the platform.</p>
-      </header>
+    <div className="tenant-audit-page io-operational-page io-workspace-page" id="tenant-audit-workspace-top">
+      <OperationalWorkspaceHero
+        iconPath="/audit"
+        eyebrow="Accountability & evidence"
+        title="Tenant audit trail"
+        description="Review tenant-scoped business changes and attributed support-session activity. Audit evidence is read-only and remains isolated to the current tenant."
+        meta={
+          <>
+            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Read-only evidence</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Support activity attributed</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>CSV export</OperationalWorkspaceMetaPill>
+          </>
+        }
+        aside={<OperationalWorkspaceStatus value={summary?.total_events ?? '—'} label="events matching applied filters" />}
+      />
 
-      <section style={styles.panel}>
-        <div style={styles.filterHeader}>
-          <div>
-            <h2 style={styles.sectionTitle}>Filters</h2>
-            <p style={styles.helper}>Set filters, then apply them once. Typing does not send a new server request on every keystroke.</p>
-          </div>
-          <div style={styles.filterActions}>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={resetFilters}
-              disabled={!anyFilterApplied && !filtersChanged}
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              style={styles.primaryButton}
-              onClick={applyFilters}
-              disabled={!filtersChanged || auditQuery.isFetching}
-            >
-              Apply filters
-            </button>
-          </div>
-        </div>
-        <div style={styles.filters}>
-          <label style={styles.label}>
-            Events per page
+      <OperationalWorkspaceStats ariaLabel="Tenant audit overview">
+        <OperationalWorkspaceStatCard label="Matching events" value={summary?.total_events ?? '—'} helper="Across the applied audit filters" tone="blue" iconPath="/audit" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Tenant actions" value={summary?.tenant_events ?? '—'} helper="Actions attributed to tenant users or tenant services" tone="neutral" iconPath="/users" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Support actions" value={summary?.support_events ?? '—'} helper="Audited platform support-session activity" tone={summary?.support_events ? 'warn' : 'good'} iconPath="/sessions" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Unique actors" value={summary?.unique_actors ?? '—'} helper="Distinct tenant or support actors in scope" tone="good" iconPath="/users" loading={summaryQuery.isLoading} />
+      </OperationalWorkspaceStats>
+
+      {summaryQuery.error ? <div className="app-error-state tenant-audit-message">Audit summary could not be loaded: {readableError(summaryQuery.error)}</div> : null}
+      {filterError ? <div className="app-error-state tenant-audit-message" role="alert">{filterError}</div> : null}
+      {refreshError ? <div className="app-error-state tenant-audit-message" role="alert">{refreshError}</div> : null}
+      {refreshMessage ? <div className="app-success-state tenant-audit-message" role="status">{refreshMessage}</div> : null}
+
+      <section className="app-panel tenant-audit-panel">
+        <OperationalSectionHeader
+          iconPath="/audit"
+          title="Audit filters"
+          description="Narrow the audit trail by date, actor or evidence. Filters are applied only when you choose Apply filters."
+          actions={
+            <>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={resetFilters}
+                disabled={!anyFilterApplied && !filtersChanged}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="app-button app-button--primary"
+                onClick={applyFilters}
+                disabled={!filtersChanged || auditQuery.isFetching || draftDateRangeInvalid}
+              >
+                Apply filters
+              </button>
+            </>
+          }
+        />
+
+        <div className="tenant-audit-filter-grid">
+          <label className="tenant-audit-field tenant-audit-field--search">
+            <span>Search audit history</span>
+            <input
+              value={draftFilters.search}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Actor, action, entity, request ID, or support reason"
+            />
+          </label>
+          <label className="tenant-audit-field">
+            <span>From</span>
+            <input
+              type="date"
+              value={draftFilters.from}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
+            />
+          </label>
+          <label className="tenant-audit-field">
+            <span>To</span>
+            <input
+              type="date"
+              value={draftFilters.to}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
+              aria-invalid={draftDateRangeInvalid}
+            />
+          </label>
+          <label className="tenant-audit-field">
+            <span>Events per page</span>
             <select
               value={draftFilters.limit}
               onChange={(event) => setDraftFilters((current) => ({ ...current, limit: event.target.value as AuditFilters['limit'] }))}
-              style={styles.input}
             >
               <option value="25">25</option>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
           </label>
-          <label style={styles.label}>
-            Action code
+          <label className="tenant-audit-field">
+            <span>Action code</span>
             <input
               value={draftFilters.action}
               onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
-              placeholder="create / update / export_csv"
-              style={styles.input}
+              placeholder="Example: shipment.receive"
             />
           </label>
-          <label style={styles.label}>
-            Entity type
+          <label className="tenant-audit-field">
+            <span>Entity type</span>
             <input
               value={draftFilters.entityType}
               onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
-              placeholder="shipments / products / tenant_user"
-              style={styles.input}
+              placeholder="Example: shipments"
             />
           </label>
-          <label style={styles.checkboxLabel}>
+          <label className="tenant-audit-checkbox">
             <input
               type="checkbox"
               checked={draftFilters.supportOnly}
               onChange={(event) => setDraftFilters((current) => ({ ...current, supportOnly: event.target.checked }))}
             />
-            Support-session actions only
+            <span>Support-session actions only</span>
           </label>
+          <div className="tenant-audit-filter-note">CSV export uses the currently applied filters, not unfinished filter edits.</div>
         </div>
       </section>
 
       {auditQuery.isLoading ? <div className="app-empty-state">Loading tenant audit…</div> : null}
-      {auditQuery.error ? <div className="app-error-state">{readableError(auditQuery.error)}</div> : null}
-      {refreshError ? <div className="app-error-state">{refreshError}</div> : null}
-      {refreshMessage ? <div className="app-success-state">{refreshMessage}</div> : null}
+      {auditQuery.error ? <div className="app-error-state">Failed to load tenant audit: {readableError(auditQuery.error)}</div> : null}
 
-      <section style={styles.panel}>
-        <div style={styles.sectionHeader}>
-          <div>
-            <h2 style={styles.sectionTitle}>Audit Events</h2>
-            <p style={styles.refreshMeta}>
-              {lastRefreshedText} · Page {pageIndex + 1} · {rows.length} event{rows.length === 1 ? '' : 's'} loaded
-              {auditQuery.isFetching && !auditQuery.isLoading ? ' · Updating…' : ''}
-            </p>
-          </div>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={handleRefreshAudit}
-            disabled={auditQuery.isFetching}
-            title="Reload the current audit page from the server"
-          >
-            {auditQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
+      <section className="app-panel tenant-audit-panel tenant-audit-events-panel">
+        <OperationalSectionHeader
+          iconPath="/audit"
+          title="Audit event log"
+          description={`${lastRefreshedText} · Page ${pageIndex + 1} · ${rows.length} event${rows.length === 1 ? '' : 's'} loaded${auditQuery.isFetching && !auditQuery.isLoading ? ' · Updating…' : ''}`}
+          actions={
+            <>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => setShowTechnicalDetails((current) => !current)}
+                aria-pressed={showTechnicalDetails}
+              >
+                {showTechnicalDetails ? 'Hide technical details' : 'Show technical details'}
+              </button>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={handleExport}
+                disabled={exporting || auditQuery.isFetching}
+              >
+                {exporting ? 'Exporting…' : 'Export CSV'}
+              </button>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={handleRefreshAudit}
+                disabled={auditQuery.isFetching}
+              >
+                {auditQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </>
+          }
+        />
 
         {rows.length ? (
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
+          <div className="tenant-audit-table-wrap">
+            <table className="tenant-audit-table">
               <thead>
                 <tr>
-                  <th style={styles.th}>Time</th>
-                  <th style={styles.th}>Operation</th>
-                  <th style={styles.th}>Actor</th>
-                  <th style={styles.th}>Entity</th>
-                  <th style={styles.th}>Request</th>
-                  <th style={styles.th}>Evidence</th>
+                  <th>Time</th>
+                  <th>Operation</th>
+                  <th>Actor</th>
+                  <th>Entity</th>
+                  <th>Source</th>
+                  <th>Evidence</th>
                 </tr>
               </thead>
               <tbody>
@@ -403,35 +583,39 @@ export default function TenantAuditPage() {
                   return (
                     <Fragment key={row.id}>
                       <tr>
-                        <td style={styles.td}>{formatDateTime(row.created_at)}</td>
-                        <td style={styles.td}>
-                          <div style={styles.operationPrimary}>{operationLabel(row)}</div>
-                          <div style={styles.codeText}>{row.action}</div>
+                        <td className="tenant-audit-time">{formatDateTime(row.created_at)}</td>
+                        <td>
+                          <div className="tenant-audit-primary">{operationLabel(row)}</div>
+                          {showTechnicalDetails ? <div className="tenant-audit-code">{row.action}</div> : null}
                         </td>
-                        <td style={styles.td}>
-                          <span style={actor.support ? styles.supportBadge : styles.userBadge}>
+                        <td>
+                          <span className={`tenant-audit-badge ${actor.support ? 'tenant-audit-badge--support' : 'tenant-audit-badge--tenant'}`}>
                             {actor.support ? 'SUPPORT' : 'TENANT'}
                           </span>
-                          <div style={styles.actorPrimary}>{actor.primary}</div>
-                          {actor.secondary ? <div style={styles.muted}>{actor.secondary}</div> : null}
+                          <div className="tenant-audit-primary tenant-audit-actor">{actor.primary}</div>
+                          {actor.secondary ? <div className="tenant-audit-muted">{actor.secondary}</div> : null}
+                          {showTechnicalDetails && row.user_id ? <div className="tenant-audit-code">User {shortId(row.user_id)}</div> : null}
                         </td>
-                        <td style={styles.td}>
-                          <span style={styles.entityType}>{formatLabel(row.entity_type)}</span>
-                          {row.entity_id ? <div style={styles.muted}>{shortId(row.entity_id)}</div> : null}
+                        <td>
+                          <div className="tenant-audit-primary">{formatLabel(row.entity_type)}</div>
+                          {showTechnicalDetails && row.entity_id ? <div className="tenant-audit-code">{row.entity_id}</div> : null}
                         </td>
-                        <td style={styles.tdRequest}>
-                          <div style={styles.requestTopLine}>
-                            {request.method ? <span style={styles.methodBadge}>{request.method}</span> : null}
-                            {request.status ? <span style={styles.statusCode}>{request.status}</span> : null}
+                        <td className="tenant-audit-source-cell">
+                          <div className="tenant-audit-request-topline">
+                            {request.method ? <span className="tenant-audit-method">{request.method}</span> : null}
+                            {request.status ? <span className={`tenant-audit-status tenant-audit-status--${statusTone(request.status)}`}>{request.status}</span> : null}
+                            {!request.method && request.source ? <span className="tenant-audit-source-label">{formatLabel(request.source)}</span> : null}
+                            {!request.method && !request.source && actor.support ? <span className="tenant-audit-source-label">Support event</span> : null}
+                            {!request.method && !request.source && !actor.support ? <span className="tenant-audit-source-label">System event</span> : null}
                           </div>
-                          {request.path ? <div style={styles.pathText}>{request.path}</div> : <span style={styles.muted}>No HTTP request metadata</span>}
-                          {request.supportReason ? <div style={styles.supportReason}>Reason: {request.supportReason}</div> : null}
-                          {request.requestId ? <div style={styles.muted}>Request {shortId(request.requestId)}</div> : null}
+                          {request.supportReason ? <div className="tenant-audit-support-reason">Reason: {request.supportReason}</div> : null}
+                          {showTechnicalDetails && request.path ? <div className="tenant-audit-path">{request.path}</div> : null}
+                          {showTechnicalDetails && request.requestId ? <div className="tenant-audit-muted">Request {request.requestId}</div> : null}
                         </td>
-                        <td style={styles.td}>
+                        <td>
                           <button
                             type="button"
-                            style={styles.detailsButton}
+                            className="app-button app-button--secondary tenant-audit-details-button"
                             onClick={() => setSelectedAuditId(isSelected ? null : row.id)}
                             aria-expanded={isSelected}
                           >
@@ -440,21 +624,44 @@ export default function TenantAuditPage() {
                         </td>
                       </tr>
                       {isSelected ? (
-                        <tr>
-                          <td colSpan={6} style={styles.detailCell}>
+                        <tr className="tenant-audit-detail-row">
+                          <td colSpan={6}>
                             {detailQuery.isLoading ? <div className="app-empty-state">Loading full audit evidence…</div> : null}
-                            {detailQuery.error ? <div className="app-error-state">{readableError(detailQuery.error)}</div> : null}
+                            {detailQuery.error ? <div className="app-error-state">Audit evidence could not be loaded: {readableError(detailQuery.error)}</div> : null}
                             {detailQuery.data?.id === row.id ? (
-                              <div style={styles.detailPanel}>
-                                <div style={styles.detailGrid}>
-                                  <div><strong>Event ID</strong><div style={styles.detailValue}>{detailQuery.data.id}</div></div>
-                                  <div><strong>User ID</strong><div style={styles.detailValue}>{detailQuery.data.user_id || '-'}</div></div>
-                                  <div><strong>Entity ID</strong><div style={styles.detailValue}>{detailQuery.data.entity_id || '-'}</div></div>
+                              <div className="tenant-audit-detail-panel">
+                                <div className="tenant-audit-detail-heading">
+                                  <div>
+                                    <strong>Recorded evidence</strong>
+                                    <p>Business evidence is shown first. Technical identifiers and request metadata stay hidden unless technical details are enabled.</p>
+                                  </div>
+                                  <span>{formatDateTime(detailQuery.data.created_at)}</span>
                                 </div>
-                                <div>
-                                  <strong>Full metadata</strong>
-                                  <pre style={styles.metadataPre}>{JSON.stringify(detailQuery.data.metadata || {}, null, 2)}</pre>
-                                </div>
+
+                                {visibleEvidenceEntries(detailQuery.data.metadata).length ? (
+                                  <div className="tenant-audit-evidence-grid">
+                                    {visibleEvidenceEntries(detailQuery.data.metadata).map(([key, value]) => (
+                                      <div key={key}>
+                                        <span>{formatLabel(key)}</span>
+                                        <strong>{metadataDisplayValue(value)}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : <div className="tenant-audit-no-extra-evidence">No additional business evidence was recorded for this event.</div>}
+
+                                {showTechnicalDetails ? (
+                                  <>
+                                    <div className="tenant-audit-id-grid">
+                                      <div><span>Event ID</span><strong>{detailQuery.data.id}</strong></div>
+                                      <div><span>User ID</span><strong>{detailQuery.data.user_id || '-'}</strong></div>
+                                      <div><span>Entity ID</span><strong>{detailQuery.data.entity_id || '-'}</strong></div>
+                                    </div>
+                                    <div>
+                                      <strong className="tenant-audit-raw-title">Raw metadata</strong>
+                                      <pre className="tenant-audit-metadata-pre">{JSON.stringify(detailQuery.data.metadata || {}, null, 2)}</pre>
+                                    </div>
+                                  </>
+                                ) : null}
                               </div>
                             ) : null}
                           </td>
@@ -466,14 +673,14 @@ export default function TenantAuditPage() {
               </tbody>
             </table>
           </div>
-        ) : !auditQuery.isLoading && !auditQuery.error ? <div className="app-empty-state">No tenant audit events match the applied filters.</div> : null}
+        ) : !auditQuery.isLoading && !auditQuery.error ? <div className="app-empty-state tenant-audit-empty">No tenant audit events match the applied filters.</div> : null}
 
-        <div style={styles.pagination}>
-          <div style={styles.paginationMeta}>Page {pageIndex + 1}</div>
-          <div style={styles.paginationButtons}>
+        <div className="tenant-audit-pagination">
+          <div className="tenant-audit-pagination-meta">Page {pageIndex + 1}</div>
+          <div className="tenant-audit-pagination-buttons">
             <button
               type="button"
-              style={styles.secondaryButton}
+              className="app-button app-button--secondary"
               onClick={goToPreviousPage}
               disabled={pageIndex === 0 || auditQuery.isFetching}
             >
@@ -481,7 +688,7 @@ export default function TenantAuditPage() {
             </button>
             <button
               type="button"
-              style={styles.secondaryButton}
+              className="app-button app-button--secondary"
               onClick={goToNextPage}
               disabled={!hasMore || auditQuery.isFetching}
             >
@@ -493,52 +700,3 @@ export default function TenantAuditPage() {
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  title: { margin: 0, fontSize: '30px', color: '#0f172a' },
-  subtitle: { margin: '8px 0 0', color: '#64748b', lineHeight: 1.5 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' },
-  filterHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' },
-  filterActions: { display: 'flex', gap: '10px', alignItems: 'center' },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '14px' },
-  sectionTitle: { margin: '0 0 6px', fontSize: '20px' },
-  helper: { margin: 0, color: '#64748b', fontSize: '13px', lineHeight: 1.5 },
-  refreshMeta: { margin: 0, color: '#64748b', fontSize: '12px' },
-  filters: { display: 'grid', gridTemplateColumns: 'minmax(150px, 0.7fr) repeat(2, minmax(220px, 1.3fr)) minmax(220px, 1fr)', gap: '14px', alignItems: 'end' },
-  label: { display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#334155' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px', minHeight: '42px', fontSize: '13px', fontWeight: 700, color: '#334155' },
-  input: { width: '100%', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '10px 12px', fontSize: '14px', background: '#fff', boxSizing: 'border-box' },
-  primaryButton: {
-    border: '1px solid #2563eb', borderRadius: '12px', background: '#2563eb', color: '#fff', padding: '10px 14px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap'
-  },
-  secondaryButton: {
-    border: '1px solid #cbd5e1', borderRadius: '12px', background: '#ffffff', color: '#0f172a', padding: '10px 14px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap'
-  },
-  tableWrap: { width: '100%', overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1040px' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '11px 10px', color: '#64748b', background: '#f8fafc', fontSize: '13px', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #e2e8f0', padding: '12px 10px', verticalAlign: 'top' },
-  tdRequest: { borderBottom: '1px solid #e2e8f0', padding: '12px 10px', verticalAlign: 'top', minWidth: '300px', maxWidth: '460px' },
-  muted: { color: '#64748b', fontSize: '12px', marginTop: '4px', wordBreak: 'break-word' },
-  codeText: { color: '#64748b', fontSize: '11px', marginTop: '4px', fontFamily: 'monospace', wordBreak: 'break-word' },
-  operationPrimary: { fontWeight: 800, color: '#0f172a' },
-  actorPrimary: { marginTop: '6px', fontWeight: 700 },
-  entityType: { fontWeight: 700 },
-  supportBadge: { display: 'inline-flex', borderRadius: '999px', padding: '4px 8px', background: '#fffbeb', color: '#92400e', fontSize: '11px', fontWeight: 800 },
-  userBadge: { display: 'inline-flex', borderRadius: '999px', padding: '4px 8px', background: '#eff6ff', color: '#1d4ed8', fontSize: '11px', fontWeight: 800 },
-  requestTopLine: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' },
-  methodBadge: { display: 'inline-flex', borderRadius: '6px', padding: '3px 6px', background: '#f1f5f9', color: '#334155', fontSize: '11px', fontWeight: 800, fontFamily: 'monospace' },
-  statusCode: { display: 'inline-flex', borderRadius: '6px', padding: '3px 6px', background: '#ecfdf5', color: '#047857', fontSize: '11px', fontWeight: 800, fontFamily: 'monospace' },
-  pathText: { color: '#334155', fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.45, wordBreak: 'break-all' },
-  supportReason: { marginTop: '5px', color: '#92400e', fontSize: '12px' },
-  detailsButton: { border: '1px solid #cbd5e1', borderRadius: '10px', background: '#fff', color: '#0f172a', padding: '7px 10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
-  detailCell: { padding: 0, borderBottom: '1px solid #e2e8f0', background: '#f8fafc' },
-  detailPanel: { padding: '16px', display: 'grid', gap: '14px' },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' },
-  detailValue: { marginTop: '4px', fontFamily: 'monospace', fontSize: '12px', color: '#475569', wordBreak: 'break-all' },
-  metadataPre: { margin: '8px 0 0', padding: '12px', borderRadius: '12px', background: '#0f172a', color: '#e2e8f0', fontSize: '12px', overflow: 'auto', maxHeight: '320px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  pagination: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #e2e8f0' },
-  paginationMeta: { color: '#64748b', fontSize: '13px', fontWeight: 700 },
-  paginationButtons: { display: 'flex', gap: '8px' }
-};
