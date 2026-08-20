@@ -1,7 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchCertificatePage.css';
 
 type EvidenceScope = {
   mode: string;
@@ -55,8 +64,104 @@ type CommercialLaunchCertificate = {
   validation_note: string;
 };
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+type SummaryItem = {
+  key: string;
+  label: string;
+  helper: string;
+  tone?: 'default' | 'neutral' | 'good' | 'warn' | 'danger';
+};
+
+const summaryItems: SummaryItem[] = [
+  { key: 'controls_total', label: 'Controls reviewed', helper: 'Owner/evidence domains in this certificate precheck.' },
+  { key: 'evidence_surfaces_ready', label: 'Evidence ready', helper: 'Upstream evidence surfaces clear for manual owner review.', tone: 'good' },
+  { key: 'evidence_reviews_required', label: 'Evidence review', helper: 'Sources or scope still require explicit review.', tone: 'warn' },
+  { key: 'evidence_surfaces_blocked', label: 'Evidence blocked', helper: 'Known upstream evidence blockers.', tone: 'danger' },
+  { key: 'evidence_sources_unavailable', label: 'Sources unavailable', helper: 'Evidence sources that could not be loaded.', tone: 'danger' },
+  { key: 'scope_reviews_required', label: 'Scope review', helper: 'Tenant evidence windows requiring broader review.', tone: 'warn' },
+  { key: 'manual_acceptances_required', label: 'Manual acceptances', helper: 'Owner decisions that remain intentionally outside this board.', tone: 'warn' },
+  { key: 'certificate_issued', label: 'Certificates issued', helper: 'This read-only board never issues a production certificate.', tone: 'neutral' }
+];
+
+const summaryLabels: Record<string, string> = {
+  controls_total: 'Controls reviewed',
+  evidence_surfaces_ready: 'Evidence surfaces ready',
+  evidence_reviews_required: 'Evidence reviews required',
+  evidence_surfaces_blocked: 'Evidence surfaces blocked',
+  evidence_sources_unavailable: 'Evidence sources unavailable',
+  scope_reviews_required: 'Scope reviews required',
+  manual_acceptances_required: 'Manual acceptances required',
+  certificate_issued: 'Certificates issued'
+};
+
+const statusLabels: Record<string, string> = {
+  commercial_launch_certificate_blocked_by_evidence: 'Blocked by evidence',
+  commercial_launch_certificate_ready_for_manual_evidence_review: 'Ready for manual evidence review',
+  commercial_launch_certificate_ready_for_manual_acceptance: 'Ready for manual acceptance',
+  evidence_surface_ready: 'Evidence surface ready',
+  evidence_review_required: 'Evidence review required',
+  evidence_surface_blocked: 'Evidence surface blocked',
+  evidence_source_unavailable: 'Evidence source unavailable',
+  full_population: 'Full tenant population',
+  full_population_inferred: 'Full tenant population inferred',
+  scope_limit_review_required: 'Scope review required',
+  not_limited_by_certificate: 'Not limited by certificate',
+  manual_acceptance_required: 'Manual acceptance required'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function displayStatus(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  return statusLabels[value] || humanize(value);
+}
+
+function displaySummaryKey(value: string) {
+  return summaryLabels[value] || humanize(value);
+}
+
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('missing')
+    || normalized.includes('unavailable')
+    || normalized.includes('incomplete')
+    || normalized.includes('not_launchable')
+    || normalized.includes('failed')
+  ) return 'danger';
+  if (
+    normalized.includes('manual')
+    || normalized.includes('required')
+    || normalized.includes('review')
+    || normalized.includes('external')
+    || normalized.includes('partial')
+    || normalized.includes('scope_limit')
+  ) return 'warn';
+  if (normalized.includes('no_tenants') || normalized.includes('not_limited')) return 'neutral';
+  if (
+    normalized.includes('ready')
+    || normalized.includes('clear')
+    || normalized.includes('present')
+    || normalized.includes('full_population')
+  ) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'The platform request failed.';
 }
 
 function getControlReviewLink(control: CertificateControl) {
@@ -91,49 +196,6 @@ function getControlReviewLabel(control: CertificateControl) {
   return byCode[control.code] || 'Open readiness page';
 }
 
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized.includes('no_tenants') || normalized.includes('not_limited')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (
-    normalized.includes('blocked')
-    || normalized.includes('missing')
-    || normalized.includes('unavailable')
-    || normalized.includes('incomplete')
-    || normalized.includes('not_launchable')
-    || normalized.includes('failed')
-  ) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (
-    normalized.includes('manual')
-    || normalized.includes('required')
-    || normalized.includes('review')
-    || normalized.includes('external')
-    || normalized.includes('partial')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (
-    normalized.includes('ready')
-    || normalized.includes('clear')
-    || normalized.includes('present')
-    || normalized.includes('full_population')
-  ) {
-    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  }
-  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-}
-
-function neutralBadgeStyle(): CSSProperties {
-  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Failed to load commercial launch certificate.';
-}
-
 export default function PlatformCommercialLaunchCertificatePage() {
   const certificate = useQuery({
     queryKey: ['platform', 'commercial-launch-certificate'],
@@ -143,139 +205,214 @@ export default function PlatformCommercialLaunchCertificatePage() {
   });
 
   const data = certificate.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summary = data?.summary || {};
+  const detailedSummary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = certificate.isError && !data;
+  const refreshError = certificate.isError && Boolean(data);
+  const errorMessage = readableError(certificate.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Certificate Board</h1>
-          <p style={styles.description}>
-            Step 217 is an internal certificate precheck. It now evaluates the current postures from the real
-            provisioning, onboarding, billing, support, monitoring, backup/restore, deployment, documentation,
-            pilot, and commercial-closure evidence sources. It does not persist owner signoff or issue an external certificate.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-launch-certificate">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-certificate"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Certificate"
+        description="Read-only final launch-certificate precheck that joins the current provisioning, onboarding, billing, support, monitoring, backup/restore, deployment, documentation, pilot and commercial-closure evidence postures without pretending that owner signoff or an external certificate already exists."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 217 — Commercial Launch Certificate Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Internal precheck only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Manual owner acceptance required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-launch-certificate__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.evidence_surfaces_ready ?? 0}/${summary.controls_total ?? 0}` : '—'}
+              label="evidence surfaces ready for owner review"
+            />
+            {data ? (
+              <span className="platform-launch-certificate__status-badge" data-tone={badgeTone(data.posture)}>
+                {displayStatus(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-launch-certificate__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void certificate.refetch()}
+                disabled={certificate.isFetching}
+              >
+                {certificate.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-launch-certificate__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-certificate"
+          title="Certificate boundary"
+          description="The board combines current internal evidence postures, then stops before the human launch decision."
+        />
+        <div className="platform-launch-certificate__boundary-grid">
+          <div className="platform-launch-certificate__boundary-notice">
+            <strong>Internal precheck only.</strong>
+            <span>
+              A green evidence source means its current technical/readiness posture is clear enough to enter manual owner acceptance. It does not mean an owner signed, a customer accepted launch, a live restore succeeded, payment settlement was proven or a production certificate was issued.
+            </span>
+          </div>
+          <div className="platform-launch-certificate__supporting-pages">
+            <strong>Supporting readiness pages</strong>
+            <span>This page already requires the combined read permissions needed by these underlying evidence surfaces.</span>
+            <div className="platform-launch-certificate__link-row">
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-readiness">Launch readiness</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-readiness-verification-program">Readiness verification</Link>
+              <Link className="app-button app-button--secondary" to="/platform/tenant-provisioning-hardening">Provisioning</Link>
+              <Link className="app-button app-button--secondary" to="/platform/customer-onboarding-checklist">Onboarding</Link>
+              <Link className="app-button app-button--secondary" to="/platform/billing-subscription-activation">Billing activation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/support-cockpit">Support cockpit</Link>
+              <Link className="app-button app-button--secondary" to="/platform/monitoring-readiness">Monitoring</Link>
+              <Link className="app-button app-button--secondary" to="/platform/backup-restore-validation">Backup restore</Link>
+              <Link className="app-button app-button--secondary" to="/platform/deployment-validation">Deployment validation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/documentation-completeness">Documentation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/pilot-customer-readiness">Pilot readiness</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+            </div>
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {certificate.isLoading ? <section className="app-panel app-panel--padded">Loading commercial launch certificate…</section> : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-launch-certificate__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Certificate.</strong>
+          <span>{errorMessage}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--danger platform-launch-certificate__retry"
             onClick={() => void certificate.refetch()}
             disabled={certificate.isFetching}
           >
-            {certificate.isFetching ? 'Refreshing...' : 'Refresh'}
+            {certificate.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.warningCard}>
-        <strong>Internal precheck only.</strong> A green evidence source means its current technical/readiness posture is clear enough to enter manual owner acceptance. It does not mean the owner has signed, the customer has accepted launch, or a production certificate has been issued.
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting readiness pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness registry</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-readiness-verification-program">Readiness verification</Link>
-          <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
-          <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring</Link>
-          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
-          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
-          <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
-          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
-        </div>
-      </section>
-
-      {certificate.isLoading ? <div style={styles.card}>Loading commercial launch certificate...</div> : null}
-      {certificate.error ? (
-        <div style={styles.error}>
-          <strong>Unable to load Launch Certificate.</strong>
-          <span style={styles.errorDetail}>{errorMessage(certificate.error)}</span>
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-launch-certificate__feedback platform-launch-certificate__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Certificate snapshot. {errorMessage}</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-launch-certificate__retry"
             onClick={() => void certificate.refetch()}
             disabled={certificate.isFetching}
           >
-            {certificate.isFetching ? 'Retrying...' : 'Retry'}
+            {certificate.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
-              <div style={styles.metadataItem}><strong>Phase</strong><span>{data.phase}</span></div>
-              <div style={styles.metadataItem}><strong>Step</strong><span>{data.step}</span></div>
-              <div style={styles.metadataItem}><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div style={styles.metadataItem}><strong>Tenant population</strong><span>{data.tenant_scope.total_tenants ?? 'Unavailable'}</span></div>
-              <div style={styles.metadataItem}><strong>Tenant review cap</strong><span>{data.tenant_scope.review_limit}</span></div>
-              <div style={styles.metadataItem}><strong>Tenant scope query</strong><span>{data.tenant_scope.available ? 'Available' : humanize(data.tenant_scope.error_code || 'unavailable')}</span></div>
-            </div>
-            <p style={styles.validationText}>{data.validation_note}</p>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Commercial launch certificate summary">
+            {summaryItems.map((item) => (
+              <OperationalWorkspaceStatCard
+                key={item.key}
+                label={item.label}
+                value={summary[item.key] ?? 0}
+                helper={item.helper}
+                tone={item.tone}
+              />
             ))}
-          </section>
+          </OperationalWorkspaceStats>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Certificate posture inputs</h2>
-            <div style={styles.inputGrid}>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Launch readiness registry posture</span>
-                <strong>{humanize(data.launch_readiness_posture)}</strong>
-                <span style={styles.help}>{data.launch_readiness_registry_note}</span>
-              </div>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Commercial readiness closure posture</span>
-                <strong>{humanize(data.commercial_readiness_closure_posture)}</strong>
-                <span style={styles.help}>Closure remains a separate owner/security review input; its static registry does not persist execution results.</span>
-              </div>
+          <section className="app-panel app-panel--padded platform-launch-certificate__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-certificate"
+              title="Certificate posture inputs"
+              description="Snapshot identity, tenant evidence scope and the two higher-level readiness inputs used for context. Current evidence decisions come from the real upstream source postures, not the static registry gate labels."
+            />
+            <div className="platform-launch-certificate__program-grid">
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Tenant population</strong><span>{data.tenant_scope.total_tenants ?? 'Unavailable'}</span></div>
+              <div><strong>Tenant review cap</strong><span>{data.tenant_scope.review_limit}</span></div>
+              <div><strong>Tenant scope query</strong><span>{data.tenant_scope.available ? 'Available' : displayStatus(data.tenant_scope.error_code || 'unavailable')}</span></div>
+              <div><strong>Launch readiness registry</strong><span>{displayStatus(data.launch_readiness_posture)}</span></div>
+              <div><strong>Commercial readiness closure</strong><span>{displayStatus(data.commercial_readiness_closure_posture)}</span></div>
             </div>
+            <div className="platform-launch-certificate__registry-note">
+              <strong>Static registry is context only</strong>
+              <span>{data.launch_readiness_registry_note}</span>
+            </div>
+            <details className="platform-launch-certificate__details">
+              <summary>Detailed certificate counters</summary>
+              <div className="platform-launch-certificate__summary-grid">
+                {detailedSummary.map(([key, value]) => (
+                  <div key={key}>
+                    <span>{displaySummaryKey(key)}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </details>
+            <details className="platform-launch-certificate__details">
+              <summary>Validation note</summary>
+              <p>{data.validation_note}</p>
+            </details>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Certificate controls</h2>
-            <div style={styles.controlGrid}>
+          <section className="platform-launch-certificate__controls-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-certificate"
+              title="Certificate controls"
+              description="Each control shows its current upstream posture, evidence scope, static registry context and the manual acceptance that still remains outside this read-only board."
+            />
+            <div className="platform-launch-certificate__control-grid">
               {data.certificate_controls.map((control) => (
-                <article key={control.code} style={styles.controlCard}>
-                  <div style={styles.controlHeader}>
-                    <div style={styles.controlTitleBlock}>
-                      <strong>{humanize(control.code)}</strong>
-                      <div style={styles.help}>{humanize(control.domain)} · owner: {humanize(control.acceptance_owner)}</div>
+                <article key={control.code} className="app-panel platform-launch-certificate__control-card">
+                  <div className="platform-launch-certificate__control-heading">
+                    <div>
+                      <h3>{humanize(control.code)}</h3>
+                      <span>{humanize(control.domain)} · owner: {humanize(control.acceptance_owner)}</span>
                     </div>
-                    <span style={badgeStyle(control.evidence_status)}>{humanize(control.evidence_status)}</span>
+                    <span className="platform-launch-certificate__status-badge" data-tone={badgeTone(control.evidence_status)}>
+                      {displayStatus(control.evidence_status)}
+                    </span>
                   </div>
 
-                  <p style={styles.reason}>{control.acceptance_rule}</p>
+                  <p>{control.acceptance_rule}</p>
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Current upstream posture</span>
-                    <span style={badgeStyle(control.source_posture)}>{humanize(control.source_posture)}</span>
-                    {control.source_error_code ? <span style={styles.sourceError}>Source error: {humanize(control.source_error_code)}</span> : null}
-                    {control.source_validation_note ? <span style={styles.help}>{control.source_validation_note}</span> : null}
+                  <div className="platform-launch-certificate__control-meta-grid">
+                    <div>
+                      <span>Current upstream posture</span>
+                      <strong data-tone={badgeTone(control.source_posture)}>{displayStatus(control.source_posture)}</strong>
+                    </div>
+                    <div>
+                      <span>Manual acceptance</span>
+                      <strong data-tone={badgeTone(control.manual_acceptance_status)}>{displayStatus(control.manual_acceptance_status)}</strong>
+                    </div>
+                    <div>
+                      <span>Static registry gate (context only)</span>
+                      <strong data-tone="neutral">{displayStatus(control.launch_gate)}</strong>
+                    </div>
+                    <div>
+                      <span>Launch area status</span>
+                      <strong data-tone="neutral">{displayStatus(control.launch_area_status)}</strong>
+                    </div>
                   </div>
 
                   {control.evidence_scope.mode === 'tenant_population' ? (
-                    <div style={styles.evidenceBox}>
-                      <span style={styles.evidenceLabel}>Tenant evidence scope</span>
-                      <span style={badgeStyle(control.evidence_scope.status)}>{humanize(control.evidence_scope.status)}</span>
-                      <span style={styles.help}>
+                    <div className="platform-launch-certificate__scope-box">
+                      <div>
+                        <span>Tenant evidence scope</span>
+                        <strong data-tone={badgeTone(control.evidence_scope.status)}>{displayStatus(control.evidence_scope.status)}</strong>
+                      </div>
+                      <span>
                         Evaluated {control.evidence_scope.evaluated_tenants}
                         {control.evidence_scope.total_tenants !== null ? ` of ${control.evidence_scope.total_tenants}` : ''}
                         {control.evidence_scope.review_limit ? ` · cap ${control.evidence_scope.review_limit}` : ''}
@@ -283,88 +420,64 @@ export default function PlatformCommercialLaunchCertificatePage() {
                     </div>
                   ) : null}
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence surface</span>
-                    <strong style={styles.wrapAnywhere}>{control.required_evidence}</strong>
+                  <div className="platform-launch-certificate__evidence-path">
+                    <span>Required evidence surface</span>
+                    <code>{control.required_evidence}</code>
                   </div>
 
-                  <Link style={styles.controlLink} to={getControlReviewLink(control)}>{getControlReviewLabel(control)}</Link>
+                  {control.source_error_code ? (
+                    <div className="platform-launch-certificate__source-warning" role="status">
+                      <strong>Evidence source error</strong>
+                      <span>{humanize(control.source_error_code)}</span>
+                    </div>
+                  ) : null}
 
-                  <div style={styles.statusRow}>
-                    <span>Static registry gate (context only)</span>
-                    <span style={neutralBadgeStyle()}>{humanize(control.launch_gate)}</span>
-                  </div>
-                  <div style={styles.statusRow}>
-                    <span>Manual acceptance</span>
-                    <span style={badgeStyle(control.manual_acceptance_status)}>{humanize(control.manual_acceptance_status)}</span>
+                  {control.source_validation_note ? (
+                    <details className="platform-launch-certificate__details platform-launch-certificate__details--control">
+                      <summary>Source validation note</summary>
+                      <p>{control.source_validation_note}</p>
+                    </details>
+                  ) : null}
+
+                  <div className="platform-launch-certificate__control-actions">
+                    <Link className="app-button app-button--secondary" to={getControlReviewLink(control)}>
+                      {getControlReviewLabel(control)}
+                    </Link>
                   </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Required manual acceptance</h2>
-              <ul style={styles.list}>
+          <section className="platform-launch-certificate__decision-grid">
+            <div className="app-panel app-panel--padded platform-launch-certificate__decision-panel">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-certificate"
+                title="Required manual acceptance"
+                description="These decisions are deliberately not persisted or inferred by this board."
+              />
+              <ul className="platform-launch-certificate__list">
                 {data.required_manual_acceptance.map((item) => <li key={item}>{item}</li>)}
               </ul>
             </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Certificate limitations</h2>
-              <ul style={styles.list}>
+            <div className="app-panel app-panel--padded platform-launch-certificate__decision-panel">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-certificate"
+                title="Certificate limitations"
+                description="What this evidence precheck cannot prove on its own."
+              />
+              <ul className="platform-launch-certificate__list">
                 {data.certificate_limitations.map((item) => <li key={item}>{item}</li>)}
               </ul>
             </div>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
+          <section className="app-panel app-panel--padded platform-launch-certificate__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0 , color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', maxWidth: '100%', overflowWrap: 'anywhere' },
-  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#78350f', lineHeight: 1.5 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'grid', gap: 6, minWidth: 0, overflowWrap: 'anywhere' },
-  controlGrid: { display: 'grid', gap: 14 },
-  controlCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12, minWidth: 0 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  controlTitleBlock: { minWidth: 0, overflowWrap: 'anywhere' },
-  reason: { color: '#334155', lineHeight: 1.45, margin: 0 },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
-  evidenceBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 6, minWidth: 0 },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize' },
-  sourceError: { color: '#991b1b', fontSize: 12, fontWeight: 700, overflowWrap: 'anywhere' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 8, flexWrap: 'wrap' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
-  list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', lineHeight: 1.5 },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  errorButton: { justifySelf: 'start', border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, display: 'grid', gap: 8 },
-  errorDetail: { fontSize: 12, overflowWrap: 'anywhere' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metadataItem: { display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
-  validationText: { margin: '14px 0 0', color: '#475569', lineHeight: 1.5 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  controlLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  wrapAnywhere: { overflowWrap: 'anywhere' }
-};

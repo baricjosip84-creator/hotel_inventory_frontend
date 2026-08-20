@@ -3,26 +3,33 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchCertificatePage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchCertificatePage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  'Internal precheck only.',
-  'current postures from the real',
+  'io-operational-page io-workspace-page platform-launch-certificate',
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalWorkspaceStatCard',
+  'OperationalSectionHeader',
+  'Internal precheck only',
+  'Manual owner acceptance required',
   'source_posture',
   'evidence_scope',
   'Static registry gate (context only)',
-  'Launch readiness registry posture',
+  'launch_readiness_registry_note',
   'commercial-launch-acceptance-packet',
   '/platform/support-cockpit',
   '/platform/monitoring-readiness',
   'refetchOnWindowFocus: false',
   'staleTime: 30_000',
-  'Unable to load Launch Certificate.',
-  'errorMessage(certificate.error)',
-  "normalized.includes('unavailable')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'initialLoadError',
+  'refreshError',
+  'Showing the last successful Commercial Launch Certificate snapshot.',
+  'disabled={certificate.isFetching}',
+  'readableError(certificate.error)',
+  "import './PlatformCommercialLaunchCertificatePage.css'"
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -31,8 +38,28 @@ for (const anchor of requiredPageAnchors) {
   }
 }
 
+if (page.includes('const styles: Record<string, CSSProperties>')) {
+  throw new Error('Platform Launch Certificate check failed: legacy inline-style shell was reintroduced.');
+}
 if (page.includes('<span>Launch gate</span>')) {
   throw new Error('Platform Launch Certificate check failed: static registry gate must not be presented as the current evidence decision.');
+}
+if (!page.includes('certificate.isError && !data') || !page.includes('certificate.isError && Boolean(data)')) {
+  throw new Error('Platform Launch Certificate check failed: initial-load and background-refresh errors are not separated.');
+}
+
+for (const anchor of [
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)',
+  "[data-tone='good']",
+  "[data-tone='warn']",
+  "[data-tone='danger']",
+  '@media (max-width: 760px)'
+]) {
+  if (!css.includes(anchor)) {
+    throw new Error(`Platform Launch Certificate check failed: missing CSS/design anchor: ${anchor}`);
+  }
 }
 
 const requiredPermissions = [
