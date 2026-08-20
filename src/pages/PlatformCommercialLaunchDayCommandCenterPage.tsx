@@ -1,7 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchDayCommandCenterPage.css';
 
 type ExternalPersistence = {
   stored_in_application: boolean;
@@ -50,13 +59,57 @@ type CommercialLaunchDayCommandCenter = {
   validation_note: string;
 };
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+const summaryLabels: Record<string, string> = {
+  checkpoints_total: 'Launch-window checkpoints',
+  checkpoints_requiring_evidence_review: 'Evidence review required',
+  checkpoints_awaiting_external_go_no_go_confirmation: 'Awaiting Go/No-Go confirmation',
+  checkpoints_awaiting_external_smoke_test_confirmation: 'Awaiting smoke-test confirmation',
+  checkpoints_blocked: 'Blocked checkpoints',
+  decision_records_persisted_in_application: 'Decisions stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  checkpoints_total: 'Owner and evidence templates prepared for the real launch window',
+  checkpoints_requiring_evidence_review: 'Checkpoints held until upstream launch evidence is reviewed',
+  checkpoints_awaiting_external_go_no_go_confirmation: 'Waiting for externally recorded launch decisions',
+  checkpoints_awaiting_external_smoke_test_confirmation: 'Waiting for externally recorded smoke-test outcomes',
+  checkpoints_blocked: 'Checkpoints that cannot proceed with the current smoke-test prerequisite posture',
+  decision_records_persisted_in_application: 'Expected to remain zero on this read-only preparation surface'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function errorMessage(error: unknown) {
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('hold') || normalized.includes('missing')) return 'danger';
+  if (
+    normalized.includes('review')
+    || normalized.includes('waiting')
+    || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('conditional')
+    || normalized.includes('required')
+  ) return 'warn';
+  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('pass')) return 'good';
+  if (normalized.includes('not reviewed') || normalized.includes('not_reviewed') || normalized.includes('preparation')) return 'neutral';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
   if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unable to load the commercial launch day command center.';
+  return 'Unknown API error';
 }
 
 function getCheckpointEvidenceLink(row: CommandCenterCheckpoint) {
@@ -75,7 +128,7 @@ function getCheckpointEvidenceLink(row: CommandCenterCheckpoint) {
 
 function getCheckpointEvidenceLabel(row: CommandCenterCheckpoint) {
   const byDomain: Record<string, string> = {
-    launch_window_control: 'Open go/no-go register',
+    launch_window_control: 'Open Go/No-Go register',
     smoke_test_execution: 'Open smoke-test checklist',
     customer_communication: 'Open pilot readiness',
     support_readiness: 'Open support cockpit',
@@ -87,28 +140,6 @@ function getCheckpointEvidenceLabel(row: CommandCenterCheckpoint) {
   return byDomain[row.domain] || 'Open smoke-test checklist';
 }
 
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized.includes('blocked') || normalized.includes('hold') || normalized.includes('missing')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (
-    normalized.includes('review')
-    || normalized.includes('waiting')
-    || normalized.includes('external')
-    || normalized.includes('manual')
-    || normalized.includes('conditional')
-    || normalized.includes('not reviewed')
-    || normalized.includes('not_reviewed')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (normalized.includes('loading') || normalized.includes('unknown') || normalized.includes('preparation')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-}
-
 export default function PlatformCommercialLaunchDayCommandCenterPage() {
   const commandCenter = useQuery({
     queryKey: ['platform', 'commercial-launch-day-command-center'],
@@ -118,204 +149,267 @@ export default function PlatformCommercialLaunchDayCommandCenterPage() {
   });
 
   const data = commandCenter.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summary = data?.summary || {};
+  const smokeTestSummary = useMemo(() => Object.entries(data?.smoke_test_summary || {}), [data?.smoke_test_summary]);
+  const initialLoadError = commandCenter.isError && !data;
+  const refreshError = commandCenter.isError && Boolean(data);
+  const requestError = readableError(commandCenter.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div style={styles.headerCopy}>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Day Command Center</h1>
-          <p style={styles.description}>
-            Step 221 is a launch-window preparation board. It organizes owners, communication checkpoints, incident
-            response, billing holds, rollback controls, and post-launch observation evidence without executing launch
-            actions or claiming that external decisions or smoke-test results exist.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-launch-command-center">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-day-command-center"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Day Command Center"
+        description="Read-only launch-window preparation for owners, decision references, customer/support coordination, billing holds, incident response, rollback control and post-launch observation. It organizes the real launch window without executing launch actions or claiming external decisions exist."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 221 — Commercial Launch Day Command Center'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External decision records required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-launch-command-center__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? summary.checkpoints_total ?? data.checkpoints.length : '—'}
+              label="launch-window checkpoints"
+            />
+            {data ? (
+              <span className="platform-launch-command-center__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-launch-command-center__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void commandCenter.refetch()}
+                disabled={commandCenter.isFetching}
+              >
+                {commandCenter.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-launch-command-center__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-day-command-center"
+          title="Launch-window boundary"
+          description="The board prepares launch-day decision records, but external decisions and live smoke-test outcomes remain outside the application."
+        />
+        <div className="platform-launch-command-center__boundary-grid">
+          <div className="platform-launch-command-center__boundary-notice">
+            <strong>Preparation only.</strong>
+            <span>
+              This application cannot observe external go/no-go decisions, smoke-test execution records, or launch-window command-center decisions. A checkpoint row is a record template, not proof that its prerequisite or decision has been completed.
+            </span>
+          </div>
+          <div className="platform-launch-command-center__supporting-pages">
+            <strong>Supporting launch pages</strong>
+            <span>This page already requires the evidence permissions used by these destinations, including Platform Sessions for the launch smoke-test path.</span>
+            <div className="platform-launch-command-center__link-row">
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-go-no-go-register">Launch Go/No-Go</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-acceptance-packet">Launch acceptance</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-certificate">Launch certificate</Link>
+              <Link className="app-button app-button--secondary" to="/platform/support-cockpit">Support cockpit</Link>
+              <Link className="app-button app-button--secondary" to="/platform/billing-subscription-activation">Billing activation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/incidents">Incidents</Link>
+              <Link className="app-button app-button--secondary" to="/platform/monitoring-readiness">Monitoring readiness</Link>
+              <Link className="app-button app-button--secondary" to="/platform/deployment-validation">Deployment validation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
+            </div>
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {commandCenter.isLoading ? <section className="app-panel app-panel--padded">Loading Commercial Launch Day Command Center…</section> : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-launch-command-center__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Day Command Center.</strong>
+          <span>{requestError}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--danger platform-launch-command-center__retry"
             onClick={() => void commandCenter.refetch()}
             disabled={commandCenter.isFetching}
           >
-            {commandCenter.isFetching ? 'Refreshing...' : 'Refresh'}
+            {commandCenter.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.warningCard}>
-        <strong>Preparation only.</strong> This application cannot observe external go/no-go decisions, smoke-test
-        execution records, or launch-window command-center decisions. A checkpoint row is a record template, not proof
-        that the launch prerequisite or decision has been completed.
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting launch pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-acceptance">Launch acceptance</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
-          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring readiness</Link>
-          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
-        </div>
-      </section>
-
-      {commandCenter.isLoading ? <div style={styles.card}>Loading commercial launch day command center...</div> : null}
-      {commandCenter.error ? (
-        <div style={styles.error}>
-          <div><strong>Failed to load commercial launch day command center.</strong><div style={styles.errorDetail}>{errorMessage(commandCenter.error)}</div></div>
-          <button type="button" style={styles.errorButton} onClick={() => void commandCenter.refetch()} disabled={commandCenter.isFetching}>
-            {commandCenter.isFetching ? 'Retrying...' : 'Retry'}
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-launch-command-center__feedback platform-launch-command-center__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Day Command Center snapshot. {requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-launch-command-center__retry"
+            onClick={() => void commandCenter.refetch()}
+            disabled={commandCenter.isFetching}
+          >
+            {commandCenter.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
+          <OperationalWorkspaceStats ariaLabel="Commercial launch command-center summary">
+            {Object.keys(summaryLabels).map((key) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                label={summaryLabels[key]}
+                value={summary[key] ?? 0}
+                helper={summaryHelpers[key]}
+                tone={key === 'checkpoints_blocked' && (summary[key] ?? 0) > 0 ? 'danger' : key === 'checkpoints_requiring_evidence_review' && (summary[key] ?? 0) > 0 ? 'warn' : 'default'}
+              />
+            ))}
+          </OperationalWorkspaceStats>
+
+          <section className="app-panel app-panel--padded platform-launch-command-center__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-day-command-center"
+              title="Current launch prerequisite context"
+              description="Current upstream launch postures and persistence boundaries are shown separately from the external decisions that this application cannot observe."
+            />
+            <div className="platform-launch-command-center__context-grid">
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Smoke-test posture</strong><span>{humanize(data.smoke_test_posture)}</span></div>
+              <div><strong>Go/No-Go register posture</strong><span>{humanize(data.go_no_go_register_posture)}</span></div>
+              <div><strong>Acceptance packet posture</strong><span>{humanize(data.acceptance_packet_posture)}</span></div>
+              <div><strong>Certificate posture</strong><span>{humanize(data.certificate_posture)}</span></div>
+              <div><strong>Command-center posture</strong><span>{humanize(data.posture)}</span></div>
             </div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
+            <div className="platform-launch-command-center__persistence-grid">
+              <div>
+                <strong>Go/No-Go decision persistence</strong>
+                <span>{data.go_no_go_decision_persistence?.stored_in_application ? 'Stored in application' : 'External only'}</span>
+                <small>{data.go_no_go_decision_persistence?.interpretation || 'External Go/No-Go decision records are not observable by this page.'}</small>
               </div>
-            ))}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source launch postures and external persistence</h2>
-            <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Acceptance packet</span><strong>{humanize(data.acceptance_packet_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-acceptance">Open Launch Acceptance</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Certificate</span><strong>{humanize(data.certificate_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-certificate">Open Launch Certificate</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go decision persistence</span><strong>{data.go_no_go_decision_persistence?.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.go_no_go_decision_persistence?.interpretation || 'No persistence metadata returned.'}</span></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke-test result persistence</span><strong>{data.smoke_test_result_persistence?.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.smoke_test_result_persistence?.interpretation || 'No persistence metadata returned.'}</span></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command-center decision persistence</span><strong>{data.decision_persistence.stored_in_application ? 'Stored in application' : 'External / not stored'}</strong><span>{data.decision_persistence.interpretation}</span></div>
+              <div>
+                <strong>Smoke-test result persistence</strong>
+                <span>{data.smoke_test_result_persistence?.stored_in_application ? 'Stored in application' : 'External only'}</span>
+                <small>{data.smoke_test_result_persistence?.interpretation || 'External smoke-test result records are not observable by this page.'}</small>
+              </div>
+              <div>
+                <strong>Command-center decision persistence</strong>
+                <span>{data.decision_persistence.stored_in_application ? 'Stored in application' : 'External only'}</span>
+                <small>{data.decision_persistence.interpretation}</small>
+              </div>
             </div>
+            {smokeTestSummary.length > 0 ? (
+              <details className="platform-launch-command-center__details">
+                <summary>Current smoke-test summary</summary>
+                <div className="platform-launch-command-center__source-summary">
+                  {smokeTestSummary.map(([key, value]) => (
+                    <div key={key}><span>{humanize(key)}</span><strong>{value}</strong></div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Launch-window checkpoints</h2>
-            <div style={styles.checkGrid}>
-              {data.checkpoints.map((row) => (
-                <article key={row.code} style={styles.checkCard}>
-                  <div style={styles.rowHeader}>
-                    <div style={styles.rowHeaderCopy}>
-                      <strong>{humanize(row.code)}</strong>
-                      <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
+          <section className="platform-launch-command-center__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-day-command-center"
+              title="Launch-window checkpoints"
+              description="Each checkpoint is an external decision template. Its status describes the current prerequisite posture, not a stored launch-day decision."
+            />
+            {data.checkpoints.length > 0 ? (
+              <div className="platform-launch-command-center__row-grid">
+                {data.checkpoints.map((row) => (
+                  <article key={row.code} className="app-panel platform-launch-command-center__row-card">
+                    <div className="platform-launch-command-center__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-launch-command-center__status-badge" data-tone={badgeTone(row.command_center_status)}>{humanize(row.command_center_status)}</span>
                     </div>
-                    <span style={badgeStyle(row.command_center_status)}>{humanize(row.command_center_status)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Manual precondition</span>
-                    <strong>{row.manual_precondition}</strong>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence</span>
-                    <strong>{row.required_evidence}</strong>
-                  </div>
-                  <Link style={styles.packetLink} to={getCheckpointEvidenceLink(row)}>{getCheckpointEvidenceLabel(row)}</Link>
-                  <div style={styles.statusRow}><span>Template default decision</span><span style={badgeStyle(row.default_decision_status)}>{humanize(row.default_decision_status)}</span></div>
-                  <div style={styles.statusRow}><span>Hold trigger</span><strong>{humanize(row.hold_trigger)}</strong></div>
-                  <div style={styles.statusRow}><span>External decision artifact</span><strong>{row.decision_artifact}</strong></div>
-                  <div style={styles.statusRow}><span>Artifact storage</span><strong>{humanize(row.decision_artifact_storage)}</strong></div>
-                  <div style={styles.statusRow}>
-                    <span>Source smoke tests</span>
-                    <strong>
-                      {row.source_smoke_tests_total} total · {row.source_smoke_tests_requiring_evidence_review} review ·{' '}
-                      {row.source_smoke_tests_awaiting_external_go_no_go_confirmation} external confirmation · {row.source_smoke_tests_blocked} blocked
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Allowed external decision statuses</span>
-                    <div style={styles.chips}>{row.allowed_decision_statuses.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Required external decision fields</span>
-                    <div style={styles.chips}>{row.required_decision_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
-                  </div>
-                </article>
-              ))}
+
+                    <div className="platform-launch-command-center__status-grid">
+                      <div><strong>Source smoke-test posture</strong><span>{humanize(row.source_smoke_test_posture)}</span></div>
+                      <div><strong>Smoke-test rows</strong><span>{row.source_smoke_tests_total}</span></div>
+                      <div><strong>Evidence review rows</strong><span>{row.source_smoke_tests_requiring_evidence_review}</span></div>
+                      <div><strong>Awaiting external Go/No-Go</strong><span>{row.source_smoke_tests_awaiting_external_go_no_go_confirmation}</span></div>
+                      <div><strong>Blocked smoke-test rows</strong><span>{row.source_smoke_tests_blocked}</span></div>
+                      <div>
+                        <strong>Template default decision</strong>
+                        <span className="platform-launch-command-center__status-badge" data-tone={badgeTone(row.default_decision_status)}>{humanize(row.default_decision_status)}</span>
+                        <small>A template default of not reviewed is not proof that no external decision exists.</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-launch-command-center__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-launch-command-center__evidence-box">
+                      <strong>Required evidence</strong>
+                      <span>{row.required_evidence}</span>
+                      <div className="platform-launch-command-center__row-actions">
+                        <Link className="app-button app-button--secondary" to={getCheckpointEvidenceLink(row)}>{getCheckpointEvidenceLabel(row)}</Link>
+                      </div>
+                    </div>
+
+                    <div className="platform-launch-command-center__artifact-grid">
+                      <div><strong>Hold trigger</strong><span>{humanize(row.hold_trigger)}</span></div>
+                      <div><strong>External decision artifact</strong><span>{row.decision_artifact}</span><small>Storage: {humanize(row.decision_artifact_storage)}</small></div>
+                    </div>
+
+                    <div className="platform-launch-command-center__field-groups">
+                      <div><strong>Allowed external decision statuses</strong><div>{row.allowed_decision_statuses.map((item) => <span key={item}>{humanize(item)}</span>)}</div></div>
+                      <div><strong>Required external decision fields</strong><div>{row.required_decision_fields.map((field) => <span key={field}>{humanize(field)}</span>)}</div></div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <section className="app-panel app-panel--padded platform-launch-command-center__empty-state">
+                <strong>No command-center checkpoints are available.</strong>
+                <span>Review the Launch Smoke Test prerequisite before preparing the real launch window.</span>
+              </section>
+            )}
+          </section>
+
+          <section className="platform-launch-command-center__two-column">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-day-command-center"
+                title="Command center rules"
+                description="Operating rules for preparing and controlling the real launch window."
+              />
+              <ul className="platform-launch-command-center__list">{data.command_center_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-day-command-center"
+                title="Launch-day limitations"
+                description="Important boundaries on what this read-only workspace can prove or execute."
+              />
+              <ul className="platform-launch-command-center__list">{data.launch_day_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Command center rules</h2>
-              <ul style={styles.list}>{data.command_center_rules.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Launch-day limitations</h2>
-              <ul style={styles.list}>{data.launch_day_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
+          <section className="app-panel app-panel--padded platform-launch-command-center__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <section className="app-panel app-panel--padded platform-launch-command-center__validation-note">
+            <strong>Validation boundary</strong>
+            <span>{data.validation_note}</span>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  headerCopy: { minWidth: 0, flex: '1 1 620px' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a', overflowWrap: 'anywhere' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center' },
-  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700, overflowWrap: 'anywhere' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  errorDetail: { marginTop: 4, fontSize: 12, overflowWrap: 'anywhere' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  sourceLink: { marginTop: 4, color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
-  packetLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a', overflowWrap: 'anywhere' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'grid', gap: 6, minWidth: 0, overflowWrap: 'anywhere' },
-  checkGrid: { display: 'grid', gap: 14 },
-  checkCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12, minWidth: 0 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  rowHeaderCopy: { minWidth: 0, flex: '1 1 360px', overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: 12 },
-  evidenceBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, overflowWrap: 'anywhere' },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize' },
-  chips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 10, color: '#334155', flexWrap: 'wrap', overflowWrap: 'anywhere' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.6, overflowWrap: 'anywhere' },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
-  error: { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-};
