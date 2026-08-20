@@ -3,30 +3,39 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformProductionMonitoringReadinessPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformProductionMonitoringReadinessPage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  "searchParams.get('tenant_id')",
+  "const tenantId = searchParams.get('tenant_id') || ''",
   "platformApiRequest<SystemHealthPackage>('/platform/system-health')",
   "platformApiRequest<MonitoringPackage>(`/platform/production-monitoring-readiness${queryString ? `?${queryString}` : ''}`)",
   'refetchOnWindowFocus: false',
   'staleTime: 60_000',
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalSectionHeader',
+  "import './PlatformProductionMonitoringReadinessPage.css'",
   'htmlFor="monitoring-readiness-tenant-filter"',
   'Tenant filter options could not be loaded:',
+  'The current URL scope is preserved.',
+  'Selected tenant (',
+  "setSearchParams(nextParams, { replace: true })",
   'Unable to load production monitoring readiness:',
-  'readableError(monitoring.error)',
+  'Refresh failed — showing the last successful monitoring snapshot.',
+  'const refreshError = monitoring.isError && Boolean(data)',
+  'const initialLoadError = monitoring.isError && !data',
+  'disabled={tenantOptions.isFetching || monitoring.isFetching}',
   'Operator precheck only.',
   'Customer-impacting:',
   'Missing public updates:',
   'Critical unhealthy:',
   'Integration blockers:',
   'Integration review required:',
-  "value.includes('no_tenants')",
-  "value.includes('review')",
-  "value.includes('blocked')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'tenant.controls.map((control)',
+  'tenant.missing_control_codes.join',
+  'No incident or monitoring mutations'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -35,6 +44,28 @@ for (const anchor of requiredPageAnchors) {
   }
 }
 
+const requiredCssAnchors = [
+  '.platform-monitoring-readiness__status-badge[data-tone=',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)',
+  'overflow-wrap: anywhere',
+  'flex-wrap: wrap',
+  '@media (max-width: 860px)',
+  '@media (max-width: 620px)'
+];
+for (const anchor of requiredCssAnchors) {
+  if (!css.includes(anchor)) {
+    throw new Error(`Platform Monitoring Readiness check failed: stylesheet missing ${anchor}`);
+  }
+}
+
+if (page.includes('useState(')) {
+  throw new Error('Platform Monitoring Readiness check failed: tenant filter must derive from URL search params instead of parallel local state.');
+}
+if (page.includes('const styles: Record<string, CSSProperties>')) {
+  throw new Error('Platform Monitoring Readiness check failed: legacy inline-style shell is still present.');
+}
 if (page.includes("platformApiRequest<Tenant[]>('/platform/tenants')")) {
   throw new Error('Platform Monitoring Readiness check failed: tenant filter must not depend on TENANTS_READ.');
 }
