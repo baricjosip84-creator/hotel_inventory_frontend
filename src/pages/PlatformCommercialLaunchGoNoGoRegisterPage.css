@@ -1,0 +1,531 @@
+.platform-launch-go-no-go {
+  color: var(--io-navy, #0f172a);
+  overflow-x: hidden;
+}
+
+.platform-launch-go-no-go__hero-aside {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__refresh-block {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+  min-width: 200px;
+}
+
+.platform-launch-go-no-go__refresh-block > span {
+  max-width: 270px;
+  color: var(--io-slate, #64748b);
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 370px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--io-primary-border);
+  border-radius: 999px;
+  background: var(--io-primary-soft);
+  color: var(--io-primary-dark);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__status-badge[data-tone='good'] {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.platform-launch-go-no-go__status-badge[data-tone='warn'] {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.platform-launch-go-no-go__status-badge[data-tone='danger'] {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.platform-launch-go-no-go__status-badge[data-tone='neutral'] {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.platform-launch-go-no-go__boundary-panel,
+.platform-launch-go-no-go__context-panel,
+.platform-launch-go-no-go__rows-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__boundary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__boundary-notice,
+.platform-launch-go-no-go__supporting-pages {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.platform-launch-go-no-go__boundary-notice {
+  border-color: var(--io-primary-border);
+  background: var(--io-primary-soft);
+}
+
+.platform-launch-go-no-go__boundary-notice strong {
+  color: var(--io-primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.platform-launch-go-no-go__boundary-notice span,
+.platform-launch-go-no-go__supporting-pages > span {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__supporting-pages > strong {
+  color: #334155;
+  font-size: 12px;
+}
+
+.platform-launch-go-no-go__link-row,
+.platform-launch-go-no-go__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.platform-launch-go-no-go__link-row .app-button,
+.platform-launch-go-no-go__row-actions .app-button {
+  min-height: 31px;
+  padding: 6px 9px;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.platform-launch-go-no-go__feedback {
+  display: grid;
+  gap: 6px;
+}
+
+.platform-launch-go-no-go__feedback strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.platform-launch-go-no-go__feedback span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__feedback--warning {
+  border-color: #fde68a !important;
+  background: #fffbeb !important;
+}
+
+.platform-launch-go-no-go__feedback--warning strong {
+  color: #92400e;
+}
+
+.platform-launch-go-no-go__retry {
+  justify-self: start;
+  margin-top: 3px;
+}
+
+.platform-launch-go-no-go__context-grid,
+.platform-launch-go-no-go__summary-grid,
+.platform-launch-go-no-go__status-grid,
+.platform-launch-go-no-go__source-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__context-grid > div,
+.platform-launch-go-no-go__summary-grid > div,
+.platform-launch-go-no-go__status-grid > div,
+.platform-launch-go-no-go__source-summary > div,
+.platform-launch-go-no-go__persistence-note,
+.platform-launch-go-no-go__details {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.platform-launch-go-no-go__context-grid > div,
+.platform-launch-go-no-go__summary-grid > div,
+.platform-launch-go-no-go__status-grid > div,
+.platform-launch-go-no-go__source-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.platform-launch-go-no-go__context-grid strong,
+.platform-launch-go-no-go__summary-grid span,
+.platform-launch-go-no-go__status-grid strong,
+.platform-launch-go-no-go__source-summary span,
+.platform-launch-go-no-go__details summary {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__context-grid span,
+.platform-launch-go-no-go__summary-grid strong,
+.platform-launch-go-no-go__status-grid span,
+.platform-launch-go-no-go__source-summary strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__context-grid small,
+.platform-launch-go-no-go__status-grid small {
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__summary-grid strong {
+  font-size: 16px;
+}
+
+.platform-launch-go-no-go__persistence-note {
+  display: grid;
+  gap: 5px;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.platform-launch-go-no-go__persistence-note--secondary {
+  border-color: var(--io-primary-border);
+  background: var(--io-primary-soft);
+}
+
+.platform-launch-go-no-go__persistence-note strong {
+  color: #92400e;
+  font-size: 11.5px;
+  font-weight: 900;
+}
+
+.platform-launch-go-no-go__persistence-note--secondary strong {
+  color: var(--io-primary-dark);
+}
+
+.platform-launch-go-no-go__persistence-note span {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__details {
+  background: #fff;
+}
+
+.platform-launch-go-no-go__details summary {
+  color: #334155;
+  cursor: pointer;
+}
+
+.platform-launch-go-no-go__details > div {
+  margin-top: 10px;
+}
+
+.platform-launch-go-no-go__row-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__row-card {
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  min-width: 0;
+  padding: 15px;
+  overflow: hidden;
+}
+
+.platform-launch-go-no-go__row-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__row-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__row-heading h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__row-heading > div > span {
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__status-grid,
+.platform-launch-go-no-go__source-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.platform-launch-go-no-go__source-error,
+.platform-launch-go-no-go__source-note,
+.platform-launch-go-no-go__evidence-box,
+.platform-launch-go-no-go__artifact-grid > div,
+.platform-launch-go-no-go__decision-state {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.platform-launch-go-no-go__source-error,
+.platform-launch-go-no-go__source-note,
+.platform-launch-go-no-go__evidence-box,
+.platform-launch-go-no-go__artifact-grid > div {
+  display: grid;
+  gap: 5px;
+}
+
+.platform-launch-go-no-go__source-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.platform-launch-go-no-go__source-error strong,
+.platform-launch-go-no-go__source-error span {
+  color: #991b1b;
+}
+
+.platform-launch-go-no-go__source-note {
+  background: #f8fafc;
+}
+
+.platform-launch-go-no-go__source-note strong,
+.platform-launch-go-no-go__evidence-box > strong,
+.platform-launch-go-no-go__artifact-grid strong,
+.platform-launch-go-no-go__decision-state > strong,
+.platform-launch-go-no-go__field-groups > div > strong {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.platform-launch-go-no-go__source-note span,
+.platform-launch-go-no-go__evidence-box > span,
+.platform-launch-go-no-go__artifact-grid span,
+.platform-launch-go-no-go__artifact-grid p,
+.platform-launch-go-no-go__artifact-grid small {
+  margin: 0;
+  color: #475569;
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.platform-launch-go-no-go__decision-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #f8fafc;
+}
+
+.platform-launch-go-no-go__field-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.platform-launch-go-no-go__field-groups > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.platform-launch-go-no-go__field-groups > div > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.platform-launch-go-no-go__field-groups > div > div > span {
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 10.5px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.platform-launch-go-no-go__two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.platform-launch-go-no-go__list {
+  margin: 10px 0 0;
+  padding-left: 19px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.platform-launch-go-no-go__list li + li {
+  margin-top: 5px;
+}
+
+.platform-launch-go-no-go__next-step,
+.platform-launch-go-no-go__validation-note,
+.platform-launch-go-no-go__empty-state {
+  display: grid;
+  gap: 5px;
+}
+
+.platform-launch-go-no-go__next-step {
+  border-color: var(--io-primary-border) !important;
+  background: var(--io-primary-soft) !important;
+}
+
+.platform-launch-go-no-go__next-step strong {
+  color: var(--io-primary-dark);
+  font-size: 11.5px;
+}
+
+.platform-launch-go-no-go__validation-note strong,
+.platform-launch-go-no-go__empty-state strong {
+  color: #334155;
+  font-size: 11.5px;
+}
+
+.platform-launch-go-no-go__next-step span,
+.platform-launch-go-no-go__validation-note span,
+.platform-launch-go-no-go__empty-state span {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .platform-launch-go-no-go__context-grid,
+  .platform-launch-go-no-go__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .platform-launch-go-no-go__row-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .platform-launch-go-no-go__boundary-grid,
+  .platform-launch-go-no-go__artifact-grid,
+  .platform-launch-go-no-go__field-groups,
+  .platform-launch-go-no-go__two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .platform-launch-go-no-go__hero-aside {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .platform-launch-go-no-go__refresh-block {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .platform-launch-go-no-go__refresh-block > span {
+    max-width: none;
+    text-align: left;
+  }
+
+  .platform-launch-go-no-go__context-grid,
+  .platform-launch-go-no-go__summary-grid,
+  .platform-launch-go-no-go__status-grid,
+  .platform-launch-go-no-go__source-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-launch-go-no-go__row-heading {
+    display: grid;
+  }
+}
