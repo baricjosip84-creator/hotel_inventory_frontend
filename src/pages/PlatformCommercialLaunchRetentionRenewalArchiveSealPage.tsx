@@ -707,7 +707,7 @@ const styles: Record<string, CSSProperties> = {
   metaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, color: "#334155" },
   supportingLinks: { marginTop: 14 },
   linkList: { display: "flex", flexWrap: "wrap", gap: 8 },
-  link: { color: "#1d4ed8", fontWeight: 700, textDecoration: "none" },
+  link: { color: "var(--io-primary-dark)", fontWeight: 700, textDecoration: "none" },
   tableWrap: { overflowX: "auto" },
   table: { width: "100%", borderCollapse: "collapse" },
   th: { textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: "10px 8px", color: "#475569", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 },

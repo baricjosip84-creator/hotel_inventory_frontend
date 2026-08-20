@@ -258,7 +258,7 @@ const styles: Record<string, CSSProperties> = {
   badge: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, border: '1px solid transparent' },
   help: { color: '#64748b', fontSize: 12, lineHeight: 1.45 },
   actions: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', marginTop: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', marginTop: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', marginTop: 12, fontWeight: 700 },
   error: { margin: '12px 0 0', color: '#991b1b', fontWeight: 700 },

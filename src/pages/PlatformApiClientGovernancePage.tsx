@@ -206,7 +206,7 @@ const styles: Record<string, CSSProperties> = {
   metric: { fontSize: 28, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
   cardTitle: { margin: '0 0 10px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  flag: { background: 'var(--io-primary-soft)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
   help: { color: '#64748b', fontSize: 12, lineHeight: 1.45 },
   rowLinks: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8, fontSize: 12 },
   tableWrap: { overflowX: 'auto' },

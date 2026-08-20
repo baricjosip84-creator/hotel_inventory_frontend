@@ -31,11 +31,11 @@ type TimelineResponse = {
 type TimelineIconName = 'audit' | 'support' | 'incident' | 'maintenance' | 'task' | 'communication' | 'billing' | 'retention' | 'offboarding' | 'default';
 
 const sourceVisuals: Record<string, { icon: TimelineIconName; accent: string; label: string }> = {
-  audit: { icon: 'audit', accent: '#2563eb', label: 'Audit' },
+  audit: { icon: 'audit', accent: 'var(--io-primary)', label: 'Audit' },
   support_session: { icon: 'support', accent: '#0284c7', label: 'Support session' },
   incident: { icon: 'incident', accent: '#dc2626', label: 'Incident' },
   maintenance: { icon: 'maintenance', accent: '#d97706', label: 'Maintenance' },
-  tenant_task: { icon: 'task', accent: '#2563eb', label: 'Task' },
+  tenant_task: { icon: 'task', accent: 'var(--io-primary)', label: 'Task' },
   tenant_communication: { icon: 'communication', accent: '#0284c7', label: 'Communication' },
   billing_event: { icon: 'billing', accent: '#16a34a', label: 'Billing' },
   data_retention: { icon: 'retention', accent: '#64748b', label: 'Retention' },
@@ -328,7 +328,7 @@ const styles: Record<string, CSSProperties> = {
   sectionTitle: { marginTop: 0, color: '#0f172a', fontSize: 18, letterSpacing: '-.015em' },
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' },
   input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', minWidth: 0 },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   retryButton: { padding: '8px 12px', borderRadius: 9, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
   metadataPanel: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#475569', fontSize: 13 },
@@ -347,6 +347,6 @@ const styles: Record<string, CSSProperties> = {
   details: { margin: '10px 0', color: '#334155', lineHeight: 1.5 },
   metaLine: { fontSize: 13, color: '#64748b', marginTop: 4 },
   badgeGroup: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
-  badge: { fontSize: 12, padding: '4px 9px', borderRadius: 999, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', fontWeight: 700 },
+  badge: { fontSize: 12, padding: '4px 9px', borderRadius: 999, background: 'var(--io-primary-soft)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', fontWeight: 700 },
   badgeStrong: { fontSize: 12, padding: '4px 9px', borderRadius: 999, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontWeight: 700 }
 };

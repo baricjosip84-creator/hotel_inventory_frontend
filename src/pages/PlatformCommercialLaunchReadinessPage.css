@@ -18,10 +18,10 @@
   align-items: center;
   justify-content: center;
   max-width: 320px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--io-primary-soft-strong);
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--io-primary-soft);
+  color: var(--io-primary-dark);
   font-size: 11.5px;
   font-weight: 800;
   line-height: 1.25;
@@ -162,7 +162,7 @@
 }
 
 .platform-launch-readiness__posture-item[data-tone='good'] > strong { color: #15803d; }
-.platform-launch-readiness__posture-item[data-tone='blue'] > strong { color: #1d4ed8; }
+.platform-launch-readiness__posture-item[data-tone='blue'] > strong { color: var(--io-primary-dark); }
 .platform-launch-readiness__posture-item[data-tone='warn'] > strong { color: #b45309; }
 .platform-launch-readiness__posture-item[data-tone='danger'] > strong { color: #b91c1c; }
 

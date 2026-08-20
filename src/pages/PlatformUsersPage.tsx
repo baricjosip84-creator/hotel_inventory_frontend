@@ -211,7 +211,7 @@ const styles: Record<string, CSSProperties> = {
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, alignItems: 'end' },
   field: { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 700, color: '#334155', fontSize: 13 },
   input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, width: '100%', boxSizing: 'border-box', background: '#fff', color: '#0f172a' },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   disabledButton: { cursor: 'not-allowed', opacity: 0.55, background: '#e2e8f0', borderColor: '#cbd5e1', color: '#64748b', boxShadow: 'none' },
   table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
   th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },

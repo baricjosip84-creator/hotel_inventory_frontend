@@ -305,6 +305,6 @@ const styles: Record<string, CSSProperties> = {
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px', color: '#334155', fontSize: '13px' },
   td: { borderBottom: '1px solid #f1f5f9', padding: '10px', verticalAlign: 'top', color: '#334155', fontSize: '13px', lineHeight: 1.45, overflowWrap: 'anywhere' },
   actionRowCompact: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
-  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '4px 8px', fontWeight: 800, color: '#1d4ed8', textDecoration: 'none', fontSize: '12px' },
+  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '4px 8px', fontWeight: 800, color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: '12px' },
   badge: { borderRadius: '999px', padding: '5px 10px', fontWeight: 700, fontSize: '12px', textTransform: 'capitalize', display: 'inline-block' }
 };

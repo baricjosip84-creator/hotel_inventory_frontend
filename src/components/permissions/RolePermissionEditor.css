@@ -44,14 +44,14 @@
 }
 
 .role-permission-editor--operational .role-permission-editor__role-card:hover:not(:disabled) {
-  border-color: #bfdbfe !important;
-  background: #f8fbff !important;
+  border-color: var(--io-primary-border, #bfdbfe) !important;
+  background: var(--io-primary-surface, #f8fbff) !important;
 }
 
 .role-permission-editor--operational .role-permission-editor__role-card.is-active {
-  border-color: #93c5fd !important;
-  background: #eff6ff !important;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, .08) !important;
+  border-color: var(--io-primary-light, #93c5fd) !important;
+  background: var(--io-primary-soft, #eff6ff) !important;
+  box-shadow: 0 0 0 2px rgba(var(--io-primary-rgb, 37, 99, 235), .08) !important;
 }
 
 .role-permission-editor--operational .role-permission-editor__role-card.is-inactive {
@@ -176,10 +176,10 @@
   width: 26px;
   height: 26px;
   flex: 0 0 26px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--io-primary-soft-strong, #dbeafe);
   border-radius: 8px;
   background: #fff;
-  color: #2563eb;
+  color: var(--io-primary, #2563eb);
   font-size: 17px;
   font-weight: 700;
 }

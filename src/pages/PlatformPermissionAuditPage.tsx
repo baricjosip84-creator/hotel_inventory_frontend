@@ -486,8 +486,8 @@ const styles: Record<string, CSSProperties> = {
   },
   flags: { display: "flex", flexWrap: "wrap", gap: 6 },
   flag: {
-    background: "#dbeafe",
-    color: "#1d4ed8",
+    background: "var(--io-primary-soft-strong)",
+    color: "var(--io-primary-dark)",
     borderRadius: 999,
     padding: "4px 9px",
     fontSize: 12,
@@ -506,7 +506,7 @@ const styles: Record<string, CSSProperties> = {
   linkButton: {
     border: "1px solid #cbd5e1",
     background: "#fff",
-    color: "#1d4ed8",
+    color: "var(--io-primary-dark)",
     borderRadius: 9,
     padding: "8px 10px",
     textDecoration: "none",

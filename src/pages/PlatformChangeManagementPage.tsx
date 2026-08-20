@@ -348,7 +348,7 @@ export default function PlatformChangeManagementPage() {
 }
 
 function badgeStyle(status: string): CSSProperties {
-  const background = status === 'approved' ? '#dcfce7' : status === 'pending_approval' ? '#fef3c7' : status === 'rejected' || status === 'cancelled' ? '#fee2e2' : status === 'executed' ? '#dbeafe' : '#f3f4f6';
+  const background = status === 'approved' ? '#dcfce7' : status === 'pending_approval' ? '#fef3c7' : status === 'rejected' || status === 'cancelled' ? '#fee2e2' : status === 'executed' ? 'var(--io-primary-soft-strong)' : '#f3f4f6';
   return { ...styles.badge, background };
 }
 
@@ -372,10 +372,10 @@ const styles: Record<string, CSSProperties> = {
   fieldLabel: { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155' },
   input: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', font: 'inherit', fontWeight: 400, minWidth: 0 },
   checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  linkButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#1d4ed8', cursor: 'pointer', textDecoration: 'none', fontWeight: 700 },
-  inlineLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
+  linkButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: 'var(--io-primary-dark)', cursor: 'pointer', textDecoration: 'none', fontWeight: 700 },
+  inlineLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
   dangerButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #dc2626', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 },
   errorText: { color: '#991b1b', fontWeight: 700, margin: '0 0 12px' },
   successText: { color: '#166534', fontWeight: 700, margin: '0 0 12px' },

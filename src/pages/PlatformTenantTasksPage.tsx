@@ -263,7 +263,7 @@ const styles: Record<string, CSSProperties> = {
   textarea: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, minHeight: 80, background: '#fff', color: '#0f172a' },
   checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
   actions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  button: { padding: '9px 13px', border: '1px solid #2563eb', borderRadius: 9, background: '#2563eb', color: '#fff', cursor: 'pointer', width: 'fit-content', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  button: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', width: 'fit-content', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   dangerButton: { padding: '9px 13px', border: '1px solid #fecaca', borderRadius: 9, background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
   error: { color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 12 },
@@ -277,7 +277,7 @@ const styles: Record<string, CSSProperties> = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   cardTitle: { margin: 0, color: '#0f172a' },
   badges: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'flex-end' },
-  badge: { background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: 999, height: 'fit-content', fontSize: 12, fontWeight: 700 },
+  badge: { background: 'var(--io-primary-soft)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', padding: '4px 10px', borderRadius: 999, height: 'fit-content', fontSize: 12, fontWeight: 700 },
   warningBadge: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '4px 10px', borderRadius: 999, height: 'fit-content', fontSize: 12, fontWeight: 700 },
   empty: { background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: 18, color: '#64748b' }
 };

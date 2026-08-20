@@ -242,13 +242,13 @@ const styles: Record<string, CSSProperties> = {
   panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
   metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155' },
   supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { background: '#fff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
+  supportLink: { background: '#fff', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '7px 11px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
   sectionTitle: { margin: '0 0 6px', fontSize: 19, letterSpacing: '-.015em', color: '#0f172a' },
   sectionSubtitle: { margin: '0 0 16px', color: '#64748b', lineHeight: 1.5 },
   smallTitle: { margin: '16px 0 10px', fontSize: 16, color: '#0f172a' },
   generatedAt: { color: '#64748b', marginBottom: 14, fontSize: 13 },
-  filterNotice: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, color: '#1e3a8a', padding: 10, marginBottom: 12 },
-  filterLink: { color: '#1d4ed8', fontWeight: 700, marginLeft: 8 },
+  filterNotice: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 10, color: 'var(--io-primary-deep)', padding: 10, marginBottom: 12 },
+  filterLink: { color: 'var(--io-primary-dark)', fontWeight: 700, marginLeft: 8 },
   error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 12 },
   errorPanel: { display: 'flex', flexDirection: 'column', gap: 10, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 14 },
   retryButton: { alignSelf: 'flex-start', border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '8px 11px', fontWeight: 700, cursor: 'pointer' },
@@ -262,5 +262,5 @@ const styles: Record<string, CSSProperties> = {
   badgeWarn: { display: 'inline-flex', borderRadius: 999, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '4px 9px', fontWeight: 700, fontSize: 12 },
   issueList: { margin: '8px 0 0', paddingLeft: 18, color: '#475569', lineHeight: 1.5 },
   evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6 },
-  evidenceLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' }
+  evidenceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' }
 };

@@ -355,7 +355,7 @@ const styles: Record<string, CSSProperties> = {
   statusRow: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 8, flexWrap: 'wrap' },
   twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 },
   list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', lineHeight: 1.5 },
+  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', lineHeight: 1.5 },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
   errorButton: { justifySelf: 'start', border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, display: 'grid', gap: 8 },
@@ -364,7 +364,7 @@ const styles: Record<string, CSSProperties> = {
   metadataItem: { display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
   validationText: { margin: '14px 0 0', color: '#475569', lineHeight: 1.5 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: '#1d4ed8', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  controlLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: '#1d4ed8', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
+  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
+  controlLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
   wrapAnywhere: { overflowWrap: 'anywhere' }
 };

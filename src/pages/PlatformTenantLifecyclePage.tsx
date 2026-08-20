@@ -220,14 +220,14 @@ const styles: Record<string, CSSProperties> = {
   card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: '#334155' },
   sourceList: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   code: { border: '1px solid #e2e8f0', borderRadius: 9, padding: '6px 8px', background: '#f8fafc', color: '#334155' },
-  codeLink: { border: '1px solid #bfdbfe', borderRadius: 9, padding: '6px 8px', background: '#eff6ff', color: '#1d4ed8', textDecoration: 'none', fontFamily: 'monospace' },
-  button: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  codeLink: { border: '1px solid var(--io-primary-border)', borderRadius: 9, padding: '6px 8px', background: 'var(--io-primary-soft)', color: 'var(--io-primary-dark)', textDecoration: 'none', fontFamily: 'monospace' },
+  button: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' },
   errorButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
   table: { width: '100%', borderCollapse: 'collapse', marginTop: 12 },
   th: { textAlign: 'left', padding: 10, borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   td: { padding: 10, borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', color: '#334155' },
-  linkButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '6px 10px', background: '#fff', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700 },
+  linkButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '6px 10px', background: '#fff', color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700 },
   evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  inlineLink: { color: '#1d4ed8', textDecoration: 'none', fontWeight: 700 }
+  inlineLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700 }
 };

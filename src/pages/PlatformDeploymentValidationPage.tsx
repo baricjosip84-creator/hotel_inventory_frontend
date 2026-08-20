@@ -253,13 +253,13 @@ const styles: Record<string, CSSProperties> = {
   reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
   helpText: { color: '#64748b', fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' },
   list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 14, padding: 14, color: '#1e3a8a', overflowWrap: 'anywhere' },
+  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', overflowWrap: 'anywhere' },
   note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
   error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
   wrap: { overflowWrap: 'anywhere', minWidth: 0 }
 };

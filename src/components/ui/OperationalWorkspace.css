@@ -14,7 +14,11 @@
   --io-workspace-hero-radius: 16px;
   --io-workspace-blue: var(--io-primary, #2563eb);
   --io-workspace-blue-dark: var(--io-primary-dark, #1d4ed8);
-  --io-workspace-blue-soft: #eff6ff;
+  --io-workspace-blue-soft: var(--io-primary-soft, #eff6ff);
+  --io-workspace-blue-border: var(--io-primary-border, #bfdbfe);
+  --io-workspace-blue-soft-strong: var(--io-primary-soft-strong, #dbeafe);
+  --io-workspace-blue-rgb: var(--io-primary-rgb, 37, 99, 235);
+  --io-workspace-blue-surface: var(--io-primary-surface, #f8fbff);
   --io-workspace-ink: var(--io-navy, #0f172a);
   --io-workspace-muted: var(--io-slate, #64748b);
   --io-workspace-border: var(--io-border, #e2e8f0);
@@ -49,11 +53,11 @@
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--io-workspace-blue-border);
   border-radius: 12px;
   background: var(--io-workspace-blue-soft);
   color: var(--io-workspace-blue);
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 1px 2px rgba(var(--io-workspace-blue-rgb), 0.08);
 }
 
 .io-workspace-hero__copy {
@@ -186,7 +190,7 @@
 }
 
 .io-workspace-tab.is-active {
-  border-color: #dbeafe;
+  border-color: var(--io-workspace-blue-soft-strong);
   background: var(--io-workspace-blue-soft);
   color: var(--io-workspace-blue-dark);
 }
@@ -206,7 +210,7 @@
 }
 
 .io-workspace-tab.is-active .io-workspace-tab__count {
-  background: #dbeafe;
+  background: var(--io-workspace-blue-soft-strong);
   color: var(--io-workspace-blue-dark);
 }
 
@@ -284,9 +288,9 @@
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--io-workspace-blue-soft-strong);
   border-radius: 9px;
-  background: #f8fbff;
+  background: var(--io-workspace-blue-surface);
   color: var(--io-workspace-blue);
 }
 
@@ -376,9 +380,9 @@
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--io-workspace-blue-soft-strong);
   border-radius: 10px;
-  background: #f8fbff;
+  background: var(--io-workspace-blue-surface);
   color: var(--io-workspace-blue);
 }
 
@@ -422,9 +426,9 @@
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--io-workspace-blue-soft-strong);
   border-radius: 10px;
-  background: #f8fbff;
+  background: var(--io-workspace-blue-surface);
   color: var(--io-workspace-blue);
   box-shadow: none;
 }

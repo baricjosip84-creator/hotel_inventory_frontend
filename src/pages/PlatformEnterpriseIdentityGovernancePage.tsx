@@ -185,6 +185,6 @@ const styles: Record<string, CSSProperties> = {
   metaRow: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   metaPill: { background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
   linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  sourceLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
+  sourceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }
 };

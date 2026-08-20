@@ -201,9 +201,9 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
   subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5, maxWidth: 900 },
   badge: { padding: '6px 10px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap', fontSize: 13 },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, padding: 14, border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: 12, color: '#1e3a8a', fontSize: 13 },
+  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, padding: 14, border: '1px solid var(--io-primary-border)', background: 'var(--io-primary-soft)', borderRadius: 12, color: 'var(--io-primary-deep)', fontSize: 13 },
   supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { border: '1px solid #bfdbfe', background: '#fff', color: '#1d4ed8', borderRadius: 999, padding: '6px 10px', textDecoration: 'none', fontWeight: 700, fontSize: 13 },
+  supportLink: { border: '1px solid var(--io-primary-border)', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '6px 10px', textDecoration: 'none', fontWeight: 700, fontSize: 13 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
@@ -214,7 +214,7 @@ const styles: Record<string, CSSProperties> = {
   input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', color: '#0f172a' },
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700 },
   retryButton: { border: '1px solid #dc2626', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700, width: 'fit-content' },
-  linkButton: { border: 'none', background: 'transparent', color: '#1d4ed8', cursor: 'pointer', fontWeight: 700, padding: 0 },
+  linkButton: { border: 'none', background: 'transparent', color: 'var(--io-primary-dark)', cursor: 'pointer', fontWeight: 700, padding: 0 },
   errorPanel: { display: 'flex', flexDirection: 'column', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 12, padding: 14 },
   errorText: { color: '#991b1b', margin: '10px 0 0', fontSize: 13 },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
@@ -226,5 +226,5 @@ const styles: Record<string, CSSProperties> = {
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
   td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top', color: '#334155' },
   evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6 },
-  evidenceLink: { color: '#1d4ed8', fontSize: 12, fontWeight: 700, textDecoration: 'none' }
+  evidenceLink: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }
 };

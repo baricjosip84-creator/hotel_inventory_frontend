@@ -312,7 +312,7 @@ const styles: Record<string, CSSProperties> = {
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 },
   evidenceItem: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, display: 'grid', gap: 4, minWidth: 0 },
   evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  nextStep: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 12, color: '#1e3a8a', lineHeight: 1.5, overflowWrap: 'anywhere' },
+  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 12, padding: 12, color: 'var(--io-primary-deep)', lineHeight: 1.5, overflowWrap: 'anywhere' },
   note: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 14, color: '#9a3412', lineHeight: 1.5, overflowWrap: 'anywhere' },
   error: { background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 14, padding: 14, color: '#991b1b', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
   errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
@@ -320,7 +320,7 @@ const styles: Record<string, CSSProperties> = {
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   metadataItem: { display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: '#1d4ed8', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
   breakAnywhere: { overflowWrap: 'anywhere' },
   minWidthZero: { minWidth: 0 }
 };

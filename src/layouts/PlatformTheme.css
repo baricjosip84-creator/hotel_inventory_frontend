@@ -1,0 +1,48 @@
+/*
+ * Platform-only accent palette.
+ *
+ * The tenant application keeps the global Inventory Operations blue palette.
+ * This scope is applied only to platform administration surfaces so platform
+ * navigation and operational workspaces can use a distinct restrained red
+ * accent without leaking visual changes into tenant routes.
+ */
+.platform-theme {
+  --io-primary: #d14343;
+  --io-primary-dark: #b93636;
+  --io-primary-deep: #8f2d2d;
+  --io-primary-light: #ef8b8b;
+  --io-primary-soft: #fff4f4;
+  --io-primary-soft-strong: #fde2e2;
+  --io-primary-border: #f2c5c5;
+  --io-primary-surface: #fffafa;
+  --io-primary-rgb: 209, 67, 67;
+  --io-primary-light-rgb: 239, 139, 139;
+  --io-primary-border-rgb: 242, 197, 197;
+  --io-role-accent-eyebrow: #c93f3f;
+  --io-role-accent-metric-soft: #fff1f1;
+  --io-role-accent-metric-text: #983232;
+}
+
+.platform-theme button:focus-visible,
+.platform-theme input:focus-visible,
+.platform-theme select:focus-visible,
+.platform-theme textarea:focus-visible,
+.platform-theme a:focus-visible {
+  outline-color: var(--io-primary);
+}
+
+.platform-theme input[type='checkbox'],
+.platform-theme input[type='radio'] {
+  accent-color: var(--io-primary);
+}
+
+.platform-theme .app-button--primary {
+  box-shadow: 0 1px 2px rgba(var(--io-primary-rgb), 0.18);
+}
+
+.platform-theme .io-operational-page input:not([type='checkbox']):not([type='radio']):focus,
+.platform-theme .io-operational-page select:focus,
+.platform-theme .io-operational-page textarea:focus {
+  border-color: var(--io-primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--io-primary-rgb), 0.10);
+}

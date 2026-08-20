@@ -316,7 +316,7 @@ const styles: Record<string, CSSProperties> = {
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', minHeight: 80, font: 'inherit', background: '#fff', color: '#0f172a' },
   checkboxLine: { display: 'inline-flex', gap: 8, alignItems: 'center', fontWeight: 600, color: '#334155' },
   actions: { display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, background: '#2563eb', color: '#fff', padding: '9px 13px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', padding: '9px 13px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, background: '#e2e8f0', color: '#64748b', padding: '9px 13px', cursor: 'not-allowed', fontWeight: 700 },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', padding: '9px 13px', cursor: 'pointer', fontWeight: 700 },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', padding: '6px 9px', cursor: 'pointer', fontWeight: 700 },

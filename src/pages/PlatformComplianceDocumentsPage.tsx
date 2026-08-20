@@ -351,7 +351,7 @@ const styles: Record<string, CSSProperties> = {
   input: { width: '100%', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', boxSizing: 'border-box', fontWeight: 400, background: '#fff', color: '#0f172a', minWidth: 0 },
   checkbox: { display: 'flex', gap: 8, alignItems: 'center', color: '#334155' },
   actions: { display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   disabledButton: { opacity: 0.55, cursor: 'not-allowed' },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 9px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
@@ -365,14 +365,14 @@ const styles: Record<string, CSSProperties> = {
   badgeMuted: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, background: '#e2e8f0', color: '#475569' },
   badgeDanger: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, background: '#fee2e2', color: '#991b1b' },
   badgeWarn: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, background: '#fef3c7', color: '#92400e' },
-  badgeInfo: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' },
+  badgeInfo: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)' },
   rowActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   empty: { padding: 24, textAlign: 'center', color: '#64748b' },
   errorPanel: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14 },
   successPanel: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: 12, fontWeight: 700 },
   validationMessage: { border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', borderRadius: 10, padding: 10, marginTop: 12, fontWeight: 700 },
   metaPanel: { display: 'grid', gap: 6, border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 12, padding: 12, color: '#475569', fontSize: 13 },
-  linkPanel: { display: 'grid', gap: 10, border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: 12, padding: 12, color: '#1e3a8a' },
+  linkPanel: { display: 'grid', gap: 10, border: '1px solid var(--io-primary-border)', background: 'var(--io-primary-soft)', borderRadius: 12, padding: 12, color: 'var(--io-primary-deep)' },
   linkGrid: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  link: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' }
+  link: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' }
 };

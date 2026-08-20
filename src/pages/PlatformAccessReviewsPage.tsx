@@ -266,17 +266,17 @@ const styles: Record<string, CSSProperties> = {
   badgeDanger: { borderRadius: '999px', padding: '4px 9px', fontSize: '12px', fontWeight: 800, background: '#fee2e2', color: '#991b1b' },
   help: { color: '#64748b', fontSize: '12px' },
   actions: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: '9px', padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', marginTop: '12px', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: '9px', padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', marginTop: '12px', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   disabledButton: { border: '1px solid #cbd5e1', borderRadius: '9px', padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', marginTop: '12px', opacity: 0.85, fontWeight: 700 },
   disabledOutlineButton: { border: '1px solid #cbd5e1', borderRadius: '9px', padding: '8px 10px', background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed', fontWeight: 700 },
   validationMessage: { marginTop: '12px', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', borderRadius: '10px', padding: '10px 12px', fontWeight: 700 },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: '9px', padding: '8px 10px', background: '#fff', cursor: 'pointer', color: '#0f172a', fontWeight: 700 },
   dangerButton: { border: '1px solid #dc2626', borderRadius: '9px', padding: '8px 10px', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  metaPanel: { display: 'flex', flexWrap: 'wrap', gap: '10px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '12px', padding: '12px 14px', fontSize: '13px' },
+  metaPanel: { display: 'flex', flexWrap: 'wrap', gap: '10px', border: '1px solid var(--io-primary-border)', background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', borderRadius: '12px', padding: '12px 14px', fontSize: '13px' },
   linkPanel: { display: 'flex', flexDirection: 'column', gap: '10px', border: '1px solid #e2e8f0', background: '#fff', borderRadius: '12px', padding: '14px' },
   linkGrid: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
-  link: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '6px 10px', color: '#1d4ed8', background: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '13px' },
+  link: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '6px 10px', color: 'var(--io-primary-dark)', background: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '13px' },
   successPanel: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '12px', padding: '10px 12px', fontWeight: 700 },
   errorPanel: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: '12px', padding: '12px' },
-  linkButton: { border: 0, background: 'transparent', color: '#1d4ed8', cursor: 'pointer', padding: 0, fontWeight: 700 }
+  linkButton: { border: 0, background: 'transparent', color: 'var(--io-primary-dark)', cursor: 'pointer', padding: 0, fontWeight: 700 }
 };

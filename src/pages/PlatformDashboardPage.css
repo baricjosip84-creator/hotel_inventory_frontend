@@ -46,7 +46,7 @@
 
 .platform-dashboard__metric-link,
 .platform-dashboard__section-link {
-  color: var(--io-primary-dark, #1d4ed8);
+  color: var(--io-primary-dark);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.3;

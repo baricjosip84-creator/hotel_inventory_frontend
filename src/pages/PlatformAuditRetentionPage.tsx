@@ -152,7 +152,7 @@ const styles: Record<string, CSSProperties> = {
   metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
   cardTitle: { margin: '0 0 10px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
+  flag: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
   help: { color: '#64748b', fontSize: 12 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },

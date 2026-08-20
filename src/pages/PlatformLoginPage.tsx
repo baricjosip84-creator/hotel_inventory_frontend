@@ -1,6 +1,7 @@
 
 import { fetchCurrentPlatformIdentity } from '../lib/platformAuth';
 import { InventoryMark } from '../components/brand/InventoryBrand';
+import '../layouts/PlatformTheme.css';
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
@@ -70,11 +71,11 @@ export default function PlatformLoginPage() {
   };
 
   return (
-    <main style={styles.page}>
+    <main className="platform-theme" style={styles.page}>
       <div style={styles.shell}>
         <section style={styles.brandPanel} aria-label="Inventory Operations platform administration">
           <div style={styles.brandRow}>
-            <InventoryMark size={42} tone="dark" />
+            <InventoryMark size={42} tone="dark" accent="red" />
             <div>
               <div style={styles.brandName}>Inventory Operations</div>
               <div style={styles.brandCaption}>PLATFORM ADMINISTRATION</div>
@@ -145,7 +146,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     placeItems: 'center',
     padding: 24,
-    background: 'linear-gradient(145deg,#eef4ff 0%,#f8fafc 46%,#fff 100%)',
+    background: 'linear-gradient(145deg,#fff1f1 0%,#f8fafc 46%,#fff 100%)',
     color: '#0f172a'
   },
   shell: {
@@ -163,31 +164,31 @@ const styles: Record<string, CSSProperties> = {
   brandPanel: {
     padding: '42px 46px',
     color: '#fff',
-    background: 'radial-gradient(circle at 12% 18%,rgba(37,99,235,.28),transparent 30%),linear-gradient(155deg,#081220 0%,#0f2749 52%,#0b1b32 100%)',
+    background: 'radial-gradient(circle at 12% 18%,rgba(var(--io-primary-rgb),.28),transparent 30%),linear-gradient(155deg,#081220 0%,#0f2749 52%,#0b1b32 100%)',
     display: 'flex',
     flexDirection: 'column',
     gap: 42
   },
   brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
   brandName: { fontWeight: 800, fontSize: 20, lineHeight: 1.05, letterSpacing: '-.02em' },
-  brandCaption: { color: 'rgba(191,219,254,.66)', fontSize: 10, marginTop: 4, fontWeight: 800, letterSpacing: '.08em' },
-  kicker: { color: '#93c5fd', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 },
+  brandCaption: { color: 'rgba(var(--io-primary-border-rgb),.66)', fontSize: 10, marginTop: 4, fontWeight: 800, letterSpacing: '.08em' },
+  kicker: { color: 'var(--io-primary-light)', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 },
   hero: { margin: 0, fontSize: 36, lineHeight: 1.1, letterSpacing: '-.035em', fontWeight: 800, maxWidth: 500 },
   heroText: { margin: '16px 0 0', color: 'rgba(255,255,255,.72)', fontSize: 15, lineHeight: 1.7, maxWidth: 520 },
   features: { display: 'grid', gap: 16 },
   feature: { display: 'grid', gridTemplateColumns: '42px 1fr', gap: 13, alignItems: 'start', fontSize: 14 },
-  featureIcon: { width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', color: '#bfdbfe', border: '1px solid rgba(147,197,253,.25)', background: 'rgba(37,99,235,.14)', fontSize: 19, fontWeight: 800 },
+  featureIcon: { width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--io-primary-border)', border: '1px solid rgba(var(--io-primary-light-rgb),.25)', background: 'rgba(var(--io-primary-rgb),.14)', fontSize: 19, fontWeight: 800 },
   featureText: { display: 'block', marginTop: 4, color: 'rgba(255,255,255,.60)', fontSize: 13, lineHeight: 1.55 },
   brandFooter: { marginTop: 'auto', color: 'rgba(255,255,255,.42)', fontSize: 12, fontWeight: 650 },
   loginPanel: { display: 'grid', placeItems: 'center', padding: 48, background: '#fff' },
   card: { width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 17 },
-  eyebrow: { color: '#2563eb', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 },
+  eyebrow: { color: 'var(--io-primary)', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 },
   title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em' },
   subtitle: { margin: '10px 0 8px', color: '#64748b', fontSize: 14, lineHeight: 1.55 },
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { color: '#334155', fontSize: 13, fontWeight: 700 },
   input: { width: '100%', height: 44, padding: '0 13px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', outline: 'none' },
-  button: { width: '100%', height: 44, marginTop: 2, padding: '0 14px', borderRadius: 9, border: '1px solid #2563eb', background: '#2563eb', color: '#fff', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 18px rgba(37,99,235,.18)' },
+  button: { width: '100%', height: 44, marginTop: 2, padding: '0 14px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 18px rgba(var(--io-primary-rgb),.18)' },
   buttonDisabled: { opacity: .58, cursor: 'not-allowed' },
   error: { padding: '12px 13px', borderRadius: 9, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', fontSize: 13, display: 'grid', gap: 3 }
 };

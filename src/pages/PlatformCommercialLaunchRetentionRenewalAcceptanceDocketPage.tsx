@@ -338,6 +338,6 @@ const styles: Record<string, CSSProperties> = {
   metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, color: '#334155' },
   supportingLinks: { marginTop: 14 },
   linkList: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  link: { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', border: '1px solid #cbd5e1', background: '#fff', padding: '0.3rem 0.6rem', color: '#1d4ed8', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 },
-  inlineLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' }
+  link: { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', border: '1px solid #cbd5e1', background: '#fff', padding: '0.3rem 0.6rem', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 },
+  inlineLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' }
 };

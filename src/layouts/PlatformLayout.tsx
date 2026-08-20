@@ -7,6 +7,7 @@ import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryMark } from '../components/brand/InventoryBrand';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
+import './PlatformTheme.css';
 
 export default function PlatformLayout() {
   const navigate = useNavigate();
@@ -117,10 +118,10 @@ export default function PlatformLayout() {
   });
 
   return (
-    <div style={styles.shell}>
+    <div className="platform-theme" style={styles.shell}>
       <aside style={styles.sidebar}>
         <div style={styles.brand}>
-          <InventoryMark size={36} tone="dark" />
+          <InventoryMark size={36} tone="dark" accent="red" />
           <div style={styles.brandTextWrap}>
             <div style={styles.brandTitle}>Inventory Operations</div>
             <div style={styles.brandCaption}>PLATFORM ADMINISTRATION</div>
@@ -808,7 +809,7 @@ const styles: Record<string, CSSProperties> = {
   },
   brandTextWrap: { minWidth: 0 },
   brandTitle: { fontWeight: 800, fontSize: 15, lineHeight: 1.1, letterSpacing: '-.02em', whiteSpace: 'nowrap' },
-  brandCaption: { color: 'rgba(191,219,254,.62)', fontSize: 9, marginTop: 4, fontWeight: 800, letterSpacing: '.08em', whiteSpace: 'nowrap' },
+  brandCaption: { color: 'rgba(var(--io-primary-border-rgb),.62)', fontSize: 9, marginTop: 4, fontWeight: 800, letterSpacing: '.08em', whiteSpace: 'nowrap' },
   nav: {
     display: 'flex',
     flexDirection: 'column',
@@ -834,9 +835,9 @@ const styles: Record<string, CSSProperties> = {
   },
   linkActive: {
     color: '#ffffff',
-    background: 'rgba(37,99,235,.23)',
-    borderColor: 'rgba(96,165,250,.28)',
-    boxShadow: 'inset 3px 0 0 #60a5fa'
+    background: 'rgba(var(--io-primary-rgb),.23)',
+    borderColor: 'rgba(var(--io-primary-light-rgb),.28)',
+    boxShadow: 'inset 3px 0 0 var(--io-primary-light)'
   },
   logoutButton: {
     marginTop: 'auto',

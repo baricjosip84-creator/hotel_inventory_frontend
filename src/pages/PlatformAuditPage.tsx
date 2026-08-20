@@ -378,8 +378,8 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer' },
   metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155' },
   supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { background: '#fff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 999, padding: '7px 11px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
-  primaryButton: { border: '1px solid #2563eb', background: '#2563eb', color: '#fff', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  supportLink: { background: '#fff', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '7px 11px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
+  primaryButton: { border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 },
   metricCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
   metricLabel: { color: '#64748b', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em' },
@@ -396,6 +396,6 @@ const styles: Record<string, CSSProperties> = {
   tdMono: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', fontFamily: 'monospace', verticalAlign: 'top', whiteSpace: 'nowrap', color: '#334155' },
   tdMonoSmall: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', fontFamily: 'monospace', fontSize: 12, verticalAlign: 'top', maxWidth: 320, wordBreak: 'break-word', color: '#334155' },
   evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 },
-  evidenceLink: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none', fontFamily: 'system-ui, sans-serif' },
+  evidenceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none', fontFamily: 'system-ui, sans-serif' },
   muted: { color: '#64748b', fontSize: 12, marginTop: 4, wordBreak: 'break-all' }
 };

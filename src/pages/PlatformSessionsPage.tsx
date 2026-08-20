@@ -169,7 +169,7 @@ const styles: Record<string, CSSProperties> = {
   button: { padding: '8px 11px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
   dangerButton: { padding: '8px 11px', borderRadius: 9, border: '1px solid #fecaca', cursor: 'pointer', background: '#fff', color: '#b91c1c', fontWeight: 700 },
   activeBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 700 },
-  currentBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 700 },
+  currentBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', fontSize: 12, fontWeight: 700 },
   mutedBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 700 },
   empty: { padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b' },
   error: { padding: 12, borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', marginBottom: 12 }

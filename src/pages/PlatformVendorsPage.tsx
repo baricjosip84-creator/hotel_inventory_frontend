@@ -344,7 +344,7 @@ const styles: Record<string, CSSProperties> = {
   checkboxLine: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#334155' },
   actions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   rowActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', fontWeight: 700, cursor: 'not-allowed' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #dc2626', borderRadius: 9, padding: '8px 10px', background: '#dc2626', color: '#fff', fontWeight: 700, cursor: 'pointer' },
@@ -353,7 +353,7 @@ const styles: Record<string, CSSProperties> = {
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, color: '#334155' },
   muted: { color: '#64748b', fontSize: 12 },
-  badge: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#dbeafe', color: '#1d4ed8', fontWeight: 700 },
+  badge: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', fontWeight: 700 },
   badgeDanger: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 700 },
   badgeMuted: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#e2e8f0', color: '#475569', fontWeight: 700 },
   empty: { textAlign: 'center', padding: 24, color: '#64748b' }

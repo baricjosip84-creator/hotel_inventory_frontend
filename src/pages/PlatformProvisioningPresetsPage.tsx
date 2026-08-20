@@ -374,7 +374,7 @@ const styles: Record<string, CSSProperties> = {
   error: { padding: 12, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', fontWeight: 700 },
   sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
   actionRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', background: '#2563eb', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 12px', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
   dangerButton: { border: '1px solid #dc2626', borderRadius: 9, padding: '8px 12px', cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 700 },
   formStack: { display: 'grid', gap: 16 },
@@ -393,6 +393,6 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse', minWidth: 860, color: '#334155' },
   th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', fontSize: 12, color: '#64748b' },
   td: { borderBottom: '1px solid #f1f5f9', padding: '10px 8px', verticalAlign: 'top' },
-  selectedRow: { background: '#eff6ff' },
+  selectedRow: { background: 'var(--io-primary-soft)' },
   statusChip: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#e2e8f0', color: '#475569', textTransform: 'capitalize', fontSize: 12, fontWeight: 700 }
 };

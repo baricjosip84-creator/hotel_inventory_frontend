@@ -459,13 +459,13 @@ const styles: Record<string, CSSProperties> = {
   panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
   metaPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, color: '#475569', fontSize: 13 },
   linkBar: { display: 'flex', gap: 8, flexWrap: 'wrap', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 },
-  supportLink: { color: '#1d4ed8', background: '#fff', border: '1px solid #bfdbfe', borderRadius: 999, padding: '6px 10px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
+  supportLink: { color: 'var(--io-primary-dark)', background: '#fff', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '6px 10px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 },
   summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, color: '#334155' },
   notice: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 10, padding: 10 },
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, alignItems: 'end' },
   input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit', minWidth: 0 },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid #2563eb', cursor: 'pointer', background: '#2563eb', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', cursor: 'pointer', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
   dangerButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #dc2626', cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 700 },
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
@@ -478,5 +478,5 @@ const styles: Record<string, CSSProperties> = {
   empty: { color: '#64748b', padding: '14px 0' },
   error: { marginTop: 10, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
   success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
-  evidenceLinks: { display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 13, color: '#1d4ed8' }
+  evidenceLinks: { display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 13, color: 'var(--io-primary-dark)' }
 };

@@ -39,7 +39,7 @@ function badgeStyle(row: PrivacyRequest): CSSProperties {
   if (row.status === 'fulfilled') return { ...styles.badge, background: '#dcfce7', color: '#166534' };
   if (row.status === 'rejected' || row.status === 'cancelled') return { ...styles.badge, background: '#e5e7eb', color: '#374151' };
   if (row.priority === 'urgent' || row.priority === 'high') return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
+  return { ...styles.badge, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)' };
 }
 function trimOrNull(value: string) { const trimmed = value.trim(); return trimmed || null; }
 function isValidEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
@@ -237,7 +237,7 @@ const styles: Record<string, CSSProperties> = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
   title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
   subtitle: { margin: '6px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  notice: { border: '1px solid #bfdbfe', borderRadius: 12, padding: '10px 12px', background: '#eff6ff', color: '#1e3a8a', fontWeight: 700 },
+  notice: { border: '1px solid var(--io-primary-border)', borderRadius: 12, padding: '10px 12px', background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', fontWeight: 700 },
   errorPanel: { border: '1px solid #fecaca', borderRadius: 12, padding: 14, background: '#fef2f2', color: '#991b1b', display: 'grid', gap: 8 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
   metric: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#fff', display: 'grid', gap: 4, color: '#334155' },
@@ -251,7 +251,7 @@ const styles: Record<string, CSSProperties> = {
   input: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
   textarea: { width: '100%', boxSizing: 'border-box', minHeight: 80, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
   checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', fontWeight: 700 },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 12px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 9px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
@@ -262,6 +262,6 @@ const styles: Record<string, CSSProperties> = {
   table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
   badge: { borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 },
   muted: { color: '#64748b', fontSize: 12 },
-  link: { color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' },
+  link: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }
 };

@@ -245,7 +245,7 @@ const styles: Record<string, CSSProperties> = {
   textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, minHeight: 110, resize: 'vertical', background: '#fff', color: '#0f172a' },
   checkboxLine: { display: 'inline-flex', alignItems: 'center', gap: 8, color: '#334155' },
   actions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  primaryButton: { border: '1px solid #2563eb', borderRadius: 9, padding: '9px 13px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
+  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
   dangerButton: { border: '1px solid #fecaca', borderRadius: 9, padding: '9px 13px', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
   muted: { color: '#64748b', fontSize: 13, lineHeight: 1.5 },

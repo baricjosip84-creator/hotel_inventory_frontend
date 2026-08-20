@@ -392,5 +392,5 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
   inlineButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 700, cursor: 'pointer', justifySelf: 'start' },
   actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '8px 12px', fontWeight: 800, color: '#1d4ed8', textDecoration: 'none', overflowWrap: 'anywhere' }
+  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '8px 12px', fontWeight: 800, color: 'var(--io-primary-dark)', textDecoration: 'none', overflowWrap: 'anywhere' }
 };

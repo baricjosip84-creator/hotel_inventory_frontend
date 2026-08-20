@@ -324,6 +324,6 @@ const styles: Record<string, CSSProperties> = {
   errorButton: { border: '1px solid #fca5a5', background: '#fff', color: '#991b1b', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
   quickLinks: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: '#1d4ed8', textDecoration: 'none', fontSize: '12px', fontWeight: 700 },
+  quickLink: { border: '1px solid #cbd5e1', borderRadius: '999px', padding: '4px 8px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: '12px', fontWeight: 700 },
   breakAnywhere: { overflowWrap: 'anywhere' }
 };
