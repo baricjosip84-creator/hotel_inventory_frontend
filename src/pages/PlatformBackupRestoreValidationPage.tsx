@@ -1,8 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformBackupRestoreValidationPage.css';
 
 type EvidenceValue = string | number | boolean | null | string[] | Record<string, number>;
 
@@ -40,38 +48,111 @@ type BackupRestorePackage = {
 };
 
 type Tenant = { id: string; name: string };
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+const summaryLabels: Record<string, string> = {
+  tenants_total: 'Tenants reviewed',
+  tenant_scope_ready: 'Tenant scopes ready',
+  tenant_scope_blocked: 'Tenant scopes blocked',
+  tenant_scope_review_required: 'Tenant review required',
+  tenants_with_core_data: 'Tenants with core data',
+  tenants_without_core_data: 'Tenants without core data',
+  tenants_with_export_archive_evidence: 'Export evidence present',
+  tenants_without_export_archive_evidence: 'Export evidence missing',
+  exportable_table_count: 'Exportable tables',
+  backup_policy_fields_configured: 'Backup policy fields configured',
+  backup_policy_fields_total: 'Backup policy fields total',
+  platform_controls_total: 'Platform controls',
+  platform_controls_with_evidence: 'Platform controls with evidence',
+  platform_controls_blocking: 'Platform blockers',
+  platform_controls_review_required: 'Platform review required',
+  total_controls: 'Total controls',
+  controls_with_evidence: 'Controls with evidence'
+};
+
+const detailSummaryKeys = [
+  'tenants_with_core_data',
+  'tenants_without_core_data',
+  'tenants_with_export_archive_evidence',
+  'tenants_without_export_archive_evidence',
+  'exportable_table_count',
+  'backup_policy_fields_configured',
+  'backup_policy_fields_total',
+  'platform_controls_total',
+  'platform_controls_with_evidence',
+  'platform_controls_blocking',
+  'platform_controls_review_required',
+  'total_controls',
+  'controls_with_evidence'
+] as const;
+
+const statusLabels: Record<string, string> = {
+  backup_restore_validation_blocked: 'Backup / restore validation blocked',
+  backup_restore_review_required: 'Backup / restore review required',
+  backup_restore_technical_precheck_clear: 'Technical precheck clear',
+  no_tenants_to_review_for_backup_restore: 'No tenants to review',
+  tenant_backup_scope_ready: 'Tenant backup scope ready',
+  tenant_backup_scope_blocked: 'Tenant backup scope blocked',
+  tenant_backup_scope_review_required: 'Tenant backup scope review required',
+  evidence_present: 'Evidence present',
+  backup_restore_evidence_missing: 'Evidence missing',
+  backup_policy_configuration_missing: 'Backup policy configuration missing',
+  manual_restore_drill_verification_required: 'Manual restore-drill verification required',
+  manual_restore_drill_required: 'Manual restore drill required',
+  tenant_export_sample_review_required: 'Tenant export sample review required'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function badgeStyle(value: string): CSSProperties {
-  if (value === 'loading' || value.includes('no_tenants') || value.includes('not_available')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (value.includes('review') || value.includes('manual') || value.includes('sample')) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (value.includes('blocked') || value.includes('missing')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+function displayStatus(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  return statusLabels[value] || humanize(value);
+}
+
+function displaySummaryKey(value: string) {
+  return summaryLabels[value] || humanize(value);
+}
+
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('missing')) return 'danger';
+  if (normalized.includes('review') || normalized.includes('manual') || normalized.includes('sample')) return 'warn';
+  if (normalized.includes('no_tenants') || normalized.includes('not_available')) return 'neutral';
+  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('evidence_present')) return 'good';
+  return 'accent';
 }
 
 function formatValue(value: EvidenceValue | undefined) {
-  if (value === null || value === undefined || value === '') return 'Not available';
-  if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (Array.isArray(value)) return value.length ? value.join(', ') : 'none';
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
   if (typeof value === 'object') {
-    return Object.entries(value).map(([key, count]) => `${key}: ${count}`).join(', ') || 'none';
+    return Object.entries(value).map(([key, count]) => `${humanize(key)}: ${count}`).join(', ') || 'None';
   }
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleString();
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  }
   return String(value);
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
 }
 
 function readableError(error: unknown) {
   if (error instanceof Error && error.message.trim()) return error.message;
   return 'Unknown error';
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? `${value.slice(0, 8)}…` : value;
 }
 
 function tenantExportLink(tenantId: string) {
@@ -81,9 +162,9 @@ function tenantExportLink(tenantId: string) {
 
 export default function PlatformBackupRestoreValidationPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
+  const tenantId = searchParams.get('tenant_id') || '';
 
-  const tenants = useQuery({
+  const tenantsQuery = useQuery({
     queryKey: ['platform', 'tenants', 'for-backup-restore-validation'],
     queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
     refetchOnWindowFocus: false,
@@ -92,235 +173,351 @@ export default function PlatformBackupRestoreValidationPage() {
 
   const query = new URLSearchParams();
   if (tenantId) query.set('tenant_id', tenantId);
+  const queryString = query.toString();
 
   const validation = useQuery({
     queryKey: ['platform', 'backup-restore-validation', tenantId],
-    queryFn: () => {
-      const queryString = query.toString();
-      return platformApiRequest<BackupRestorePackage>(`/platform/backup-restore-validation${queryString ? `?${queryString}` : ''}`);
-    },
+    queryFn: () => platformApiRequest<BackupRestorePackage>(`/platform/backup-restore-validation${queryString ? `?${queryString}` : ''}`),
     refetchOnWindowFocus: false,
     staleTime: 60_000
   });
 
   const data = validation.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summary = data?.summary || {};
+  const tenants = useMemo(() => tenantsQuery.data || [], [tenantsQuery.data]);
+  const selectedTenant = useMemo(() => tenants.find((tenant) => tenant.id === tenantId), [tenantId, tenants]);
   const platformEvidence = useMemo(() => Object.entries(data?.platform_evidence || {}), [data?.platform_evidence]);
+  const refreshError = validation.isError && Boolean(data);
+  const initialLoadError = validation.isError && !data;
+  const errorMessage = readableError(validation.error);
+  const scopeLabel = tenantId
+    ? selectedTenant?.name || `Selected tenant (${shortId(tenantId)})`
+    : 'All tenants';
 
   function changeTenant(nextTenantId: string) {
-    setTenantId(nextTenantId);
     const nextParams = new URLSearchParams(searchParams);
     if (nextTenantId) nextParams.set('tenant_id', nextTenantId);
     else nextParams.delete('tenant_id');
     setSearchParams(nextParams, { replace: true });
   }
 
+  function refreshAll() {
+    void tenantsQuery.refetch();
+    void validation.refetch();
+  }
+
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Backup Restore Validation</h1>
-          <p style={styles.description}>
-            Step 213 combines repository backup/recovery foundations, runtime backup-policy configuration,
-            tenant export evidence, and tenant data scope into one read-only technical recovery precheck.
+    <div className="io-operational-page io-workspace-page platform-backup-restore">
+      <OperationalWorkspaceHero
+        iconPath="/platform/backup-restore-validation"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Backup Restore Validation"
+        description="Read-only technical recovery precheck across backup policy configuration, recovery runbooks, tenant export evidence, and tenant data scope."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 213 — Backup Restore Validation Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Operator precheck only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>No backup or restore mutations</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-backup-restore__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.tenant_scope_ready ?? 0}/${summary.tenants_total ?? 0}` : '—'}
+              label="tenant scopes technically ready"
+            />
+            {data ? (
+              <span className="platform-backup-restore__status-badge" data-tone={badgeTone(data.posture)}>
+                {displayStatus(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-backup-restore__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={refreshAll}
+                disabled={tenantsQuery.isFetching || validation.isFetching}
+              >
+                {tenantsQuery.isFetching || validation.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Backup restore validation key metrics">
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/backup-restore-validation"
+          label="Tenants reviewed"
+          value={summary.tenants_total ?? 0}
+          helper="Tenants in the current recovery-evidence scope"
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/tenant-exports"
+          label="Tenant scopes ready"
+          value={summary.tenant_scope_ready ?? 0}
+          helper="Data scope and audited export-path evidence are present"
+          tone="good"
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/backup-restore-validation"
+          label="Tenant scopes blocked"
+          value={summary.tenant_scope_blocked ?? 0}
+          helper="Required tenant recovery evidence is missing"
+          tone={(summary.tenant_scope_blocked ?? 0) > 0 ? 'danger' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/tenant-exports"
+          label="Tenant review required"
+          value={summary.tenant_scope_review_required ?? 0}
+          helper="Export-path sampling or operator review remains"
+          tone={(summary.tenant_scope_review_required ?? 0) > 0 ? 'warn' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/runbooks"
+          label="Platform blockers"
+          value={summary.platform_controls_blocking ?? 0}
+          helper="Missing runbook, implementation or policy evidence"
+          tone={(summary.platform_controls_blocking ?? 0) > 0 ? 'danger' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/runbooks"
+          label="Platform review required"
+          value={summary.platform_controls_review_required ?? 0}
+          helper="Manual restore-drill verification still required"
+          tone={(summary.platform_controls_review_required ?? 0) > 0 ? 'warn' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <section className="app-panel app-panel--padded platform-backup-restore__scope-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/backup-restore-validation"
+          title="Recovery scope"
+          description="Review all tenants or one tenant. The selected tenant is stored in the URL so the same recovery scope can be reopened reliably."
+        />
+        <div className="platform-backup-restore__filter-grid">
+          <label className="platform-backup-restore__field" htmlFor="backup-restore-tenant-filter">
+            <span>Tenant filter</span>
+            <select
+              id="backup-restore-tenant-filter"
+              value={tenantId}
+              onChange={(event) => changeTenant(event.target.value)}
+              disabled={tenantsQuery.isLoading && !tenantId}
+            >
+              <option value="">All tenants</option>
+              {tenantId && !selectedTenant ? <option value={tenantId}>Selected tenant ({shortId(tenantId)})</option> : null}
+              {tenants.map((tenant) => (
+                <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
+              ))}
+            </select>
+          </label>
+          <div className="platform-backup-restore__scope-copy">
+            <strong>Current scope</strong>
+            <span>{scopeLabel}</span>
+          </div>
+        </div>
+        {tenantsQuery.error ? (
+          <p className="platform-backup-restore__filter-warning">
+            Tenant filter options could not be loaded: {readableError(tenantsQuery.error)}. The current URL scope is preserved.
           </p>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
-          <button
-            type="button"
-            style={styles.secondaryButton}
-            onClick={() => { void tenants.refetch(); void validation.refetch(); }}
-            disabled={tenants.isFetching || validation.isFetching}
-          >
-            {tenants.isFetching || validation.isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
-      </section>
-
-      <section style={styles.notice}>
-        <strong>Operator precheck only.</strong> The application does not execute production database backups, restore databases,
-        verify an external backup provider, or persist restore-drill completion. A clear tenant export scope is not disaster-recovery
-        certification; a real isolated restore drill and operator-owned provider evidence are still required.
-      </section>
-
-      <section style={styles.card}>
-        <label style={styles.label} htmlFor="backup-restore-tenant-filter">Tenant filter</label>
-        <select
-          id="backup-restore-tenant-filter"
-          value={tenantId}
-          onChange={(event) => changeTenant(event.target.value)}
-          style={styles.select}
-          disabled={tenants.isLoading}
-        >
-          <option value="">All tenants</option>
-          {(tenants.data || []).map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
-          ))}
-        </select>
-        {tenants.error ? (
-          <p style={styles.inlineError}>Tenant filter options could not be loaded: {readableError(tenants.error)}</p>
         ) : null}
       </section>
 
-      {validation.isLoading ? <div style={styles.card}>Loading backup restore validation...</div> : null}
-      {validation.error ? (
-        <div style={styles.error}>
-          <span>Unable to load backup restore validation: {readableError(validation.error)}</span>
+      {validation.isLoading && !data ? (
+        <section className="app-panel app-panel--padded platform-backup-restore__feedback">
+          <strong>Loading backup restore validation…</strong>
+          <span>Collecting current recovery foundations, tenant export evidence, data scope and backup-policy posture.</span>
+        </section>
+      ) : null}
+
+      {initialLoadError ? (
+        <section className="app-panel app-panel--padded platform-backup-restore__feedback platform-backup-restore__feedback--error" role="alert">
+          <strong>Unable to load backup restore validation: {errorMessage}</strong>
+          <span>No successful recovery-evidence snapshot is currently available.</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-backup-restore__retry"
             onClick={() => void validation.refetch()}
             disabled={validation.isFetching}
           >
-            {validation.isFetching ? 'Retrying...' : 'Retry'}
+            {validation.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-backup-restore__feedback platform-backup-restore__feedback--warning" role="status">
+          <strong>Refresh failed — showing the last successful backup / restore snapshot.</strong>
+          <span>{errorMessage}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-backup-restore__retry"
+            onClick={() => void validation.refetch()}
+            disabled={validation.isFetching}
+          >
+            {validation.isFetching ? 'Retrying…' : 'Retry refresh'}
+          </button>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
-              <div style={styles.metadataItem}><strong>Phase</strong><span>{data.phase}</span></div>
-              <div style={styles.metadataItem}><strong>Step</strong><span>{data.step}</span></div>
-              <div style={styles.metadataItem}><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div style={styles.metadataItem}><strong>Validation</strong><span>{data.validation_note}</span></div>
+          <section className="app-panel app-panel--padded platform-backup-restore__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/backup-restore-validation"
+              title="Recovery program context"
+              description="Technical evidence for operator review. A clear application precheck is not disaster-recovery certification."
+            />
+            <div className="platform-backup-restore__program-grid">
+              <div><strong>Phase</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Control definitions</strong><span>{data.backup_restore_controls.length}</span></div>
+              <div className="platform-backup-restore__operator-notice">
+                <strong>Operator precheck only.</strong>
+                <span>The application does not execute production database backups, restore databases, verify an external backup provider, or persist restore-drill completion. A real isolated restore drill and operator-owned provider evidence remain required.</span>
+              </div>
+              <details className="platform-backup-restore__validation-note">
+                <summary>Validation boundary</summary>
+                <p>{data.validation_note}</p>
+              </details>
             </div>
           </section>
 
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
-            ))}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Platform recovery evidence</h2>
-            <div style={styles.evidenceGrid}>
-              {platformEvidence.map(([key, value]) => (
-                <div key={key} style={styles.evidenceItem}>
-                  <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                  <strong style={styles.breakAnywhere}>{formatValue(value)}</strong>
+          <section className="app-panel app-panel--padded platform-backup-restore__summary-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/backup-restore-validation"
+              title="Detailed recovery summary"
+              description="Supporting counters behind the primary backup / restore readiness KPIs."
+            />
+            <div className="platform-backup-restore__summary-grid">
+              {detailSummaryKeys.map((key) => (
+                <div className="platform-backup-restore__summary-item" key={key}>
+                  <span>{displaySummaryKey(key)}</span>
+                  <strong>{summary[key] ?? 0}</strong>
                 </div>
               ))}
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Platform recovery controls</h2>
-            <div style={styles.controlGrid}>
+          <section className="app-panel app-panel--padded platform-backup-restore__evidence-section">
+            <OperationalSectionHeader
+              iconPath="/platform/runbooks"
+              title="Platform recovery evidence"
+              description="Repository, runtime policy and implementation evidence used by the platform recovery controls. Configuration values themselves are not exposed."
+            />
+            <div className="platform-backup-restore__platform-grid">
+              {platformEvidence.map(([key, value]) => (
+                <div className="platform-backup-restore__platform-item" key={key}>
+                  <span>{humanize(key)}</span>
+                  <strong>{formatValue(value)}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="platform-backup-restore__controls-section">
+            <OperationalSectionHeader
+              iconPath="/platform/runbooks"
+              title="Platform recovery controls"
+              description="Read-only platform controls covering export implementation, runbooks, backup-policy configuration and restore-drill verification."
+            />
+            <div className="platform-backup-restore__control-grid">
               {data.platform_controls.map((control) => (
-                <article key={control.code} style={styles.controlCard}>
-                  <div style={styles.controlHeader}>
-                    <strong style={styles.breakAnywhere}>{control.label}</strong>
-                    <span style={badgeStyle(control.status || 'missing')}>{humanize(control.status || 'missing')}</span>
+                <article key={control.code} className="app-panel platform-backup-restore__control-card">
+                  <div className="platform-backup-restore__control-heading">
+                    <div>
+                      <h3>{control.label}</h3>
+                      <code>{control.code}</code>
+                    </div>
+                    <span className="platform-backup-restore__mini-badge" data-tone={badgeTone(control.status)}>
+                      {displayStatus(control.status)}
+                    </span>
                   </div>
-                  <p style={styles.reason}>{control.launch_reason}</p>
-                  <span style={styles.help}>Evidence: {humanize(control.evidence_key)} · value: {control.evidence_value ?? 'not persisted'}</span>
+                  <p>{control.launch_reason}</p>
+                  <div className="platform-backup-restore__evidence-key">
+                    <span>Evidence</span>
+                    <code>{humanize(control.evidence_key)}</code>
+                    <strong>{control.evidence_value ?? 'Not persisted'}</strong>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.rows}>
+          <section className="platform-backup-restore__tenant-section">
+            <OperationalSectionHeader
+              iconPath="/platform/tenant-exports"
+              title="Tenant recovery evidence"
+              description="Per-tenant data scope and audited export-path evidence. Tenant export evidence is useful recovery evidence, but it is not a database restore."
+            />
             {data.tenants.length === 0 ? (
-              <div style={styles.card}>No tenants match the current backup/restore filter.</div>
-            ) : data.tenants.map((tenant) => (
-              <article key={tenant.tenant_id} style={styles.tenantCard}>
-                <div style={styles.tenantHeader}>
-                  <div style={styles.minWidthZero}>
-                    <h2 style={styles.tenantTitle}>{tenant.tenant_name}</h2>
-                    <span style={styles.help}>Tenant status: {humanize(tenant.tenant_status || 'unknown')}</span>
-                    <div style={styles.quickLinks}>
-                      <Link style={styles.quickLink} to={tenantExportLink(tenant.tenant_id)}>Tenant export</Link>
-                      <Link style={styles.quickLink} to="/platform/runbooks?category=maintenance">Runbooks</Link>
-                      <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
-                    </div>
-                  </div>
-                  <span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span>
-                </div>
-
-                <div style={styles.evidenceGrid}>
-                  {Object.entries(tenant.evidence).map(([key, value]) => (
-                    <div key={key} style={styles.evidenceItem}>
-                      <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                      <strong style={styles.breakAnywhere}>{formatValue(value)}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={styles.controlGrid}>
-                  {tenant.controls.map((control) => (
-                    <div key={control.code} style={styles.controlCard}>
-                      <div style={styles.controlHeader}>
-                        <strong style={styles.breakAnywhere}>{control.label}</strong>
-                        <span style={badgeStyle(control.status || 'missing')}>{humanize(control.status || 'missing')}</span>
+              <div className="app-panel app-panel--padded platform-backup-restore__empty-state">
+                No tenants match the current backup / restore filter.
+              </div>
+            ) : (
+              <div className="platform-backup-restore__tenant-list">
+                {data.tenants.map((tenant) => (
+                  <article key={tenant.tenant_id} className="app-panel platform-backup-restore__tenant-card">
+                    <div className="platform-backup-restore__tenant-header">
+                      <div className="platform-backup-restore__tenant-title-wrap">
+                        <span>{humanize(tenant.tenant_status)} lifecycle</span>
+                        <h3>{tenant.tenant_name}</h3>
+                        <code>{tenant.tenant_id}</code>
                       </div>
-                      <p style={styles.reason}>{control.launch_reason}</p>
-                      <span style={styles.help}>Evidence value: {control.evidence_value ?? 0}</span>
+                      <span className="platform-backup-restore__status-badge" data-tone={badgeTone(tenant.status)}>
+                        {displayStatus(tenant.status)}
+                      </span>
                     </div>
-                  ))}
-                </div>
 
-                <div style={styles.nextStep}><strong>Next best step:</strong> {tenant.next_best_step}</div>
-              </article>
-            ))}
+                    <div className="platform-backup-restore__action-row">
+                      <Link className="app-button app-button--secondary" to={tenantExportLink(tenant.tenant_id)}>Tenant export</Link>
+                      <Link className="app-button app-button--secondary" to="/platform/runbooks?category=maintenance">Runbooks</Link>
+                      <Link className="app-button app-button--secondary" to="/platform/documentation-completeness">Documentation</Link>
+                    </div>
+
+                    <div className="platform-backup-restore__evidence-grid">
+                      {Object.entries(tenant.evidence).map(([key, value]) => (
+                        <div key={key} className="platform-backup-restore__tenant-evidence">
+                          <span>{humanize(key)}</span>
+                          <strong>{formatValue(value)}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="platform-backup-restore__control-status-grid">
+                      {tenant.controls.map((control) => (
+                        <div key={control.code} className="platform-backup-restore__tenant-control">
+                          <span>{control.label}</span>
+                          <strong>{formatValue(control.evidence_value)}</strong>
+                          <em className="platform-backup-restore__mini-badge" data-tone={badgeTone(control.status)}>
+                            {displayStatus(control.status)}
+                          </em>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="platform-backup-restore__missing-controls">
+                      <strong>Controls needing attention</strong>
+                      <span>{tenant.missing_control_codes.length ? tenant.missing_control_codes.map(humanize).join(', ') : 'None'}</span>
+                    </div>
+
+                    <div className="platform-backup-restore__next-step">
+                      <strong>Next operator step</strong>
+                      <span>{tenant.next_best_step}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
-
-          <section style={styles.note}><strong>Validation boundary:</strong> {data.validation_note}</section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 940, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-  notice: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 14, padding: 14, color: '#334155', lineHeight: 1.5 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  label: { display: 'block', fontWeight: 800, marginBottom: 6 },
-  select: { width: 'min(100%, 420px)', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px' },
-  inlineError: { color: '#991b1b', margin: '10px 0 0', fontSize: 13 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a', overflowWrap: 'anywhere' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  rows: { display: 'grid', gap: 16 },
-  tenantCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 14, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  tenantHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  tenantTitle: { margin: 0, fontSize: 20, overflowWrap: 'anywhere' },
-  evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 },
-  evidenceItem: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, display: 'grid', gap: 4, minWidth: 0 },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 12, padding: 12, color: 'var(--io-primary-deep)', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  note: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 14, color: '#9a3412', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  error: { background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 14, padding: 14, color: '#991b1b', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
-  errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metadataItem: { display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  breakAnywhere: { overflowWrap: 'anywhere' },
-  minWidthZero: { minWidth: 0 }
-};
