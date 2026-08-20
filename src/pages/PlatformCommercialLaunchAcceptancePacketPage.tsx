@@ -1,7 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchAcceptancePacketPage.css';
 
 type EvidenceScope = {
   mode: string;
@@ -65,13 +74,114 @@ type CommercialLaunchAcceptancePacket = {
   validation_note: string;
 };
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+type SummaryItem = {
+  key: string;
+  label: string;
+  helper: string;
+  tone?: 'default' | 'neutral' | 'good' | 'warn' | 'danger';
+};
+
+const summaryItems: SummaryItem[] = [
+  { key: 'packets_total', label: 'Acceptance packets', helper: 'Owner-facing packets derived from current certificate controls.' },
+  { key: 'packets_ready_for_acceptance', label: 'Ready for owner review', helper: 'Current evidence is ready to enter external manual signoff.', tone: 'good' },
+  { key: 'packets_requiring_evidence_review', label: 'Evidence review', helper: 'Evidence or scope still needs explicit review before signoff.', tone: 'warn' },
+  { key: 'packets_blocked', label: 'Blocked packets', helper: 'Packets blocked by missing or unavailable evidence.', tone: 'danger' },
+  { key: 'manual_owner_signoffs_required', label: 'Manual signoffs', helper: 'Owner acceptances still required outside this application.', tone: 'warn' },
+  { key: 'owner_signoffs_persisted_in_application', label: 'Signoffs stored', helper: 'This read-only board intentionally stores no owner signatures.', tone: 'neutral' }
+];
+
+const summaryLabels: Record<string, string> = {
+  packets_total: 'Acceptance packets',
+  packets_ready_for_acceptance: 'Ready for owner review',
+  packets_requiring_evidence_review: 'Evidence review required',
+  packets_blocked: 'Blocked packets',
+  manual_owner_signoffs_required: 'Manual owner signoffs required',
+  owner_signoffs_persisted_in_application: 'Owner signoffs stored in application'
+};
+
+const statusLabels: Record<string, string> = {
+  commercial_launch_acceptance_packet_blocked: 'Blocked by evidence',
+  commercial_launch_acceptance_packet_evidence_review_required: 'Evidence review required',
+  commercial_launch_acceptance_packet_ready_for_manual_signoff: 'Ready for manual signoff',
+  ready_for_manual_owner_acceptance: 'Ready for manual owner acceptance',
+  evidence_review_required_before_manual_owner_acceptance: 'Evidence review required before owner acceptance',
+  blocked_until_evidence_surface_ready: 'Blocked until evidence is ready',
+  evidence_surface_ready: 'Evidence surface ready',
+  evidence_review_required: 'Evidence review required',
+  evidence_surface_blocked: 'Evidence surface blocked',
+  evidence_source_unavailable: 'Evidence source unavailable',
+  full_population: 'Full tenant population',
+  full_population_reviewed: 'Full tenant population reviewed',
+  full_population_inferred: 'Full tenant population inferred',
+  scope_limit_review_required: 'Scope review required',
+  not_limited_by_certificate: 'Not limited by certificate',
+  external_not_persisted_by_application: 'External — not persisted by application'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message) return error.message;
-  return 'Unknown API error';
+function displayStatus(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  return statusLabels[value] || humanize(value);
+}
+
+function displaySummaryKey(value: string) {
+  return summaryLabels[value] || humanize(value);
+}
+
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('missing')
+    || normalized.includes('unavailable')
+    || normalized.includes('failed')
+    || normalized.includes('incomplete')
+  ) return 'danger';
+  if (
+    normalized.includes('manual')
+    || normalized.includes('required')
+    || normalized.includes('review')
+    || normalized.includes('external')
+    || normalized.includes('partial')
+    || normalized.includes('scope_limit')
+  ) return 'warn';
+  if (normalized.includes('context_only') || normalized.includes('not_limited')) return 'neutral';
+  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('present') || normalized.includes('full_population')) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'The platform request failed.';
+}
+
+function formatEvidenceValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') {
+    const parsed = /^\d{4}-\d{2}-\d{2}T/.test(value) ? new Date(value) : null;
+    if (parsed && !Number.isNaN(parsed.getTime())) return parsed.toLocaleString();
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function getPacketReviewLink(packet: AcceptancePacket) {
@@ -106,39 +216,6 @@ function getPacketReviewLabel(packet: AcceptancePacket) {
   return bySourceControl[packet.source_control] || 'Open certificate evidence';
 }
 
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized.includes('context_only') || normalized.includes('not_limited')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (
-    normalized.includes('blocked')
-    || normalized.includes('missing')
-    || normalized.includes('unavailable')
-    || normalized.includes('failed')
-    || normalized.includes('incomplete')
-  ) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (
-    normalized.includes('manual')
-    || normalized.includes('required')
-    || normalized.includes('review')
-    || normalized.includes('external')
-    || normalized.includes('partial')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (normalized.includes('ready') || normalized.includes('clear') || normalized.includes('present')) {
-    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  }
-  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-}
-
-function neutralBadgeStyle(): CSSProperties {
-  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-}
-
 export default function PlatformCommercialLaunchAcceptancePacketPage() {
   const packet = useQuery({
     queryKey: ['platform', 'commercial-launch-acceptance-packet'],
@@ -148,257 +225,335 @@ export default function PlatformCommercialLaunchAcceptancePacketPage() {
   });
 
   const data = packet.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summary = data?.summary || {};
+  const detailedSummary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = packet.isError && !data;
+  const refreshError = packet.isError && Boolean(data);
+  const requestError = readableError(packet.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Acceptance Packet</h1>
-          <p style={styles.description}>
-            Step 218 prepares owner signoff packets from the current Launch Certificate evidence. It preserves
-            blocked and review-required states instead of treating the static Launch Readiness registry as proof.
-            Signatures and external approval tickets are not stored or observable by this page.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-launch-acceptance">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-acceptance-packet"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Acceptance Packet"
+        description="Read-only owner-signoff preparation built from the current Launch Certificate evidence. It preserves blocked, review-required and ready evidence states without pretending that an owner signed, an external ticket exists or production launch has been approved."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 218 — Commercial Launch Acceptance Packet'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Owner-signoff preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External acceptance records required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-launch-acceptance__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.packets_ready_for_acceptance ?? 0}/${summary.packets_total ?? 0}` : '—'}
+              label="packets ready for manual owner review"
+            />
+            {data ? (
+              <span className="platform-launch-acceptance__status-badge" data-tone={badgeTone(data.posture)}>
+                {displayStatus(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-launch-acceptance__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void packet.refetch()}
+                disabled={packet.isFetching}
+              >
+                {packet.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-launch-acceptance__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-acceptance-packet"
+          title="Acceptance boundary"
+          description="The packet prepares the evidence an accountable owner must review, then stops before the external signature or go/no-go decision."
+        />
+        <div className="platform-launch-acceptance__boundary-grid">
+          <div className="platform-launch-acceptance__boundary-notice">
+            <strong>Owner-signoff preparation only.</strong>
+            <span>
+              A packet marked ready means its current technical evidence is ready for an owner to review and sign externally. It does not mean an owner has signed, a go/no-go decision exists, a customer accepted launch, or production launch has been approved.
+            </span>
+          </div>
+          <div className="platform-launch-acceptance__supporting-pages">
+            <strong>Supporting readiness pages</strong>
+            <span>This page requires the combined read permissions for the underlying evidence surfaces, so every shortcut below is within the page&apos;s existing access boundary.</span>
+            <div className="platform-launch-acceptance__link-row">
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-certificate">Launch certificate</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-readiness">Launch readiness</Link>
+              <Link className="app-button app-button--secondary" to="/platform/tenant-provisioning-hardening">Provisioning</Link>
+              <Link className="app-button app-button--secondary" to="/platform/customer-onboarding-checklist">Onboarding</Link>
+              <Link className="app-button app-button--secondary" to="/platform/billing-subscription-activation">Billing activation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/support-cockpit">Support cockpit</Link>
+              <Link className="app-button app-button--secondary" to="/platform/monitoring-readiness">Monitoring</Link>
+              <Link className="app-button app-button--secondary" to="/platform/backup-restore-validation">Backup restore</Link>
+              <Link className="app-button app-button--secondary" to="/platform/deployment-validation">Deployment validation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/documentation-completeness">Documentation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/pilot-customer-readiness">Pilot readiness</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
+            </div>
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {packet.isLoading ? <section className="app-panel app-panel--padded">Loading Commercial Launch Acceptance Packet…</section> : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-launch-acceptance__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Acceptance Packet.</strong>
+          <span>{requestError}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--danger platform-launch-acceptance__retry"
             onClick={() => void packet.refetch()}
             disabled={packet.isFetching}
           >
-            {packet.isFetching ? 'Refreshing...' : 'Refresh'}
+            {packet.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.warningCard}>
-        <strong>Owner-signoff preparation only.</strong>
-        <span>
-          A packet marked ready means its current technical evidence is ready for an owner to review and sign externally.
-          It does not mean an owner has signed, a go/no-go decision exists, or production launch has been approved.
-        </span>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting readiness pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-certificate">Launch certificate</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-readiness">Launch readiness registry</Link>
-          <Link style={styles.quickLink} to="/platform/tenant-provisioning-hardening">Provisioning</Link>
-          <Link style={styles.quickLink} to="/platform/customer-onboarding-checklist">Onboarding</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/monitoring-readiness">Monitoring</Link>
-          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
-          <Link style={styles.quickLink} to="/platform/deployment-validation">Deployment validation</Link>
-          <Link style={styles.quickLink} to="/platform/documentation-completeness">Documentation</Link>
-          <Link style={styles.quickLink} to="/platform/pilot-customer-readiness">Pilot readiness</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-        </div>
-      </section>
-
-      {packet.isLoading ? <div style={styles.card}>Loading commercial launch acceptance packet...</div> : null}
-      {packet.error ? (
-        <div style={styles.error}>
-          <div><strong>Failed to load commercial launch acceptance packet.</strong></div>
-          <div style={styles.errorDetail}>{errorMessage(packet.error)}</div>
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-launch-acceptance__feedback platform-launch-acceptance__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Acceptance Packet snapshot. {requestError}</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-launch-acceptance__retry"
             onClick={() => void packet.refetch()}
             disabled={packet.isFetching}
           >
-            {packet.isFetching ? 'Retrying...' : 'Retry'}
+            {packet.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
+          <OperationalWorkspaceStats ariaLabel="Commercial launch acceptance summary">
+            {summaryItems.map((item) => (
+              <OperationalWorkspaceStatCard
+                key={item.key}
+                label={item.label}
+                value={summary[item.key] ?? 0}
+                helper={item.helper}
+                tone={item.tone}
+              />
+            ))}
+          </OperationalWorkspaceStats>
+
+          <section className="app-panel app-panel--padded platform-launch-acceptance__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-acceptance-packet"
+              title="Current certificate context"
+              description="Snapshot identity, tenant evidence scope, certificate posture and signoff persistence boundary inherited from the current Launch Certificate."
+            />
+            <div className="platform-launch-acceptance__context-grid">
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{new Date(data.generated_at).toLocaleString()}</span></div>
-              <div><strong>Validation</strong><span>{data.validation_note}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Certificate posture</strong><span>{displayStatus(data.certificate_posture)}</span></div>
+              <div><strong>Launch readiness registry</strong><span>{displayStatus(data.launch_readiness_posture)}</span></div>
+              <div><strong>Tenant population</strong><span>{data.tenant_scope?.total_tenants ?? 'Unavailable'}</span></div>
+              <div><strong>Tenant review cap</strong><span>{data.tenant_scope?.review_limit ?? 'Not available'}</span></div>
+              <div><strong>Signoff storage</strong><span>{data.acceptance_persistence.stored_in_application ? 'Stored in application' : 'External only'}</span></div>
             </div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
-            ))}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Certificate context</h2>
-            <div style={styles.inputGrid}>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Current Launch Certificate posture</span>
-                <strong>{humanize(data.certificate_posture)}</strong>
-              </div>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Static Launch Readiness registry posture</span>
-                <strong>{humanize(data.launch_readiness_posture)}</strong>
-                <span style={styles.help}>Context only — current certificate evidence controls signoff readiness.</span>
-              </div>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Tenant evidence population</span>
-                <strong>
-                  {data.tenant_scope?.total_tenants == null ? 'Unavailable' : `${data.tenant_scope.total_tenants} tenants`}
-                </strong>
-                <span style={styles.help}>Tenant-scoped certificate sources review up to {data.tenant_scope?.review_limit ?? 300} tenants per board.</span>
-              </div>
-              <div style={styles.inputCard}>
-                <span style={styles.help}>Signoff persistence</span>
-                <strong>{data.acceptance_persistence.stored_in_application ? 'Stored in application' : 'External only'}</strong>
-                <span style={styles.help}>{data.acceptance_persistence.interpretation}</span>
-              </div>
+            <div className="platform-launch-acceptance__persistence-note">
+              <strong>Signatures and external approval tickets are not stored or observable</strong>
+              <span>{data.acceptance_persistence.interpretation}</span>
             </div>
-            {data.certificate_registry_note ? <p style={styles.contextNote}>{data.certificate_registry_note}</p> : null}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Owner acceptance packets</h2>
-            <div style={styles.packetGrid}>
-              {data.acceptance_packets.map((item) => (
-                <article key={item.code} style={styles.packetCard}>
-                  <div style={styles.packetHeader}>
-                    <div style={styles.wrapAnywhere}>
-                      <strong>{humanize(item.source_control)}</strong>
-                      <div style={styles.help}>{humanize(item.domain)} · owner: {humanize(item.acceptance_owner)}</div>
-                    </div>
-                    <span style={badgeStyle(item.packet_status)}>{humanize(item.packet_status)}</span>
+            {data.certificate_registry_note ? (
+              <div className="platform-launch-acceptance__registry-note">
+                <strong>Static registry gate is context only</strong>
+                <span>{data.certificate_registry_note}</span>
+              </div>
+            ) : null}
+            {data.certificate_validation_note ? (
+              <details className="platform-launch-acceptance__details">
+                <summary>Launch Certificate validation note</summary>
+                <p>{data.certificate_validation_note}</p>
+              </details>
+            ) : null}
+            <details className="platform-launch-acceptance__details">
+              <summary>Detailed acceptance counters</summary>
+              <div className="platform-launch-acceptance__summary-grid">
+                {detailedSummary.map(([key, value]) => (
+                  <div key={key}>
+                    <span>{displaySummaryKey(key)}</span>
+                    <strong>{value}</strong>
                   </div>
+                ))}
+              </div>
+            </details>
+          </section>
 
-                  <div style={styles.statusGrid}>
-                    <div style={styles.inputCard}>
-                      <span style={styles.help}>Current certificate evidence</span>
-                      <span style={badgeStyle(item.evidence_status)}>{humanize(item.evidence_status)}</span>
-                    </div>
-                    <div style={styles.inputCard}>
-                      <span style={styles.help}>Current upstream posture</span>
-                      <strong style={styles.wrapAnywhere}>{humanize(item.source_posture)}</strong>
-                    </div>
-                    <div style={styles.inputCard}>
-                      <span style={styles.help}>Evidence scope</span>
-                      <strong>{item.evidence_scope ? humanize(item.evidence_scope.status) : 'Not scope-limited'}</strong>
-                      {item.evidence_scope ? (
-                        <span style={styles.help}>
-                          Evaluated {item.evidence_scope.evaluated_tenants}
-                          {item.evidence_scope.total_tenants == null ? '' : ` of ${item.evidence_scope.total_tenants}`} tenants
+          <section className="platform-launch-acceptance__packets-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-acceptance-packet"
+              title="Owner acceptance packets"
+              description="Each packet shows the current certificate evidence, upstream source posture and scope, source evidence summary, required external acceptance statement and fields."
+            />
+            {data.acceptance_packets.length === 0 ? (
+              <section className="app-panel app-panel--padded platform-launch-acceptance__empty-state">
+                <strong>No acceptance packets are available.</strong>
+                <span>Return to Launch Certificate and verify that the certificate controls were generated before requesting owner signoff.</span>
+              </section>
+            ) : (
+              <div className="platform-launch-acceptance__packet-grid">
+                {data.acceptance_packets.map((item) => {
+                  const sourceSummary = Object.entries(item.source_summary || {});
+                  return (
+                    <article key={item.code} className="app-panel platform-launch-acceptance__packet-card">
+                      <div className="platform-launch-acceptance__packet-heading">
+                        <div>
+                          <h3>{humanize(item.source_control)}</h3>
+                          <span>{humanize(item.domain)} · owner: {humanize(item.acceptance_owner)}</span>
+                        </div>
+                        <span className="platform-launch-acceptance__status-badge" data-tone={badgeTone(item.packet_status)}>
+                          {displayStatus(item.packet_status)}
                         </span>
+                      </div>
+
+                      <div className="platform-launch-acceptance__packet-meta-grid">
+                        <div>
+                          <span>Current certificate evidence</span>
+                          <strong data-tone={badgeTone(item.evidence_status)}>{displayStatus(item.evidence_status)}</strong>
+                        </div>
+                        <div>
+                          <span>Current upstream posture</span>
+                          <strong data-tone={badgeTone(item.source_posture)}>{displayStatus(item.source_posture)}</strong>
+                        </div>
+                        <div>
+                          <span>Source availability</span>
+                          <strong data-tone={item.source_available ? 'good' : 'danger'}>{item.source_available ? 'Available' : 'Unavailable'}</strong>
+                        </div>
+                        <div>
+                          <span>Static registry gate</span>
+                          <strong data-tone="neutral">{displayStatus(item.launch_gate)} · Context only</strong>
+                        </div>
+                      </div>
+
+                      {item.evidence_scope ? (
+                        <div className="platform-launch-acceptance__scope-box">
+                          <div>
+                            <span>Evidence scope</span>
+                            <strong data-tone={badgeTone(item.evidence_scope.status)}>{displayStatus(item.evidence_scope.status)}</strong>
+                          </div>
+                          <span>
+                            Evaluated {item.evidence_scope.evaluated_tenants}
+                            {item.evidence_scope.total_tenants !== null ? ` of ${item.evidence_scope.total_tenants}` : ''}
+                            {item.evidence_scope.review_limit ? ` · cap ${item.evidence_scope.review_limit}` : ''}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="platform-launch-acceptance__scope-box">
+                          <div><span>Evidence scope</span><strong data-tone="neutral">Not scope-limited</strong></div>
+                        </div>
+                      )}
+
+                      {item.source_error_code ? (
+                        <div className="platform-launch-acceptance__source-warning" role="status">
+                          <strong>Evidence source error</strong>
+                          <span>{humanize(item.source_error_code)}</span>
+                        </div>
                       ) : null}
-                    </div>
-                    <div style={styles.inputCard}>
-                      <span style={styles.help}>Static registry gate</span>
-                      <span style={neutralBadgeStyle()}>{humanize(item.launch_gate)}</span>
-                      <span style={styles.help}>Context only</span>
-                    </div>
-                  </div>
 
-                  {item.source_error_code ? (
-                    <div style={styles.sourceError}>Evidence source error: {item.source_error_code}</div>
-                  ) : null}
-                  {item.source_validation_note ? (
-                    <div style={styles.sourceNote}>{item.source_validation_note}</div>
-                  ) : null}
+                      {sourceSummary.length > 0 ? (
+                        <details className="platform-launch-acceptance__details platform-launch-acceptance__details--packet">
+                          <summary>Current source evidence summary</summary>
+                          <div className="platform-launch-acceptance__source-summary-grid">
+                            {sourceSummary.map(([key, value]) => (
+                              <div key={key}>
+                                <span>{humanize(key)}</span>
+                                <strong>{formatEvidenceValue(value)}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Required evidence endpoint</span>
-                    <strong style={styles.wrapAnywhere}>{item.required_evidence}</strong>
-                    {item.acceptance_rule ? <p style={styles.reason}>{item.acceptance_rule}</p> : null}
-                  </div>
-                  <Link style={styles.packetLink} to={getPacketReviewLink(item)}>{getPacketReviewLabel(item)}</Link>
+                      {item.source_validation_note ? (
+                        <details className="platform-launch-acceptance__details platform-launch-acceptance__details--packet">
+                          <summary>Source validation note</summary>
+                          <p>{item.source_validation_note}</p>
+                        </details>
+                      ) : null}
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>External acceptance artifact</span>
-                    <strong>{item.acceptance_artifact}</strong>
-                    <p style={styles.reason}>{item.required_statement}</p>
-                    <span style={styles.help}>Storage: {humanize(item.acceptance_artifact_storage)}</span>
-                  </div>
+                      <div className="platform-launch-acceptance__evidence-path">
+                        <span>Required evidence endpoint</span>
+                        <code>{item.required_evidence}</code>
+                        {item.acceptance_rule ? <p>{item.acceptance_rule}</p> : null}
+                      </div>
 
-                  <div>
-                    <span style={styles.evidenceLabel}>Required acceptance fields</span>
-                    <div style={styles.chips}>
-                      {item.required_acceptance_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}
-                    </div>
-                  </div>
-                </article>
-              ))}
+                      <div className="platform-launch-acceptance__packet-actions">
+                        <Link className="app-button app-button--secondary" to={getPacketReviewLink(item)}>
+                          {getPacketReviewLabel(item)}
+                        </Link>
+                      </div>
+
+                      <div className="platform-launch-acceptance__artifact-box">
+                        <span>External acceptance artifact</span>
+                        <strong>{item.acceptance_artifact}</strong>
+                        <p>{item.required_statement}</p>
+                        <small>Storage: {displayStatus(item.acceptance_artifact_storage)}</small>
+                      </div>
+
+                      <div className="platform-launch-acceptance__fields-box">
+                        <span>Required acceptance fields</span>
+                        <div className="platform-launch-acceptance__chips">
+                          {item.required_acceptance_fields.map((field) => (
+                            <span key={field} className="platform-launch-acceptance__chip">{humanize(field)}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="platform-launch-acceptance__decision-grid">
+            <div className="app-panel app-panel--padded platform-launch-acceptance__decision-panel">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-acceptance-packet"
+                title="Required packet controls"
+                description="Rules that must remain true before these packets can support the final manual launch decision."
+              />
+              <ul className="platform-launch-acceptance__list">
+                {data.required_packet_controls.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <div className="app-panel app-panel--padded platform-launch-acceptance__decision-panel">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-acceptance-packet"
+                title="Launch limitations carried forward"
+                description="Limitations inherited from Launch Certificate that owner signoff must explicitly understand rather than silently erase."
+              />
+              <ul className="platform-launch-acceptance__list">
+                {data.launch_limitations.map((item) => <li key={item}>{item}</li>)}
+              </ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Required packet controls</h2>
-              <ul style={styles.list}>{data.required_packet_controls.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Launch limitations carried forward</h2>
-              <ul style={styles.list}>{data.launch_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
+          <section className="app-panel app-panel--padded platform-launch-acceptance__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <details className="app-panel app-panel--padded platform-launch-acceptance__details platform-launch-acceptance__details--validation">
+            <summary>Acceptance packet validation note</summary>
+            <p>{data.validation_note}</p>
+          </details>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0 , color: '#0f172a' },
-  header: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  warningCard: { display: 'grid', gap: 6, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
-  inputCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'grid', gap: 6, minWidth: 0 },
-  packetGrid: { display: 'grid', gap: 14 },
-  packetCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12, minWidth: 0 },
-  packetHeader: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
-  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0 0' },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
-  evidenceBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, minWidth: 0 },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize' },
-  chips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, textTransform: 'capitalize' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 },
-  list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e' },
-  contextNote: { margin: '12px 0 0', color: '#475569', lineHeight: 1.5 },
-  sourceError: { background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, padding: 10, overflowWrap: 'anywhere' },
-  sourceNote: { background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 10, padding: 10, lineHeight: 1.45, overflowWrap: 'anywhere' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  errorButton: { marginTop: 10, border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  packetLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12 },
-  errorDetail: { marginTop: 6, fontSize: 13, overflowWrap: 'anywhere' },
-  wrapAnywhere: { overflowWrap: 'anywhere', minWidth: 0 }
-};
