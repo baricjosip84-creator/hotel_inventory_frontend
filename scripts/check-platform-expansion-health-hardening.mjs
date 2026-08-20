@@ -3,35 +3,46 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchExpansionHealthObservationPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchExpansionHealthObservationPage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  'Expansion-health preparation only.',
-  'External confirmation boundary.',
-  'does not observe external rollout-expansion authorization',
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalSectionHeader',
+  'Expansion-health preparation only',
+  'External confirmation boundary',
+  'does not observe or persist the real rollout-expansion authorization',
   'Rollout-authorization persistence',
   'Expansion-health persistence',
   'Manual precondition',
+  'Source observation',
+  'Source triage',
+  'Source closure',
+  'Source prevention',
+  'Source rollout authorization',
+  'Customer impact review',
+  'Template default recommendation',
+  'Template default only; not an observed health or growth decision.',
   'Source authorization artifact',
   'External observation artifact',
-  'Allowed recommendations',
+  'Allowed next-expansion recommendations',
   'Required external observation fields',
-  'rollout_expansion_authorization_persistence',
-  'expansion_health_persistence',
-  'source_authorization_artifact',
-  'observation_artifact',
-  'manual_precondition',
+  'No expansion-health observation rows were produced.',
+  'This is not evidence that rollout expansion did not occur',
+  'initialLoadError',
+  'refreshError',
+  'Showing the last successful Commercial Launch Expansion Health Observation snapshot.',
+  'Retry refresh',
+  'refetchOnWindowFocus: false',
+  'staleTime: 30_000',
+  "permission: PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ",
+  'hasPlatformPermission(link.permission)',
   '/platform/customer-success-admin',
   '/platform/tenant-communications',
   '/platform/support-cockpit',
-  '/platform/commercial-launch-additional-growth-authorization',
-  'refetchOnWindowFocus: false',
-  'staleTime: 30_000',
-  'errorMessage(observation.error)',
-  "normalized.includes('external')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  '/platform/commercial-launch-additional-growth-authorization'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -41,8 +52,10 @@ for (const anchor of requiredPageAnchors) {
 }
 
 for (const staleAnchor of [
-  "/platform/customer-success'",
-  '/platform/support-operations-cockpit',
+  'style={styles.',
+  'const styles:',
+  '<a key=',
+  'Failed to load commercial launch expansion health observation board:',
   'tenant_sample_health_reviews_recorded',
   'support_volume_reviews_recorded',
   'customer_success_feedback_reviews_recorded',
@@ -53,6 +66,18 @@ for (const staleAnchor of [
 ]) {
   if (page.includes(staleAnchor)) {
     throw new Error(`Platform Expansion Health check failed: stale page anchor remains: ${staleAnchor}`);
+  }
+}
+
+for (const anchor of [
+  '.platform-expansion-health',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)',
+  '@media'
+]) {
+  if (!css.includes(anchor)) {
+    throw new Error(`Platform Expansion Health check failed: missing CSS anchor: ${anchor}`);
   }
 }
 

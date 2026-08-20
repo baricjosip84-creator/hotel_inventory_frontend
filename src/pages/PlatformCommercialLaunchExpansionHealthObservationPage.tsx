@@ -1,6 +1,17 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import { hasPlatformPermission, PLATFORM_PERMISSIONS, type PlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchExpansionHealthObservationPage.css';
 
 type PersistenceBoundary = {
   stored_in_application: boolean;
@@ -13,6 +24,8 @@ type ObservationRow = {
   source_expansion_code: string;
   source_prevention_code: string;
   source_closure_code: string;
+  source_triage_code: string;
+  source_observation_code: string;
   domain: string;
   owner: string;
   source_authorization_status: string;
@@ -52,97 +65,155 @@ type ExpansionHealthObservation = {
   validation_note: string;
 };
 
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
 type PageLink = {
   label: string;
-  href: string;
+  to: string;
+  permission?: PlatformPermission;
 };
 
-const SOURCE_POSTURE_LINKS = [
-  { label: 'Rollout expansion authorization', key: 'rollout_expansion_authorization_posture', href: '/platform/commercial-launch-rollout-expansion-authorization' },
-  { label: 'Prevention verification', key: 'prevention_verification_posture', href: '/platform/commercial-launch-prevention-verification' },
-  { label: 'Incident closure', key: 'incident_closure_posture', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Incident triage', key: 'incident_triage_posture', href: '/platform/commercial-launch-incident-triage' },
-  { label: 'Post-launch observation', key: 'post_launch_observation_posture', href: '/platform/commercial-launch-post-launch-observation' },
-  { label: 'Command center', key: 'command_center_posture', href: '/platform/commercial-launch-day-command-center' },
-  { label: 'Smoke test', key: 'smoke_test_posture', href: '/platform/commercial-launch-smoke-test-checklist' },
-  { label: 'Go/no-go register', key: 'go_no_go_register_posture', href: '/platform/commercial-launch-go-no-go-register' }
+const summaryLabels: Record<string, string> = {
+  observation_rows_total: 'Observation rows',
+  waiting_for_post_launch_evidence_review: 'Post-launch review',
+  waiting_for_external_go_no_go_confirmation: 'Awaiting Go/No-Go',
+  waiting_for_external_smoke_test_confirmation: 'Awaiting smoke test',
+  waiting_for_external_launch_window_confirmation: 'Awaiting launch window',
+  waiting_for_external_post_launch_observation_confirmation: 'Awaiting observation',
+  waiting_for_external_triage_confirmation: 'Awaiting triage confirmation',
+  waiting_for_external_incident_closure_confirmation: 'Awaiting closure confirmation',
+  waiting_for_external_prevention_verification_confirmation: 'Awaiting prevention confirmation',
+  waiting_for_external_rollout_expansion_authorization_confirmation: 'Awaiting rollout authorization',
+  blocked_until_rollout_expansion_authorization_ready: 'Blocked rows',
+  observation_records_persisted_in_application: 'Observation records stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  observation_rows_total: 'Expanded-cohort observation templates prepared by this read-only board',
+  waiting_for_post_launch_evidence_review: 'Rows held until upstream post-launch evidence review is resolved',
+  waiting_for_external_go_no_go_confirmation: 'Rows waiting for independently confirmed Go/No-Go decisions',
+  waiting_for_external_smoke_test_confirmation: 'Rows waiting for independently confirmed smoke-test results',
+  waiting_for_external_launch_window_confirmation: 'Rows waiting for the real launch window and production launch to be confirmed',
+  waiting_for_external_post_launch_observation_confirmation: 'Rows waiting for an external post-launch observation record',
+  waiting_for_external_triage_confirmation: 'Rows waiting for the externally recorded incident-triage record',
+  waiting_for_external_incident_closure_confirmation: 'Rows waiting for the externally recorded incident-closure record',
+  waiting_for_external_prevention_verification_confirmation: 'Rows waiting for the externally recorded prevention-verification record',
+  waiting_for_external_rollout_expansion_authorization_confirmation: 'Rows waiting for the externally recorded rollout-expansion authorization',
+  blocked_until_rollout_expansion_authorization_ready: 'Rows that cannot proceed with the current Rollout Expansion posture',
+  observation_records_persisted_in_application: 'Expected to remain zero because this endpoint stores no expansion-health outcomes'
+};
+
+const sourcePostures = [
+  { label: 'Rollout expansion authorization', key: 'rollout_expansion_authorization_posture', to: '/platform/commercial-launch-rollout-expansion-authorization' },
+  { label: 'Prevention verification', key: 'prevention_verification_posture', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident closure', key: 'incident_closure_posture', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', key: 'incident_triage_posture', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', key: 'post_launch_observation_posture', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Launch command center', key: 'command_center_posture', to: '/platform/commercial-launch-day-command-center' },
+  { label: 'Launch smoke test', key: 'smoke_test_posture', to: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Launch Go/No-Go', key: 'go_no_go_register_posture', to: '/platform/commercial-launch-go-no-go-register' }
 ] as const;
 
-const SUPPORTING_LINKS: PageLink[] = [
-  { label: 'Rollout Expansion', href: '/platform/commercial-launch-rollout-expansion-authorization' },
-  { label: 'Prevention Verification', href: '/platform/commercial-launch-prevention-verification' },
-  { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Additional Growth Authorization', href: '/platform/commercial-launch-additional-growth-authorization' }
+const supportingLinks: PageLink[] = [
+  { label: 'Rollout expansion', to: '/platform/commercial-launch-rollout-expansion-authorization' },
+  { label: 'Prevention verification', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Additional growth authorization', to: '/platform/commercial-launch-additional-growth-authorization' }
 ];
 
-const DOMAIN_EVIDENCE_LINKS: Record<string, PageLink[]> = {
+const domainEvidenceLinks: Record<string, PageLink[]> = {
   service_health: [
-    { label: 'System Health', href: '/platform/system-health' },
-    { label: 'Monitoring Readiness', href: '/platform/production-monitoring-readiness' }
+    { label: 'System health', to: '/platform/system-health' },
+    { label: 'Monitoring readiness', to: '/platform/production-monitoring-readiness' }
   ],
   customer_feedback: [
-    { label: 'Customer Success', href: '/platform/customer-success-admin' },
-    { label: 'Communications', href: '/platform/tenant-communications' }
+    { label: 'Customer success', to: '/platform/customer-success-admin' },
+    { label: 'Tenant communications', to: '/platform/tenant-communications' }
   ],
   support_intake: [
-    { label: 'Support Cockpit', href: '/platform/support-cockpit' },
-    { label: 'Tenant SLA', href: '/platform/tenant-sla' }
+    { label: 'Support cockpit', to: '/platform/support-cockpit' },
+    { label: 'Tenant SLA', to: '/platform/tenant-sla' }
   ],
   billing_confirmation: [
-    { label: 'Billing', href: '/platform/billing' },
-    { label: 'Billing Activation', href: '/platform/billing-subscription-activation' },
-    { label: 'License Enforcement', href: '/platform/license-plan-enforcement' }
+    { label: 'Billing', to: '/platform/billing' },
+    { label: 'Billing activation', to: '/platform/billing-subscription-activation' },
+    { label: 'License enforcement', to: '/platform/license-plan-enforcement' }
   ],
   incident_review: [
-    { label: 'Incidents', href: '/platform/incidents' },
-    { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' }
+    { label: 'Incidents', to: '/platform/incidents' },
+    { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' }
   ],
   rollback_readiness: [
-    { label: 'Runbooks', href: '/platform/runbooks' },
-    { label: 'Launch Command Center', href: '/platform/commercial-launch-day-command-center' }
+    { label: 'Runbooks', to: '/platform/runbooks' },
+    { label: 'Launch command center', to: '/platform/commercial-launch-day-command-center' }
   ],
   adoption_signal: [
-    { label: 'Tenant Health', href: '/platform/tenant-health' },
-    { label: 'Customer Success', href: '/platform/customer-success-admin' }
+    { label: 'Tenant health', to: '/platform/tenant-health' },
+    { label: 'Customer success', to: '/platform/customer-success-admin' }
   ],
   handoff_closure: [
-    { label: 'Operational Jobs', href: '/platform/operational-jobs' },
-    { label: 'Additional Growth Authorization', href: '/platform/commercial-launch-additional-growth-authorization' }
+    { label: 'Operational jobs', to: '/platform/operational-jobs', permission: PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ },
+    { label: 'Additional growth authorization', to: '/platform/commercial-launch-additional-growth-authorization' }
   ]
 };
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unknown error';
-}
-
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized === 'unknown' || normalized === 'not generated yet') {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('rollback') || normalized.includes('hold')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'not_reviewed' || normalized === 'not reviewed') return 'neutral';
+  if (normalized.includes('blocked') || normalized.includes('rollback') || normalized.includes('fail')) return 'danger';
   if (
     normalized.includes('waiting')
-    || normalized.includes('manual')
     || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('review')
     || normalized.includes('watch')
-    || normalized.includes('not_reviewed')
+    || normalized.includes('required')
     || normalized.includes('preparation')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+    || normalized.includes('hold')
+  ) return 'warn';
+  if (
+    normalized.includes('accepted')
+    || normalized.includes('approved')
+    || normalized.includes('ready')
+    || normalized.includes('healthy')
+    || normalized.includes('clear')
+    || normalized.includes('continue')
+  ) return 'good';
+  return 'accent';
 }
 
-function linkRow(links: PageLink[]) {
-  return <div style={styles.linkRow}>{links.map((link) => <a key={link.href} href={link.href} style={styles.linkButton}>{link.label}</a>)}</div>;
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown API error';
+}
+
+function persistenceLabel(value: PersistenceBoundary | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence observable';
+}
+
+function visibleLinks(links: PageLink[]) {
+  return links.filter((link) => !link.permission || hasPlatformPermission(link.permission));
+}
+
+function evidenceLinksForDomain(domain: string) {
+  return visibleLinks(domainEvidenceLinks[domain] || [
+    { label: 'Rollout expansion', to: '/platform/commercial-launch-rollout-expansion-authorization' }
+  ]);
 }
 
 export default function PlatformCommercialLaunchExpansionHealthObservationPage() {
@@ -154,208 +225,272 @@ export default function PlatformCommercialLaunchExpansionHealthObservationPage()
   });
 
   const data = observation.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summaryEntries = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = observation.isError && !data;
+  const refreshError = observation.isError && Boolean(data);
+  const requestError = readableError(observation.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Expansion Health Observation</h1>
-          <p style={styles.description}>
-            <strong>Expansion-health preparation only.</strong> Step 227 converts Rollout Expansion rows into external expanded-cohort
-            health-observation evidence requirements. This application does not observe external rollout-expansion authorization or
-            expansion-health outcomes, so a generated row is not proof that expansion occurred, the cohort is healthy, or additional
-            growth is safe.
-          </p>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
-          <button type="button" style={styles.button} onClick={() => observation.refetch()} disabled={observation.isFetching}>
-            {observation.isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
+    <div className="io-operational-page io-workspace-page platform-expansion-health">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-expansion-health-observation"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Expansion Health Observation"
+        description="Read-only preparation for expanded-cohort health observation after Rollout Expansion Authorization. It organizes the complete source lineage, cohort-health evidence, support/customer-success review, billing/entitlement review, incident and rollback evidence, adoption signals and next-growth recommendation without claiming that rollout expansion occurred or that an external observation record exists."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 227 — Commercial Launch Expansion Health Observation Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Expansion-health preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External observation record required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-expansion-health__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? data.summary.observation_rows_total ?? data.observation_rows.length : '—'}
+              label="expansion health rows"
+            />
+            {data ? (
+              <span className="platform-expansion-health__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-expansion-health__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void observation.refetch()}
+                disabled={observation.isFetching}
+              >
+                {observation.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-expansion-health__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-expansion-health-observation"
+          title="External confirmation boundary"
+          description="This board prepares an expanded-cohort observation record; it does not observe or persist the real rollout-expansion authorization or the real expansion-health result."
+        />
+        <div className="platform-expansion-health__boundary-grid">
+          <div className="platform-expansion-health__boundary-notice">
+            <strong>Expansion-health preparation only.</strong>
+            <span>
+              Before expanded-cohort health observation can be accepted, independently confirm the external Rollout Expansion authorization record for the relevant domain. Actual cohort health, support/customer-success, billing/entitlement, incident, rollback, adoption and next-expansion evidence must be recorded outside this application.
+            </span>
+          </div>
+          <div className="platform-expansion-health__supporting-pages">
+            <strong>Supporting expansion-health pages</strong>
+            <span>Shortcuts are shown only when the current operator can open the destination. In particular, Operational Jobs remains hidden without its additional jobs-read permission.</span>
+            <div className="platform-expansion-health__link-row">
+              {visibleLinks(supportingLinks).map((link) => (
+                <Link key={link.to} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section style={styles.boundary}>
-        <strong>External confirmation boundary.</strong> Before expanded-cohort health observation can be recorded, independently confirm
-        the external Rollout Expansion authorization record for the relevant domain. The actual cohort health, support/customer-success,
-        billing/entitlement, incident, rollback, adoption, and next-expansion evidence must also be recorded outside this application.
-      </section>
+      {observation.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading Commercial Launch Expansion Health Observation…</section>
+      ) : null}
 
-      {observation.isLoading ? <div style={styles.card}>Loading commercial launch expansion health observation board...</div> : null}
-      {observation.error ? (
-        <div style={styles.error}>
-          <span>Failed to load commercial launch expansion health observation board: {errorMessage(observation.error)}</span>
-          <button type="button" style={styles.errorButton} onClick={() => observation.refetch()} disabled={observation.isFetching}>
-            {observation.isFetching ? 'Retrying...' : 'Retry'}
+      {initialLoadError ? (
+        <section className="app-error-state platform-expansion-health__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Expansion Health Observation.</strong>
+          <span>{requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-expansion-health__retry"
+            onClick={() => void observation.refetch()}
+            disabled={observation.isFetching}
+          >
+            {observation.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-expansion-health__feedback platform-expansion-health__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Expansion Health Observation snapshot. {requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-expansion-health__retry"
+            onClick={() => void observation.refetch()}
+            disabled={observation.isFetching}
+          >
+            {observation.isFetching ? 'Retrying…' : 'Retry refresh'}
+          </button>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaGrid}>
-            <div style={styles.metaCard}><span style={styles.help}>Snapshot generated</span><strong>{new Date(data.generated_at).toLocaleString()}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Rollout-authorization persistence</span><strong>{data.rollout_expansion_authorization_persistence?.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Expansion-health persistence</span><strong>{data.expansion_health_persistence.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Persistence boundary</h2>
-            <div style={styles.persistenceGrid}>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Rollout Expansion Authorization</span>
-                <span>{data.rollout_expansion_authorization_persistence?.interpretation || 'Rollout Expansion persistence details unavailable.'}</span>
-              </div>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Expansion Health Observation</span>
-                <span>{data.expansion_health_persistence.interpretation}</span>
-              </div>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Supporting pages</h2>
-            {linkRow(SUPPORTING_LINKS)}
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Expansion health observation summary">
+            {summaryEntries.map(([key, value]) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                iconPath="/platform/commercial-launch-expansion-health-observation"
+                label={summaryLabels[key] || humanize(key)}
+                value={value}
+                helper={summaryHelpers[key] || 'Current read-only expanded-cohort observation preparation snapshot'}
+                tone={key.includes('blocked') && value > 0 ? 'danger' : key.includes('waiting') && value > 0 ? 'warn' : key.includes('persisted') ? 'neutral' : 'default'}
+              />
             ))}
-          </section>
+          </OperationalWorkspaceStats>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
-            <div style={styles.inputGrid}>
-              {SOURCE_POSTURE_LINKS.map((source) => (
-                <a key={source.key} href={source.href} style={styles.inputCardLink}>
-                  <span style={styles.help}>{source.label}</span>
-                  <strong>{humanize(String(data[source.key]))}</strong>
-                  <span style={styles.openHint}>Open source board →</span>
-                </a>
+          <section className="app-panel app-panel--padded platform-expansion-health__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+              title="Source launch posture"
+              description="Current upstream launch postures and persistence boundaries supplied by the rollout-expansion evidence chain."
+            />
+            <div className="platform-expansion-health__source-grid">
+              {sourcePostures.map((source) => (
+                <div key={source.key}>
+                  <strong>{source.label}</strong>
+                  <span>{humanize(data[source.key])}</span>
+                  <Link to={source.to}>Open source board</Link>
+                </div>
               ))}
             </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Observation rows</h2>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Domain / owner</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Manual precondition</th>
-                    <th style={styles.th}>Evidence artifacts</th>
-                    <th style={styles.th}>Recommendation contract</th>
-                    <th style={styles.th}>Requirements</th>
-                    <th style={styles.th}>Evidence pages</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.observation_rows.map((row) => (
-                    <tr key={row.code}>
-                      <td style={styles.td}>
-                        <strong>{humanize(row.domain)}</strong>
-                        <span style={styles.subtle}>{row.owner}</span>
-                        <span style={styles.codeText}>{row.code}</span>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={badgeStyle(row.observation_status)}>{humanize(row.observation_status)}</span>
-                        <span style={styles.subtle}>Source authorization: {humanize(row.source_authorization_status)}</span>
-                      </td>
-                      <td style={styles.td}>{row.manual_precondition}</td>
-                      <td style={styles.td}>
-                        <strong>Source authorization artifact</strong>
-                        <span>{row.source_authorization_artifact}</span>
-                        <span style={styles.subtle}>{humanize(row.source_authorization_artifact_storage)}</span>
-                        <strong style={styles.artifactGap}>External observation artifact</strong>
-                        <span>{row.observation_artifact}</span>
-                        <span style={styles.subtle}>{humanize(row.observation_artifact_storage)}</span>
-                      </td>
-                      <td style={styles.td}>
-                        <strong>Allowed recommendations</strong>
-                        <span>{row.accepted_next_expansion_recommendations.map(humanize).join(', ')}</span>
-                        <strong style={styles.artifactGap}>Template default</strong>
-                        <span>{humanize(row.default_next_expansion_recommendation)}</span>
-                        <strong style={styles.artifactGap}>Required external observation fields</strong>
-                        <span>{row.required_observation_fields.join(', ')}</span>
-                      </td>
-                      <td style={styles.td}><ul style={styles.list}>{row.observation_requirements.map((item) => <li key={item}>{item}</li>)}</ul></td>
-                      <td style={styles.td}>{linkRow(DOMAIN_EVIDENCE_LINKS[row.domain] || [{ label: 'Rollout Expansion', href: '/platform/commercial-launch-rollout-expansion-authorization' }])}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="platform-expansion-health__persistence-grid">
+              <div>
+                <strong>Rollout-authorization persistence</strong>
+                <span>{persistenceLabel(data.rollout_expansion_authorization_persistence)}</span>
+                <small>{data.rollout_expansion_authorization_persistence?.interpretation || 'Rollout Expansion persistence details are not available in this snapshot.'}</small>
+              </div>
+              <div>
+                <strong>Expansion-health persistence</strong>
+                <span>{persistenceLabel(data.expansion_health_persistence)}</span>
+                <small>{data.expansion_health_persistence.interpretation}</small>
+              </div>
             </div>
           </section>
 
-          <section style={styles.twoCol}>
-            <article style={styles.card}>
-              <h2 style={styles.sectionTitle}>Rules</h2>
-              <ul style={styles.list}>{data.observation_rules.map((rule) => <li key={rule}>{rule}</li>)}</ul>
-            </article>
-            <article style={styles.card}>
-              <h2 style={styles.sectionTitle}>Limitations</h2>
-              <ul style={styles.list}>{data.observation_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </article>
+          <section className="app-panel app-panel--padded platform-expansion-health__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-expansion-health-observation"
+              title="Expansion health observation rows"
+              description="External observation templates derived from Rollout Expansion Authorization. Each row preserves its observation → triage → closure → prevention → rollout → expansion-health lineage and remains read-only in this application."
+            />
+
+            {data.observation_rows.length === 0 ? (
+              <div className="platform-expansion-health__empty-state">
+                <strong>No expansion-health observation rows were produced.</strong>
+                <span>This is not evidence that rollout expansion did not occur, that the expanded cohort is healthy, or that additional growth is safe; it only means the current read-only source board returned no rows.</span>
+              </div>
+            ) : (
+              <div className="platform-expansion-health__row-grid">
+                {data.observation_rows.map((row) => (
+                  <article key={row.code} className="app-panel platform-expansion-health__row-card">
+                    <div className="platform-expansion-health__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-expansion-health__status-badge" data-tone={badgeTone(row.observation_status)}>
+                        {humanize(row.observation_status)}
+                      </span>
+                    </div>
+
+                    <div className="platform-expansion-health__source-summary">
+                      <div><span>Source observation</span><strong>{humanize(row.source_observation_code)}</strong><small>Upstream post-launch observation reference.</small></div>
+                      <div><span>Source triage</span><strong>{humanize(row.source_triage_code)}</strong><small>Upstream incident-triage reference.</small></div>
+                      <div><span>Source closure</span><strong>{humanize(row.source_closure_code)}</strong><small>Upstream incident-closure reference.</small></div>
+                      <div><span>Source prevention</span><strong>{humanize(row.source_prevention_code)}</strong><small>Upstream prevention-verification reference.</small></div>
+                      <div><span>Source rollout authorization</span><strong>{humanize(row.source_expansion_code)}</strong><small>External rollout-expansion authorization template reference.</small></div>
+                      <div><span>Source authorization status</span><strong>{humanize(row.source_authorization_status)}</strong></div>
+                      <div><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                      <div><span>Template default recommendation</span><strong>{humanize(row.default_next_expansion_recommendation)}</strong><small>Template default only; not an observed health or growth decision.</small></div>
+                    </div>
+
+                    <div className="platform-expansion-health__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-expansion-health__row-actions">
+                      {evidenceLinksForDomain(row.domain).map((link) => (
+                        <Link key={`${row.code}-${link.to}`} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+                      ))}
+                    </div>
+
+                    <div className="platform-expansion-health__artifact-grid">
+                      <div>
+                        <strong>Source authorization artifact</strong>
+                        <span>{row.source_authorization_artifact}</span>
+                        <small>{humanize(row.source_authorization_artifact_storage)}</small>
+                      </div>
+                      <div>
+                        <strong>External observation artifact</strong>
+                        <span>{row.observation_artifact}</span>
+                        <small>{humanize(row.observation_artifact_storage)}</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-expansion-health__evidence-box">
+                      <strong>Expansion-health observation requirements</strong>
+                      <ul>{row.observation_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+
+                    <div className="platform-expansion-health__field-groups">
+                      <div>
+                        <strong>Allowed next-expansion recommendations</strong>
+                        <div className="platform-expansion-health__chips">
+                          {row.accepted_next_expansion_recommendations.map((item) => (
+                            <span key={item} data-tone={badgeTone(item)}>{humanize(item)}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Required external observation fields</strong>
+                        <div className="platform-expansion-health__chips">
+                          {row.required_observation_fields.map((field) => <span key={field}>{humanize(field)}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Next best step</h2>
-            <p style={styles.description}>{data.next_best_step}</p>
-            <p style={styles.note}>{data.validation_note}</p>
+          <section className="platform-expansion-health__rules-grid">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-expansion-health-observation"
+                title="Observation rules"
+                description="Guardrails that determine when an external expanded-cohort observation record may be prepared and accepted."
+              />
+              <ul>{data.observation_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-expansion-health-observation"
+                title="Observation limitations"
+                description="Claims and actions this read-only expansion-health board deliberately does not make."
+              />
+              <ul>{data.observation_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+          </section>
+
+          <section className="app-panel app-panel--padded platform-expansion-health__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
+          </section>
+
+          <section className="app-panel app-panel--padded platform-expansion-health__snapshot-note">
+            <strong>Snapshot metadata</strong>
+            <span>{data.phase} · {data.step}</span>
+            <span>Generated: {formatDateTime(data.generated_at)}</span>
+            <small>{data.validation_note}</small>
           </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
-  eyebrow: { margin: 0, color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.75rem' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', lineHeight: 1.6, overflowWrap: 'anywhere', maxWidth: 1000 },
-  headerMeta: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: '220px' },
-  button: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  generated: { color: '#64748b', fontSize: '0.85rem' },
-  badge: { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  boundary: { padding: '1rem 1.15rem', borderRadius: 14, border: '1px solid #fde68a', background: '#fffbeb', color: '#78350f', lineHeight: 1.55 },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metaCard: { display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#fff', boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0, overflowWrap: 'anywhere' },
-  persistenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
-  evidenceBox: { display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: 14, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#334155', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  evidenceLabel: { fontWeight: 700, color: '#0f172a' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { padding: 16, background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricLabel: { color: '#64748b', fontSize: '0.78rem', overflowWrap: 'anywhere' },
-  metricValue: { color: '#0f172a', fontSize: 30, lineHeight: 1.1, fontWeight: 800 },
-  card: { padding: 18, background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { margin: '0 0 12px', color: '#0f172a', fontSize: 18, letterSpacing: '-.015em' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 },
-  inputCardLink: { display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, color: '#0f172a', textDecoration: 'none', background: '#f8fafc', overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: '0.8rem' },
-  openHint: { color: 'var(--io-primary-dark)', fontSize: '0.75rem', fontWeight: 700 },
-  linkRow: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem' },
-  linkButton: { display: 'inline-flex', borderRadius: '999px', border: '1px solid #cbd5e1', background: '#fff', padding: '0.3rem 0.6rem', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 },
-  tableWrap: { overflowX: 'auto', maxWidth: '100%' },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1480px' },
-  th: { textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.8rem' },
-  td: { verticalAlign: 'top', padding: '0.75rem', borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: '0.85rem', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  subtle: { display: 'block', marginTop: '0.35rem', color: '#64748b', fontSize: '0.78rem' },
-  codeText: { display: 'block', marginTop: '0.35rem', color: '#64748b', fontFamily: 'monospace', fontSize: '0.72rem', overflowWrap: 'anywhere' },
-  artifactGap: { display: 'block', marginTop: '0.7rem' },
-  list: { margin: 0, paddingLeft: '1.2rem', color: '#334155', lineHeight: 1.6 },
-  twoCol: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' },
-  note: { margin: '0.75rem 0 0', color: '#64748b', fontSize: '0.9rem', overflowWrap: 'anywhere' },
-  error: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '1rem', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, overflowWrap: 'anywhere' },
-  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 9, padding: '0.4rem 0.7rem', fontWeight: 700, cursor: 'pointer' }
-};
