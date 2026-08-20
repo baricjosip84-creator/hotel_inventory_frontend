@@ -1,7 +1,17 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformDeploymentValidationPage.css';
 
 type DeploymentControl = {
   code: string;
@@ -27,40 +37,80 @@ type DeploymentValidationPackage = {
   validation_note: string;
 };
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+type SupportLink = {
+  label: string;
+  to: string;
+  allowed: boolean;
+};
+
+const summaryLabels: Record<string, string> = {
+  controls_total: 'Controls reviewed',
+  controls_with_evidence: 'Evidence present',
+  deployment_blockers: 'Deployment blockers',
+  review_required: 'Review required',
+  frontend_ci_evidence_required: 'Frontend CI evidence',
+  runtime_gate_artifact_review_required: 'Runtime artifact review'
+};
+
+const statusLabels: Record<string, string> = {
+  deployment_validation_blocked: 'Deployment validation blocked',
+  deployment_precheck_ready_for_external_evidence: 'Precheck ready for external evidence',
+  deployment_validation_ready: 'Deployment validation ready',
+  evidence_present: 'Evidence present',
+  deployment_evidence_missing: 'Deployment evidence missing',
+  runtime_configuration_missing: 'Runtime configuration missing',
+  runtime_deployment_identity_missing: 'Runtime deployment identity missing',
+  frontend_ci_evidence_required: 'Frontend CI evidence required',
+  runtime_gate_artifact_review_required: 'Runtime gate artifact review required',
+  runtime_environment_review_required: 'Runtime environment review required',
+  runtime_configuration_review_required: 'Runtime configuration review required'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading') {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('unsafe')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
+function displayStatus(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  return statusLabels[value] || humanize(value);
+}
+
+function displaySummaryKey(value: string) {
+  return summaryLabels[value] || humanize(value);
+}
+
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('unsafe')) return 'danger';
   if (
     normalized.includes('review')
     || normalized.includes('required')
     || normalized.includes('external')
     || normalized.includes('waived')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('safe')) {
-    return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  }
-  return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
+  ) return 'warn';
+  if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('safe')) return 'good';
+  if (normalized.includes('not_available')) return 'neutral';
+  return 'accent';
 }
 
 function formatValue(value: string | number | boolean | null | undefined) {
-  if (value === null || value === undefined || value === '') return 'not available on this surface';
-  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (value === null || value === undefined || value === '') return 'Not available on this surface';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString();
   }
   return String(value);
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
 }
 
 function readableError(error: unknown) {
@@ -77,189 +127,321 @@ export default function PlatformDeploymentValidationPage() {
   });
 
   const data = validation.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summary = data?.summary || {};
+  const detailSummary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const platformEvidence = useMemo(() => Object.entries(data?.platform_evidence || {}), [data?.platform_evidence]);
+  const refreshError = validation.isError && Boolean(data);
+  const initialLoadError = validation.isError && !data;
+  const errorMessage = readableError(validation.error);
+
+  const supportingPages: SupportLink[] = [
+    {
+      label: 'Monitoring readiness',
+      to: '/platform/production-monitoring-readiness',
+      allowed: [
+        PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+        PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+        PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
+      ].every((permission) => hasPlatformPermission(permission))
+    },
+    {
+      label: 'Backup restore',
+      to: '/platform/backup-restore-validation',
+      allowed: [
+        PLATFORM_PERMISSIONS.TENANTS_READ,
+        PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+        PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ
+      ].every((permission) => hasPlatformPermission(permission))
+    },
+    {
+      label: 'Releases',
+      to: '/platform/releases',
+      allowed: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RELEASES_READ)
+    },
+    {
+      label: 'Change management',
+      to: '/platform/change-management',
+      allowed: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_READ)
+    },
+    {
+      label: 'Deployment runbooks',
+      to: '/platform/runbooks?category=deployment',
+      allowed: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+    },
+    {
+      label: 'System health',
+      to: '/platform/system-health',
+      allowed: hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+    }
+  ];
+  const accessibleSupportingPages = supportingPages.filter((item) => item.allowed);
+  const hiddenSupportingPageCount = supportingPages.length - accessibleSupportingPages.length;
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Deployment Validation</h1>
-          <p style={styles.description}>
-            Operator precheck only. This page reviews backend deployment foundations and the running backend configuration,
-            then points operators to the frontend-owned automatic Deployment Readiness Gate for live Render/Vercel evidence.
-            It does not deploy services or certify a production release by itself.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-deployment-validation">
+      <OperationalWorkspaceHero
+        iconPath="/platform/deployment-validation"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Deployment Validation"
+        description="Read-only technical deployment precheck for checked-in backend foundations, current runtime configuration, and the handoff to the frontend-owned automatic Deployment Readiness Gate. This page does not deploy services or certify a production release by itself."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 214 — Deployment Validation Gate'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Operator precheck only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Live gate evidence stays external</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-deployment-validation__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.controls_with_evidence ?? 0}/${summary.controls_total ?? 0}` : '—'}
+              label="controls with evidence on this surface"
+            />
+            {data ? (
+              <span className="platform-deployment-validation__status-badge" data-tone={badgeTone(data.posture)}>
+                {displayStatus(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-deployment-validation__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void validation.refetch()}
+                disabled={validation.isFetching}
+              >
+                {validation.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <OperationalWorkspaceStats ariaLabel="Deployment validation key metrics">
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/deployment-validation"
+          label="Controls reviewed"
+          value={summary.controls_total ?? 0}
+          helper="Static, runtime, frontend-repository and external-evidence controls"
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/deployment-validation"
+          label="Evidence present"
+          value={summary.controls_with_evidence ?? 0}
+          helper="Controls proven directly by this surface"
+          tone="good"
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/system-health"
+          label="Deployment blockers"
+          value={summary.deployment_blockers ?? 0}
+          helper="Missing foundations or unsafe production runtime configuration"
+          tone={(summary.deployment_blockers ?? 0) > 0 ? 'danger' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/deployment-validation"
+          label="Review required"
+          value={summary.review_required ?? 0}
+          helper="Non-blocking runtime or external evidence still needs operator review"
+          tone={(summary.review_required ?? 0) > 0 ? 'warn' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/deployment-validation"
+          label="Frontend CI evidence"
+          value={summary.frontend_ci_evidence_required ?? 0}
+          helper="Frontend source evidence must be confirmed by the frontend CI repository"
+          tone={(summary.frontend_ci_evidence_required ?? 0) > 0 ? 'warn' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+        <OperationalWorkspaceStatCard
+          iconPath="/platform/deployment-validation"
+          label="Artifact review"
+          value={summary.runtime_gate_artifact_review_required ?? 0}
+          helper="Retained Deployment Readiness Gate artifact still needs external review"
+          tone={(summary.runtime_gate_artifact_review_required ?? 0) > 0 ? 'warn' : 'default'}
+          loading={!data && validation.isLoading}
+        />
+      </OperationalWorkspaceStats>
+
+      <section className="app-panel app-panel--padded platform-deployment-validation__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/deployment-validation"
+          title="Validation boundary"
+          description="The application can prove backend source/runtime foundations, but live post-release evidence remains owned by the frontend GitHub Actions Deployment Readiness Gate."
+        />
+        <div className="platform-deployment-validation__boundary-grid">
+          <div className="platform-deployment-validation__external-notice">
+            <strong>Live evidence is external.</strong>
+            <span>
+              This application does not query or persist the Deployment Readiness Gate HTML/JSON artifact. An amber external-evidence state therefore means operator review is still required; it does not prove the deployment failed.
+            </span>
+          </div>
+          <div className="platform-deployment-validation__supporting-pages">
+            <strong>Supporting pages</strong>
+            <div className="platform-deployment-validation__link-row">
+              {accessibleSupportingPages.map((item) => (
+                <Link key={item.to} className="app-button app-button--secondary" to={item.to}>{item.label}</Link>
+              ))}
+            </div>
+            {hiddenSupportingPageCount > 0 ? (
+              <span className="platform-deployment-validation__permission-note">
+                {hiddenSupportingPageCount} supporting {hiddenSupportingPageCount === 1 ? 'page is' : 'pages are'} hidden because your platform role does not include the required read permission.
+              </span>
+            ) : null}
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {validation.isLoading && !data ? (
+        <section className="app-panel app-panel--padded platform-deployment-validation__feedback">
+          <strong>Loading deployment validation…</strong>
+          <span>Reviewing backend source controls, runtime posture and deployment-readiness handoff evidence.</span>
+        </section>
+      ) : null}
+
+      {initialLoadError ? (
+        <section className="app-panel app-panel--padded platform-deployment-validation__feedback platform-deployment-validation__feedback--error">
+          <strong>Unable to load deployment validation.</strong>
+          <span>{errorMessage}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--secondary platform-deployment-validation__retry"
             onClick={() => void validation.refetch()}
             disabled={validation.isFetching}
           >
-            {validation.isFetching ? 'Refreshing...' : 'Refresh'}
+            {validation.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.notice}>
-        <strong>Live evidence is external.</strong> The canonical post-release gate runs from the frontend GitHub Actions workflow.
-        This application does not query or persist that HTML/JSON artifact, so an amber external-evidence state is not the same as a failed deployment.
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/production-monitoring-readiness">Monitoring readiness</Link>
-          <Link style={styles.quickLink} to="/platform/backup-restore-validation">Backup restore</Link>
-          <Link style={styles.quickLink} to="/platform/releases">Releases</Link>
-          <Link style={styles.quickLink} to="/platform/change-management">Change management</Link>
-          <Link style={styles.quickLink} to="/platform/runbooks?category=deployment">Deployment runbooks</Link>
-          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
-        </div>
-      </section>
-
-      {validation.isLoading ? <div style={styles.card}>Loading deployment validation...</div> : null}
-      {validation.error ? (
-        <div style={styles.error}>
-          <span>Unable to load deployment validation: {readableError(validation.error)}</span>
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-deployment-validation__feedback platform-deployment-validation__feedback--warning">
+          <strong>Latest refresh failed.</strong>
+          <span>Showing the last successful deployment-validation snapshot. Refresh error: {errorMessage}</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-deployment-validation__retry"
             onClick={() => void validation.refetch()}
             disabled={validation.isFetching}
           >
-            {validation.isFetching ? 'Retrying...' : 'Retry'}
+            {validation.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
+          <section className="app-panel app-panel--padded platform-deployment-validation__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/deployment-validation"
+              title="Validation program"
+              description="Snapshot identity, summary detail and the precise boundary of what this read-only technical precheck can prove."
+            />
+            <div className="platform-deployment-validation__program-grid">
               <div><strong>Phase</strong><span>{data.phase}</span></div>
               <div><strong>Step</strong><span>{data.step}</span></div>
-              <div><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div><strong>Validation boundary</strong><span>{data.validation_note}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Current posture</strong><span>{displayStatus(data.posture)}</span></div>
             </div>
+            <details className="platform-deployment-validation__validation-note">
+              <summary>Read exact validation boundary</summary>
+              <p>{data.validation_note}</p>
+            </details>
           </section>
 
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
-            ))}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Platform evidence</h2>
-            <p style={styles.helpText}>
-              Runtime evidence exposes status/counts only. Configured CORS origins, tokens, secrets, and external artifact contents are not returned.
-            </p>
-            <div style={styles.evidenceGrid}>
-              {Object.entries(data.platform_evidence).map(([key, value]) => (
-                <div key={key} style={styles.evidenceItem}>
-                  <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                  <strong style={styles.wrap}>{formatValue(value)}</strong>
+          <section className="app-panel app-panel--padded platform-deployment-validation__summary-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/deployment-validation"
+              title="Detailed summary"
+              description="Complete counters returned by the validation service, including blocking and external-review requirements."
+            />
+            <div className="platform-deployment-validation__summary-grid">
+              {detailSummary.map(([key, value]) => (
+                <div key={key} className="platform-deployment-validation__summary-item">
+                  <span>{displaySummaryKey(key)}</span>
+                  <strong>{value}</strong>
                 </div>
               ))}
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Deployment validation controls</h2>
-            <div style={styles.controlGrid}>
+          <section className="app-panel app-panel--padded platform-deployment-validation__evidence-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/system-health"
+              title="Platform evidence"
+              description="Status and counts only. Configured CORS origins, tokens, secrets and external artifact contents are deliberately not returned."
+            />
+            <div className="platform-deployment-validation__evidence-grid">
+              {platformEvidence.map(([key, value]) => (
+                <div key={key} className="platform-deployment-validation__evidence-item">
+                  <span>{humanize(key)}</span>
+                  <strong>{formatValue(value)}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="app-panel app-panel--padded platform-deployment-validation__controls-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/deployment-validation"
+              title="Deployment validation controls"
+              description="Each control shows the evidence source, current evidence value and operator-facing launch reason without mutating deployment state."
+            />
+            <div className="platform-deployment-validation__control-grid">
               {data.deployment_validation_controls.map((control) => (
-                <article key={control.code} style={styles.controlCard}>
-                  <div style={styles.controlHeader}>
-                    <strong style={styles.wrap}>{control.label}</strong>
-                    <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
+                <article key={control.code} className="app-panel platform-deployment-validation__control-card">
+                  <div className="platform-deployment-validation__control-heading">
+                    <div>
+                      <h3>{control.label}</h3>
+                      <code>{control.code}</code>
+                    </div>
+                    <span className="platform-deployment-validation__status-badge" data-tone={badgeTone(control.status)}>
+                      {displayStatus(control.status)}
+                    </span>
                   </div>
-                  <p style={styles.reason}>{control.launch_reason}</p>
-                  <div style={styles.controlMeta}>
-                    <span>Scope: {humanize(control.evidence_scope)}</span>
-                    <span>Evidence: {humanize(control.evidence_key)} · value {control.evidence_value}</span>
+                  <p>{control.launch_reason}</p>
+                  <div className="platform-deployment-validation__control-meta">
+                    <div><span>Evidence scope</span><strong>{humanize(control.evidence_scope)}</strong></div>
+                    <div><span>Evidence key</span><code>{control.evidence_key}</code></div>
+                    <div><span>Evidence value</span><strong>{control.evidence_value}</strong></div>
                   </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Automatic runtime gate coverage</h2>
-              <p style={styles.helpText}>
-                These are the repeatable checks already owned by the current frontend Deployment Readiness Gate.
-              </p>
-              <ul style={styles.list}>
-                {data.automatic_runtime_gate_coverage.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
+          <div className="platform-deployment-validation__two-column">
+            <section className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/deployment-validation"
+                title="Automatic runtime gate coverage"
+                description="Repeatable checks already owned by the frontend Deployment Readiness Gate."
+              />
+              <ul className="platform-deployment-validation__list">
+                {data.automatic_runtime_gate_coverage.map((item) => <li key={item}>{item}</li>)}
               </ul>
-            </div>
+            </section>
 
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Operator follow-up</h2>
-              <p style={styles.helpText}>
-                The automatic workflow is the normal release path. Manual execution is a fallback, not an unconditional requirement.
-              </p>
-              <ul style={styles.list}>
-                {data.operator_follow_up.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
+            <section className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/deployment-validation"
+                title="Operator follow-up"
+                description="The automatic workflow is the normal release path. Manual execution is a fallback, not an unconditional requirement."
+              />
+              <ul className="platform-deployment-validation__list">
+                {data.operator_follow_up.map((item) => <li key={item}>{item}</li>)}
               </ul>
-            </div>
+            </section>
+          </div>
+
+          <section className="app-panel app-panel--padded platform-deployment-validation__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
-
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 980, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8, minWidth: 0 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'nowrap' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  notice: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', lineHeight: 1.5 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  evidenceItem: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'grid', gap: 4, minWidth: 0 },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  controlMeta: { color: '#64748b', fontSize: 12, display: 'grid', gap: 4, overflowWrap: 'anywhere' },
-  reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
-  helpText: { color: '#64748b', fontSize: 13, lineHeight: 1.5, margin: '0 0 12px' },
-  list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', overflowWrap: 'anywhere' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
-  error: { background: '#fee2e2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' },
-  errorButton: { border: '1px solid #991b1b', background: '#fff', color: '#991b1b', borderRadius: 8, padding: '6px 10px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '4px 8px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700, fontSize: 12 },
-  wrap: { overflowWrap: 'anywhere', minWidth: 0 }
-};
