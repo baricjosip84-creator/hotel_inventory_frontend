@@ -480,10 +480,23 @@ export default function PlatformLayout() {
                   <span>Exception review</span>
                 </NavLink>
               ) : null}
-              <NavLink to="/platform/commercial-launch-steady-state-exception-closure" style={getPlatformLinkStyle}>
-              <TenantNavIcon path="/platform/commercial-launch-steady-state-exception-closure" />
-              <span>Exception closure</span>
-            </NavLink>
+              {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ)
+                && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
+                <NavLink to="/platform/commercial-launch-steady-state-exception-closure" style={getPlatformLinkStyle}>
+                  <TenantNavIcon path="/platform/commercial-launch-steady-state-exception-closure" />
+                  <span>Exception closure</span>
+                </NavLink>
+              ) : null}
               <NavLink to="/platform/commercial-launch-steady-state-recurrence-audit" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-steady-state-recurrence-audit" />
               <span>Recurrence audit</span>
