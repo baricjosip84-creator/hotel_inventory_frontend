@@ -1,8 +1,17 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformPilotCustomerReadinessPage.css';
 
 type PilotControl = {
   code: string;
@@ -47,69 +56,118 @@ type PilotCustomerReadinessPackage = {
 };
 
 type Tenant = { id: string; name: string };
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
 
 const allowedLimits = new Set(['25', '50', '100', '300']);
-const evidenceKeys = [
-  'tenant_status',
-  'tenant_status_launchable',
-  'pilot_selection_evidence',
-  'pilot_owner_evidence',
-  'success_criteria_evidence',
-  'data_policy_evidence',
-  'feedback_log_evidence',
-  'onboarding_evidence_count',
-  'support_handover_evidence',
-  'monitoring_review_evidence',
-  'open_blocker_count',
-  'blocked_pilot_tasks',
-  'blocked_onboarding_tasks',
-  'blocked_support_tasks',
-  'open_incidents',
-  'latest_pilot_activity_at'
-];
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+const primarySummaryItems = [
+  { key: 'tenants_total', label: 'Tenants reviewed' },
+  { key: 'pilot_ready_for_manual_launch_review', label: 'Ready for manual review' },
+  { key: 'pilot_readiness_incomplete', label: 'Readiness incomplete' },
+  { key: 'pilot_launch_blocked', label: 'Launch blocked' },
+  { key: 'tenants_with_open_blockers', label: 'Tenants with blockers' },
+  { key: 'controls_requiring_manual_confirmation', label: 'Manual confirmations' }
+] as const;
+
+const evidenceItems = [
+  { key: 'tenant_status', label: 'Lifecycle status' },
+  { key: 'tenant_status_launchable', label: 'Lifecycle launchable' },
+  { key: 'pilot_selection_evidence', label: 'Pilot selection refs' },
+  { key: 'pilot_owner_evidence', label: 'Pilot owner refs' },
+  { key: 'success_criteria_evidence', label: 'Success criteria refs' },
+  { key: 'data_policy_evidence', label: 'Data policy refs' },
+  { key: 'feedback_log_evidence', label: 'Feedback log refs' },
+  { key: 'onboarding_evidence_count', label: 'Onboarding evidence' },
+  { key: 'support_handover_evidence', label: 'Support handover refs' },
+  { key: 'monitoring_review_evidence', label: 'Monitoring review refs' },
+  { key: 'open_blocker_count', label: 'Open blockers' },
+  { key: 'blocked_pilot_tasks', label: 'Blocked pilot tasks' },
+  { key: 'blocked_onboarding_tasks', label: 'Blocked onboarding tasks' },
+  { key: 'blocked_support_tasks', label: 'Blocked support tasks' },
+  { key: 'open_incidents', label: 'Open incidents' },
+  { key: 'latest_pilot_activity_at', label: 'Latest pilot activity' }
+] as const;
+
+const summaryLabels: Record<string, string> = {
+  tenants_total: 'Tenants reviewed',
+  pilot_ready_for_manual_launch_review: 'Ready for manual launch review',
+  pilot_readiness_incomplete: 'Pilot readiness incomplete',
+  pilot_launch_blocked: 'Pilot launch blocked',
+  tenant_status_not_launchable: 'Lifecycle not launchable',
+  tenants_with_pilot_selection: 'Pilot selection references',
+  tenants_with_pilot_owner: 'Pilot owner references',
+  tenants_with_success_criteria: 'Success criteria references',
+  tenants_with_data_policy: 'Data policy references',
+  tenants_with_feedback_log: 'Feedback log references',
+  tenants_with_support_handover: 'Support handover references',
+  tenants_with_monitoring_review: 'Monitoring review references',
+  tenants_with_open_blockers: 'Tenants with open blockers',
+  total_controls: 'Controls reviewed',
+  controls_with_evidence: 'Controls with evidence',
+  controls_requiring_manual_confirmation: 'Manual confirmations required'
+};
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function readableError(error: unknown) {
-  return error instanceof Error ? error.message : 'Unknown error';
+function displaySummaryKey(value: string) {
+  return summaryLabels[value] || humanize(value);
 }
 
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized.includes('no_tenants') || normalized.includes('not generated')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('not_launchable')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (normalized.includes('incomplete') || normalized.includes('manual') || normalized.includes('review') || normalized.includes('confirmation')) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('not_launchable')) return 'danger';
+  if (normalized.includes('incomplete') || normalized.includes('manual') || normalized.includes('review') || normalized.includes('confirmation')) return 'warn';
+  if (normalized.includes('no_tenants')) return 'neutral';
+  if (normalized.includes('ready') || normalized.includes('present') || normalized.includes('launchable')) return 'good';
+  return 'accent';
 }
 
 function formatEvidenceValue(value: string | number | boolean | null | undefined) {
-  if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (value === null || value === undefined || value === '') return 'none';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleString();
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  }
   return String(value);
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? `${value.slice(0, 8)}…` : value;
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'The platform request failed.';
 }
 
 export default function PlatformPilotCustomerReadinessPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialLimit = searchParams.get('limit') || '100';
-  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
-  const [limit, setLimit] = useState(allowedLimits.has(initialLimit) ? initialLimit : '100');
+  const tenantId = searchParams.get('tenant_id') || '';
+  const requestedLimit = searchParams.get('limit') || '100';
+  const limit = allowedLimits.has(requestedLimit) ? requestedLimit : '100';
 
-  const canOpenSupportCockpit = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
-    && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ)
-    && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
-    && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ);
-  const canOpenMonitoringReadiness = hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
-    && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
-    && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ);
+  const canOpenSupportCockpit = [
+    PLATFORM_PERMISSIONS.TENANTS_READ,
+    PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+    PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+    PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ
+  ].every((permission) => hasPlatformPermission(permission));
+  const canOpenMonitoringReadiness = [
+    PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+    PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+    PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
+  ].every((permission) => hasPlatformPermission(permission));
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-pilot-customer-readiness'],
@@ -129,228 +187,317 @@ export default function PlatformPilotCustomerReadinessPage() {
     staleTime: 30_000
   });
 
-  const updateUrl = (nextTenantId: string, nextLimit: string) => {
+  const data = pilot.data;
+  const summary = data?.summary || {};
+  const detailSummary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const tenantOptions = useMemo(() => tenants.data || [], [tenants.data]);
+  const selectedTenant = useMemo(
+    () => tenantOptions.find((tenant) => tenant.id === tenantId),
+    [tenantId, tenantOptions]
+  );
+  const initialLoadError = pilot.isError && !data;
+  const refreshError = pilot.isError && Boolean(data);
+  const errorMessage = readableError(pilot.error);
+
+  const updateSearchParam = (key: 'tenant_id' | 'limit', value: string) => {
     const next = new URLSearchParams(searchParams);
-    if (nextTenantId) next.set('tenant_id', nextTenantId); else next.delete('tenant_id');
-    if (!nextTenantId && nextLimit !== '100') next.set('limit', nextLimit); else next.delete('limit');
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (key === 'tenant_id' && value) next.delete('limit');
     setSearchParams(next, { replace: true });
   };
 
-  const onTenantChange = (value: string) => {
-    setTenantId(value);
-    updateUrl(value, limit);
-  };
-
-  const onLimitChange = (value: string) => {
-    setLimit(value);
-    updateUrl(tenantId, value);
-  };
-
-  const data = pilot.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
-  const selectedTenantName = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId)?.name, [tenantId, tenants.data]);
-
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Pilot Customer Readiness Board</h1>
-          <p style={styles.description}>
-            Step 216 is a pre-launch operator check for pilot selection, accountable ownership, success criteria,
-            data policy, feedback tracking, onboarding, support handover, monitoring references, and open blockers.
-          </p>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+    <div className="io-operational-page io-workspace-page platform-pilot-readiness">
+      <OperationalWorkspaceHero
+        iconPath="/platform/pilot-customer-readiness"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Pilot Customer Readiness"
+        description="Read-only pre-launch review of pilot selection references, accountable ownership, success criteria, data policy, feedback tracking, onboarding, support handover, monitoring references and open blockers."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 216 — Pilot Customer Readiness Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Operator precheck only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Manual pilot acceptance required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-pilot-readiness__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.pilot_ready_for_manual_launch_review ?? 0}/${summary.tenants_total ?? 0}` : '—'}
+              label="tenants ready for manual launch review"
+            />
+            {data ? (
+              <span className="platform-pilot-readiness__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-pilot-readiness__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void pilot.refetch()}
+                disabled={pilot.isFetching}
+              >
+                {pilot.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-pilot-readiness__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/pilot-customer-readiness"
+          title="Evidence boundary"
+          description="This board deliberately stops at evidence review. It does not create a pilot, certify pilot success or approve expansion."
+        />
+        <div className="platform-pilot-readiness__boundary-copy">
+          <strong>Operator precheck only.</strong>
+          <span>
+            The current platform does not persist a dedicated pilot entity or pilot-acceptance record. Task/note text matches are evidence references and require manual confirmation. A post-pilot expansion decision is deliberately outside this pre-launch board.
+          </span>
         </div>
       </section>
 
-      <section style={styles.notice}>
-        <strong>Operator precheck only.</strong> The current platform does not persist a dedicated pilot entity or pilot-acceptance record.
-        Task/note text matches are evidence references and require manual confirmation. A post-pilot expansion decision is deliberately outside this pre-launch board.
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.filterGrid}>
-          <label style={styles.label}>Tenant filter
-            <select style={styles.input} value={tenantId} onChange={(event) => onTenantChange(event.target.value)}>
+      <section className="app-panel app-panel--padded platform-pilot-readiness__scope-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/tenants"
+          title="Pilot review scope"
+          description="Review one tenant or a recent tenant window. Filters are kept in the page URL so the current scope remains reliable across refresh, back/forward navigation and shared links."
+        />
+        <div className="platform-pilot-readiness__filter-grid">
+          <label className="platform-pilot-readiness__field" htmlFor="pilot-readiness-tenant-filter">
+            <span>Tenant filter</span>
+            <select
+              id="pilot-readiness-tenant-filter"
+              value={tenantId}
+              onChange={(event) => updateSearchParam('tenant_id', event.target.value)}
+            >
               <option value="">All tenants</option>
-              {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+              {tenantId && !selectedTenant ? <option value={tenantId}>Selected tenant ({shortId(tenantId)})</option> : null}
+              {tenantOptions.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
             </select>
           </label>
-          <label style={styles.label}>Tenant limit
-            <select style={styles.input} value={limit} onChange={(event) => onLimitChange(event.target.value)} disabled={Boolean(tenantId)}>
+          <label className="platform-pilot-readiness__field" htmlFor="pilot-readiness-limit">
+            <span>Tenant limit</span>
+            <select
+              id="pilot-readiness-limit"
+              value={limit}
+              onChange={(event) => updateSearchParam('limit', event.target.value)}
+              disabled={Boolean(tenantId)}
+            >
               <option value="25">Latest 25 tenants</option>
               <option value="50">Latest 50 tenants</option>
               <option value="100">Latest 100 tenants</option>
               <option value="300">Latest 300 tenants</option>
             </select>
           </label>
-          <button style={styles.secondaryButton} onClick={() => pilot.refetch()} disabled={pilot.isFetching}>
-            {pilot.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="platform-pilot-readiness__scope-copy">
+            <strong>Current scope</strong>
+            <span>
+              {tenantId
+                ? `Single tenant: ${selectedTenant?.name || shortId(tenantId)}`
+                : `Latest ${limit} tenants by pilot activity or creation date`}
+            </span>
+          </div>
         </div>
-        {tenants.error ? <div style={styles.inlineError}>Unable to load tenant filter: {readableError(tenants.error)}</div> : null}
-        {selectedTenantName
-          ? <span style={styles.help}>Showing pilot readiness evidence for {selectedTenantName}.</span>
-          : <span style={styles.help}>Showing up to {limit} tenants by pilot activity or creation date.</span>}
+        {tenants.isLoading ? <span className="platform-pilot-readiness__help">Loading tenant filter options…</span> : null}
+        {tenants.error ? (
+          <span className="platform-pilot-readiness__filter-warning" role="status">
+            Unable to load tenant filter: {readableError(tenants.error)}. The current URL scope is still being used.
+          </span>
+        ) : null}
       </section>
 
-      {pilot.isLoading ? <div style={styles.card}>Loading pilot customer readiness…</div> : null}
-      {pilot.error ? (
-        <div style={styles.error}>
-          Unable to load pilot customer readiness: {readableError(pilot.error)}
-          <button style={styles.inlineButton} onClick={() => pilot.refetch()} disabled={pilot.isFetching}>Retry</button>
-        </div>
+      {pilot.isLoading ? <section className="app-panel app-panel--padded">Loading pilot customer readiness…</section> : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-pilot-readiness__feedback" role="alert">
+          <strong>Unable to load pilot customer readiness.</strong>
+          <span>{errorMessage}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-pilot-readiness__retry"
+            onClick={() => void pilot.refetch()}
+            disabled={pilot.isFetching}
+          >
+            {pilot.isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-pilot-readiness__feedback platform-pilot-readiness__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful pilot-readiness snapshot. {errorMessage}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-pilot-readiness__retry"
+            onClick={() => void pilot.refetch()}
+            disabled={pilot.isFetching}
+          >
+            {pilot.isFetching ? 'Retrying…' : 'Retry refresh'}
+          </button>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaCard}>
-            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
-            <div><strong>Generated</strong><br /><span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span></div>
-            <div><strong>Evidence model</strong><br /><span style={styles.help}>Manual confirmation required for task/note references.</span></div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Evidence-model limitation</h2>
-            <p style={styles.reason}>{data.evidence_model.explanation}</p>
-            <div style={styles.evidenceGrid}>
-              <div style={styles.evidenceItem}><span style={styles.evidenceLabel}>Dedicated pilot record persisted</span><strong>{formatEvidenceValue(data.evidence_model.dedicated_pilot_record_persisted)}</strong></div>
-              <div style={styles.evidenceItem}><span style={styles.evidenceLabel}>Text reference needs confirmation</span><strong>{formatEvidenceValue(data.evidence_model.text_reference_requires_manual_confirmation)}</strong></div>
-              <div style={styles.evidenceItem}><span style={styles.evidenceLabel}>Pre-launch scope only</span><strong>{formatEvidenceValue(data.evidence_model.prelaunch_scope_only)}</strong></div>
-              <div style={styles.evidenceItem}><span style={styles.evidenceLabel}>Expansion decision evaluated</span><strong>{formatEvidenceValue(data.evidence_model.expansion_decision_evaluated)}</strong></div>
-            </div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Pilot readiness summary">
+            {primarySummaryItems.map((item) => (
+              <OperationalWorkspaceStatCard
+                key={item.key}
+                label={item.label}
+                value={summary[item.key] ?? 0}
+              />
             ))}
+          </OperationalWorkspaceStats>
+
+          <section className="app-panel app-panel--padded platform-pilot-readiness__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/pilot-customer-readiness"
+              title="Program and evidence model"
+              description="Current pre-launch scope and the evidence limitations operators must keep in mind before manual pilot acceptance."
+            />
+            <div className="platform-pilot-readiness__program-grid">
+              <div><strong>Program</strong><span>{data.phase}</span></div>
+              <div><strong>Step</strong><span>{data.step}</span></div>
+              <div><strong>Generated</strong><span>{formatDateTime(data.generated_at)}</span></div>
+              <div><strong>Dedicated pilot record</strong><span>{data.evidence_model.dedicated_pilot_record_persisted ? 'Persisted' : 'Not persisted'}</span></div>
+              <div><strong>Text references</strong><span>{data.evidence_model.text_reference_requires_manual_confirmation ? 'Manual confirmation required' : 'Structured evidence'}</span></div>
+              <div><strong>Scope</strong><span>{data.evidence_model.prelaunch_scope_only ? 'Pre-launch only' : 'Includes post-pilot decision'}</span></div>
+              <div><strong>Expansion decision</strong><span>{data.evidence_model.expansion_decision_evaluated ? 'Evaluated here' : 'Outside this board'}</span></div>
+            </div>
+            <div className="platform-pilot-readiness__evidence-model-copy">
+              <strong>Evidence-model limitation</strong>
+              <span>{data.evidence_model.explanation}</span>
+            </div>
+            <details className="platform-pilot-readiness__summary-details">
+              <summary>Detailed readiness counters</summary>
+              <div className="platform-pilot-readiness__summary-grid">
+                {detailSummary.map(([key, value]) => (
+                  <div key={key}>
+                    <span>{displaySummaryKey(key)}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </details>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Required pilot controls</h2>
-            <div style={styles.controlGrid}>
+          <section className="app-panel app-panel--padded platform-pilot-readiness__controls-section">
+            <OperationalSectionHeader
+              iconPath="/platform/pilot-customer-readiness"
+              title="Required pilot controls"
+              description="Every tenant is evaluated against these same pre-launch controls. Text-reference controls remain manual-confirmation evidence, not automatic acceptance."
+            />
+            <div className="platform-pilot-readiness__control-grid">
               {data.pilot_controls.map((control) => (
-                <article key={control.code} style={styles.controlCard}>
-                  <strong>{control.label}</strong>
-                  <p style={styles.reason}>{control.launch_reason}</p>
-                  <span style={styles.help}>Evidence: {humanize(control.evidence_key)}</span>
+                <article key={control.code} className="app-panel platform-pilot-readiness__control-card">
+                  <div>
+                    <strong>{control.label}</strong>
+                    <code>{control.code}</code>
+                  </div>
+                  <p>{control.launch_reason}</p>
+                  <span>Evidence source: {humanize(control.evidence_key)}</span>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Tenant pilot readiness</h2>
-            {data.tenants.length === 0 ? <div style={styles.empty}>No tenants match the current pilot-readiness filter.</div> : null}
-            <div style={styles.tenantGrid}>
+          <section className="platform-pilot-readiness__tenant-section">
+            <OperationalSectionHeader
+              iconPath="/platform/tenants"
+              title="Tenant pilot readiness"
+              description="Evidence counts, control status, open blockers and the next operator action for each tenant in scope."
+            />
+            {data.tenants.length === 0 ? (
+              <div className="app-empty-state platform-pilot-readiness__empty">No tenants match the current pilot-readiness filter.</div>
+            ) : null}
+            <div className="platform-pilot-readiness__tenant-list">
               {data.tenants.map((tenant) => (
-                <article key={tenant.tenant_id} style={styles.tenantCard}>
-                  <div style={styles.controlHeader}>
-                    <div style={styles.breakable}>
-                      <strong>{tenant.tenant_name}</strong>
-                      <div style={styles.help}>{tenant.tenant_id}</div>
-                      <div style={styles.help}>Lifecycle: {tenant.tenant_status || 'unknown'}</div>
+                <article key={tenant.tenant_id} className="app-panel platform-pilot-readiness__tenant-card">
+                  <div className="platform-pilot-readiness__tenant-header">
+                    <div className="platform-pilot-readiness__tenant-title-wrap">
+                      <h3>{tenant.tenant_name}</h3>
+                      <span>{tenant.tenant_id}</span>
+                      <span>Lifecycle: {tenant.tenant_status || 'unknown'}</span>
                     </div>
-                    <span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span>
+                    <span className="platform-pilot-readiness__status-badge" data-tone={badgeTone(tenant.status)}>
+                      {humanize(tenant.status)}
+                    </span>
                   </div>
 
-                  <div style={styles.evidenceGrid}>
-                    {evidenceKeys.filter((key) => key in tenant.evidence).map((key) => (
-                      <div key={key} style={styles.evidenceItem}>
-                        <span style={styles.evidenceLabel}>{humanize(key)}</span>
-                        <strong style={styles.breakable}>{formatEvidenceValue(tenant.evidence[key])}</strong>
+                  <div className="platform-pilot-readiness__evidence-grid" aria-label={`${tenant.tenant_name} pilot evidence`}>
+                    {evidenceItems.filter((item) => item.key in tenant.evidence).map((item) => (
+                      <div key={item.key} className="platform-pilot-readiness__evidence-item">
+                        <span>{item.label}</span>
+                        <strong>{formatEvidenceValue(tenant.evidence[item.key])}</strong>
                       </div>
                     ))}
                   </div>
 
-                  <div style={styles.controlList}>
+                  <div className="platform-pilot-readiness__tenant-controls">
                     {tenant.controls.map((control) => (
-                      <div key={control.code} style={styles.controlRow}>
-                        <span style={styles.breakable}>{control.label}</span>
-                        <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
+                      <div key={control.code} className="platform-pilot-readiness__tenant-control-row">
+                        <div>
+                          <strong>{control.label}</strong>
+                          <span>Evidence count: {control.evidence_value}</span>
+                        </div>
+                        <span className="platform-pilot-readiness__status-badge" data-tone={badgeTone(control.status)}>
+                          {humanize(control.status)}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  <p style={styles.nextInline}><strong>Next:</strong> {tenant.next_best_step}</p>
-                  <div style={styles.actionRow}>
-                    <Link style={styles.linkButton} to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}`}>Open tenant tasks</Link>
-                    <Link style={styles.linkButton} to={`/platform/tenant-notes?tenant_id=${tenant.tenant_id}&search=pilot`}>Search pilot notes</Link>
-                    <Link style={styles.linkButton} to={`/platform/incidents?tenant_id=${tenant.tenant_id}&scope=tenant&include_resolved=false`}>Open tenant incidents</Link>
-                    <Link style={styles.linkButton} to={`/platform/customer-onboarding-checklist?tenant_id=${tenant.tenant_id}`}>Open onboarding evidence</Link>
-                    {canOpenSupportCockpit ? <Link style={styles.linkButton} to={`/platform/support-cockpit?tenant_id=${tenant.tenant_id}`}>Open support cockpit</Link> : null}
-                    {canOpenMonitoringReadiness ? <Link style={styles.linkButton} to={`/platform/monitoring-readiness?tenant_id=${tenant.tenant_id}`}>Open monitoring readiness</Link> : null}
+                  <div className="platform-pilot-readiness__next-step">
+                    <strong>Next operator step</strong>
+                    <span>{tenant.next_best_step}</span>
+                  </div>
+
+                  <div className="platform-pilot-readiness__actions">
+                    <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}`}>Open tenant tasks</Link>
+                    <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/tenant-notes?tenant_id=${tenant.tenant_id}&search=pilot`}>Search pilot notes</Link>
+                    <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/incidents?tenant_id=${tenant.tenant_id}&scope=tenant&include_resolved=false`}>Open tenant incidents</Link>
+                    <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/customer-onboarding-checklist?tenant_id=${tenant.tenant_id}`}>Open onboarding evidence</Link>
+                    {canOpenSupportCockpit ? <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/support-operations-cockpit?tenant_id=${tenant.tenant_id}`}>Open support cockpit</Link> : null}
+                    {canOpenMonitoringReadiness ? <Link className="app-button app-button--secondary platform-pilot-readiness__link-button" to={`/platform/production-monitoring-readiness?tenant_id=${tenant.tenant_id}`}>Open monitoring readiness</Link> : null}
                   </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Required manual acceptance</h2>
-            <ul style={styles.list}>
-              {data.required_manual_acceptance.map((item) => <li key={item}>{item}</li>)}
-            </ul>
+          <section className="platform-pilot-readiness__two-column">
+            <article className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/pilot-customer-readiness"
+                title="Required manual acceptance"
+                description="These decisions remain human-owned even when supporting evidence is present."
+              />
+              <ul className="platform-pilot-readiness__list">
+                {data.required_manual_acceptance.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <article className="app-panel app-panel--padded platform-pilot-readiness__operator-panel">
+              <OperationalSectionHeader
+                iconPath="/platform/pilot-customer-readiness"
+                title="Operator follow-up"
+                description="The board identifies readiness evidence but does not make the pilot or expansion decision."
+              />
+              <div className="platform-pilot-readiness__next-step platform-pilot-readiness__next-step--primary">
+                <strong>Next best step</strong>
+                <span>{data.next_best_step}</span>
+              </div>
+              <details className="platform-pilot-readiness__validation-note">
+                <summary>Validation boundary</summary>
+                <p>{data.validation_note}</p>
+              </details>
+            </article>
           </section>
-
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 980, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  label: { display: 'grid', gap: 6, color: '#334155', fontSize: 13, fontWeight: 800 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', background: '#fff', minWidth: 0 },
-  generated: { color: '#64748b', fontSize: 12 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', textTransform: 'capitalize', fontSize: 12, marginTop: 4, overflowWrap: 'anywhere' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
-  controlCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0 },
-  tenantGrid: { display: 'grid', gap: 14 },
-  tenantCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12, minWidth: 0 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 },
-  evidenceItem: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, background: '#fff', display: 'grid', gap: 4, minWidth: 0 },
-  evidenceLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  controlList: { display: 'grid', gap: 8 },
-  controlRow: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 8, flexWrap: 'wrap' },
-  reason: { color: '#334155', lineHeight: 1.45, margin: '8px 0', overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  list: { margin: 0, paddingLeft: 22, color: '#334155', lineHeight: 1.7 },
-  nextInline: { margin: 0, color: 'var(--io-primary-deep)', overflowWrap: 'anywhere' },
-  actionRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', overflowWrap: 'anywhere' },
-  note: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14, padding: 14, color: '#92400e', overflowWrap: 'anywhere' },
-  notice: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 14, color: 'var(--io-primary-deep)', lineHeight: 1.55, overflowWrap: 'anywhere' },
-  empty: { background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: 14, color: '#64748b' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  inlineButton: { marginLeft: 10, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 8, padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
-  inlineError: { marginTop: 10, color: '#991b1b', fontSize: 13, overflowWrap: 'anywhere' },
-  breakable: { overflowWrap: 'anywhere', minWidth: 0 }
-};
