@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialReadinessVerificationProgramPage.css';
 
 type VerificationControl = {
   order: number;
@@ -468,7 +476,8 @@ type VerificationProgram = {
 };
 
 function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+  const normalized = value.replaceAll('_', ' ').trim();
+  return normalized ? `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}` : 'Not set';
 }
 
 function capitalizeFirst(value: string) {
@@ -489,20 +498,38 @@ function anchorId(value: string) {
     .replace(/^-+|-+$/g, '');
 }
 
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string | undefined) {
+  if (!value) return 'Not available';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return 'Not available';
   return date.toLocaleString();
 }
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
+type StatusTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+function statusTone(value: string): StatusTone {
+  const normalized = value.toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('missing') || normalized.includes('not_ready') || normalized.includes('failed')) {
+    return 'danger';
   }
-  if (value.includes('required') || value.includes('ready_for_operator')) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
+  if (normalized.includes('certified') && !normalized.includes('uncertified') && !normalized.includes('not_certified')) {
+    return 'good';
   }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+  if (normalized.includes('required') || normalized.includes('ready_for_operator') || normalized.includes('ready_for_execution')) {
+    return 'warn';
+  }
+  if (normalized.includes('present') || normalized.includes('ready')) {
+    return 'accent';
+  }
+  return 'neutral';
+}
+
+function StatusBadge({ value }: { value: string }) {
+  return (
+    <span className="platform-readiness-verification__status-badge" data-tone={statusTone(value)}>
+      {humanize(value)}
+    </span>
+  );
 }
 
 function hasPositiveSummaryFlag(summary: ReadinessGate['summary'], suffix: string) {
@@ -525,64 +552,78 @@ function renderGate(title: string, gate: ReadinessGate) {
   const runnable = isGateReadyForLiveExecution(gate);
 
   return (
-    <details key={id} id={id} style={styles.gateCard}>
-      <summary style={styles.gateSummary}>
-        <div style={styles.gateSummaryInner}>
-          <div style={styles.gateSummaryCopy}>
-            <strong style={styles.gateTitle}>{title}</strong>
-            <span style={styles.help}>{gate.step}</span>
-          </div>
-          <div style={styles.gateSummaryMeta}>
-            <span style={styles.countBadge}>{gate.summary.controls_total} controls</span>
-            <span style={styles.countBadge}>{gate.summary.operator_evidence_required} evidence required</span>
-            <span style={styles.statusText}>Certified: {certified ? 'Yes' : 'No'}</span>
-            <span style={styles.statusText}>Runnable: {runnable ? 'Yes' : 'No'}</span>
-            <span style={badgeStyle(gate.posture)}>{humanize(gate.posture)}</span>
-          </div>
-        </div>
+    <details key={id} id={id} className="app-panel platform-readiness-verification__gate-card">
+      <summary className="platform-readiness-verification__gate-summary">
+        <span className="platform-readiness-verification__gate-summary-copy">
+          <strong className="platform-readiness-verification__gate-title">{title}</strong>
+          <span className="platform-readiness-verification__help">{gate.step}</span>
+        </span>
+        <span className="platform-readiness-verification__gate-summary-meta">
+          <span className="platform-readiness-verification__count-badge">{gate.summary.controls_total} controls</span>
+          <span className="platform-readiness-verification__count-badge">{gate.summary.operator_evidence_required} evidence required</span>
+          <span className="platform-readiness-verification__gate-state" data-tone={certified ? 'good' : 'neutral'}>
+            Certified: {certified ? 'Yes' : 'No'}
+          </span>
+          <span className="platform-readiness-verification__gate-state" data-tone={runnable ? 'warn' : 'neutral'}>
+            Runnable: {runnable ? 'Yes' : 'No'}
+          </span>
+          <StatusBadge value={gate.posture} />
+        </span>
       </summary>
 
-      <div style={styles.gateBody}>
-        <section style={styles.summaryGrid} aria-label={`${title} summary`}>
-          <div style={styles.miniCard}><strong>Controls</strong><div style={styles.metric}>{gate.summary.controls_total}</div></div>
-          <div style={styles.miniCard}><strong>Evidence required</strong><div style={styles.metric}>{gate.summary.operator_evidence_required}</div></div>
-          <div style={styles.miniCard}><strong>Certified</strong><div style={styles.metric}>{certified ? 'Yes' : 'No'}</div></div>
-          <div style={styles.miniCard}><strong>Verification runnable</strong><div style={styles.metric}>{runnable ? 'Yes' : 'No'}</div></div>
-        </section>
-
-        <div style={styles.block}>
-          <strong>Closure rule</strong>
-          <div style={styles.action}>{gate.closure_rule}</div>
+      <div className="platform-readiness-verification__gate-body">
+        <div className="platform-readiness-verification__gate-metrics" aria-label={`${title} summary`}>
+          <div className="platform-readiness-verification__mini-card">
+            <strong>Controls</strong>
+            <span>{gate.summary.controls_total}</span>
+          </div>
+          <div className="platform-readiness-verification__mini-card">
+            <strong>Evidence required</strong>
+            <span>{gate.summary.operator_evidence_required}</span>
+          </div>
+          <div className="platform-readiness-verification__mini-card">
+            <strong>Certified</strong>
+            <span>{certified ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="platform-readiness-verification__mini-card">
+            <strong>Verification runnable</strong>
+            <span>{runnable ? 'Yes' : 'No'}</span>
+          </div>
         </div>
 
-        <div style={styles.block}>
+        <div className="platform-readiness-verification__evidence-block platform-readiness-verification__evidence-block--accent">
+          <strong>Closure rule</strong>
+          <span>{gate.closure_rule}</span>
+        </div>
+
+        <div className="platform-readiness-verification__evidence-block">
           <strong>Execution order</strong>
-          <ol style={styles.list}>
+          <ol className="platform-readiness-verification__list">
             {gate.execution_order.map((item) => <li key={item}>{item}</li>)}
           </ol>
         </div>
 
-        <section style={styles.controlGrid}>
+        <section className="platform-readiness-verification__control-grid">
           {gate.controls.map((control) => (
-            <article key={control.code} style={styles.controlCard}>
-              <div style={styles.controlHeader}>
-                <div style={styles.controlHeadingCopy}>
-                  <h3 style={styles.controlTitle}>{control.order}. {control.label}</h3>
-                  <div style={styles.help}>{humanize(control.automation_level)}</div>
+            <article key={control.code} className="platform-readiness-verification__control-card">
+              <div className="platform-readiness-verification__control-header">
+                <div className="platform-readiness-verification__control-heading-copy">
+                  <h3>{control.order}. {control.label}</h3>
+                  <span className="platform-readiness-verification__help">{humanize(control.automation_level)}</span>
                 </div>
-                <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
+                <StatusBadge value={control.status} />
               </div>
-              <div style={styles.block}>
+              <div className="platform-readiness-verification__evidence-block">
                 <strong>Evidence surface</strong>
-                <div style={styles.surface}>{control.evidence_surface}</div>
+                <span className="platform-readiness-verification__surface">{control.evidence_surface}</span>
               </div>
-              <div style={styles.block}>
+              <div className="platform-readiness-verification__evidence-block">
                 <strong>Required evidence</strong>
-                <div style={styles.action}>{control.required_evidence}</div>
+                <span>{control.required_evidence}</span>
               </div>
-              <div style={styles.block}>
+              <div className="platform-readiness-verification__evidence-block">
                 <strong>Failure mode prevented</strong>
-                <div style={styles.action}>{control.failure_mode}</div>
+                <span>{control.failure_mode}</span>
               </div>
             </article>
           ))}
@@ -621,169 +662,238 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
   const errorMessage = query.error instanceof Error
     ? query.error.message
     : 'The readiness verification program could not be retrieved.';
+  const initialLoadError = query.isError && !data;
+  const refreshError = query.isError && Boolean(data);
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.headerCopy}>
-          <h1 style={styles.title}>Commercial readiness verification program</h1>
-          <p style={styles.subtitle}>
-            Read-only operator checklist for the platform&apos;s commercial-readiness evidence chain. It shows which verification
-            surfaces and evidence requirements exist; it does not mean the runtime/manual checks have passed or that a commercial launch is certified.
-          </p>
-        </div>
-        <div style={styles.headerActions}>
-          {data ? <span style={badgeStyle(data.posture)}>{humanize(data.posture)}</span> : null}
+    <div className="io-operational-page io-workspace-page platform-readiness-verification">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-readiness-verification-program"
+        eyebrow="Platform commercial operations"
+        title="Commercial readiness verification program"
+        description="Read-only operator checklist for the platform's commercial-readiness evidence chain. It shows which verification surfaces and evidence requirements exist; it does not mean the runtime/manual checks have passed or that a commercial launch is certified."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Platform-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Read-only operator checklist</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Runtime/manual evidence required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-readiness-verification__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? gateEntries.length : '—'}
+              label="verification gates in this program"
+            />
+            {data ? <StatusBadge value={data.posture} /> : null}
+            <div className="platform-readiness-verification__refresh-block">
+              <span>Last refreshed: {formatTimestamp(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void query.refetch()}
+                disabled={query.isFetching}
+              >
+                {query.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      {query.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading verification program…</section>
+      ) : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-readiness-verification__feedback" role="alert">
+          <strong>Unable to load verification program.</strong>
+          <span>{errorMessage}</span>
           <button
             type="button"
-            style={styles.button}
-            onClick={() => query.refetch()}
+            className="app-button app-button--danger platform-readiness-verification__retry"
+            onClick={() => void query.refetch()}
             disabled={query.isFetching}
           >
-            {query.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
-
-      {query.isLoading ? <section style={styles.card}>Loading verification program…</section> : null}
-      {query.error ? (
-        <section style={styles.errorCard}>
-          <strong>Unable to load verification program.</strong>
-          <span style={styles.errorText}>{errorMessage}</span>
-          <button type="button" style={styles.retryButton} onClick={() => query.refetch()} disabled={query.isFetching}>
             {query.isFetching ? 'Retrying…' : 'Retry'}
           </button>
         </section>
       ) : null}
 
+      {refreshError ? (
+        <section className="app-warning-state platform-readiness-verification__feedback" role="status">
+          <strong>Latest verification refresh failed.</strong>
+          <span>Showing the last successful verification program from {formatTimestamp(data?.generated_at)}.</span>
+          <span>{errorMessage}</span>
+        </section>
+      ) : null}
+
       {data ? (
         <>
-          <section style={styles.metaCard}>
-            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
-            <div><strong>Last refreshed</strong><br /><span style={styles.help}>{formatTimestamp(data.generated_at)}</span></div>
-            <details style={styles.noteDetails}>
-              <summary style={styles.noteSummary}>Read full validation note</summary>
-              <div style={styles.note}>{data.validation_note}</div>
-            </details>
-          </section>
+          <OperationalWorkspaceStats ariaLabel="Commercial readiness verification key metrics">
+            <OperationalWorkspaceStatCard
+              label="Total controls"
+              value={data.summary.controls_total}
+              helper="Program-level readiness controls"
+              iconPath="/platform/commercial-readiness-verification-program"
+              tone="neutral"
+            />
+            <OperationalWorkspaceStatCard
+              label="Verification surfaces present"
+              value={data.summary.verification_surfaces_present}
+              helper="Evidence surfaces represented by the program"
+              iconPath="/platform/commercial-readiness-verification-program"
+              tone="blue"
+            />
+            <OperationalWorkspaceStatCard
+              label="Runtime/manual checks required"
+              value={data.summary.runtime_or_manual_runs_required}
+              helper="Operator evidence still required before certification"
+              iconPath="/platform/commercial-readiness-verification-program"
+              tone={data.summary.runtime_or_manual_runs_required > 0 ? 'warn' : 'good'}
+            />
+            <OperationalWorkspaceStatCard
+              label="Program ready to run"
+              value={data.summary.ready_for_execution ? 'Yes' : 'No'}
+              helper="Runnable means executable, not commercially certified"
+              iconPath="/platform/commercial-readiness-verification-program"
+              tone={data.summary.ready_for_execution ? 'warn' : 'danger'}
+            />
+          </OperationalWorkspaceStats>
 
-          <section style={styles.infoCard}>
-            <strong>How to read this page</strong>
-            <div style={styles.infoText}>
-              “Surfaces present” and “Program ready to run” describe checklist coverage only. Runtime/manual checks still need operator evidence,
-              and certification is reported separately for each gate.
+          <section className="app-panel app-panel--padded platform-readiness-verification__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-readiness-verification-program"
+              title="Verification program context"
+              description="Program identity, current operator posture, and the validation note attached to this generated package."
+              actions={<span className="platform-readiness-verification__count-badge">{gateEntries.length} gates</span>}
+            />
+            <div className="platform-readiness-verification__program-grid">
+              <div>
+                <strong>Phase</strong>
+                <span>{data.phase}</span>
+              </div>
+              <div>
+                <strong>Current step</strong>
+                <span>{data.step}</span>
+              </div>
+              <div>
+                <strong>Gate posture</strong>
+                <span>{runnableGateCount} runnable · {certifiedGateCount} certified · {gateEntries.length - certifiedGateCount} uncertified</span>
+              </div>
+              <details className="platform-readiness-verification__validation-note">
+                <summary>Read full validation note</summary>
+                <p>{data.validation_note}</p>
+              </details>
             </div>
           </section>
 
-          <section style={styles.summaryGrid} aria-label="Verification program summary">
-            <div style={styles.summaryCard}><strong>Total controls</strong><div style={styles.metric}>{data.summary.controls_total}</div></div>
-            <div style={styles.summaryCard}><strong>Verification surfaces present</strong><div style={styles.metric}>{data.summary.verification_surfaces_present}</div></div>
-            <div style={styles.summaryCard}><strong>Runtime/manual checks required</strong><div style={styles.metric}>{data.summary.runtime_or_manual_runs_required}</div></div>
-            <div style={styles.summaryCard}><strong>Program ready to run</strong><div style={styles.metric}>{data.summary.ready_for_execution ? 'Yes' : 'No'}</div></div>
+          <section className="app-panel app-panel--padded platform-readiness-verification__reading-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-readiness-verification-program"
+              title="How to read this page"
+              description="Surfaces present and Program ready to run describe checklist coverage only. Runtime/manual checks still need operator evidence, and certification is reported separately for each gate."
+            />
+            <div className="platform-readiness-verification__gate-overview" aria-label="Verification gate summary">
+              <div><strong>Verification gates</strong><span>{gateEntries.length}</span></div>
+              <div><strong>Runnable gates</strong><span>{runnableGateCount}</span></div>
+              <div><strong>Certified gates</strong><span>{certifiedGateCount}</span></div>
+              <div><strong>Uncertified gates</strong><span>{gateEntries.length - certifiedGateCount}</span></div>
+            </div>
           </section>
 
-          <section style={styles.summaryGrid} aria-label="Verification gate summary">
-            <div style={styles.summaryCard}><strong>Verification gates</strong><div style={styles.metric}>{gateEntries.length}</div></div>
-            <div style={styles.summaryCard}><strong>Runnable gates</strong><div style={styles.metric}>{runnableGateCount}</div></div>
-            <div style={styles.summaryCard}><strong>Certified gates</strong><div style={styles.metric}>{certifiedGateCount}</div></div>
-            <div style={styles.summaryCard}><strong>Uncertified gates</strong><div style={styles.metric}>{gateEntries.length - certifiedGateCount}</div></div>
-          </section>
-
-          <details style={styles.card}>
-            <summary style={styles.detailsSummaryRow}>
+          <details className="app-panel app-panel--padded platform-readiness-verification__details-panel">
+            <summary className="platform-readiness-verification__details-summary-row">
               <span>
                 <strong>Verification gate index</strong>
-                <span style={styles.summaryHint}>Jump to a specific gate. Gates remain read-only.</span>
+                <small>Jump to a specific gate. Gates remain read-only.</small>
               </span>
-              <span style={styles.countBadge}>{gateEntries.length} gates</span>
+              <span className="platform-readiness-verification__count-badge">{gateEntries.length} gates</span>
             </summary>
-            <div style={styles.detailsBody}>
-              <div style={styles.linkGrid}>
+            <div className="platform-readiness-verification__details-body">
+              <div className="platform-readiness-verification__link-grid">
                 {gateEntries.map((entry) => (
-                  <a key={entry.key} href={entry.href} style={styles.linkCard}>
-                    {entry.gate.summary.controls_total} controls · {entry.title}
+                  <a key={entry.key} href={entry.href} className="platform-readiness-verification__link-card">
+                    <span>{entry.title}</span>
+                    <small>{entry.gate.summary.controls_total} controls</small>
                   </a>
                 ))}
               </div>
             </div>
           </details>
 
-          <section style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Verification gates</h2>
-              <p style={styles.sectionDescription}>
-                Gates are collapsed so the page remains usable. Open a gate to review its closure rule, execution order, evidence surfaces, and failure modes.
-              </p>
+          <section className="platform-readiness-verification__section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-readiness-verification-program"
+              title="Verification gates"
+              description="Gates are collapsed so the page remains usable. Open a gate to review its closure rule, execution order, evidence surfaces, and failure modes."
+              actions={<span className="platform-readiness-verification__count-badge">{gateEntries.length} gates</span>}
+            />
+            <div className="platform-readiness-verification__gate-list">
+              {gateEntries.map((entry) => renderGate(entry.title, entry.gate))}
             </div>
-            <span style={styles.countBadge}>{gateEntries.length} gates</span>
           </section>
 
-          <section style={styles.gateList}>
-            {gateEntries.map((entry) => renderGate(entry.title, entry.gate))}
-          </section>
-
-          <details style={styles.card}>
-            <summary style={styles.detailsSummaryRow}>
+          <details className="app-panel app-panel--padded platform-readiness-verification__details-panel">
+            <summary className="platform-readiness-verification__details-summary-row">
               <span>
                 <strong>Program execution sequence</strong>
-                <span style={styles.summaryHint}>Program-level order across all readiness domains.</span>
+                <small>Program-level order across all readiness domains.</small>
               </span>
-              <span style={styles.countBadge}>{data.execution_sequence.length} steps</span>
+              <span className="platform-readiness-verification__count-badge">{data.execution_sequence.length} steps</span>
             </summary>
-            <div style={styles.detailsBody}>
-              <ol style={styles.list}>
+            <div className="platform-readiness-verification__details-body">
+              <ol className="platform-readiness-verification__list">
                 {data.execution_sequence.map((item) => <li key={item}>{item}</li>)}
               </ol>
             </div>
           </details>
 
-          <details style={styles.card}>
-            <summary style={styles.detailsSummaryRow}>
+          <details className="app-panel app-panel--padded platform-readiness-verification__details-panel">
+            <summary className="platform-readiness-verification__details-summary-row">
               <span>
                 <strong>Domain coverage</strong>
-                <span style={styles.summaryHint}>Control and runtime/manual-run counts by verification domain.</span>
+                <small>Control and runtime/manual-run counts by verification domain.</small>
               </span>
-              <span style={styles.countBadge}>{domainEntries.length} domains</span>
+              <span className="platform-readiness-verification__count-badge">{domainEntries.length} domains</span>
             </summary>
-            <div style={styles.detailsBody}>
-              <section style={styles.domainGrid}>
+            <div className="platform-readiness-verification__details-body">
+              <section className="platform-readiness-verification__domain-grid">
                 {domainEntries.map(([domain, summary]) => (
-                  <article key={domain} style={styles.miniCard}>
+                  <article key={domain} className="platform-readiness-verification__domain-card">
                     <strong>{humanize(domain)}</strong>
-                    <div style={styles.help}>{summary.verification_surfaces_present}/{summary.controls_total} surfaces present</div>
-                    <div style={styles.help}>{summary.runtime_or_manual_runs_required} runtime/manual runs required</div>
+                    <span>{summary.verification_surfaces_present}/{summary.controls_total} surfaces present</span>
+                    <span>{summary.runtime_or_manual_runs_required} runtime/manual runs required</span>
                   </article>
                 ))}
               </section>
             </div>
           </details>
 
-          <details style={styles.card}>
-            <summary style={styles.detailsSummaryRow}>
+          <details className="app-panel app-panel--padded platform-readiness-verification__details-panel">
+            <summary className="platform-readiness-verification__details-summary-row">
               <span>
                 <strong>Program-level controls</strong>
-                <span style={styles.summaryHint}>Top-level verification surfaces and required operator actions.</span>
+                <small>Top-level verification surfaces and required operator actions.</small>
               </span>
-              <span style={styles.countBadge}>{data.controls.length} controls</span>
+              <span className="platform-readiness-verification__count-badge">{data.controls.length} controls</span>
             </summary>
-            <div style={styles.detailsBody}>
-              <section style={styles.controlGrid}>
+            <div className="platform-readiness-verification__details-body">
+              <section className="platform-readiness-verification__control-grid">
                 {data.controls.map((control) => (
-                  <article key={control.code} style={styles.controlCard}>
-                    <div style={styles.controlHeader}>
-                      <div style={styles.controlHeadingCopy}>
-                        <h3 style={styles.controlTitle}>{control.order}. {control.label}</h3>
-                        <div style={styles.help}>{humanize(control.domain)} · {humanize(control.automation_level)}</div>
+                  <article key={control.code} className="platform-readiness-verification__control-card">
+                    <div className="platform-readiness-verification__control-header">
+                      <div className="platform-readiness-verification__control-heading-copy">
+                        <h3>{control.order}. {control.label}</h3>
+                        <span className="platform-readiness-verification__help">{humanize(control.domain)} · {humanize(control.automation_level)}</span>
                       </div>
-                      <span style={badgeStyle(control.status)}>{humanize(control.status)}</span>
+                      <StatusBadge value={control.status} />
                     </div>
-                    <div style={styles.block}>
+                    <div className="platform-readiness-verification__evidence-block">
                       <strong>Evidence surface</strong>
-                      <div style={styles.surface}>{control.evidence_surface}</div>
+                      <span className="platform-readiness-verification__surface">{control.evidence_surface}</span>
                     </div>
-                    <div style={styles.block}>
+                    <div className="platform-readiness-verification__evidence-block">
                       <strong>Required action</strong>
-                      <div style={styles.action}>{control.required_action}</div>
+                      <span>{control.required_action}</span>
                     </div>
                   </article>
                 ))}
@@ -795,57 +905,3 @@ export default function PlatformCommercialReadinessVerificationProgramPage() {
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowX: 'hidden', color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  headerCopy: { minWidth: 0, flex: '1 1 620px' },
-  headerActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 940, lineHeight: 1.5 },
-  badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, whiteSpace: 'normal', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere', textAlign: 'center' },
-  button: { border: '1px solid #cbd5e1', borderRadius: 999, background: '#fff', padding: '8px 12px', fontWeight: 800, color: '#0f172a', cursor: 'pointer' },
-  retryButton: { border: '1px solid #fecaca', borderRadius: 999, background: '#fff', padding: '8px 12px', fontWeight: 800, color: '#991b1b', cursor: 'pointer', justifySelf: 'start' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'grid', gap: 10, color: '#991b1b' },
-  errorText: { color: '#7f1d1d', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  infoCard: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 14, padding: 16, display: 'grid', gap: 6, color: 'var(--io-primary-deep)' },
-  infoText: { lineHeight: 1.55, color: 'var(--io-primary-dark)' },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12, minWidth: 0 },
-  noteDetails: { minWidth: 0 },
-  noteSummary: { cursor: 'pointer', fontWeight: 800, color: '#334155' },
-  note: { color: '#334155', lineHeight: 1.55, marginTop: 10, overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 12 },
-  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  domainGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 },
-  linkGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 10 },
-  linkCard: { display: 'block', padding: 10, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700, lineHeight: 1.4, overflowWrap: 'anywhere' },
-  gateList: { display: 'grid', gap: 12 },
-  gateCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0, scrollMarginTop: 16 },
-  gateSummary: { cursor: 'pointer', padding: 16 },
-  gateSummaryInner: { display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', minWidth: 0 },
-  gateSummaryCopy: { display: 'grid', gap: 4, minWidth: 0, flex: '1 1 360px' },
-  gateSummaryMeta: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 },
-  gateTitle: { fontSize: 17, color: '#0f172a', overflowWrap: 'anywhere' },
-  gateBody: { borderTop: '1px solid #e2e8f0', padding: 18, display: 'grid', gap: 16, minWidth: 0 },
-  countBadge: { display: 'inline-flex', alignItems: 'center', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', borderRadius: 999, padding: '5px 9px', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' },
-  statusText: { fontSize: 12, fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' },
-  controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16, minWidth: 0 },
-  metric: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' },
-  sectionTitle: { margin: 0, fontSize: 20, letterSpacing: '-.015em', color: '#0f172a' },
-  sectionDescription: { margin: '5px 0 0', color: '#64748b', lineHeight: 1.5, maxWidth: 900 },
-  miniCard: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, minWidth: 0 },
-  list: { margin: 0, paddingLeft: 24, color: '#334155', lineHeight: 1.7, overflowWrap: 'anywhere' },
-  controlCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 14, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  controlHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', minWidth: 0 },
-  controlHeadingCopy: { minWidth: 0, flex: '1 1 240px' },
-  controlTitle: { margin: 0, fontSize: 17, overflowWrap: 'anywhere' },
-  block: { display: 'grid', gap: 6, minWidth: 0 },
-  surface: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, color: '#0f172a', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  action: { color: '#334155', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  detailsSummaryRow: { cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  summaryHint: { display: 'block', color: '#64748b', fontSize: 12, fontWeight: 400, lineHeight: 1.45, marginTop: 4 },
-  detailsBody: { marginTop: 16 }
-};
