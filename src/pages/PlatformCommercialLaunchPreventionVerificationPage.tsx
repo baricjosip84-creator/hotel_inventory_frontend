@@ -1,6 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchPreventionVerificationPage.css';
 
 type PersistenceBoundary = {
   stored_in_application: boolean;
@@ -51,90 +61,142 @@ type PreventionVerification = {
   validation_note: string;
 };
 
-const SOURCE_POSTURE_LINKS = [
-  { label: 'Incident closure', key: 'incident_closure_posture', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Incident triage', key: 'incident_triage_posture', href: '/platform/commercial-launch-incident-triage' },
-  { label: 'Post-launch observation', key: 'post_launch_observation_posture', href: '/platform/commercial-launch-post-launch-observation' },
-  { label: 'Command center', key: 'command_center_posture', href: '/platform/commercial-launch-day-command-center' },
-  { label: 'Smoke test', key: 'smoke_test_posture', href: '/platform/commercial-launch-smoke-test-checklist' },
-  { label: 'Go/no-go register', key: 'go_no_go_register_posture', href: '/platform/commercial-launch-go-no-go-register' }
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+const summaryLabels: Record<string, string> = {
+  prevention_rows_total: 'Prevention rows',
+  waiting_for_post_launch_evidence_review: 'Post-launch review',
+  waiting_for_external_go_no_go_confirmation: 'Awaiting Go/No-Go',
+  waiting_for_external_smoke_test_confirmation: 'Awaiting smoke test',
+  waiting_for_external_launch_window_confirmation: 'Awaiting launch window',
+  waiting_for_external_post_launch_observation_confirmation: 'Awaiting observation',
+  waiting_for_external_triage_confirmation: 'Awaiting triage confirmation',
+  waiting_for_external_incident_closure_confirmation: 'Awaiting closure confirmation',
+  blocked_until_incident_closure_ready: 'Blocked rows',
+  prevention_records_persisted_in_application: 'Prevention records stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  prevention_rows_total: 'External prevention-verification records prepared by this read-only board',
+  waiting_for_post_launch_evidence_review: 'Rows held until upstream post-launch evidence review is resolved',
+  waiting_for_external_go_no_go_confirmation: 'Rows waiting for independently confirmed Go/No-Go decisions',
+  waiting_for_external_smoke_test_confirmation: 'Rows waiting for independently confirmed smoke-test results',
+  waiting_for_external_launch_window_confirmation: 'Rows waiting for the real launch window and production launch to be confirmed',
+  waiting_for_external_post_launch_observation_confirmation: 'Rows waiting for an external post-launch observation record',
+  waiting_for_external_triage_confirmation: 'Rows waiting for the externally recorded incident-triage record',
+  waiting_for_external_incident_closure_confirmation: 'Rows waiting for the externally recorded incident-closure record',
+  blocked_until_incident_closure_ready: 'Rows that cannot proceed with the current Incident Closure posture',
+  prevention_records_persisted_in_application: 'Expected to remain zero because this endpoint stores no prevention outcomes'
+};
+
+const sourcePostures = [
+  { label: 'Incident closure', key: 'incident_closure_posture', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', key: 'incident_triage_posture', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', key: 'post_launch_observation_posture', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Launch command center', key: 'command_center_posture', to: '/platform/commercial-launch-day-command-center' },
+  { label: 'Launch smoke test', key: 'smoke_test_posture', to: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Launch Go/No-Go', key: 'go_no_go_register_posture', to: '/platform/commercial-launch-go-no-go-register' }
 ] as const;
 
-const SUPPORTING_LINKS = [
-  { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Incident Triage', href: '/platform/commercial-launch-incident-triage' },
-  { label: 'Post-launch Observation', href: '/platform/commercial-launch-post-launch-observation' },
-  { label: 'Rollout Expansion Authorization', href: '/platform/commercial-launch-rollout-expansion-authorization' }
+const supportingLinks = [
+  { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Rollout expansion authorization', to: '/platform/commercial-launch-rollout-expansion-authorization' }
 ];
 
-const DOMAIN_EVIDENCE_LINKS: Record<string, { label: string; href: string }[]> = {
+const domainEvidenceLinks: Record<string, { label: string; to: string }[]> = {
   service_health: [
-    { label: 'System Health', href: '/platform/system-health' },
-    { label: 'Monitoring Readiness', href: '/platform/production-monitoring-readiness' }
+    { label: 'System health', to: '/platform/system-health' },
+    { label: 'Monitoring readiness', to: '/platform/production-monitoring-readiness' }
   ],
   customer_feedback: [
-    { label: 'Customer Success', href: '/platform/customer-success-admin' },
-    { label: 'Communications', href: '/platform/tenant-communications' }
+    { label: 'Customer success', to: '/platform/customer-success-admin' },
+    { label: 'Tenant communications', to: '/platform/tenant-communications' }
   ],
   support_intake: [
-    { label: 'Support Cockpit', href: '/platform/support-cockpit' },
-    { label: 'Tenant SLA', href: '/platform/tenant-sla' }
+    { label: 'Support cockpit', to: '/platform/support-cockpit' },
+    { label: 'Tenant SLA', to: '/platform/tenant-sla' }
   ],
   billing_confirmation: [
-    { label: 'Billing', href: '/platform/billing' },
-    { label: 'Billing Activation', href: '/platform/billing-subscription-activation' },
-    { label: 'License Enforcement', href: '/platform/license-plan-enforcement' }
+    { label: 'Billing', to: '/platform/billing' },
+    { label: 'Billing activation', to: '/platform/billing-subscription-activation' },
+    { label: 'License enforcement', to: '/platform/license-plan-enforcement' }
   ],
   incident_review: [
-    { label: 'Incidents', href: '/platform/incidents' },
-    { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' }
+    { label: 'Incidents', to: '/platform/incidents' },
+    { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' }
   ],
   rollback_readiness: [
-    { label: 'Runbooks', href: '/platform/runbooks' },
-    { label: 'Launch Command Center', href: '/platform/commercial-launch-day-command-center' }
+    { label: 'Runbooks', to: '/platform/runbooks' },
+    { label: 'Launch command center', to: '/platform/commercial-launch-day-command-center' }
   ],
   adoption_signal: [
-    { label: 'Tenant Health', href: '/platform/tenant-health' },
-    { label: 'Customer Success', href: '/platform/customer-success-admin' }
+    { label: 'Tenant health', to: '/platform/tenant-health' },
+    { label: 'Customer success', to: '/platform/customer-success-admin' }
   ],
   handoff_closure: [
-    { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
-    { label: 'Rollout Expansion Authorization', href: '/platform/commercial-launch-rollout-expansion-authorization' }
+    { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' },
+    { label: 'Rollout expansion authorization', to: '/platform/commercial-launch-rollout-expansion-authorization' }
   ]
 };
 
-function getDomainLinks(domain: string) {
-  return DOMAIN_EVIDENCE_LINKS[domain] || [{ label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' }];
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unknown error';
-}
-
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized === 'unknown' || normalized === 'not generated yet') {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('rollback') || normalized.includes('hold')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'not_reviewed' || normalized === 'not reviewed') return 'neutral';
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('rollback')
+    || normalized.includes('fail')
+  ) return 'danger';
   if (
     normalized.includes('waiting')
-    || normalized.includes('manual')
     || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('review')
     || normalized.includes('watch')
-    || normalized.includes('not_reviewed')
+    || normalized.includes('required')
     || normalized.includes('preparation')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+    || normalized.includes('hold')
+  ) return 'warn';
+  if (
+    normalized.includes('accepted')
+    || normalized.includes('ready')
+    || normalized.includes('healthy')
+    || normalized.includes('clear')
+    || normalized === 'continue'
+  ) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown API error';
+}
+
+function persistenceLabel(value: PersistenceBoundary | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence observable';
+}
+
+function evidenceLinksForDomain(domain: string) {
+  return domainEvidenceLinks[domain] || [
+    { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' }
+  ];
 }
 
 export default function PlatformCommercialLaunchPreventionVerificationPage() {
@@ -146,201 +208,271 @@ export default function PlatformCommercialLaunchPreventionVerificationPage() {
   });
 
   const data = prevention.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summaryEntries = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = prevention.isError && !data;
+  const refreshError = prevention.isError && Boolean(data);
+  const requestError = readableError(prevention.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Prevention Verification</h1>
-          <p style={styles.description}>
-            <strong>Prevention preparation only.</strong> Step 225 converts Incident Closure rows into external
-            prevention-verification evidence requirements. This application does not observe external incident-closure
-            completion or prevention-verification outcomes, so a generated row is not proof that prevention was implemented,
-            effective, accepted, or cleared for rollout expansion.
-          </p>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
-          <button type="button" style={styles.button} onClick={() => prevention.refetch()} disabled={prevention.isFetching}>
-            {prevention.isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
+    <div className="io-operational-page io-workspace-page platform-prevention-verification">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-prevention-verification"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Prevention Verification"
+        description="Read-only preparation for external prevention-verification decisions after Incident Closure. It organizes source traceability, prevention actions, implementation evidence, effectiveness review, monitoring re-entry, recurrence ownership, customer-success acknowledgement and rollout-expansion decisions without claiming that external closure or prevention outcomes exist."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 225 — Commercial Launch Prevention Verification Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Prevention preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External prevention record required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-prevention-verification__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? data.summary.prevention_rows_total ?? data.prevention_rows.length : '—'}
+              label="prevention verification rows"
+            />
+            {data ? (
+              <span className="platform-prevention-verification__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-prevention-verification__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void prevention.refetch()}
+                disabled={prevention.isFetching}
+              >
+                {prevention.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-prevention-verification__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-prevention-verification"
+          title="External confirmation boundary"
+          description="This board prepares the structure of a prevention-verification record; it does not observe or persist the real Incident Closure or prevention decision."
+        />
+        <div className="platform-prevention-verification__boundary-grid">
+          <div className="platform-prevention-verification__boundary-notice">
+            <strong>Prevention preparation only.</strong>
+            <span>
+              Before prevention verification can proceed, independently confirm the external Incident Closure record for the relevant domain. Prevention implementation, effectiveness review, monitoring re-entry, recurrence watch, customer-success acknowledgement and rollout-expansion decisions must be recorded outside this application.
+            </span>
+          </div>
+          <div className="platform-prevention-verification__supporting-pages">
+            <strong>Supporting prevention-verification pages</strong>
+            <span>This page already requires the evidence permissions used by these destinations, so these shortcuts do not bypass a stricter destination permission boundary.</span>
+            <div className="platform-prevention-verification__link-row">
+              {supportingLinks.map((link) => (
+                <Link key={link.to} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section style={styles.boundary}>
-        <strong>External confirmation boundary.</strong> Before prevention verification can proceed, independently confirm the
-        external Incident Closure record for the relevant domain. Any prevention implementation, effectiveness review,
-        monitoring re-entry, recurrence watch, customer-success acknowledgement, and rollout-expansion decision must also be
-        recorded outside this application.
-      </section>
+      {prevention.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading Commercial Launch Prevention Verification…</section>
+      ) : null}
 
-      {prevention.isLoading ? <div style={styles.card}>Loading commercial launch prevention verification board...</div> : null}
-      {prevention.error ? (
-        <div style={styles.error}>
-          <span>Failed to load commercial launch prevention verification board: {errorMessage(prevention.error)}</span>
-          <button type="button" style={styles.errorButton} onClick={() => prevention.refetch()} disabled={prevention.isFetching}>
-            {prevention.isFetching ? 'Retrying...' : 'Retry'}
+      {initialLoadError ? (
+        <section className="app-error-state platform-prevention-verification__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Prevention Verification.</strong>
+          <span>{requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-prevention-verification__retry"
+            onClick={() => void prevention.refetch()}
+            disabled={prevention.isFetching}
+          >
+            {prevention.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-prevention-verification__feedback platform-prevention-verification__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Prevention Verification snapshot. {requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-prevention-verification__retry"
+            onClick={() => void prevention.refetch()}
+            disabled={prevention.isFetching}
+          >
+            {prevention.isFetching ? 'Retrying…' : 'Retry refresh'}
+          </button>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaGrid}>
-            <div style={styles.metaCard}><span style={styles.help}>Snapshot generated</span><strong>{new Date(data.generated_at).toLocaleString()}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Incident-closure persistence</span><strong>{data.incident_closure_persistence?.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Prevention-verification persistence</span><strong>{data.prevention_persistence.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Persistence boundary</h2>
-            <div style={styles.persistenceGrid}>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Incident Closure</span>
-                <span>{data.incident_closure_persistence?.interpretation || 'Incident Closure persistence details unavailable.'}</span>
-              </div>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Prevention Verification</span>
-                <span>{data.prevention_persistence.interpretation}</span>
-              </div>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Supporting pages</h2>
-            <div style={styles.linkRow}>{SUPPORTING_LINKS.map((link) => <a key={link.href} href={link.href} style={styles.linkButton}>{link.label}</a>)}</div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Prevention verification summary">
+            {summaryEntries.map(([key, value]) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                iconPath="/platform/commercial-launch-prevention-verification"
+                label={summaryLabels[key] || humanize(key)}
+                value={value}
+                helper={summaryHelpers[key] || 'Current read-only prevention-verification preparation snapshot'}
+                tone={key.includes('blocked') && value > 0 ? 'danger' : key.includes('waiting') && value > 0 ? 'warn' : key.includes('persisted') ? 'neutral' : 'default'}
+              />
             ))}
-          </section>
+          </OperationalWorkspaceStats>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
-            <div style={styles.inputGrid}>
-              {SOURCE_POSTURE_LINKS.map((source) => (
-                <a key={source.key} href={source.href} style={styles.inputCardLink}>
-                  <span style={styles.help}>{source.label}</span>
-                  <strong style={styles.breakText}>{humanize(String(data[source.key] || 'unknown'))}</strong>
-                  <span style={styles.openHint}>Open source board →</span>
-                </a>
+          <section className="app-panel app-panel--padded platform-prevention-verification__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-incident-closure"
+              title="Source launch posture"
+              description="Current upstream launch postures and persistence boundaries supplied by the incident-to-prevention evidence chain."
+            />
+            <div className="platform-prevention-verification__source-grid">
+              {sourcePostures.map((source) => (
+                <div key={source.key}>
+                  <strong>{source.label}</strong>
+                  <span>{humanize(data[source.key])}</span>
+                  <Link to={source.to}>Open source board</Link>
+                </div>
               ))}
+            </div>
+            <div className="platform-prevention-verification__persistence-grid">
+              <div>
+                <strong>Incident-closure persistence</strong>
+                <span>{persistenceLabel(data.incident_closure_persistence)}</span>
+                <small>{data.incident_closure_persistence?.interpretation || 'Incident Closure persistence details are not available in this snapshot.'}</small>
+              </div>
+              <div>
+                <strong>Prevention-verification persistence</strong>
+                <span>{persistenceLabel(data.prevention_persistence)}</span>
+                <small>{data.prevention_persistence.interpretation}</small>
+              </div>
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Prevention verification rows</h2>
-            <div style={styles.checkGrid}>
-              {data.prevention_rows.map((row) => (
-                <article key={row.code} style={styles.checkCard}>
-                  <div style={styles.rowHeader}>
-                    <div style={styles.breakText}>
-                      <strong>{humanize(row.code)}</strong>
-                      <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
+          <section className="app-panel app-panel--padded platform-prevention-verification__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-prevention-verification"
+              title="Prevention verification rows"
+              description="External prevention-verification templates derived from Incident Closure. Each row preserves its observation → triage → closure lineage and remains read-only in this application."
+            />
+
+            {data.prevention_rows.length === 0 ? (
+              <div className="platform-prevention-verification__empty-state">
+                <strong>No prevention preparation rows were produced.</strong>
+                <span>This is not evidence that prevention is complete or that no external prevention-verification work exists; it only means the current read-only source board returned no rows.</span>
+              </div>
+            ) : (
+              <div className="platform-prevention-verification__row-grid">
+                {data.prevention_rows.map((row) => (
+                  <article key={row.code} className="app-panel platform-prevention-verification__row-card">
+                    <div className="platform-prevention-verification__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-prevention-verification__status-badge" data-tone={badgeTone(row.verification_status)}>
+                        {humanize(row.verification_status)}
+                      </span>
                     </div>
-                    <span style={badgeStyle(row.verification_status)}>{humanize(row.verification_status)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Manual precondition</span>
-                    <span>{row.manual_precondition}</span>
-                  </div>
-                  <div style={styles.statusRow}><span>Source closure</span><strong style={styles.breakText}>{humanize(row.source_closure_code)}</strong></div>
-                  <div style={styles.statusRow}><span>Source closure status</span><span style={badgeStyle(row.source_closure_status)}>{humanize(row.source_closure_status)}</span></div>
-                  <div style={styles.statusRow}><span>Source template severity</span><span style={badgeStyle(row.source_default_severity)}>{humanize(row.source_default_severity)}</span></div>
-                  <div style={styles.statusRow}><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Source closure artifact</span>
-                    <strong>{row.source_closure_artifact}</strong>
-                    <span style={styles.help}>Storage: {humanize(row.source_closure_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>External prevention artifact</span>
-                    <strong>{row.prevention_artifact}</strong>
-                    <span style={styles.help}>Storage: {humanize(row.prevention_artifact_storage)}</span>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Evidence links</span>
-                    <div style={styles.linkRow}>{getDomainLinks(row.domain).map((link) => <a key={`${row.code}-${link.href}`} href={link.href} style={styles.smallLinkButton}>{link.label}</a>)}</div>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Prevention requirements</span>
-                    <ul style={styles.list}>{row.prevention_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Allowed rollout-expansion decisions</span>
-                    <div style={styles.chips}>{row.accepted_rollout_expansion_decisions.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
-                    <div style={styles.help}>Template default: {humanize(row.default_rollout_expansion_decision)}</div>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Required external prevention fields</span>
-                    <div style={styles.chips}>{row.required_prevention_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
-                  </div>
-                </article>
-              ))}
+
+                    <div className="platform-prevention-verification__source-summary">
+                      <div><span>Source observation</span><strong>{humanize(row.source_observation_code)}</strong><small>Upstream post-launch observation reference.</small></div>
+                      <div><span>Source triage</span><strong>{humanize(row.source_triage_code)}</strong><small>Upstream incident-triage reference.</small></div>
+                      <div><span>Source closure</span><strong>{humanize(row.source_closure_code)}</strong><small>External incident-closure template reference.</small></div>
+                      <div><span>Source closure prerequisite</span><strong>{humanize(row.source_closure_status)}</strong></div>
+                      <div><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                      <div><span>Source template default severity</span><strong>{humanize(row.source_default_severity)}</strong><small>Template default only; not an observed final severity.</small></div>
+                      <div><span>Template default rollout decision</span><strong>{humanize(row.default_rollout_expansion_decision)}</strong><small>Template default only; not an observed rollout-expansion decision.</small></div>
+                    </div>
+
+                    <div className="platform-prevention-verification__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-prevention-verification__row-actions">
+                      {evidenceLinksForDomain(row.domain).map((link) => (
+                        <Link key={`${row.code}-${link.to}`} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+                      ))}
+                    </div>
+
+                    <div className="platform-prevention-verification__artifact-grid">
+                      <div>
+                        <strong>Source closure artifact</strong>
+                        <span>{row.source_closure_artifact}</span>
+                        <small>{humanize(row.source_closure_artifact_storage)}</small>
+                      </div>
+                      <div>
+                        <strong>External prevention artifact</strong>
+                        <span>{row.prevention_artifact}</span>
+                        <small>{humanize(row.prevention_artifact_storage)}</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-prevention-verification__evidence-box">
+                      <strong>Prevention requirements</strong>
+                      <ul>{row.prevention_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+
+                    <div className="platform-prevention-verification__field-groups">
+                      <div>
+                        <strong>Allowed rollout-expansion decisions</strong>
+                        <div className="platform-prevention-verification__chips">
+                          {row.accepted_rollout_expansion_decisions.map((item) => (
+                            <span key={item} data-tone={badgeTone(item)}>{humanize(item)}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Required external prevention fields</strong>
+                        <div className="platform-prevention-verification__chips">
+                          {row.required_prevention_fields.map((field) => <span key={field}>{humanize(field)}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="platform-prevention-verification__rules-grid">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-prevention-verification"
+                title="Prevention rules"
+                description="Guardrails that determine when an external prevention-verification record may be prepared and accepted."
+              />
+              <ul>{data.prevention_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-prevention-verification"
+                title="Prevention limitations"
+                description="Claims and actions this read-only board deliberately does not make."
+              />
+              <ul>{data.prevention_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}><h2 style={styles.sectionTitle}>Prevention rules</h2><ul style={styles.list}>{data.prevention_rules.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            <div style={styles.card}><h2 style={styles.sectionTitle}>Prevention limitations</h2><ul style={styles.list}>{data.prevention_limitations.map((item) => <li key={item}>{item}</li>)}</ul></div>
+          <section className="app-panel app-panel--padded platform-prevention-verification__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <section className="app-panel app-panel--padded platform-prevention-verification__snapshot-note">
+            <strong>Snapshot metadata</strong>
+            <span>{data.phase} · {data.step}</span>
+            <span>Generated: {formatDateTime(data.generated_at)}</span>
+            <small>{data.validation_note}</small>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  button: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
-  boundary: { background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.55 },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 6, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  persistenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
-  inputCardLink: { display: 'grid', gap: 6, border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: 'inherit', textDecoration: 'none', minWidth: 0 },
-  openHint: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 800 },
-  linkRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  linkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #cbd5e1', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700, textDecoration: 'none' },
-  smallLinkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #cbd5e1', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '5px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', marginTop: 6 },
-  checkGrid: { display: 'grid', gap: 12 },
-  checkCard: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 12, minWidth: 0 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  evidenceBox: { display: 'grid', gap: 4, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
-  evidenceLabel: { color: '#64748b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 10, flexWrap: 'wrap' },
-  chips: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.55 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 14, padding: 14 },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13 },
-  error: { display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14, flexWrap: 'wrap', border: '1px solid #fecaca' },
-  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 10, padding: '7px 10px', fontWeight: 800, cursor: 'pointer' },
-  breakText: { minWidth: 0, overflowWrap: 'anywhere' }
-};
