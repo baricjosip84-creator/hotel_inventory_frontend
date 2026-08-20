@@ -3,34 +3,43 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchIncidentClosurePage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchIncidentClosurePage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  'Closure preparation only.',
-  'External confirmation boundary.',
-  'does not observe or persist the external triage records',
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalWorkspaceStatCard',
+  'OperationalSectionHeader',
+  "import './PlatformCommercialLaunchIncidentClosurePage.css'",
+  'Closure preparation only',
+  'External confirmation boundary',
+  'does not observe or persist the real triage or closure decision',
+  'initialLoadError',
+  'refreshError',
+  'Showing the last successful Commercial Launch Incident Closure snapshot.',
+  'Retry refresh',
+  'disabled={closure.isFetching}',
   'Incident-triage persistence',
   'Incident-closure persistence',
-  'Manual precondition',
+  'Source observation',
+  'source_observation_code',
   'Source triage artifact',
   'External closure artifact',
+  'Customer impact review',
+  'Template default only; not an observed final severity.',
+  'Template default only; not an observed handoff decision.',
+  'Manual precondition',
   'Allowed handoff decisions',
   'Required external closure fields',
-  'incident_triage_persistence',
-  'closure_persistence',
-  'source_triage_artifact',
-  'closure_artifact',
-  'manual_precondition',
+  'No closure preparation rows were produced.',
+  'not evidence that there are no incidents to close',
   '/platform/tenant-communications',
   '/platform/support-cockpit',
   '/platform/commercial-launch-prevention-verification',
   'refetchOnWindowFocus: false',
-  'staleTime: 30_000',
-  'errorMessage(closure.error)',
-  "normalized.includes('external')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'staleTime: 30_000'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -40,6 +49,10 @@ for (const anchor of requiredPageAnchors) {
 }
 
 for (const staleAnchor of [
+  'CSSProperties',
+  '<div style={styles.page}>',
+  'const styles:',
+  '<strong>Failed to load commercial launch incident closure.</strong>',
   'to="/platform/communications"',
   'to="/platform/support-operations-cockpit"',
   'accepted_handoff_decisions_recorded',
@@ -50,6 +63,25 @@ for (const staleAnchor of [
 ]) {
   if (page.includes(staleAnchor)) {
     throw new Error(`Platform Incident Closure check failed: stale page anchor remains: ${staleAnchor}`);
+  }
+}
+
+for (const cssAnchor of [
+  '.platform-incident-closure__hero-aside',
+  '.platform-incident-closure__status-badge',
+  '.platform-incident-closure__boundary-grid',
+  '.platform-incident-closure__feedback--warning',
+  '.platform-incident-closure__source-grid',
+  '.platform-incident-closure__persistence-grid',
+  '.platform-incident-closure__row-grid',
+  '.platform-incident-closure__empty-state',
+  '.platform-incident-closure__rules-grid',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)'
+]) {
+  if (!css.includes(cssAnchor)) {
+    throw new Error(`Platform Incident Closure check failed: missing CSS anchor: ${cssAnchor}`);
   }
 }
 

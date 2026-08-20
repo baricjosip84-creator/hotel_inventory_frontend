@@ -1,7 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchIncidentClosurePage.css';
 
 type Persistence = {
   stored_in_application: boolean;
@@ -50,13 +59,81 @@ type IncidentClosure = {
   validation_note: string;
 };
 
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+const summaryLabels: Record<string, string> = {
+  closure_rows_total: 'Closure rows',
+  waiting_for_post_launch_evidence_review: 'Post-launch review',
+  waiting_for_external_go_no_go_confirmation: 'Awaiting Go/No-Go',
+  waiting_for_external_smoke_test_confirmation: 'Awaiting smoke test',
+  waiting_for_external_launch_window_confirmation: 'Awaiting launch window',
+  waiting_for_external_post_launch_observation_confirmation: 'Awaiting observation',
+  waiting_for_external_triage_confirmation: 'Awaiting triage confirmation',
+  blocked_until_triage_ready: 'Blocked rows',
+  closure_records_persisted_in_application: 'Closure records stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  closure_rows_total: 'External incident-closure records prepared by this read-only board',
+  waiting_for_post_launch_evidence_review: 'Rows held until the upstream post-launch evidence review is resolved',
+  waiting_for_external_go_no_go_confirmation: 'Rows waiting for independently confirmed Go/No-Go decisions',
+  waiting_for_external_smoke_test_confirmation: 'Rows waiting for independently confirmed smoke-test results',
+  waiting_for_external_launch_window_confirmation: 'Rows waiting for the real launch window and production launch to be confirmed',
+  waiting_for_external_post_launch_observation_confirmation: 'Rows waiting for an external post-launch observation record',
+  waiting_for_external_triage_confirmation: 'Rows waiting for the externally recorded incident-triage record',
+  blocked_until_triage_ready: 'Rows that cannot proceed with the current Incident Triage posture',
+  closure_records_persisted_in_application: 'Expected to remain zero because this endpoint stores no closure outcomes'
+};
+
 function humanize(value: string | null | undefined) {
-  return (value || 'unknown').replaceAll('_', ' ');
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function errorMessage(error: unknown) {
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'not_reviewed' || normalized === 'not reviewed') return 'neutral';
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('sev1')
+    || normalized.includes('rolled_back')
+    || normalized.includes('fail')
+  ) return 'danger';
+  if (
+    normalized.includes('waiting')
+    || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('review')
+    || normalized.includes('watch')
+    || normalized.includes('required')
+    || normalized.includes('preparation')
+  ) return 'warn';
+  if (
+    normalized.includes('accepted')
+    || normalized.includes('ready')
+    || normalized.includes('healthy')
+    || normalized.includes('clear')
+  ) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
   if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unknown error';
+  return 'Unknown API error';
+}
+
+function persistenceLabel(value: Persistence | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence observable';
 }
 
 function getClosureEvidenceLink(row: ClosureRow) {
@@ -97,28 +174,6 @@ function getClosureEvidenceLabel(row: ClosureRow) {
   return byDomain[row.domain] || 'Open incident triage';
 }
 
-function badgeStyle(value: string | null | undefined): CSSProperties {
-  const normalized = (value || '').toLowerCase();
-  if (!normalized || normalized === 'loading' || normalized.includes('unknown')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('sev1') || normalized.includes('rolled_back')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (
-    normalized.includes('waiting')
-    || normalized.includes('external')
-    || normalized.includes('manual')
-    || normalized.includes('review')
-    || normalized.includes('watch')
-    || normalized.includes('not_reviewed')
-    || normalized.includes('preparation')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-}
-
 export default function PlatformCommercialLaunchIncidentClosurePage() {
   const closure = useQuery({
     queryKey: ['platform', 'commercial-launch-incident-closure'],
@@ -128,232 +183,275 @@ export default function PlatformCommercialLaunchIncidentClosurePage() {
   });
 
   const data = closure.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summaryEntries = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = closure.isError && !data;
+  const refreshError = closure.isError && Boolean(data);
+  const requestError = readableError(closure.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Incident Closure</h1>
-          <p style={styles.description}>
-            <strong>Closure preparation only.</strong> Step 224 converts Incident Triage rows into external final-severity,
-            customer-impact, rollback, customer-communication, prevention, handoff, evidence, and closure-owner
-            requirements. This application does not observe or persist the external triage records or the resulting
-            incident-closure decisions.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-incident-closure">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-incident-closure"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Incident Closure"
+        description="Read-only preparation for external incident-closure decisions after Incident Triage. It organizes final severity, customer-impact resolution, rollback outcome, customer communication, prevention, handoff, evidence and closure ownership without claiming that any external triage or closure outcome exists."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 224 — Commercial Launch Incident Closure Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Closure preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External closure record required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-incident-closure__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? data.summary.closure_rows_total ?? data.closure_rows.length : '—'}
+              label="incident closure rows"
+            />
+            {data ? (
+              <span className="platform-incident-closure__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-incident-closure__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void closure.refetch()}
+                disabled={closure.isFetching}
+              >
+                {closure.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-incident-closure__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-incident-closure"
+          title="External confirmation boundary"
+          description="This board prepares the structure of an incident-closure record; it does not observe or persist the real triage or closure decision."
+        />
+        <div className="platform-incident-closure__boundary-grid">
+          <div className="platform-incident-closure__boundary-notice">
+            <strong>Closure preparation only.</strong>
+            <span>
+              The application cannot confirm that external Go/No-Go decisions, smoke-test results, launch-window decisions, post-launch observations, incident-triage outcomes or incident-closure outcomes were recorded elsewhere. Resolve the current prerequisite and independently confirm the source triage record before recording closure.
+            </span>
+          </div>
+          <div className="platform-incident-closure__supporting-pages">
+            <strong>Supporting incident-closure pages</strong>
+            <span>This page already requires the evidence permissions used by these destinations, so these shortcuts do not bypass a stricter destination permission boundary.</span>
+            <div className="platform-incident-closure__link-row">
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-incident-triage">Incident triage</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-day-command-center">Launch command center</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-go-no-go-register">Launch Go/No-Go</Link>
+              <Link className="app-button app-button--secondary" to="/platform/incidents">Incidents</Link>
+              <Link className="app-button app-button--secondary" to="/platform/system-health">System health</Link>
+              <Link className="app-button app-button--secondary" to="/platform/support-cockpit">Support cockpit</Link>
+              <Link className="app-button app-button--secondary" to="/platform/billing-subscription-activation">Billing activation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/tenant-communications">Tenant communications</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-prevention-verification">Prevention verification</Link>
+            </div>
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {closure.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading Commercial Launch Incident Closure…</section>
+      ) : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-incident-closure__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Incident Closure.</strong>
+          <span>{requestError}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--danger platform-incident-closure__retry"
             onClick={() => void closure.refetch()}
             disabled={closure.isFetching}
           >
-            {closure.isFetching ? 'Refreshing...' : 'Refresh'}
+            {closure.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.boundaryCard}>
-        <strong>External confirmation boundary.</strong>
-        <span>
-          This board can prepare closure records, but it cannot confirm external Go/No-Go decisions, smoke-test
-          results, launch-window decisions, post-launch observations, triage outcomes, or incident-closure outcomes.
-          Resolve the current prerequisite and independently confirm the source triage record before recording closure.
-        </span>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting incident closure pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-incident-triage">Incident triage</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
-          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/tenant-communications">Tenant communications</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-prevention-verification">Prevention verification</Link>
-        </div>
-      </section>
-
-      {closure.isLoading ? <div style={styles.card}>Loading commercial launch incident closure preparation...</div> : null}
-      {closure.error ? (
-        <div style={styles.error}>
-          <strong>Failed to load commercial launch incident closure.</strong>
-          <span>{errorMessage(closure.error)}</span>
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-incident-closure__feedback platform-incident-closure__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Incident Closure snapshot. {requestError}</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-incident-closure__retry"
             onClick={() => void closure.refetch()}
             disabled={closure.isFetching}
           >
-            {closure.isFetching ? 'Retrying...' : 'Retry'}
+            {closure.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
-              <div style={styles.metadataItem}><strong>Phase</strong><span>{data.phase}</span></div>
-              <div style={styles.metadataItem}><strong>Step</strong><span>{data.step}</span></div>
-              <div style={styles.metadataItem}><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div style={styles.metadataItem}><strong>Validation</strong><span>{data.validation_note}</span></div>
-            </div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Incident closure summary">
+            {summaryEntries.map(([key, value]) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                iconPath="/platform/commercial-launch-incident-closure"
+                label={summaryLabels[key] || humanize(key)}
+                value={value}
+                helper={summaryHelpers[key] || 'Current read-only incident-closure preparation snapshot'}
+                tone={key.includes('blocked') && value > 0 ? 'danger' : key.includes('waiting') && value > 0 ? 'warn' : key.includes('persisted') ? 'neutral' : 'default'}
+              />
             ))}
+          </OperationalWorkspaceStats>
+
+          <section className="app-panel app-panel--padded platform-incident-closure__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-incident-triage"
+              title="Source launch posture"
+              description="Current upstream postures and persistence boundaries supplied by the launch evidence chain."
+            />
+            <div className="platform-incident-closure__source-grid">
+              <div><strong>Incident triage</strong><span>{humanize(data.incident_triage_posture)}</span><Link to="/platform/commercial-launch-incident-triage">Open Incident Triage</Link></div>
+              <div><strong>Post-launch observation</strong><span>{humanize(data.post_launch_observation_posture)}</span><Link to="/platform/commercial-launch-post-launch-observation">Open Post-Launch Observation</Link></div>
+              <div><strong>Launch command center</strong><span>{humanize(data.command_center_posture)}</span><Link to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
+              <div><strong>Smoke test</strong><span>{humanize(data.smoke_test_posture)}</span><Link to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
+              <div><strong>Go/No-Go register</strong><span>{humanize(data.go_no_go_register_posture)}</span><Link to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
+            </div>
+
+            <div className="platform-incident-closure__persistence-grid">
+              <div>
+                <strong>Incident-triage persistence</strong>
+                <span>{persistenceLabel(data.incident_triage_persistence)}</span>
+                <small>{data.incident_triage_persistence?.interpretation || 'No persistence statement reported.'}</small>
+              </div>
+              <div>
+                <strong>Incident-closure persistence</strong>
+                <span>{persistenceLabel(data.closure_persistence)}</span>
+                <small>{data.closure_persistence.interpretation}</small>
+              </div>
+            </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Incident-triage persistence</h2>
-              <div style={styles.statusRow}><span>Stored in application</span><strong>{data.incident_triage_persistence?.stored_in_application ? 'Yes' : 'No'}</strong></div>
-              <div style={styles.statusRow}><span>External records observable</span><strong>{data.incident_triage_persistence?.external_records_observable ? 'Yes' : 'No'}</strong></div>
-              <p style={styles.help}>{data.incident_triage_persistence?.interpretation || 'Incident-triage persistence metadata is unavailable.'}</p>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Incident-closure persistence</h2>
-              <div style={styles.statusRow}><span>Stored in application</span><strong>{data.closure_persistence.stored_in_application ? 'Yes' : 'No'}</strong></div>
-              <div style={styles.statusRow}><span>External records observable</span><strong>{data.closure_persistence.external_records_observable ? 'Yes' : 'No'}</strong></div>
-              <p style={styles.help}>{data.closure_persistence.interpretation}</p>
-            </div>
-          </section>
+          <section className="app-panel app-panel--padded platform-incident-closure__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-incident-closure"
+              title="Closure preparation rows"
+              description="Each row is an external closure template. The status shown here is the prerequisite posture, not a stored final severity, handoff decision or completed incident closure."
+            />
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
-            <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Incident triage</span><strong>{humanize(data.incident_triage_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-incident-triage">Open Incident Triage</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-post-launch-observation">Open Post-Launch Observation</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Closure preparation rows</h2>
-            <div style={styles.checkGrid}>
-              {data.closure_rows.map((row) => (
-                <article key={row.code} style={styles.checkCard}>
-                  <div style={styles.rowHeader}>
-                    <div style={styles.wrapAnywhere}>
-                      <strong>{humanize(row.code)}</strong>
-                      <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
+            {data.closure_rows.length === 0 ? (
+              <div className="platform-incident-closure__empty-state">
+                <strong>No closure preparation rows were produced.</strong>
+                <span>This is not evidence that there are no incidents to close or that incident closure is complete. Review Incident Triage and its external evidence availability.</span>
+              </div>
+            ) : (
+              <div className="platform-incident-closure__row-grid">
+                {data.closure_rows.map((row) => (
+                  <article key={row.code} className="app-panel platform-incident-closure__row-card">
+                    <div className="platform-incident-closure__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-incident-closure__status-badge" data-tone={badgeTone(row.closure_status)}>
+                        {humanize(row.closure_status)}
+                      </span>
                     </div>
-                    <span style={badgeStyle(row.closure_status)}>{humanize(row.closure_status)}</span>
-                  </div>
-                  <div style={styles.statusRow}><span>Source triage</span><strong style={styles.wrapAnywhere}>{humanize(row.source_triage_code)}</strong></div>
-                  <div style={styles.statusRow}><span>Source prerequisite status</span><span style={badgeStyle(row.source_triage_status)}>{humanize(row.source_triage_status)}</span></div>
-                  <div style={styles.statusRow}><span>Source template default severity</span><span style={badgeStyle(row.source_default_severity)}>{humanize(row.source_default_severity)}</span></div>
-                  <div style={styles.statusRow}><span>Template default handoff decision</span><span style={badgeStyle(row.default_handoff_decision)}>{humanize(row.default_handoff_decision)}</span></div>
-                  <div style={styles.statusRow}><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
-                  <Link style={styles.packetLink} to={getClosureEvidenceLink(row)}>{getClosureEvidenceLabel(row)}</Link>
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Manual precondition</span>
-                    <span>{row.manual_precondition}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Source triage artifact</span>
-                    <strong>{row.source_triage_artifact}</strong>
-                    <span>{humanize(row.source_triage_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>External closure artifact</span>
-                    <strong>{row.closure_artifact}</strong>
-                    <span>{humanize(row.closure_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Closure requirements</span>
-                    <ul style={styles.list}>{row.closure_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Allowed handoff decisions</span>
-                    <div style={styles.chips}>{row.handoff_decision_values.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Required external closure fields</span>
-                    <div style={styles.chips}>{row.required_closure_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
-                  </div>
-                </article>
-              ))}
+                    <div className="platform-incident-closure__source-summary">
+                      <div><span>Source observation</span><strong>{humanize(row.source_observation_code)}</strong><small>Upstream post-launch observation reference.</small></div>
+                      <div><span>Source triage</span><strong>{humanize(row.source_triage_code)}</strong></div>
+                      <div><span>Source prerequisite</span><strong>{humanize(row.source_triage_status)}</strong></div>
+                      <div><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                      <div><span>Source template default severity</span><strong>{humanize(row.source_default_severity)}</strong><small>Template default only; not an observed final severity.</small></div>
+                      <div><span>Template default handoff decision</span><strong>{humanize(row.default_handoff_decision)}</strong><small>Template default only; not an observed handoff decision.</small></div>
+                    </div>
+
+                    <div className="platform-incident-closure__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-incident-closure__row-actions">
+                      <Link className="app-button app-button--secondary" to={getClosureEvidenceLink(row)}>{getClosureEvidenceLabel(row)}</Link>
+                    </div>
+
+                    <div className="platform-incident-closure__artifact-grid">
+                      <div>
+                        <strong>Source triage artifact</strong>
+                        <span>{row.source_triage_artifact}</span>
+                        <small>{humanize(row.source_triage_artifact_storage)}</small>
+                      </div>
+                      <div>
+                        <strong>External closure artifact</strong>
+                        <span>{row.closure_artifact}</span>
+                        <small>{humanize(row.closure_artifact_storage)}</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-incident-closure__evidence-box">
+                      <strong>Closure requirements</strong>
+                      <ul>{row.closure_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+
+                    <div className="platform-incident-closure__field-groups">
+                      <div>
+                        <strong>Allowed handoff decisions</strong>
+                        <div className="platform-incident-closure__chips">
+                          {row.handoff_decision_values.map((item) => (
+                            <span key={item} data-tone={badgeTone(item)}>{humanize(item)}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Required external closure fields</strong>
+                        <div className="platform-incident-closure__chips">
+                          {row.required_closure_fields.map((field) => <span key={field}>{humanize(field)}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="platform-incident-closure__rules-grid">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-incident-closure"
+                title="Closure rules"
+                description="Guardrails that determine when an external incident-closure record may be prepared and accepted."
+              />
+              <ul>{data.closure_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-incident-closure"
+                title="Closure limitations"
+                description="Claims and actions this read-only board deliberately does not make."
+              />
+              <ul>{data.closure_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Closure rules</h2>
-              <ul style={styles.list}>{data.closure_rules.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Closure limitations</h2>
-              <ul style={styles.list}>{data.closure_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
+          <section className="app-panel app-panel--padded platform-incident-closure__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <section className="app-panel app-panel--padded platform-incident-closure__snapshot-note">
+            <strong>Snapshot metadata</strong>
+            <span>{data.phase} · {data.step}</span>
+            <span>Generated: {formatDateTime(data.generated_at)}</span>
+            <small>{data.validation_note}</small>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  errorButton: { justifySelf: 'start', border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metadataItem: { display: 'grid', gap: 5, overflowWrap: 'anywhere' },
-  sourceLink: { marginTop: 4, color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
-  packetLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  boundaryCard: { display: 'grid', gap: 6, background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.5 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
-  inputCard: { display: 'grid', gap: 6, border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0, overflowWrap: 'anywhere' },
-  checkGrid: { display: 'grid', gap: 12 },
-  checkCard: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 12, minWidth: 0 },
-  rowHeader: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
-  evidenceBox: { display: 'grid', gap: 5, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
-  evidenceLabel: { color: '#64748b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' },
-  statusRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 10, overflowWrap: 'anywhere' },
-  chips: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.55 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13, overflowWrap: 'anywhere' },
-  error: { display: 'grid', gap: 8, background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14, overflowWrap: 'anywhere', border: '1px solid #fecaca' },
-  wrapAnywhere: { minWidth: 0, overflowWrap: 'anywhere' }
-};
