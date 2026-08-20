@@ -3,29 +3,59 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformTenantProvisioningHardeningPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformTenantProvisioningHardeningPage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  "admin_user_count: 'Active admin count'",
-  "latest_provisioning_preset_key: 'Latest provisioning preset'",
-  "onboarding_task_count: 'Non-cancelled onboarding tasks'",
-  "value.includes('no_tenants')",
+  "import './PlatformTenantProvisioningHardeningPage.css'",
+  'io-operational-page io-workspace-page platform-provisioning-hardening',
+  '<OperationalWorkspaceHero',
+  '<OperationalWorkspaceStats ariaLabel="Tenant provisioning hardening key metrics">',
+  '<OperationalSectionHeader',
+  'Pre-onboarding gate',
   'refetchOnWindowFocus: false',
   'staleTime: 60_000',
+  'const allowedLimits = new Set',
+  'const refreshError = hardening.isError && Boolean(data)',
+  'const initialLoadError = hardening.isError && !data',
+  'Showing the last successful provisioning snapshot from',
+  'disabled={hardening.isFetching}',
   'htmlFor="provisioning-hardening-tenant-filter"',
   'htmlFor="provisioning-hardening-tenant-limit"',
+  "setSearchParams(next, { replace: true })",
+  'Selected tenant ({shortId(tenantId)})',
   'Tenant filter options could not be loaded.',
   'Unable to load provisioning hardening board.',
-  "hardening.error instanceof Error ? hardening.error.message",
-  'explicit provisioning audit evidence',
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'Controls with evidence / total controls in scope',
+  'Similar tenant fields alone are not treated as proof that a preset was applied.',
+  'hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ)',
+  'Open provisioning',
+  'Open onboarding tasks',
+  'Open platform audit'
 ];
 
 for (const anchor of requiredPageAnchors) {
   if (!page.includes(anchor)) {
     throw new Error(`Platform Provisioning Hardening check failed: missing ${anchor}`);
+  }
+}
+
+const requiredCssAnchors = [
+  '.platform-provisioning-hardening__filter-grid',
+  '.platform-provisioning-hardening__preset-grid',
+  '.platform-provisioning-hardening__evidence-grid',
+  '.platform-provisioning-hardening__control-row',
+  '.platform-provisioning-hardening__next-step',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'overflow-wrap: anywhere',
+  '@media (max-width: 720px)'
+];
+
+for (const anchor of requiredCssAnchors) {
+  if (!css.includes(anchor)) {
+    throw new Error(`Platform Provisioning Hardening check failed: CSS missing ${anchor}`);
   }
 }
 

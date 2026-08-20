@@ -1,8 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformTenantProvisioningHardeningPage.css';
 
 type ProvisioningControl = {
   code: string;
@@ -46,49 +55,65 @@ type ProvisioningHardeningPackage = {
 };
 
 type Tenant = { id: string; name: string };
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
 
-const evidenceLabels: Record<string, string> = {
-  organization_type: 'Organization type',
-  plan_code: 'Commercial plan',
-  billing_status: 'Billing status',
-  feature_flag_count: 'Feature flag count',
-  limit_count: 'Configured limit count',
-  admin_user_count: 'Active admin count',
-  storage_location_count: 'Active storage locations',
-  provisioning_audit_count: 'Provisioning audit events',
-  onboarding_task_count: 'Non-cancelled onboarding tasks',
-  latest_provisioning_preset_key: 'Latest provisioning preset',
-  latest_provisioning_audit_at: 'Latest provisioning audit',
-  latest_onboarding_task_at: 'Latest onboarding handoff update'
-};
+const allowedLimits = new Set(['25', '50', '100', '300']);
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+const evidenceItems = [
+  { key: 'organization_type', label: 'Organization type' },
+  { key: 'plan_code', label: 'Commercial plan' },
+  { key: 'billing_status', label: 'Billing status' },
+  { key: 'feature_flag_count', label: 'Feature flags' },
+  { key: 'limit_count', label: 'Configured limits' },
+  { key: 'admin_user_count', label: 'Active admins' },
+  { key: 'storage_location_count', label: 'Active storage locations' },
+  { key: 'provisioning_audit_count', label: 'Provisioning audit events' },
+  { key: 'onboarding_task_count', label: 'Onboarding tasks' },
+  { key: 'latest_provisioning_preset_key', label: 'Latest provisioning preset' },
+  { key: 'latest_provisioning_audit_at', label: 'Latest provisioning audit' },
+  { key: 'latest_onboarding_task_at', label: 'Latest onboarding handoff update' }
+] as const;
+
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not set';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked') || value.includes('missing') || value.includes('incomplete')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (value.includes('no_tenants')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (value.includes('needs') || value.includes('ready_for_onboarding_task') || value.includes('review')) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('blocked')) return 'danger';
+  if (normalized.includes('missing') || normalized.includes('incomplete')) return 'warn';
+  if (normalized.includes('no_tenants')) return 'neutral';
+  if (normalized.includes('needs') || normalized.includes('ready_for_onboarding_task') || normalized.includes('review')) return 'warn';
+  if (normalized.includes('ready_for_customer_onboarding') || normalized.includes('hardened') || normalized.includes('evidence_present')) return 'good';
+  return 'accent';
 }
 
 function formatValue(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === '') return '-';
-  if (typeof value === 'string' && value.includes('T')) return new Date(value).toLocaleString();
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'string' && value.includes('T')) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  }
   return String(value);
 }
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? `${value.slice(0, 8)}…` : value;
+}
+
 export default function PlatformTenantProvisioningHardeningPage() {
-  const [searchParams] = useSearchParams();
-  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
-  const [limit, setLimit] = useState(searchParams.get('limit') || '100');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tenantId = searchParams.get('tenant_id') || '';
+  const requestedLimit = searchParams.get('limit') || '100';
+  const limit = allowedLimits.has(requestedLimit) ? requestedLimit : '100';
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', 'for-provisioning-hardening'],
@@ -110,201 +135,325 @@ export default function PlatformTenantProvisioningHardeningPage() {
 
   const data = hardening.data;
   const summary = data?.summary || {};
-  const summaryKeys = [
-    'tenants_total',
-    'hardened_for_onboarding',
-    'missing_provisioning_evidence',
-    'missing_initial_admin',
-    'missing_starter_locations',
-    'missing_audit_trail',
-    'missing_onboarding_handoff',
-    'total_controls',
-    'controls_with_evidence'
-  ];
+  const tenantOptions = useMemo(() => tenants.data || [], [tenants.data]);
+  const selectedTenant = useMemo(
+    () => tenantOptions.find((tenant) => tenant.id === tenantId),
+    [tenantId, tenantOptions]
+  );
+  const refreshError = hardening.isError && Boolean(data);
+  const initialLoadError = hardening.isError && !data;
+  const errorMessage = hardening.error instanceof Error ? hardening.error.message : 'The platform request failed.';
+  const controlCoverage = `${summary.controls_with_evidence ?? 0}/${summary.total_controls ?? 0}`;
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
 
-  const selectedTenantName = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId)?.name, [tenantId, tenants.data]);
+  const updateSearchParam = (key: 'tenant_id' | 'limit', value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Tenant provisioning hardening</h1>
-          <p style={styles.subtitle}>Read-only launch gate for explicit preset evidence, commercial plan and billing seed, active tenant admin, starter locations, provisioning audit trail, and onboarding handoff.</p>
-        </div>
-        {data ? <span style={badgeStyle(data.posture)}>{humanize(data.posture)}</span> : null}
-      </header>
-
-      <section style={styles.panel}>
-        <div style={styles.filterGrid}>
-          <div style={styles.filterControl}>
-            <label style={styles.label} htmlFor="provisioning-hardening-tenant-filter">Tenant filter</label>
-            <select id="provisioning-hardening-tenant-filter" style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
-              <option value="">All tenants</option>
-              {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-            </select>
+    <div className="io-operational-page io-workspace-page platform-provisioning-hardening">
+      <OperationalWorkspaceHero
+        iconPath="/platform/tenant-provisioning-hardening"
+        eyebrow="Tenant provisioning"
+        title="Tenant provisioning hardening"
+        description="Verify that each provisioned tenant has explicit preset evidence, commercial plan and billing posture, an active admin, starter locations, an audit trail, and an onboarding handoff."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Platform-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Read-only evidence</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Pre-onboarding gate</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-provisioning-hardening__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? `${summary.hardened_for_onboarding ?? 0}/${summary.tenants_total ?? 0}` : '—'}
+              label="tenants hardened for onboarding"
+            />
+            {data ? (
+              <span className="platform-provisioning-hardening__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-provisioning-hardening__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void hardening.refetch()}
+                disabled={hardening.isFetching}
+              >
+                {hardening.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
           </div>
-          <div style={styles.filterControl}>
-            <label style={styles.label} htmlFor="provisioning-hardening-tenant-limit">Tenant limit</label>
-            <select id="provisioning-hardening-tenant-limit" style={styles.input} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={Boolean(tenantId)}>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-provisioning-hardening__scope-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/tenants"
+          title="Hardening scope"
+          description="Review one tenant or a recent tenant window. Filters are kept in the page URL so the current evidence scope can be revisited reliably."
+        />
+        <div className="platform-provisioning-hardening__filter-grid">
+          <label className="platform-provisioning-hardening__field" htmlFor="provisioning-hardening-tenant-filter">
+            <span>Tenant filter</span>
+            <select
+              id="provisioning-hardening-tenant-filter"
+              value={tenantId}
+              onChange={(event) => updateSearchParam('tenant_id', event.target.value)}
+            >
+              <option value="">All tenants</option>
+              {tenantId && !selectedTenant ? <option value={tenantId}>Selected tenant ({shortId(tenantId)})</option> : null}
+              {tenantOptions.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+            </select>
+          </label>
+          <label className="platform-provisioning-hardening__field" htmlFor="provisioning-hardening-tenant-limit">
+            <span>Tenant limit</span>
+            <select
+              id="provisioning-hardening-tenant-limit"
+              value={limit}
+              onChange={(event) => updateSearchParam('limit', event.target.value)}
+              disabled={Boolean(tenantId)}
+            >
               <option value="25">Latest 25 tenants</option>
               <option value="50">Latest 50 tenants</option>
               <option value="100">Latest 100 tenants</option>
               <option value="300">Latest 300 tenants</option>
             </select>
+          </label>
+          <div className="platform-provisioning-hardening__scope-copy">
+            <strong>Current scope</strong>
+            <span>
+              {tenantId
+                ? `Single tenant: ${selectedTenant?.name || shortId(tenantId)}`
+                : `Latest ${limit} tenants by creation date`}
+            </span>
           </div>
-          <button style={styles.secondaryButton} onClick={() => hardening.refetch()} disabled={hardening.isFetching}>
-            {hardening.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
         </div>
-        {selectedTenantName ? <span style={styles.help}>Showing provisioning evidence for {selectedTenantName}.</span> : <span style={styles.help}>Showing the latest {limit} tenants by creation date.</span>}
-        {tenants.error ? <span style={styles.errorText}>Tenant filter options could not be loaded. The hardening board can still be reviewed with its current filter.</span> : null}
+        {tenants.isLoading ? <span className="platform-provisioning-hardening__help">Loading tenant filter options…</span> : null}
+        {tenants.error ? (
+          <span className="platform-provisioning-hardening__filter-warning" role="status">
+            Tenant filter options could not be loaded. The hardening board can still be reviewed with its current filter.
+          </span>
+        ) : null}
       </section>
 
-      {hardening.isLoading ? <section style={styles.card}>Loading provisioning hardening board…</section> : null}
-      {hardening.error ? (
-        <section style={styles.errorCard}>
+      {hardening.isLoading ? <section className="app-panel app-panel--padded">Loading provisioning hardening board…</section> : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-provisioning-hardening__feedback" role="alert">
           <strong>Unable to load provisioning hardening board.</strong>
-          <span style={styles.errorText}>{hardening.error instanceof Error ? hardening.error.message : 'The platform request failed.'}</span>
-          <button style={styles.inlineButton} onClick={() => hardening.refetch()} disabled={hardening.isFetching}>Retry</button>
+          <span>{errorMessage}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-provisioning-hardening__retry"
+            onClick={() => void hardening.refetch()}
+            disabled={hardening.isFetching}
+          >
+            {hardening.isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-warning-state platform-provisioning-hardening__feedback" role="status">
+          <strong>Latest provisioning refresh failed.</strong>
+          <span>Showing the last successful provisioning snapshot from {formatDateTime(data?.generated_at)}.</span>
+          <span>{errorMessage}</span>
         </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaCard}>
-            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
-            <div><strong>Generated</strong><br /><span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span></div>
-            <div style={styles.note}>{data.validation_note}</div>
-          </section>
+          <OperationalWorkspaceStats ariaLabel="Tenant provisioning hardening key metrics">
+            <OperationalWorkspaceStatCard
+              label="Tenants in scope"
+              value={summary.tenants_total ?? 0}
+              helper={tenantId ? 'Selected tenant evidence package' : `Latest ${limit} tenants`}
+              iconPath="/platform/tenants"
+              tone="neutral"
+            />
+            <OperationalWorkspaceStatCard
+              label="Hardened for onboarding"
+              value={summary.hardened_for_onboarding ?? 0}
+              helper="All six provisioning controls have evidence"
+              iconPath="/platform/tenant-provisioning-hardening"
+              tone="good"
+            />
+            <OperationalWorkspaceStatCard
+              label="Incomplete hardening"
+              value={summary.missing_provisioning_evidence ?? 0}
+              helper="Tenants with one or more missing controls"
+              iconPath="/platform/tenant-provisioning-hardening"
+              tone={(summary.missing_provisioning_evidence ?? 0) > 0 ? 'warn' : 'good'}
+            />
+            <OperationalWorkspaceStatCard
+              label="Missing active admin"
+              value={summary.missing_initial_admin ?? 0}
+              helper="Tenants without an active tenant admin"
+              iconPath="/platform/users"
+              tone={(summary.missing_initial_admin ?? 0) > 0 ? 'danger' : 'neutral'}
+            />
+            <OperationalWorkspaceStatCard
+              label="Missing starter locations"
+              value={summary.missing_starter_locations ?? 0}
+              helper="Tenants without an active storage location"
+              iconPath="/platform/tenant-provisioning-hardening"
+              tone={(summary.missing_starter_locations ?? 0) > 0 ? 'danger' : 'neutral'}
+            />
+            <OperationalWorkspaceStatCard
+              label="Control evidence coverage"
+              value={controlCoverage}
+              helper="Controls with evidence / total controls in scope"
+              iconPath="/platform/tenant-provisioning-hardening"
+              tone="blue"
+            />
+          </OperationalWorkspaceStats>
 
-          <section style={styles.summaryGrid}>
-            {summaryKeys.map((key) => (
-              <div key={key} style={styles.card}>
-                <strong>{humanize(key)}</strong>
-                <div style={styles.metric}>{summary[key] ?? 0}</div>
+          <section className="app-panel app-panel--padded platform-provisioning-hardening__program-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/tenant-provisioning-hardening"
+              title="Program context"
+              description="This surface verifies provisioning evidence only. It does not provision tenants or certify commercial launch."
+            />
+            <div className="platform-provisioning-hardening__program-grid">
+              <div>
+                <strong>Phase</strong>
+                <span>{data.phase}</span>
               </div>
-            ))}
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Available commercial presets</h2>
-            <p style={styles.sectionHelp}>These are the presets the live provisioning service can apply. A tenant is not treated as preset-provisioned merely because its current fields resemble one of these presets; the hardening board also requires explicit provisioning audit evidence.</p>
-            <div style={styles.presetGrid}>
-              {data.provisioning_presets.map((preset) => (
-                <article key={preset.key} style={styles.presetCard}>
-                  <strong>{preset.label}</strong>
-                  <span style={styles.help}>{preset.description}</span>
-                  <span style={styles.help}>Organization type: {preset.organization_type}</span>
-                  <span style={styles.help}>Starter locations: {preset.storage_locations.length}</span>
-                  <span style={styles.help}>Feature flags: {Object.keys(preset.feature_flags || {}).length}</span>
-                  <span style={styles.help}>Configured limits: {Object.keys(preset.limits || {}).length}</span>
-                </article>
-              ))}
+              <div>
+                <strong>Step</strong>
+                <span>{data.step}</span>
+              </div>
+              <div>
+                <strong>Generated</strong>
+                <span>{formatDateTime(data.generated_at)}</span>
+              </div>
+              <div className="platform-provisioning-hardening__gap-summary">
+                <strong>Audit trail gaps</strong>
+                <span>{summary.missing_audit_trail ?? 0} tenant(s)</span>
+              </div>
+              <div className="platform-provisioning-hardening__gap-summary">
+                <strong>Onboarding handoff gaps</strong>
+                <span>{summary.missing_onboarding_handoff ?? 0} tenant(s)</span>
+              </div>
+              <details className="platform-provisioning-hardening__validation-note">
+                <summary>Evidence interpretation</summary>
+                <p>{data.validation_note}</p>
+              </details>
             </div>
           </section>
 
-          <section style={styles.areaGrid}>
-            {data.tenants.map((tenant) => (
-              <article key={tenant.tenant_id} style={styles.tenantCard}>
-                <div style={styles.areaHeader}>
-                  <div>
-                    <h2 style={styles.areaTitle}>{tenant.tenant_name}</h2>
-                    <div style={styles.help}>{tenant.tenant_id}</div>
+          <section className="app-panel app-panel--padded platform-provisioning-hardening__presets-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/provisioning"
+              title="Available commercial presets"
+              description="These are the currently available presets the live provisioning service can apply. Similar tenant fields alone are not treated as proof that a preset was applied."
+            />
+            <div className="platform-provisioning-hardening__preset-grid">
+              {data.provisioning_presets.map((preset) => (
+                <article key={preset.key} className="platform-provisioning-hardening__preset-card">
+                  <div className="platform-provisioning-hardening__preset-heading">
+                    <strong>{preset.label}</strong>
+                    <span>{humanize(preset.organization_type)}</span>
                   </div>
-                  <span style={badgeStyle(tenant.status)}>{humanize(tenant.status)}</span>
-                </div>
+                  <p>{preset.description}</p>
+                  <div className="platform-provisioning-hardening__preset-facts">
+                    <span><strong>{preset.storage_locations.length}</strong> starter locations</span>
+                    <span><strong>{Object.keys(preset.feature_flags || {}).length}</strong> feature flags</span>
+                    <span><strong>{Object.keys(preset.limits || {}).length}</strong> configured limits</span>
+                  </div>
+                </article>
+              ))}
+              {data.provisioning_presets.length === 0 ? (
+                <div className="app-empty-state platform-provisioning-hardening__empty">No published provisioning presets are available.</div>
+              ) : null}
+            </div>
+          </section>
 
-                <div style={styles.evidenceGrid}>
-                  {[
-                    'organization_type',
-                    'plan_code',
-                    'billing_status',
-                    'feature_flag_count',
-                    'limit_count',
-                    'admin_user_count',
-                    'storage_location_count',
-                    'provisioning_audit_count',
-                    'onboarding_task_count',
-                    'latest_provisioning_preset_key',
-                    'latest_provisioning_audit_at',
-                    'latest_onboarding_task_at'
-                  ].map((key) => (
-                    <div key={key} style={styles.evidenceCard}>
-                      <strong>{evidenceLabels[key] || humanize(key)}</strong>
-                      <span style={styles.evidenceValue}>{formatValue(tenant.evidence[key])}</span>
+          <section className="platform-provisioning-hardening__tenant-section">
+            <OperationalSectionHeader
+              iconPath="/platform/tenants"
+              title="Tenant provisioning evidence"
+              description="Each tenant shows the evidence the platform can prove, the six hardening controls, and the next operational step when something is missing."
+            />
+
+            <div className="platform-provisioning-hardening__tenant-list">
+              {data.tenants.map((tenant) => (
+                <article key={tenant.tenant_id} className="app-panel platform-provisioning-hardening__tenant-card">
+                  <div className="platform-provisioning-hardening__tenant-header">
+                    <div className="platform-provisioning-hardening__tenant-title-wrap">
+                      <h3>{tenant.tenant_name}</h3>
+                      <span title={tenant.tenant_id}>Tenant ID {shortId(tenant.tenant_id)}</span>
                     </div>
-                  ))}
-                </div>
+                    <span className="platform-provisioning-hardening__status-badge" data-tone={badgeTone(tenant.status)}>
+                      {humanize(tenant.status)}
+                    </span>
+                  </div>
 
-                <div style={styles.checklistGrid}>
-                  {tenant.controls.map((control) => (
-                    <div key={control.code} style={styles.checklistRow}>
-                      <div style={styles.checklistCopy}>
-                        <strong>{control.label}</strong>
-                        <div style={styles.help}>{control.launch_reason}</div>
+                  <div className="platform-provisioning-hardening__evidence-grid" aria-label={`${tenant.tenant_name} provisioning evidence`}>
+                    {evidenceItems.map((item) => (
+                      <div key={item.key} className="platform-provisioning-hardening__evidence-card">
+                        <span>{item.label}</span>
+                        <strong>{formatValue(tenant.evidence[item.key])}</strong>
                       </div>
-                      <div style={styles.checklistStatus}>
-                        <span style={badgeStyle(control.status || 'missing_evidence')}>{humanize(control.status || 'missing_evidence')}</span>
-                        <span style={styles.help}>Evidence: {control.evidence_value ?? 0}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
 
-                <div style={styles.nextStep}><strong>Next best step:</strong> {tenant.next_best_step}</div>
-                <div style={styles.actionRow}>
-                  <Link style={styles.linkButton} to="/platform/tenants">Open tenants</Link>
-                  <Link style={styles.linkButton} to="/platform/provisioning">Open provisioning</Link>
-                  <Link style={styles.linkButton} to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}&category=onboarding`}>Open onboarding tasks</Link>
-                  <Link style={styles.linkButton} to="/platform/audit">Open platform audit</Link>
-                </div>
-              </article>
-            ))}
-            {!hardening.isLoading && data.tenants.length === 0 ? <section style={styles.card}>No tenants found for this board.</section> : null}
+                  <div className="platform-provisioning-hardening__control-grid">
+                    {tenant.controls.map((control) => (
+                      <div key={control.code} className="platform-provisioning-hardening__control-row">
+                        <div className="platform-provisioning-hardening__control-copy">
+                          <strong>{control.label}</strong>
+                          <span>{control.launch_reason}</span>
+                        </div>
+                        <div className="platform-provisioning-hardening__control-status">
+                          <span className="platform-provisioning-hardening__status-badge" data-tone={badgeTone(control.status)}>
+                            {humanize(control.status || 'missing_evidence')}
+                          </span>
+                          <span>Evidence: {control.evidence_value ?? 0}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="platform-provisioning-hardening__next-step">
+                    <strong>Next best step</strong>
+                    <span>{tenant.next_best_step}</span>
+                  </div>
+
+                  <div className="platform-provisioning-hardening__actions">
+                    <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/tenants">
+                      Open tenants
+                    </Link>
+                    <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/provisioning">
+                      Open provisioning
+                    </Link>
+                    <Link
+                      className="app-button app-button--secondary platform-provisioning-hardening__link-button"
+                      to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}&category=onboarding`}
+                    >
+                      Open onboarding tasks
+                    </Link>
+                    {canReadAudit ? (
+                      <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/audit">
+                        Open platform audit
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+
+              {data.tenants.length === 0 ? (
+                <div className="app-empty-state platform-provisioning-hardening__empty">No tenants found for this hardening board.</div>
+              ) : null}
+            </div>
           </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 900 },
-  badge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, whiteSpace: 'nowrap', fontSize: 12, textTransform: 'capitalize' },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 8, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  filterControl: { display: 'grid', gap: 8 },
-  label: { fontWeight: 800 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', maxWidth: 420 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  errorText: { color: '#991b1b', fontSize: 12, lineHeight: 1.5, overflowWrap: 'anywhere' },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  note: { color: '#334155', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  sectionTitle: { margin: '0 0 8px', fontSize: 20, letterSpacing: '-.015em', color: '#0f172a' },
-  sectionHelp: { margin: '0 0 14px', color: '#64748b', fontSize: 13, lineHeight: 1.5, maxWidth: 980 },
-  presetGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  presetCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, background: '#f8fafc', minWidth: 0 },
-  areaGrid: { display: 'grid', gap: 16 },
-  tenantCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  areaTitle: { margin: 0, fontSize: 20 },
-  evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 },
-  evidenceCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 8, background: '#f8fafc', minWidth: 0 },
-  evidenceValue: { overflowWrap: 'anywhere' },
-  checklistGrid: { display: 'grid', gap: 10 },
-  checklistRow: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' },
-  checklistCopy: { flex: '1 1 360px', minWidth: 0 },
-  checklistStatus: { display: 'grid', gap: 6, justifyItems: 'end' },
-  nextStep: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#0f172a', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
-  inlineButton: { marginLeft: 10, border: '1px solid #cbd5e1', background: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 700, cursor: 'pointer' },
-  actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  linkButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '8px 12px', fontWeight: 800, color: 'var(--io-primary-dark)', textDecoration: 'none' }
-};
