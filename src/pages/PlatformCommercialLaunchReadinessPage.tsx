@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchReadinessPage.css';
 
 type LaunchReadinessArea = {
   code: string;
@@ -23,23 +31,19 @@ type LaunchReadinessPackage = {
   validation_note: string;
 };
 
-const summaryItems = [
-  { key: 'areas_total', label: 'Areas total' },
-  { key: 'core_launch_areas_total', label: 'Core launch areas' },
-  { key: 'post_launch_controls_total', label: 'Post-launch controls' },
-  { key: 'strong_foundation_present', label: 'Strong foundation' },
-  { key: 'medium_strong_foundation_present', label: 'Medium-strong foundation' },
-  { key: 'medium_foundation_present', label: 'Medium foundation' },
-  { key: 'partial_foundation_present', label: 'Partial foundation' },
-  { key: 'not_complete', label: 'Not complete' },
-  { key: 'manual_certificate_review_required', label: 'Manual certificate review' },
-  { key: 'manual_evidence_required', label: 'Manual evidence required' },
-  { key: 'ready_launch_gates', label: 'Review-ready gates' },
-  { key: 'blocked_launch_gates', label: 'Blocked gates' }
+const statusSummaryItems = [
+  { key: 'strong_foundation_present', label: 'Strong foundation', tone: 'good' },
+  { key: 'medium_strong_foundation_present', label: 'Medium-strong foundation', tone: 'blue' },
+  { key: 'medium_foundation_present', label: 'Medium foundation', tone: 'warn' },
+  { key: 'partial_foundation_present', label: 'Partial foundation', tone: 'warn' },
+  { key: 'not_complete', label: 'Not complete', tone: 'danger' },
+  { key: 'manual_certificate_review_required', label: 'Manual certificate review', tone: 'warn' },
+  { key: 'manual_evidence_required', label: 'Manual evidence required', tone: 'warn' }
 ] as const;
 
 function humanize(value: string) {
-  return value.replaceAll('_', ' ');
+  const normalized = value.replaceAll('_', ' ').trim();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Not set';
 }
 
 function statusLabel(value: string) {
@@ -55,62 +59,58 @@ function statusLabel(value: string) {
   return labels[value] || humanize(value);
 }
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('not_ready') || value.includes('blocked') || value.includes('not_complete')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (value.includes('manual_') || value.includes('partial') || value === 'medium_foundation_present') {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  if (value.includes('medium_strong')) {
-    return { ...styles.badge, background: '#dbeafe', color: '#1d4ed8' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+function statusTone(value: string): 'good' | 'blue' | 'warn' | 'danger' {
+  if (value.includes('not_ready') || value.includes('blocked') || value.includes('not_complete')) return 'danger';
+  if (value.includes('manual_') || value.includes('partial') || value === 'medium_foundation_present') return 'warn';
+  if (value.includes('medium_strong')) return 'blue';
+  return 'good';
 }
 
-function postureStyle(value: string): CSSProperties {
-  if (value.includes('not_ready') || value.includes('blocked')) {
-    return { ...styles.postureBadge, background: '#fee2e2', color: '#991b1b' };
-  }
-  return { ...styles.postureBadge, background: '#dbeafe', color: '#1d4ed8' };
+function formatDateTime(value: string | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
 }
 
 function SmallList({ items }: { items: string[] }) {
   return (
-    <ul style={styles.list}>
-      {items.map((item) => <li key={item} style={styles.listItem}>{item}</li>)}
+    <ul className="platform-launch-readiness__list">
+      {items.map((item) => <li key={item}>{item}</li>)}
     </ul>
   );
 }
 
 function AreaCard({ area }: { area: LaunchReadinessArea }) {
   return (
-    <article style={styles.areaCard}>
-      <div style={styles.areaHeader}>
-        <div style={styles.areaHeadingText}>
-          <h3 style={styles.areaTitle}>{area.label}</h3>
-          <div style={styles.help}>{humanize(area.domain)}</div>
+    <article className="app-panel app-panel--padded platform-launch-readiness__area-card">
+      <div className="platform-launch-readiness__area-header">
+        <div className="platform-launch-readiness__area-heading">
+          <h3>{area.label}</h3>
+          <span>{humanize(area.domain)}</span>
         </div>
-        <span style={badgeStyle(area.current_status)}>{statusLabel(area.current_status)}</span>
+        <span className="platform-launch-readiness__status-badge" data-tone={statusTone(area.current_status)}>
+          {statusLabel(area.current_status)}
+        </span>
       </div>
 
-      <div style={styles.nextStep}>
-        <strong>Next best step:</strong> {area.next_best_step}
+      <div className="platform-launch-readiness__next-step">
+        <strong>Next best step</strong>
+        <span>{area.next_best_step}</span>
       </div>
 
-      <div style={styles.gateLine}>
+      <div className="platform-launch-readiness__gate-line">
         <strong>Review gate</strong>
-        <span style={styles.gateValue}>{humanize(area.launch_gate)}</span>
+        <span>{humanize(area.launch_gate)}</span>
       </div>
 
-      <details style={styles.details}>
-        <summary style={styles.detailsSummary}>Evidence surfaces ({area.evidence_surfaces.length})</summary>
-        <div style={styles.detailsBody}><SmallList items={area.evidence_surfaces} /></div>
+      <details className="platform-launch-readiness__details">
+        <summary>Evidence surfaces ({area.evidence_surfaces.length})</summary>
+        <div className="platform-launch-readiness__details-body"><SmallList items={area.evidence_surfaces} /></div>
       </details>
 
-      <details style={styles.details}>
-        <summary style={styles.detailsSummary}>Required controls ({area.required_launch_controls.length})</summary>
-        <div style={styles.detailsBody}><SmallList items={area.required_launch_controls} /></div>
+      <details className="platform-launch-readiness__details">
+        <summary>Required controls ({area.required_launch_controls.length})</summary>
+        <div className="platform-launch-readiness__details-body"><SmallList items={area.required_launch_controls} /></div>
       </details>
     </article>
   );
@@ -131,130 +131,175 @@ export default function PlatformCommercialLaunchReadinessPage() {
   const errorMessage = readinessQuery.error instanceof Error
     ? readinessQuery.error.message
     : 'The launch-readiness package could not be retrieved.';
+  const initialLoadError = readinessQuery.isError && !data;
+  const refreshError = readinessQuery.isError && Boolean(data);
+  const blockedGates = summary.blocked_launch_gates ?? 0;
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.headerCopy}>
-          <h1 style={styles.title}>Commercial launch readiness</h1>
-          <p style={styles.subtitle}>
-            Read-only capability board for the ten core launch areas and the post-launch evidence-governance chain.
-            It shows what review surfaces and manual controls exist; it does not certify a real customer launch.
-          </p>
-        </div>
-        <div style={styles.headerActions}>
-          {data ? <span style={postureStyle(data.posture)}>{humanize(data.posture)}</span> : null}
-          <button
-            type="button"
-            style={styles.refreshButton}
-            onClick={() => readinessQuery.refetch()}
-            disabled={readinessQuery.isFetching}
-          >
-            {readinessQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
+    <div className="io-operational-page io-workspace-page platform-launch-readiness">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-readiness"
+        eyebrow="Platform commercial operations"
+        title="Commercial launch readiness"
+        description="Review the ten core launch areas and the post-launch evidence-governance chain from one read-only capability board. This surface shows implementation and evidence posture; it does not certify a real customer launch."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Platform-scoped</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Read-only readiness evidence</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Manual launch certification remains separate</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-launch-readiness__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? blockedGates : '—'}
+              label="blocked review gates in this package"
+            />
+            {data ? (
+              <span className="platform-launch-readiness__posture" data-tone={statusTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-launch-readiness__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void readinessQuery.refetch()}
+                disabled={readinessQuery.isFetching}
+              >
+                {readinessQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
 
       {readinessQuery.isLoading ? (
-        <section style={styles.card}>Loading commercial launch readiness…</section>
+        <section className="app-panel app-panel--padded">Loading commercial launch readiness…</section>
       ) : null}
 
-      {readinessQuery.error ? (
-        <section style={styles.errorCard}>
+      {initialLoadError ? (
+        <section className="app-error-state platform-launch-readiness__feedback" role="alert">
           <strong>Unable to load commercial launch readiness.</strong>
-          <span style={styles.errorText}>{errorMessage}</span>
-          <button type="button" style={styles.retryButton} onClick={() => readinessQuery.refetch()}>Retry</button>
+          <span>{errorMessage}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-launch-readiness__retry"
+            onClick={() => void readinessQuery.refetch()}
+            disabled={readinessQuery.isFetching}
+          >
+            {readinessQuery.isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-warning-state platform-launch-readiness__feedback" role="status">
+          <strong>Latest readiness refresh failed.</strong>
+          <span>Showing the last successful readiness package from {formatDateTime(data?.generated_at)}.</span>
+          <span>{errorMessage}</span>
         </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaCard}>
-            <div><strong>{data.phase}</strong><br /><span style={styles.help}>{data.step}</span></div>
-            <div>
-              <strong>Last refreshed</strong><br />
-              <span style={styles.help}>{new Date(data.generated_at).toLocaleString()}</span>
-            </div>
-            <div style={styles.note}>{data.validation_note}</div>
-          </section>
+          <OperationalWorkspaceStats ariaLabel="Commercial launch readiness key metrics">
+            <OperationalWorkspaceStatCard
+              label="Areas total"
+              value={summary.areas_total ?? 0}
+              helper="All core launch and post-launch control areas"
+              iconPath="/platform/commercial-launch-readiness"
+              tone="neutral"
+            />
+            <OperationalWorkspaceStatCard
+              label="Core launch areas"
+              value={summary.core_launch_areas_total ?? 0}
+              helper="Pre-launch capability areas"
+              iconPath="/platform/commercial-launch-readiness"
+              tone="blue"
+            />
+            <OperationalWorkspaceStatCard
+              label="Post-launch controls"
+              value={summary.post_launch_controls_total ?? 0}
+              helper="Evidence-governance checkpoints after launch"
+              iconPath="/platform/commercial-launch-readiness"
+              tone="neutral"
+            />
+            <OperationalWorkspaceStatCard
+              label="Blocked gates"
+              value={blockedGates}
+              helper={`${summary.ready_launch_gates ?? 0} review-ready gates`}
+              iconPath="/platform/commercial-launch-readiness"
+              tone={blockedGates > 0 ? 'danger' : 'good'}
+            />
+          </OperationalWorkspaceStats>
 
-          <section style={styles.summaryGrid} aria-label="Launch readiness summary">
-            {summaryItems.map(({ key, label }) => (
-              <div key={key} style={styles.summaryCard}>
-                <strong style={styles.summaryLabel}>{label}</strong>
-                <div style={styles.metric}>{summary[key] ?? 0}</div>
+          <section className="app-panel app-panel--padded platform-launch-readiness__package-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-readiness"
+              title="Readiness package context"
+              description="Static capability posture and evidence requirements for the current commercial-launch readiness package."
+            />
+            <div className="platform-launch-readiness__package-grid">
+              <div>
+                <strong>{data.phase}</strong>
+                <span>{data.step}</span>
               </div>
-            ))}
+              <div>
+                <strong>Review-ready gates</strong>
+                <span>{summary.ready_launch_gates ?? 0}</span>
+              </div>
+              <div>
+                <strong>Blocked gates</strong>
+                <span>{blockedGates}</span>
+              </div>
+              <div className="platform-launch-readiness__validation-note">
+                <strong>Validation note</strong>
+                <span>{data.validation_note}</span>
+              </div>
+            </div>
           </section>
 
-          <section style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Core launch readiness</h2>
-              <p style={styles.sectionDescription}>
-                Ten pre-launch capability areas. Foundation labels describe implementation/evidence posture, not proof that a launch has succeeded.
-              </p>
+          <section className="app-panel app-panel--padded platform-launch-readiness__posture-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-readiness"
+              title="Implementation and evidence posture"
+              description="Foundation labels describe what implementation or evidence support exists. Manual states remain intentionally separate from completed green states."
+            />
+            <div className="platform-launch-readiness__posture-grid">
+              {statusSummaryItems.map(({ key, label, tone }) => (
+                <div key={key} className="platform-launch-readiness__posture-item" data-tone={tone}>
+                  <span>{label}</span>
+                  <strong>{summary[key] ?? 0}</strong>
+                </div>
+              ))}
             </div>
-            <span style={styles.countBadge}>{coreAreas.length} areas</span>
-          </section>
-          <section style={styles.areaGrid}>
-            {coreAreas.map((area) => <AreaCard key={area.code} area={area} />)}
           </section>
 
-          <section style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Post-launch evidence controls</h2>
-              <p style={styles.sectionDescription}>
-                Manual governance checkpoints for incident closure, rollout, steady-state operations, retention, and renewal evidence.
-                “Manual evidence required” is intentionally not treated as a completed green state.
-              </p>
+          <section className="platform-launch-readiness__section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-readiness"
+              title="Core launch readiness"
+              description="Ten pre-launch capability areas. Foundation labels describe implementation/evidence posture, not proof that a launch has succeeded."
+              actions={<span className="platform-launch-readiness__count-badge">{coreAreas.length} areas</span>}
+            />
+            <div className="platform-launch-readiness__area-grid">
+              {coreAreas.map((area) => <AreaCard key={area.code} area={area} />)}
             </div>
-            <span style={styles.countBadge}>{postLaunchAreas.length} controls</span>
           </section>
-          <section style={styles.areaGrid}>
-            {postLaunchAreas.map((area) => <AreaCard key={area.code} area={area} />)}
+
+          <section className="platform-launch-readiness__section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-readiness"
+              title="Post-launch evidence controls"
+              description="Manual governance checkpoints for incident closure, rollout, steady-state operations, retention, and renewal evidence. “Manual evidence required” is intentionally not treated as a completed green state."
+              actions={<span className="platform-launch-readiness__count-badge">{postLaunchAreas.length} controls</span>}
+            />
+            <div className="platform-launch-readiness__area-grid">
+              {postLaunchAreas.map((area) => <AreaCard key={area.code} area={area} />)}
+            </div>
           </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowX: 'hidden', color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  headerCopy: { minWidth: 0, flex: '1 1 620px' },
-  headerActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 980, lineHeight: 1.5 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontWeight: 800, fontSize: 11, textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.25, maxWidth: 200 },
-  postureBadge: { padding: '8px 12px', borderRadius: 999, fontWeight: 800, fontSize: 12, textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.25, maxWidth: 320 },
-  refreshButton: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer' },
-  retryButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-start' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  errorCard: { background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: 18, display: 'grid', gap: 8, color: '#991b1b' },
-  errorText: { color: '#7f1d1d', lineHeight: 1.4, overflowWrap: 'anywhere' },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, minWidth: 0 },
-  note: { color: '#334155', lineHeight: 1.5 },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 12, minWidth: 0 },
-  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  summaryLabel: { display: 'block', lineHeight: 1.3, fontSize: 13 },
-  metric: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 6 },
-  sectionTitle: { margin: 0, fontSize: 22, letterSpacing: '-.015em', color: '#0f172a' },
-  sectionDescription: { margin: '5px 0 0', color: '#64748b', lineHeight: 1.45, maxWidth: 980 },
-  countBadge: { padding: '6px 10px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' },
-  areaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, minWidth: 0 },
-  areaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 18, display: 'grid', gap: 13, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0, alignContent: 'start' },
-  areaHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', minWidth: 0 },
-  areaHeadingText: { flex: '1 1 170px', minWidth: 0 },
-  areaTitle: { margin: 0, fontSize: 19, lineHeight: 1.25, overflowWrap: 'anywhere' },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.5, minWidth: 0 },
-  listItem: { overflowWrap: 'anywhere', wordBreak: 'break-word' },
-  nextStep: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#0f172a', lineHeight: 1.5, overflowWrap: 'anywhere' },
-  gateLine: { display: 'grid', gap: 3, color: '#334155', fontSize: 12, minWidth: 0 },
-  gateValue: { color: '#64748b', overflowWrap: 'anywhere' },
-  details: { borderTop: '1px solid #eef2f7', paddingTop: 9, minWidth: 0 },
-  detailsSummary: { cursor: 'pointer', fontWeight: 800, color: '#334155', lineHeight: 1.4 },
-  detailsBody: { marginTop: 9, minWidth: 0 }
-};
