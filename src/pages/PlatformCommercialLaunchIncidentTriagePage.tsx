@@ -1,7 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchIncidentTriagePage.css';
 
 type Persistence = {
   stored_in_application: boolean;
@@ -48,13 +57,74 @@ type IncidentTriage = {
   validation_note: string;
 };
 
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+const summaryLabels: Record<string, string> = {
+  triage_rows_total: 'Triage rows',
+  waiting_for_post_launch_evidence_review: 'Post-launch review',
+  waiting_for_external_go_no_go_confirmation: 'Awaiting Go/No-Go',
+  waiting_for_external_smoke_test_confirmation: 'Awaiting smoke test',
+  waiting_for_external_launch_window_confirmation: 'Awaiting launch window',
+  waiting_for_external_post_launch_observation_confirmation: 'Awaiting observation',
+  blocked_until_post_launch_observation_ready: 'Blocked rows',
+  triage_records_persisted_in_application: 'Triage records stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  triage_rows_total: 'External incident-triage records prepared by this read-only queue',
+  waiting_for_post_launch_evidence_review: 'Rows held until the upstream evidence review is resolved',
+  waiting_for_external_go_no_go_confirmation: 'Rows waiting for independently confirmed Go/No-Go decisions',
+  waiting_for_external_smoke_test_confirmation: 'Rows waiting for independently confirmed smoke-test results',
+  waiting_for_external_launch_window_confirmation: 'Rows waiting for the real launch window and production launch to be confirmed',
+  waiting_for_external_post_launch_observation_confirmation: 'Rows waiting for an external post-launch observation record',
+  blocked_until_post_launch_observation_ready: 'Rows that cannot proceed with the current upstream posture',
+  triage_records_persisted_in_application: 'Expected to remain zero because this endpoint stores no triage outcomes'
+};
+
 function humanize(value: string | null | undefined) {
-  return (value || 'unknown').replaceAll('_', ' ');
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function errorMessage(error: unknown) {
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'not_reviewed' || normalized === 'not reviewed') return 'neutral';
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('sev1')
+    || normalized.includes('fail')
+    || normalized.includes('degradation')
+  ) return 'danger';
+  if (
+    normalized.includes('waiting')
+    || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('review')
+    || normalized.includes('watch')
+    || normalized.includes('required')
+    || normalized.includes('preparation')
+  ) return 'warn';
+  if (normalized.includes('ready') || normalized.includes('healthy') || normalized.includes('clear')) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
   if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unknown error';
+  return 'Unknown API error';
+}
+
+function persistenceLabel(value: Persistence | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence observable';
 }
 
 function getTriageEvidenceLink(row: TriageRow) {
@@ -85,28 +155,6 @@ function getTriageEvidenceLabel(row: TriageRow) {
   return bySource[row.source_observation_code] || 'Open post-launch observation';
 }
 
-function badgeStyle(value: string | null | undefined): CSSProperties {
-  const normalized = (value || '').toLowerCase();
-  if (!normalized || normalized === 'loading' || normalized.includes('unknown')) {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('sev1')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
-  if (
-    normalized.includes('waiting')
-    || normalized.includes('external')
-    || normalized.includes('manual')
-    || normalized.includes('review')
-    || normalized.includes('watch')
-    || normalized.includes('not_reviewed')
-    || normalized.includes('preparation')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-}
-
 export default function PlatformCommercialLaunchIncidentTriagePage() {
   const triage = useQuery({
     queryKey: ['platform', 'commercial-launch-incident-triage'],
@@ -116,229 +164,276 @@ export default function PlatformCommercialLaunchIncidentTriagePage() {
   });
 
   const data = triage.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summaryEntries = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = triage.isError && !data;
+  const refreshError = triage.isError && Boolean(data);
+  const requestError = readableError(triage.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Incident Triage</h1>
-          <p style={styles.description}>
-            <strong>Triage preparation only.</strong> Step 223 converts the Post-Launch Observation template into
-            external severity, customer-impact, ownership, communication, rollback, follow-up, and closure-evidence
-            requirements. This application does not observe or persist the external post-launch observation outcomes
-            or the resulting triage decisions.
-          </p>
+    <div className="io-operational-page io-workspace-page platform-incident-triage">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-incident-triage"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Incident Triage"
+        description="Read-only preparation for external incident-triage decisions after post-launch observation. It organizes severity, customer impact, ownership, communication, rollback, follow-up and closure evidence without claiming that any external observation or triage outcome exists."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 223 — Commercial Launch Incident Triage Queue'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Triage preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External triage record required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-incident-triage__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? data.summary.triage_rows_total ?? data.triage_rows.length : '—'}
+              label="incident triage rows"
+            />
+            {data ? (
+              <span className="platform-incident-triage__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-incident-triage__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void triage.refetch()}
+                disabled={triage.isFetching}
+              >
+                {triage.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-incident-triage__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-incident-triage"
+          title="External confirmation boundary"
+          description="This queue prepares the structure of an incident-triage record; it does not observe or persist the real triage decision."
+        />
+        <div className="platform-incident-triage__boundary-grid">
+          <div className="platform-incident-triage__boundary-notice">
+            <strong>Triage preparation only.</strong>
+            <span>
+              The application cannot confirm that external Go/No-Go decisions, smoke-test results, launch-window decisions, post-launch observations or incident-triage outcomes were recorded elsewhere. Confirm the source observation independently before recording severity or any follow-up decision.
+            </span>
+          </div>
+          <div className="platform-incident-triage__supporting-pages">
+            <strong>Supporting incident-triage pages</strong>
+            <span>This page already requires the evidence permissions used by these destinations, so these shortcuts do not bypass a stricter destination permission boundary.</span>
+            <div className="platform-incident-triage__link-row">
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-day-command-center">Launch command center</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-go-no-go-register">Launch Go/No-Go</Link>
+              <Link className="app-button app-button--secondary" to="/platform/incidents">Incidents</Link>
+              <Link className="app-button app-button--secondary" to="/platform/system-health">System health</Link>
+              <Link className="app-button app-button--secondary" to="/platform/support-cockpit">Support cockpit</Link>
+              <Link className="app-button app-button--secondary" to="/platform/billing-subscription-activation">Billing activation</Link>
+              <Link className="app-button app-button--secondary" to="/platform/tenant-communications">Tenant communications</Link>
+              <Link className="app-button app-button--secondary" to="/platform/commercial-launch-incident-closure">Incident closure</Link>
+            </div>
+          </div>
         </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
+      </section>
+
+      {triage.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading Commercial Launch Incident Triage…</section>
+      ) : null}
+
+      {initialLoadError ? (
+        <section className="app-error-state platform-incident-triage__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Incident Triage.</strong>
+          <span>{requestError}</span>
           <button
             type="button"
-            style={styles.secondaryButton}
+            className="app-button app-button--danger platform-incident-triage__retry"
             onClick={() => void triage.refetch()}
             disabled={triage.isFetching}
           >
-            {triage.isFetching ? 'Refreshing...' : 'Refresh'}
+            {triage.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section style={styles.boundaryCard}>
-        <strong>External confirmation boundary.</strong>
-        <span>
-          The queue can prepare triage records, but it cannot confirm that external Go/No-Go decisions, smoke-test
-          results, launch-window decisions, post-launch observations, or triage outcomes were recorded elsewhere.
-          Resolve the current prerequisite and independently confirm the source observation record before recording triage.
-        </span>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Supporting incident triage pages</h2>
-        <div style={styles.quickLinks}>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-post-launch-observation">Post-launch observation</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-day-command-center">Launch command center</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-smoke-test-checklist">Launch smoke test</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-go-no-go-register">Launch go/no-go</Link>
-          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/system-health">System health</Link>
-          <Link style={styles.quickLink} to="/platform/support-cockpit">Support cockpit</Link>
-          <Link style={styles.quickLink} to="/platform/billing-subscription-activation">Billing activation</Link>
-          <Link style={styles.quickLink} to="/platform/tenant-communications">Tenant communications</Link>
-          <Link style={styles.quickLink} to="/platform/commercial-launch-incident-closure">Incident closure</Link>
-        </div>
-      </section>
-
-      {triage.isLoading ? <div style={styles.card}>Loading commercial launch incident triage preparation...</div> : null}
-      {triage.error ? (
-        <div style={styles.error}>
-          <strong>Failed to load commercial launch incident triage.</strong>
-          <span>{errorMessage(triage.error)}</span>
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-incident-triage__feedback platform-incident-triage__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Incident Triage snapshot. {requestError}</span>
           <button
             type="button"
-            style={styles.errorButton}
+            className="app-button app-button--secondary platform-incident-triage__retry"
             onClick={() => void triage.refetch()}
             disabled={triage.isFetching}
           >
-            {triage.isFetching ? 'Retrying...' : 'Retry'}
+            {triage.isFetching ? 'Retrying…' : 'Retry refresh'}
           </button>
-        </div>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Snapshot metadata</h2>
-            <div style={styles.metadataGrid}>
-              <div style={styles.metadataItem}><strong>Phase</strong><span>{data.phase}</span></div>
-              <div style={styles.metadataItem}><strong>Step</strong><span>{data.step}</span></div>
-              <div style={styles.metadataItem}><strong>Generated</strong><span>{data.generated_at ? new Date(data.generated_at).toLocaleString() : '-'}</span></div>
-              <div style={styles.metadataItem}><strong>Validation</strong><span>{data.validation_note}</span></div>
-            </div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Incident triage summary">
+            {summaryEntries.map(([key, value]) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                iconPath="/platform/commercial-launch-incident-triage"
+                label={summaryLabels[key] || humanize(key)}
+                value={value}
+                helper={summaryHelpers[key] || 'Current read-only incident-triage preparation snapshot'}
+                tone={key.includes('blocked') && value > 0 ? 'danger' : key.includes('waiting') && value > 0 ? 'warn' : key.includes('persisted') ? 'neutral' : 'default'}
+              />
             ))}
+          </OperationalWorkspaceStats>
+
+          <section className="app-panel app-panel--padded platform-incident-triage__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-post-launch-observation"
+              title="Source launch posture"
+              description="Current upstream postures and persistence boundaries supplied by the launch evidence chain."
+            />
+            <div className="platform-incident-triage__source-grid">
+              <div><strong>Post-launch observation</strong><span>{humanize(data.post_launch_observation_posture)}</span><Link to="/platform/commercial-launch-post-launch-observation">Open Post-Launch Observation</Link></div>
+              <div><strong>Launch command center</strong><span>{humanize(data.command_center_posture)}</span><Link to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
+              <div><strong>Smoke test</strong><span>{humanize(data.smoke_test_posture)}</span><Link to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
+              <div><strong>Go/No-Go register</strong><span>{humanize(data.go_no_go_register_posture)}</span><Link to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
+            </div>
+
+            <div className="platform-incident-triage__persistence-grid">
+              <div>
+                <strong>Post-launch observation persistence</strong>
+                <span>{persistenceLabel(data.post_launch_observation_persistence)}</span>
+                <small>{data.post_launch_observation_persistence?.interpretation || 'No persistence statement reported.'}</small>
+              </div>
+              <div>
+                <strong>Incident-triage persistence</strong>
+                <span>{persistenceLabel(data.triage_persistence)}</span>
+                <small>{data.triage_persistence.interpretation}</small>
+              </div>
+            </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Post-launch observation persistence</h2>
-              <div style={styles.statusRow}><span>Stored in application</span><strong>{data.post_launch_observation_persistence?.stored_in_application ? 'Yes' : 'No'}</strong></div>
-              <div style={styles.statusRow}><span>External records observable</span><strong>{data.post_launch_observation_persistence?.external_records_observable ? 'Yes' : 'No'}</strong></div>
-              <p style={styles.help}>{data.post_launch_observation_persistence?.interpretation || 'Post-launch observation persistence metadata is unavailable.'}</p>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Incident-triage persistence</h2>
-              <div style={styles.statusRow}><span>Stored in application</span><strong>{data.triage_persistence.stored_in_application ? 'Yes' : 'No'}</strong></div>
-              <div style={styles.statusRow}><span>External records observable</span><strong>{data.triage_persistence.external_records_observable ? 'Yes' : 'No'}</strong></div>
-              <p style={styles.help}>{data.triage_persistence.interpretation}</p>
-            </div>
-          </section>
+          <section className="app-panel app-panel--padded platform-incident-triage__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-incident-triage"
+              title="Triage preparation rows"
+              description="Each row is an external triage template. The status shown here is the prerequisite posture, not a stored incident severity or completed triage decision."
+            />
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
-            <div style={styles.inputGrid}>
-              <div style={styles.inputCard}><span style={styles.help}>Post-launch observation</span><strong>{humanize(data.post_launch_observation_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-post-launch-observation">Open Post-Launch Observation</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Command center</span><strong>{humanize(data.command_center_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-day-command-center">Open Command Center</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Smoke test</span><strong>{humanize(data.smoke_test_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-smoke-test-checklist">Open Launch Smoke Test</Link></div>
-              <div style={styles.inputCard}><span style={styles.help}>Go/no-go register</span><strong>{humanize(data.go_no_go_register_posture)}</strong><Link style={styles.sourceLink} to="/platform/commercial-launch-go-no-go-register">Open Launch Go/No-Go</Link></div>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Triage preparation rows</h2>
-            <div style={styles.checkGrid}>
-              {data.triage_rows.map((row) => (
-                <article key={row.code} style={styles.checkCard}>
-                  <div style={styles.rowHeader}>
-                    <div style={styles.wrapAnywhere}>
-                      <strong>{humanize(row.code)}</strong>
-                      <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
+            {data.triage_rows.length === 0 ? (
+              <div className="platform-incident-triage__empty-state">
+                <strong>No triage preparation rows were produced.</strong>
+                <span>This is not evidence that the launch is incident-free. Review the upstream Post-Launch Observation source and its evidence availability.</span>
+              </div>
+            ) : (
+              <div className="platform-incident-triage__row-grid">
+                {data.triage_rows.map((row) => (
+                  <article key={row.code} className="app-panel platform-incident-triage__row-card">
+                    <div className="platform-incident-triage__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-incident-triage__status-badge" data-tone={badgeTone(row.triage_status)}>
+                        {humanize(row.triage_status)}
+                      </span>
                     </div>
-                    <span style={badgeStyle(row.triage_status)}>{humanize(row.triage_status)}</span>
-                  </div>
-                  <div style={styles.statusRow}><span>Source observation</span><strong style={styles.wrapAnywhere}>{humanize(row.source_observation_code)}</strong></div>
-                  <div style={styles.statusRow}><span>Source prerequisite status</span><span style={badgeStyle(row.source_observation_status)}>{humanize(row.source_observation_status)}</span></div>
-                  <div style={styles.statusRow}><span>Template default severity</span><span style={badgeStyle(row.default_severity)}>{humanize(row.default_severity)}</span></div>
-                  <div style={styles.statusRow}><span>Escalation trigger</span><strong style={styles.wrapAnywhere}>{humanize(row.escalation_trigger)}</strong></div>
-                  <Link style={styles.packetLink} to={getTriageEvidenceLink(row)}>{getTriageEvidenceLabel(row)}</Link>
 
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Manual precondition</span>
-                    <span>{row.manual_precondition}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Source observation artifact</span>
-                    <strong>{row.source_observation_artifact}</strong>
-                    <span>{humanize(row.source_observation_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>External triage artifact</span>
-                    <strong>{row.triage_artifact}</strong>
-                    <span>{humanize(row.triage_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Triage actions</span>
-                    <ul style={styles.list}>{row.triage_actions.map((item) => <li key={item}>{item}</li>)}</ul>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Allowed severity values</span>
-                    <div style={styles.chips}>{row.severity_values.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Required external triage fields</span>
-                    <div style={styles.chips}>{row.required_triage_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
-                  </div>
-                </article>
-              ))}
+                    <div className="platform-incident-triage__source-summary">
+                      <div><span>Source observation</span><strong>{humanize(row.source_observation_code)}</strong></div>
+                      <div><span>Source prerequisite</span><strong>{humanize(row.source_observation_status)}</strong></div>
+                      <div><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                      <div><span>Template default severity</span><strong>{humanize(row.default_severity)}</strong><small>Template default only; not an observed severity.</small></div>
+                    </div>
+
+                    <div className="platform-incident-triage__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-incident-triage__evidence-box">
+                      <strong>Escalation trigger</strong>
+                      <span>{humanize(row.escalation_trigger)}</span>
+                    </div>
+
+                    <div className="platform-incident-triage__row-actions">
+                      <Link className="app-button app-button--secondary" to={getTriageEvidenceLink(row)}>{getTriageEvidenceLabel(row)}</Link>
+                    </div>
+
+                    <div className="platform-incident-triage__artifact-grid">
+                      <div>
+                        <strong>Source observation artifact</strong>
+                        <span>{row.source_observation_artifact}</span>
+                        <small>{humanize(row.source_observation_artifact_storage)}</small>
+                      </div>
+                      <div>
+                        <strong>External triage artifact</strong>
+                        <span>{row.triage_artifact}</span>
+                        <small>{humanize(row.triage_artifact_storage)}</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-incident-triage__evidence-box">
+                      <strong>Triage actions</strong>
+                      <ul>{row.triage_actions.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+
+                    <div className="platform-incident-triage__field-groups">
+                      <div>
+                        <strong>Allowed severity values</strong>
+                        <div className="platform-incident-triage__chips">
+                          {row.severity_values.map((item) => (
+                            <span key={item} data-tone={badgeTone(item)}>{humanize(item)}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Required external triage fields</strong>
+                        <div className="platform-incident-triage__chips">
+                          {row.required_triage_fields.map((field) => <span key={field}>{humanize(field)}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="platform-incident-triage__rules-grid">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-incident-triage"
+                title="Triage rules"
+                description="Guardrails that determine when an external incident-triage record may be prepared."
+              />
+              <ul>{data.triage_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-incident-triage"
+                title="Triage limitations"
+                description="Claims and actions this read-only queue deliberately does not make."
+              />
+              <ul>{data.triage_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Triage rules</h2>
-              <ul style={styles.list}>{data.triage_rules.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Triage limitations</h2>
-              <ul style={styles.list}>{data.triage_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-            </div>
+          <section className="app-panel app-panel--padded platform-incident-triage__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <section className="app-panel app-panel--padded platform-incident-triage__snapshot-note">
+            <strong>Snapshot metadata</strong>
+            <span>{data.phase} · {data.step}</span>
+            <span>Generated: {formatDateTime(data.generated_at)}</span>
+            <small>{data.validation_note}</small>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  quickLinks: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  quickLink: { border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  errorButton: { justifySelf: 'start', border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metadataItem: { display: 'grid', gap: 5, overflowWrap: 'anywhere' },
-  sourceLink: { marginTop: 4, color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 800, textDecoration: 'none' },
-  packetLink: { justifySelf: 'start', border: '1px solid #cbd5e1', background: '#fff', borderRadius: 999, padding: '6px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  boundaryCard: { display: 'grid', gap: 6, background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.5 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
-  inputCard: { display: 'grid', gap: 6, border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0, overflowWrap: 'anywhere' },
-  checkGrid: { display: 'grid', gap: 12 },
-  checkCard: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 12, minWidth: 0 },
-  rowHeader: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45, overflowWrap: 'anywhere' },
-  evidenceBox: { display: 'grid', gap: 5, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
-  evidenceLabel: { color: '#64748b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' },
-  statusRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 10, overflowWrap: 'anywhere' },
-  chips: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.55 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 14, padding: 14, overflowWrap: 'anywhere' },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13, overflowWrap: 'anywhere' },
-  error: { display: 'grid', gap: 8, background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14, overflowWrap: 'anywhere', border: '1px solid #fecaca' },
-  wrapAnywhere: { minWidth: 0, overflowWrap: 'anywhere' }
-};

@@ -3,12 +3,18 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchIncidentTriagePage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchIncidentTriagePage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
-  'Triage preparation only.',
-  'External confirmation boundary.',
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalWorkspaceStatCard',
+  'OperationalSectionHeader',
+  "import './PlatformCommercialLaunchIncidentTriagePage.css'",
+  'Triage preparation only',
+  'External confirmation boundary',
   'cannot confirm that external Go/No-Go decisions',
   'Post-launch observation persistence',
   'Incident-triage persistence',
@@ -16,6 +22,15 @@ const requiredPageAnchors = [
   'Source observation artifact',
   'External triage artifact',
   'Required external triage fields',
+  'Customer impact review',
+  'customer_impact_review_required',
+  'Template default only; not an observed severity.',
+  'No triage preparation rows were produced.',
+  'not evidence that the launch is incident-free',
+  'initialLoadError',
+  'refreshError',
+  'Showing the last successful Commercial Launch Incident Triage snapshot.',
+  "disabled={triage.isFetching}",
   'post_launch_observation_persistence',
   'triage_persistence',
   'source_observation_artifact',
@@ -26,10 +41,7 @@ const requiredPageAnchors = [
   '/platform/commercial-launch-incident-closure',
   'refetchOnWindowFocus: false',
   'staleTime: 30_000',
-  'errorMessage(triage.error)',
-  "normalized.includes('external')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'readableError(triage.error)'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -38,12 +50,29 @@ for (const anchor of requiredPageAnchors) {
   }
 }
 
+for (const requiredCssAnchor of [
+  '.platform-incident-triage',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)',
+  'overflow-wrap: anywhere',
+  '@media (max-width: 640px)'
+]) {
+  if (!css.includes(requiredCssAnchor)) {
+    throw new Error(`Platform Incident Triage check failed: missing CSS anchor: ${requiredCssAnchor}`);
+  }
+}
+
 for (const staleAnchor of [
+  "const styles: Record<string, CSSProperties>",
+  "type CSSProperties",
+  'style={styles.',
   'to="/platform/communications"',
   'severity_assigned',
   'customer_impact_reviews_recorded',
   'rollback_decisions_recorded',
-  'not_reviewed_triage_rows'
+  'not_reviewed_triage_rows',
+  'Failed to load commercial launch incident triage.'
 ]) {
   if (page.includes(staleAnchor)) {
     throw new Error(`Platform Incident Triage check failed: stale page anchor remains: ${staleAnchor}`);
