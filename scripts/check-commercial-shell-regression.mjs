@@ -126,8 +126,8 @@ if (!router.includes("path: 'ai-review'") || !router.includes('LegacyAIReviewRed
 
 for (const signal of [
   'Recommendation reviews',
-  'Readiness &amp; governance',
-  'Not every item on this page was produced by an AI model',
+  'Readiness & governance',
+  'It does not prove that an external AI model was used',
   'How this result was produced',
   "activeView === 'recommendations'",
   "activeView === 'readiness'"
