@@ -887,7 +887,20 @@ const router = createBrowserRouter([
       {
         path: 'commercial-launch-retention-renewal-acceptance-docket',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+            PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ,
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ,
+            PLATFORM_PERMISSIONS.TENANTS_EXPORT,
+            PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ,
+            PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ
+          ]}>
             <PlatformCommercialLaunchRetentionRenewalAcceptanceDocketPage />
           </PlatformProtectedRoute>
         )
