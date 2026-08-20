@@ -3,30 +3,38 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformSupportOperationsCockpitPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformSupportOperationsCockpitPage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
+  "import './PlatformSupportOperationsCockpitPage.css'",
+  'io-operational-page io-workspace-page platform-support-cockpit',
+  '<OperationalWorkspaceHero',
+  '<OperationalWorkspaceStats ariaLabel="Support operations key metrics">',
+  '<OperationalSectionHeader',
+  'Operator precheck only',
+  'No automatic support actions',
   "searchParams.get('tenant_id')",
   "queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')",
-  "queryFn: () => platformApiRequest<SupportPackage>(`/platform/support-operations-cockpit?${query.toString()}`)",
+  '/platform/support-operations-cockpit${queryString ? `?${queryString}` : \'\'}',
   'refetchOnWindowFocus: false',
   'staleTime: 60_000',
+  'const refreshError = cockpit.isError && Boolean(data)',
+  'const initialLoadError = cockpit.isError && !data',
+  'Showing the last successful support operations snapshot from',
+  'disabled={cockpit.isFetching}',
   'htmlFor="support-cockpit-tenant-filter"',
-  'Tenant filter options could not be loaded:',
-  'Unable to load support operations cockpit:',
-  'readableError(cockpit.error)',
-  'Operator precheck only.',
+  "setSearchParams(next, { replace: true })",
+  'Selected tenant ({shortId(tenantId)})',
+  'Tenant filter options could not be loaded.',
+  'Unable to load support operations cockpit.',
   'Customer context',
-  'Last external touch:',
-  'Unresolved follow-ups:',
-  'Pending approvals:',
-  'to={`/platform/incidents?tenant_id=${tenant.tenant_id}`}',
-  "value.includes('no_tenants')",
-  "value.includes('review')",
-  "value.includes('blocked')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'tenant.evidence.unresolved_follow_ups',
+  'Pending support approvals',
+  'Control review',
+  'Next support step',
+  'to={`/platform/incidents?tenant_id=${tenant.tenant_id}`}'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -35,10 +43,23 @@ for (const anchor of requiredPageAnchors) {
   }
 }
 
-const reviewIndex = page.indexOf("value.includes('review')");
-const blockedIndex = page.indexOf("value.includes('blocked')");
-if (reviewIndex < 0 || blockedIndex < 0 || reviewIndex > blockedIndex) {
-  throw new Error('Platform Support Cockpit check failed: review states must be classified before blocked states.');
+const requiredCssAnchors = [
+  '.platform-support-cockpit__filter-grid',
+  '.platform-support-cockpit__summary-grid',
+  '.platform-support-cockpit__control-grid',
+  '.platform-support-cockpit__evidence-grid',
+  '.platform-support-cockpit__control-row',
+  '.platform-support-cockpit__next-step',
+  'var(--io-primary-border)',
+  'var(--io-primary-soft)',
+  'overflow-wrap: anywhere',
+  '@media (max-width: 720px)'
+];
+
+for (const anchor of requiredCssAnchors) {
+  if (!css.includes(anchor)) {
+    throw new Error(`Platform Support Cockpit check failed: CSS missing ${anchor}`);
+  }
 }
 
 const canonicalRouteIndex = router.indexOf("path: 'support-operations-cockpit'");
