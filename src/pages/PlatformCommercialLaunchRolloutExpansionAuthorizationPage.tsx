@@ -1,6 +1,16 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCommercialLaunchRolloutExpansionAuthorizationPage.css';
 
 type PersistenceBoundary = {
   stored_in_application: boolean;
@@ -13,6 +23,7 @@ type ExpansionRow = {
   source_prevention_code: string;
   source_closure_code: string;
   source_triage_code: string;
+  source_observation_code: string;
   domain: string;
   owner: string;
   source_verification_status: string;
@@ -52,91 +63,146 @@ type RolloutExpansionAuthorization = {
   validation_note: string;
 };
 
-const SOURCE_POSTURE_LINKS = [
-  { label: 'Prevention verification', key: 'prevention_verification_posture', href: '/platform/commercial-launch-prevention-verification' },
-  { label: 'Incident closure', key: 'incident_closure_posture', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Incident triage', key: 'incident_triage_posture', href: '/platform/commercial-launch-incident-triage' },
-  { label: 'Post-launch observation', key: 'post_launch_observation_posture', href: '/platform/commercial-launch-post-launch-observation' },
-  { label: 'Command center', key: 'command_center_posture', href: '/platform/commercial-launch-day-command-center' },
-  { label: 'Smoke test', key: 'smoke_test_posture', href: '/platform/commercial-launch-smoke-test-checklist' },
-  { label: 'Go/no-go register', key: 'go_no_go_register_posture', href: '/platform/commercial-launch-go-no-go-register' }
+type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
+
+const summaryLabels: Record<string, string> = {
+  expansion_rows_total: 'Authorization rows',
+  waiting_for_post_launch_evidence_review: 'Post-launch review',
+  waiting_for_external_go_no_go_confirmation: 'Awaiting Go/No-Go',
+  waiting_for_external_smoke_test_confirmation: 'Awaiting smoke test',
+  waiting_for_external_launch_window_confirmation: 'Awaiting launch window',
+  waiting_for_external_post_launch_observation_confirmation: 'Awaiting observation',
+  waiting_for_external_triage_confirmation: 'Awaiting triage confirmation',
+  waiting_for_external_incident_closure_confirmation: 'Awaiting closure confirmation',
+  waiting_for_external_prevention_verification_confirmation: 'Awaiting prevention confirmation',
+  blocked_until_prevention_verification_ready: 'Blocked rows',
+  authorization_records_persisted_in_application: 'Authorization records stored here'
+};
+
+const summaryHelpers: Record<string, string> = {
+  expansion_rows_total: 'External rollout-expansion authorization records prepared by this read-only board',
+  waiting_for_post_launch_evidence_review: 'Rows held until upstream post-launch evidence review is resolved',
+  waiting_for_external_go_no_go_confirmation: 'Rows waiting for independently confirmed Go/No-Go decisions',
+  waiting_for_external_smoke_test_confirmation: 'Rows waiting for independently confirmed smoke-test results',
+  waiting_for_external_launch_window_confirmation: 'Rows waiting for the real launch window and production launch to be confirmed',
+  waiting_for_external_post_launch_observation_confirmation: 'Rows waiting for an external post-launch observation record',
+  waiting_for_external_triage_confirmation: 'Rows waiting for the externally recorded incident-triage record',
+  waiting_for_external_incident_closure_confirmation: 'Rows waiting for the externally recorded incident-closure record',
+  waiting_for_external_prevention_verification_confirmation: 'Rows waiting for the externally recorded prevention-verification record',
+  blocked_until_prevention_verification_ready: 'Rows that cannot proceed with the current Prevention Verification posture',
+  authorization_records_persisted_in_application: 'Expected to remain zero because this endpoint stores no authorization outcomes'
+};
+
+const sourcePostures = [
+  { label: 'Prevention verification', key: 'prevention_verification_posture', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident closure', key: 'incident_closure_posture', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', key: 'incident_triage_posture', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Post-launch observation', key: 'post_launch_observation_posture', to: '/platform/commercial-launch-post-launch-observation' },
+  { label: 'Launch command center', key: 'command_center_posture', to: '/platform/commercial-launch-day-command-center' },
+  { label: 'Launch smoke test', key: 'smoke_test_posture', to: '/platform/commercial-launch-smoke-test-checklist' },
+  { label: 'Launch Go/No-Go', key: 'go_no_go_register_posture', to: '/platform/commercial-launch-go-no-go-register' }
 ] as const;
 
-const SUPPORTING_LINKS = [
-  { label: 'Prevention Verification', href: '/platform/commercial-launch-prevention-verification' },
-  { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' },
-  { label: 'Incident Triage', href: '/platform/commercial-launch-incident-triage' },
-  { label: 'Expansion Health', href: '/platform/commercial-launch-expansion-health-observation' }
+const supportingLinks = [
+  { label: 'Prevention verification', to: '/platform/commercial-launch-prevention-verification' },
+  { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' },
+  { label: 'Incident triage', to: '/platform/commercial-launch-incident-triage' },
+  { label: 'Expansion health', to: '/platform/commercial-launch-expansion-health-observation' }
 ];
 
-const DOMAIN_EVIDENCE_LINKS: Record<string, { label: string; href: string }[]> = {
+const domainEvidenceLinks: Record<string, { label: string; to: string }[]> = {
   service_health: [
-    { label: 'System Health', href: '/platform/system-health' },
-    { label: 'Monitoring Readiness', href: '/platform/production-monitoring-readiness' }
+    { label: 'System health', to: '/platform/system-health' },
+    { label: 'Monitoring readiness', to: '/platform/production-monitoring-readiness' }
   ],
   customer_feedback: [
-    { label: 'Customer Success', href: '/platform/customer-success-admin' },
-    { label: 'Communications', href: '/platform/tenant-communications' }
+    { label: 'Customer success', to: '/platform/customer-success-admin' },
+    { label: 'Tenant communications', to: '/platform/tenant-communications' }
   ],
   support_intake: [
-    { label: 'Support Cockpit', href: '/platform/support-cockpit' },
-    { label: 'Tenant SLA', href: '/platform/tenant-sla' }
+    { label: 'Support cockpit', to: '/platform/support-cockpit' },
+    { label: 'Tenant SLA', to: '/platform/tenant-sla' }
   ],
   billing_confirmation: [
-    { label: 'Billing', href: '/platform/billing' },
-    { label: 'Billing Activation', href: '/platform/billing-subscription-activation' },
-    { label: 'License Enforcement', href: '/platform/license-plan-enforcement' }
+    { label: 'Billing', to: '/platform/billing' },
+    { label: 'Billing activation', to: '/platform/billing-subscription-activation' },
+    { label: 'License enforcement', to: '/platform/license-plan-enforcement' }
   ],
   incident_review: [
-    { label: 'Incidents', href: '/platform/incidents' },
-    { label: 'Incident Closure', href: '/platform/commercial-launch-incident-closure' }
+    { label: 'Incidents', to: '/platform/incidents' },
+    { label: 'Incident closure', to: '/platform/commercial-launch-incident-closure' }
   ],
   rollback_readiness: [
-    { label: 'Runbooks', href: '/platform/runbooks' },
-    { label: 'Launch Command Center', href: '/platform/commercial-launch-day-command-center' }
+    { label: 'Runbooks', to: '/platform/runbooks' },
+    { label: 'Launch command center', to: '/platform/commercial-launch-day-command-center' }
   ],
   adoption_signal: [
-    { label: 'Tenant Health', href: '/platform/tenant-health' },
-    { label: 'Customer Success', href: '/platform/customer-success-admin' }
+    { label: 'Tenant health', to: '/platform/tenant-health' },
+    { label: 'Customer success', to: '/platform/customer-success-admin' }
   ],
   handoff_closure: [
-    { label: 'Prevention Verification', href: '/platform/commercial-launch-prevention-verification' },
-    { label: 'Expansion Health', href: '/platform/commercial-launch-expansion-health-observation' }
+    { label: 'Prevention verification', to: '/platform/commercial-launch-prevention-verification' },
+    { label: 'Expansion health', to: '/platform/commercial-launch-expansion-health-observation' }
   ]
 };
 
-function getDomainLinks(domain: string) {
-  return DOMAIN_EVIDENCE_LINKS[domain] || [{ label: 'Prevention Verification', href: '/platform/commercial-launch-prevention-verification' }];
+function humanize(value: string | null | undefined) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ');
+  if (!normalized) return 'Not available';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function humanize(value: string) {
-  return value.replaceAll('_', ' ');
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Unknown error';
-}
-
-function badgeStyle(value: string): CSSProperties {
-  const normalized = value.toLowerCase();
-  if (normalized === 'loading' || normalized === 'unknown' || normalized === 'not generated yet') {
-    return { ...styles.badge, background: '#f1f5f9', color: '#475569' };
-  }
-  if (normalized.includes('blocked') || normalized.includes('rollback') || normalized.includes('hold')) {
-    return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  }
+function badgeTone(value: string | null | undefined): BadgeTone {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'not_reviewed' || normalized === 'not reviewed') return 'neutral';
+  if (
+    normalized.includes('blocked')
+    || normalized.includes('rollback')
+    || normalized.includes('fail')
+  ) return 'danger';
   if (
     normalized.includes('waiting')
-    || normalized.includes('manual')
     || normalized.includes('external')
+    || normalized.includes('manual')
+    || normalized.includes('review')
     || normalized.includes('watch')
-    || normalized.includes('not_reviewed')
+    || normalized.includes('required')
     || normalized.includes('preparation')
-  ) {
-    return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  }
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+    || normalized.includes('hold')
+  ) return 'warn';
+  if (
+    normalized.includes('accepted')
+    || normalized.includes('approved')
+    || normalized.includes('ready')
+    || normalized.includes('healthy')
+    || normalized.includes('clear')
+    || normalized.includes('continue')
+  ) return 'good';
+  return 'accent';
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not available' : parsed.toLocaleString();
+}
+
+function readableError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Unknown API error';
+}
+
+function persistenceLabel(value: PersistenceBoundary | null) {
+  if (!value) return 'Not reported';
+  if (value.stored_in_application) return 'Stored in application';
+  if (!value.external_records_observable) return 'External records not observable';
+  return 'External evidence observable';
+}
+
+function evidenceLinksForDomain(domain: string) {
+  return domainEvidenceLinks[domain] || [
+    { label: 'Prevention verification', to: '/platform/commercial-launch-prevention-verification' }
+  ];
 }
 
 export default function PlatformCommercialLaunchRolloutExpansionAuthorizationPage() {
@@ -148,197 +214,272 @@ export default function PlatformCommercialLaunchRolloutExpansionAuthorizationPag
   });
 
   const data = expansion.data;
-  const summary = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const summaryEntries = useMemo(() => Object.entries(data?.summary || {}), [data?.summary]);
+  const initialLoadError = expansion.isError && !data;
+  const refreshError = expansion.isError && Boolean(data);
+  const requestError = readableError(expansion.error);
 
   return (
-    <div style={styles.page}>
-      <section style={styles.header}>
-        <div>
-          <p style={styles.eyebrow}>Platform Commercial Launch Readiness</p>
-          <h1 style={styles.title}>Commercial Launch Rollout Expansion Authorization</h1>
-          <p style={styles.description}>
-            <strong>Rollout expansion preparation only.</strong> Step 226 converts Prevention Verification rows into external
-            rollout-expansion authorization evidence requirements. This application does not observe external prevention-verification
-            completion or expansion-authorization outcomes, so a generated row is not proof that tenant expansion was approved,
-            executed, or safe to continue.
-          </p>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={badgeStyle(data?.posture || 'loading')}>{humanize(data?.posture || 'loading')}</span>
-          <span style={styles.generated}>{data?.generated_at ? new Date(data.generated_at).toLocaleString() : 'Not generated yet'}</span>
-          <button type="button" style={styles.button} onClick={() => expansion.refetch()} disabled={expansion.isFetching}>
-            {expansion.isFetching ? 'Refreshing...' : 'Refresh'}
-          </button>
+    <div className="io-operational-page io-workspace-page platform-rollout-expansion">
+      <OperationalWorkspaceHero
+        iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+        eyebrow="Platform Commercial Launch Readiness"
+        title="Commercial Launch Rollout Expansion Authorization"
+        description="Read-only preparation for external rollout-expansion authorization after Prevention Verification. It organizes source lineage, requested scope, prevention evidence, support and customer-success capacity, rollback readiness, monitoring ownership, product/executive approval and expansion decisions without claiming that an external prevention record or rollout authorization exists."
+        meta={<>
+          <OperationalWorkspaceMetaPill>{data?.step || 'Step 226 — Commercial Launch Rollout Expansion Authorization Board'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Rollout expansion preparation only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>External authorization record required</OperationalWorkspaceMetaPill>
+        </>}
+        aside={
+          <div className="platform-rollout-expansion__hero-aside">
+            <OperationalWorkspaceStatus
+              value={data ? data.summary.expansion_rows_total ?? data.expansion_rows.length : '—'}
+              label="rollout authorization rows"
+            />
+            {data ? (
+              <span className="platform-rollout-expansion__status-badge" data-tone={badgeTone(data.posture)}>
+                {humanize(data.posture)}
+              </span>
+            ) : null}
+            <div className="platform-rollout-expansion__refresh-block">
+              <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+              <button
+                type="button"
+                className="app-button app-button--secondary"
+                onClick={() => void expansion.refetch()}
+                disabled={expansion.isFetching}
+              >
+                {expansion.isFetching ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <section className="app-panel app-panel--padded platform-rollout-expansion__boundary-panel">
+        <OperationalSectionHeader
+          iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+          title="External confirmation boundary"
+          description="This board prepares the structure of a rollout-expansion authorization record; it does not observe or persist the real Prevention Verification or rollout-expansion decision."
+        />
+        <div className="platform-rollout-expansion__boundary-grid">
+          <div className="platform-rollout-expansion__boundary-notice">
+            <strong>Rollout expansion preparation only.</strong>
+            <span>
+              Before rollout expansion can be authorized, independently confirm the external Prevention Verification record for the relevant domain. Requested tenant scope, prevention evidence, support/customer-success capacity, rollback readiness, monitoring ownership, product/executive approval and the final expansion decision must be recorded outside this application.
+            </span>
+          </div>
+          <div className="platform-rollout-expansion__supporting-pages">
+            <strong>Supporting rollout-authorization pages</strong>
+            <span>This page already requires the evidence permissions used by these destinations, so these shortcuts do not bypass a stricter destination permission boundary.</span>
+            <div className="platform-rollout-expansion__link-row">
+              {supportingLinks.map((link) => (
+                <Link key={link.to} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section style={styles.boundary}>
-        <strong>External confirmation boundary.</strong> Before rollout expansion can be authorized, independently confirm the external
-        Prevention Verification record for the relevant domain. Requested scope, capacity acknowledgements, rollback readiness,
-        monitoring ownership, product/executive approval, and the expansion decision must also be recorded outside this application.
-      </section>
+      {expansion.isLoading ? (
+        <section className="app-panel app-panel--padded">Loading Commercial Launch Rollout Expansion Authorization…</section>
+      ) : null}
 
-      {expansion.isLoading ? <div style={styles.card}>Loading commercial launch rollout expansion authorization board...</div> : null}
-      {expansion.error ? (
-        <div style={styles.error}>
-          <span>Failed to load commercial launch rollout expansion authorization board: {errorMessage(expansion.error)}</span>
-          <button type="button" style={styles.errorButton} onClick={() => expansion.refetch()} disabled={expansion.isFetching}>
-            {expansion.isFetching ? 'Retrying...' : 'Retry'}
+      {initialLoadError ? (
+        <section className="app-error-state platform-rollout-expansion__feedback" role="alert">
+          <strong>Unable to load Commercial Launch Rollout Expansion Authorization.</strong>
+          <span>{requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--danger platform-rollout-expansion__retry"
+            onClick={() => void expansion.refetch()}
+            disabled={expansion.isFetching}
+          >
+            {expansion.isFetching ? 'Retrying…' : 'Retry'}
           </button>
-        </div>
+        </section>
+      ) : null}
+
+      {refreshError ? (
+        <section className="app-panel app-panel--padded platform-rollout-expansion__feedback platform-rollout-expansion__feedback--warning" role="status">
+          <strong>Refresh failed.</strong>
+          <span>Showing the last successful Commercial Launch Rollout Expansion Authorization snapshot. {requestError}</span>
+          <button
+            type="button"
+            className="app-button app-button--secondary platform-rollout-expansion__retry"
+            onClick={() => void expansion.refetch()}
+            disabled={expansion.isFetching}
+          >
+            {expansion.isFetching ? 'Retrying…' : 'Retry refresh'}
+          </button>
+        </section>
       ) : null}
 
       {data ? (
         <>
-          <section style={styles.metaGrid}>
-            <div style={styles.metaCard}><span style={styles.help}>Snapshot generated</span><strong>{new Date(data.generated_at).toLocaleString()}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Prevention-verification persistence</span><strong>{data.prevention_verification_persistence?.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-            <div style={styles.metaCard}><span style={styles.help}>Rollout-authorization persistence</span><strong>{data.rollout_expansion_persistence.stored_in_application ? 'Stored here' : 'External only'}</strong></div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Persistence boundary</h2>
-            <div style={styles.persistenceGrid}>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Prevention Verification</span>
-                <span>{data.prevention_verification_persistence?.interpretation || 'Prevention Verification persistence details unavailable.'}</span>
-              </div>
-              <div style={styles.evidenceBox}>
-                <span style={styles.evidenceLabel}>Rollout Expansion Authorization</span>
-                <span>{data.rollout_expansion_persistence.interpretation}</span>
-              </div>
-            </div>
-          </section>
-
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Supporting pages</h2>
-            <div style={styles.linkRow}>{SUPPORTING_LINKS.map((link) => <a key={link.href} href={link.href} style={styles.linkButton}>{link.label}</a>)}</div>
-          </section>
-
-          <section style={styles.grid}>
-            {summary.map(([key, value]) => (
-              <div key={key} style={styles.metric}>
-                <div style={styles.metricValue}>{value}</div>
-                <div style={styles.metricLabel}>{humanize(key)}</div>
-              </div>
+          <OperationalWorkspaceStats ariaLabel="Rollout expansion authorization summary">
+            {summaryEntries.map(([key, value]) => (
+              <OperationalWorkspaceStatCard
+                key={key}
+                iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+                label={summaryLabels[key] || humanize(key)}
+                value={value}
+                helper={summaryHelpers[key] || 'Current read-only rollout-expansion authorization preparation snapshot'}
+                tone={key.includes('blocked') && value > 0 ? 'danger' : key.includes('waiting') && value > 0 ? 'warn' : key.includes('persisted') ? 'neutral' : 'default'}
+              />
             ))}
-          </section>
+          </OperationalWorkspaceStats>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Source postures</h2>
-            <div style={styles.inputGrid}>
-              {SOURCE_POSTURE_LINKS.map((source) => (
-                <a key={source.key} href={source.href} style={styles.inputCardLink}>
-                  <span style={styles.help}>{source.label}</span>
-                  <strong>{humanize(String(data[source.key]))}</strong>
-                  <span style={styles.openHint}>Open source board →</span>
-                </a>
+          <section className="app-panel app-panel--padded platform-rollout-expansion__context-panel">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-prevention-verification"
+              title="Source launch posture"
+              description="Current upstream launch postures and persistence boundaries supplied by the prevention-to-rollout evidence chain."
+            />
+            <div className="platform-rollout-expansion__source-grid">
+              {sourcePostures.map((source) => (
+                <div key={source.key}>
+                  <strong>{source.label}</strong>
+                  <span>{humanize(data[source.key])}</span>
+                  <Link to={source.to}>Open source board</Link>
+                </div>
               ))}
+            </div>
+            <div className="platform-rollout-expansion__persistence-grid">
+              <div>
+                <strong>Prevention-verification persistence</strong>
+                <span>{persistenceLabel(data.prevention_verification_persistence)}</span>
+                <small>{data.prevention_verification_persistence?.interpretation || 'Prevention Verification persistence details are not available in this snapshot.'}</small>
+              </div>
+              <div>
+                <strong>Rollout-authorization persistence</strong>
+                <span>{persistenceLabel(data.rollout_expansion_persistence)}</span>
+                <small>{data.rollout_expansion_persistence.interpretation}</small>
+              </div>
             </div>
           </section>
 
-          <section style={styles.card}>
-            <h2 style={styles.sectionTitle}>Rollout expansion authorization rows</h2>
-            <div style={styles.checkGrid}>
-              {data.expansion_rows.map((row) => (
-                <article key={row.code} style={styles.checkCard}>
-                  <div style={styles.rowHeader}>
-                    <div>
-                      <strong>{humanize(row.code)}</strong>
-                      <div style={styles.help}>{humanize(row.domain)} · owner: {humanize(row.owner)}</div>
+          <section className="app-panel app-panel--padded platform-rollout-expansion__rows-section">
+            <OperationalSectionHeader
+              iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+              title="Rollout expansion authorization rows"
+              description="External authorization templates derived from Prevention Verification. Each row preserves its observation → triage → closure → prevention lineage and remains read-only in this application."
+            />
+
+            {data.expansion_rows.length === 0 ? (
+              <div className="platform-rollout-expansion__empty-state">
+                <strong>No rollout-expansion authorization rows were produced.</strong>
+                <span>This is not evidence that expansion is authorized, unnecessary or complete; it only means the current read-only source board returned no rows.</span>
+              </div>
+            ) : (
+              <div className="platform-rollout-expansion__row-grid">
+                {data.expansion_rows.map((row) => (
+                  <article key={row.code} className="app-panel platform-rollout-expansion__row-card">
+                    <div className="platform-rollout-expansion__row-heading">
+                      <div>
+                        <h3>{humanize(row.code)}</h3>
+                        <span>{humanize(row.domain)} · owner: {humanize(row.owner)}</span>
+                      </div>
+                      <span className="platform-rollout-expansion__status-badge" data-tone={badgeTone(row.authorization_status)}>
+                        {humanize(row.authorization_status)}
+                      </span>
                     </div>
-                    <span style={badgeStyle(row.authorization_status)}>{humanize(row.authorization_status)}</span>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Manual precondition</span>
-                    <span>{row.manual_precondition}</span>
-                  </div>
-                  <div style={styles.statusRow}><span>Source prevention</span><strong>{humanize(row.source_prevention_code)}</strong></div>
-                  <div style={styles.statusRow}><span>Source status</span><span style={badgeStyle(row.source_verification_status)}>{humanize(row.source_verification_status)}</span></div>
-                  <div style={styles.statusRow}><span>Source default severity</span><span style={badgeStyle(row.source_default_severity)}>{humanize(row.source_default_severity)}</span></div>
-                  <div style={styles.statusRow}><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
-                  <div style={styles.statusRow}>
-                    <span>Source prevention artifact</span>
-                    <span>{row.source_prevention_artifact} · {humanize(row.source_prevention_artifact_storage)}</span>
-                  </div>
-                  <div style={styles.statusRow}>
-                    <span>External authorization artifact</span>
-                    <span>{row.authorization_artifact} · {humanize(row.authorization_artifact_storage)}</span>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Evidence links</span>
-                    <div style={styles.linkRow}>{getDomainLinks(row.domain).map((link) => <a key={`${row.code}-${link.href}`} href={link.href} style={styles.smallLinkButton}>{link.label}</a>)}</div>
-                  </div>
-                  <div style={styles.evidenceBox}>
-                    <span style={styles.evidenceLabel}>Expansion requirements</span>
-                    <ul style={styles.list}>{row.expansion_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Allowed expansion decisions</span>
-                    <div style={styles.chips}>{row.accepted_expansion_decisions.map((item) => <span key={item} style={styles.chip}>{humanize(item)}</span>)}</div>
-                    <div style={styles.help}>Template default: {humanize(row.default_expansion_decision)}</div>
-                  </div>
-                  <div>
-                    <span style={styles.evidenceLabel}>Required external authorization fields</span>
-                    <div style={styles.chips}>{row.required_authorization_fields.map((field) => <span key={field} style={styles.chip}>{humanize(field)}</span>)}</div>
-                  </div>
-                </article>
-              ))}
+
+                    <div className="platform-rollout-expansion__source-summary">
+                      <div><span>Source observation</span><strong>{humanize(row.source_observation_code)}</strong><small>Upstream post-launch observation reference.</small></div>
+                      <div><span>Source triage</span><strong>{humanize(row.source_triage_code)}</strong><small>Upstream incident-triage reference.</small></div>
+                      <div><span>Source closure</span><strong>{humanize(row.source_closure_code)}</strong><small>Upstream incident-closure reference.</small></div>
+                      <div><span>Source prevention</span><strong>{humanize(row.source_prevention_code)}</strong><small>External prevention-verification template reference.</small></div>
+                      <div><span>Source prevention prerequisite</span><strong>{humanize(row.source_verification_status)}</strong></div>
+                      <div><span>Customer impact review</span><strong>{row.customer_impact_review_required ? 'Required' : 'Not required'}</strong></div>
+                      <div><span>Source template default severity</span><strong>{humanize(row.source_default_severity)}</strong><small>Template default only; not an observed final severity.</small></div>
+                      <div><span>Template default expansion decision</span><strong>{humanize(row.default_expansion_decision)}</strong><small>Template default only; not an observed rollout-expansion decision.</small></div>
+                    </div>
+
+                    <div className="platform-rollout-expansion__precondition-box">
+                      <strong>Manual precondition</strong>
+                      <span>{row.manual_precondition}</span>
+                    </div>
+
+                    <div className="platform-rollout-expansion__row-actions">
+                      {evidenceLinksForDomain(row.domain).map((link) => (
+                        <Link key={`${row.code}-${link.to}`} className="app-button app-button--secondary" to={link.to}>{link.label}</Link>
+                      ))}
+                    </div>
+
+                    <div className="platform-rollout-expansion__artifact-grid">
+                      <div>
+                        <strong>Source prevention artifact</strong>
+                        <span>{row.source_prevention_artifact}</span>
+                        <small>{humanize(row.source_prevention_artifact_storage)}</small>
+                      </div>
+                      <div>
+                        <strong>External authorization artifact</strong>
+                        <span>{row.authorization_artifact}</span>
+                        <small>{humanize(row.authorization_artifact_storage)}</small>
+                      </div>
+                    </div>
+
+                    <div className="platform-rollout-expansion__evidence-box">
+                      <strong>Expansion requirements</strong>
+                      <ul>{row.expansion_requirements.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+
+                    <div className="platform-rollout-expansion__field-groups">
+                      <div>
+                        <strong>Allowed expansion decisions</strong>
+                        <div className="platform-rollout-expansion__chips">
+                          {row.accepted_expansion_decisions.map((item) => (
+                            <span key={item} data-tone={badgeTone(item)}>{humanize(item)}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Required external authorization fields</strong>
+                        <div className="platform-rollout-expansion__chips">
+                          {row.required_authorization_fields.map((field) => <span key={field}>{humanize(field)}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="platform-rollout-expansion__rules-grid">
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+                title="Expansion rules"
+                description="Guardrails that determine when an external rollout-expansion authorization record may be prepared and accepted."
+              />
+              <ul>{data.expansion_rules.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div className="app-panel app-panel--padded">
+              <OperationalSectionHeader
+                iconPath="/platform/commercial-launch-rollout-expansion-authorization"
+                title="Expansion limitations"
+                description="Claims and actions this read-only authorization board deliberately does not make."
+              />
+              <ul>{data.expansion_limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
 
-          <section style={styles.twoColumn}>
-            <div style={styles.card}><h2 style={styles.sectionTitle}>Expansion rules</h2><ul style={styles.list}>{data.expansion_rules.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            <div style={styles.card}><h2 style={styles.sectionTitle}>Expansion limitations</h2><ul style={styles.list}>{data.expansion_limitations.map((item) => <li key={item}>{item}</li>)}</ul></div>
+          <section className="app-panel app-panel--padded platform-rollout-expansion__next-step">
+            <strong>Next best step</strong>
+            <span>{data.next_best_step}</span>
           </section>
 
-          <section style={styles.nextStep}><strong>Next best step:</strong> {data.next_best_step}</section>
-          <section style={styles.note}>{data.validation_note}</section>
+          <section className="app-panel app-panel--padded platform-rollout-expansion__snapshot-note">
+            <strong>Snapshot metadata</strong>
+            <span>{data.phase} · {data.step}</span>
+            <span>Generated: {formatDateTime(data.generated_at)}</span>
+            <small>{data.validation_note}</small>
+          </section>
         </>
       ) : null}
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  eyebrow: { margin: 0, color: '#64748b', fontSize: 12, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { margin: '4px 0', fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  description: { margin: 0, color: '#64748b', maxWidth: 1000, lineHeight: 1.5 },
-  headerMeta: { display: 'grid', justifyItems: 'end', gap: 8 },
-  generated: { color: '#64748b', fontSize: 12 },
-  button: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' },
-  badge: { padding: '7px 10px', borderRadius: 999, fontSize: 12, fontWeight: 800, textTransform: 'capitalize', whiteSpace: 'normal', overflowWrap: 'anywhere' },
-  boundary: { background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 14, padding: 14, lineHeight: 1.55 },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  metaCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 6, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  persistenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metricValue: { fontSize: 30, lineHeight: 1.1, fontWeight: 800, color: '#0f172a' },
-  metricLabel: { color: '#64748b', fontSize: 12, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { margin: '0 0 12px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  inputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 },
-  inputCardLink: { display: 'grid', gap: 6, border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: 'inherit', textDecoration: 'none', minWidth: 0 },
-  openHint: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 800 },
-  linkRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  linkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #cbd5e1', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700, textDecoration: 'none' },
-  smallLinkButton: { display: 'inline-flex', alignItems: 'center', border: '1px solid #cbd5e1', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '5px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', marginTop: 6 },
-  checkGrid: { display: 'grid', gap: 12 },
-  checkCard: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'grid', gap: 12, minWidth: 0 },
-  rowHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  help: { color: '#64748b', fontSize: 12, overflowWrap: 'anywhere' },
-  evidenceBox: { display: 'grid', gap: 4, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, overflowWrap: 'anywhere' },
-  evidenceLabel: { color: '#64748b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 10, flexWrap: 'wrap' },
-  chips: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 },
-  chip: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '5px 9px', background: '#fff', color: '#334155', fontSize: 12, fontWeight: 700, textTransform: 'capitalize', overflowWrap: 'anywhere' },
-  twoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
-  list: { margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.55 },
-  nextStep: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 14, padding: 14 },
-  note: { background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#475569', borderRadius: 14, padding: 14, fontSize: 13 },
-  error: { display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 14, flexWrap: 'wrap', border: '1px solid #fecaca' },
-  errorButton: { border: '1px solid #fecaca', background: '#fff', color: '#991b1b', borderRadius: 10, padding: '7px 10px', fontWeight: 800, cursor: 'pointer' }
-};
