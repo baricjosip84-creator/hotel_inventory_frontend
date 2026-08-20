@@ -3,12 +3,19 @@ import path from 'node:path';
 
 const root = process.cwd();
 const page = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchPostLaunchObservationPage.tsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/pages/PlatformCommercialLaunchPostLaunchObservationPage.css'), 'utf8');
 const router = fs.readFileSync(path.join(root, 'src/app/router.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'src/layouts/PlatformLayout.tsx'), 'utf8');
 
 const requiredPageAnchors = [
+  'OperationalWorkspaceHero',
+  'OperationalWorkspaceStats',
+  'OperationalWorkspaceStatCard',
+  'OperationalSectionHeader',
+  'io-operational-page io-workspace-page platform-post-launch-observation',
+  "./PlatformCommercialLaunchPostLaunchObservationPage.css",
   'Observation preparation only.',
-  'External confirmation boundary.',
+  'External confirmation boundary',
   'cannot observe external go/no-go decisions',
   'Command-center decision persistence',
   'Smoke-test result persistence',
@@ -24,16 +31,18 @@ const requiredPageAnchors = [
   'source_checkpoints_requiring_evidence_review',
   'source_checkpoints_awaiting_external_go_no_go_confirmation',
   'source_checkpoints_awaiting_external_smoke_test_confirmation',
+  'Template default only; it does not prove that no external observation record exists.',
+  'No post-launch observation checks were returned. This is not evidence that observation is complete',
+  'initialLoadError = observation.isError && !data',
+  'refreshError = observation.isError && Boolean(data)',
+  'Showing the last successful Commercial Launch Post-Launch Observation snapshot.',
+  "disabled={observation.isFetching}",
   '/platform/tenant-communications',
   '/platform/support-cockpit',
   '/platform/monitoring-readiness',
   '/platform/commercial-launch-incident-triage',
   'refetchOnWindowFocus: false',
-  'staleTime: 30_000',
-  'errorMessage(observation.error)',
-  "normalized.includes('review')",
-  "overflowWrap: 'anywhere'",
-  "flexWrap: 'wrap'"
+  'staleTime: 30_000'
 ];
 
 for (const anchor of requiredPageAnchors) {
@@ -45,10 +54,29 @@ for (const anchor of requiredPageAnchors) {
 for (const staleAnchor of [
   'source_checkpoints_waiting_for_go_no_go_decisions',
   'source_not_reviewed_decisions',
-  'to="/platform/communications"'
+  'to="/platform/communications"',
+  'const styles:',
+  'style={styles.'
 ]) {
   if (page.includes(staleAnchor)) {
     throw new Error(`Platform Post-Launch Observation check failed: stale page anchor remains: ${staleAnchor}`);
+  }
+}
+
+for (const cssAnchor of [
+  '.platform-post-launch-observation__boundary-grid',
+  '.platform-post-launch-observation__feedback--warning',
+  '.platform-post-launch-observation__source-grid',
+  '.platform-post-launch-observation__persistence-grid',
+  '.platform-post-launch-observation__source-summary',
+  '.platform-post-launch-observation__row-grid',
+  '.platform-post-launch-observation__field-groups',
+  'var(--io-primary-soft)',
+  'var(--io-primary-dark)',
+  '@media (max-width: 700px)'
+]) {
+  if (!css.includes(cssAnchor)) {
+    throw new Error(`Platform Post-Launch Observation check failed: missing CSS anchor: ${cssAnchor}`);
   }
 }
 
