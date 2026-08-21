@@ -113,6 +113,7 @@ export default function PlatformCapacityPlanningPage() {
   const queryClient = useQueryClient();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CAPACITY_WRITE);
   const canReadUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadRisks = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ);
   const [filters, setFilters] = useState({ status: '', resource_type: '', environment: '', search: '', attention_only: true, include_archived: false });
   const [form, setForm] = useState<CapacityForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -205,7 +206,7 @@ export default function PlatformCapacityPlanningPage() {
         <strong>Supporting Platform pages:</strong>
         <Link to="/platform/service-dependencies">Service Dependencies</Link>
         <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
-        <Link to="/platform/risk-register">Risk Register</Link>
+        {canReadRisks ? <Link to="/platform/risk-register">Risk Register</Link> : null}
         <Link to="/platform/vendors">Vendors</Link>
       </section>
 

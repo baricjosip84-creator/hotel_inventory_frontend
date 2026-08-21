@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { platformApiRequest } from '../lib/platformApi';
+import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
 type ReportItem = {
   type: string;
@@ -20,6 +21,9 @@ type LegalComplianceReport = {
   phase: number;
   step: number;
   posture: string;
+  evidence_state?: string;
+  available_sources?: string[];
+  omitted_sources?: string[];
   summary: {
     total_report_items: number;
     legal_documents: number;
@@ -56,6 +60,7 @@ type LegalComplianceReport = {
 };
 
 function badgeStyle(value: string): CSSProperties {
+  if (value.includes('partial')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   if (value.includes('blocked') || value.includes('overdue') || value.includes('high')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
   if (value.includes('review') || value.includes('open')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
   return { ...styles.badge, background: '#dcfce7', color: '#166534' };
@@ -113,6 +118,7 @@ function sourceTextFor(item: ReportItem) {
 }
 
 export default function PlatformLegalComplianceReportingPage() {
+  const canReadRiskRegister = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ);
   const reportQuery = useQuery({
     queryKey: ['platform', 'legal-compliance-reporting'],
     queryFn: () => platformApiRequest<LegalComplianceReport>('/platform/legal-compliance-reporting/report')
@@ -151,6 +157,11 @@ export default function PlatformLegalComplianceReportingPage() {
       </header>
 
       {reportQuery.isLoading ? <section style={styles.card}>Loading legal compliance reporting…</section> : null}
+      {data?.evidence_state === 'partial_evidence' ? (
+        <section style={styles.warningCard}>
+          <strong>Partial evidence.</strong> Risk Register evidence is omitted because this account does not have Risk Register read permission. The report must not be treated as a complete legal/compliance posture.
+        </section>
+      ) : null}
       {reportQuery.error ? (
         <section style={styles.errorCard}>
           <strong>Unable to load legal compliance reporting.</strong>
@@ -178,7 +189,7 @@ export default function PlatformLegalComplianceReportingPage() {
           <SourceLink href="/platform/compliance-documents">Compliance Docs</SourceLink>
           <SourceLink href="/platform/privacy-requests">Privacy Requests</SourceLink>
           <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
-          <SourceLink href="/platform/risk-register">Risk Register</SourceLink>
+          {canReadRiskRegister ? <SourceLink href="/platform/risk-register">Risk Register</SourceLink> : null}
           <SourceLink href="/platform/vendors">Vendors</SourceLink>
           <SourceLink href="/platform/compliance-export">Compliance Export</SourceLink>
           <SourceLink href="/platform/integration-monitoring">Integration Monitoring</SourceLink>
@@ -253,6 +264,7 @@ const styles: Record<string, CSSProperties> = {
   badge: { padding: '4px 9px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap', fontSize: 12 },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
   card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
+  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16, color: '#92400e' },
   errorCard: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03)' },
   metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
   cardTitle: { margin: '0 0 10px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
