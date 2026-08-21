@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const page=fs.readFileSync(path.join(root,'src/pages/PlatformComplianceExportPage.tsx'),'utf8');
+const css=fs.readFileSync(path.join(root,'src/pages/PlatformComplianceExportPage.css'),'utf8');
+const router=fs.readFileSync(path.join(root,'src/app/router.tsx'),'utf8');
+const layout=fs.readFileSync(path.join(root,'src/layouts/PlatformLayout.tsx'),'utf8');
+const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+const required=['OperationalWorkspaceHero','OperationalWorkspaceStats','OperationalSectionHeader','useSearchParams','PAGE_SIZE=50','document_offset','placeholderData:(previous)=>previous','Showing the last successful snapshot','Permission-scoped evidence','evidence_complete','available_sources','omitted_sources','Restricted','current available evidence posture','does not generate a certified external compliance package','Archived rows are historical','PLATFORM_PRIVACY_READ','TENANTS_EXPORT','AUDIT_READ','PLATFORM_DATA_RETENTION_READ','PLATFORM_ACCESS_REVIEWS_READ'];
+for(const token of required) if(!page.includes(token)) throw new Error(`Compliance export page hardening missing: ${token}`);
+if(!css.includes('--io-primary:#d14343')||!css.includes('--io-primary-dark:#b93636')) throw new Error('Compliance export Platform red workspace identity missing.');
+if(!router.includes("path: 'compliance-export'")||!router.includes('PLATFORM_COMPLIANCE_READ')) throw new Error('Compliance export route permission guard missing.');
+if(!layout.includes('to="/platform/compliance-export"')||!layout.includes('PLATFORM_COMPLIANCE_READ')) throw new Error('Compliance export sidebar permission visibility missing.');
+if(!pkg.scripts?.['check:platform-compliance-export-page-hardening']) throw new Error('Compliance export checker script missing from package.json.');
+if(!pkg.scripts?.['check:ci']?.includes('check:platform-compliance-export-page-hardening')) throw new Error('Compliance export checker is not wired into check:ci.');
+console.log('Platform Compliance export page hardening check: PASS');
