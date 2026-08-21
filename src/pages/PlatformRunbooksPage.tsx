@@ -226,8 +226,6 @@ export default function PlatformRunbooksPage() {
   const staleError = (summary.isError && summary.data !== undefined) || (runbooks.isError && runbooks.data !== undefined) || (executions.isError && executions.data !== undefined);
   const refreshing = summary.isFetching || runbooks.isFetching || executions.isFetching || tenants.isFetching;
   const structuralLocked = Boolean((selectedRunbook.data?.execution_count || 0) > 0);
-  const mutationError = createRunbook.error || updateRunbook.error || replaceSteps.error || startExecution.error || updateStep.error || closeExecution.error;
-
   const updateFilter = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value); else next.delete(key);
@@ -316,6 +314,8 @@ export default function PlatformRunbooksPage() {
     mutationFn: ({ executionId, action }: { executionId: string; action: 'complete' | 'cancel' }) => platformApiRequest<Execution>(`/platform/runbooks/executions/${executionId}/${action}`, { method: 'POST', body: JSON.stringify({ notes: closeNotes.trim() || null }) }),
     onSuccess: async (_data, variables) => { setMessage(variables.action === 'complete' ? 'Execution marked complete in the application.' : 'Execution cancelled in the application.'); await invalidateRunbooks(); }
   });
+
+  const mutationError = createRunbook.error || updateRunbook.error || replaceSteps.error || startExecution.error || updateStep.error || closeExecution.error;
 
   const canCreate = createDraft.title.trim().length > 0 && createDraft.steps.length > 0 && createDraft.steps.every((step) => step.title.trim().length > 0);
   const canSaveDefinition = selectedRunbookId && editDraft.title.trim().length > 0;

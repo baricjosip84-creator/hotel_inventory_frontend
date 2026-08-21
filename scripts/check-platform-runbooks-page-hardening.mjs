@@ -41,4 +41,10 @@ if (navIndex < 0 || navGuardStart < 0 || !navWindow.includes('hasPlatformPermiss
 if (!packageJson.includes('check:platform-runbooks-page-hardening')) throw new Error('Platform Runbooks check failed: package script missing.');
 if (!packageJson.includes('npm run check:platform-runbooks-page-hardening')) throw new Error('Platform Runbooks check failed: checker is not wired into check:ci.');
 
+const mutationErrorIndex = page.indexOf('const mutationError = createRunbook.error');
+const closeExecutionIndex = page.indexOf('const closeExecution = useMutation({');
+if (mutationErrorIndex < 0 || closeExecutionIndex < 0 || mutationErrorIndex <= closeExecutionIndex) {
+  throw new Error('Platform Runbooks check failed: mutationError must be declared after the mutation hooks it reads to avoid a temporal-dead-zone runtime crash.');
+}
+
 console.log('Platform Runbooks page hardening checks passed.');
