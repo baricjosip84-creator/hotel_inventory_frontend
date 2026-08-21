@@ -1,360 +1,249 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformVendorsPage.css';
 
-type PlatformUser = { id: string; email: string; name?: string | null };
-type Vendor = {
-  id: string;
-  name: string;
-  category: string;
-  status: string;
-  risk_level: string;
-  primary_contact_name?: string | null;
-  primary_contact_email?: string | null;
-  primary_contact_phone?: string | null;
-  website_url?: string | null;
-  account_reference?: string | null;
-  sla_reference?: string | null;
-  contract_start_date?: string | null;
-  contract_renewal_date?: string | null;
-  owner_platform_user_id?: string | null;
-  owner_email?: string | null;
-  dependency_notes?: string | null;
-  internal_notes?: string | null;
-  archived_at?: string | null;
-  updated_at?: string | null;
+type PlatformUser = { id: string; email: string; name?: string | null; is_active?: boolean };
+type Pagination = { limit: number; offset: number; total: number; has_more: boolean };
+type EvidenceAccess = { platform_user_identity: boolean };
+type EvidenceContract = {
+  application_registry_only: boolean;
+  vendor_relationship_not_verified_externally: boolean;
+  contract_and_sla_references_are_metadata: boolean;
+  risk_and_status_are_internal_operator_classifications: boolean;
 };
-
+type Vendor = {
+  id: string; name: string; category: string; status: string; risk_level: string;
+  primary_contact_name?: string | null; primary_contact_email?: string | null; primary_contact_phone?: string | null;
+  website_url?: string | null; account_reference?: string | null; sla_reference?: string | null;
+  contract_start_date?: string | null; contract_renewal_date?: string | null;
+  owner_platform_user_id?: string | null; owner_email?: string | null; dependency_notes?: string | null; internal_notes?: string | null;
+  archived_at?: string | null; is_archived?: boolean; created_at?: string | null; updated_at?: string | null; updated_by_email?: string | null;
+};
 type VendorsResponse = {
   vendors: Vendor[];
-  summary: {
-    total: number;
-    archived: number;
-    renewal_due: number;
-    by_category: Record<string, number>;
-    by_status: Record<string, number>;
-    by_risk: Record<string, number>;
-  };
-  categories: string[];
-  statuses: string[];
-  risk_levels: string[];
+  summary: { total: number; archived: number; renewal_due: number; critical_risk: number; high_risk: number; by_category: Record<string, number>; by_status: Record<string, number>; by_risk: Record<string, number> };
+  pagination: Pagination;
+  evidence_access: EvidenceAccess;
+  evidence_contract: EvidenceContract;
+  categories: string[]; statuses: string[]; mutable_statuses: string[]; risk_levels: string[];
 };
 
-const emptyForm = {
-  name: '',
-  category: 'other',
-  status: 'active',
-  risk_level: 'medium',
-  primary_contact_name: '',
-  primary_contact_email: '',
-  primary_contact_phone: '',
-  website_url: '',
-  account_reference: '',
-  sla_reference: '',
-  contract_start_date: '',
-  contract_renewal_date: '',
-  owner_platform_user_id: '',
-  dependency_notes: '',
-  internal_notes: ''
+type VendorForm = {
+  name: string; category: string; status: string; risk_level: string; primary_contact_name: string; primary_contact_email: string;
+  primary_contact_phone: string; website_url: string; account_reference: string; sla_reference: string; contract_start_date: string;
+  contract_renewal_date: string; owner_platform_user_id: string; dependency_notes: string; internal_notes: string;
 };
 
-type VendorForm = typeof emptyForm;
+const PAGE_SIZE = 50;
+const CATEGORY_OPTIONS = ['payment', 'infrastructure', 'messaging', 'integrations', 'support', 'security', 'legal', 'other'];
+const STATUS_OPTIONS = ['active', 'watch', 'renewal_due', 'inactive', 'archived'];
+const MUTABLE_STATUS_OPTIONS = ['active', 'watch', 'renewal_due', 'inactive'];
+const RISK_OPTIONS = ['low', 'medium', 'high', 'critical'];
+const emptyForm = (): VendorForm => ({ name: '', category: 'other', status: 'active', risk_level: 'medium', primary_contact_name: '', primary_contact_email: '', primary_contact_phone: '', website_url: '', account_reference: '', sla_reference: '', contract_start_date: '', contract_renewal_date: '', owner_platform_user_id: '', dependency_notes: '', internal_notes: '' });
 
-function dateOnly(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  return date.toISOString().slice(0, 10);
-}
-
-function label(value?: string | null) {
-  return value ? String(value).replace(/_/g, ' ') : '—';
-}
-
-function toForm(vendor: Vendor): VendorForm {
-  return {
-    name: vendor.name || '',
-    category: vendor.category || 'other',
-    status: vendor.status || 'active',
-    risk_level: vendor.risk_level || 'medium',
-    primary_contact_name: vendor.primary_contact_name || '',
-    primary_contact_email: vendor.primary_contact_email || '',
-    primary_contact_phone: vendor.primary_contact_phone || '',
-    website_url: vendor.website_url || '',
-    account_reference: vendor.account_reference || '',
-    sla_reference: vendor.sla_reference || '',
-    contract_start_date: dateOnly(vendor.contract_start_date),
-    contract_renewal_date: dateOnly(vendor.contract_renewal_date),
-    owner_platform_user_id: vendor.owner_platform_user_id || '',
-    dependency_notes: vendor.dependency_notes || '',
-    internal_notes: vendor.internal_notes || ''
-  };
-}
-
-function clean(value: string) {
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function payloadFromForm(form: VendorForm) {
-  return {
-    name: form.name.trim(),
-    category: form.category,
-    status: form.status,
-    risk_level: form.risk_level,
-    primary_contact_name: clean(form.primary_contact_name),
-    primary_contact_email: clean(form.primary_contact_email),
-    primary_contact_phone: clean(form.primary_contact_phone),
-    website_url: clean(form.website_url),
-    account_reference: clean(form.account_reference),
-    sla_reference: clean(form.sla_reference),
-    contract_start_date: clean(form.contract_start_date),
-    contract_renewal_date: clean(form.contract_renewal_date),
-    owner_platform_user_id: clean(form.owner_platform_user_id),
-    dependency_notes: clean(form.dependency_notes),
-    internal_notes: clean(form.internal_notes)
-  };
-}
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function clean(value: string) { const trimmed = value.trim(); return trimmed || null; }
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
+function dateOnly(value?: string | null) { if (!value) return ''; return String(value).slice(0, 10); }
+function dateTime(value?: string | null) { if (!value) return 'Not recorded'; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleString(); }
+function riskTone(value?: string) { if (value === 'critical') return 'danger'; if (value === 'high') return 'warn'; if (value === 'low') return 'good'; return 'neutral'; }
+function statusTone(value?: string, archived?: boolean) { if (archived || value === 'archived') return 'neutral'; if (value === 'watch' || value === 'renewal_due') return 'warn'; if (value === 'active') return 'good'; return 'neutral'; }
+function validExternalUrl(value?: string | null) { if (!value) return false; try { const parsed = new URL(value); return parsed.protocol === 'https:' || parsed.protocol === 'http:'; } catch { return false; } }
+function toForm(vendor: Vendor): VendorForm { return { name: vendor.name || '', category: vendor.category || 'other', status: MUTABLE_STATUS_OPTIONS.includes(vendor.status) ? vendor.status : 'inactive', risk_level: vendor.risk_level || 'medium', primary_contact_name: vendor.primary_contact_name || '', primary_contact_email: vendor.primary_contact_email || '', primary_contact_phone: vendor.primary_contact_phone || '', website_url: vendor.website_url || '', account_reference: vendor.account_reference || '', sla_reference: vendor.sla_reference || '', contract_start_date: dateOnly(vendor.contract_start_date), contract_renewal_date: dateOnly(vendor.contract_renewal_date), owner_platform_user_id: vendor.owner_platform_user_id || '', dependency_notes: vendor.dependency_notes || '', internal_notes: vendor.internal_notes || '' }; }
 
 export default function PlatformVendorsPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_VENDORS_WRITE);
   const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
-  const [filters, setFilters] = useState({ category: '', status: '', risk_level: '', search: '', renewal_due: false, include_archived: false });
-  const [form, setForm] = useState<VendorForm>(emptyForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const canReadDependencies = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ);
+  const canReadCompliance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const requestedCategory = searchParams.get('category') || '';
+  const requestedStatus = searchParams.get('status') || '';
+  const requestedRisk = searchParams.get('risk_level') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const requestedRenewalDue = searchParams.get('renewal_due') || '';
+  const requestedIncludeArchived = searchParams.get('include_archived') || '';
+  const category = CATEGORY_OPTIONS.includes(requestedCategory) ? requestedCategory : '';
+  const status = STATUS_OPTIONS.includes(requestedStatus) ? requestedStatus : '';
+  const riskLevel = RISK_OPTIONS.includes(requestedRisk) ? requestedRisk : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const renewalDue = requestedRenewalDue === 'true';
+  const includeArchived = requestedIncludeArchived === 'true';
+  const invalidFilters = Boolean((requestedCategory && !category) || (requestedStatus && !status) || (requestedRisk && !riskLevel) || (requestedSearch && !search) || (requestedRenewalDue && !['true', 'false'].includes(requestedRenewalDue)) || (requestedIncludeArchived && !['true', 'false'].includes(requestedIncludeArchived)));
+
+  const [offset, setOffset] = useState(0);
+  const [form, setForm] = useState<VendorForm>(() => emptyForm());
+  const [editingId, setEditingId] = useState('');
   const [message, setMessage] = useState('');
+  const [mutationError, setMutationError] = useState('');
+
+  useEffect(() => { setOffset(0); }, [category, status, riskLevel, search, renewalDue, includeArchived, invalidFilters]);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.category) params.set('category', filters.category);
-    if (filters.status) params.set('status', filters.status);
-    if (filters.risk_level) params.set('risk_level', filters.risk_level);
-    if (filters.search) params.set('search', filters.search);
-    if (filters.renewal_due) params.set('renewal_due', 'true');
-    if (filters.include_archived) params.set('include_archived', 'true');
-    params.set('limit', '300');
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (category) params.set('category', category);
+    if (status) params.set('status', status);
+    if (riskLevel) params.set('risk_level', riskLevel);
+    if (search.trim()) params.set('search', search.trim());
+    if (renewalDue) params.set('renewal_due', 'true');
+    if (includeArchived) params.set('include_archived', 'true');
     return params.toString();
-  }, [filters]);
+  }, [category, status, riskLevel, search, renewalDue, includeArchived, offset]);
 
-  const vendors = useQuery({ queryKey: ['platform', 'vendors', filters], queryFn: () => platformApiRequest<VendorsResponse>(`/platform/vendors?${queryString}`) });
-  const users = useQuery({ queryKey: ['platform', 'vendor-owner-users'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite && canReadPlatformUsers });
-
-  const save = useMutation({
-    mutationFn: () => {
-      const body = JSON.stringify(payloadFromForm(form));
-      if (editingId) return platformApiRequest(`/platform/vendors/${editingId}`, { method: 'PATCH', body });
-      return platformApiRequest('/platform/vendors', { method: 'POST', body });
-    },
-    onSuccess: async () => {
-      const action = editingId ? 'Vendor changes saved.' : 'Vendor created.';
-      setForm(emptyForm);
-      setEditingId(null);
-      setMessage(action);
-      await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] });
-    }
+  const vendors = useQuery({
+    queryKey: ['platform', 'vendors', category, status, riskLevel, search, renewalDue, includeArchived, offset],
+    queryFn: () => platformApiRequest<VendorsResponse>(`/platform/vendors?${queryString}`), enabled: !invalidFilters,
+    refetchOnWindowFocus: false, staleTime: 30_000
+  });
+  const users = useQuery({
+    queryKey: ['platform', 'vendor-owner-users'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'),
+    enabled: canWrite && canReadPlatformUsers, refetchOnWindowFocus: false, staleTime: 30_000
   });
 
-  const archive = useMutation({
-    mutationFn: (vendor: Vendor) => platformApiRequest(`/platform/vendors/${vendor.id}/archive`, { method: 'POST' }),
-    onSuccess: async (_data, vendor) => {
-      setMessage(`Vendor archived: ${vendor.name}`);
-      await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] });
-    }
+  const payloadFromForm = () => {
+    const payload: Record<string, unknown> = {
+      name: form.name.trim(), category: form.category, status: form.status, risk_level: form.risk_level,
+      primary_contact_name: clean(form.primary_contact_name), primary_contact_email: clean(form.primary_contact_email), primary_contact_phone: clean(form.primary_contact_phone),
+      website_url: clean(form.website_url), account_reference: clean(form.account_reference), sla_reference: clean(form.sla_reference),
+      contract_start_date: clean(form.contract_start_date), contract_renewal_date: clean(form.contract_renewal_date),
+      dependency_notes: clean(form.dependency_notes), internal_notes: clean(form.internal_notes)
+    };
+    if (canReadPlatformUsers) payload.owner_platform_user_id = clean(form.owner_platform_user_id);
+    return payload;
+  };
+
+  const saveVendor = useMutation({
+    mutationFn: () => platformApiRequest(editingId ? `/platform/vendors/${editingId}` : '/platform/vendors', { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify(payloadFromForm()) }),
+    onSuccess: async () => { setMessage(editingId ? 'Vendor changes saved.' : 'Vendor created.'); setMutationError(''); setEditingId(''); setForm(emptyForm()); await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] }); },
+    onError: (error) => setMutationError(readableError(error))
+  });
+  const archiveVendor = useMutation({
+    mutationFn: (vendor: Vendor) => platformApiRequest(`/platform/vendors/${vendor.id}/archive`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: async (_data, vendor) => { setMessage(`Vendor archived: ${vendor.name}`); setMutationError(''); if (editingId === vendor.id) { setEditingId(''); setForm(emptyForm()); } await queryClient.invalidateQueries({ queryKey: ['platform', 'vendors'] }); },
+    onError: (error) => setMutationError(readableError(error))
   });
 
-  const categories = vendors.data?.categories || ['payment', 'infrastructure', 'messaging', 'integrations', 'support', 'security', 'legal', 'other'];
-  const statuses = vendors.data?.statuses || ['active', 'watch', 'renewal_due', 'inactive', 'archived'];
-  const riskLevels = vendors.data?.risk_levels || ['low', 'medium', 'high', 'critical'];
+  const categories = vendors.data?.categories || CATEGORY_OPTIONS;
+  const statuses = vendors.data?.statuses || STATUS_OPTIONS;
+  const mutableStatuses = vendors.data?.mutable_statuses || MUTABLE_STATUS_OPTIONS;
+  const riskLevels = vendors.data?.risk_levels || RISK_OPTIONS;
+  const rows = vendors.data?.vendors || [];
   const summary = vendors.data?.summary;
+  const access = vendors.data?.evidence_access || { platform_user_identity: canReadPlatformUsers };
+  const pagination = vendors.data?.pagination;
+  const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
+  const initialError = vendors.isError && vendors.data === undefined;
+  const refreshError = vendors.isError && vendors.data !== undefined;
+  const activeUsers = (users.data || []).filter((user) => user.is_active !== false);
   const hasInvalidContractWindow = Boolean(form.contract_start_date && form.contract_renewal_date && form.contract_renewal_date < form.contract_start_date);
-  const isVendorSaveDisabled = !form.name.trim() || hasInvalidContractWindow || save.isPending;
-  const vendorSaveHelp = !form.name.trim()
-    ? 'Enter a vendor name before creating or saving a vendor.'
-    : hasInvalidContractWindow
-      ? 'Renewal date must be on or after contract start date.'
-      : '';
+  const hasInvalidWebsite = Boolean(form.website_url.trim() && !validExternalUrl(form.website_url.trim()));
+  const saveDisabled = !form.name.trim() || hasInvalidContractWindow || hasInvalidWebsite || saveVendor.isPending;
+  const saveHelp = !form.name.trim() ? 'Enter a vendor name.' : hasInvalidContractWindow ? 'Renewal date must be on or after the contract start date.' : hasInvalidWebsite ? 'Website must be a valid HTTP or HTTPS URL.' : '';
+  const mutating = saveVendor.isPending || archiveVendor.isPending;
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Platform vendors</h1>
-          <p style={styles.subtitle}>Track HLA vendors and partners that affect platform operations: infrastructure, payments, messaging, integrations, support, legal, and security.</p>
+  const setFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value); else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+  const setBooleanFilter = (key: string, checked: boolean) => setFilter(key, checked ? 'true' : '');
+  const clearFilters = () => setSearchParams(new URLSearchParams(), { replace: true });
+  const startEdit = (vendor: Vendor) => { setMessage(''); setMutationError(''); setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); };
+  const cancelEdit = () => { setEditingId(''); setForm(emptyForm()); setMutationError(''); setMessage('Vendor edit cancelled.'); };
+
+  return <div className="platform-vendors">
+    <OperationalWorkspaceHero
+      iconPath="/platform/vendors" eyebrow="Platform operations" title="Vendors"
+      description="Maintain the internal registry of external vendors and partners that can affect Platform operations, contracts, dependencies, security, and compliance."
+      meta={<><OperationalWorkspaceMetaPill>Filtered registry summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Page size {PAGE_SIZE}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{access.platform_user_identity ? 'Operator identity visible' : 'Operator identity redacted'}</OperationalWorkspaceMetaPill></>}
+      aside={<div className="platform-vendors__hero-aside"><OperationalWorkspaceStatus value={summary?.critical_risk ? 'Review required' : vendors.data ? 'Registry evidence' : 'Loading'} label="Internal vendor posture" /><div className="platform-vendors__refresh-block"><button type="button" className="app-button app-button--secondary" onClick={() => vendors.refetch()} disabled={vendors.isFetching || invalidFilters}>{vendors.isFetching ? 'Refreshing…' : 'Refresh'}</button><span>{vendors.data ? `Last successful snapshot · ${pagination?.total ?? 0} matched` : 'No successful snapshot loaded yet'}</span></div></div>}
+    />
+
+    <div className="platform-vendors__truth-note"><strong>Vendor evidence boundary</strong>Vendor status, risk, contacts, SLA references, contract dates and notes are application-maintained registry evidence. They do not prove an external contract is valid, an SLA is contractually agreed, the vendor acknowledged anything, or the real-world vendor relationship is currently active.</div>
+    {!access.platform_user_identity ? <div className="platform-vendors__restricted"><strong>Platform-user identity is redacted.</strong><span>Owner and updater identities require PLATFORM_USERS_READ. Vendor records remain readable under PLATFORM_VENDORS_READ.</span></div> : null}
+    {invalidFilters ? <div className="platform-vendors__blocking-error"><strong>Invalid URL filter</strong><span>One or more Vendor filters are unsupported. Clear them before loading registry evidence.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></div> : null}
+    {refreshError ? <div className="platform-vendors__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(vendors.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => vendors.refetch()}>Retry</button></div> : null}
+    {message ? <div className="platform-vendors__success"><span>{message}</span><button type="button" className="app-button app-button--secondary" onClick={() => setMessage('')}>Dismiss</button></div> : null}
+    {mutationError ? <div className="platform-vendors__warning"><strong>Vendor action failed.</strong><span>{mutationError}</span><button type="button" className="app-button app-button--secondary" onClick={() => setMutationError('')}>Dismiss</button></div> : null}
+
+    <OperationalWorkspaceStats ariaLabel="Vendor registry summary">
+      <OperationalWorkspaceStatCard label="Matched vendors" value={summary?.total ?? 0} helper="Across current filters, not only this page" iconPath="/platform/vendors" loading={vendors.isLoading} />
+      <OperationalWorkspaceStatCard label="Renewal due ≤60 days" value={summary?.renewal_due ?? 0} helper="Includes overdue recorded renewal dates" tone={(summary?.renewal_due || 0) > 0 ? 'warn' : 'neutral'} loading={vendors.isLoading} />
+      <OperationalWorkspaceStatCard label="Critical risk" value={summary?.critical_risk ?? 0} helper="Internal operator classification" tone={(summary?.critical_risk || 0) > 0 ? 'danger' : 'neutral'} loading={vendors.isLoading} />
+      <OperationalWorkspaceStatCard label="Archived matched" value={summary?.archived ?? 0} helper="Historical registry evidence" tone="slate" loading={vendors.isLoading} />
+    </OperationalWorkspaceStats>
+
+    <section className="io-workspace-panel platform-vendors__section">
+      <OperationalSectionHeader iconPath="/platform/vendors" title="Filter registry" description="Filters are URL-backed so the current evidence view can be reopened or shared." actions={<button type="button" className="app-button app-button--secondary" onClick={clearFilters} disabled={!searchParams.toString()}>Clear filters</button>} />
+      <div className="platform-vendors__filter-grid">
+        <label>Category<select value={category} onChange={(event) => setFilter('category', event.target.value)}><option value="">All categories</option>{categories.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Status<select value={status} onChange={(event) => setFilter('status', event.target.value)}><option value="">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Risk<select value={riskLevel} onChange={(event) => setFilter('risk_level', event.target.value)}><option value="">All risk levels</option>{riskLevels.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label className="platform-vendors__search">Search<input value={search} maxLength={200} onChange={(event) => setFilter('search', event.target.value)} placeholder="Name, contact, account, SLA or notes" /></label>
+        <label className="platform-vendors__checkbox"><input type="checkbox" checked={renewalDue} onChange={(event) => setBooleanFilter('renewal_due', event.target.checked)} />Renewal due / overdue</label>
+        <label className="platform-vendors__checkbox"><input type="checkbox" checked={includeArchived} onChange={(event) => setBooleanFilter('include_archived', event.target.checked)} />Include archived history</label>
+      </div>
+    </section>
+
+    {canWrite ? <section id="platform-vendors-form" className="io-workspace-panel platform-vendors__section">
+      <OperationalSectionHeader iconPath="/platform/vendors" title={editingId ? 'Edit vendor registry entry' : 'Add vendor registry entry'} description={editingId ? 'Archived vendors are immutable. Saving an active record preserves fields you are not authorized to view or change.' : 'Create an internal vendor record. External relationship or contract validity is not verified by this action.'} actions={editingId ? <button type="button" className="app-button app-button--secondary" onClick={cancelEdit} disabled={mutating}>Cancel edit</button> : undefined} />
+      <div className="platform-vendors__form-grid">
+        <label>Name<input value={form.name} maxLength={300} onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))} /></label>
+        <label>Category<select value={form.category} onChange={(event) => setForm((value) => ({ ...value, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Status<select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>{mutableStatuses.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Risk<select value={form.risk_level} onChange={(event) => setForm((value) => ({ ...value, risk_level: event.target.value }))}>{riskLevels.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Contact name<input value={form.primary_contact_name} maxLength={200} onChange={(event) => setForm((value) => ({ ...value, primary_contact_name: event.target.value }))} /></label>
+        <label>Contact email<input type="email" value={form.primary_contact_email} maxLength={320} onChange={(event) => setForm((value) => ({ ...value, primary_contact_email: event.target.value }))} /></label>
+        <label>Contact phone<input value={form.primary_contact_phone} maxLength={80} onChange={(event) => setForm((value) => ({ ...value, primary_contact_phone: event.target.value }))} /></label>
+        <label>Website URL<input value={form.website_url} maxLength={2048} placeholder="https://vendor.example" onChange={(event) => setForm((value) => ({ ...value, website_url: event.target.value }))} /></label>
+        <label>Account/reference<input value={form.account_reference} maxLength={160} onChange={(event) => setForm((value) => ({ ...value, account_reference: event.target.value }))} /></label>
+        <label>SLA reference<input value={form.sla_reference} maxLength={160} onChange={(event) => setForm((value) => ({ ...value, sla_reference: event.target.value }))} /></label>
+        <label>Contract start<input type="date" value={form.contract_start_date} onChange={(event) => setForm((value) => ({ ...value, contract_start_date: event.target.value }))} /></label>
+        <label>Renewal date<input type="date" value={form.contract_renewal_date} onChange={(event) => setForm((value) => ({ ...value, contract_renewal_date: event.target.value }))} /></label>
+        {canReadPlatformUsers ? <label>Owner<select value={form.owner_platform_user_id} onChange={(event) => setForm((value) => ({ ...value, owner_platform_user_id: event.target.value }))}><option value="">Unassigned</option>{activeUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label> : <div className="platform-vendors__owner-restricted"><strong>Owner linkage restricted</strong><span>PLATFORM_USERS_READ is required to view or change the Platform owner.</span></div>}
+        <label className="platform-vendors__span-all">Dependency notes<textarea value={form.dependency_notes} maxLength={5000} onChange={(event) => setForm((value) => ({ ...value, dependency_notes: event.target.value }))} /></label>
+        <label className="platform-vendors__span-all">Internal notes<textarea value={form.internal_notes} maxLength={5000} onChange={(event) => setForm((value) => ({ ...value, internal_notes: event.target.value }))} /></label>
+      </div>
+      {saveHelp ? <div className="platform-vendors__validation">{saveHelp}</div> : null}
+      <div className="platform-vendors__actions"><button type="button" className="app-button app-button--primary" disabled={saveDisabled} onClick={() => { setMessage(''); setMutationError(''); saveVendor.mutate(); }}>{saveVendor.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create vendor'}</button></div>
+    </section> : null}
+
+    <section className="io-workspace-panel platform-vendors__section">
+      <OperationalSectionHeader iconPath="/platform/vendors" title="Vendor evidence" description="Registry-wide summary is above; cards below are only the currently loaded page." actions={<span className="platform-vendors__page-note">Page {pageNumber} · {rows.length} loaded · {pagination?.total ?? 0} matched</span>} />
+      {initialError ? <div className="platform-vendors__blocking-error"><strong>Vendor registry could not be loaded.</strong><span>{readableError(vendors.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => vendors.refetch()}>Retry</button></div> : null}
+      {vendors.isLoading ? <div className="platform-vendors__loading">Loading vendor registry evidence…</div> : null}
+      {vendors.data && rows.length ? <div className="platform-vendors__list">{rows.map((vendor) => <article key={vendor.id} className="platform-vendors__card">
+        <div className="platform-vendors__card-header"><div><h4>{vendor.name}</h4><p>{vendor.account_reference || 'No account/reference recorded'}</p></div><div className="platform-vendors__badges"><span data-tone={statusTone(vendor.status, vendor.is_archived)}>{pretty(vendor.status)}</span><span data-tone={riskTone(vendor.risk_level)}>{pretty(vendor.risk_level)} risk</span><span>{pretty(vendor.category)}</span></div></div>
+        <div className="platform-vendors__metrics-grid">
+          <div><span>Contact</span><strong>{vendor.primary_contact_name || vendor.primary_contact_email || vendor.primary_contact_phone || 'Not recorded'}</strong></div>
+          <div><span>Owner</span><strong>{access.platform_user_identity ? (vendor.owner_email || 'Unassigned') : 'Redacted'}</strong></div>
+          <div><span>Contract start</span><strong>{dateOnly(vendor.contract_start_date) || 'Not recorded'}</strong></div>
+          <div><span>Renewal</span><strong>{dateOnly(vendor.contract_renewal_date) || 'Not recorded'}</strong></div>
+          <div><span>SLA reference</span><strong>{vendor.sla_reference || 'Not recorded'}</strong></div>
+          <div><span>Updated</span><strong>{dateTime(vendor.updated_at)}</strong></div>
         </div>
-        <button type="button" style={styles.secondaryButton} onClick={() => vendors.refetch()} disabled={vendors.isFetching}>
-          {vendors.isFetching ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+        {(vendor.dependency_notes || vendor.internal_notes) ? <div className="platform-vendors__notes">{vendor.dependency_notes ? <div><strong>Dependency notes</strong><span>{vendor.dependency_notes}</span></div> : null}{vendor.internal_notes ? <div><strong>Internal notes</strong><span>{vendor.internal_notes}</span></div> : null}</div> : null}
+        <div className="platform-vendors__card-footer"><div className="platform-vendors__source-links">{validExternalUrl(vendor.website_url) ? <a href={vendor.website_url || '#'} target="_blank" rel="noreferrer">Vendor website</a> : null}{vendor.primary_contact_email ? <a href={`mailto:${vendor.primary_contact_email}`}>Email contact</a> : null}{canReadDependencies ? <Link to={`/platform/service-dependencies?vendor_id=${encodeURIComponent(vendor.id)}`}>Service dependencies</Link> : null}{canReadAudit ? <Link to={`/platform/audit?target_type=platform_vendor&target_id=${encodeURIComponent(vendor.id)}`}>Audit history</Link> : null}</div>{canWrite && !vendor.is_archived ? <div className="platform-vendors__actions"><button type="button" className="app-button app-button--secondary" onClick={() => startEdit(vendor)} disabled={mutating}>Edit</button><button type="button" className="app-button app-button--danger" onClick={() => { if (window.confirm(`Archive vendor ${vendor.name}? Archived vendors become immutable.`)) archiveVendor.mutate(vendor); }} disabled={mutating}>Archive</button></div> : vendor.is_archived ? <span className="platform-vendors__immutable">Archived · immutable</span> : null}</div>
+      </article>)}</div> : vendors.data ? <div className="platform-vendors__empty"><strong>No vendor records matched.</strong><span>No application vendor evidence matched the current filters. This does not prove that no external vendor relationship exists.</span></div> : null}
+      {vendors.data ? <div className="platform-vendors__pagination"><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))} disabled={offset === 0 || vendors.isFetching}>Previous</button><span>Page {pageNumber} · up to {PAGE_SIZE} vendors</span><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => value + PAGE_SIZE)} disabled={!pagination?.has_more || vendors.isFetching}>Next</button></div> : null}
+    </section>
 
-      <section style={styles.metaCard}>
-        <span>Source: GET /platform/vendors</span>
-        <span>Limit: 300</span>
-        <span>Visible vendors: {vendors.data?.vendors.length ?? 0}</span>
-        <span>Filters: {queryString || 'limit=300'}</span>
-      </section>
-
-      <section style={styles.linkCard}>
-        <strong>Supporting Platform pages:</strong>
-        <Link to="/platform/service-dependencies">Service Dependencies</Link>
-        <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
-        <Link to="/platform/legal-compliance-reporting">Legal Compliance Reporting</Link>
-      </section>
-
-      {message ? <div style={styles.success}>{message}</div> : null}
-
-      <section style={styles.metrics}>
-        <div style={styles.metric}><strong>{summary?.total ?? 0}</strong><span>Total shown</span></div>
-        <div style={styles.metric}><strong>{summary?.renewal_due ?? 0}</strong><span>Renewal due soon</span></div>
-        <div style={styles.metric}><strong>{summary?.by_risk?.critical ?? 0}</strong><span>Critical risk</span></div>
-        <div style={styles.metric}><strong>{summary?.archived ?? 0}</strong><span>Archived shown</span></div>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Filters</h2>
-        <div style={styles.grid6}>
-          <label style={styles.label}>Category
-            <select style={styles.input} value={filters.category} onChange={(e) => setFilters((v) => ({ ...v, category: e.target.value }))}>
-              <option value="">All</option>{categories.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>Status
-            <select style={styles.input} value={filters.status} onChange={(e) => setFilters((v) => ({ ...v, status: e.target.value }))}>
-              <option value="">All</option>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>Risk
-            <select style={styles.input} value={filters.risk_level} onChange={(e) => setFilters((v) => ({ ...v, risk_level: e.target.value }))}>
-              <option value="">All</option>{riskLevels.map((item) => <option key={item} value={item}>{label(item)}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>Search
-            <input style={styles.input} value={filters.search} onChange={(e) => setFilters((v) => ({ ...v, search: e.target.value }))} placeholder="name, contact, account, SLA" />
-          </label>
-          <label style={{ ...styles.label, justifyContent: 'end' }}><span style={styles.checkboxLine}><input type="checkbox" checked={filters.renewal_due} onChange={(e) => setFilters((v) => ({ ...v, renewal_due: e.target.checked }))} /> Renewal due</span></label>
-          <label style={{ ...styles.label, justifyContent: 'end' }}><span style={styles.checkboxLine}><input type="checkbox" checked={filters.include_archived} onChange={(e) => setFilters((v) => ({ ...v, include_archived: e.target.checked }))} /> Include archived</span></label>
-        </div>
-      </section>
-
-      {canWrite ? (
-        <section id="platform-vendors-form" style={styles.card}>
-          <h2 style={styles.sectionTitle}>{editingId ? 'Edit vendor' : 'Add vendor'}</h2>
-          <div style={styles.grid4}>
-            <label style={styles.label}>Name<input style={styles.input} value={form.name} onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))} /></label>
-            <label style={styles.label}>Category<select style={styles.input} value={form.category} onChange={(e) => setForm((v) => ({ ...v, category: e.target.value }))}>{categories.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.label}>Status<select style={styles.input} value={form.status} onChange={(e) => setForm((v) => ({ ...v, status: e.target.value }))}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.label}>Risk<select style={styles.input} value={form.risk_level} onChange={(e) => setForm((v) => ({ ...v, risk_level: e.target.value }))}>{riskLevels.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-          </div>
-          <div style={styles.grid3}>
-            <label style={styles.label}>Contact name<input style={styles.input} value={form.primary_contact_name} onChange={(e) => setForm((v) => ({ ...v, primary_contact_name: e.target.value }))} /></label>
-            <label style={styles.label}>Contact email<input style={styles.input} value={form.primary_contact_email} onChange={(e) => setForm((v) => ({ ...v, primary_contact_email: e.target.value }))} /></label>
-            <label style={styles.label}>Contact phone<input style={styles.input} value={form.primary_contact_phone} onChange={(e) => setForm((v) => ({ ...v, primary_contact_phone: e.target.value }))} /></label>
-          </div>
-          <div style={styles.grid3}>
-            <label style={styles.label}>Website URL<input style={styles.input} value={form.website_url} onChange={(e) => setForm((v) => ({ ...v, website_url: e.target.value }))} /></label>
-            <label style={styles.label}>Account/reference<input style={styles.input} value={form.account_reference} onChange={(e) => setForm((v) => ({ ...v, account_reference: e.target.value }))} /></label>
-            <label style={styles.label}>SLA reference<input style={styles.input} value={form.sla_reference} onChange={(e) => setForm((v) => ({ ...v, sla_reference: e.target.value }))} /></label>
-          </div>
-          <div style={styles.grid3}>
-            <label style={styles.label}>Contract start<input style={styles.input} type="date" value={form.contract_start_date} onChange={(e) => setForm((v) => ({ ...v, contract_start_date: e.target.value }))} /></label>
-            <label style={styles.label}>Renewal date<input style={styles.input} type="date" value={form.contract_renewal_date} onChange={(e) => setForm((v) => ({ ...v, contract_renewal_date: e.target.value }))} /></label>
-            <label style={styles.label}>Owner
-              <select style={styles.input} value={form.owner_platform_user_id} onChange={(e) => setForm((v) => ({ ...v, owner_platform_user_id: e.target.value }))}>
-                <option value="">Unassigned</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-              </select>
-            </label>
-          </div>
-          <div style={styles.grid2}>
-            <label style={styles.label}>Dependency notes<textarea style={styles.textarea} value={form.dependency_notes} onChange={(e) => setForm((v) => ({ ...v, dependency_notes: e.target.value }))} /></label>
-            <label style={styles.label}>Internal notes<textarea style={styles.textarea} value={form.internal_notes} onChange={(e) => setForm((v) => ({ ...v, internal_notes: e.target.value }))} /></label>
-          </div>
-          <div style={styles.actions}>
-            <button
-              type="button"
-              style={isVendorSaveDisabled ? styles.disabledButton : styles.primaryButton}
-              disabled={isVendorSaveDisabled}
-              onClick={() => { setMessage(''); save.mutate(); }}
-            >
-              {save.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Create vendor'}
-            </button>
-            {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(emptyForm); setMessage('Vendor edit cancelled.'); }}>Cancel edit</button> : null}
-            {vendorSaveHelp ? <span style={styles.error}>{vendorSaveHelp}</span> : null}
-            {save.error ? <span style={styles.error}>{(save.error as Error).message}</span> : null}
-          </div>
-        </section>
-      ) : null}
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Vendors</h2>
-        {vendors.isLoading ? <p>Loading vendors…</p> : null}
-        {vendors.error ? <p style={styles.error}>{(vendors.error as Error).message} <button type="button" style={styles.secondaryButton} onClick={() => vendors.refetch()}>Retry</button></p> : null}
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Risk</th><th>Contact</th><th>Owner</th><th>Renewal</th><th>Notes</th><th>Actions</th></tr></thead>
-            <tbody>
-              {(vendors.data?.vendors || []).map((vendor) => (
-                <tr key={vendor.id}>
-                  <td><strong>{vendor.name}</strong><br /><span style={styles.muted}>{vendor.website_url || vendor.account_reference || '—'}</span></td>
-                  <td>{label(vendor.category)}</td>
-                  <td><span style={vendor.archived_at ? styles.badgeMuted : styles.badge}>{label(vendor.status)}</span></td>
-                  <td><span style={vendor.risk_level === 'critical' || vendor.risk_level === 'high' ? styles.badgeDanger : styles.badge}>{label(vendor.risk_level)}</span></td>
-                  <td>{vendor.primary_contact_name || '—'}<br /><span style={styles.muted}>{vendor.primary_contact_email || vendor.primary_contact_phone || ''}</span></td>
-                  <td>{vendor.owner_email || '—'}</td>
-                  <td>{dateOnly(vendor.contract_renewal_date) || '—'}<br /><span style={styles.muted}>{vendor.sla_reference || ''}</span></td>
-                  <td><span style={styles.muted}>{vendor.dependency_notes || vendor.internal_notes || '—'}</span><br /><span style={styles.muted}>Updated {dateOnly(vendor.updated_at) || '—'}</span></td>
-                  <td>
-                    {canWrite ? <div style={styles.rowActions}>
-                      <button type="button" style={styles.secondaryButton} onClick={() => { setMessage(''); setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); }}>Edit</button>
-                      {!vendor.archived_at ? <button type="button" style={styles.dangerButton} disabled={archive.isPending} onClick={() => { if (window.confirm(`Archive vendor ${vendor.name}?`)) archive.mutate(vendor); }}>Archive</button> : null}
-                    </div> : '—'}
-                  </td>
-                </tr>
-              ))}
-              {!vendors.isLoading && !(vendors.data?.vendors || []).length ? <tr><td colSpan={9} style={styles.empty}>No vendors match the current filters.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-vendors__section"><OperationalSectionHeader iconPath="/platform/vendors" title="Supporting operations" description="Only destinations allowed by the current Platform permission snapshot are shown." /><div className="platform-vendors__supporting-links">{canReadDependencies ? <Link to="/platform/service-dependencies">Service dependencies</Link> : null}{canReadDependencies ? <Link to="/platform/integration-monitoring?source=service_dependencies">Integration monitoring</Link> : null}{canReadCompliance ? <Link to="/platform/legal-compliance-reporting">Legal compliance reporting</Link> : null}{canReadPlatformUsers ? <Link to="/platform/users">Platform users</Link> : null}{canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : null}</div></section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', fontWeight: 800, color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 820, fontSize: 13, lineHeight: 1.5 },
-  metrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 4, color: '#334155' },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metaCard: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', color: '#475569', fontSize: 12, fontWeight: 700 },
-  linkCard: { display: 'flex', gap: 12, flexWrap: 'wrap', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', alignItems: 'center', color: '#334155' },
-  sectionTitle: { margin: '0 0 14px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  grid6: { display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12 },
-  grid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 12 },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 12 },
-  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 12 },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155' },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff', color: '#0f172a', minWidth: 0 },
-  textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, minHeight: 84, resize: 'vertical', background: '#fff', color: '#0f172a' },
-  checkboxLine: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#334155' },
-  actions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  rowActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', fontWeight: 700, cursor: 'not-allowed' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
-  dangerButton: { border: '1px solid #dc2626', borderRadius: 9, padding: '8px 10px', background: '#dc2626', color: '#fff', fontWeight: 700, cursor: 'pointer' },
-  error: { color: '#991b1b', fontWeight: 700 },
-  success: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: '10px 12px', fontWeight: 700 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, color: '#334155' },
-  muted: { color: '#64748b', fontSize: 12 },
-  badge: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', fontWeight: 700 },
-  badgeDanger: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 700 },
-  badgeMuted: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#e2e8f0', color: '#475569', fontWeight: 700 },
-  empty: { textAlign: 'center', padding: 24, color: '#64748b' }
-};
