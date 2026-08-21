@@ -99,6 +99,14 @@ export default function PlatformNotificationsPage() {
   const [lastBulkRouting, setLastBulkRouting] = useState<BulkRoutingResult | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_WRITE);
+  const canRunIntegrationMonitoringScan = canWrite &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_WEBHOOKS_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ) &&
+    hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_VENDORS_READ);
   const trimmedTitle = form.title.trim();
   const trimmedMessage = form.message.trim();
   const parsedCleanupDays = Number(cleanupDays);
@@ -335,8 +343,9 @@ export default function PlatformNotificationsPage() {
       <hr />
       <h3>Integration monitoring scan</h3>
       <p style={styles.muted}>Creates, refreshes, resolves, and escalates integration-monitoring notifications, including overdue routed-response assignments.</p>
-      <button style={styles.button} onClick={() => confirmAction('Run integration monitoring notification scan now?') && integrationScan.mutate()} disabled={integrationScan.isPending}>Run integration monitoring scan</button>
-      {lastIntegrationScan ? <div style={styles.scanResult}>Checked {lastIntegrationScan.integrations_checked || 0} integrations. Created {lastIntegrationScan.created}, refreshed {lastIntegrationScan.refreshed}, auto-resolved {lastIntegrationScan.auto_resolved || 0}, SLA escalated {lastIntegrationScan.sla_escalated || 0}, unrouted escalated {lastIntegrationScan.routing_escalated || 0}, overdue responses escalated {lastIntegrationScan.routed_response_escalated || 0}.</div> : null}
+      <button style={styles.button} onClick={() => confirmAction('Run integration monitoring notification scan now?') && integrationScan.mutate()} disabled={integrationScan.isPending || !canRunIntegrationMonitoringScan}>Run integration monitoring scan</button>
+      {!canRunIntegrationMonitoringScan ? <div style={styles.notice}>Integration monitoring scan requires Notifications read/write plus Dependency, Webhook, API Key, Tenant, Platform User, and Vendor read permissions because the scan consumes those protected evidence sources.</div> : null}
+      {lastIntegrationScan ? <div style={styles.scanResult}>Checked {lastIntegrationScan.integrations_checked || 0} application evidence records. Created {lastIntegrationScan.created}, refreshed {lastIntegrationScan.refreshed}, auto-resolved {lastIntegrationScan.auto_resolved || 0}, SLA escalated {lastIntegrationScan.sla_escalated || 0}, unrouted escalated {lastIntegrationScan.routing_escalated || 0}, overdue responses escalated {lastIntegrationScan.routed_response_escalated || 0}.</div> : null}
       {integrationScan.error ? <div style={styles.error}>{readableError(integrationScan.error)}</div> : null}
     </section> : null}
 
