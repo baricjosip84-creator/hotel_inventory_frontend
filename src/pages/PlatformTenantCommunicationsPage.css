@@ -1,0 +1,81 @@
+.platform-tenant-communications {
+  --io-primary: #d14343;
+  --io-primary-rgb: 209, 67, 67;
+  --io-primary-dark: #b93636;
+  --io-primary-soft: rgba(209, 67, 67, .075);
+  --io-primary-soft-strong: rgba(209, 67, 67, .13);
+  --io-primary-border: rgba(209, 67, 67, .24);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-tenant-communications__hero-aside { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.platform-tenant-communications__refresh-block { display: grid; justify-items: end; gap: 5px; min-width: 180px; }
+.platform-tenant-communications__refresh-block > span { color: #64748b; font-size: 10.5px; text-align: right; }
+.platform-tenant-communications__section { display: grid; gap: 13px; min-width: 0; }
+.platform-tenant-communications__warning, .platform-tenant-communications__feedback, .platform-tenant-communications__inline-note, .platform-tenant-communications__truth-note { padding: 10px 12px; border-radius: 9px; font-size: 11px; line-height: 1.45; }
+.platform-tenant-communications__warning { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-communications__feedback { border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; }
+.platform-tenant-communications__feedback[data-tone='warn'] { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-communications__inline-note { border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; }
+.platform-tenant-communications__truth-note { border: 1px solid var(--io-primary-border); background: var(--io-primary-soft); color: #7f1d1d; }
+.platform-tenant-communications__form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; min-width: 0; }
+.platform-tenant-communications__form-grid--filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.platform-tenant-communications__form-grid label, .platform-tenant-communications__notes-label, .platform-tenant-communications__followup-row label { display: grid; gap: 6px; min-width: 0; color: #334155; font-size: 11.5px; font-weight: 800; }
+.platform-tenant-communications__form-grid input, .platform-tenant-communications__form-grid select, .platform-tenant-communications__notes-label textarea, .platform-tenant-communications__followup-row input { width: 100%; min-width: 0; min-height: 38px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; color: #0f172a; font: inherit; }
+.platform-tenant-communications__notes-label textarea { min-height: 100px; resize: vertical; }
+.platform-tenant-communications__form-grid input:focus-visible, .platform-tenant-communications__form-grid select:focus-visible, .platform-tenant-communications__notes-label textarea:focus-visible, .platform-tenant-communications__followup-row input:focus-visible { outline: 2px solid rgba(var(--io-primary-rgb), .2); outline-offset: 1px; border-color: var(--io-primary); }
+.platform-tenant-communications__search-field { grid-column: span 2; }
+.platform-tenant-communications__subject-field { grid-column: span 2; }
+.platform-tenant-communications__checkbox { display: flex !important; align-items: center; gap: 8px !important; min-height: 38px; align-self: end; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
+.platform-tenant-communications__checkbox input { width: auto !important; min-height: 0 !important; }
+.platform-tenant-communications__followup-row { display: grid; grid-template-columns: minmax(180px, 260px) minmax(220px, 320px); gap: 10px; align-items: end; }
+.platform-tenant-communications__action-row, .platform-tenant-communications__link-row, .platform-tenant-communications__badge-row, .platform-tenant-communications__channel-row, .platform-tenant-communications__pagination, .platform-tenant-communications__provenance { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.platform-tenant-communications__pagination { justify-content: flex-end; }
+.platform-tenant-communications__pagination > span { color: #64748b; font-size: 11px; font-weight: 800; }
+.platform-tenant-communications__list { display: grid; gap: 11px; min-width: 0; }
+.platform-tenant-communications__card { display: grid; gap: 11px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; min-width: 0; }
+.platform-tenant-communications__card[data-archived='true'] { background: #f8fafc; opacity: .8; }
+.platform-tenant-communications__card-header { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.platform-tenant-communications__card-title { display: grid; gap: 6px; min-width: 0; }
+.platform-tenant-communications__card-title h4 { margin: 0; color: #0f172a; font-size: 14px; overflow-wrap: anywhere; }
+.platform-tenant-communications__tenant-label { display: grid; gap: 4px; min-width: 200px; text-align: right; }
+.platform-tenant-communications__tenant-label strong { color: #334155; font-size: 11.5px; }
+.platform-tenant-communications__tenant-label span { color: #94a3b8; font-size: 10px; overflow-wrap: anywhere; }
+.platform-tenant-communications__badge { display: inline-flex; min-height: 23px; align-items: center; padding: 3px 8px; border: 1px solid #e2e8f0; border-radius: 999px; background: #f8fafc; color: #475569; font-size: 10px; font-weight: 800; }
+.platform-tenant-communications__badge[data-tone='platform'] { border-color: var(--io-primary-border); background: var(--io-primary-soft); color: var(--io-primary-dark); }
+.platform-tenant-communications__badge[data-tone='good'] { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.platform-tenant-communications__badge[data-tone='warn'] { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-communications__evidence-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.platform-tenant-communications__evidence-grid > div { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #eef2f7; border-radius: 8px; background: #f8fafc; min-width: 0; }
+.platform-tenant-communications__evidence-grid span { color: #94a3b8; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.platform-tenant-communications__evidence-grid strong { color: #334155; font-size: 10.5px; overflow-wrap: anywhere; }
+.platform-tenant-communications__channel-row a, .platform-tenant-communications__link-row a { display: inline-flex; align-items: center; min-height: 31px; padding: 6px 9px; border: 1px solid var(--io-primary-border); border-radius: 8px; background: var(--io-primary-soft); color: var(--io-primary-dark); font-size: 10.5px; font-weight: 800; text-decoration: none; overflow-wrap: anywhere; }
+.platform-tenant-communications__channel-row a:hover, .platform-tenant-communications__link-row a:hover { background: var(--io-primary-soft-strong); }
+.platform-tenant-communications__notes { margin: 0; color: #334155; font-size: 11.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.platform-tenant-communications__provenance { padding-top: 9px; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 10.5px; }
+.platform-tenant-communications__blocking-error { display: grid; gap: 7px; padding: 14px; border: 1px solid #fecaca; border-radius: 11px; background: #fef2f2; color: #991b1b; }
+.platform-tenant-communications__blocking-error strong { font-size: 12px; }
+.platform-tenant-communications__blocking-error span { font-size: 11px; line-height: 1.45; }
+.platform-tenant-communications__blocking-error .app-button { width: fit-content; }
+.platform-tenant-communications__loading { padding: 14px; color: #64748b; font-size: 12px; }
+.platform-tenant-communications__empty { display: grid; gap: 5px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; color: #64748b; }
+.platform-tenant-communications__empty strong { color: #334155; font-size: 12px; }
+.platform-tenant-communications__empty span { font-size: 11px; line-height: 1.45; }
+.platform-tenant-communications__card .app-button { min-height: 31px; padding: 6px 9px; font-size: 10.5px; }
+
+@media (max-width: 1100px) {
+  .platform-tenant-communications__form-grid, .platform-tenant-communications__form-grid--filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .platform-tenant-communications__evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .platform-tenant-communications__hero-aside { justify-content: flex-start; width: 100%; }
+  .platform-tenant-communications__refresh-block { justify-items: start; min-width: 0; }
+  .platform-tenant-communications__refresh-block > span { text-align: left; }
+  .platform-tenant-communications__form-grid, .platform-tenant-communications__form-grid--filters, .platform-tenant-communications__followup-row, .platform-tenant-communications__evidence-grid { grid-template-columns: 1fr; }
+  .platform-tenant-communications__search-field, .platform-tenant-communications__subject-field { grid-column: auto; }
+  .platform-tenant-communications__tenant-label { min-width: 0; text-align: left; }
+  .platform-tenant-communications__pagination { justify-content: flex-start; }
+}
