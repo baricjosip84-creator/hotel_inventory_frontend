@@ -1,271 +1,218 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformWebhooksPage.css';
 
 type Tenant = { id: string; name: string };
-type Webhook = {
-  id: string;
-  tenant_id: string;
-  tenant_name?: string;
-  name: string;
-  url: string;
-  description?: string | null;
-  event_types: string[];
-  secret_prefix: string;
-  is_enabled: boolean;
-  is_healthy: boolean;
-  last_delivery_at?: string | null;
-  last_delivery_status?: string | null;
-  consecutive_failure_count: number;
-  disabled_reason?: string | null;
-  created_at: string;
+type Pagination = { limit: number; offset: number; has_more: boolean };
+type EvidenceAccess = { tenant: boolean; platform_user_identity: boolean };
+type DeliveryContract = {
+  https_only: boolean;
+  private_network_destinations_blocked: boolean;
+  signing_algorithm: string;
+  automatic_audit_outbox_delivery: boolean;
+  legacy_hash_only_secret_requires_rotation: boolean;
 };
-type Delivery = { id: string; webhook_name?: string; tenant_name?: string; event_type: string; delivery_status: string; response_status?: number | null; error_message?: string | null; created_at: string; completed_at?: string | null };
-type WebhooksResponse = { webhooks: Webhook[]; event_types: string[] };
-type CreateWebhookResponse = { webhook: Webhook; secret: string; warning: string };
-type TestDeliveryResponse = { delivery: Delivery; success: boolean };
-type DeliveriesResponse = { deliveries: Delivery[] };
+type DeliveryPosture = 'disabled' | 'secret_rotation_required' | 'not_observed' | 'failing' | 'observed_success' | 'unknown';
+type Webhook = {
+  id: string; tenant_id?: string | null; tenant_name?: string | null; name: string; url: string;
+  description?: string | null; event_types: string[]; secret_prefix: string; signing_secret_ready: boolean;
+  delivery_posture: DeliveryPosture; is_enabled: boolean; is_healthy: boolean | null;
+  last_delivery_at?: string | null; last_delivery_status?: string | null; consecutive_failure_count: number;
+  disabled_reason?: string | null; created_at: string; updated_at?: string | null;
+  created_by_email?: string | null; updated_by_email?: string | null;
+};
+type Delivery = {
+  id: string; webhook_id: string; webhook_name?: string | null; tenant_id?: string | null; tenant_name?: string | null;
+  event_type: string; delivery_status: string; response_status?: number | null; error_message?: string | null;
+  attempt_count: number; next_retry_at?: string | null; last_attempt_at?: string | null; attempted_at?: string | null;
+  completed_at?: string | null; created_at: string;
+};
+type WebhooksResponse = { webhooks: Webhook[]; event_types: string[]; evidence_access: EvidenceAccess; pagination: Pagination; delivery_contract: DeliveryContract };
+type DeliveriesResponse = { deliveries: Delivery[]; evidence_access: EvidenceAccess; pagination: Pagination };
+type SecretResponse = { webhook: Webhook; secret: string; warning: string };
+type TestResponse = { delivery: Delivery | null; success: boolean };
+type WebhookDraft = { name: string; url: string; description: string; event_types: string[]; is_enabled: boolean };
+type CreateDraft = WebhookDraft & { tenant_id: string };
 
-const defaultForm = { tenant_id: '', name: '', url: '', description: '', event_types: [] as string[], is_enabled: true };
+const PAGE_SIZE = 50;
+const DELIVERY_PAGE_SIZE = 50;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const deliveryStatuses = ['', 'pending', 'processing', 'succeeded', 'failed', 'blocked'] as const;
+const emptyCreateDraft = (): CreateDraft => ({ tenant_id: '', name: '', url: '', description: '', event_types: [], is_enabled: true });
 
-function trimOptional(value: string) {
-  const text = value.trim();
-  return text || null;
-}
-
-function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : 'Not recorded';
-}
-
-function badgeStyle(webhook: Webhook): CSSProperties {
-  if (!webhook.is_enabled) return { ...styles.badge, background: '#f3f4f6', color: '#374151' };
-  if (webhook.is_healthy) return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-}
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function trimOptional(value: string) { const text = value.trim(); return text || null; }
+function dateTime(value?: string | null) { if (!value) return 'Not recorded'; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleString(); }
+function draftFor(webhook: Webhook): WebhookDraft { return { name: webhook.name, url: webhook.url, description: webhook.description || '', event_types: [...(webhook.event_types || [])], is_enabled: webhook.is_enabled }; }
+function postureLabel(value: DeliveryPosture) { if (value === 'observed_success') return 'Observed success'; if (value === 'secret_rotation_required') return 'Secret rotation required'; if (value === 'not_observed') return 'Not observed'; return value.charAt(0).toUpperCase() + value.slice(1).replaceAll('_', ' '); }
+function postureTone(value: DeliveryPosture) { if (value === 'observed_success') return 'good'; if (value === 'failing') return 'danger'; if (value === 'secret_rotation_required' || value === 'not_observed' || value === 'unknown') return 'warn'; return 'neutral'; }
+function deliveryTone(value: string) { if (value === 'succeeded') return 'good'; if (value === 'failed' || value === 'blocked') return 'danger'; return 'warn'; }
+function validHttpsUrl(value: string) { try { const parsed = new URL(value.trim()); return parsed.protocol === 'https:' && Boolean(parsed.hostname); } catch { return false; } }
+function auditLinkFor(webhook: Webhook) { const params = new URLSearchParams({ target_type: 'platform_webhook', target_id: webhook.id }); return `/platform/audit?${params.toString()}`; }
 
 export default function PlatformWebhooksPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_WEBHOOKS_WRITE);
-  const [filters, setFilters] = useState({ tenant_id: '', search: '', include_disabled: true });
-  const [form, setForm] = useState(defaultForm);
-  const [secret, setSecret] = useState<CreateWebhookResponse | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadDependencies = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ);
+  const canReadApiKeys = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ);
+  const canReadNotifications = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ);
+  const canReadJobs = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ);
 
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
-    if (filters.search) params.set('search', filters.search);
-    if (filters.include_disabled) params.set('include_disabled', 'true');
-    params.set('limit', '200');
-    return params.toString();
-  }, [filters]);
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const requestedIncludeDisabled = searchParams.get('include_disabled') || '';
+  const requestedDeliveryStatus = searchParams.get('delivery_status') || '';
+  const tenantId = canReadTenants && uuidPattern.test(requestedTenantId) ? requestedTenantId : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const includeDisabled = requestedIncludeDisabled ? requestedIncludeDisabled === 'true' : true;
+  const deliveryStatus = deliveryStatuses.includes(requestedDeliveryStatus as typeof deliveryStatuses[number]) ? requestedDeliveryStatus : '';
+  const invalidFilters = Boolean((requestedTenantId && !tenantId) || (requestedSearch && !search) || (requestedIncludeDisabled && !['true', 'false'].includes(requestedIncludeDisabled)) || (requestedDeliveryStatus && !deliveryStatus));
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants', 'webhook-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const webhooks = useQuery({ queryKey: ['platform', 'webhooks', filters], queryFn: () => platformApiRequest<WebhooksResponse>(`/platform/webhooks?${queryString}`) });
-  const deliveries = useQuery({ queryKey: ['platform', 'webhook-deliveries'], queryFn: () => platformApiRequest<DeliveriesResponse>('/platform/webhooks/deliveries?limit=50') });
+  const [offset, setOffset] = useState(0);
+  const [deliveryOffset, setDeliveryOffset] = useState(0);
+  const [form, setForm] = useState<CreateDraft>(() => emptyCreateDraft());
+  const [editingId, setEditingId] = useState('');
+  const [editDraft, setEditDraft] = useState<WebhookDraft>(() => ({ name: '', url: '', description: '', event_types: [], is_enabled: true }));
+  const [newSecret, setNewSecret] = useState<SecretResponse | null>(null);
+  const [message, setMessage] = useState('');
+  const [mutationError, setMutationError] = useState('');
 
-  const createWebhook = useMutation({
-    mutationFn: () => platformApiRequest<CreateWebhookResponse>('/platform/webhooks', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...form,
-        name: form.name.trim(),
-        url: form.url.trim(),
-        description: trimOptional(form.description)
-      })
-    }),
-    onSuccess: (data) => {
-      setSecret(data);
-      setNotice(`Webhook ${data.webhook.name} created. Copy the signing secret now.`);
-      setForm(defaultForm);
-      queryClient.invalidateQueries({ queryKey: ['platform', 'webhooks'] });
-    }
+  useEffect(() => { setOffset(0); }, [tenantId, search, includeDisabled, invalidFilters]);
+  useEffect(() => { setDeliveryOffset(0); }, [tenantId, deliveryStatus, invalidFilters]);
+
+  const tenants = useQuery({
+    queryKey: ['platform', 'tenants', 'webhook-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
+    enabled: canReadTenants, refetchOnWindowFocus: false, staleTime: 30_000
   });
-
-  const updateWebhook = useMutation({
-    mutationFn: ({ webhook, patch }: { webhook: Webhook; patch: Partial<Webhook> }) => platformApiRequest(`/platform/webhooks/${webhook.id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-    onSuccess: (_data, variables) => {
-      setNotice(`${variables.webhook.name} ${variables.patch.is_enabled ? 'enabled' : 'disabled'}.`);
-      queryClient.invalidateQueries({ queryKey: ['platform', 'webhooks'] });
-    }
+  const webhooks = useQuery({
+    queryKey: ['platform', 'webhooks', 'list', tenantId, search, includeDisabled, offset],
+    queryFn: () => { const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset), include_disabled: String(includeDisabled) }); if (tenantId) params.set('tenant_id', tenantId); if (search.trim()) params.set('search', search.trim()); return platformApiRequest<WebhooksResponse>(`/platform/webhooks?${params.toString()}`); },
+    enabled: !invalidFilters, refetchOnWindowFocus: false, staleTime: 30_000
   });
-
-  const rotateSecret = useMutation({
-    mutationFn: (webhookId: string) => platformApiRequest<CreateWebhookResponse>(`/platform/webhooks/${webhookId}/rotate-secret`, { method: 'POST' }),
-    onSuccess: (data) => {
-      setSecret(data);
-      setNotice(`Signing secret rotated for ${data.webhook.name}. Copy the new secret now.`);
-      queryClient.invalidateQueries({ queryKey: ['platform', 'webhooks'] });
-    }
+  const deliveries = useQuery({
+    queryKey: ['platform', 'webhook-deliveries', tenantId, deliveryStatus, deliveryOffset],
+    queryFn: () => { const params = new URLSearchParams({ limit: String(DELIVERY_PAGE_SIZE), offset: String(deliveryOffset) }); if (tenantId) params.set('tenant_id', tenantId); if (deliveryStatus) params.set('status', deliveryStatus); return platformApiRequest<DeliveriesResponse>(`/platform/webhooks/deliveries?${params.toString()}`); },
+    enabled: !invalidFilters, refetchOnWindowFocus: false, staleTime: 30_000
   });
-
-  const testDelivery = useMutation({
-    mutationFn: (webhookId: string) => platformApiRequest<TestDeliveryResponse>(`/platform/webhooks/${webhookId}/test`, { method: 'POST' }),
-    onSuccess: (data) => {
-      setNotice(`Test delivery ${data.success ? 'succeeded' : 'failed'}. Review recent deliveries for response evidence.`);
-      queryClient.invalidateQueries({ queryKey: ['platform', 'webhooks'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'webhook-deliveries'] });
-    }
-  });
-
-  const refreshAll = () => {
-    void tenants.refetch();
-    void webhooks.refetch();
-    void deliveries.refetch();
-  };
 
   const events = webhooks.data?.event_types || [];
   const rows = webhooks.data?.webhooks || [];
   const deliveryRows = deliveries.data?.deliveries || [];
-  const loadError = tenants.error || webhooks.error || deliveries.error;
-  const snapshotText = `Source: /platform/webhooks + /platform/webhooks/deliveries + /platform/tenants | Limit: webhooks 200, deliveries 50 | Tenant: ${filters.tenant_id || 'all'} | Search: ${filters.search.trim() || 'none'} | Include disabled: ${filters.include_disabled ? 'yes' : 'no'}`;
-  const createReady = Boolean(form.tenant_id && form.name.trim() && form.url.trim() && form.event_types.length);
-  const createHelp = !form.tenant_id
-    ? 'Select a tenant before creating a webhook.'
-    : !form.name.trim()
-      ? 'Enter a webhook name before creating a webhook.'
-      : !form.url.trim()
-        ? 'Enter a webhook URL before creating a webhook.'
-        : !form.event_types.length
-          ? 'Select at least one event before creating a webhook.'
-          : '';
+  const access = webhooks.data?.evidence_access || { tenant: canReadTenants, platform_user_identity: canReadPlatformUsers };
+  const contract = webhooks.data?.delivery_contract;
+  const endpointPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const deliveryPage = Math.floor(deliveryOffset / DELIVERY_PAGE_SIZE) + 1;
+  const endpointInitialError = webhooks.isError && webhooks.data === undefined;
+  const endpointRefreshError = webhooks.isError && webhooks.data !== undefined;
+  const deliveryInitialError = deliveries.isError && deliveries.data === undefined;
+  const deliveryRefreshError = deliveries.isError && deliveries.data !== undefined;
+  const enabledCount = rows.filter((row) => row.is_enabled).length;
+  const observedSuccessCount = rows.filter((row) => row.delivery_posture === 'observed_success').length;
+  const failingCount = rows.filter((row) => row.delivery_posture === 'failing').length;
+  const rotationCount = rows.filter((row) => row.delivery_posture === 'secret_rotation_required').length;
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Webhooks</h1>
-          <p style={styles.subtitle}>Manage tenant outbound integration endpoints, signing secrets, and delivery health.</p>
-        </div>
-        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={tenants.isFetching || webhooks.isFetching || deliveries.isFetching}>Refresh</button>
-      </header>
+  const updateFilter = (key: 'tenant_id' | 'search' | 'include_disabled' | 'delivery_status', value: string) => { const next = new URLSearchParams(searchParams); if (value) next.set(key, value); else next.delete(key); setSearchParams(next, { replace: true }); };
+  const clearInvalidFilters = () => { const next = new URLSearchParams(searchParams); for (const key of ['tenant_id', 'search', 'include_disabled', 'delivery_status']) next.delete(key); setSearchParams(next, { replace: true }); };
+  const invalidateWebhookData = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['platform', 'webhooks'] }), queryClient.invalidateQueries({ queryKey: ['platform', 'webhook-deliveries'] }), queryClient.invalidateQueries({ queryKey: ['platform', 'integration-monitoring'] })]); };
+  const refreshAll = async () => { const work: Array<Promise<unknown>> = [webhooks.refetch(), deliveries.refetch()]; if (canReadTenants) work.push(tenants.refetch()); await Promise.all(work); };
+  const startEdit = (webhook: Webhook) => { setEditingId(webhook.id); setEditDraft(draftFor(webhook)); setMutationError(''); };
+  const stopEdit = () => { setEditingId(''); setMutationError(''); };
 
-      <section style={styles.metaBar}>
-        <span>{snapshotText}</span>
-        <span>Visible endpoints: {rows.length}</span>
-        <span>Recent deliveries: {deliveryRows.length}</span>
-        <span>Event types: {events.length}</span>
-      </section>
+  const createWebhook = useMutation({
+    mutationFn: () => platformApiRequest<SecretResponse>('/platform/webhooks', { method: 'POST', body: JSON.stringify({ tenant_id: form.tenant_id, name: form.name.trim(), url: form.url.trim(), description: trimOptional(form.description), event_types: form.event_types, is_enabled: form.is_enabled }) }),
+    onSuccess: async (data) => { setNewSecret(data); setMessage(`Webhook ${data.webhook.name} created. Store the one-time signing secret before dismissing it.`); setForm(emptyCreateDraft()); setMutationError(''); await invalidateWebhookData(); },
+    onError: (error) => setMutationError(readableError(error))
+  });
+  const updateWebhook = useMutation({
+    mutationFn: ({ webhookId, patch }: { webhookId: string; patch: Partial<WebhookDraft> }) => platformApiRequest<{ webhook: Webhook }>(`/platform/webhooks/${webhookId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    onSuccess: async (data) => { setMessage(`Webhook ${data.webhook.name} updated.`); setMutationError(''); setEditingId(''); await invalidateWebhookData(); },
+    onError: (error) => setMutationError(readableError(error))
+  });
+  const rotateSecret = useMutation({
+    mutationFn: (webhookId: string) => platformApiRequest<SecretResponse>(`/platform/webhooks/${webhookId}/rotate-secret`, { method: 'POST' }),
+    onSuccess: async (data) => { setNewSecret(data); setMessage(`Signing secret rotated for ${data.webhook.name}. The prior secret is no longer valid.`); setMutationError(''); await invalidateWebhookData(); },
+    onError: (error) => setMutationError(readableError(error))
+  });
+  const testDelivery = useMutation({
+    mutationFn: (webhookId: string) => platformApiRequest<TestResponse>(`/platform/webhooks/${webhookId}/test`, { method: 'POST' }),
+    onSuccess: async (data) => { setMessage(data.success ? 'Test delivery received an HTTP 2xx response.' : 'Test delivery did not receive an HTTP 2xx response. Review delivery evidence and retry state.'); setMutationError(''); await invalidateWebhookData(); },
+    onError: (error) => setMutationError(readableError(error))
+  });
 
-      <section style={styles.linkBar}>
-        <Link to="/platform/integration-monitoring">Integration Monitoring</Link>
-        <Link to="/platform/api-keys">API Keys</Link>
-        <Link to="/platform/api-client-governance">API Client Governance</Link>
-        <Link to="/platform/notifications">Notifications</Link>
-      </section>
+  const mutating = createWebhook.isPending || updateWebhook.isPending || rotateSecret.isPending || testDelivery.isPending;
+  const createProblem = !form.tenant_id ? 'Select a tenant.' : !form.name.trim() ? 'Name is required.' : !validHttpsUrl(form.url) ? 'A valid HTTPS destination is required.' : !form.event_types.length ? 'Select at least one event type.' : '';
+  const editProblem = !editDraft.name.trim() ? 'Name is required.' : !validHttpsUrl(editDraft.url) ? 'A valid HTTPS destination is required.' : !editDraft.event_types.length ? 'Select at least one event type.' : '';
+  const snapshotLabel = useMemo(() => `Tenant: ${tenantId || 'all permitted'} · Search: ${search.trim() || 'none'} · Disabled: ${includeDisabled ? 'included' : 'hidden'} · Deliveries: ${deliveryStatus || 'all statuses'}`, [tenantId, search, includeDisabled, deliveryStatus]);
 
-      {notice ? <section style={styles.success}>{notice}<button type="button" style={styles.inlineButton} onClick={() => setNotice(null)}>Dismiss</button></section> : null}
+  return <div className="platform-webhooks">
+    <OperationalWorkspaceHero iconPath="/platform/webhooks" eyebrow="Platform operations" title="Webhooks" description="Operate tenant-bound outbound webhook endpoints, one-time signing secrets, automatic event delivery, retries, and application-recorded delivery evidence."
+      meta={<><OperationalWorkspaceMetaPill>HTTPS destinations only</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>HMAC-SHA256 signing</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Evidence is permission scoped</OperationalWorkspaceMetaPill></>}
+      aside={<div className="platform-webhooks__hero-aside"><OperationalWorkspaceStatus value={endpointRefreshError || deliveryRefreshError ? 'Stale snapshot' : invalidFilters ? 'Filter blocked' : 'Delivery registry'} label="Platform-managed outbound integrations" /><div className="platform-webhooks__refresh-block"><button type="button" className="app-button app-button--secondary" onClick={() => void refreshAll()} disabled={invalidFilters || webhooks.isFetching || deliveries.isFetching || tenants.isFetching}>{webhooks.isFetching || deliveries.isFetching ? 'Refreshing…' : 'Refresh'}</button><span>{webhooks.data ? `Loaded ${rows.length} endpoints on page ${endpointPage}` : 'Awaiting webhook snapshot'}</span></div></div>} />
 
-      {loadError ? (
-        <section style={styles.errorPanel}>
-          <strong>Unable to load all webhook data.</strong> Retry after checking platform authentication, permissions, or backend availability.
-          <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
-        </section>
-      ) : null}
+    {endpointRefreshError || deliveryRefreshError ? <div className="platform-webhooks__warning"><strong>Showing the last successful snapshot.</strong> A background refresh failed. Endpoint error: {endpointRefreshError ? readableError(webhooks.error) : 'none'}. Delivery error: {deliveryRefreshError ? readableError(deliveries.error) : 'none'}.</div> : null}
+    {tenants.isError && canReadTenants ? <div className="platform-webhooks__warning"><strong>Tenant directory unavailable.</strong> Existing webhook evidence can remain visible, but tenant selection/filtering may be incomplete until the directory reloads.</div> : null}
+    {message ? <div className="platform-webhooks__success">{message}<button type="button" className="app-button app-button--secondary" onClick={() => setMessage('')}>Dismiss</button></div> : null}
+    {mutationError ? <div className="platform-webhooks__warning"><strong>Webhook action failed.</strong> {mutationError}</div> : null}
 
-      {secret ? (
-        <section style={{ ...styles.card, borderColor: '#f59e0b' }}>
-          <h2 style={styles.cardTitle}>Copy signing secret now</h2>
-          <p style={styles.help}>{secret.warning}</p>
-          <code style={styles.secret}>{secret.secret}</code>
-          <button type="button" style={styles.secondaryButton} onClick={() => setSecret(null)}>I copied it</button>
-        </section>
-      ) : null}
+    <OperationalWorkspaceStats ariaLabel="Webhook loaded-page metrics">
+      <OperationalWorkspaceStatCard label="Loaded endpoints" value={rows.length} helper={`Current page ${endpointPage}; not a global registry total`} loading={webhooks.isLoading && !webhooks.data} />
+      <OperationalWorkspaceStatCard label="Enabled" value={enabledCount} helper="Loaded-page enabled endpoints" tone={enabledCount ? 'good' : 'neutral'} loading={webhooks.isLoading && !webhooks.data} />
+      <OperationalWorkspaceStatCard label="Observed success" value={observedSuccessCount} helper="Last application-recorded delivery succeeded" tone={observedSuccessCount ? 'good' : 'neutral'} loading={webhooks.isLoading && !webhooks.data} />
+      <OperationalWorkspaceStatCard label="Failing" value={failingCount} helper="Loaded endpoints with failed delivery evidence" tone={failingCount ? 'danger' : 'neutral'} loading={webhooks.isLoading && !webhooks.data} />
+      <OperationalWorkspaceStatCard label="Rotate secret" value={rotationCount} helper="Legacy endpoints not yet delivery-ready" tone={rotationCount ? 'warn' : 'neutral'} loading={webhooks.isLoading && !webhooks.data} />
+    </OperationalWorkspaceStats>
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Filters</h2>
-        <div style={styles.grid}>
-          <label style={styles.field}>Tenant<select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">All tenants</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
-          <label style={styles.field}>Search<input style={styles.input} value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Name, URL, tenant" /></label>
-          <label style={styles.checkbox}><input type="checkbox" checked={filters.include_disabled} onChange={(event) => setFilters((current) => ({ ...current, include_disabled: event.target.checked }))} /> Include disabled</label>
-        </div>
-      </section>
+    <section className="io-workspace-panel platform-webhooks__section"><OperationalSectionHeader iconPath="/platform/webhooks" title="Delivery contract" description="What this registry can and cannot prove about outbound integration activity." />
+      <div className="platform-webhooks__truth-note"><strong>Webhook truth boundary</strong>An HTTP 2xx response is application-recorded delivery evidence only. It does not prove the remote system processed, acknowledged, or completed external work. No observed delivery does not prove that no external integration exists outside this registry.</div>
+      <div className="platform-webhooks__evidence-grid"><div data-state={access.tenant ? 'available' : 'restricted'}><span>Tenant evidence</span><strong>{access.tenant ? 'Available' : 'Redacted'}</strong><small>TENANTS_READ</small></div><div data-state={access.platform_user_identity ? 'available' : 'restricted'}><span>Operator identity</span><strong>{access.platform_user_identity ? 'Available' : 'Redacted'}</strong><small>PLATFORM_USERS_READ</small></div><div><span>Network boundary</span><strong>{contract?.https_only === false ? 'Review required' : 'HTTPS only'}</strong><small>{contract?.private_network_destinations_blocked === false ? 'Private destinations not blocked' : 'Private/local destinations blocked'}</small></div><div><span>Automatic delivery</span><strong>{contract?.automatic_audit_outbox_delivery === false ? 'Not enabled' : 'Audit outbox'}</strong><small>Idempotent event queueing</small></div></div>
+    </section>
 
-      {canWrite ? (
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Create webhook</h2>
-          <div style={styles.grid}>
-            <label style={styles.field}>Tenant<select style={styles.input} value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Select tenant</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
-            <label style={styles.field}>Name<input style={styles.input} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="POS integration webhook" /></label>
-            <label style={styles.field}>URL<input style={styles.input} value={form.url} onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))} placeholder="https://example.com/webhook" /></label>
-          </div>
-          <label style={styles.field}>Description<textarea style={styles.textarea} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></label>
-          <div style={styles.scopeGrid}>{events.map((eventName) => <label key={eventName} style={styles.checkbox}><input type="checkbox" checked={form.event_types.includes(eventName)} onChange={(event) => setForm((current) => ({ ...current, event_types: event.target.checked ? [...current.event_types, eventName] : current.event_types.filter((item) => item !== eventName) }))} /> {eventName}</label>)}</div>
-          <label style={styles.checkbox}><input type="checkbox" checked={form.is_enabled} onChange={(event) => setForm((current) => ({ ...current, is_enabled: event.target.checked }))} /> Enabled immediately</label>
-          {createHelp ? <p style={styles.error}>{createHelp}</p> : null}
-          <button type="button" style={createReady ? styles.primaryButton : styles.disabledButton} disabled={createWebhook.isPending || !createReady} onClick={() => { setNotice(null); createWebhook.mutate(); }}>Create webhook</button>
-        </section>
-      ) : null}
+    {newSecret ? <section className="io-workspace-panel platform-webhooks__section platform-webhooks__secret-panel"><OperationalSectionHeader iconPath="/platform/webhooks" title="Copy signing secret now" description={newSecret.warning} /><code className="platform-webhooks__secret">{newSecret.secret}</code><div className="platform-webhooks__actions"><button type="button" className="app-button" onClick={() => { void navigator.clipboard?.writeText(newSecret.secret); setMessage('Copy requested. Verify the secret is stored in the receiving integration before dismissing it.'); }}>Copy secret</button><button type="button" className="app-button app-button--secondary" onClick={() => setNewSecret(null)}>Clear one-time secret</button></div></section> : null}
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Endpoints</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Name</th><th style={styles.th}>URL</th><th style={styles.th}>Events</th><th style={styles.th}>Delivery health</th><th style={styles.th}>Actions</th></tr></thead>
-            <tbody>
-              {rows.map((webhook) => (
-                <tr key={webhook.id}>
-                  <td style={styles.td}>{webhook.tenant_name || webhook.tenant_id}</td>
-                  <td style={styles.td}><strong>{webhook.name}</strong><br /><span style={styles.help}>Secret {webhook.secret_prefix}…</span></td>
-                  <td style={styles.td}><code>{webhook.url}</code><br /><span style={styles.help}>{webhook.description || 'No description'}</span></td>
-                  <td style={styles.td}>{webhook.event_types.join(', ')}</td>
-                  <td style={styles.td}><span style={badgeStyle(webhook)}>{webhook.is_enabled ? (webhook.is_healthy ? 'healthy' : 'failing') : 'disabled'}</span><br /><span style={styles.help}>Last: {webhook.last_delivery_at ? `${webhook.last_delivery_status || 'unknown'} at ${formatDate(webhook.last_delivery_at)}` : 'Never delivered'} · failures: {webhook.consecutive_failure_count}</span><br /><span style={styles.help}>Created: {formatDate(webhook.created_at)} · ID: {webhook.id}</span></td>
-                  <td style={styles.td}>{canWrite ? <div style={styles.actions}><button type="button" style={styles.secondaryButton} onClick={() => { if (window.confirm(`${webhook.is_enabled ? 'Disable' : 'Enable'} webhook ${webhook.name}?`)) updateWebhook.mutate({ webhook, patch: { is_enabled: !webhook.is_enabled, disabled_reason: webhook.is_enabled ? 'Disabled from platform UI' : null } }); }}>{webhook.is_enabled ? 'Disable' : 'Enable'}</button><button type="button" style={styles.secondaryButton} disabled={!webhook.is_enabled} onClick={() => { if (window.confirm(`Send a test delivery to ${webhook.name}?`)) testDelivery.mutate(webhook.id); }}>Test</button><button type="button" style={styles.secondaryButton} onClick={() => { if (window.confirm(`Rotate signing secret for ${webhook.name}? The new secret must be copied immediately.`)) rotateSecret.mutate(webhook.id); }}>Rotate secret</button><Link to="/platform/integration-monitoring">Evidence</Link></div> : <Link to="/platform/integration-monitoring">Evidence</Link>}</td>
-                </tr>
-              ))}
-              {!rows.length ? <tr><td style={styles.td} colSpan={6}>No webhooks found.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
+    {canWrite ? <section className="io-workspace-panel platform-webhooks__section"><OperationalSectionHeader iconPath="/platform/webhooks" title="Create webhook" description="New endpoints are tenant-bound. The signing secret is displayed only once." />
+      {!canReadTenants ? <div className="platform-webhooks__restricted"><strong>Creation restricted</strong><span>TENANTS_READ is required to bind a new webhook to a tenant.</span></div> : <><div className="platform-webhooks__form-grid"><label>Tenant<select value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Select tenant</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label><label>Name<input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={160} placeholder="ERP notifications" /></label><label className="platform-webhooks__span-all">HTTPS destination<input value={form.url} onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))} maxLength={2048} placeholder="https://example.com/inventory/webhooks" /></label><label className="platform-webhooks__span-all">Description<textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} /></label><label className="platform-webhooks__checkbox"><input type="checkbox" checked={form.is_enabled} onChange={(event) => setForm((current) => ({ ...current, is_enabled: event.target.checked }))} />Enable automatic delivery immediately</label></div>
+      <div className="platform-webhooks__event-grid" aria-label="Webhook event types">{events.map((eventType) => <label key={eventType}><input type="checkbox" checked={form.event_types.includes(eventType)} onChange={(event) => setForm((current) => ({ ...current, event_types: event.target.checked ? [...current.event_types, eventType] : current.event_types.filter((item) => item !== eventType) }))} />{eventType}</label>)}</div>{createProblem ? <div className="platform-webhooks__validation">{createProblem}</div> : null}<div className="platform-webhooks__actions"><button type="button" className="app-button" disabled={Boolean(createProblem) || mutating} onClick={() => createWebhook.mutate()}>{createWebhook.isPending ? 'Creating…' : 'Create webhook'}</button></div></>}</section> : null}
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Recent deliveries</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th style={styles.th}>Webhook</th><th style={styles.th}>Tenant</th><th style={styles.th}>Event</th><th style={styles.th}>Status</th><th style={styles.th}>Response</th><th style={styles.th}>When</th></tr></thead>
-            <tbody>
-              {deliveryRows.map((delivery) => <tr key={delivery.id}><td style={styles.td}>{delivery.webhook_name || delivery.id}<br /><span style={styles.help}>Delivery ID: {delivery.id}</span></td><td style={styles.td}>{delivery.tenant_name || '—'}</td><td style={styles.td}>{delivery.event_type}</td><td style={styles.td}>{delivery.delivery_status}</td><td style={styles.td}>{delivery.response_status || delivery.error_message || '—'}</td><td style={styles.td}>{formatDate(delivery.created_at)}<br /><span style={styles.help}>Completed: {formatDate(delivery.completed_at)}</span></td></tr>)}
-              {!deliveryRows.length ? <tr><td style={styles.td} colSpan={6}>No deliveries yet.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-webhooks__section"><OperationalSectionHeader iconPath="/platform/webhooks" title="Endpoint registry" description={snapshotLabel} />
+      <div className="platform-webhooks__filter-grid">{canReadTenants ? <label>Tenant<select value={tenantId} onChange={(event) => updateFilter('tenant_id', event.target.value)}><option value="">All permitted tenants</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : <div className="platform-webhooks__restricted-filter">Tenant filter restricted · TENANTS_READ required</div>}<label>Search<input value={search} onChange={(event) => updateFilter('search', event.target.value)} maxLength={200} placeholder="Name, description, URL" /></label><label className="platform-webhooks__checkbox"><input type="checkbox" checked={includeDisabled} onChange={(event) => updateFilter('include_disabled', event.target.checked ? 'true' : 'false')} />Include disabled</label></div>
+      {invalidFilters ? <div className="platform-webhooks__blocking-error"><strong>Invalid or unauthorized URL filter</strong><span>Clear the invalid filter before loading webhook evidence.</span><button type="button" className="app-button app-button--secondary" onClick={clearInvalidFilters}>Clear invalid filters</button></div> : null}
+      {endpointInitialError ? <div className="platform-webhooks__blocking-error"><strong>Webhook registry unavailable</strong><span>{readableError(webhooks.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void webhooks.refetch()}>Retry</button></div> : null}
+      {webhooks.isLoading && !webhooks.data ? <div className="platform-webhooks__loading">Loading webhook endpoints…</div> : null}
+      {rows.length ? <div className="platform-webhooks__list">{rows.map((webhook) => { const editing = editingId === webhook.id; return <article className="platform-webhooks__card" key={webhook.id}><div className="platform-webhooks__card-header"><div><h4>{webhook.name}</h4><p>{webhook.description || 'No description recorded.'}</p></div><div className="platform-webhooks__badges"><span data-tone={webhook.is_enabled ? 'good' : 'neutral'}>{webhook.is_enabled ? 'Enabled' : 'Disabled'}</span><span data-tone={postureTone(webhook.delivery_posture)}>{postureLabel(webhook.delivery_posture)}</span></div></div>
+        {webhook.delivery_posture === 'secret_rotation_required' ? <div className="platform-webhooks__warning"><strong>Signing secret rotation required.</strong> This legacy endpoint has only a one-way stored hash. Rotate once before tests or automatic deliveries can be signed correctly.</div> : null}
+        <div className="platform-webhooks__metrics-grid"><div><span>Tenant</span><strong>{access.tenant ? (webhook.tenant_name || webhook.tenant_id || 'Not recorded') : 'Redacted'}</strong></div><div><span>Destination</span><strong><code>{webhook.url}</code></strong></div><div><span>Secret prefix</span><strong><code>{webhook.secret_prefix}…</code></strong></div><div><span>Signing ready</span><strong>{webhook.signing_secret_ready ? 'Yes' : 'No · rotate'}</strong></div><div><span>Last delivery</span><strong>{webhook.last_delivery_at ? dateTime(webhook.last_delivery_at) : 'Never observed'}</strong></div><div><span>Last status</span><strong>{webhook.last_delivery_status || 'Not observed'}</strong></div><div><span>Consecutive failures</span><strong>{webhook.consecutive_failure_count || 0}</strong></div><div><span>Updated by</span><strong>{access.platform_user_identity ? (webhook.updated_by_email || webhook.created_by_email || 'Not recorded') : 'Redacted'}</strong></div></div>
+        <div className="platform-webhooks__event-list">{(webhook.event_types || []).map((eventType) => <span key={eventType}>{eventType}</span>)}</div>{webhook.disabled_reason ? <div className="platform-webhooks__restricted"><strong>Disabled reason</strong><span>{webhook.disabled_reason}</span></div> : null}
+        {editing ? <div className="platform-webhooks__edit-panel"><div className="platform-webhooks__form-grid"><label>Name<input value={editDraft.name} onChange={(event) => setEditDraft((current) => ({ ...current, name: event.target.value }))} maxLength={160} /></label><label className="platform-webhooks__span-all">HTTPS destination<input value={editDraft.url} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} maxLength={2048} /></label><label className="platform-webhooks__span-all">Description<textarea value={editDraft.description} onChange={(event) => setEditDraft((current) => ({ ...current, description: event.target.value }))} maxLength={1000} /></label></div><div className="platform-webhooks__event-grid">{events.map((eventType) => <label key={eventType}><input type="checkbox" checked={editDraft.event_types.includes(eventType)} onChange={(event) => setEditDraft((current) => ({ ...current, event_types: event.target.checked ? [...current.event_types, eventType] : current.event_types.filter((item) => item !== eventType) }))} />{eventType}</label>)}</div>{editProblem ? <div className="platform-webhooks__validation">{editProblem}</div> : null}<div className="platform-webhooks__actions"><button type="button" className="app-button" disabled={Boolean(editProblem) || mutating} onClick={() => updateWebhook.mutate({ webhookId: webhook.id, patch: { name: editDraft.name.trim(), url: editDraft.url.trim(), description: trimOptional(editDraft.description) || '', event_types: editDraft.event_types } })}>Save settings</button><button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={stopEdit}>Cancel edit</button></div></div> : null}
+        <div className="platform-webhooks__source-links">{canReadAudit ? <Link to={auditLinkFor(webhook)}>Audit evidence</Link> : null}{canReadTenants && webhook.tenant_id ? <Link to={`/platform/tenants?tenant_id=${encodeURIComponent(webhook.tenant_id)}`}>Tenant source</Link> : null}{canReadDependencies ? <Link to={`/platform/integration-monitoring?tenant_id=${webhook.tenant_id ? encodeURIComponent(webhook.tenant_id) : ''}&source=webhooks`}>Integration monitoring</Link> : null}</div>
+        {canWrite ? <div className="platform-webhooks__actions">{!editing ? <button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => startEdit(webhook)}>Edit settings</button> : null}<button type="button" className="app-button app-button--secondary" disabled={mutating || !webhook.is_enabled || !webhook.signing_secret_ready} onClick={() => testDelivery.mutate(webhook.id)}>Send test</button><button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => window.confirm('Rotate this signing secret? The previous secret stops verifying new deliveries immediately.') && rotateSecret.mutate(webhook.id)}>Rotate secret</button><button type="button" className={webhook.is_enabled ? 'app-button app-button--danger' : 'app-button'} disabled={mutating} onClick={() => window.confirm(`${webhook.is_enabled ? 'Disable' : 'Enable'} this webhook?`) && updateWebhook.mutate({ webhookId: webhook.id, patch: { is_enabled: !webhook.is_enabled } })}>{webhook.is_enabled ? 'Disable' : 'Enable'}</button></div> : null}
+      </article>; })}</div> : webhooks.data ? <div className="platform-webhooks__empty"><strong>No webhook records matched.</strong><span>No application webhook records matched these filters. This does not prove there are no external integration endpoints or external integration activity outside this registry.</span></div> : null}
+      {webhooks.data ? <div className="platform-webhooks__pagination"><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))} disabled={offset === 0 || webhooks.isFetching}>Previous</button><span>Page {endpointPage} · up to {PAGE_SIZE} endpoints</span><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => value + PAGE_SIZE)} disabled={!webhooks.data.pagination.has_more || webhooks.isFetching}>Next</button></div> : null}
+    </section>
+
+    <section className="io-workspace-panel platform-webhooks__section"><OperationalSectionHeader iconPath="/platform/webhooks" title="Delivery evidence" description="Safe operational metadata only; stored webhook payloads and remote response bodies are not exposed here." />
+      <div className="platform-webhooks__filter-grid">{canReadTenants ? <label>Tenant<select value={tenantId} onChange={(event) => updateFilter('tenant_id', event.target.value)}><option value="">All permitted tenants</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : <div className="platform-webhooks__restricted-filter">Tenant filter restricted · TENANTS_READ required</div>}<label>Delivery status<select value={deliveryStatus} onChange={(event) => updateFilter('delivery_status', event.target.value)}>{deliveryStatuses.map((status) => <option key={status || 'all'} value={status}>{status || 'All statuses'}</option>)}</select></label></div>
+      {deliveryInitialError ? <div className="platform-webhooks__warning"><strong>Delivery evidence unavailable.</strong> Endpoint registry remains usable. {readableError(deliveries.error)} <button type="button" className="app-button app-button--secondary" onClick={() => void deliveries.refetch()}>Retry deliveries</button></div> : null}
+      {deliveries.isLoading && !deliveries.data ? <div className="platform-webhooks__loading">Loading delivery evidence…</div> : null}
+      {deliveryRows.length ? <div className="platform-webhooks__delivery-list">{deliveryRows.map((delivery) => <article className="platform-webhooks__delivery" key={delivery.id}><div className="platform-webhooks__card-header"><div><h4>{delivery.webhook_name || 'Webhook delivery'}</h4><p>{delivery.event_type}</p></div><div className="platform-webhooks__badges"><span data-tone={deliveryTone(delivery.delivery_status)}>{delivery.delivery_status}</span></div></div><div className="platform-webhooks__metrics-grid"><div><span>Tenant</span><strong>{access.tenant ? (delivery.tenant_name || delivery.tenant_id || 'Not recorded') : 'Redacted'}</strong></div><div><span>Created</span><strong>{dateTime(delivery.created_at)}</strong></div><div><span>HTTP response</span><strong>{delivery.response_status ?? 'Not recorded'}</strong></div><div><span>Attempts</span><strong>{delivery.attempt_count || 0}</strong></div><div><span>Last attempt</span><strong>{dateTime(delivery.last_attempt_at || delivery.attempted_at)}</strong></div><div><span>Next retry</span><strong>{delivery.next_retry_at ? dateTime(delivery.next_retry_at) : 'Not scheduled'}</strong></div><div><span>Completed</span><strong>{dateTime(delivery.completed_at)}</strong></div><div><span>Error</span><strong>{delivery.error_message || 'None recorded'}</strong></div></div></article>)}</div> : deliveries.data ? <div className="platform-webhooks__empty"><strong>No delivery records matched.</strong><span>No application delivery evidence matched these filters. Absence of records is not proof that no external system activity occurred.</span></div> : null}
+      {deliveries.data ? <div className="platform-webhooks__pagination"><button type="button" className="app-button app-button--secondary" onClick={() => setDeliveryOffset((value) => Math.max(0, value - DELIVERY_PAGE_SIZE))} disabled={deliveryOffset === 0 || deliveries.isFetching}>Previous</button><span>Page {deliveryPage} · up to {DELIVERY_PAGE_SIZE} deliveries</span><button type="button" className="app-button app-button--secondary" onClick={() => setDeliveryOffset((value) => value + DELIVERY_PAGE_SIZE)} disabled={!deliveries.data.pagination.has_more || deliveries.isFetching}>Next</button></div> : null}
+    </section>
+
+    <section className="io-workspace-panel platform-webhooks__section"><OperationalSectionHeader iconPath="/platform/webhooks" title="Supporting operations" description="Only destinations allowed by the current Platform permission snapshot are shown." /><div className="platform-webhooks__supporting-links">{canReadDependencies ? <Link to="/platform/integration-monitoring?source=webhooks">Integration monitoring</Link> : null}{canReadApiKeys ? <Link to="/platform/api-keys">API keys</Link> : null}{canReadApiKeys ? <Link to="/platform/api-client-governance">API client governance</Link> : null}{canReadNotifications ? <Link to="/platform/notifications">Notifications</Link> : null}{canReadJobs ? <Link to="/platform/operational-jobs">Operational jobs</Link> : null}{canReadTenants ? <Link to={tenantId ? `/platform/tenants?tenant_id=${encodeURIComponent(tenantId)}` : '/platform/tenants'}>Tenants</Link> : null}{canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : null}</div></section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  cardTitle: { margin: '0 0 12px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  scopeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, margin: '12px 0' },
-  field: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155' },
-  checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', background: '#fff', color: '#0f172a', font: 'inherit', minWidth: 0 },
-  textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', minHeight: 72, background: '#fff', color: '#0f172a', font: 'inherit' },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: 10, color: '#475569', fontSize: 13, background: '#f8fafc' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: 10, verticalAlign: 'top', color: '#334155' },
-  badge: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, border: '1px solid transparent' },
-  help: { color: '#64748b', fontSize: 12, lineHeight: 1.45 },
-  actions: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', marginTop: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', marginTop: 12, fontWeight: 700 },
-  error: { margin: '12px 0 0', color: '#991b1b', fontWeight: 700 },
-  errorPanel: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: '12px 14px' },
-  success: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: '12px 14px', fontWeight: 700 },
-  metaBar: { display: 'flex', flexWrap: 'wrap', gap: 10, border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 12, padding: '10px 12px', color: '#475569', fontSize: 12 },
-  linkBar: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
-  inlineButton: { border: '1px solid currentColor', borderRadius: 999, padding: '4px 8px', background: 'transparent', color: 'inherit', cursor: 'pointer' },
-  secret: { display: 'block', background: '#0f172a', color: '#fff', padding: 12, borderRadius: 10, marginBottom: 12, overflowWrap: 'anywhere' }
-};
