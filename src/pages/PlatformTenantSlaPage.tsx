@@ -1,51 +1,97 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformTenantSlaPage.css';
 
-type Tenant = { id: string; name: string };
+type EvidenceKey = 'incidents' | 'tenant_tasks' | 'support_sessions';
+type SlaStatus = 'breached' | 'within_sla' | 'partial_evidence' | 'inactive' | 'not_configured';
+type Policy = {
+  id: string | null;
+  tenant_id: string;
+  tenant_name: string;
+  response_target_minutes: number;
+  incident_resolution_target_hours: number;
+  task_overdue_grace_hours: number;
+  review_frequency: 'daily' | 'weekly' | 'monthly';
+  escalation_notes?: string;
+  is_active: boolean;
+  is_persisted: boolean;
+  uses_template_defaults: boolean;
+};
+type SlaCounts = {
+  open_incidents: number | null;
+  breached_open_incidents: number | null;
+  resolved_incident_breaches: number | null;
+  open_tasks: number | null;
+  overdue_tasks_after_grace: number | null;
+  pending_support_approvals: number | null;
+  active_support_sessions: number | null;
+  support_response_breaches: number | null;
+};
 type SlaRow = {
   tenant_id: string;
   tenant_name: string;
+  policy_id: string | null;
+  is_persisted: boolean;
+  uses_template_defaults: boolean;
   is_active: boolean;
   response_target_minutes: number;
   incident_resolution_target_hours: number;
   task_overdue_grace_hours: number;
   review_frequency: 'daily' | 'weekly' | 'monthly';
   escalation_notes?: string;
+  known_breach_count: number;
   breach_count: number;
-  status: 'within_sla' | 'breached';
-  counts: Record<string, number>;
+  status: SlaStatus;
+  counts: SlaCounts;
 };
 type SlaOverview = {
   generated_at: string;
-  summary: { tenants: number; breached: number; within_sla: number; inactive_policies: number };
+  evidence: { available: EvidenceKey[]; omitted: EvidenceKey[]; complete: boolean };
+  summary_scope: 'loaded_page' | 'full_scan_scope';
+  summary: {
+    tenants: number;
+    breached: number;
+    within_sla: number;
+    partial_evidence: number;
+    inactive_policies: number;
+    not_configured: number;
+  };
+  pagination: { limit: number; offset: number; has_more: boolean } | null;
+  truthfulness: {
+    template_defaults_are_persisted_policy: false;
+    unconfigured_tenants_are_within_sla: false;
+    within_sla_requires_complete_evidence: true;
+    external_contractual_sla_proven: false;
+  };
   tenants: SlaRow[];
 };
 type PolicyResponse = {
-  policies: Array<{
-    tenant_id: string;
-    response_target_minutes: number;
-    incident_resolution_target_hours: number;
-    task_overdue_grace_hours: number;
-    review_frequency: 'daily' | 'weekly' | 'monthly';
-    escalation_notes?: string;
-    is_active: boolean;
-  }>;
+  policies: Policy[];
+  pagination: { limit: number; offset: number; has_more: boolean };
+  policy_truth: { template_defaults_are_persisted_policy: false; unconfigured_tenants_are_active_sla: false };
 };
-
 type SlaScanResult = {
   scanned_at: string;
   tenants_checked: number;
   breached_tenants: number;
   created: number;
   refreshed: number;
+  resolved_duplicates: number;
+  resolved_recovered: number;
   notifications_touched: number;
-  summary: SlaOverview['summary'];
 };
-
 type FormState = {
   tenant_id: string;
   response_target_minutes: string;
@@ -56,6 +102,9 @@ type FormState = {
   is_active: boolean;
 };
 
+const PAGE_SIZE = 100;
+const POLICY_PICKER_LIMIT = 250;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const defaultForm: FormState = {
   tenant_id: '',
   response_target_minutes: '60',
@@ -65,270 +114,384 @@ const defaultForm: FormState = {
   escalation_notes: '',
   is_active: true
 };
+const evidenceMeta: Record<EvidenceKey, { label: string; permission: string }> = {
+  incidents: { label: 'Incident evidence', permission: 'PLATFORM_INCIDENTS_READ' },
+  tenant_tasks: { label: 'Tenant task evidence', permission: 'TENANTS_READ' },
+  support_sessions: { label: 'Support-session evidence', permission: 'SUPPORT_SESSION_READ' }
+};
+const scanPermissions = [
+  PLATFORM_PERMISSIONS.PLATFORM_SLA_READ,
+  PLATFORM_PERMISSIONS.PLATFORM_SLA_WRITE,
+  PLATFORM_PERMISSIONS.TENANTS_READ,
+  PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
+  PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ,
+  PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_WRITE
+];
 
-function badgeStyle(status: SlaRow['status']): CSSProperties {
-  return status === 'breached'
-    ? { ...styles.badge, background: '#fee2e2', color: '#991b1b' }
-    : { ...styles.badge, background: '#dcfce7', color: '#166534' };
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
+}
+function dateTime(value: string | null | undefined) {
+  if (!value) return 'Not loaded';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not loaded' : date.toLocaleString();
+}
+function humanize(value: string | null | undefined) {
+  const text = String(value || '').replaceAll('_', ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Not recorded';
+}
+function statusTone(status: SlaStatus) {
+  if (status === 'breached') return 'danger';
+  if (status === 'within_sla') return 'good';
+  if (status === 'partial_evidence' || status === 'not_configured') return 'warn';
+  return 'neutral';
+}
+function countText(value: number | null) {
+  return value === null ? 'Restricted' : String(value);
 }
 
 export default function PlatformTenantSlaPage() {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
-  const [tenantId, setTenantId] = useState(searchParams.get('tenant_id') || '');
-  const [onlyBreached, setOnlyBreached] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [offset, setOffset] = useState(0);
   const [form, setForm] = useState<FormState>(defaultForm);
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants', 'sla-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const overviewQuery = useMemo(() => {
-    const params = new URLSearchParams();
-    if (tenantId) params.set('tenant_id', tenantId);
-    return params.toString();
-  }, [tenantId]);
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const requestedView = searchParams.get('view') || '';
+  const tenantId = uuidPattern.test(requestedTenantId) ? requestedTenantId : '';
+  const view = requestedView === 'breached' ? 'breached' : 'all';
+  const invalidTenantFilter = Boolean(requestedTenantId && !tenantId);
+  const invalidViewFilter = Boolean(requestedView && !['all', 'breached'].includes(requestedView));
+  const invalidFilters = invalidTenantFilter || invalidViewFilter;
 
-  const overview = useQuery({
-    queryKey: ['platform', 'tenant-sla', 'overview', tenantId],
-    queryFn: () => platformApiRequest<SlaOverview>(`/platform/tenant-sla/overview${overviewQuery ? `?${overviewQuery}` : ''}`)
-  });
+  useEffect(() => { setOffset(0); }, [tenantId, view, invalidFilters]);
 
   const policies = useQuery({
-    queryKey: ['platform', 'tenant-sla', 'policies'],
-    queryFn: () => platformApiRequest<PolicyResponse>('/platform/tenant-sla')
+    queryKey: ['platform', 'tenant-sla', 'policies', POLICY_PICKER_LIMIT],
+    queryFn: () => platformApiRequest<PolicyResponse>(`/platform/tenant-sla?limit=${POLICY_PICKER_LIMIT}&offset=0`),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
+  const overview = useQuery({
+    queryKey: ['platform', 'tenant-sla', 'overview', tenantId, offset],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (tenantId) params.set('tenant_id', tenantId);
+      return platformApiRequest<SlaOverview>(`/platform/tenant-sla/overview?${params.toString()}`);
+    },
+    enabled: !invalidFilters,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+
+  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_WRITE);
+  const canScan = scanPermissions.every((permission) => hasPlatformPermission(permission));
+  const missingScanPermissions = scanPermissions.filter((permission) => !hasPlatformPermission(permission));
+  const selectedRow = overview.data?.tenants.find((row) => row.tenant_id === tenantId);
+  const selectedPolicy = policies.data?.policies.find((policy) => policy.tenant_id === tenantId);
+  const selectedTenantLabel = selectedRow?.tenant_name || selectedPolicy?.tenant_name || (tenantId ? 'Selected tenant' : 'All tenants');
+  const policyOptions = useMemo(() => {
+    const options = [...(policies.data?.policies || [])];
+    if (selectedRow && !options.some((policy) => policy.tenant_id === selectedRow.tenant_id)) {
+      options.unshift({
+        id: selectedRow.policy_id,
+        tenant_id: selectedRow.tenant_id,
+        tenant_name: selectedRow.tenant_name,
+        response_target_minutes: selectedRow.response_target_minutes,
+        incident_resolution_target_hours: selectedRow.incident_resolution_target_hours,
+        task_overdue_grace_hours: selectedRow.task_overdue_grace_hours,
+        review_frequency: selectedRow.review_frequency,
+        escalation_notes: selectedRow.escalation_notes,
+        is_active: selectedRow.is_active,
+        is_persisted: selectedRow.is_persisted,
+        uses_template_defaults: selectedRow.uses_template_defaults
+      });
+    }
+    return options;
+  }, [policies.data?.policies, selectedRow]);
+
+  const rows = (overview.data?.tenants || []).filter((row) => view !== 'breached' || row.status === 'breached');
+  const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
+  const initialOverviewError = overview.isError && overview.data === undefined;
+  const refreshOverviewError = overview.isError && overview.data !== undefined;
+  const initialPoliciesError = policies.isError && policies.data === undefined;
+  const refreshPoliciesError = policies.isError && policies.data !== undefined;
+  const refreshing = overview.isFetching || policies.isFetching;
+
+  const responseTarget = Number(form.response_target_minutes);
+  const incidentTarget = Number(form.incident_resolution_target_hours);
+  const taskGrace = Number(form.task_overdue_grace_hours);
+  const formIsValid = Boolean(form.tenant_id)
+    && Number.isInteger(responseTarget) && responseTarget >= 1 && responseTarget <= 10080
+    && Number.isInteger(incidentTarget) && incidentTarget >= 1 && incidentTarget <= 8760
+    && Number.isInteger(taskGrace) && taskGrace >= 0 && taskGrace <= 8760;
+
   const savePolicy = useMutation({
-    mutationFn: () => platformApiRequest(`/platform/tenant-sla/${form.tenant_id}`, {
+    mutationFn: () => platformApiRequest<Policy>(`/platform/tenant-sla/${form.tenant_id}`, {
       method: 'PUT',
       body: JSON.stringify({
-        response_target_minutes: Number(form.response_target_minutes) || 60,
-        incident_resolution_target_hours: Number(form.incident_resolution_target_hours) || 24,
-        task_overdue_grace_hours: Number(form.task_overdue_grace_hours),
+        response_target_minutes: responseTarget,
+        incident_resolution_target_hours: incidentTarget,
+        task_overdue_grace_hours: taskGrace,
         review_frequency: form.review_frequency,
         escalation_notes: form.escalation_notes.trim(),
         is_active: form.is_active
       })
     }),
-    onSuccess: () => {
-      window.alert('SLA policy saved.');
-      setForm(defaultForm);
-      void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
     }
   });
 
   const scan = useMutation({
     mutationFn: () => platformApiRequest<SlaScanResult>('/platform/tenant-sla/scan', { method: 'POST' }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
-      void queryClient.invalidateQueries({ queryKey: ['platform', 'notifications'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] }),
+        queryClient.invalidateQueries({ queryKey: ['platform', 'notifications'] })
+      ]);
     }
   });
 
-  const rows = (overview.data?.tenants || []).filter((row) => !onlyBreached || row.breach_count > 0);
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_WRITE);
-  const tenantError = tenants.error instanceof Error ? tenants.error.message : tenants.error ? 'Tenant list failed to load' : '';
-  const overviewError = overview.error instanceof Error ? overview.error.message : overview.error ? 'Tenant SLA overview failed to load' : '';
-  const policiesError = policies.error instanceof Error ? policies.error.message : policies.error ? 'Tenant SLA policies failed to load' : '';
-  const selectedTenantName = tenantId ? tenants.data?.find((tenant) => tenant.id === tenantId)?.name || 'Selected tenant' : 'All tenants';
-  const responseTarget = Number(form.response_target_minutes);
-  const incidentTarget = Number(form.incident_resolution_target_hours);
-  const taskGrace = Number(form.task_overdue_grace_hours);
-  const formIsValid = Boolean(form.tenant_id) && Number.isInteger(responseTarget) && responseTarget >= 1 && responseTarget <= 10080 && Number.isInteger(incidentTarget) && incidentTarget >= 1 && incidentTarget <= 8760 && Number.isInteger(taskGrace) && taskGrace >= 0 && taskGrace <= 8760;
-
-  function refreshAll() {
-    void tenants.refetch();
-    void overview.refetch();
-    void policies.refetch();
-  }
-
-  function loadPolicy(tenant: SlaRow) {
-    const existing = policies.data?.policies.find((policy) => policy.tenant_id === tenant.tenant_id);
+  const updateFilter = (key: 'tenant_id' | 'view', value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value && value !== 'all') next.set(key, value); else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+  const clearInvalidFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    if (invalidTenantFilter) next.delete('tenant_id');
+    if (invalidViewFilter) next.delete('view');
+    setSearchParams(next, { replace: true });
+  };
+  const refreshAll = async () => {
+    const work: Array<Promise<unknown>> = [policies.refetch()];
+    if (!invalidFilters) work.push(overview.refetch());
+    await Promise.all(work);
+  };
+  const loadPolicy = (row: SlaRow | Policy) => {
     setForm({
-      tenant_id: tenant.tenant_id,
-      response_target_minutes: String(existing?.response_target_minutes ?? tenant.response_target_minutes),
-      incident_resolution_target_hours: String(existing?.incident_resolution_target_hours ?? tenant.incident_resolution_target_hours),
-      task_overdue_grace_hours: String(existing?.task_overdue_grace_hours ?? tenant.task_overdue_grace_hours),
-      review_frequency: existing?.review_frequency ?? tenant.review_frequency,
-      escalation_notes: existing?.escalation_notes ?? tenant.escalation_notes ?? '',
-      is_active: existing?.is_active ?? tenant.is_active
+      tenant_id: row.tenant_id,
+      response_target_minutes: String(row.response_target_minutes),
+      incident_resolution_target_hours: String(row.incident_resolution_target_hours),
+      task_overdue_grace_hours: String(row.task_overdue_grace_hours),
+      review_frequency: row.review_frequency,
+      escalation_notes: row.escalation_notes || '',
+      is_active: row.is_persisted ? row.is_active : true
     });
-  }
+  };
+  const selectPolicyTenant = (id: string) => {
+    const policy = policyOptions.find((item) => item.tenant_id === id);
+    if (policy) loadPolicy(policy); else setForm((current) => ({ ...current, tenant_id: id }));
+  };
+
+  const heroStatus = invalidFilters
+    ? 'Filter invalid'
+    : initialOverviewError
+      ? 'Unavailable'
+      : refreshOverviewError
+        ? 'Stale snapshot'
+        : overview.data && !overview.data.evidence.complete
+          ? 'Partial evidence'
+          : overview.data?.summary.breached
+            ? 'Known breach'
+            : overview.data?.summary.within_sla
+              ? 'Within SLA'
+              : 'Policy review';
+  const heroLabel = invalidFilters
+    ? 'Correct the URL filter before evidence is requested.'
+    : initialOverviewError
+      ? 'No SLA status snapshot is available.'
+      : refreshOverviewError
+        ? 'Showing the last successful SLA snapshot.'
+        : overview.data && !overview.data.evidence.complete
+          ? 'Final within-SLA status is withheld because protected evidence is unavailable.'
+          : 'Application SLA evidence and persisted policy state.';
 
   return (
-    <div style={styles.page}>
-      <header style={styles.headerRow}>
-        <div>
-          <h1 style={styles.title}>Tenant SLA</h1>
-          <p style={styles.muted}>Operational targets for HLA/platform response, incident resolution, and overdue tenant work. This turns support expectations into visible breaches instead of hidden promises.</p>
-        </div>
-        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={tenants.isFetching || overview.isFetching || policies.isFetching}>Refresh</button>
-      </header>
+    <div className="platform-tenant-sla">
+      <OperationalWorkspaceHero
+        iconPath="/platform/tenant-sla"
+        eyebrow="Platform tenant operations"
+        title="Tenant SLA"
+        description="Manage persisted platform SLA policies and review application-observed incident, task, and support-response evidence without treating template defaults or hidden evidence as proof of SLA compliance."
+        meta={(
+          <>
+            <OperationalWorkspaceMetaPill>Tenant scope: {selectedTenantLabel}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Snapshot: {dateTime(overview.data?.generated_at)}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Evidence: {overview.data?.evidence.complete ? 'Complete' : overview.data ? 'Partial' : 'Not loaded'}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>Page {pageNumber}</OperationalWorkspaceMetaPill>
+          </>
+        )}
+        aside={(
+          <div className="platform-tenant-sla__hero-aside">
+            <OperationalWorkspaceStatus value={heroStatus} label={heroLabel} />
+            <div className="platform-tenant-sla__refresh-block">
+              <button className="app-button app-button--secondary" type="button" onClick={() => void refreshAll()} disabled={refreshing}>
+                {refreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+              <span>Read-only evidence refresh; policy and notification changes remain explicit actions.</span>
+            </div>
+          </div>
+        )}
+      />
 
-      <section style={styles.metaPanel}>
-        <span><strong>Snapshot:</strong> {overview.data?.generated_at ? new Date(overview.data.generated_at).toLocaleString() : 'Not loaded'}</span>
-        <span><strong>Tenant scope:</strong> {selectedTenantName}</span>
-        <span><strong>Breached filter:</strong> {onlyBreached ? 'Breached only' : 'All SLA rows'}</span>
-        <span><strong>Rows shown:</strong> {rows.length}</span>
+      <OperationalWorkspaceStats ariaLabel="Tenant SLA loaded-page summary">
+        <OperationalWorkspaceStatCard label="Loaded tenants" value={overview.data?.summary.tenants ?? 0} helper="Current server page only" tone="neutral" iconPath="/platform/tenants" loading={overview.isLoading && !overview.data} />
+        <OperationalWorkspaceStatCard label="Known breached" value={overview.data?.summary.breached ?? 0} helper="At least one authorized active breach signal" tone={(overview.data?.summary.breached || 0) > 0 ? 'danger' : 'neutral'} iconPath="/platform/incidents" loading={overview.isLoading && !overview.data} />
+        <OperationalWorkspaceStatCard label="Verified within" value={overview.data?.summary.within_sla ?? 0} helper="Only when all protected evidence is available" tone={(overview.data?.summary.within_sla || 0) > 0 ? 'good' : 'neutral'} iconPath="/platform/tenant-sla" loading={overview.isLoading && !overview.data} />
+        <OperationalWorkspaceStatCard label="Partial evidence" value={overview.data?.summary.partial_evidence ?? 0} helper="Final within-SLA result deliberately withheld" tone={(overview.data?.summary.partial_evidence || 0) > 0 ? 'warn' : 'neutral'} iconPath="/platform/tenant-timeline" loading={overview.isLoading && !overview.data} />
+        <OperationalWorkspaceStatCard label="Not configured" value={overview.data?.summary.not_configured ?? 0} helper="Template defaults are not persisted SLA policy" tone={(overview.data?.summary.not_configured || 0) > 0 ? 'warn' : 'neutral'} iconPath="/platform/tenant-lifecycle" loading={overview.isLoading && !overview.data} />
+      </OperationalWorkspaceStats>
+
+      {invalidFilters ? (
+        <section className="platform-tenant-sla__blocking-error">
+          <strong>Invalid Tenant SLA URL filter</strong>
+          <span>{invalidTenantFilter ? 'tenant_id must be a UUID. ' : ''}{invalidViewFilter ? 'view must be all or breached.' : ''}</span>
+          <button className="app-button app-button--secondary" type="button" onClick={clearInvalidFilters}>Clear invalid filters</button>
+        </section>
+      ) : null}
+      {initialOverviewError ? (
+        <section className="platform-tenant-sla__blocking-error">
+          <strong>Tenant SLA status could not be loaded</strong>
+          <span>{readableError(overview.error)}</span>
+          <button className="app-button app-button--secondary" type="button" onClick={() => void overview.refetch()}>Retry</button>
+        </section>
+      ) : null}
+      {refreshOverviewError ? <div className="platform-tenant-sla__warning">Showing the last successful SLA snapshot. Refresh failed: {readableError(overview.error)}</div> : null}
+      {refreshPoliciesError ? <div className="platform-tenant-sla__warning">Showing the last successful SLA policy snapshot. Refresh failed: {readableError(policies.error)}</div> : null}
+
+      <section className="platform-tenant-sla__section io-workspace-section">
+        <OperationalSectionHeader iconPath="/platform/tenant-sla" title="Evidence and policy boundary" description="SLA status is derived only from evidence families the current operator is authorized to read. Missing protected evidence never becomes a false within-SLA result." />
+        <div className="platform-tenant-sla__truth-note">
+          <strong>Application evidence ≠ contractual proof.</strong>
+          Template values (60-minute response, 24-hour incident resolution, 24-hour task grace) are configuration defaults only until a policy is persisted. This board does not prove an external contractual SLA, customer acknowledgement, or legal agreement.
+        </div>
+        <div className="platform-tenant-sla__evidence-grid">
+          {(Object.keys(evidenceMeta) as EvidenceKey[]).map((key) => {
+            const available = overview.data?.evidence.available.includes(key) ?? false;
+            return (
+              <div key={key} data-state={available ? 'available' : 'restricted'}>
+                <span>{evidenceMeta[key].label}</span>
+                <strong>{available ? 'Available' : 'Restricted'}</strong>
+                <small>{evidenceMeta[key].permission}</small>
+              </div>
+            );
+          })}
+        </div>
+        <div className="platform-tenant-sla__supporting-grid">
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? <Link to="/platform/tenant-health">Tenant Health</Link> : <span>Tenant Health · TENANTS_READ required</span>}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ) ? <Link to="/platform/incidents">Incidents</Link> : <span>Incidents · PLATFORM_INCIDENTS_READ required</span>}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? <Link to="/platform/tenant-tasks">Tenant Tasks</Link> : <span>Tenant Tasks · TENANTS_READ required</span>}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? <Link to="/platform/support-sessions">Support Sessions</Link> : <span>Support Sessions · SUPPORT_SESSION_READ required</span>}
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ) ? <Link to="/platform/notifications">Notifications</Link> : <span>Notifications · PLATFORM_NOTIFICATIONS_READ required</span>}
+        </div>
+        <div className="platform-tenant-sla__scan-row">
+          {canScan ? (
+            <button className="app-button app-button--secondary" type="button" onClick={() => scan.mutate()} disabled={scan.isPending}>
+              {scan.isPending ? 'Synchronizing…' : 'Synchronize SLA notifications'}
+            </button>
+          ) : (
+            <span>Notification synchronization is restricted until all SLA evidence read permissions plus PLATFORM_SLA_WRITE and PLATFORM_NOTIFICATIONS_WRITE are present.</span>
+          )}
+          {!canScan && missingScanPermissions.length ? <small>Missing: {missingScanPermissions.join(', ')}</small> : null}
+          {scan.data ? <strong>Sync complete: {scan.data.created} created · {scan.data.refreshed} refreshed · {scan.data.resolved_duplicates} duplicate resolved · {scan.data.resolved_recovered} recovered resolved</strong> : null}
+          {scan.error ? <strong className="platform-tenant-sla__error-text">Sync failed: {readableError(scan.error)}</strong> : null}
+        </div>
       </section>
 
-      <nav style={styles.linkRow} aria-label="Related SLA source pages">
-        <a style={styles.link} href="/platform/tenant-health">Tenant Health</a>
-        <a style={styles.link} href="/platform/incidents">Incidents</a>
-        <a style={styles.link} href="/platform/tenant-tasks">Tenant Tasks</a>
-        <a style={styles.link} href="/platform/support-sessions">Support Sessions</a>
-        <a style={styles.link} href="/platform/notifications">Notifications</a>
-      </nav>
-
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Overview</h2>
-        {tenantError || overviewError || policiesError ? (
-          <div style={styles.errorBox}>
-            <strong>Load problem</strong>
-            {tenantError ? <span>{tenantError}</span> : null}
-            {overviewError ? <span>{overviewError}</span> : null}
-            {policiesError ? <span>{policiesError}</span> : null}
-            <button type="button" style={styles.smallButton} onClick={refreshAll}>Retry</button>
-          </div>
-        ) : null}
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}><strong>{overview.data?.summary.tenants ?? 0}</strong><span>Tenants tracked</span></div>
-          <div style={styles.summaryCard}><strong>{overview.data?.summary.breached ?? 0}</strong><span>Breached</span></div>
-          <div style={styles.summaryCard}><strong>{overview.data?.summary.within_sla ?? 0}</strong><span>Within SLA</span></div>
-          <div style={styles.summaryCard}><strong>{overview.data?.summary.inactive_policies ?? 0}</strong><span>Inactive policies</span></div>
-        </div>
-        <div style={styles.filterGrid}>
-          <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
-            <option value="">All tenants</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
-          <label style={styles.checkboxLabel}>
-            <input type="checkbox" checked={onlyBreached} onChange={(event) => setOnlyBreached(event.target.checked)} />
-            Breached only
+      <section className="platform-tenant-sla__section io-workspace-section">
+        <OperationalSectionHeader iconPath="/platform/tenant-sla" title="Scope and filters" description="Filters are stored in the URL. The status summary and cards below describe only the currently loaded server page." />
+        <div className="platform-tenant-sla__filter-grid">
+          <label>
+            Tenant
+            <select value={tenantId} onChange={(event) => updateFilter('tenant_id', event.target.value)} disabled={initialPoliciesError}>
+              <option value="">All tenants</option>
+              {policyOptions.map((policy) => <option key={policy.tenant_id} value={policy.tenant_id}>{policy.tenant_name}</option>)}
+            </select>
           </label>
-          <button type="button" style={styles.button} onClick={refreshAll} disabled={tenants.isFetching || overview.isFetching || policies.isFetching}>Refresh</button>
-          {canWrite ? <button type="button" style={styles.secondaryButton} onClick={() => scan.mutate()} disabled={scan.isPending}>{scan.isPending ? 'Syncing...' : 'Sync SLA notifications'}</button> : null}
+          <label>
+            Loaded-page view
+            <select value={view} onChange={(event) => updateFilter('view', event.target.value)}>
+              <option value="all">All loaded SLA rows</option>
+              <option value="breached">Known breached only</option>
+            </select>
+          </label>
+          <div className="platform-tenant-sla__filter-summary">
+            <span>Rows visible</span><strong>{rows.length}</strong>
+          </div>
+          <div className="platform-tenant-sla__filter-summary">
+            <span>Policy selector</span><strong>{initialPoliciesError ? 'Unavailable' : `${policyOptions.length} loaded`}</strong>
+          </div>
         </div>
-        {canWrite ? (
-          <p style={styles.helpText}>This action scans the current SLA overview and keeps one open SLA platform notification for each active breached tenant; existing open SLA notifications are refreshed instead of duplicated.</p>
-        ) : null}
-        {scan.data ? (
-          <p style={styles.successText}>SLA notification sync complete: checked {scan.data.tenants_checked} tenant(s); {scan.data.breached_tenants} breached tenant(s); {scan.data.created} created, {scan.data.refreshed} refreshed, {scan.data.notifications_touched} total touched.</p>
-        ) : null}
-        {scan.error ? <p style={styles.errorText}>{scan.error instanceof Error ? scan.error.message : 'SLA notification sync failed'}</p> : null}
+        {initialPoliciesError ? <div className="platform-tenant-sla__warning">Policy selector unavailable: {readableError(policies.error)}. Existing SLA status evidence can still be reviewed.</div> : null}
       </section>
 
       {canWrite ? (
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>SLA policy</h2>
-          <div style={styles.formGrid}>
-            <label style={styles.fieldLabel}>
-              Tenant
-              <select style={styles.input} value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}>
-                <option value="">Select tenant</option>
-                {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-              </select>
-            </label>
-            <label style={styles.fieldLabel}>
-              Response SLA (minutes)
-              <input style={styles.input} type="number" min="1" value={form.response_target_minutes} onChange={(event) => setForm((current) => ({ ...current, response_target_minutes: event.target.value }))} />
-            </label>
-            <label style={styles.fieldLabel}>
-              Incident SLA (hours)
-              <input style={styles.input} type="number" min="1" value={form.incident_resolution_target_hours} onChange={(event) => setForm((current) => ({ ...current, incident_resolution_target_hours: event.target.value }))} />
-            </label>
-            <label style={styles.fieldLabel}>
-              Task grace period (hours)
-              <input style={styles.input} type="number" min="0" value={form.task_overdue_grace_hours} onChange={(event) => setForm((current) => ({ ...current, task_overdue_grace_hours: event.target.value }))} />
-            </label>
-            <label style={styles.fieldLabel}>
-              Review cadence
-              <select style={styles.input} value={form.review_frequency} onChange={(event) => setForm((current) => ({ ...current, review_frequency: event.target.value as FormState['review_frequency'] }))}>
-                <option value="daily">Daily review</option>
-                <option value="weekly">Weekly review</option>
-                <option value="monthly">Monthly review</option>
-              </select>
-            </label>
-            <label style={styles.fieldLabel}>
-              Active policy
-              <span style={styles.checkboxField}>
-                <input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />
-                Policy is active
-              </span>
-            </label>
-            <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>
-              Escalation notes
-              <textarea style={{ ...styles.input, minHeight: 96, resize: 'vertical' }} value={form.escalation_notes} onChange={(event) => setForm((current) => ({ ...current, escalation_notes: event.target.value }))} placeholder="Add escalation instructions, owner notes, or review context." />
-            </label>
-            <p style={styles.helperText}>These thresholds determine when tenant work is considered overdue and when SLA notifications are generated. Response must be 1-10080 minutes, incident must be 1-8760 hours, and task grace must be 0-8760 hours.</p>
-            <button type="button" style={styles.button} onClick={() => savePolicy.mutate()} disabled={!formIsValid || savePolicy.isPending}>{savePolicy.isPending ? 'Saving...' : 'Save policy'}</button>
+        <section className="platform-tenant-sla__section io-workspace-section">
+          <OperationalSectionHeader iconPath="/platform/tenant-sla" title="SLA policy" description="Saving a tenant with template defaults creates a real persisted policy. Partial API updates preserve existing values instead of resetting omitted fields." actions={<button className="app-button app-button--secondary" type="button" onClick={() => setForm(defaultForm)}>Reset form</button>} />
+          <div className="platform-tenant-sla__policy-grid">
+            <label>Tenant<select value={form.tenant_id} onChange={(event) => selectPolicyTenant(event.target.value)}><option value="">Select tenant</option>{policyOptions.map((policy) => <option key={policy.tenant_id} value={policy.tenant_id}>{policy.tenant_name}{policy.is_persisted ? '' : ' · not configured'}</option>)}</select></label>
+            <label>Response target (minutes)<input type="number" min="1" max="10080" value={form.response_target_minutes} onChange={(event) => setForm((current) => ({ ...current, response_target_minutes: event.target.value }))} /></label>
+            <label>Incident resolution (hours)<input type="number" min="1" max="8760" value={form.incident_resolution_target_hours} onChange={(event) => setForm((current) => ({ ...current, incident_resolution_target_hours: event.target.value }))} /></label>
+            <label>Task overdue grace (hours)<input type="number" min="0" max="8760" value={form.task_overdue_grace_hours} onChange={(event) => setForm((current) => ({ ...current, task_overdue_grace_hours: event.target.value }))} /></label>
+            <label>Review cadence<select value={form.review_frequency} onChange={(event) => setForm((current) => ({ ...current, review_frequency: event.target.value as FormState['review_frequency'] }))}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+            <label className="platform-tenant-sla__checkbox"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />Active policy</label>
+            <label className="platform-tenant-sla__notes">Escalation notes<textarea value={form.escalation_notes} onChange={(event) => setForm((current) => ({ ...current, escalation_notes: event.target.value }))} maxLength={5000} /></label>
+          </div>
+          <div className="platform-tenant-sla__policy-actions">
+            <button className="app-button app-button--primary" type="button" disabled={!formIsValid || savePolicy.isPending} onClick={() => savePolicy.mutate()}>{savePolicy.isPending ? 'Saving…' : 'Save policy'}</button>
+            {form.tenant_id && !policyOptions.find((policy) => policy.tenant_id === form.tenant_id)?.is_persisted ? <span>Saving will turn the displayed template defaults into a persisted SLA policy.</span> : null}
+            {savePolicy.data ? <strong>Policy saved for {savePolicy.data.tenant_name}.</strong> : null}
+            {savePolicy.error ? <strong className="platform-tenant-sla__error-text">Save failed: {readableError(savePolicy.error)}</strong> : null}
           </div>
         </section>
       ) : null}
 
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>SLA status</h2>
-        {overview.isLoading ? <p style={styles.muted}>Loading SLA status...</p> : null}
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr><th>Tenant</th><th>Status</th><th>Targets</th><th>Breaches</th><th>Open work</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.tenant_id}>
-                  <td><strong>{row.tenant_name}</strong><br /><span style={styles.muted}>{row.is_active ? 'active policy' : 'inactive policy'}</span></td>
-                  <td><span style={badgeStyle(row.status)}>{row.status === 'breached' ? 'Breached' : 'Within SLA'}</span></td>
-                  <td>{row.response_target_minutes}m response<br />{row.incident_resolution_target_hours}h incident<br />{row.task_overdue_grace_hours}h task grace</td>
-                  <td>{row.breach_count}<br /><span style={styles.muted}>Incident {row.counts.breached_open_incidents} · Task {row.counts.overdue_tasks_after_grace} · Support {row.counts.support_response_breaches}</span></td>
-                  <td>Incidents {row.counts.open_incidents}<br />Tasks {row.counts.open_tasks}<br />Support approvals {row.counts.pending_support_approvals}</td>
-                  <td>
-                    <div style={styles.actionStack}>
-                      {canWrite ? <button type="button" style={styles.smallButton} onClick={() => loadPolicy(row)}>Edit policy</button> : null}
-                      <a style={styles.rowLink} href={`/platform/tenant-health?tenant_id=${row.tenant_id}`}>Health</a>
-                      <a style={styles.rowLink} href={`/platform/tenant-tasks?tenant_id=${row.tenant_id}`}>Tasks</a>
-                      <a style={styles.rowLink} href={`/platform/tenant-timeline?tenant_id=${row.tenant_id}`}>Timeline</a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 ? <tr><td colSpan={6} style={styles.empty}>No SLA rows match the current filters.</td></tr> : null}
-            </tbody>
-          </table>
+      <section className="platform-tenant-sla__section io-workspace-section">
+        <OperationalSectionHeader iconPath="/platform/tenant-sla" title="SLA status" description="Known breaches can be shown from authorized evidence. “Within SLA” appears only for an active persisted policy with complete evidence and no active breach signal." />
+        {overview.isLoading && !overview.data ? <div className="platform-tenant-sla__loading">Loading Tenant SLA evidence…</div> : null}
+        {!initialOverviewError && !overview.isLoading && rows.length === 0 ? (
+          <div className="platform-tenant-sla__empty"><strong>No SLA rows match this loaded-page view.</strong><span>This does not prove that no external SLA issue exists; it describes only persisted policy plus application-observed authorized evidence.</span></div>
+        ) : null}
+        <div className="platform-tenant-sla__list">
+          {rows.map((row) => (
+            <article className="platform-tenant-sla__card" key={row.tenant_id}>
+              <div className="platform-tenant-sla__card-header">
+                <div><h4>{row.tenant_name}</h4><div className="platform-tenant-sla__provenance"><span>{row.is_persisted ? 'Persisted SLA policy' : 'Template defaults — policy not configured'}</span><span>{row.is_active ? 'Active' : row.is_persisted ? 'Inactive' : 'Not active'}</span><span>{humanize(row.review_frequency)} review</span></div></div>
+                <span className="platform-tenant-sla__posture" data-tone={statusTone(row.status)}>{humanize(row.status)}</span>
+              </div>
+              <div className="platform-tenant-sla__metrics-grid">
+                <div><span>Response target</span><strong>{row.response_target_minutes} min</strong></div>
+                <div><span>Incident target</span><strong>{row.incident_resolution_target_hours} h</strong></div>
+                <div><span>Task grace</span><strong>{row.task_overdue_grace_hours} h</strong></div>
+                <div><span>Known breach areas</span><strong>{row.known_breach_count}</strong></div>
+                <div><span>Open incidents</span><strong>{countText(row.counts.open_incidents)}</strong></div>
+                <div><span>Incident breaches</span><strong>{countText(row.counts.breached_open_incidents)}</strong></div>
+                <div><span>Open tenant tasks</span><strong>{countText(row.counts.open_tasks)}</strong></div>
+                <div><span>Overdue after grace</span><strong>{countText(row.counts.overdue_tasks_after_grace)}</strong></div>
+                <div><span>Pending support approvals</span><strong>{countText(row.counts.pending_support_approvals)}</strong></div>
+                <div><span>Support response breaches</span><strong>{countText(row.counts.support_response_breaches)}</strong></div>
+              </div>
+              {row.escalation_notes ? <div className="platform-tenant-sla__notes-read"><strong>Escalation notes</strong><span>{row.escalation_notes}</span></div> : null}
+              <div className="platform-tenant-sla__link-row">
+                {canWrite ? <button className="app-button app-button--secondary" type="button" onClick={() => loadPolicy(row)}>Edit policy</button> : null}
+                {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? <Link to={`/platform/tenant-health?tenant_id=${row.tenant_id}`}>Health</Link> : null}
+                {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? <Link to={`/platform/tenant-tasks?tenant_id=${row.tenant_id}`}>Tasks</Link> : null}
+                {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? <Link to={`/platform/tenant-timeline?tenant_id=${row.tenant_id}`}>Timeline</Link> : null}
+                {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ) ? <Link to={`/platform/incidents?tenant_id=${row.tenant_id}`}>Incidents</Link> : null}
+                {hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? <Link to={`/platform/support-sessions?tenant_id=${row.tenant_id}`}>Support sessions</Link> : null}
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="platform-tenant-sla__pagination">
+          <button className="app-button app-button--secondary" type="button" disabled={offset === 0 || overview.isFetching} onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))}>Previous</button>
+          <span>Page {pageNumber} · {overview.data?.summary.tenants ?? 0} loaded</span>
+          <button className="app-button app-button--secondary" type="button" disabled={!overview.data?.pagination?.has_more || overview.isFetching} onClick={() => setOffset((value) => value + PAGE_SIZE)}>Next</button>
         </div>
       </section>
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  muted: { color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#475569', fontSize: 13 },
-  linkRow: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
-  link: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '7px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 13, fontWeight: 700, background: '#fff' },
-  rowLink: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 700, textDecoration: 'none' },
-  actionStack: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
-  errorBox: { display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #fecaca', borderRadius: 12, padding: 12, marginBottom: 16, background: '#fef2f2', color: '#991b1b', fontSize: 13 },
-  sectionTitle: { marginTop: 0, fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 },
-  summaryCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 4, background: '#f8fafc', color: '#334155' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) auto auto auto', gap: 12, alignItems: 'center' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, alignItems: 'center' },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff', color: '#0f172a', minWidth: 0 },
-  fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontSize: 13, fontWeight: 700 },
-  helperText: { gridColumn: '1 / -1', margin: '0 0 2px', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  helpText: { margin: '12px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  successText: { margin: '12px 0 0', color: '#166534', fontSize: 14, fontWeight: 700 },
-  errorText: { margin: '12px 0 0', color: '#991b1b', fontSize: 14, fontWeight: 700 },
-  checkboxField: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center', color: '#334155', fontSize: 14, fontWeight: 500, background: '#fff' },
-  checkboxLabel: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, color: '#334155' },
-  button: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
-  smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  badge: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700, border: '1px solid transparent' },
-  empty: { textAlign: 'center', color: '#64748b', padding: 24, background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12 }
-};
