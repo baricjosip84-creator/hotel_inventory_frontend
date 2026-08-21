@@ -35,7 +35,7 @@ const navGuardStart = layout.lastIndexOf('{hasPlatformPermission(', navIndex);
 if (navIndex < 0 || navGuardStart < 0 || !layout.slice(navGuardStart, navIndex + 300).includes('hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ)')) throw new Error('Platform Risk Register check failed: navigation must remain PLATFORM_RISKS_READ guarded.');
 
 if (!legalReporting.includes('hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ)')) throw new Error('Platform Risk Register check failed: Legal Compliance Risk Register link must be permission-aware.');
-if (!legalReporting.includes("data?.evidence_state === 'partial_evidence'")) throw new Error('Platform Risk Register check failed: Legal Compliance must surface omitted Risk Register evidence.');
+if (!legalReporting.includes("data?.evidence_complete ? 'Complete authorized source set' : 'Permission-scoped source set'") || !legalReporting.includes("data-state={available ? 'available' : 'restricted'}")) throw new Error('Platform Risk Register check failed: Legal Compliance must surface permission-scoped/omitted source evidence.');
 if (!capacityPlanning.includes('hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ)')) throw new Error('Platform Risk Register check failed: Capacity Planning Risk Register link must be permission-aware.');
 if (!packageJson.includes('check:platform-risk-register-page-hardening')) throw new Error('Platform Risk Register check failed: package script missing.');
 if (!packageJson.includes('npm run check:platform-risk-register-page-hardening')) throw new Error('Platform Risk Register check failed: checker is not wired into check:ci.');

@@ -1,285 +1,300 @@
+import { FormEvent, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
+import { Link, useSearchParams } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformLegalComplianceReportingPage.css';
 
-type ReportItem = {
-  type: string;
+type SourceKey = 'legal_documents' | 'privacy_requests' | 'access_reviews' | 'risk_register' | 'vendors';
+type Pagination = { source: string; limit: number; offset: number; total: number; has_more: boolean };
+type SourceSummary = { total?: number; current_total?: number; requiring_review?: number; overdue?: number; open_high?: number; historical?: number };
+type EvidenceAccess = Record<SourceKey, boolean> & { tenant_identity: boolean; platform_user_identity: boolean; integration_monitoring: boolean };
+type ReportSummary = {
+  total_report_items: number | null;
+  visible_report_items: number;
+  legal_documents: number;
+  privacy_requests: number | null;
+  access_reviews: number | null;
+  compliance_risks: number | null;
+  vendors: number | null;
+  items_requiring_review: number | null;
+  visible_items_requiring_review: number;
+  expired_or_expiring_documents: number;
+  overdue_privacy_requests: number | null;
+  overdue_access_reviews: number | null;
+  open_high_compliance_risks: number | null;
+  vendors_requiring_legal_review: number | null;
+  tenants_with_legal_findings: number | null;
+};
+type EvidenceItem = {
+  type: 'legal_document' | 'privacy_request' | 'access_review' | 'compliance_risk' | 'vendor_legal';
   id: string;
-  tenant_id?: string | null;
   title?: string;
   name?: string;
+  tenant_id?: string | null;
   tenant_name?: string | null;
+  tenant_present?: boolean;
   status?: string;
   owner_email?: string | null;
+  owner_present?: boolean;
+  assigned_owner_present?: boolean;
+  request_type?: string;
+  priority?: string;
+  scope?: string;
+  category?: string;
+  likelihood?: string;
+  impact?: string;
+  severity_score?: number;
+  risk_level?: string;
+  external_url_present?: boolean;
+  sla_reference_present?: boolean;
+  reviewed_at?: string | null;
+  expires_at?: string | null;
+  due_at?: string | null;
+  review_due_at?: string | null;
+  contract_renewal_date?: string | null;
+  pending_items?: number;
+  needs_change_items?: number;
+  requester_email_present?: boolean;
+  historical?: boolean;
   risk_flags: string[];
   report_state: string;
 };
-
 type LegalComplianceReport = {
   feature: string;
   phase: number;
   step: number;
+  generated_at: string;
+  requested_source: string;
   posture: string;
-  evidence_state?: string;
-  available_sources?: string[];
-  omitted_sources?: string[];
-  summary: {
-    total_report_items: number;
-    legal_documents: number;
-    privacy_requests: number;
-    access_reviews: number;
-    compliance_risks: number;
-    vendors: number;
-    items_requiring_review: number;
-    expired_or_expiring_documents: number;
-    overdue_privacy_requests: number;
-    overdue_access_reviews: number;
-    open_high_compliance_risks: number;
-    vendors_requiring_legal_review: number;
-    tenants_with_legal_findings: number;
-  };
+  evidence_state: string;
+  evidence_complete: boolean;
+  available_sources: SourceKey[];
+  omitted_sources: SourceKey[];
+  evidence_access: EvidenceAccess;
+  required_permissions_by_source: Record<string, string[]>;
+  summary: ReportSummary;
+  source_summaries: Partial<Record<SourceKey, SourceSummary>>;
+  pagination: Pagination;
+  correlated_postures: { compliance_export_package: string | null; integration_monitoring_surface: string | null };
   reporting_controls: {
     read_only: boolean;
-    mutation_owners: string[];
-    source_routes: string[];
+    application_evidence_only: boolean;
     no_subject_data_export: boolean;
     no_secret_export: boolean;
     no_document_body_export: boolean;
-    correlates_existing_surfaces: string[];
+    archived_documents_are_historical: boolean;
+    inactive_or_archived_vendors_are_not_current_legal_blockers: boolean;
+    source_records_do_not_prove_external_legal_validity_or_acceptance: boolean;
+    ready_posture_is_application_evidence_only: boolean;
   };
-  correlated_postures: {
-    compliance_export_package: string;
-    integration_monitoring_surface: string;
-  };
-  documents: ReportItem[];
-  privacy_requests: ReportItem[];
-  access_reviews: ReportItem[];
-  compliance_risks: ReportItem[];
-  vendors: ReportItem[];
+  evidence: EvidenceItem[];
 };
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('partial')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  if (value.includes('blocked') || value.includes('overdue') || value.includes('high')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('review') || value.includes('open')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-}
+const PAGE_SIZE = 50;
+const SOURCE_OPTIONS: Array<{ value: SourceKey; label: string; href: string; permission: string }> = [
+  { value: 'legal_documents', label: 'Compliance documents', href: '/platform/compliance-documents', permission: PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ },
+  { value: 'privacy_requests', label: 'Privacy requests', href: '/platform/privacy-requests', permission: PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ },
+  { value: 'access_reviews', label: 'Access reviews', href: '/platform/access-reviews', permission: PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ },
+  { value: 'risk_register', label: 'Risk register', href: '/platform/risk-register', permission: PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ },
+  { value: 'vendors', label: 'Vendors', href: '/platform/vendors', permission: PLATFORM_PERMISSIONS.PLATFORM_VENDORS_READ }
+];
 
-function FlagList({ flags }: { flags: string[] }) {
-  if (!flags.length) return <span style={styles.help}>No flags</span>;
-  return <div style={styles.flags}>{flags.map((flag) => <span key={flag} style={styles.flag}>{flag}</span>)}</div>;
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function pretty(value?: string | null) { const text = String(value || '').replaceAll('_', ' ').trim(); return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Not recorded'; }
+function dateOnly(value?: string | null) { if (!value) return 'Not recorded'; const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString(); }
+function metric(value: number | null | undefined) { return value === null || value === undefined ? 'Restricted' : value; }
+function sourceOption(value: SourceKey) { return SOURCE_OPTIONS.find((option) => option.value === value)!; }
+function itemLabel(item: EvidenceItem) { return item.title || item.name || item.id; }
+function sourceForItem(item: EvidenceItem): SourceKey {
+  if (item.type === 'legal_document') return 'legal_documents';
+  if (item.type === 'privacy_request') return 'privacy_requests';
+  if (item.type === 'access_review') return 'access_reviews';
+  if (item.type === 'compliance_risk') return 'risk_register';
+  return 'vendors';
 }
-
-function sourceLabel(route: string) {
-  return route.replace('/api/platform/', '').replace(/-/g, ' ');
-}
-
-function SourceLink({ href, children }: { href: string; children: string }) {
-  return <a href={href} style={styles.sourceLink}>{children}</a>;
-}
-
-function itemLabel(item: ReportItem) {
-  return item.title || item.name || item.id;
-}
-
-function sourceHrefFor(item: ReportItem) {
+function itemDetail(item: EvidenceItem) {
   switch (item.type) {
     case 'legal_document':
-      return '/platform/compliance-documents';
+      return `${item.external_url_present ? 'Reference recorded' : 'No external reference'} · reviewed ${dateOnly(item.reviewed_at)} · expires ${dateOnly(item.expires_at)}`;
     case 'privacy_request':
-      return '/platform/privacy-requests';
+      return `${pretty(item.request_type)} · ${pretty(item.priority)} priority · due ${dateOnly(item.due_at)} · ${item.requester_email_present ? 'requester email recorded' : 'requester email not recorded'}`;
     case 'access_review':
-      return '/platform/access-reviews';
+      return `${pretty(item.scope)} · due ${dateOnly(item.due_at)} · ${item.pending_items || 0} pending · ${item.needs_change_items || 0} needs change`;
     case 'compliance_risk':
-      return '/platform/risk-register';
+      return `${pretty(item.category)} · ${pretty(item.likelihood)} likelihood / ${pretty(item.impact)} impact · score ${item.severity_score ?? '—'} · review ${dateOnly(item.review_due_at)}`;
     case 'vendor_legal':
-      return '/platform/vendors';
-    default:
-      return '/platform/legal-compliance-reporting';
+      return `${pretty(item.category)} · ${pretty(item.risk_level)} risk · renewal ${dateOnly(item.contract_renewal_date)} · ${item.sla_reference_present ? 'SLA reference recorded' : 'SLA reference missing'}`;
   }
 }
-
-function sourceTextFor(item: ReportItem) {
-  switch (item.type) {
-    case 'legal_document':
-      return 'Fix in Compliance Docs';
-    case 'privacy_request':
-      return 'Fix in Privacy Requests';
-    case 'access_review':
-      return 'Fix in Access Reviews';
-    case 'compliance_risk':
-      return 'Fix in Risk Register';
-    case 'vendor_legal':
-      return 'Fix in Vendors';
-    default:
-      return 'Open source area';
-  }
+function tenantText(item: EvidenceItem, canReadTenantIdentity: boolean) {
+  if (!item.tenant_present && !item.tenant_id) return 'Platform-wide';
+  if (!canReadTenantIdentity) return 'Restricted tenant linkage';
+  return item.tenant_name || 'Tenant name unavailable';
+}
+function ownerText(item: EvidenceItem, canReadUserIdentity: boolean) {
+  const present = item.owner_present ?? item.assigned_owner_present;
+  if (present === undefined) return null;
+  if (!present) return 'No owner recorded';
+  if (!canReadUserIdentity) return 'Owner linkage restricted';
+  return item.owner_email || 'Owner assigned';
+}
+function postureLabel(value: string) {
+  if (value === 'legal_compliance_ready') return 'Application ready';
+  if (value === 'legal_compliance_review_required') return 'Review required';
+  if (value === 'legal_compliance_blocked') return 'Blocked';
+  if (value === 'partial_evidence') return 'Partial evidence';
+  return pretty(value);
 }
 
 export default function PlatformLegalComplianceReportingPage() {
-  const canReadRiskRegister = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ);
-  const reportQuery = useQuery({
-    queryKey: ['platform', 'legal-compliance-reporting'],
-    queryFn: () => platformApiRequest<LegalComplianceReport>('/platform/legal-compliance-reporting/report')
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawSource = searchParams.get('source') || 'legal_documents';
+  const knownSource = SOURCE_OPTIONS.some((option) => option.value === rawSource);
+  const selectedSource = (knownSource ? rawSource : 'legal_documents') as SourceKey;
+  const rawOffset = searchParams.get('offset') || '0';
+  const parsedOffset = Number(rawOffset);
+  const invalidOffset = !Number.isInteger(parsedOffset) || parsedOffset < 0 || parsedOffset > 1000000;
+  const offset = invalidOffset ? 0 : parsedOffset;
+  const search = searchParams.get('search') || '';
+  const invalidSearch = search.length > 200;
+  const [searchDraft, setSearchDraft] = useState(search);
+  useEffect(() => setSearchDraft(search), [search]);
+
+  const localAccess: Record<SourceKey, boolean> = {
+    legal_documents: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ),
+    privacy_requests: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ),
+    access_reviews: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ),
+    risk_register: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ),
+    vendors: hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_VENDORS_READ)
+  };
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadIntegrationMonitoring = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ);
+
+  const query = useQuery({
+    queryKey: ['platform', 'legal-compliance-reporting', selectedSource, search, offset],
+    queryFn: () => platformApiRequest<LegalComplianceReport>(`/platform/legal-compliance-reporting/report?source=${selectedSource}&limit=${PAGE_SIZE}&offset=${offset}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
+    enabled: knownSource && !invalidOffset && !invalidSearch,
+    placeholderData: (previous) => previous
   });
-
-  const data = reportQuery.data;
+  const data = query.data;
   const summary = data?.summary;
-  const evidence: ReportItem[] = [
-    ...(data?.documents || []),
-    ...(data?.privacy_requests || []),
-    ...(data?.access_reviews || []),
-    ...(data?.compliance_risks || []),
-    ...(data?.vendors || [])
-  ];
-  const isRefreshing = reportQuery.isFetching && !reportQuery.isLoading;
+  const pagination = data?.pagination;
+  const staleWarning = Boolean(query.isError && data);
+  const blockingError = Boolean(query.isError && !data);
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Legal & compliance reporting</h1>
-          <p style={styles.subtitle}>Read-only commercial readiness posture for legal documents, privacy requests, access reviews, compliance risks, vendors, and correlated compliance surfaces.</p>
-          <div style={styles.metaRow}>
-            <span style={styles.metaPill}>Source: /platform/legal-compliance-reporting/report</span>
-            <span style={styles.metaPill}>Mode: controlled read-only report</span>
-            {data ? <span style={styles.metaPill}>Phase {data.phase} · Step {data.step}</span> : null}
-            {data ? <span style={styles.metaPill}>Feature: {data.feature}</span> : null}
-          </div>
-        </div>
-        <div style={styles.headerActions}>
-          {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
-          <button type="button" style={styles.primaryButton} onClick={() => reportQuery.refetch()} disabled={reportQuery.isFetching}>
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
+  const setPageState = (updates: { source?: SourceKey; search?: string; offset?: number }) => {
+    const next = new URLSearchParams(searchParams);
+    if (updates.source) next.set('source', updates.source);
+    if (updates.search !== undefined) updates.search ? next.set('search', updates.search) : next.delete('search');
+    const nextOffset = updates.offset ?? 0;
+    if (nextOffset > 0) next.set('offset', String(nextOffset)); else next.delete('offset');
+    setSearchParams(next, { replace: true });
+  };
+  const applySearch = (event: FormEvent) => { event.preventDefault(); setPageState({ search: searchDraft.trim(), offset: 0 }); };
 
-      {reportQuery.isLoading ? <section style={styles.card}>Loading legal compliance reporting…</section> : null}
-      {data?.evidence_state === 'partial_evidence' ? (
-        <section style={styles.warningCard}>
-          <strong>Partial evidence.</strong> Risk Register evidence is omitted because this account does not have Risk Register read permission. The report must not be treated as a complete legal/compliance posture.
-        </section>
-      ) : null}
-      {reportQuery.error ? (
-        <section style={styles.errorCard}>
-          <strong>Unable to load legal compliance reporting.</strong>
-          <p style={styles.subtitle}>The backend report snapshot could not be loaded. Retry after checking platform compliance read access and backend availability.</p>
-          <button type="button" style={styles.primaryButton} onClick={() => reportQuery.refetch()} disabled={reportQuery.isFetching}>Retry</button>
-        </section>
-      ) : null}
+  return <div className="platform-legal-compliance io-workspace-shell">
+    <OperationalWorkspaceHero
+      iconPath="/platform/legal-compliance-reporting"
+      eyebrow="Legal & compliance governance"
+      title="Legal & compliance reporting"
+      description="Correlate current application evidence across compliance documents, privacy requests, access reviews, risks and vendors without bypassing the permissions of those source areas. Restricted evidence is omitted, never converted into a reassuring zero."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Read-only application evidence</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>{data?.evidence_complete ? 'Complete authorized source set' : 'Permission-scoped source set'}</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>{data ? `Generated ${new Date(data.generated_at).toLocaleString()}` : 'Loading snapshot'}</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<OperationalWorkspaceStatus value={data ? postureLabel(data.posture) : 'Loading'} label={data?.evidence_complete ? 'current application posture' : 'current available-evidence posture'} />}
+    />
 
-      {summary ? (
-        <section style={styles.summaryGrid}>
-          <div style={styles.card}><strong>Total report items</strong><div style={styles.metric}>{summary.total_report_items}</div><span style={styles.help}>{summary.legal_documents} docs · {summary.privacy_requests} privacy · {summary.access_reviews} reviews</span></div>
-          <div style={styles.card}><strong>Requiring review</strong><div style={styles.metric}>{summary.items_requiring_review}</div><span style={styles.help}>Rows with one or more flags</span></div>
-          <div style={styles.card}><strong>Expired / expiring documents</strong><div style={styles.metric}>{summary.expired_or_expiring_documents}</div><span style={styles.help}>Legal document validity window</span></div>
-          <div style={styles.card}><strong>Overdue privacy requests</strong><div style={styles.metric}>{summary.overdue_privacy_requests}</div><span style={styles.help}>Blocking privacy queue signal</span></div>
-          <div style={styles.card}><strong>Overdue access reviews</strong><div style={styles.metric}>{summary.overdue_access_reviews}</div><span style={styles.help}>Access governance signal</span></div>
-          <div style={styles.card}><strong>High compliance risks</strong><div style={styles.metric}>{summary.open_high_compliance_risks}</div><span style={styles.help}>{summary.compliance_risks} compliance risk rows</span></div>
-          <div style={styles.card}><strong>Vendor legal reviews</strong><div style={styles.metric}>{summary.vendors_requiring_legal_review}</div><span style={styles.help}>{summary.vendors} vendor rows checked</span></div>
-          <div style={styles.card}><strong>Tenants with findings</strong><div style={styles.metric}>{summary.tenants_with_legal_findings}</div><span style={styles.help}>Tenant-linked flagged rows</span></div>
-        </section>
-      ) : null}
+    {!knownSource ? <div className="platform-legal-compliance__blocking"><strong>Invalid evidence source.</strong><span>Select one of the supported legal/compliance evidence sources.</span><button type="button" className="app-button app-button--secondary" onClick={() => setPageState({ source: 'legal_documents', offset: 0 })}>Reset source</button></div> : null}
+    {invalidOffset ? <div className="platform-legal-compliance__blocking"><strong>Invalid evidence page.</strong><span>Offset must be a whole number between 0 and 1,000,000.</span><button type="button" className="app-button app-button--secondary" onClick={() => setPageState({ offset: 0 })}>Reset page</button></div> : null}
+    {invalidSearch ? <div className="platform-legal-compliance__blocking"><strong>Search is too long.</strong><span>Search text is limited to 200 characters.</span><button type="button" className="app-button app-button--secondary" onClick={() => setPageState({ search: '', offset: 0 })}>Clear search</button></div> : null}
+    {blockingError ? <div className="platform-legal-compliance__blocking"><strong>Legal/compliance evidence could not be loaded.</strong><span>{readableError(query.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void query.refetch()}>Retry</button></div> : null}
+    {staleWarning ? <div className="platform-legal-compliance__stale"><strong>Showing the last successful snapshot.</strong><span>Refresh failed: {readableError(query.error)}</span></div> : null}
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Supporting Platform pages</h2>
-        <div style={styles.linkGrid}>
-          <SourceLink href="/platform/compliance-documents">Compliance Docs</SourceLink>
-          <SourceLink href="/platform/privacy-requests">Privacy Requests</SourceLink>
-          <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
-          {canReadRiskRegister ? <SourceLink href="/platform/risk-register">Risk Register</SourceLink> : null}
-          <SourceLink href="/platform/vendors">Vendors</SourceLink>
-          <SourceLink href="/platform/compliance-export">Compliance Export</SourceLink>
-          <SourceLink href="/platform/integration-monitoring">Integration Monitoring</SourceLink>
-        </div>
-      </section>
+    {summary ? <OperationalWorkspaceStats ariaLabel="Legal and compliance overview">
+      <OperationalWorkspaceStatCard label="Current report items" value={metric(summary.total_report_items)} helper={`${summary.visible_report_items} visible across authorized sources`} tone="blue" iconPath="/platform/legal-compliance-reporting" />
+      <OperationalWorkspaceStatCard label="Items requiring review" value={metric(summary.items_requiring_review)} helper={`${summary.visible_items_requiring_review} known in authorized sources`} tone={summary.visible_items_requiring_review ? 'amber' : 'green'} iconPath="/platform/legal-compliance-reporting" />
+      <OperationalWorkspaceStatCard label="Expired / expiring documents" value={summary.expired_or_expiring_documents} helper={`${summary.legal_documents} current document records`} tone={summary.expired_or_expiring_documents ? 'amber' : 'green'} iconPath="/platform/compliance-documents" />
+      <OperationalWorkspaceStatCard label="Overdue privacy requests" value={metric(summary.overdue_privacy_requests)} helper={summary.privacy_requests === null ? 'Privacy evidence restricted' : `${summary.privacy_requests} privacy records`} tone="red" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="Overdue access reviews" value={metric(summary.overdue_access_reviews)} helper={summary.access_reviews === null ? 'Access Review evidence restricted' : `${summary.access_reviews} review records`} tone="amber" iconPath="/platform/access-reviews" />
+      <OperationalWorkspaceStatCard label="Open high risks" value={metric(summary.open_high_compliance_risks)} helper={summary.compliance_risks === null ? 'Risk Register evidence restricted' : `${summary.compliance_risks} current risk records`} tone="red" iconPath="/platform/risk-register" />
+      <OperationalWorkspaceStatCard label="Vendor legal review" value={metric(summary.vendors_requiring_legal_review)} helper={summary.vendors === null ? 'Vendor evidence restricted' : `${summary.vendors} current vendor records`} tone="amber" iconPath="/platform/vendors" />
+      <OperationalWorkspaceStatCard label="Tenants with findings" value={metric(summary.tenants_with_legal_findings)} helper={summary.tenants_with_legal_findings === null ? 'Requires TENANTS_READ plus tenant-linked source access' : 'Distinct tenant linkages with current findings'} tone="amber" iconPath="/platform/tenants" />
+    </OperationalWorkspaceStats> : null}
 
-      {data ? (
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Reporting controls</h2>
-          <div style={styles.metadataGrid}>
-            <div><strong>Read-only</strong><br /><span style={styles.help}>{String(data.reporting_controls.read_only)}</span></div>
-            <div><strong>No subject data export</strong><br /><span style={styles.help}>{String(data.reporting_controls.no_subject_data_export)}</span></div>
-            <div><strong>No document body export</strong><br /><span style={styles.help}>{String(data.reporting_controls.no_document_body_export)}</span></div>
-            <div><strong>No secret export</strong><br /><span style={styles.help}>{String(data.reporting_controls.no_secret_export)}</span></div>
-            <div><strong>Compliance export posture</strong><br /><span style={styles.help}>{data.correlated_postures.compliance_export_package}</span></div>
-            <div><strong>Integration posture</strong><br /><span style={styles.help}>{data.correlated_postures.integration_monitoring_surface}</span></div>
-          </div>
-          <h3 style={styles.smallTitle}>Mutation owners</h3>
-          <div style={styles.flags}>{data.reporting_controls.mutation_owners.map((owner) => <span key={owner} style={styles.flag}>{owner}</span>)}</div>
-          <h3 style={styles.smallTitle}>Source routes</h3>
-          <div style={styles.flags}>{data.reporting_controls.source_routes.map((route) => <span key={route} style={styles.flag}>{sourceLabel(route)}</span>)}</div>
-        </section>
-      ) : null}
+    <section className="io-workspace-panel platform-legal-compliance__section">
+      <OperationalSectionHeader iconPath="/platform/legal-compliance-reporting" title="Evidence coverage" description="The report remains available with PLATFORM_COMPLIANCE_READ, but each protected source keeps its own read boundary. Requesting a forbidden source fails closed." actions={<button type="button" className="app-button app-button--secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>{query.isFetching ? 'Refreshing…' : 'Refresh'}</button>} />
+      <div className="platform-legal-compliance__coverage">
+        {SOURCE_OPTIONS.map((option) => {
+          const available = data?.evidence_access?.[option.value] ?? localAccess[option.value];
+          return <span key={option.value} data-state={available ? 'available' : 'restricted'}><strong>{option.label}</strong><small>{available ? 'Available' : `Restricted · ${option.permission}`}</small></span>;
+        })}
+      </div>
+      <div className="platform-legal-compliance__identity-note">
+        <span>Tenant identity: <strong>{data?.evidence_access.tenant_identity ?? canReadTenants ? 'Available' : 'Restricted'}</strong></span>
+        <span>Platform-user identity: <strong>{data?.evidence_access.platform_user_identity ?? canReadUsers ? 'Available' : 'Restricted'}</strong></span>
+      </div>
+    </section>
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Legal/compliance evidence</h2>
-        <p style={styles.subtitle}>Rows are classified by backend risk flags. Use the source links to fix records on the owning page, then Refresh this report snapshot.</p>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Item</th>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Tenant</th>
-                <th style={styles.th}>State</th>
-                <th style={styles.th}>Flags</th>
-                <th style={styles.th}>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {evidence.map((item) => (
-                <tr key={`${item.type}:${item.id}`}>
-                  <td style={styles.td}>
-                    <strong>{itemLabel(item)}</strong><br />
-                    <span style={styles.help}>{item.status || 'status unavailable'}{item.owner_email ? ` · ${item.owner_email}` : ''}</span>
-                  </td>
-                  <td style={styles.td}>{item.type}</td>
-                  <td style={styles.td}>{item.tenant_name || 'Platform-wide'}</td>
-                  <td style={styles.td}><span style={badgeStyle(item.report_state)}>{item.report_state}</span></td>
-                  <td style={styles.td}><FlagList flags={item.risk_flags} /></td>
-                  <td style={styles.td}>
-                    <a href={sourceHrefFor(item)} style={styles.sourceLink}>{sourceTextFor(item)}</a>
-                    {item.tenant_id ? <><br /><a href={`/platform/tenants/${item.tenant_id}`} style={styles.sourceLink}>Tenant source</a></> : null}
-                  </td>
-                </tr>
-              ))}
-              {!evidence.length ? <tr><td style={styles.td} colSpan={6}>No legal/compliance evidence available for reporting review.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-legal-compliance__section">
+      <OperationalSectionHeader iconPath="/platform/compliance-export" title="Correlated application postures" description="These are supporting application surfaces, not external legal opinions or certifications." />
+      <div className="platform-legal-compliance__correlations">
+        <div><strong>Compliance export</strong><span>{data ? pretty(data.correlated_postures.compliance_export_package) : 'Loading'}</span></div>
+        <div><strong>Integration monitoring</strong><span>{data?.correlated_postures.integration_monitoring_surface ? pretty(data.correlated_postures.integration_monitoring_surface) : 'Restricted'}</span></div>
+      </div>
+      <div className="platform-legal-compliance__links">
+        <Link to="/platform/compliance-documents">Compliance Docs</Link>
+        {localAccess.privacy_requests ? <Link to="/platform/privacy-requests">Privacy Requests</Link> : null}
+        {localAccess.access_reviews ? <Link to="/platform/access-reviews">Access Reviews</Link> : null}
+        {localAccess.risk_register ? <Link to="/platform/risk-register">Risk Register</Link> : null}
+        {localAccess.vendors ? <Link to="/platform/vendors">Vendors</Link> : null}
+        <Link to="/platform/compliance-export">Compliance Export</Link>
+        {canReadIntegrationMonitoring ? <Link to="/platform/integration-monitoring">Integration Monitoring</Link> : null}
+      </div>
+    </section>
+
+    <section className="io-workspace-panel platform-legal-compliance__section">
+      <OperationalSectionHeader iconPath={sourceOption(selectedSource).href} title="Evidence registry" description="Choose one authorized source at a time for true server pagination. Summary cards remain registry-wide across every authorized source and are not narrowed by this evidence-table search." />
+      <form className="platform-legal-compliance__filters" onSubmit={applySearch}>
+        <label>Evidence source<select value={selectedSource} onChange={(event) => setPageState({ source: event.target.value as SourceKey, offset: 0 })}>{SOURCE_OPTIONS.map((option) => <option key={option.value} value={option.value} disabled={!localAccess[option.value]}>{option.label}{localAccess[option.value] ? '' : ' — Restricted'}</option>)}</select></label>
+        <label className="platform-legal-compliance__search">Search<input value={searchDraft} maxLength={200} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search this evidence source" /></label>
+        <button type="submit" className="app-button app-button--secondary" disabled={query.isFetching}>Apply</button>
+        {(search || offset > 0) ? <button type="button" className="app-button app-button--ghost" onClick={() => { setSearchDraft(''); setPageState({ search: '', offset: 0 }); }}>Reset</button> : null}
+      </form>
+
+      <div className="platform-legal-compliance__table-wrap"><table><thead><tr><th>Item</th><th>Source</th><th>Tenant</th><th>State</th><th>Recorded evidence</th><th>Flags</th><th>Source action</th></tr></thead><tbody>
+        {(data?.evidence || []).map((item) => {
+          const source = sourceForItem(item); const option = sourceOption(source); const owner = ownerText(item, data?.evidence_access.platform_user_identity ?? canReadUsers);
+          return <tr key={`${item.type}:${item.id}`} data-historical={Boolean(item.historical)}>
+            <td><strong>{itemLabel(item)}</strong><small>{pretty(item.status)}{owner ? ` · ${owner}` : ''}</small></td>
+            <td>{option.label}</td>
+            <td>{tenantText(item, data?.evidence_access.tenant_identity ?? canReadTenants)}</td>
+            <td><span className="platform-legal-compliance__state" data-state={item.report_state}>{pretty(item.report_state)}</span></td>
+            <td>{itemDetail(item)}</td>
+            <td>{item.risk_flags.length ? <div className="platform-legal-compliance__flags">{item.risk_flags.map((flag) => <span key={flag}>{pretty(flag)}</span>)}</div> : <span className="platform-legal-compliance__muted">No current application flags</span>}</td>
+            <td><Link to={option.href}>Open source page</Link>{canReadTenants && item.tenant_id ? <small><Link to={`/platform/tenants/${item.tenant_id}`}>Tenant source</Link></small> : null}</td>
+          </tr>;
+        })}
+        {!data?.evidence.length && !query.isLoading ? <tr><td colSpan={7} className="platform-legal-compliance__empty">No evidence rows match this source and search.</td></tr> : null}
+      </tbody></table></div>
+      {pagination ? <div className="platform-legal-compliance__pager"><span>Showing {pagination.total ? pagination.offset + 1 : 0}–{Math.min(pagination.offset + pagination.limit, pagination.total)} of {pagination.total} {sourceOption(selectedSource).label.toLowerCase()} records</span><div><button type="button" className="app-button app-button--secondary" disabled={pagination.offset === 0 || query.isFetching} onClick={() => setPageState({ offset: Math.max(0, pagination.offset - PAGE_SIZE) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination.has_more || query.isFetching} onClick={() => setPageState({ offset: pagination.offset + PAGE_SIZE })}>Next</button></div></div> : null}
+    </section>
+
+    <section className="io-workspace-panel platform-legal-compliance__section">
+      <OperationalSectionHeader iconPath="/platform/legal-compliance-reporting" title="Evidence boundary" description="What this report can and cannot truthfully claim." />
+      <div className="platform-legal-compliance__truth"><strong>Application governance evidence only.</strong><span>A recorded document, review, privacy workflow, risk state, vendor record or supporting application posture does not prove that an external agreement exists, that legal advice was obtained, that a customer accepted a term, that an external control operated effectively, or that a real-world obligation was satisfied.</span><span>Archived documents, closed/cancelled risks, and inactive/archived vendors are historical evidence and do not create current blockers by themselves.</span></div>
+    </section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  headerActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  badge: { padding: '4px 9px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap', fontSize: 12 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  warningCard: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16, color: '#92400e' },
-  errorCard: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03)' },
-  metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  cardTitle: { margin: '0 0 10px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  smallTitle: { margin: '14px 0 8px', fontSize: 14, color: '#334155' },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  help: { color: '#64748b', fontSize: 12 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12 },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' },
-  primaryButton: { border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  metaRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  metaPill: { background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  linkGrid: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  sourceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
-  metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }
-};
