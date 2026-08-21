@@ -1,429 +1,179 @@
-import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformTenantOffboardingPage.css';
 
-type Tenant = { id: string; name: string; status?: string; write_locked?: boolean };
-type PlatformUser = { id: string; email: string; name?: string | null };
-type OffboardingRow = {
-  id: string;
-  tenant_id: string;
-  tenant_name?: string;
-  tenant_status?: string;
-  write_locked?: boolean;
-  status: string;
-  reason?: string | null;
-  scheduled_for?: string | null;
-  owner_platform_user_id?: string | null;
-  owner_platform_user_email?: string | null;
-  checklist: Record<string, boolean>;
-  checklist_complete?: boolean;
-  notes?: string | null;
-  completed_at?: string | null;
-  updated_at?: string;
-};
-type Checks = {
-  tenant_user_count: number;
-  active_tenant_sessions: number;
-  active_support_sessions: number;
-  open_incidents: number;
-  open_tasks: number;
-  last_export_at?: string | null;
-  legal_hold?: boolean;
-  legal_hold_reason?: string | null;
-  retain_until?: string | null;
-  purge_after_offboarding?: boolean;
-};
-type Detail = { offboarding: OffboardingRow | null; checks: Checks };
+type Tenant = { id:string; name:string; status?:string; write_locked?:boolean };
+type PlatformUser = { id:string; email:string; is_active?:boolean };
+type Pagination = { limit:number; offset:number; total:number; has_more:boolean };
+type EvidenceAccess = { tenant_identity:boolean; platform_user_identity:boolean; tenant_sessions:boolean; support_sessions:boolean; incidents:boolean; tenant_tasks:boolean; export_audit:boolean; data_retention:boolean; billing:boolean };
+type Checks = { tenant_user_count:number|null; tenant_write_locked:boolean|null; tenant_status:string|null; billing_status:string|null; active_tenant_sessions:number|null; active_support_sessions:number|null; open_incidents:number|null; open_tasks:number|null; last_export_at?:string|null; legal_hold:boolean|null; legal_hold_reason?:string|null; retain_until?:string|null; purge_after_offboarding:boolean|null };
+type OffboardingRow = { id:string; tenant_id:string; tenant_name:string; tenant_status?:string|null; write_locked?:boolean; billing_status?:string|null; status:string; reason?:string|null; scheduled_for?:string|null; owner_platform_user_id?:string|null; owner_platform_user_email?:string|null; owner_present?:boolean; creator_present?:boolean; completer_present?:boolean; checklist:Record<string,boolean>; checklist_complete?:boolean; notes?:string|null; completed_at?:string|null; updated_at?:string|null };
+type ListResponse = { offboarding:OffboardingRow[]; statuses:string[]; checklist_keys:string[]; summary:{total:number;active:number;blocked:number;ready_to_archive:number;completed:number;cancelled:number;checklist_complete:number}; pagination:Pagination; evidence_access:EvidenceAccess; available_sources:string[]; omitted_sources:string[]; completion_evidence_complete:boolean; evidence_contract:Record<string,boolean> };
+type DetailResponse = { offboarding:OffboardingRow|null; checks:Checks; evidence_access:EvidenceAccess; available_sources:string[]; omitted_sources:string[]; completion_evidence_complete:boolean; evidence_contract:Record<string,boolean> };
+type FormState = { tenant_id:string; reason:string; scheduled_for:string; owner_platform_user_id:string; notes:string; checklist:Record<string,boolean> };
 
-const statuses = ['not_started', 'planned', 'in_progress', 'blocked', 'ready_to_archive', 'completed', 'cancelled'];
-const checklistKeys = [
-  'customer_notified',
-  'billing_closed',
-  'final_export_completed',
-  'active_users_reviewed',
-  'active_sessions_revoked',
-  'support_sessions_closed',
-  'open_incidents_resolved',
-  'open_tasks_closed',
-  'tenant_locked',
-  'data_retention_confirmed'
-];
-const labels: Record<string, string> = {
-  customer_notified: 'Customer notified',
-  billing_closed: 'Billing closed',
-  final_export_completed: 'Final export completed',
-  active_users_reviewed: 'Active users reviewed',
-  active_sessions_revoked: 'Active sessions revoked',
-  support_sessions_closed: 'Support sessions closed',
-  open_incidents_resolved: 'Open incidents resolved',
-  open_tasks_closed: 'Open tasks closed',
-  tenant_locked: 'Tenant locked',
-  data_retention_confirmed: 'Data retention confirmed'
-};
+const PAGE_SIZE=50;
+const STATUSES=['not_started','planned','in_progress','blocked','ready_to_archive','completed','cancelled'];
+const EDITABLE_STATUSES=['planned','in_progress','blocked','ready_to_archive'];
+const CHECKLIST_KEYS=['customer_notified','billing_closed','final_export_completed','active_users_reviewed','active_sessions_revoked','support_sessions_closed','open_incidents_resolved','open_tasks_closed','tenant_locked','data_retention_confirmed'];
+const LABELS:Record<string,string>={customer_notified:'Customer notified',billing_closed:'Billing closed',final_export_completed:'Final export completed',active_users_reviewed:'Active users reviewed',active_sessions_revoked:'Active sessions revoked',support_sessions_closed:'Support sessions closed',open_incidents_resolved:'Open incidents resolved',open_tasks_closed:'Open tasks closed',tenant_locked:'Tenant locked',data_retention_confirmed:'Data retention confirmed'};
+const emptyChecklist=()=>Object.fromEntries(CHECKLIST_KEYS.map((key)=>[key,false]));
+const emptyForm=():FormState=>({tenant_id:'',reason:'',scheduled_for:'',owner_platform_user_id:'',notes:'',checklist:emptyChecklist()});
+function readableError(error:unknown){return error instanceof ApiError||error instanceof Error?error.message:'Unknown error';}
+function clean(value:string){const v=value.trim();return v||null;}
+function pretty(value?:string|null){const v=String(value||'').replaceAll('_',' ').trim();return v?v.charAt(0).toUpperCase()+v.slice(1):'Not recorded';}
+function dateTime(value?:string|null){if(!value)return 'Not recorded';const d=new Date(value);return Number.isNaN(d.getTime())?'Not recorded':d.toLocaleString();}
+function toLocalDateTimeInput(value?:string|null){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return '';const pad=(n:number)=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+function toIsoDateTimeOrNull(value:string){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toISOString();}
+function terminal(status:string){return status==='completed'||status==='cancelled';}
+function tone(status:string){if(status==='completed')return 'good';if(status==='blocked'||status==='cancelled')return 'danger';if(status==='ready_to_archive')return 'warn';return 'red';}
 
-const emptyChecklist = checklistKeys.reduce<Record<string, boolean>>((acc, key) => ({ ...acc, [key]: false }), {});
-const blankForm = { tenant_id: '', status: 'planned', reason: '', scheduled_for: '', owner_platform_user_id: '', notes: '', checklist: emptyChecklist };
+export default function PlatformTenantOffboardingPage(){
+  const qc=useQueryClient();
+  const [params,setParams]=useSearchParams();
+  const canWrite=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UPDATE);
+  const canReadUsers=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadSessions=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ);
+  const canReadSupport=hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ);
+  const canReadIncidents=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
+  const canReadRetention=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_READ);
+  const canReadBilling=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ);
+  const canExport=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
+  const canReadAudit=hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canLock=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_LOCK);
+  const canCompletionEvidence=canReadSessions&&canReadSupport&&canReadIncidents&&canReadRetention;
 
-function readableError(error: unknown): string { return error instanceof Error ? error.message : 'Unknown error'; }
-function formatDate(value?: string | null): string { return value ? new Date(value).toLocaleString() : '-'; }
-function dateTimeLocalToIso(value: string): string | null { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); }
-function isValidDateInput(value: string) { return !value || !Number.isNaN(new Date(value).getTime()); }
-function pretty(value: string): string { return value.replaceAll('_', ' '); }
-function trimOrNull(value: string) { const trimmed = value.trim(); return trimmed || null; }
-function normalizeForm(value: typeof blankForm) {
-  return JSON.stringify({
-    tenant_id: value.tenant_id || '',
-    status: value.status || 'planned',
-    reason: value.reason.trim(),
-    scheduled_for: value.scheduled_for || '',
-    owner_platform_user_id: value.owner_platform_user_id || '',
-    notes: value.notes.trim(),
-    checklist: checklistKeys.reduce<Record<string, boolean>>((acc, key) => ({ ...acc, [key]: Boolean(value.checklist?.[key]) }), {})
-  });
-}
-function SourceLink({ to, children }: { to: string; children: string }) { return <Link to={to} style={styles.link}>{children}</Link>; }
+  const search=params.get('search')||'';
+  const status=params.get('status')||'';
+  const tenantId=params.get('tenant_id')||'';
+  const ownerId=params.get('owner_platform_user_id')||'';
+  const includeCompleted=params.get('include_completed')!=='false';
+  const offset=Math.max(0,Number(params.get('offset')||0)||0);
+  const [editingTenantId,setEditingTenantId]=useState<string|null>(null);
+  const [inspectedTenantId,setInspectedTenantId]=useState<string>(tenantId);
+  const [form,setForm]=useState<FormState>(emptyForm());
+  const [archiveOnComplete,setArchiveOnComplete]=useState(canLock);
+  const [cancelReasons,setCancelReasons]=useState<Record<string,string>>({});
+  const [message,setMessage]=useState<string|null>(null);
 
-export default function PlatformTenantOffboardingPage() {
-  const qc = useQueryClient();
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_UPDATE);
-  const [tenantId, setTenantId] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [includeCompleted, setIncludeCompleted] = useState(false);
-  const [form, setForm] = useState(blankForm);
-  const [originalForm, setOriginalForm] = useState<typeof blankForm | null>(null);
-  const [archiveOnComplete, setArchiveOnComplete] = useState(true);
-  const [loadedWorkflowId, setLoadedWorkflowId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const tenants=useQuery({queryKey:['platform','tenants','offboarding-directory'],queryFn:()=>platformApiRequest<Tenant[]>('/platform/tenants')});
+  const users=useQuery({queryKey:['platform','users','offboarding-directory'],queryFn:()=>platformApiRequest<PlatformUser[]>('/platform/users'),enabled:canReadUsers});
+  const query=useMemo(()=>{const q=new URLSearchParams();if(search)q.set('search',search);if(status)q.set('status',status);if(tenantId)q.set('tenant_id',tenantId);if(ownerId)q.set('owner_platform_user_id',ownerId);q.set('include_completed',String(includeCompleted));q.set('limit',String(PAGE_SIZE));q.set('offset',String(offset));return q.toString();},[search,status,tenantId,ownerId,includeCompleted,offset]);
+  const list=useQuery({queryKey:['platform','tenant-offboarding',query],queryFn:()=>platformApiRequest<ListResponse>(`/platform/tenant-offboarding?${query}`)});
+  const detail=useQuery({queryKey:['platform','tenant-offboarding-detail',inspectedTenantId],queryFn:()=>platformApiRequest<DetailResponse>(`/platform/tenant-offboarding/${inspectedTenantId}`),enabled:Boolean(inspectedTenantId)});
+  const rows=list.data?.offboarding||[];
+  const summary=list.data?.summary;
+  const pagination=list.data?.pagination;
+  const initialError=Boolean(list.error&&!list.data);
+  const staleWarning=Boolean(list.error&&list.data);
+  const mutationBusy=false;
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants', 'for-offboarding'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const users = useQuery({ queryKey: ['platform', 'users', 'for-offboarding'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite });
+  useEffect(()=>{if(tenantId&&!inspectedTenantId)setInspectedTenantId(tenantId);},[tenantId,inspectedTenantId]);
+  const setFilter=(key:string,value:string)=>{const next=new URLSearchParams(params);if(value)next.set(key,value);else next.delete(key);next.delete('offset');setParams(next,{replace:true});};
+  const setOffset=(nextOffset:number)=>{const next=new URLSearchParams(params);next.set('offset',String(Math.max(0,nextOffset)));setParams(next,{replace:true});};
+  const refresh=()=>{setMessage(null);list.refetch();tenants.refetch();if(canReadUsers)users.refetch();if(inspectedTenantId)detail.refetch();};
+  const invalidate=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['platform','tenant-offboarding']}),qc.invalidateQueries({queryKey:['platform','tenant-offboarding-detail']}),qc.invalidateQueries({queryKey:['platform','tenants']})]);};
+  const resetForm=()=>{setEditingTenantId(null);setForm(emptyForm());};
+  const beginCreate=()=>{setEditingTenantId(null);setForm({...emptyForm(),tenant_id:tenantId});scrollToFormSection('platform-tenant-offboarding-form');};
+  const beginEdit=(row:OffboardingRow)=>{setEditingTenantId(row.tenant_id);setForm({tenant_id:row.tenant_id,reason:row.reason||'',scheduled_for:toLocalDateTimeInput(row.scheduled_for),owner_platform_user_id:row.owner_platform_user_id||'',notes:row.notes||'',checklist:{...emptyChecklist(),...(row.checklist||{})}});setInspectedTenantId(row.tenant_id);scrollToFormSection('platform-tenant-offboarding-form');};
 
-  const queryString = useMemo(() => {
-    const query = new URLSearchParams();
-    if (tenantId) query.set('tenant_id', tenantId);
-    if (statusFilter) query.set('status', statusFilter);
-    query.set('include_completed', String(includeCompleted));
-    query.set('limit', '200');
-    return query.toString();
-  }, [tenantId, statusFilter, includeCompleted]);
+  const save=useMutation({mutationFn:()=>platformApiRequest(editingTenantId?`/platform/tenant-offboarding/${editingTenantId}`:'/platform/tenant-offboarding',{method:editingTenantId?'PATCH':'POST',body:JSON.stringify({...(editingTenantId?{}:{tenant_id:form.tenant_id}),reason:clean(form.reason),scheduled_for:toIsoDateTimeOrNull(form.scheduled_for),...(canReadUsers?{owner_platform_user_id:form.owner_platform_user_id||null}:{}),notes:clean(form.notes),checklist:form.checklist})}),onSuccess:async()=>{setMessage(editingTenantId?'Offboarding details updated.':'Offboarding workflow created in Planned status.');await invalidate();resetForm();},onError:()=>setMessage(null)});
+  const changeStatus=useMutation({mutationFn:({id,nextStatus}:{id:string;nextStatus:string})=>platformApiRequest(`/platform/tenant-offboarding/${id}/status`,{method:'POST',body:JSON.stringify({status:nextStatus})}),onSuccess:async()=>{setMessage('Offboarding workflow status recorded.');await invalidate();},onError:()=>setMessage(null)});
+  const complete=useMutation({mutationFn:(id:string)=>platformApiRequest(`/platform/tenant-offboarding/${id}/complete`,{method:'POST',body:JSON.stringify({archive_tenant:archiveOnComplete})}),onSuccess:async()=>{setMessage(archiveOnComplete?'Offboarding completed; tenant archived and write-locked in the application.':'Offboarding workflow completed without changing tenant lifecycle state.');await invalidate();},onError:()=>setMessage(null)});
+  const cancel=useMutation({mutationFn:(id:string)=>platformApiRequest(`/platform/tenant-offboarding/${id}/cancel`,{method:'POST',body:JSON.stringify({reason:clean(cancelReasons[id]||'')})}),onSuccess:async()=>{setMessage('Offboarding workflow cancelled. Tenant lifecycle status was not changed automatically.');await invalidate();},onError:()=>setMessage(null)});
 
-  const list = useQuery({ queryKey: ['platform', 'tenant-offboarding', tenantId, statusFilter, includeCompleted], queryFn: () => platformApiRequest<OffboardingRow[]>(`/platform/tenant-offboarding?${queryString}`) });
-  const detail = useQuery({ queryKey: ['platform', 'tenant-offboarding-detail', tenantId], queryFn: () => platformApiRequest<Detail>(`/platform/tenant-offboarding/${tenantId}`), enabled: Boolean(tenantId) });
+  const mutationError=save.error||changeStatus.error||complete.error||cancel.error;
+  const validForm=Boolean(form.tenant_id&&!Number.isNaN(form.scheduled_for?new Date(form.scheduled_for).getTime():0));
+  const canSave=canWrite&&validForm&&!save.isPending;
+  const selected=detail.data?.offboarding||null;
+  const checks=detail.data?.checks||null;
+  const blockerCount=checks?[checks.active_tenant_sessions,checks.active_support_sessions,checks.open_incidents,checks.open_tasks].filter((v)=>typeof v==='number'&&v>0).length+(checks.legal_hold?1:0):0;
 
-  const selectedTenant = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId), [tenants.data, tenantId]);
-  const rows = list.data || [];
-  const selected = detail.data?.offboarding || rows.find((row) => row.tenant_id === tenantId) || null;
-  const checks = detail.data?.checks || null;
-  const isLoading = tenants.isLoading || users.isLoading || list.isLoading || detail.isLoading;
-  const loadError = tenants.error || users.error || list.error || detail.error;
+  return <div className="platform-tenant-offboarding">
+    <OperationalWorkspaceHero iconPath="/platform/tenant-offboarding" eyebrow="Platform governance" title="Tenant offboarding" description="Coordinate Platform-recorded tenant shutdown, operational blocker checks, final application archive/write-lock actions and offboarding evidence without treating operator checklist assertions as proof of external outcomes." meta={<><OperationalWorkspaceMetaPill>Registry-wide filtered summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{list.data?.completion_evidence_complete?'Completion blocker evidence available':'Completion blocker evidence partial'}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{canReadUsers?'Platform-user identity available':'Owner identity restricted'}</OperationalWorkspaceMetaPill></>} aside={<div className="platform-tenant-offboarding__hero-aside"><OperationalWorkspaceStatus value="Application evidence" label="Not proof of external closure"/><button type="button" className="app-button app-button--secondary" onClick={refresh} disabled={list.isFetching}>{list.isFetching?'Refreshing…':'Refresh'}</button></div>} />
 
-  const invalidate = async () => {
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ['platform', 'tenant-offboarding'] }),
-      qc.invalidateQueries({ queryKey: ['platform', 'tenant-offboarding-detail'] }),
-      qc.invalidateQueries({ queryKey: ['platform', 'tenants'] })
-    ]);
-  };
+    {staleWarning?<div className="platform-tenant-offboarding__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(list.error)}</span></div>:null}
+    {message?<div className="platform-tenant-offboarding__success"><span>{message}</span><button type="button" className="app-button app-button--secondary" onClick={()=>setMessage(null)}>Dismiss</button></div>:null}
+    <div className="platform-tenant-offboarding__truth-note"><strong>Evidence boundary</strong><span>Checklist items are operator-recorded assertions. A completed workflow or archived tenant record does not prove customer notification, billing settlement, external export delivery/receipt, backup deletion, legal compliance, or any other external outcome.</span></div>
 
-  const refreshAll = () => {
-    setStatusMessage('Refreshing tenant offboarding evidence...');
-    tenants.refetch();
-    users.refetch();
-    list.refetch();
-    if (tenantId) detail.refetch();
-  };
+    <OperationalWorkspaceStats ariaLabel="Tenant offboarding registry summary">
+      <OperationalWorkspaceStatCard label="Filtered workflows" value={summary?.total??'—'} helper="Registry-wide filtered total" tone="red" iconPath="/platform/tenant-offboarding" />
+      <OperationalWorkspaceStatCard label="Active" value={summary?.active??'—'} helper="Non-terminal application workflow" tone="warn" iconPath="/platform/tenant-offboarding" />
+      <OperationalWorkspaceStatCard label="Blocked" value={summary?.blocked??'—'} helper="Recorded blocked status" tone="danger" iconPath="/platform/tenant-offboarding" />
+      <OperationalWorkspaceStatCard label="Ready to archive" value={summary?.ready_to_archive??'—'} helper="Checklist + visible hard blockers cleared" tone="warn" iconPath="/platform/tenant-offboarding" />
+      <OperationalWorkspaceStatCard label="Completed" value={summary?.completed??'—'} helper="Application workflow completion" tone="good" iconPath="/platform/tenant-offboarding" />
+      <OperationalWorkspaceStatCard label="Checklist complete" value={summary?.checklist_complete??'—'} helper="Operator-recorded checklist only" tone="neutral" iconPath="/platform/tenant-offboarding" />
+    </OperationalWorkspaceStats>
 
-  const save = useMutation({
-    mutationFn: () => platformApiRequest('/platform/tenant-offboarding', {
-      method: 'POST',
-      body: JSON.stringify({
-        tenant_id: form.tenant_id || tenantId,
-        status: form.status,
-        reason: trimOrNull(form.reason),
-        scheduled_for: dateTimeLocalToIso(form.scheduled_for),
-        owner_platform_user_id: form.owner_platform_user_id || null,
-        notes: trimOrNull(form.notes),
-        checklist: form.checklist
-      })
-    }),
-    onSuccess: async () => {
-      setStatusMessage(selected ? 'Offboarding workflow updated.' : 'Offboarding workflow saved.');
-      await invalidate();
-      const savedForm = { ...form, tenant_id: form.tenant_id || tenantId, reason: form.reason.trim(), notes: form.notes.trim(), checklist: { ...form.checklist } };
-      setForm(savedForm);
-      setOriginalForm(savedForm);
-      setLoadedWorkflowId(selected?.id || loadedWorkflowId);
-    }
-  });
-  const complete = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/tenant-offboarding/${id}/complete`, { method: 'POST', body: JSON.stringify({ archiveTenant: archiveOnComplete }) }),
-    onSuccess: async () => { setStatusMessage(archiveOnComplete ? 'Offboarding completed and tenant archived/write-locked.' : 'Offboarding completed.'); await invalidate(); }
-  });
-  const cancel = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/tenant-offboarding/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Cancelled from platform UI' }) }),
-    onSuccess: async () => { setStatusMessage('Offboarding workflow cancelled.'); await invalidate(); }
-  });
-
-  const buildFormFromWorkflow = useCallback((row: OffboardingRow): typeof blankForm => ({
-    tenant_id: row.tenant_id,
-    status: row.status,
-    reason: row.reason || '',
-    scheduled_for: row.scheduled_for ? new Date(row.scheduled_for).toISOString().slice(0, 16) : '',
-    owner_platform_user_id: row.owner_platform_user_id || '',
-    notes: row.notes || '',
-    checklist: { ...emptyChecklist, ...(row.checklist || {}) }
-  }), []);
-
-  const loadWorkflowIntoForm = useCallback((row: OffboardingRow) => {
-    const nextForm = buildFormFromWorkflow(row);
-    setForm(nextForm);
-    setOriginalForm(nextForm);
-    setLoadedWorkflowId(row.id);
-  }, [buildFormFromWorkflow]);
-
-  const resetFormForTenant = (nextTenantId: string) => {
-    setTenantId(nextTenantId);
-    setForm({ ...blankForm, tenant_id: nextTenantId });
-    setOriginalForm(null);
-    setLoadedWorkflowId(null);
-  };
-
-  const selectedTenantId = form.tenant_id || tenantId;
-  const isUpdateWorkflow = Boolean(selected && originalForm && loadedWorkflowId === selected.id);
-  const isCreateWorkflow = Boolean(selectedTenantId && !selected);
-
-  useEffect(() => {
-    if (!tenantId) {
-      setForm(blankForm);
-      setOriginalForm(null);
-      setLoadedWorkflowId(null);
-      return;
-    }
-
-    if (detail.isFetching) {
-      return;
-    }
-
-    if (detail.data?.offboarding) {
-      if (loadedWorkflowId !== detail.data.offboarding.id) {
-        loadWorkflowIntoForm(detail.data.offboarding);
-      }
-      return;
-    }
-
-    if (form.tenant_id !== tenantId || loadedWorkflowId) {
-      setForm({ ...blankForm, tenant_id: tenantId });
-      setOriginalForm(null);
-      setLoadedWorkflowId(null);
-    }
-  }, [detail.data?.offboarding, detail.isFetching, form.tenant_id, loadWorkflowIntoForm, loadedWorkflowId, tenantId]);
-
-  const isFormDirty = isUpdateWorkflow && originalForm ? normalizeForm(form) !== normalizeForm(originalForm) : false;
-  const hasCreateRequiredFields = Boolean(selectedTenantId && form.reason.trim());
-  const invalidScheduledFor = !isValidDateInput(form.scheduled_for);
-  const readyToArchiveWithIncompleteChecklist = form.status === 'ready_to_archive' && !checklistKeys.every((key) => Boolean(form.checklist[key]));
-  const canSaveWorkflow = !save.isPending && !invalidScheduledFor && !readyToArchiveWithIncompleteChecklist && (isUpdateWorkflow ? isFormDirty : isCreateWorkflow && hasCreateRequiredFields);
-  const blockCount = checks ? checks.active_tenant_sessions + checks.active_support_sessions + checks.open_incidents + checks.open_tasks : 0;
-  const isTerminalWorkflow = selected?.status === 'completed' || selected?.status === 'cancelled';
-  const completionBlockers = [
-    !selected ? 'Create or select a workflow before completing offboarding.' : '',
-    selected && !selected.checklist_complete ? 'Complete all checklist items before completing offboarding.' : '',
-    selected && blockCount > 0 ? 'Clear active sessions, support sessions, open incidents, and open tasks before completing offboarding.' : '',
-    selected && checks?.legal_hold ? 'Resolve the tenant legal hold before completing offboarding or archiving.' : '',
-    selected && isTerminalWorkflow ? 'Completed or cancelled workflows cannot be completed again.' : ''
-  ].filter(Boolean);
-  const canCompleteWorkflow = Boolean(selected && selected.checklist_complete && blockCount === 0 && !checks?.legal_hold && !isTerminalWorkflow && !complete.isPending);
-  const canCancelWorkflow = Boolean(selected && !isTerminalWorkflow && !cancel.isPending);
-  const openWorkflowCount = rows.filter((row) => !['completed', 'cancelled'].includes(row.status)).length;
-  const completeWorkflowCount = rows.filter((row) => row.status === 'completed').length;
-  const cancelledWorkflowCount = rows.filter((row) => row.status === 'cancelled').length;
-  const selectedWorkflowLabel = selected ? `${selected.tenant_name || selectedTenant?.name || 'Selected tenant'} · ${pretty(selected.status)}` : selectedTenant ? `${selectedTenant.name} · no workflow yet` : 'No tenant selected';
-
-  return <div style={styles.page}>
-    <header style={styles.header}>
-      <div>
-        <h1>Tenant offboarding</h1>
-        <p style={styles.muted}>Controlled shutdown workflow for tenants before final archive. This keeps exports, sessions, support, billing, incidents, and tasks visible before completion.</p>
-      </div>
-      <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={isLoading}>{isLoading ? 'Refreshing...' : 'Refresh'}</button>
-    </header>
-
-    {statusMessage ? <div style={styles.info}>{statusMessage}</div> : null}
-    {loadError ? <section style={styles.errorPanel}>
-      <strong>Tenant offboarding data could not be loaded.</strong>
-      <span>{readableError(loadError)}</span>
-      <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
-    </section> : null}
-
-    <section style={styles.metrics}>
-      <div style={styles.metric}><strong>{rows.length}</strong><span>Total shown</span></div>
-      <div style={styles.metric}><strong>{openWorkflowCount}</strong><span>Open workflows</span></div>
-      <div style={styles.metric}><strong>{completeWorkflowCount}</strong><span>Completed</span></div>
-      <div style={styles.metric}><strong>{cancelledWorkflowCount}</strong><span>Cancelled</span></div>
-    </section>
-
-    <section style={styles.metaGrid}>
-      <div><strong>Snapshot source</strong><span>GET /platform/tenant-offboarding?limit=200 and selected tenant readiness detail.</span></div>
-      <div><strong>Current filters</strong><span>{tenantId || 'all tenants'} · {statusFilter || 'all statuses'} · {includeCompleted ? 'including completed/cancelled' : 'active only'}</span></div>
-      <div><strong>Selected workflow</strong><span>{selectedWorkflowLabel}</span></div>
-      <div><strong>Readiness source</strong><span>Tenant users, tenant sessions, support sessions, incidents, tasks, export audit, and retention/legal-hold checks.</span></div>
-    </section>
-
-    <section style={styles.supportingLinks}>
-      <strong>Supporting Platform pages</strong>
-      <SourceLink to="/platform/tenants">Tenants</SourceLink>
-      <SourceLink to="/platform/tenant-lifecycle">Tenant Lifecycle</SourceLink>
-      <SourceLink to="/platform/tenant-tasks">Tenant Tasks</SourceLink>
-      <SourceLink to="/platform/support-sessions">Support Sessions</SourceLink>
-      <SourceLink to="/platform/tenant-exports">Tenant Exports</SourceLink>
-      <SourceLink to="/platform/data-retention">Data Retention</SourceLink>
-      <SourceLink to="/platform/audit">Audit</SourceLink>
-    </section>
-
-    <section style={styles.panel}>
-      <h2>Filters</h2>
-      <div style={styles.grid}>
-        <label style={styles.fieldLabel}>Tenant
-          <select style={styles.input} value={tenantId} onChange={(event) => resetFormForTenant(event.target.value)}>
-            <option value="">All tenants</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
-        </label>
-        <label style={styles.fieldLabel}>Status
-          <select style={styles.input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="">All statuses</option>
-            {statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}
-          </select>
-        </label>
-        <label style={styles.checkboxLabel}><input type="checkbox" checked={includeCompleted} onChange={(event) => setIncludeCompleted(event.target.checked)} /> Include completed/cancelled</label>
+    <section className="io-workspace-panel platform-tenant-offboarding__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-offboarding" title="Filter offboarding registry" description="Filters persist in the URL. Owner filtering is available only when Platform-user identity permission is present." actions={canWrite?<button type="button" className="app-button app-button--primary" onClick={beginCreate}>Start workflow</button>:undefined}/>
+      <div className="platform-tenant-offboarding__filter-grid">
+        <label className="platform-tenant-offboarding__search">Search<input value={search} onChange={(e)=>setFilter('search',e.target.value)} placeholder="Tenant, reason or notes" /></label>
+        <label>Status<select value={status} onChange={(e)=>setFilter('status',e.target.value)}><option value="">All statuses</option>{STATUSES.map((item)=><option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Tenant<select value={tenantId} onChange={(e)=>{setFilter('tenant_id',e.target.value);setInspectedTenantId(e.target.value);}}><option value="">All tenants</option>{(tenants.data||[]).map((tenant)=><option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
+        {canReadUsers?<label>Owner<select value={ownerId} onChange={(e)=>setFilter('owner_platform_user_id',e.target.value)}><option value="">All owners</option>{(users.data||[]).map((user)=><option key={user.id} value={user.id}>{user.email}</option>)}</select></label>:<div className="platform-tenant-offboarding__restricted"><strong>Owner filter restricted</strong><span>PLATFORM_USERS_READ is required.</span></div>}
+        <label className="platform-tenant-offboarding__checkbox"><input type="checkbox" checked={includeCompleted} onChange={(e)=>setFilter('include_completed',String(e.target.checked))}/> Include completed/cancelled history</label>
       </div>
     </section>
 
-    {tenantId && checks ? <section style={styles.panel}>
-      <h2>Readiness checks {selectedTenant ? `for ${selectedTenant.name}` : ''}</h2>
-      <div style={styles.metrics}>
-        <div style={styles.metric}><strong>{checks.tenant_user_count}</strong><span>tenant users</span></div>
-        <div style={styles.metric}><strong>{checks.active_tenant_sessions}</strong><span>active tenant sessions</span></div>
-        <div style={styles.metric}><strong>{checks.active_support_sessions}</strong><span>active support sessions</span></div>
-        <div style={styles.metric}><strong>{checks.open_incidents}</strong><span>open incidents</span></div>
-        <div style={styles.metric}><strong>{checks.open_tasks}</strong><span>open tasks</span></div>
-        <div style={styles.metric}><strong>{formatDate(checks.last_export_at)}</strong><span>last export</span></div>
-        <div style={styles.metric}><strong>{checks.legal_hold ? 'Yes' : 'No'}</strong><span>legal hold</span></div>
-        <div style={styles.metric}><strong>{checks.purge_after_offboarding ? 'Yes' : 'No'}</strong><span>purge intent</span></div>
+    {canWrite?<section id="platform-tenant-offboarding-form" className="io-workspace-panel platform-tenant-offboarding__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-offboarding" title={editingTenantId?'Edit offboarding details':'Start offboarding workflow'} description={editingTenantId?'Lifecycle status is intentionally excluded from ordinary edits. Terminal history is immutable.':'New workflows always start Planned. Later lifecycle changes use explicit actions.'} actions={editingTenantId?<button type="button" className="app-button app-button--secondary" onClick={resetForm}>Cancel edit</button>:undefined}/>
+      <div className="platform-tenant-offboarding__form-grid">
+        <label>Tenant<select value={form.tenant_id} disabled={Boolean(editingTenantId)} onChange={(e)=>setForm({...form,tenant_id:e.target.value})}><option value="">Select tenant</option>{(tenants.data||[]).map((tenant)=><option key={tenant.id} value={tenant.id} disabled={tenant.status==='archived'}>{tenant.name} · {pretty(tenant.status)}</option>)}</select></label>
+        {canReadUsers?<label>Owner<select value={form.owner_platform_user_id} onChange={(e)=>setForm({...form,owner_platform_user_id:e.target.value})}><option value="">Unassigned</option>{(users.data||[]).filter((user)=>user.is_active!==false).map((user)=><option key={user.id} value={user.id}>{user.email}</option>)}</select></label>:<div className="platform-tenant-offboarding__restricted"><strong>Owner linkage preserved</strong><span>{editingTenantId?'Existing restricted linkage is not changed by this edit.':'PLATFORM_USERS_READ is required to assign an owner.'}</span></div>}
+        <label>Scheduled for<input type="datetime-local" value={form.scheduled_for} onChange={(e)=>setForm({...form,scheduled_for:e.target.value})}/></label>
+        <label className="platform-tenant-offboarding__span-all">Reason<textarea value={form.reason} maxLength={2000} onChange={(e)=>setForm({...form,reason:e.target.value})}/></label>
+        <label className="platform-tenant-offboarding__span-all">Notes<textarea value={form.notes} maxLength={4000} onChange={(e)=>setForm({...form,notes:e.target.value})}/></label>
       </div>
-      {checks.legal_hold ? <div style={styles.warning}>Legal hold is active{checks.legal_hold_reason ? `: ${checks.legal_hold_reason}` : ''}. Backend completion can reject this workflow until retention is resolved.</div> : null}
-      {checks.retain_until ? <div style={styles.info}>Retention date: {formatDate(checks.retain_until)}</div> : null}
-      {blockCount > 0 ? <div style={styles.warning}>Completion is blocked until active sessions/support sessions/open incidents/open tasks are cleared.</div> : <div style={styles.success}>No operational blockers detected.</div>}
-    </section> : null}
+      <div className="platform-tenant-offboarding__checklist">{CHECKLIST_KEYS.map((key)=><label key={key}><input type="checkbox" checked={Boolean(form.checklist[key])} onChange={(e)=>setForm({...form,checklist:{...form.checklist,[key]:e.target.checked}})}/><span>{LABELS[key]}</span></label>)}</div>
+      <div className="platform-tenant-offboarding__validation">Checklist checks are operator assertions. Hard application blockers are re-read separately before Ready to archive and Complete actions.</div>
+      <div className="platform-tenant-offboarding__actions"><button type="button" className="app-button app-button--primary" disabled={!canSave} onClick={()=>save.mutate()}>{save.isPending?'Saving…':editingTenantId?'Save details':'Create Planned workflow'}</button></div>
+    </section>:null}
 
-    {canWrite ? <section style={styles.panel}>
-      <h2>{selected ? 'Update offboarding workflow' : 'Start offboarding workflow'}</h2>
-      {!selectedTenantId ? <div style={styles.warning}>Select a tenant before saving an offboarding workflow.</div> : null}
-      {isCreateWorkflow && selectedTenantId && !form.reason.trim() ? <div style={styles.warning}>Reason is required before creating an offboarding workflow.</div> : null}
-      {invalidScheduledFor ? <div style={styles.warning}>Planned date must be a valid date/time.</div> : null}
-      {readyToArchiveWithIncompleteChecklist ? <div style={styles.warning}>Complete every checklist item before setting status to ready to archive.</div> : null}
-      <div style={styles.grid}>
-        <label style={styles.fieldLabel}>Tenant
-          <select style={styles.input} value={form.tenant_id || tenantId} onChange={(event) => resetFormForTenant(event.target.value)}>
-            <option value="">Select tenant</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
-        </label>
-        <label style={styles.fieldLabel}>Workflow status
-          <select style={styles.input} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{statuses.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}</select>
-        </label>
-        <label style={styles.fieldLabel}>Planned date
-          <input style={styles.input} type="datetime-local" value={form.scheduled_for} onChange={(event) => setForm({ ...form, scheduled_for: event.target.value })} />
-        </label>
-        <label style={styles.fieldLabel}>Owner
-          <select style={styles.input} value={form.owner_platform_user_id} onChange={(event) => setForm({ ...form, owner_platform_user_id: event.target.value })}>
-            <option value="">No owner</option>
-            {(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-          </select>
-        </label>
-      </div>
-      <label style={styles.fieldLabel}>Reason
-        <input style={styles.input} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-      </label>
-      <label style={styles.fieldLabel}>Notes
-        <textarea style={styles.textarea} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-      </label>
-      <div style={styles.checklist}>
-        {checklistKeys.map((key) => <label key={key} style={styles.checkItem}>
-          <input type="checkbox" checked={Boolean(form.checklist[key])} onChange={(event) => setForm({ ...form, checklist: { ...form.checklist, [key]: event.target.checked } })} />
-          {labels[key]}
-        </label>)}
-      </div>
-      <div style={styles.actions}>
-        <button type="button" style={canSaveWorkflow ? styles.button : styles.disabledButton} disabled={!canSaveWorkflow} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : isUpdateWorkflow ? 'Save changes' : 'Save workflow'}</button>
-        {tenantId ? <>
-          <label style={styles.checkboxLabel}><input type="checkbox" checked={archiveOnComplete} onChange={(event) => setArchiveOnComplete(event.target.checked)} /> Archive tenant on completion</label>
-          <button type="button" style={canCompleteWorkflow ? styles.dangerButton : styles.disabledDangerButton} disabled={!canCompleteWorkflow} onClick={() => { if (canCompleteWorkflow && window.confirm('Complete this offboarding workflow? This may archive and write-lock the tenant.')) complete.mutate(tenantId); }}>Complete offboarding</button>
-          <button type="button" style={canCancelWorkflow ? styles.secondaryButton : styles.disabledButton} disabled={!canCancelWorkflow} onClick={() => { if (canCancelWorkflow && window.confirm('Cancel this offboarding workflow?')) cancel.mutate(tenantId); }}>Cancel workflow</button>
-        </> : null}
-      </div>
-      {completionBlockers.length ? <div style={styles.warning}>{completionBlockers[0]}</div> : null}
-      {save.error ? <div style={styles.error}>{readableError(save.error)}</div> : null}
-      {complete.error ? <div style={styles.error}>{readableError(complete.error)}</div> : null}
-      {cancel.error ? <div style={styles.error}>{readableError(cancel.error)}</div> : null}
-    </section> : null}
+    {inspectedTenantId?<section className="io-workspace-panel platform-tenant-offboarding__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-offboarding" title="Selected tenant blocker evidence" description="Only source families you are permitted to read are queried. Missing permissions are shown as Restricted, never converted to zero." />
+      {detail.isPending?<div className="platform-tenant-offboarding__loading">Loading selected tenant evidence…</div>:detail.error&&!detail.data?<div className="platform-tenant-offboarding__blocking-error"><strong>Selected tenant evidence could not be loaded.</strong><span>{readableError(detail.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>detail.refetch()}>Retry</button></div>:checks?<><div className="platform-tenant-offboarding__metrics-grid">
+        <div><span>Tenant sessions</span><strong>{checks.active_tenant_sessions===null?'Restricted':checks.active_tenant_sessions}</strong></div>
+        <div><span>Support sessions</span><strong>{checks.active_support_sessions===null?'Restricted':checks.active_support_sessions}</strong></div>
+        <div><span>Open incidents</span><strong>{checks.open_incidents===null?'Restricted':checks.open_incidents}</strong></div>
+        <div><span>Open tenant tasks</span><strong>{checks.open_tasks===null?'Restricted':checks.open_tasks}</strong></div>
+        <div><span>Legal hold</span><strong>{checks.legal_hold===null?'Restricted':checks.legal_hold?'Active':'None recorded'}</strong><small>{checks.legal_hold_reason||''}</small></div>
+        <div><span>Tenant write lock</span><strong>{checks.tenant_write_locked===null?'Restricted':checks.tenant_write_locked?'Locked':'Not locked'}</strong></div>
+        <div><span>Last export audit</span><strong>{detail.data?.evidence_access.export_audit?dateTime(checks.last_export_at):'Restricted'}</strong></div>
+        <div><span>Billing status</span><strong>{checks.billing_status===null?'Restricted':pretty(checks.billing_status)}</strong></div>
+      </div><div className="platform-tenant-offboarding__source-links">{canReadSessions?<Link to="/platform/sessions">Tenant sessions</Link>:null}{canReadSupport?<Link to="/platform/support-sessions">Support sessions</Link>:null}{canReadIncidents?<Link to={`/platform/incidents?tenant_id=${encodeURIComponent(inspectedTenantId)}`}>Incidents</Link>:null}<Link to={`/platform/tenant-tasks?tenant_id=${encodeURIComponent(inspectedTenantId)}`}>Tenant tasks</Link>{canExport?<Link to={`/platform/tenant-exports?tenant_id=${encodeURIComponent(inspectedTenantId)}`}>Tenant exports</Link>:null}{canReadRetention?<Link to={`/platform/data-retention?tenant_id=${encodeURIComponent(inspectedTenantId)}`}>Data retention</Link>:null}{canReadBilling?<Link to={`/platform/billing?tenant_id=${encodeURIComponent(inspectedTenantId)}`}>Billing</Link>:null}{canReadAudit?<Link to="/platform/audit">Audit</Link>:null}</div>{!detail.data?.completion_evidence_complete?<div className="platform-tenant-offboarding__warning"><strong>Completion evidence is partial.</strong><span>Ready-to-archive and completion actions fail closed until session, support, incident, task and data-retention evidence permissions are all available.</span></div>:blockerCount>0?<div className="platform-tenant-offboarding__warning"><strong>{blockerCount} hard application blocker{blockerCount===1?'':'s'} remain.</strong><span>Clear them before recording Ready to archive or completion.</span></div>:<div className="platform-tenant-offboarding__success"><span>No hard application blockers are visible in the permitted completion evidence.</span></div>}</>:null}
+    </section>:null}
 
-    <section style={styles.list}>
-      {list.isLoading ? <div style={styles.panel}>Loading...</div> : null}
-      {rows.map((row) => <article key={row.id} style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <strong>{row.tenant_name}</strong>
-            <div style={styles.muted}>Tenant status: {row.tenant_status || '-'} · locked: {row.write_locked ? 'yes' : 'no'} · updated: {formatDate(row.updated_at)}</div>
-          </div>
-          <span style={styles.badge}>{pretty(row.status)}</span>
-        </div>
-        <p>{row.reason || 'No reason recorded.'}</p>
-        <div style={styles.muted}>Owner: {row.owner_platform_user_email || 'unassigned'} · Scheduled: {formatDate(row.scheduled_for)} · Completed: {formatDate(row.completed_at)}</div>
-        {row.notes ? <p style={styles.muted}>Notes: {row.notes}</p> : null}
-        <div style={styles.progress}>{checklistKeys.filter((key) => row.checklist?.[key]).length}/{checklistKeys.length} checklist items done {row.checklist_complete ? '· ready' : ''}</div>
-        <div style={styles.rowLinks}><SourceLink to="/platform/tenant-exports">Export evidence</SourceLink><SourceLink to="/platform/data-retention">Retention evidence</SourceLink><SourceLink to="/platform/audit">Audit trail</SourceLink></div>
-      </article>)}
-      {!list.isLoading && rows.length === 0 ? <div style={styles.panel}>No offboarding workflows found.</div> : null}
+    <section className="io-workspace-panel platform-tenant-offboarding__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-offboarding" title="Offboarding workflow evidence" description="Each card is one Platform workflow record. Terminal application history is immutable; cancellation does not automatically restore or alter the tenant lifecycle status." />
+      {initialError?<div className="platform-tenant-offboarding__blocking-error"><strong>Tenant offboarding could not be loaded.</strong><span>{readableError(list.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>list.refetch()}>Retry</button></div>:list.isPending?<div className="platform-tenant-offboarding__loading">Loading offboarding workflows…</div>:rows.length===0?<div className="platform-tenant-offboarding__empty"><strong>No matching application workflows.</strong><span>This does not prove that no external customer offboarding activity exists outside this Platform registry.</span></div>:<div className="platform-tenant-offboarding__list">{rows.map((row)=>{
+        const closed=terminal(row.status);const done=CHECKLIST_KEYS.filter((key)=>row.checklist?.[key]).length;const inspected=row.tenant_id===inspectedTenantId;
+        return <article key={row.id} className="platform-tenant-offboarding__card" data-selected={inspected?'true':'false'}>
+          <div className="platform-tenant-offboarding__card-header"><div><h4>{row.tenant_name}</h4><p>{row.reason||'No reason recorded.'}</p></div><div className="platform-tenant-offboarding__badges"><span data-tone={tone(row.status)}>{pretty(row.status)}</span><span>{done}/{CHECKLIST_KEYS.length} checklist</span><span>{row.write_locked?'Tenant locked':'Tenant not locked'}</span></div></div>
+          <div className="platform-tenant-offboarding__metrics-grid"><div><span>Tenant lifecycle</span><strong>{pretty(row.tenant_status)}</strong></div><div><span>Owner</span><strong>{row.owner_platform_user_email||(row.owner_present?'Restricted Platform-user linkage':'Unassigned')}</strong></div><div><span>Scheduled</span><strong>{dateTime(row.scheduled_for)}</strong></div><div><span>Completed</span><strong>{dateTime(row.completed_at)}</strong></div><div><span>Checklist</span><strong>{row.checklist_complete?'Complete':'Incomplete'}</strong></div><div><span>Updated</span><strong>{dateTime(row.updated_at)}</strong></div></div>
+          {row.notes?<div className="platform-tenant-offboarding__evidence-note"><strong>Notes</strong><span>{row.notes}</span></div>:null}
+          <div className="platform-tenant-offboarding__card-footer"><div className="platform-tenant-offboarding__source-links"><button type="button" className="app-button app-button--secondary" onClick={()=>setInspectedTenantId(row.tenant_id)}>{inspected?'Evidence selected':'Inspect blockers'}</button><Link to={`/platform/tenants?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Tenant</Link></div>{canWrite&&!closed?<button type="button" className="app-button app-button--secondary" onClick={()=>beginEdit(row)}>Edit details</button>:closed?<span className="platform-tenant-offboarding__immutable">Terminal history is immutable.</span>:null}</div>
+          {canWrite&&!closed?<div className="platform-tenant-offboarding__workflow"><div className="platform-tenant-offboarding__actions">{EDITABLE_STATUSES.filter((item)=>item!==row.status).map((item)=><button key={item} type="button" className="app-button app-button--secondary" disabled={changeStatus.isPending||(item==='ready_to_archive'&&(!row.checklist_complete||!canCompletionEvidence))} onClick={()=>{if(item!=='ready_to_archive'||window.confirm('Record Ready to archive only after reviewing the application blocker evidence?'))changeStatus.mutate({id:row.tenant_id,nextStatus:item});}}>{item==='ready_to_archive'?'Record ready to archive':pretty(item)}</button>)}</div>
+            {row.status==='ready_to_archive'?<div className="platform-tenant-offboarding__completion"><label className="platform-tenant-offboarding__checkbox"><input type="checkbox" checked={archiveOnComplete} disabled={!canLock} onChange={(e)=>setArchiveOnComplete(e.target.checked)}/> Archive + write-lock tenant on completion {canLock?'':'(TENANTS_LOCK required)'}</label><button type="button" className="app-button app-button--primary" disabled={complete.isPending||!canCompletionEvidence||(archiveOnComplete&&!canLock)} onClick={()=>{setInspectedTenantId(row.tenant_id);if(window.confirm('Complete this Platform offboarding workflow? External outcomes are not proven by this action.'))complete.mutate(row.tenant_id);}}>Complete offboarding</button></div>:null}
+            <div className="platform-tenant-offboarding__cancel"><input value={cancelReasons[row.tenant_id]||''} maxLength={2000} placeholder="Optional cancellation reason" onChange={(e)=>setCancelReasons((current)=>({...current,[row.tenant_id]:e.target.value}))}/><button type="button" className="app-button app-button--secondary" disabled={cancel.isPending} onClick={()=>{if(window.confirm('Cancel this workflow record? Tenant lifecycle status will not be changed automatically.'))cancel.mutate(row.tenant_id);}}>Cancel workflow</button></div>
+          </div>:null}
+        </article>;
+      })}</div>}
+      {mutationError?<div className="platform-tenant-offboarding__blocking-error"><strong>Action failed.</strong><span>{readableError(mutationError)}</span></div>:null}
+      {pagination?<div className="platform-tenant-offboarding__pagination"><button type="button" className="app-button app-button--secondary" disabled={offset===0||list.isFetching} onClick={()=>setOffset(Math.max(0,offset-PAGE_SIZE))}>Previous</button><span>Page {Math.floor(offset/PAGE_SIZE)+1} · up to {PAGE_SIZE} workflows · {pagination.total} filtered total</span><button type="button" className="app-button app-button--secondary" disabled={!pagination.has_more||list.isFetching} onClick={()=>setOffset(offset+PAGE_SIZE)}>Next</button></div>:null}
     </section>
   </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  muted: { color: '#64748b', fontSize: 13 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, width: '100%', boxSizing: 'border-box', background: '#fff', color: '#0f172a', font: 'inherit' },
-  fieldLabel: { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155', marginTop: 12 },
-  textarea: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, width: '100%', boxSizing: 'border-box', minHeight: 80, marginTop: 12, background: '#fff', color: '#0f172a', font: 'inherit' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  metrics: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 },
-  metric: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'grid', gap: 4, background: '#fff', color: '#334155' },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  supportingLinks: { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#475569' },
-  link: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
-  rowLinks: { display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 },
-  warning: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 10, padding: 12, marginTop: 12 },
-  info: { background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', border: '1px solid var(--io-primary-border)', borderRadius: 10, padding: 12, marginTop: 12 },
-  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 12, marginTop: 12 },
-  checklist: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 12 },
-  checkItem: { display: 'flex', gap: 8, alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', padding: 10, borderRadius: 10, color: '#334155' },
-  actions: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 },
-  button: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', fontWeight: 700 },
-  disabledDangerButton: { padding: '9px 13px', border: '1px solid #fecaca', borderRadius: 9, background: '#fee2e2', color: '#991b1b', opacity: 0.55, cursor: 'not-allowed', fontWeight: 700 },
-  secondaryButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  dangerButton: { padding: '9px 13px', border: '1px solid #dc2626', borderRadius: 9, background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  error: { color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', padding: 12, borderRadius: 10 },
-  errorPanel: { display: 'grid', gap: 8, color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', padding: 12, borderRadius: 10 },
-  list: { display: 'grid', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
-  badge: { padding: '4px 9px', borderRadius: 999, background: '#e2e8f0', color: '#475569', fontSize: 12, fontWeight: 700, textTransform: 'capitalize' },
-  progress: { marginTop: 10, fontWeight: 700, color: '#334155' }
-};
