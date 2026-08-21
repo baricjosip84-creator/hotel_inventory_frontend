@@ -1,313 +1,252 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformReleasesPage.css';
 
-type PlatformUser = { id: string; email: string };
+type PlatformUser = { id: string; email: string; is_active?: boolean };
+type ChangeRequest = { id: string; title: string; status: string };
+type ChangeResponse = { change_requests: ChangeRequest[] };
+type MaintenanceWindow = { id: string; title: string; status: string; starts_at?: string | null };
+type Pagination = { limit: number; offset: number; total: number; has_more: boolean };
+type EvidenceAccess = { platform_user_identity: boolean; change_reference: boolean; maintenance_reference: boolean };
+type EvidenceContract = {
+  application_registry_only: boolean;
+  status_is_application_workflow_state: boolean;
+  deployed_status_does_not_prove_external_deployment: boolean;
+  rolled_back_status_does_not_prove_external_rollback: boolean;
+  timestamps_are_application_transition_evidence: boolean;
+  linked_change_is_application_reference_only: boolean;
+  linked_maintenance_is_application_reference_only: boolean;
+};
 type Release = {
-  id: string;
-  version: string;
-  title: string;
-  release_type: string;
-  status: string;
-  environment: string;
-  planned_at?: string | null;
-  deployed_at?: string | null;
-  rolled_back_at?: string | null;
-  owner_platform_user_id?: string | null;
-  owner_email?: string | null;
-  change_request_id?: string | null;
-  maintenance_window_id?: string | null;
-  summary?: string | null;
-  tenant_impact: string;
-  requires_maintenance: boolean;
-  rollback_plan?: string | null;
-  release_notes?: string | null;
+  id: string; version: string; title: string; release_type: string; status: string; environment: string;
+  planned_at?: string | null; deployed_at?: string | null; rolled_back_at?: string | null;
+  owner_platform_user_id?: string | null; owner_email?: string | null; owner_present?: boolean;
+  change_request_id?: string | null; change_request_title?: string | null; change_request_status?: string | null; change_request_present?: boolean;
+  maintenance_window_id?: string | null; maintenance_window_title?: string | null; maintenance_window_status?: string | null; maintenance_window_present?: boolean;
+  summary?: string | null; tenant_impact: string; requires_maintenance: boolean; rollback_plan?: string | null; release_notes?: string | null;
+  created_at?: string | null; updated_at?: string | null; created_by_email?: string | null; updated_by_email?: string | null;
 };
 type ReleasesResponse = {
   releases: Release[];
   summary: { total: number; upcoming: number; rolled_back: number; by_status: Record<string, number>; by_type: Record<string, number>; by_environment: Record<string, number> };
-  release_types: string[];
-  statuses: string[];
-  environments: string[];
-  impacts: string[];
+  pagination: Pagination; evidence_access: EvidenceAccess; evidence_contract: EvidenceContract;
+  release_types: string[]; statuses: string[]; environments: string[]; impacts: string[];
+};
+type ReleaseForm = {
+  version: string; title: string; release_type: string; environment: string; planned_at: string; owner_platform_user_id: string;
+  change_request_id: string; maintenance_window_id: string; summary: string; tenant_impact: string; requires_maintenance: boolean;
+  rollback_plan: string; release_notes: string;
 };
 
-const emptyForm = {
-  version: '',
-  title: '',
-  release_type: 'minor',
-  status: 'planned',
-  environment: 'production',
-  planned_at: '',
-  owner_platform_user_id: '',
-  change_request_id: '',
-  maintenance_window_id: '',
-  summary: '',
-  tenant_impact: 'none',
-  requires_maintenance: false,
-  rollback_plan: '',
-  release_notes: ''
-};
-type ReleaseForm = typeof emptyForm;
+const PAGE_SIZE = 50;
+const RELEASE_TYPES = ['major', 'minor', 'patch', 'hotfix', 'maintenance'];
+const STATUSES = ['planned', 'in_progress', 'deployed', 'rolled_back', 'cancelled'];
+const ENVIRONMENTS = ['development', 'staging', 'production'];
+const IMPACTS = ['none', 'low', 'medium', 'high'];
+const TERMINAL = new Set(['deployed', 'rolled_back', 'cancelled']);
+const emptyForm = (): ReleaseForm => ({ version: '', title: '', release_type: 'minor', environment: 'production', planned_at: '', owner_platform_user_id: '', change_request_id: '', maintenance_window_id: '', summary: '', tenant_impact: 'none', requires_maintenance: false, rollback_plan: '', release_notes: '' });
 
-function label(value?: string | null) { return value ? value.replace(/_/g, ' ') : '—'; }
-function dateTime(value?: string | null) { return value ? new Date(value).toLocaleString() : '—'; }
-function trimToNull(value?: string | null) { const cleaned = (value || '').trim(); return cleaned || null; }
-function isValidOptionalDate(value?: string | null) { if (!value) return true; return !Number.isNaN(new Date(value).getTime()); }
-function toInputDateTime(value?: string | null) { if (!value) return ''; return new Date(value).toISOString().slice(0, 16); }
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function clean(value: string) { const text = value.trim(); return text || null; }
+function pretty(value?: string | null) { const text = String(value || '').replaceAll('_', ' ').trim(); return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Not recorded'; }
+function dateTime(value?: string | null) { if (!value) return 'Not recorded'; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleString(); }
+function toLocalDateTimeInput(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value); if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+function toIsoOrNull(value: string) { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); }
+function statusTone(status: string) { if (status === 'deployed') return 'good'; if (status === 'in_progress') return 'warn'; if (status === 'rolled_back' || status === 'cancelled') return 'danger'; return 'neutral'; }
 function toForm(row: Release): ReleaseForm {
-  return {
-    version: row.version || '',
-    title: row.title || '',
-    release_type: row.release_type || 'minor',
-    status: row.status || 'planned',
-    environment: row.environment || 'production',
-    planned_at: toInputDateTime(row.planned_at),
-    owner_platform_user_id: row.owner_platform_user_id || '',
-    change_request_id: row.change_request_id || '',
-    maintenance_window_id: row.maintenance_window_id || '',
-    summary: row.summary || '',
-    tenant_impact: row.tenant_impact || 'none',
-    requires_maintenance: Boolean(row.requires_maintenance),
-    rollback_plan: row.rollback_plan || '',
-    release_notes: row.release_notes || ''
-  };
-}
-function payload(form: ReleaseForm) {
-  return {
-    ...form,
-    version: form.version.trim(),
-    title: form.title.trim(),
-    planned_at: form.planned_at ? new Date(form.planned_at).toISOString() : null,
-    owner_platform_user_id: form.owner_platform_user_id || null,
-    change_request_id: trimToNull(form.change_request_id),
-    maintenance_window_id: trimToNull(form.maintenance_window_id),
-    summary: trimToNull(form.summary),
-    rollback_plan: trimToNull(form.rollback_plan),
-    release_notes: trimToNull(form.release_notes)
-  };
-}
-
-function canStartRelease(status: string) { return status === 'planned'; }
-function canDeployRelease(status: string) { return status === 'in_progress'; }
-function canRollbackRelease(status: string) { return status === 'in_progress' || status === 'deployed'; }
-function statusStyle(status: string): CSSProperties {
-  if (status === 'rolled_back' || status === 'cancelled') return styles.badgeDanger;
-  if (status === 'in_progress') return styles.badgeWarn;
-  if (status === 'deployed') return styles.badgeGood;
-  return styles.badge;
+  return { version: row.version || '', title: row.title || '', release_type: row.release_type || 'minor', environment: row.environment || 'production', planned_at: toLocalDateTimeInput(row.planned_at), owner_platform_user_id: row.owner_platform_user_id || '', change_request_id: row.change_request_id || '', maintenance_window_id: row.maintenance_window_id || '', summary: row.summary || '', tenant_impact: row.tenant_impact || 'none', requires_maintenance: Boolean(row.requires_maintenance), rollback_plan: row.rollback_plan || '', release_notes: row.release_notes || '' };
 }
 
 export default function PlatformReleasesPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RELEASES_WRITE);
   const canReadUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
-  const [filters, setFilters] = useState({ status: '', environment: '', release_type: '', search: '', upcoming_only: false });
-  const [form, setForm] = useState<ReleaseForm>(emptyForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const releaseFormValid = form.version.trim().length > 0 && form.title.trim().length > 0 && isValidOptionalDate(form.planned_at);
+  const canReadChanges = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_READ);
+  const canReadMaintenance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadJobs = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ);
+
+  const requestedStatus = searchParams.get('status') || '';
+  const requestedEnvironment = searchParams.get('environment') || '';
+  const requestedType = searchParams.get('release_type') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const requestedUpcoming = searchParams.get('upcoming_only') || '';
+  const status = STATUSES.includes(requestedStatus) ? requestedStatus : '';
+  const environment = ENVIRONMENTS.includes(requestedEnvironment) ? requestedEnvironment : '';
+  const releaseType = RELEASE_TYPES.includes(requestedType) ? requestedType : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const upcomingOnly = requestedUpcoming === 'true';
+  const invalidFilters = Boolean((requestedStatus && !status) || (requestedEnvironment && !environment) || (requestedType && !releaseType) || (requestedSearch && !search) || (requestedUpcoming && !['true', 'false'].includes(requestedUpcoming)));
+
+  const [offset, setOffset] = useState(0);
+  const [form, setForm] = useState<ReleaseForm>(() => emptyForm());
+  const [editingId, setEditingId] = useState('');
+  const [message, setMessage] = useState('');
+  const [mutationError, setMutationError] = useState('');
+  useEffect(() => { setOffset(0); }, [status, environment, releaseType, search, upcomingOnly, invalidFilters]);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.status) params.set('status', filters.status);
-    if (filters.environment) params.set('environment', filters.environment);
-    if (filters.release_type) params.set('release_type', filters.release_type);
-    if (filters.search) params.set('search', filters.search);
-    if (filters.upcoming_only) params.set('upcoming_only', 'true');
-    params.set('limit', '300');
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (status) params.set('status', status); if (environment) params.set('environment', environment); if (releaseType) params.set('release_type', releaseType);
+    if (search.trim()) params.set('search', search.trim()); if (upcomingOnly) params.set('upcoming_only', 'true');
     return params.toString();
-  }, [filters]);
+  }, [status, environment, releaseType, search, upcomingOnly, offset]);
 
-  const releases = useQuery({ queryKey: ['platform', 'releases', filters], queryFn: () => platformApiRequest<ReleasesResponse>(`/platform/releases?${queryString}`) });
+  const releases = useQuery({
+    queryKey: ['platform', 'releases', status, environment, releaseType, search, upcomingOnly, offset],
+    queryFn: () => platformApiRequest<ReleasesResponse>(`/platform/releases?${queryString}`),
+    enabled: !invalidFilters,
+    placeholderData: (previousData) => previousData
+  });
   const users = useQuery({ queryKey: ['platform', 'release-users'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users'), enabled: canWrite && canReadUsers });
+  const changes = useQuery({ queryKey: ['platform', 'release-change-requests'], queryFn: () => platformApiRequest<ChangeResponse>('/platform/change-management?limit=300&offset=0'), enabled: canWrite && canReadChanges });
+  const maintenance = useQuery({ queryKey: ['platform', 'release-maintenance'], queryFn: () => platformApiRequest<MaintenanceWindow[]>('/platform/maintenance?limit=300&include_past=true'), enabled: canWrite && canReadMaintenance });
+
+  const buildPayload = () => {
+    const body: Record<string, unknown> = {
+      version: form.version.trim(), title: form.title.trim(), release_type: form.release_type, environment: form.environment,
+      planned_at: toIsoOrNull(form.planned_at), summary: clean(form.summary), tenant_impact: form.tenant_impact,
+      requires_maintenance: form.requires_maintenance, rollback_plan: clean(form.rollback_plan), release_notes: clean(form.release_notes)
+    };
+    if (canReadUsers) body.owner_platform_user_id = form.owner_platform_user_id || null;
+    if (canReadChanges) body.change_request_id = form.change_request_id || null;
+    if (canReadMaintenance) body.maintenance_window_id = form.maintenance_window_id || null;
+    return body;
+  };
 
   const save = useMutation({
-    mutationFn: () => {
-      const body = JSON.stringify(payload(form));
-      if (editingId) return platformApiRequest(`/platform/releases/${editingId}`, { method: 'PATCH', body });
-      return platformApiRequest('/platform/releases', { method: 'POST', body });
-    },
-    onSuccess: async () => {
-      setStatusMessage(editingId ? 'Release changes saved.' : 'Release created.');
-      setForm(emptyForm);
-      setEditingId(null);
-      await queryClient.invalidateQueries({ queryKey: ['platform', 'releases'] });
-    }
+    mutationFn: () => platformApiRequest(editingId ? `/platform/releases/${editingId}` : '/platform/releases', { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify(buildPayload()) }),
+    onSuccess: async () => { setMessage(editingId ? 'Release details saved.' : 'Release registered as planned.'); setMutationError(''); setEditingId(''); setForm(emptyForm()); await queryClient.invalidateQueries({ queryKey: ['platform', 'releases'] }); },
+    onError: (error) => setMutationError(readableError(error))
   });
   const transition = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => platformApiRequest(`/platform/releases/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
-    onSuccess: async (_data, variables) => {
-      setStatusMessage(`Release marked ${label(variables.status)}.`);
-      await queryClient.invalidateQueries({ queryKey: ['platform', 'releases'] });
-    }
+    mutationFn: ({ id, status: nextStatus }: { id: string; status: string }) => platformApiRequest(`/platform/releases/${id}/status`, { method: 'POST', body: JSON.stringify({ status: nextStatus }) }),
+    onSuccess: async (_data, variables) => { setMessage(`Release workflow moved to ${pretty(variables.status)}.`); setMutationError(''); await queryClient.invalidateQueries({ queryKey: ['platform', 'releases'] }); },
+    onError: (error) => setMutationError(readableError(error))
   });
 
   const response = releases.data;
-  const releaseTypes = response?.release_types || ['major', 'minor', 'patch', 'hotfix', 'maintenance'];
-  const statuses = response?.statuses || ['planned', 'in_progress', 'deployed', 'rolled_back', 'cancelled'];
-  const environments = response?.environments || ['development', 'staging', 'production'];
-  const impacts = response?.impacts || ['none', 'low', 'medium', 'high'];
   const summary = response?.summary;
+  const pagination = response?.pagination;
+  const blockingError = releases.isError && !releases.data;
+  const staleWarning = releases.isError && Boolean(releases.data);
+  const refreshBusy = releases.isFetching || users.isFetching || changes.isFetching || maintenance.isFetching;
+  const formInvalid = !form.version.trim() || !form.title.trim() || Boolean(form.planned_at && Number.isNaN(new Date(form.planned_at).getTime()));
+  const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
+  const evidenceLabel = response?.evidence_access?.platform_user_identity && response?.evidence_access?.change_reference && response?.evidence_access?.maintenance_reference ? 'Full linked evidence' : 'Partial linked evidence';
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Releases</h1>
-          <p style={styles.subtitle}>Track HLA deployments, tenant impact, rollback notes, owners, and deployment state.</p>
-        </div>
-        <button type="button" onClick={() => releases.refetch()} disabled={releases.isFetching} style={styles.secondaryButton}>
-          {releases.isFetching ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+  const updateFilter = (key: string, value: string | boolean) => {
+    const next = new URLSearchParams(searchParams);
+    const normalized = typeof value === 'boolean' ? (value ? 'true' : '') : value;
+    if (normalized) next.set(key, normalized); else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+  const clearFilters = () => { setSearchParams({}, { replace: true }); setOffset(0); };
+  const startEdit = (release: Release) => { if (TERMINAL.has(release.status)) return; setMessage(''); setMutationError(''); setEditingId(release.id); setForm(toForm(release)); scrollToFormSection('platform-releases-form'); };
+  const runTransition = (release: Release, nextStatus: string, prompt: string) => { if (window.confirm(prompt)) transition.mutate({ id: release.id, status: nextStatus }); };
 
-      {releases.isError ? (
-        <section style={styles.errorPanel}>
-          <strong>Release data could not be loaded.</strong>
-          <span>Check platform release permissions or backend availability, then retry.</span>
-          <button type="button" onClick={() => releases.refetch()} style={styles.secondaryButton}>Retry</button>
-        </section>
-      ) : null}
+  return <div className="platform-releases">
+    <OperationalWorkspaceHero
+      iconPath="/platform/releases" eyebrow="Platform operations" title="Releases"
+      description="Track the application release registry, planned tenant impact and recorded lifecycle transitions without treating registry status as proof that an external deployment or rollback actually occurred."
+      meta={<><OperationalWorkspaceMetaPill>Registry-wide filtered summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{evidenceLabel}</OperationalWorkspaceMetaPill></>}
+      aside={<div className="platform-releases__hero-aside"><OperationalWorkspaceStatus value={summary?.upcoming ?? '—'} label="Planned / in progress" /><div className="platform-releases__refresh-block"><button type="button" className="app-button app-button--secondary" disabled={refreshBusy || invalidFilters} onClick={() => { setMessage(''); setMutationError(''); void releases.refetch(); if (canReadUsers) void users.refetch(); if (canReadChanges) void changes.refetch(); if (canReadMaintenance) void maintenance.refetch(); }}>{refreshBusy ? 'Refreshing…' : 'Refresh'}</button><span>{releases.dataUpdatedAt ? `Last successful snapshot ${new Date(releases.dataUpdatedAt).toLocaleString()}` : 'No successful snapshot yet'}</span></div></div>}
+    />
 
-      {statusMessage ? <div style={styles.successPanel}>{statusMessage}</div> : null}
+    {invalidFilters ? <div className="platform-releases__warning"><strong>Invalid URL filter.</strong><span>Clear the filters to load release evidence safely.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></div> : null}
+    {staleWarning ? <div className="platform-releases__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(releases.error)}</span><button type="button" className="app-button app-button--secondary" disabled={releases.isFetching} onClick={() => void releases.refetch()}>Retry</button></div> : null}
+    {message ? <div className="platform-releases__success"><strong>{message}</strong><button type="button" className="app-button app-button--ghost" onClick={() => setMessage('')}>Dismiss</button></div> : null}
+    {mutationError ? <div className="platform-releases__warning"><strong>Action failed.</strong><span>{mutationError}</span><button type="button" className="app-button app-button--ghost" onClick={() => setMutationError('')}>Dismiss</button></div> : null}
 
-      <section style={styles.metaPanel}>
-        <span><strong>Snapshot:</strong> {new Date().toLocaleString()}</span>
-        <span><strong>Source:</strong> GET /api/platform/releases?{queryString}</span>
-        <span><strong>Filters:</strong> status {filters.status || 'all'} · environment {filters.environment || 'all'} · type {filters.release_type || 'all'} · search {filters.search.trim() || 'none'} · upcoming only {filters.upcoming_only ? 'yes' : 'no'}</span>
-      </section>
+    <OperationalWorkspaceStats ariaLabel="Release registry summary">
+      <OperationalWorkspaceStatCard label="Filtered releases" value={summary?.total ?? '—'} helper="Across the filtered registry, not only this page." />
+      <OperationalWorkspaceStatCard label="Upcoming" value={summary?.upcoming ?? '—'} tone="warn" helper="Planned or in-progress application workflow records." />
+      <OperationalWorkspaceStatCard label="Deployed" value={summary?.by_status?.deployed ?? 0} tone="good" helper="Recorded deployed state only; not external deployment proof." />
+      <OperationalWorkspaceStatCard label="Rolled back" value={summary?.rolled_back ?? '—'} tone={summary?.rolled_back ? 'danger' : 'neutral'} helper="Recorded rollback workflow state." />
+    </OperationalWorkspaceStats>
 
-      <section style={styles.linkPanel}>
-        <strong>Supporting Platform pages</strong>
-        <div style={styles.linkGrid}>
-          <Link to="/platform/change-management" style={styles.link}>Change Management</Link>
-          <Link to="/platform/maintenance" style={styles.link}>Maintenance</Link>
-          <Link to="/platform/runbooks" style={styles.link}>Runbooks</Link>
-          <Link to="/platform/operational-jobs" style={styles.link}>Operational Jobs</Link>
-          <Link to="/platform/audit" style={styles.link}>Audit</Link>
-        </div>
-      </section>
+    <section className="io-workspace-panel platform-releases__section">
+      <OperationalSectionHeader iconPath="/platform/releases" title="Evidence boundary" description="What release records on this page establish—and what they do not." />
+      <div className="platform-releases__truth-note"><strong>Application evidence only.</strong><span>A planned, deployed, rolled-back or cancelled status is a Platform workflow record. It does not independently prove that a hosting provider, deployment system, customer environment or external rollback actually reached that outcome. Linked change and maintenance records are application references, not external verification.</span></div>
+    </section>
 
-      <section style={styles.metrics}>
-        <div style={styles.metric}><strong>{summary?.total ?? 0}</strong><span>Total shown</span></div>
-        <div style={styles.metric}><strong>{summary?.upcoming ?? 0}</strong><span>Upcoming / active</span></div>
-        <div style={styles.metric}><strong>{summary?.by_status?.deployed ?? 0}</strong><span>Deployed</span></div>
-        <div style={styles.metric}><strong>{summary?.rolled_back ?? 0}</strong><span>Rolled back</span></div>
-      </section>
+    <section className="io-workspace-panel platform-releases__section">
+      <OperationalSectionHeader iconPath="/platform/releases" title="Filters" description="Filters are stored in the URL; pagination is server-side." />
+      <div className="platform-releases__filter-grid">
+        <label>Status<select value={status} onChange={(e) => updateFilter('status', e.target.value)}><option value="">All statuses</option>{STATUSES.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Environment<select value={environment} onChange={(e) => updateFilter('environment', e.target.value)}><option value="">All environments</option>{ENVIRONMENTS.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Type<select value={releaseType} onChange={(e) => updateFilter('release_type', e.target.value)}><option value="">All types</option>{RELEASE_TYPES.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label className="platform-releases__search">Search<input value={search} maxLength={200} placeholder="Version, title, summary or notes" onChange={(e) => updateFilter('search', e.target.value)} /></label>
+        <label className="platform-releases__checkbox"><input type="checkbox" checked={upcomingOnly} onChange={(e) => updateFilter('upcoming_only', e.target.checked)} /> Upcoming only</label>
+      </div>
+      <div className="platform-releases__actions"><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></div>
+    </section>
 
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Filters</h2>
-        <div style={styles.grid4}>
-          <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}><option value="">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-          <select value={filters.environment} onChange={(event) => setFilters((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}><option value="">All environments</option>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-          <select value={filters.release_type} onChange={(event) => setFilters((prev) => ({ ...prev, release_type: event.target.value }))} style={styles.input}><option value="">All types</option>{releaseTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select>
-          <input value={filters.search} onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))} placeholder="Search version, title, notes" style={styles.input} />
-        </div>
-        <label style={styles.checkRow}><input type="checkbox" checked={filters.upcoming_only} onChange={(event) => setFilters((prev) => ({ ...prev, upcoming_only: event.target.checked }))} /> Upcoming only</label>
-      </section>
+    {canWrite ? <section id="platform-releases-form" className="io-workspace-panel platform-releases__section">
+      <OperationalSectionHeader iconPath="/platform/releases" title={editingId ? 'Edit release details' : 'Register planned release'} description={editingId ? 'Lifecycle state is changed only through the dedicated status actions; terminal release history is immutable.' : 'New records always enter Planned state. Link protected evidence only when your permission snapshot allows it.'} actions={editingId ? <button type="button" className="app-button app-button--ghost" onClick={() => { setEditingId(''); setForm(emptyForm()); setMutationError(''); }}>Cancel edit</button> : undefined} />
+      <div className="platform-releases__form-grid">
+        <label>Version<input value={form.version} maxLength={80} onChange={(e) => setForm((value) => ({ ...value, version: e.target.value }))} /></label>
+        <label>Title<input value={form.title} maxLength={255} onChange={(e) => setForm((value) => ({ ...value, title: e.target.value }))} /></label>
+        <label>Release type<select value={form.release_type} onChange={(e) => setForm((value) => ({ ...value, release_type: e.target.value }))}>{RELEASE_TYPES.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Environment<select value={form.environment} onChange={(e) => setForm((value) => ({ ...value, environment: e.target.value }))}>{ENVIRONMENTS.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Planned time<input type="datetime-local" value={form.planned_at} onChange={(e) => setForm((value) => ({ ...value, planned_at: e.target.value }))} /></label>
+        <label>Tenant impact<select value={form.tenant_impact} onChange={(e) => setForm((value) => ({ ...value, tenant_impact: e.target.value }))}>{IMPACTS.map((item) => <option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        {canReadUsers ? <label>Owner<select value={form.owner_platform_user_id} onChange={(e) => setForm((value) => ({ ...value, owner_platform_user_id: e.target.value }))}><option value="">No owner</option>{(users.data || []).filter((user) => user.is_active !== false).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label> : <div className="platform-releases__restricted"><strong>Owner linkage restricted</strong><span>PLATFORM_USERS_READ is required to view or change the owner. Existing hidden linkage is preserved.</span></div>}
+        {canReadChanges ? <label>Change request<select value={form.change_request_id} onChange={(e) => setForm((value) => ({ ...value, change_request_id: e.target.value }))}><option value="">No linked change</option>{(changes.data?.change_requests || []).filter((change) => !['rejected', 'cancelled'].includes(change.status)).map((change) => <option key={change.id} value={change.id}>{change.title} · {pretty(change.status)}</option>)}</select></label> : <div className="platform-releases__restricted"><strong>Change evidence restricted</strong><span>PLATFORM_CHANGES_READ is required to view or change change-request linkage. Existing hidden linkage is preserved.</span></div>}
+        {canReadMaintenance ? <label>Maintenance window<select value={form.maintenance_window_id} onChange={(e) => setForm((value) => ({ ...value, maintenance_window_id: e.target.value }))}><option value="">No linked window</option>{(maintenance.data || []).filter((window) => window.status !== 'cancelled').map((window) => <option key={window.id} value={window.id}>{window.title} · {pretty(window.status)}</option>)}</select></label> : <div className="platform-releases__restricted"><strong>Maintenance evidence restricted</strong><span>PLATFORM_MAINTENANCE_READ is required to view or change maintenance linkage. Existing hidden linkage is preserved.</span></div>}
+        <label className="platform-releases__checkbox"><input type="checkbox" checked={form.requires_maintenance} onChange={(e) => setForm((value) => ({ ...value, requires_maintenance: e.target.checked }))} /> Requires maintenance</label>
+        <label className="platform-releases__span-all">Summary<textarea value={form.summary} maxLength={5000} onChange={(e) => setForm((value) => ({ ...value, summary: e.target.value }))} /></label>
+        <label className="platform-releases__span-all">Release notes<textarea value={form.release_notes} maxLength={12000} onChange={(e) => setForm((value) => ({ ...value, release_notes: e.target.value }))} /></label>
+        <label className="platform-releases__span-all">Rollback plan<textarea value={form.rollback_plan} maxLength={8000} onChange={(e) => setForm((value) => ({ ...value, rollback_plan: e.target.value }))} /></label>
+      </div>
+      {formInvalid ? <div className="platform-releases__validation">Enter a version and title, and use a valid planned time if one is set.</div> : null}
+      <div className="platform-releases__actions"><button type="button" className="app-button app-button--primary" disabled={formInvalid || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : editingId ? 'Save details' : 'Register release'}</button></div>
+    </section> : null}
 
-      {canWrite ? (
-        <section id="platform-releases-form" style={styles.panel}>
-          <h2 style={styles.sectionTitle}>{editingId ? 'Edit release' : 'Create release'}</h2>
-          {!releaseFormValid ? <div style={styles.validation}>Version and title are required, and the planned date must be valid.</div> : null}
-          <div style={styles.grid3}>
-            <label style={styles.fieldLabel}>Version<input value={form.version} onChange={(event) => setForm((prev) => ({ ...prev, version: event.target.value }))} placeholder="Example: 1.7.0" style={styles.input} /></label>
-            <label style={styles.fieldLabel}>Release title<input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Release title" style={styles.input} /></label>
-            <label style={styles.fieldLabel}>Planned at<input type="datetime-local" value={form.planned_at} onChange={(event) => setForm((prev) => ({ ...prev, planned_at: event.target.value }))} style={styles.input} /></label>
-            <label style={styles.fieldLabel}>Release type<select value={form.release_type} onChange={(event) => setForm((prev) => ({ ...prev, release_type: event.target.value }))} style={styles.input}>{releaseTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Status<select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} style={styles.input}>{statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Environment<select value={form.environment} onChange={(event) => setForm((prev) => ({ ...prev, environment: event.target.value }))} style={styles.input}>{environments.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Tenant impact<select value={form.tenant_impact} onChange={(event) => setForm((prev) => ({ ...prev, tenant_impact: event.target.value }))} style={styles.input}>{impacts.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Owner<select value={form.owner_platform_user_id} onChange={(event) => setForm((prev) => ({ ...prev, owner_platform_user_id: event.target.value }))} style={styles.input}><option value="">No owner</option>{(users.data || []).map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>
-            <label style={styles.checkRow}><input type="checkbox" checked={form.requires_maintenance} onChange={(event) => setForm((prev) => ({ ...prev, requires_maintenance: event.target.checked }))} /> Requires maintenance</label>
-          </div>
-          <label style={styles.fieldLabel}>Summary<textarea value={form.summary} onChange={(event) => setForm((prev) => ({ ...prev, summary: event.target.value }))} placeholder="Short operational summary" style={styles.textarea} /></label>
-          <label style={styles.fieldLabel}>Release notes<textarea value={form.release_notes} onChange={(event) => setForm((prev) => ({ ...prev, release_notes: event.target.value }))} placeholder="Release notes" style={styles.textarea} /></label>
-          <label style={styles.fieldLabel}>Rollback plan<textarea value={form.rollback_plan} onChange={(event) => setForm((prev) => ({ ...prev, rollback_plan: event.target.value }))} placeholder="Rollback plan" style={styles.textarea} /></label>
-          <div style={styles.actions}>
-            <button type="button" onClick={() => save.mutate()} disabled={save.isPending || !releaseFormValid} style={save.isPending || !releaseFormValid ? styles.disabledButton : styles.primaryButton}>{editingId ? 'Save release' : 'Create release'}</button>
-            {editingId ? <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} style={styles.secondaryButton}>Cancel edit</button> : null}
-          </div>
-        </section>
-      ) : null}
+    <section className="io-workspace-panel platform-releases__section">
+      <OperationalSectionHeader iconPath="/platform/releases" title="Release registry" description="Registry entries are ordered by their recorded planning/deployment chronology. Status transitions are deliberate lifecycle actions." />
+      {blockingError ? <div className="platform-releases__blocking-error"><strong>Release registry could not be loaded.</strong><span>{readableError(releases.error)}</span><button type="button" className="app-button app-button--secondary" disabled={releases.isFetching} onClick={() => void releases.refetch()}>Retry</button></div> : null}
+      {!blockingError && releases.isLoading ? <div className="platform-releases__loading">Loading release registry…</div> : null}
+      {!blockingError && response && !response.releases.length ? <div className="platform-releases__empty"><strong>No releases match these filters.</strong><span>This means no matching application registry records were returned; it does not establish that no external deployment activity exists.</span></div> : null}
+      <div className="platform-releases__list">
+        {(response?.releases || []).map((release) => {
+          const terminal = TERMINAL.has(release.status);
+          return <article className="platform-releases__card" key={release.id}>
+            <div className="platform-releases__card-header"><div><h4>{release.version} · {release.title}</h4><p>{release.summary || 'No operational summary recorded.'}</p></div><div className="platform-releases__badges"><span data-tone={statusTone(release.status)}>{pretty(release.status)}</span><span>{pretty(release.release_type)}</span><span>{pretty(release.environment)}</span><span data-tone={release.tenant_impact === 'high' ? 'danger' : release.tenant_impact === 'medium' ? 'warn' : 'neutral'}>{pretty(release.tenant_impact)} impact</span></div></div>
+            <div className="platform-releases__metrics-grid">
+              <div><span>Planned</span><strong>{dateTime(release.planned_at)}</strong></div><div><span>Deployed state recorded</span><strong>{dateTime(release.deployed_at)}</strong></div><div><span>Rollback state recorded</span><strong>{dateTime(release.rolled_back_at)}</strong></div>
+              <div><span>Owner</span><strong>{release.owner_email || (release.owner_present ? 'Linked · identity restricted' : 'Not assigned')}</strong></div><div><span>Change evidence</span><strong>{release.change_request_title || (release.change_request_present ? 'Linked · evidence restricted' : 'Not linked')}</strong></div><div><span>Maintenance</span><strong>{release.maintenance_window_title || (release.maintenance_window_present ? 'Linked · evidence restricted' : release.requires_maintenance ? 'Required · no visible linked window' : 'Not required')}</strong></div>
+            </div>
+            <div className="platform-releases__notes"><div><strong>Release notes</strong><span>{release.release_notes || 'Not recorded'}</span></div><div><strong>Rollback plan</strong><span>{release.rollback_plan || 'Not recorded'}</span></div></div>
+            <div className="platform-releases__card-footer">
+              <div className="platform-releases__source-links">{canReadChanges && release.change_request_id ? <Link to="/platform/change-management">Change Management</Link> : null}{canReadMaintenance && release.maintenance_window_id ? <Link to="/platform/maintenance">Maintenance</Link> : null}{canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : null}</div>
+              {canWrite ? <div className="platform-releases__actions">{!terminal ? <button type="button" className="app-button app-button--secondary" onClick={() => startEdit(release)}>Edit details</button> : <span className="platform-releases__immutable">Terminal release history · details immutable</span>}{release.status === 'planned' ? <><button type="button" className="app-button app-button--secondary" disabled={transition.isPending} onClick={() => runTransition(release, 'in_progress', 'Move this release workflow to In progress? This records application workflow state only.')}>Start</button><button type="button" className="app-button app-button--secondary" disabled={transition.isPending} onClick={() => runTransition(release, 'cancelled', 'Cancel this planned release record?')}>Cancel</button></> : null}{release.status === 'in_progress' ? <><button type="button" className="app-button app-button--primary" disabled={transition.isPending} onClick={() => runTransition(release, 'deployed', 'Record this release as Deployed? Only continue when the Platform workflow should record that state; this does not verify an external deployment provider.')}>Record deployed</button><button type="button" className="app-button app-button--secondary" disabled={transition.isPending} onClick={() => runTransition(release, 'rolled_back', 'Record this release as Rolled back? This is application evidence, not external rollback verification.')}>Record rollback</button><button type="button" className="app-button app-button--secondary" disabled={transition.isPending} onClick={() => runTransition(release, 'cancelled', 'Cancel this in-progress release record?')}>Cancel</button></> : null}{release.status === 'deployed' ? <button type="button" className="app-button app-button--secondary" disabled={transition.isPending} onClick={() => runTransition(release, 'rolled_back', 'Record this deployed release as Rolled back? This does not independently verify external rollback completion.')}>Record rollback</button> : null}</div> : null}
+            </div>
+          </article>;
+        })}
+      </div>
+      {response ? <div className="platform-releases__pagination"><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))} disabled={offset === 0 || releases.isFetching}>Previous</button><span>Page {pageNumber} · up to {PAGE_SIZE} releases · {pagination?.total ?? 0} filtered total</span><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => value + PAGE_SIZE)} disabled={!pagination?.has_more || releases.isFetching}>Next</button></div> : null}
+    </section>
 
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Release list</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th style={styles.th}>Release</th><th style={styles.th}>Status</th><th style={styles.th}>Environment</th><th style={styles.th}>Impact</th><th style={styles.th}>Owner</th><th style={styles.th}>Dates</th><th style={styles.th}>Actions</th></tr></thead>
-            <tbody>
-              {(response?.releases || []).map((release) => (
-                <tr key={release.id}>
-                  <td style={styles.td}><strong>{release.version}</strong><br />{release.title}<br /><span style={styles.muted}>{release.summary || 'No summary'}</span><br /><span style={styles.muted}>Notes: {release.release_notes || 'None'}</span><br /><span style={styles.muted}>Rollback: {release.rollback_plan || 'None'}</span></td>
-                  <td style={styles.td}><span style={statusStyle(release.status)}>{label(release.status)}</span><br /><span style={styles.muted}>{label(release.release_type)}</span></td>
-                  <td style={styles.td}>{label(release.environment)}</td>
-                  <td style={styles.td}>{label(release.tenant_impact)}{release.requires_maintenance ? <><br /><span style={styles.badgeWarn}>maintenance</span></> : null}</td>
-                  <td style={styles.td}>{release.owner_email || '—'}</td>
-                  <td style={styles.td}><span style={styles.muted}>Planned:</span> {dateTime(release.planned_at)}<br /><span style={styles.muted}>Deployed:</span> {dateTime(release.deployed_at)}<br /><span style={styles.muted}>Rolled back:</span> {dateTime(release.rolled_back_at)}<br />{release.change_request_id ? <><Link to="/platform/change-management" style={styles.inlineLink}>Change evidence</Link><br /></> : null}{release.maintenance_window_id ? <><Link to="/platform/maintenance" style={styles.inlineLink}>Maintenance evidence</Link><br /></> : null}<Link to="/platform/audit" style={styles.inlineLink}>Audit evidence</Link></td>
-                  <td style={styles.td}>
-                    {canWrite ? (
-                      <div style={styles.rowActions}>
-                        <button type="button" onClick={() => { setEditingId(release.id); setForm(toForm(release)); scrollToFormSection('platform-releases-form'); }} style={styles.smallButton}>Edit</button>
-                        {canStartRelease(release.status) ? <button type="button" onClick={() => window.confirm('Start this release and move it to in progress?') && transition.mutate({ id: release.id, status: 'in_progress' })} style={styles.smallButton}>Start</button> : null}
-                        {canDeployRelease(release.status) ? <button type="button" onClick={() => window.confirm('Mark this release as deployed?') && transition.mutate({ id: release.id, status: 'deployed' })} style={styles.smallButton}>Deploy</button> : null}
-                        {canRollbackRelease(release.status) ? <button type="button" onClick={() => window.confirm('Mark this release as rolled back? Only continue if rollback was actually executed or accepted as rollback state.') && transition.mutate({ id: release.id, status: 'rolled_back' })} style={styles.dangerButton}>Rollback</button> : null}
-                      </div>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
-              {!response?.releases?.length ? <tr><td style={styles.td} colSpan={7}>No releases found.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-releases__section"><OperationalSectionHeader iconPath="/platform/releases" title="Supporting operations" description="Only destinations allowed by the current Platform permission snapshot are shown." /><div className="platform-releases__supporting-links">{canReadChanges ? <Link to="/platform/change-management">Change Management</Link> : null}{canReadMaintenance ? <Link to="/platform/maintenance">Maintenance</Link> : null}{canReadJobs ? <Link to="/platform/operational-jobs">Operational jobs</Link> : null}{canReadUsers ? <Link to="/platform/users">Platform users</Link> : null}{canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : null}</div></section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', maxWidth: 900, fontSize: 13, lineHeight: 1.5 },
-  metrics: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
-  metric: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'grid', gap: 4, color: '#334155' },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 12, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metaPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, color: '#475569', fontSize: 12, fontWeight: 700 },
-  linkPanel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 10 },
-  linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  link: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '6px 10px', background: '#fff', color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 12, fontWeight: 700 },
-  inlineLink: { color: 'var(--io-primary-dark)', fontSize: 12, textDecoration: 'none', fontWeight: 700 },
-  successPanel: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: '10px 12px', fontWeight: 700 },
-  errorPanel: { border: '1px solid #fecaca', background: '#fef2f2', color: '#991b1b', borderRadius: 12, padding: 12, display: 'grid', gap: 8 },
-  sectionTitle: { margin: 0, fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 },
-  grid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', width: '100%', background: '#fff', color: '#0f172a', minWidth: 0 },
-  fieldLabel: { display: 'grid', gap: 6, color: '#334155', fontSize: 13, fontWeight: 700 },
-  validation: { border: '1px solid #fde68a', borderRadius: 10, padding: '10px 12px', background: '#fffbeb', color: '#92400e', fontWeight: 700 },
-  textarea: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', minHeight: 76, width: '100%', background: '#fff', color: '#0f172a' },
-  checkRow: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  actions: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', opacity: 0.85, fontWeight: 700 },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '8px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 8px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  dangerButton: { border: '1px solid #dc2626', borderRadius: 8, padding: '6px 8px', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: 10, fontSize: 12, color: '#64748b', textTransform: 'uppercase' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: 10, verticalAlign: 'top' },
-  muted: { color: '#64748b', fontSize: 12 },
-  badge: { display: 'inline-block', borderRadius: 999, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  badgeGood: { display: 'inline-block', borderRadius: 999, background: '#dcfce7', color: '#166534', padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  badgeWarn: { display: 'inline-block', borderRadius: 999, background: '#fef3c7', color: '#92400e', padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  badgeDanger: { display: 'inline-block', borderRadius: 999, background: '#fee2e2', color: '#991b1b', padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  rowActions: { display: 'flex', flexWrap: 'wrap', gap: 6 }
-};
