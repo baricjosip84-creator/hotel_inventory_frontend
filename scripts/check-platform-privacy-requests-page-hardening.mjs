@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const page=fs.readFileSync(path.join(root,'src/pages/PlatformPrivacyRequestsPage.tsx'),'utf8');
+const css=fs.readFileSync(path.join(root,'src/pages/PlatformPrivacyRequestsPage.css'),'utf8');
+const router=fs.readFileSync(path.join(root,'src/app/router.tsx'),'utf8');
+const layout=fs.readFileSync(path.join(root,'src/layouts/PlatformLayout.tsx'),'utf8');
+const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+const required=['OperationalWorkspaceHero','OperationalWorkspaceStats','OperationalSectionHeader','useSearchParams','PAGE_SIZE = 50','PLATFORM_USERS_READ','TENANTS_READ','enabled:canReadTenants','enabled:canReadUsers','Showing the last successful snapshot.','Registry-wide filtered summary','Restricted tenant linkage','Restricted Platform-user linkage','Record verification','Record fulfilled','Closed history is immutable.','verification_action_does_not_prove_external_identity_verification','fulfilled_status_does_not_prove_external_right_satisfied','placeholderData:(previousData)=>previousData','toIsoDateTimeOrNull'];
+for(const token of required) if(!page.includes(token)) throw new Error(`Privacy requests page hardening missing: ${token}`);
+if(page.includes('status:form.status') || page.includes('status: form.status')) throw new Error('Privacy request ordinary edit must not submit workflow status.');
+if(!css.includes('--io-primary:#d14343') || !css.includes('--io-primary-dark:#b93636')) throw new Error('Privacy requests Platform red workspace identity missing.');
+if(!router.includes("path: 'privacy-requests'") || !router.includes('PLATFORM_PRIVACY_READ')) throw new Error('Privacy requests route permission guard missing.');
+if(!layout.includes('to="/platform/privacy-requests"') || !layout.includes('PLATFORM_PRIVACY_READ')) throw new Error('Privacy requests sidebar permission visibility missing.');
+if(!pkg.scripts?.['check:platform-privacy-requests-page-hardening']) throw new Error('Privacy requests checker script missing from package.json.');
+if(!pkg.scripts?.['check:ci']?.includes('check:platform-privacy-requests-page-hardening')) throw new Error('Privacy requests checker is not wired into check:ci.');
+console.log('Platform Privacy requests page hardening check: PASS');

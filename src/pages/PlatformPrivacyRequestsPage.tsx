@@ -1,267 +1,205 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformPrivacyRequestsPage.css';
 
 type Tenant = { id: string; name: string };
-type PlatformUser = { id: string; email: string; name?: string | null };
-type PrivacyRequest = {
-  id: string;
-  tenant_id?: string | null;
-  tenant_name?: string | null;
-  request_type: string;
-  status: string;
-  priority: string;
-  requester_name?: string | null;
-  requester_email: string;
-  subject_identifier?: string | null;
-  summary: string;
-  due_at?: string | null;
-  assigned_platform_user_id?: string | null;
-  assignee_email?: string | null;
-  verified_at?: string | null;
-  completed_at?: string | null;
-  resolution_notes?: string | null;
-  rejection_reason?: string | null;
-  is_overdue?: boolean;
-  created_at: string;
-  updated_at: string;
+type PlatformUser = { id: string; email: string; is_active?: boolean };
+type Pagination = { limit: number; offset: number; total: number; has_more: boolean };
+type EvidenceAccess = { tenant_identity: boolean; platform_user_identity: boolean };
+type EvidenceContract = {
+  application_registry_only: boolean;
+  requester_identity_fields_are_recorded_application_evidence: boolean;
+  verification_action_does_not_prove_external_identity_verification: boolean;
+  fulfilled_status_does_not_prove_external_right_satisfied: boolean;
+  due_at_is_operator_recorded_deadline_not_legal_sla: boolean;
+  audit_events_do_not_prove_external_delivery_receipt_or_legal_compliance: boolean;
 };
-type RequestsResponse = { requests: PrivacyRequest[]; request_types: string[]; statuses: string[]; priorities: string[] };
-type SummaryResponse = { summary: { total: number; open: number; overdue: number; waiting_tenant: number; high_priority_open: number }; by_type: { request_type: string; count: number }[]; by_status: { status: string; count: number }[] };
+type PrivacyRequest = {
+  id: string; tenant_id?: string | null; tenant_name?: string | null; tenant_present?: boolean;
+  request_type: string; status: string; priority: string;
+  requester_name?: string | null; requester_email: string; subject_identifier?: string | null; summary: string;
+  due_at?: string | null; assigned_platform_user_id?: string | null; assignee_email?: string | null; assignee_present?: boolean;
+  created_by_platform_user_id?: string | null; created_by_email?: string | null; creator_present?: boolean;
+  verified_at?: string | null; verified_by_platform_user_id?: string | null; verified_by_email?: string | null; verifier_present?: boolean;
+  completed_at?: string | null; completed_by_platform_user_id?: string | null; completed_by_email?: string | null; completer_present?: boolean;
+  resolution_notes?: string | null; rejection_reason?: string | null; is_overdue?: boolean;
+  created_at?: string | null; updated_at?: string | null;
+};
+type RequestsResponse = {
+  requests: PrivacyRequest[]; request_types: string[]; statuses: string[]; open_statuses: string[]; priorities: string[];
+  summary: { total: number; open: number; overdue: number; waiting_tenant: number; high_priority_open: number; verification_attention: number };
+  by_type: { request_type: string; count: number }[]; by_status: { status: string; count: number }[];
+  pagination: Pagination; evidence_access: EvidenceAccess; evidence_contract: EvidenceContract;
+};
+type FormState = { tenant_id: string; request_type: string; priority: string; requester_name: string; requester_email: string; subject_identifier: string; summary: string; due_at: string; assigned_platform_user_id: string };
 
-const defaultForm = { tenant_id: '', request_type: 'access', status: 'intake', priority: 'normal', requester_name: '', requester_email: '', subject_identifier: '', summary: '', due_at: '', assigned_platform_user_id: '' };
-function dateLabel(value?: string | null) { return value ? new Date(value).toLocaleString() : '—'; }
-function badgeStyle(row: PrivacyRequest): CSSProperties {
-  if (row.is_overdue) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (row.status === 'fulfilled') return { ...styles.badge, background: '#dcfce7', color: '#166534' };
-  if (row.status === 'rejected' || row.status === 'cancelled') return { ...styles.badge, background: '#e5e7eb', color: '#374151' };
-  if (row.priority === 'urgent' || row.priority === 'high') return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)' };
-}
-function trimOrNull(value: string) { const trimmed = value.trim(); return trimmed || null; }
-function isValidEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
-function isValidDateInput(value: string) { return !value || !Number.isNaN(new Date(value).getTime()); }
-function SourceLink({ href, children }: { href: string; children: string }) { return <a href={href} style={styles.link}>{children}</a>; }
+const PAGE_SIZE = 50;
+const REQUEST_TYPES = ['access', 'export', 'deletion', 'correction', 'consent', 'restriction', 'objection', 'other'];
+const STATUSES = ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
+const OPEN_STATUSES = ['intake', 'verifying', 'in_progress', 'waiting_tenant'];
+const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const emptyForm = (): FormState => ({ tenant_id:'', request_type:'access', priority:'normal', requester_name:'', requester_email:'', subject_identifier:'', summary:'', due_at:'', assigned_platform_user_id:'' });
+
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function clean(value: string) { const v=value.trim(); return v || null; }
+function pretty(value?: string | null) { const v=String(value || '').replaceAll('_',' ').trim(); return v ? v.charAt(0).toUpperCase()+v.slice(1) : 'Not recorded'; }
+function dateTime(value?: string | null) { if (!value) return 'Not recorded'; const d=new Date(value); return Number.isNaN(d.getTime()) ? 'Not recorded' : d.toLocaleString(); }
+function toLocalDateTimeInput(value?: string | null) { if (!value) return ''; const d=new Date(value); if (Number.isNaN(d.getTime())) return ''; const pad=(n:number)=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function toIsoDateTimeOrNull(value: string) { if (!value) return null; const d=new Date(value); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
+function isClosed(status: string) { return ['fulfilled','rejected','cancelled'].includes(status); }
+function statusTone(row: PrivacyRequest) { if (row.is_overdue) return 'danger'; if (row.status==='fulfilled') return 'good'; if (row.status==='rejected'||row.status==='cancelled') return 'neutral'; if (row.priority==='urgent'||row.priority==='high'||row.status==='waiting_tenant') return 'warn'; return 'red'; }
+function toForm(row: PrivacyRequest): FormState { return { tenant_id:row.tenant_id || '', request_type:row.request_type || 'other', priority:row.priority || 'normal', requester_name:row.requester_name || '', requester_email:row.requester_email || '', subject_identifier:row.subject_identifier || '', summary:row.summary || '', due_at:toLocalDateTimeInput(row.due_at), assigned_platform_user_id:row.assigned_platform_user_id || '' }; }
+function sameForm(a: FormState | null, b: FormState) { return Boolean(a && JSON.stringify(a)===JSON.stringify(b)); }
+function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
 
 export default function PlatformPrivacyRequestsPage() {
-  const queryClient = useQueryClient();
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_WRITE);
-  const [filters, setFilters] = useState({ tenant_id: '', status: '', request_type: '', search: '', overdue: false });
-  const [form, setForm] = useState(defaultForm);
-  const [originalForm, setOriginalForm] = useState(defaultForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [closeNotes, setCloseNotes] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const queryClient=useQueryClient();
+  const [searchParams,setSearchParams]=useSearchParams();
+  const canWrite=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_WRITE);
+  const canReadTenants=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadUsers=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadAudit=hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadCompliance=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ);
+  const canReadAccessReviews=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ);
 
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
-    if (filters.status) params.set('status', filters.status);
-    if (filters.request_type) params.set('request_type', filters.request_type);
-    if (filters.search.trim()) params.set('search', filters.search.trim());
-    if (filters.overdue) params.set('overdue', 'true');
-    params.set('limit', '200');
-    return params.toString();
-  }, [filters]);
+  const requestedStatus=searchParams.get('status') || '';
+  const requestedType=searchParams.get('request_type') || '';
+  const requestedTenant=searchParams.get('tenant_id') || '';
+  const requestedAssignee=searchParams.get('assigned_platform_user_id') || '';
+  const requestedSearch=searchParams.get('search') || '';
+  const requestedOverdue=searchParams.get('overdue') || '';
+  const status=STATUSES.includes(requestedStatus)?requestedStatus:'';
+  const requestType=REQUEST_TYPES.includes(requestedType)?requestedType:'';
+  const tenantId=canReadTenants?requestedTenant:'';
+  const assigneeId=canReadUsers?requestedAssignee:'';
+  const search=requestedSearch.length<=200?requestedSearch:'';
+  const overdue=requestedOverdue==='true';
+  const invalidFilters=Boolean((requestedStatus&&!status)||(requestedType&&!requestType)||(requestedSearch&&!search)||(requestedOverdue&&!['true','false'].includes(requestedOverdue))||(requestedTenant&&!canReadTenants)||(requestedAssignee&&!canReadUsers));
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants', 'privacy-picker'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const users = useQuery({ queryKey: ['platform', 'users', 'privacy-assignee-picker'], queryFn: () => platformApiRequest<PlatformUser[]>('/platform/users') });
-  const summary = useQuery({ queryKey: ['platform', 'privacy-requests', 'summary'], queryFn: () => platformApiRequest<SummaryResponse>('/platform/privacy-requests/summary') });
-  const requests = useQuery({ queryKey: ['platform', 'privacy-requests', filters], queryFn: () => platformApiRequest<RequestsResponse>(`/platform/privacy-requests?${queryString}`) });
-  const isLoading = tenants.isLoading || users.isLoading || summary.isLoading || requests.isLoading;
-  const loadError = tenants.error || users.error || summary.error || requests.error;
-  const refreshAll = () => {
-    setStatusMessage('Refreshing privacy request evidence...');
-    tenants.refetch();
-    users.refetch();
-    summary.refetch();
-    requests.refetch();
-  };
+  const [offset,setOffset]=useState(0);
+  const [form,setForm]=useState<FormState>(()=>emptyForm());
+  const [originalForm,setOriginalForm]=useState<FormState | null>(null);
+  const [editingId,setEditingId]=useState('');
+  const [actionNotes,setActionNotes]=useState<Record<string,string>>({});
+  const [rejectReasons,setRejectReasons]=useState<Record<string,string>>({});
+  const [message,setMessage]=useState('');
+  const [mutationError,setMutationError]=useState('');
+  useEffect(()=>setOffset(0),[status,requestType,tenantId,assigneeId,search,overdue,invalidFilters]);
 
-  const saveRequest = useMutation({
-    mutationFn: () => platformApiRequest(editingId ? `/platform/privacy-requests/${editingId}` : '/platform/privacy-requests', {
-      method: editingId ? 'PATCH' : 'POST',
-      body: JSON.stringify({
-        tenant_id: form.tenant_id || null,
-        request_type: form.request_type,
-        status: form.status,
-        priority: form.priority,
-        requester_name: trimOrNull(form.requester_name),
-        requester_email: form.requester_email.trim(),
-        subject_identifier: trimOrNull(form.subject_identifier),
-        summary: form.summary.trim(),
-        due_at: form.due_at || null,
-        assigned_platform_user_id: form.assigned_platform_user_id || null
-      })
-    }),
-    onSuccess: () => { setStatusMessage(editingId ? 'Privacy request updated.' : 'Privacy request created.'); setForm(defaultForm); setOriginalForm(defaultForm); setEditingId(null); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); }
-  });
+  const queryString=useMemo(()=>{ const params=new URLSearchParams({limit:String(PAGE_SIZE),offset:String(offset)}); if(status)params.set('status',status); if(requestType)params.set('request_type',requestType); if(tenantId)params.set('tenant_id',tenantId); if(assigneeId)params.set('assigned_platform_user_id',assigneeId); if(search.trim())params.set('search',search.trim()); if(overdue)params.set('overdue','true'); return params.toString(); },[status,requestType,tenantId,assigneeId,search,overdue,offset]);
+  const requests=useQuery({ queryKey:['platform','privacy-requests',status,requestType,tenantId,assigneeId,search,overdue,offset], queryFn:()=>platformApiRequest<RequestsResponse>(`/platform/privacy-requests?${queryString}`), enabled:!invalidFilters, placeholderData:(previousData)=>previousData });
+  const tenants=useQuery({ queryKey:['platform','privacy-request-tenants'], queryFn:()=>platformApiRequest<Tenant[]>('/platform/tenants'), enabled:canReadTenants });
+  const users=useQuery({ queryKey:['platform','privacy-request-users'], queryFn:()=>platformApiRequest<PlatformUser[]>('/platform/users'), enabled:canReadUsers });
 
-  const verifyRequest = useMutation({ mutationFn: (id: string) => platformApiRequest(`/platform/privacy-requests/${id}/verify`, { method: 'POST', body: JSON.stringify({ notes: closeNotes.trim() }) }), onSuccess: () => { setStatusMessage('Privacy request verified.'); setCloseNotes(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
-  const closeRequest = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => platformApiRequest(`/platform/privacy-requests/${id}/close`, { method: 'POST', body: JSON.stringify({ status, resolution_notes: closeNotes.trim(), rejection_reason: rejectReason.trim() }) }), onSuccess: (_data, variables) => { setStatusMessage(variables.status === 'rejected' ? 'Privacy request rejected.' : 'Privacy request fulfilled.'); setCloseNotes(''); setRejectReason(''); queryClient.invalidateQueries({ queryKey: ['platform', 'privacy-requests'] }); } });
+  const response=requests.data; const rows=response?.requests || []; const summary=response?.summary; const pagination=response?.pagination;
+  const requestTypes=response?.request_types || REQUEST_TYPES; const statuses=response?.statuses || STATUSES; const priorities=response?.priorities || PRIORITIES;
+  const initialError=requests.isError&&!response; const staleError=requests.isError&&Boolean(response);
+  const pageNumber=Math.floor(offset/PAGE_SIZE)+1;
+  const setFilter=(key:string,value:string)=>{ const next=new URLSearchParams(searchParams); if(value)next.set(key,value);else next.delete(key); setSearchParams(next,{replace:true}); };
+  const refresh=()=>requests.refetch();
+  const resetForm=()=>{setForm(emptyForm());setOriginalForm(null);setEditingId('');};
+  const buildPayload=()=>{ const body:Record<string,unknown>={request_type:form.request_type,priority:form.priority,requester_name:clean(form.requester_name),requester_email:form.requester_email.trim(),subject_identifier:clean(form.subject_identifier),summary:form.summary.trim(),due_at:toIsoDateTimeOrNull(form.due_at)}; if(canReadTenants)body.tenant_id=form.tenant_id||null; if(canReadUsers)body.assigned_platform_user_id=form.assigned_platform_user_id||null; return body; };
+  const invalidate=()=>queryClient.invalidateQueries({queryKey:['platform','privacy-requests']});
 
-  const requestTypes = requests.data?.request_types || ['access', 'export', 'deletion', 'correction', 'consent', 'restriction', 'objection', 'other'];
-  const statuses = requests.data?.statuses || ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
-  const priorities = requests.data?.priorities || ['low', 'normal', 'high', 'urgent'];
-  const rows = requests.data?.requests || [];
-  const hasOpenRequests = rows.some((row) => !['fulfilled', 'rejected', 'cancelled'].includes(row.status));
-  const isRequestClosed = (status: string) => ['fulfilled', 'rejected', 'cancelled'].includes(status);
-  const closeActionDisabled = closeRequest.isPending || !closeNotes.trim();
-  const rejectActionDisabled = closeRequest.isPending || !rejectReason.trim();
+  const save=useMutation({ mutationFn:()=>platformApiRequest(editingId?`/platform/privacy-requests/${editingId}`:'/platform/privacy-requests',{method:editingId?'PATCH':'POST',body:JSON.stringify(buildPayload())}), onSuccess:()=>{setMessage(editingId?'Privacy request details saved.':'Privacy request created in Intake.');setMutationError('');resetForm();invalidate();}, onError:(error)=>setMutationError(readableError(error)) });
+  const workflow=useMutation({ mutationFn:({id,nextStatus}:{id:string;nextStatus:string})=>platformApiRequest(`/platform/privacy-requests/${id}/status`,{method:'POST',body:JSON.stringify({status:nextStatus,note:clean(actionNotes[id]||'')})}), onSuccess:(_,variables)=>{setMessage(`Workflow status recorded as ${pretty(variables.nextStatus)}.`);setMutationError('');invalidate();}, onError:(error)=>setMutationError(readableError(error)) });
+  const verify=useMutation({ mutationFn:(id:string)=>platformApiRequest(`/platform/privacy-requests/${id}/verify`,{method:'POST',body:JSON.stringify({notes:clean(actionNotes[id]||'')})}), onSuccess:(_,id)=>{setMessage('Verification action recorded.');setMutationError('');setActionNotes((current)=>({...current,[id]:''}));invalidate();}, onError:(error)=>setMutationError(readableError(error)) });
+  const close=useMutation({ mutationFn:({id,nextStatus}:{id:string;nextStatus:string})=>platformApiRequest(`/platform/privacy-requests/${id}/close`,{method:'POST',body:JSON.stringify({status:nextStatus,resolution_notes:clean(actionNotes[id]||''),rejection_reason:nextStatus==='rejected'?clean(rejectReasons[id]||''):null})}), onSuccess:(_,variables)=>{setMessage(`Privacy request recorded as ${pretty(variables.nextStatus)}.`);setMutationError('');setActionNotes((current)=>({...current,[variables.id]:''}));setRejectReasons((current)=>({...current,[variables.id]:''}));invalidate();}, onError:(error)=>setMutationError(readableError(error)) });
 
-  const startEdit = (row: PrivacyRequest) => {
-    const nextForm = { tenant_id: row.tenant_id || '', request_type: row.request_type, status: row.status, priority: row.priority, requester_name: row.requester_name || '', requester_email: row.requester_email, subject_identifier: row.subject_identifier || '', summary: row.summary, due_at: row.due_at ? row.due_at.slice(0, 16) : '', assigned_platform_user_id: row.assigned_platform_user_id || '' };
-    setEditingId(row.id);
-    setForm(nextForm);
-    setOriginalForm(nextForm);
-    scrollToFormSection('platform-privacy-requests-form');
-  };
+  const beginEdit=(row:PrivacyRequest)=>{const next=toForm(row);setEditingId(row.id);setForm(next);setOriginalForm(next);setMessage('');setMutationError('');scrollToFormSection('platform-privacy-requests-form');};
+  const validForm=Boolean(form.requester_email.trim()&&form.summary.trim()&&validEmail(form.requester_email)&&(!form.due_at||toIsoDateTimeOrNull(form.due_at)));
+  const canSave=canWrite&&validForm&&!save.isPending&&(!editingId||!sameForm(originalForm,form));
 
-  const requiredFieldsMissing = !form.requester_email.trim() || !form.summary.trim();
-  const invalidEmail = Boolean(form.requester_email.trim()) && !isValidEmail(form.requester_email);
-  const invalidDueAt = !isValidDateInput(form.due_at);
-  const formChanged = JSON.stringify(form) !== JSON.stringify(editingId ? originalForm : defaultForm);
-  const saveDisabled = saveRequest.isPending || requiredFieldsMissing || invalidEmail || invalidDueAt || Boolean(editingId && !formChanged);
-  const showRequiredMessage = requiredFieldsMissing && (Boolean(editingId) || Boolean(form.requester_email.trim()) || Boolean(form.summary.trim()));
+  return <div className="platform-privacy-requests io-operational-workspace">
+    <OperationalWorkspaceHero iconPath="/platform/privacy-requests" eyebrow="Platform governance" title="Privacy requests" description="Track Platform-recorded privacy/data-subject requests, workflow deadlines, verification actions and closure evidence without bypassing tenant or Platform-user identity permissions." meta={<><OperationalWorkspaceMetaPill>Registry-wide filtered summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{response?.evidence_access.tenant_identity?'Tenant identity available':'Tenant identity restricted'}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{response?.evidence_access.platform_user_identity?'Platform-user identity available':'Platform-user identity restricted'}</OperationalWorkspaceMetaPill></>} aside={<div className="platform-privacy-requests__hero-aside"><OperationalWorkspaceStatus value="Application evidence" label="Not external legal verification"/><button type="button" className="app-button app-button--secondary" onClick={refresh} disabled={requests.isFetching}>{requests.isFetching?'Refreshing…':'Refresh'}</button></div>} />
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Privacy requests</h1>
-          <p style={styles.subtitle}>Track data-subject/privacy requests, deadlines, verification, and closure across tenants.</p>
-        </div>
-        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={isLoading}>{isLoading ? 'Refreshing...' : 'Refresh'}</button>
-      </header>
+    {message?<div className="platform-privacy-requests__success">{message}<button type="button" className="app-button app-button--secondary" onClick={()=>setMessage('')}>Dismiss</button></div>:null}
+    {mutationError?<div className="platform-privacy-requests__warning"><strong>Action failed.</strong><span>{mutationError}</span></div>:null}
+    {staleError?<div className="platform-privacy-requests__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(requests.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>requests.refetch()}>Retry</button></div>:null}
+    <div className="platform-privacy-requests__truth-note"><strong>Evidence boundary</strong><span>Requester fields, workflow status, recorded verification and closure actions are Platform application evidence. They do not prove external identity verification, satisfaction of a legal right, delivery/receipt, legal advice, or compliance with a real-world statutory deadline.</span></div>
 
-      {statusMessage ? <div style={styles.notice}>{statusMessage}</div> : null}
-      {loadError ? (
-        <section style={styles.errorPanel}>
-          <strong>Privacy request data could not be loaded.</strong>
-          <span>Retry the source lists, summary, and request table before making workflow decisions.</span>
-          <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
-        </section>
-      ) : null}
+    <OperationalWorkspaceStats ariaLabel="Privacy request registry summary">
+      <OperationalWorkspaceStatCard label="Filtered requests" value={summary?.total ?? '—'} helper="Registry-wide filtered total" tone="red" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="Open" value={summary?.open ?? '—'} helper="Non-terminal application workflow" tone="warn" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="Overdue" value={summary?.overdue ?? '—'} helper="Recorded due date exceeded" tone="danger" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="Waiting tenant" value={summary?.waiting_tenant ?? '—'} helper="Recorded workflow state" tone="warn" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="High priority open" value={summary?.high_priority_open ?? '—'} helper="High / urgent and non-terminal" tone="danger" iconPath="/platform/privacy-requests" />
+      <OperationalWorkspaceStatCard label="Verification attention" value={summary?.verification_attention ?? '—'} helper="No verification action recorded" tone="neutral" iconPath="/platform/privacy-requests" />
+    </OperationalWorkspaceStats>
 
-      <section style={styles.grid}>
-        <div style={styles.metric}><strong>{summary.data?.summary.open ?? 0}</strong><span>Open</span></div>
-        <div style={styles.metric}><strong>{summary.data?.summary.overdue ?? 0}</strong><span>Overdue</span></div>
-        <div style={styles.metric}><strong>{summary.data?.summary.waiting_tenant ?? 0}</strong><span>Waiting tenant</span></div>
-        <div style={styles.metric}><strong>{summary.data?.summary.high_priority_open ?? 0}</strong><span>High priority</span></div>
-      </section>
+    <section className="io-workspace-panel platform-privacy-requests__section">
+      <OperationalSectionHeader iconPath="/platform/privacy-requests" title="Filter registry" description="Filters are URL-backed. Tenant and assignee filters appear only when the corresponding source identity permission is available." />
+      <div className="platform-privacy-requests__filter-grid">
+        <label className="platform-privacy-requests__search">Search<input value={search} maxLength={200} onChange={(e)=>setFilter('search',e.target.value)} placeholder="Requester, subject or summary" /></label>
+        <label>Status<select value={status} onChange={(e)=>setFilter('status',e.target.value)}><option value="">All statuses</option>{statuses.map((item)=><option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Request type<select value={requestType} onChange={(e)=>setFilter('request_type',e.target.value)}><option value="">All types</option>{requestTypes.map((item)=><option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        {canReadTenants?<label>Tenant<select value={tenantId} onChange={(e)=>setFilter('tenant_id',e.target.value)}><option value="">All tenants</option>{(tenants.data||[]).map((tenant)=><option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>:<div className="platform-privacy-requests__restricted"><strong>Tenant filter restricted</strong><span>TENANTS_READ is required.</span></div>}
+        {canReadUsers?<label>Assignee<select value={assigneeId} onChange={(e)=>setFilter('assigned_platform_user_id',e.target.value)}><option value="">All assignees</option>{(users.data||[]).map((user)=><option key={user.id} value={user.id}>{user.email}</option>)}</select></label>:<div className="platform-privacy-requests__restricted"><strong>Assignee filter restricted</strong><span>PLATFORM_USERS_READ is required.</span></div>}
+        <label className="platform-privacy-requests__checkbox"><input type="checkbox" checked={overdue} onChange={(e)=>setFilter('overdue',e.target.checked?'true':'')} /> Recorded due date overdue</label>
+      </div>
+    </section>
 
-      <section style={styles.metaGrid}>
-        <div><strong>Snapshot source</strong><span>GET /platform/privacy-requests/summary and /platform/privacy-requests?limit=200</span></div>
-        <div><strong>Current filters</strong><span>{filters.tenant_id || 'all tenants'} · {filters.status || 'all statuses'} · {filters.request_type || 'all types'} · {filters.overdue ? 'overdue only' : 'all due states'}</span></div>
-        <div><strong>Rows shown</strong><span>{rows.length} request records</span></div>
-        <div><strong>Workflow owner</strong><span>Platform Privacy Requests; source evidence is stored in platform audit events.</span></div>
-      </section>
+    {canWrite?<section id="platform-privacy-requests-form" className="io-workspace-panel platform-privacy-requests__section">
+      <OperationalSectionHeader iconPath="/platform/privacy-requests" title={editingId?'Edit request details':'Create privacy request'} description={editingId?'Workflow status, verification and closure evidence are intentionally excluded from ordinary edits. Closed records are immutable.':'New records always enter Intake. Use the explicit workflow actions below to record later state changes.'} actions={editingId?<button type="button" className="app-button app-button--secondary" onClick={resetForm}>Cancel edit</button>:undefined}/>
+      <div className="platform-privacy-requests__form-grid">
+        <label>Request type<select value={form.request_type} onChange={(e)=>setForm({...form,request_type:e.target.value})}>{requestTypes.map((item)=><option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        <label>Priority<select value={form.priority} onChange={(e)=>setForm({...form,priority:e.target.value})}>{priorities.map((item)=><option key={item} value={item}>{pretty(item)}</option>)}</select></label>
+        {canReadTenants?<label>Tenant<select value={form.tenant_id} onChange={(e)=>setForm({...form,tenant_id:e.target.value})}><option value="">Platform-wide / none</option>{(tenants.data||[]).map((tenant)=><option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>:<div className="platform-privacy-requests__restricted"><strong>Tenant linkage preserved</strong><span>{editingId?'Existing restricted linkage is not changed by this edit.':'TENANTS_READ is required to link a tenant.'}</span></div>}
+        {canReadUsers?<label>Assignee<select value={form.assigned_platform_user_id} onChange={(e)=>setForm({...form,assigned_platform_user_id:e.target.value})}><option value="">Unassigned</option>{(users.data||[]).filter((user)=>user.is_active!==false).map((user)=><option key={user.id} value={user.id}>{user.email}</option>)}</select></label>:<div className="platform-privacy-requests__restricted"><strong>Assignee linkage preserved</strong><span>{editingId?'Existing restricted linkage is not changed by this edit.':'PLATFORM_USERS_READ is required to assign a Platform user.'}</span></div>}
+        <label>Requester name<input value={form.requester_name} maxLength={200} onChange={(e)=>setForm({...form,requester_name:e.target.value})} /></label>
+        <label>Requester email<input type="email" value={form.requester_email} onChange={(e)=>setForm({...form,requester_email:e.target.value})} /></label>
+        <label>Subject identifier<input value={form.subject_identifier} maxLength={255} onChange={(e)=>setForm({...form,subject_identifier:e.target.value})} /></label>
+        <label>Recorded due at<input type="datetime-local" value={form.due_at} onChange={(e)=>setForm({...form,due_at:e.target.value})} /></label>
+        <label className="platform-privacy-requests__span-all">Request summary<textarea value={form.summary} maxLength={4000} onChange={(e)=>setForm({...form,summary:e.target.value})} /></label>
+      </div>
+      {!validForm&&Boolean(form.requester_email||form.summary)?<div className="platform-privacy-requests__validation">Requester email and summary are required. Email and recorded due date must be valid.</div>:null}
+      <div className="platform-privacy-requests__actions"><button type="button" className="app-button app-button--primary" disabled={!canSave} onClick={()=>save.mutate()}>{save.isPending?'Saving…':editingId?'Save details':'Create Intake request'}</button></div>
+    </section>:null}
 
-      <section style={styles.supportingLinks}>
-        <strong>Supporting Platform pages</strong>
-        <SourceLink href="/platform/compliance-docs">Compliance Docs</SourceLink>
-        <SourceLink href="/platform/compliance-export">Compliance Export</SourceLink>
-        <SourceLink href="/platform/legal-compliance-reporting">Legal & Compliance Reporting</SourceLink>
-        <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
-        <SourceLink href="/platform/tenants">Tenants</SourceLink>
-      </section>
-
-      <section id="platform-privacy-requests-form" style={styles.card}>
-        <h2 style={styles.cardTitle}>{editingId ? 'Edit privacy request' : 'Create privacy request'}</h2>
-        {showRequiredMessage ? <div style={styles.validation}>Requester email and request summary are required.</div> : null}
-        {invalidEmail ? <div style={styles.validation}>Requester email must be a valid email address.</div> : null}
-        {invalidDueAt ? <div style={styles.validation}>Due at must be a valid date/time.</div> : null}
-        <div style={styles.formGrid}>
-          <label style={styles.fieldLabel}>Tenant<select value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })} style={styles.input}><option value="">Platform / no tenant</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <label style={styles.fieldLabel}>Request type<select value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })} style={styles.input}>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
-          <label style={styles.fieldLabel}>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={styles.input}>{statuses.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
-          <label style={styles.fieldLabel}>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} style={styles.input}>{priorities.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
-          <label style={styles.fieldLabel}>Requester name<input value={form.requester_name} onChange={(e) => setForm({ ...form, requester_name: e.target.value })} placeholder="Requester name" style={styles.input} /></label>
-          <label style={styles.fieldLabel}>Requester email<input value={form.requester_email} onChange={(e) => setForm({ ...form, requester_email: e.target.value })} placeholder="requester@example.com" style={styles.input} /></label>
-          <label style={styles.fieldLabel}>Subject identifier<input value={form.subject_identifier} onChange={(e) => setForm({ ...form, subject_identifier: e.target.value })} placeholder="Subject identifier" style={styles.input} /></label>
-          <label style={styles.fieldLabel}>Due at<input type="datetime-local" value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} style={styles.input} /></label>
-          <label style={styles.fieldLabel}>Assignee<select value={form.assigned_platform_user_id} onChange={(e) => setForm({ ...form, assigned_platform_user_id: e.target.value })} style={styles.input}><option value="">Unassigned</option>{(users.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}</select></label>
-        </div>
-        <label style={styles.fieldLabel}>Request summary<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Request summary" style={styles.textarea} /></label>
-        {canWrite ? <button type="button" style={saveDisabled ? styles.disabledButton : styles.primaryButton} onClick={() => saveRequest.mutate()} disabled={saveDisabled}>{editingId ? 'Save changes' : 'Create request'}</button> : null}
-        {editingId ? <button type="button" style={styles.secondaryButton} onClick={() => { setEditingId(null); setForm(defaultForm); setOriginalForm(defaultForm); }}>Cancel edit</button> : null}
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Filters</h2>
-        <div style={styles.formGrid}>
-          <select value={filters.tenant_id} onChange={(e) => setFilters({ ...filters, tenant_id: e.target.value })} style={styles.input}><option value="">All tenants</option>{(tenants.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} style={styles.input}><option value="">All statuses</option>{statuses.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <select value={filters.request_type} onChange={(e) => setFilters({ ...filters, request_type: e.target.value })} style={styles.input}><option value="">All types</option>{requestTypes.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <input value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Search requester, subject, tenant" style={styles.input} />
-          <label style={styles.checkbox}><input type="checkbox" checked={filters.overdue} onChange={(e) => setFilters({ ...filters, overdue: e.target.checked })} /> overdue only</label>
-        </div>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Requests</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th>Requester</th><th>Tenant</th><th>Type</th><th>Status</th><th>Due</th><th>Assignee</th><th>Summary</th><th>Actions</th></tr></thead>
-            <tbody>{rows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.requester_email}<br /><span style={styles.muted}>{row.requester_name || row.subject_identifier || '—'}</span></td>
-                <td>{row.tenant_name || 'Platform'}</td>
-                <td>{row.request_type}<br /><span style={styles.muted}>{row.priority}</span></td>
-                <td><span style={badgeStyle(row)}>{row.is_overdue ? 'overdue' : row.status}</span></td>
-                <td>{dateLabel(row.due_at)}</td>
-                <td>{row.assignee_email || '—'}</td>
-                <td>{row.summary}<br /><span style={styles.muted}>Created {dateLabel(row.created_at)} · Updated {dateLabel(row.updated_at)}</span>{row.verified_at ? <><br /><span style={styles.muted}>Verified {dateLabel(row.verified_at)}</span></> : null}{row.completed_at ? <><br /><span style={styles.muted}>Closed {dateLabel(row.completed_at)}</span></> : null}{row.resolution_notes ? <><br /><span style={styles.muted}>Notes: {row.resolution_notes}</span></> : null}{row.rejection_reason ? <><br /><span style={styles.muted}>Reject reason: {row.rejection_reason}</span></> : null}<br /><SourceLink href="/platform/audit">Audit evidence</SourceLink></td>
-                <td style={styles.actions}>{canWrite ? (isRequestClosed(row.status) ? <span style={styles.muted}>Closed</span> : <><button type="button" style={styles.smallButton} onClick={() => startEdit(row)} disabled={saveRequest.isPending}>Edit</button><button type="button" style={verifyRequest.isPending ? styles.disabledSmallButton : styles.smallButton} onClick={() => { if (window.confirm('Verify this privacy request and move it to in_progress?')) verifyRequest.mutate(row.id); }} disabled={verifyRequest.isPending}>Verify</button><button type="button" style={closeActionDisabled ? styles.disabledSmallButton : styles.smallButton} onClick={() => { if (window.confirm('Fulfill and close this privacy request?')) closeRequest.mutate({ id: row.id, status: 'fulfilled' }); }} disabled={closeActionDisabled}>Fulfill</button><button type="button" style={rejectActionDisabled ? styles.disabledDangerButton : styles.dangerButton} onClick={() => { if (window.confirm('Reject and close this privacy request?')) closeRequest.mutate({ id: row.id, status: 'rejected' }); }} disabled={rejectActionDisabled}>Reject</button></>) : '—'}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-        {canWrite && hasOpenRequests ? (
-          <div style={styles.formGrid}>
-            <label style={styles.fieldLabel}>Verification / resolution notes<input value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} placeholder="Verification / resolution notes" style={styles.input} /></label>
-            <label style={styles.fieldLabel}>Rejection reason<input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Rejection reason" style={styles.input} /></label>
+    <section className="io-workspace-panel platform-privacy-requests__section">
+      <OperationalSectionHeader iconPath="/platform/privacy-requests" title="Privacy request evidence" description="Each card is one Platform registry record. Status, verification and closure are explicit auditable actions rather than ordinary field edits." />
+      {invalidFilters?<div className="platform-privacy-requests__blocking-error"><strong>Invalid or unauthorized filter.</strong><span>Clear the URL filter or obtain the source permission required by that filter.</span></div>:initialError?<div className="platform-privacy-requests__blocking-error"><strong>Privacy requests could not be loaded.</strong><span>{readableError(requests.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>requests.refetch()}>Retry</button></div>:requests.isPending?<div className="platform-privacy-requests__loading">Loading privacy requests…</div>:rows.length===0?<div className="platform-privacy-requests__empty"><strong>No matching application records.</strong><span>This does not prove that no external privacy/data-subject request exists outside this Platform registry.</span></div>:<div className="platform-privacy-requests__list">{rows.map((row)=>{
+        const closed=isClosed(row.status); const note=actionNotes[row.id]||''; const rejectReason=rejectReasons[row.id]||'';
+        return <article key={row.id} className="platform-privacy-requests__card">
+          <div className="platform-privacy-requests__card-header"><div><h4>{row.requester_email}</h4><p>{row.summary}</p></div><div className="platform-privacy-requests__badges"><span data-tone={statusTone(row)}>{row.is_overdue?'Recorded deadline overdue':pretty(row.status)}</span><span>{pretty(row.request_type)}</span><span>{pretty(row.priority)}</span></div></div>
+          <div className="platform-privacy-requests__metrics-grid">
+            <div><span>Requester</span><strong>{row.requester_name || 'Name not recorded'}</strong><small>{row.subject_identifier || 'Subject identifier not recorded'}</small></div>
+            <div><span>Tenant</span><strong>{row.tenant_name || (row.tenant_present?'Restricted tenant linkage':'Platform-wide / none')}</strong></div>
+            <div><span>Assignee</span><strong>{row.assignee_email || (row.assignee_present?'Restricted Platform-user linkage':'Unassigned')}</strong></div>
+            <div><span>Recorded due</span><strong>{dateTime(row.due_at)}</strong></div>
+            <div><span>Verification</span><strong>{row.verified_at?dateTime(row.verified_at):'Not recorded'}</strong><small>{row.verified_by_email || (row.verifier_present?'Restricted verifier identity':'')}</small></div>
+            <div><span>Closure</span><strong>{row.completed_at?dateTime(row.completed_at):'Open'}</strong><small>{row.completed_by_email || (row.completer_present?'Restricted closer identity':'')}</small></div>
           </div>
-        ) : null}
-      </section>
-    </div>
-  );
-}
+          {row.resolution_notes?<div className="platform-privacy-requests__evidence-note"><strong>Closure note</strong><span>{row.resolution_notes}</span></div>:null}
+          {row.rejection_reason?<div className="platform-privacy-requests__evidence-note"><strong>Rejection reason</strong><span>{row.rejection_reason}</span></div>:null}
+          <div className="platform-privacy-requests__card-footer"><div className="platform-privacy-requests__source-links">{row.tenant_id&&canReadTenants?<Link to={`/platform/tenants?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Tenant</Link>:null}{canReadAudit?<Link to="/platform/audit">Audit evidence</Link>:null}</div>{canWrite&&!closed?<button type="button" className="app-button app-button--secondary" onClick={()=>beginEdit(row)}>Edit details</button>:closed?<span className="platform-privacy-requests__immutable">Closed history is immutable.</span>:null}</div>
+          {canWrite&&!closed?<div className="platform-privacy-requests__workflow"><label>Action / closure note<input value={note} maxLength={4000} onChange={(e)=>setActionNotes((current)=>({...current,[row.id]:e.target.value}))} placeholder="Optional for workflow/verification; required in UI to fulfill" /></label><label>Rejection reason<input value={rejectReason} maxLength={2000} onChange={(e)=>setRejectReasons((current)=>({...current,[row.id]:e.target.value}))} placeholder="Required only when rejecting" /></label><div className="platform-privacy-requests__actions">
+            {!row.verified_at&&row.status!=='verifying'?<button type="button" className="app-button app-button--secondary" disabled={workflow.isPending} onClick={()=>workflow.mutate({id:row.id,nextStatus:'verifying'})}>Start verification</button>:null}
+            {!row.verified_at?<button type="button" className="app-button app-button--secondary" disabled={verify.isPending} onClick={()=>{if(window.confirm('Record the Platform verification action? This is application evidence only.'))verify.mutate(row.id);}}>Record verification</button>:null}
+            {row.status!=='waiting_tenant'?<button type="button" className="app-button app-button--secondary" disabled={workflow.isPending} onClick={()=>workflow.mutate({id:row.id,nextStatus:'waiting_tenant'})}>Wait for tenant</button>:null}
+            {row.status!=='in_progress'?<button type="button" className="app-button app-button--secondary" disabled={workflow.isPending} onClick={()=>workflow.mutate({id:row.id,nextStatus:'in_progress'})}>Resume in progress</button>:null}
+            <button type="button" className="app-button app-button--primary" disabled={close.isPending||!note.trim()} onClick={()=>{if(window.confirm('Record this request as fulfilled? This records Platform closure evidence only.'))close.mutate({id:row.id,nextStatus:'fulfilled'});}}>Record fulfilled</button>
+            <button type="button" className="app-button app-button--secondary" disabled={close.isPending||!rejectReason.trim()} onClick={()=>{if(window.confirm('Record this request as rejected?'))close.mutate({id:row.id,nextStatus:'rejected'});}}>Reject</button>
+            <button type="button" className="app-button app-button--secondary" disabled={close.isPending} onClick={()=>{if(window.confirm('Cancel and close this privacy request record?'))close.mutate({id:row.id,nextStatus:'cancelled'});}}>Cancel request</button>
+          </div></div>:null}
+        </article>;
+      })}</div>}
+      {response?<div className="platform-privacy-requests__pagination"><button type="button" className="app-button app-button--secondary" disabled={offset===0||requests.isFetching} onClick={()=>setOffset((value)=>Math.max(0,value-PAGE_SIZE))}>Previous</button><span>Page {pageNumber} · up to {PAGE_SIZE} requests · {pagination?.total ?? 0} filtered total</span><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more||requests.isFetching} onClick={()=>setOffset((value)=>value+PAGE_SIZE)}>Next</button></div>:null}
+    </section>
 
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  notice: { border: '1px solid var(--io-primary-border)', borderRadius: 12, padding: '10px 12px', background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', fontWeight: 700 },
-  errorPanel: { border: '1px solid #fecaca', borderRadius: 12, padding: 14, background: '#fef2f2', color: '#991b1b', display: 'grid', gap: 8 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
-  metric: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#fff', display: 'grid', gap: 4, color: '#334155' },
-  card: { border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, background: '#fff', display: 'grid', gap: 12, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 },
-  supportingLinks: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', color: '#475569' },
-  cardTitle: { margin: 0, fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  fieldLabel: { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155' },
-  validation: { border: '1px solid #fde68a', borderRadius: 10, padding: '9px 12px', background: '#fffbeb', color: '#92400e', fontWeight: 700 },
-  input: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
-  textarea: { width: '100%', boxSizing: 'border-box', minHeight: 80, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
-  checkbox: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  primaryButton: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', fontWeight: 700 },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 12px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  smallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 9px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  dangerButton: { border: '1px solid #dc2626', borderRadius: 8, padding: '7px 9px', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  disabledSmallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 9px', background: '#f1f5f9', color: '#94a3b8', cursor: 'not-allowed', fontWeight: 700 },
-  disabledDangerButton: { border: '1px solid #fecaca', borderRadius: 8, padding: '7px 9px', background: '#fee2e2', color: '#991b1b', opacity: 0.55, cursor: 'not-allowed', fontWeight: 700 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  badge: { borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  muted: { color: '#64748b', fontSize: 12 },
-  link: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
-  actions: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }
-};
+    <section className="io-workspace-panel platform-privacy-requests__section"><OperationalSectionHeader iconPath="/platform/privacy-requests" title="Supporting operations" description="Only destinations allowed by the current Platform permission snapshot are shown."/><div className="platform-privacy-requests__supporting-links">{canReadCompliance?<><Link to="/platform/compliance-documents">Compliance documents</Link><Link to="/platform/compliance-export">Compliance export</Link><Link to="/platform/legal-compliance-reporting">Legal &amp; compliance reporting</Link></>:null}{canReadAccessReviews?<Link to="/platform/access-reviews">Access reviews</Link>:null}{canReadTenants?<Link to="/platform/tenants">Tenants</Link>:null}{canReadUsers?<Link to="/platform/users">Platform users</Link>:null}{canReadAudit?<Link to="/platform/audit">Platform audit</Link>:null}</div></section>
+  </div>;
+}
