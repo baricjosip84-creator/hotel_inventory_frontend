@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { platformApiRequest } from '../lib/platformApi';
+import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
 
 type ComplianceDocumentPackageRow = {
   id: string;
@@ -40,9 +41,11 @@ type ComplianceExportPackage = {
     tenants_missing_export_evidence: number;
     tenants_with_retention_holds: number;
     tenants_due_for_retention_review: number;
-    permission_attention_required: number;
-    users_requiring_permission_review: number;
-    api_keys_requiring_permission_review: number;
+    permission_audit_omitted: boolean;
+    permission_evidence_complete: boolean;
+    permission_attention_required: number | null;
+    users_requiring_permission_review: number | null;
+    api_keys_requiring_permission_review: number | null;
   };
   governance_controls: {
     read_only: boolean;
@@ -51,6 +54,8 @@ type ComplianceExportPackage = {
     source_routes: string[];
     no_raw_secret_export: boolean;
     no_subject_data_export: boolean;
+    permission_audit_available: boolean;
+    permission_audit_omitted: boolean;
   };
   documents: ComplianceDocumentPackageRow[];
 };
@@ -87,6 +92,7 @@ function SourceLink({ href, children }: { href: string; children: string }) {
 }
 
 export default function PlatformComplianceExportPage() {
+  const canReadPermissionAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ);
   const packageQuery = useQuery({
     queryKey: ['platform', 'compliance-export', 'package'],
     queryFn: () => platformApiRequest<ComplianceExportPackage>('/platform/compliance-export/package')
@@ -138,7 +144,7 @@ export default function PlatformComplianceExportPage() {
           <div style={styles.card}><strong>Blocking privacy requests</strong><div style={styles.metric}>{summary.open_blocking_privacy_requests}</div><span style={styles.help}>Blocking open statuses</span></div>
           <div style={styles.card}><strong>Tenants missing export evidence</strong><div style={styles.metric}>{summary.tenants_missing_export_evidence}</div><span style={styles.help}>{summary.tenants_with_export_evidence}/{summary.total_tenants} with evidence</span></div>
           <div style={styles.card}><strong>Retention holds</strong><div style={styles.metric}>{summary.tenants_with_retention_holds}</div><span style={styles.help}>{summary.tenants_due_for_retention_review} due for retention review</span></div>
-          <div style={styles.card}><strong>Permission attention</strong><div style={styles.metric}>{summary.permission_attention_required}</div><span style={styles.help}>{summary.users_requiring_permission_review} users · {summary.api_keys_requiring_permission_review} API keys</span></div>
+          <div style={styles.card}><strong>Permission attention</strong><div style={styles.metric}>{summary.permission_attention_required ?? 'Restricted'}</div><span style={styles.help}>{summary.permission_audit_omitted ? 'Permission Audit evidence omitted' : summary.permission_evidence_complete ? `${summary.users_requiring_permission_review ?? 0} users · ${summary.api_keys_requiring_permission_review ?? 0} API keys` : 'Partial Permission Audit evidence'}</span></div>
         </section>
       ) : null}
 
@@ -149,7 +155,7 @@ export default function PlatformComplianceExportPage() {
           <SourceLink href="/platform/privacy-requests">Privacy Requests</SourceLink>
           <SourceLink href="/platform/tenant-exports">Tenant Exports</SourceLink>
           <SourceLink href="/platform/audit-retention">Audit Retention</SourceLink>
-          <SourceLink href="/platform/permission-audit">Permission Audit</SourceLink>
+          {canReadPermissionAudit ? <SourceLink href="/platform/permission-audit">Permission Audit</SourceLink> : null}
           <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
         </div>
       </section>
