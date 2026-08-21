@@ -1,0 +1,81 @@
+.platform-tenant-tasks {
+  --io-primary: #d14343;
+  --io-primary-rgb: 209, 67, 67;
+  --io-primary-dark: #b93636;
+  --io-primary-soft: rgba(209, 67, 67, .075);
+  --io-primary-soft-strong: rgba(209, 67, 67, .13);
+  --io-primary-border: rgba(209, 67, 67, .24);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-tenant-tasks__hero-aside { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.platform-tenant-tasks__refresh-block { display: grid; justify-items: end; gap: 5px; min-width: 180px; }
+.platform-tenant-tasks__refresh-block > span { color: #64748b; font-size: 10.5px; text-align: right; }
+.platform-tenant-tasks__section { display: grid; gap: 13px; min-width: 0; }
+.platform-tenant-tasks__warning, .platform-tenant-tasks__feedback, .platform-tenant-tasks__inline-note, .platform-tenant-tasks__truth-note, .platform-tenant-tasks__identity-note { padding: 10px 12px; border-radius: 9px; font-size: 11px; line-height: 1.45; }
+.platform-tenant-tasks__warning { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-tasks__feedback { border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; }
+.platform-tenant-tasks__feedback[data-tone='warn'] { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-tasks__inline-note, .platform-tenant-tasks__identity-note { border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; }
+.platform-tenant-tasks__truth-note { border: 1px solid var(--io-primary-border); background: var(--io-primary-soft); color: #7f1d1d; }
+.platform-tenant-tasks__form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; min-width: 0; }
+.platform-tenant-tasks__form-grid--filters { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.platform-tenant-tasks__form-grid label, .platform-tenant-tasks__notes-label { display: grid; gap: 6px; min-width: 0; color: #334155; font-size: 11.5px; font-weight: 800; }
+.platform-tenant-tasks__form-grid input, .platform-tenant-tasks__form-grid select, .platform-tenant-tasks__notes-label textarea { width: 100%; min-width: 0; min-height: 38px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; color: #0f172a; font: inherit; }
+.platform-tenant-tasks__notes-label textarea { min-height: 100px; resize: vertical; }
+.platform-tenant-tasks__form-grid input:focus-visible, .platform-tenant-tasks__form-grid select:focus-visible, .platform-tenant-tasks__notes-label textarea:focus-visible { outline: 2px solid rgba(var(--io-primary-rgb), .2); outline-offset: 1px; border-color: var(--io-primary); }
+.platform-tenant-tasks__title-field { grid-column: span 2; }
+.platform-tenant-tasks__checkbox { display: flex !important; align-items: center; gap: 8px !important; min-height: 38px; align-self: end; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
+.platform-tenant-tasks__checkbox input { width: auto !important; min-height: 0 !important; }
+.platform-tenant-tasks__action-row, .platform-tenant-tasks__link-row, .platform-tenant-tasks__badge-row, .platform-tenant-tasks__pagination, .platform-tenant-tasks__provenance { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.platform-tenant-tasks__pagination { justify-content: flex-end; }
+.platform-tenant-tasks__pagination > span { color: #64748b; font-size: 11px; font-weight: 800; }
+.platform-tenant-tasks__list { display: grid; gap: 11px; min-width: 0; }
+.platform-tenant-tasks__card { display: grid; gap: 11px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; min-width: 0; }
+.platform-tenant-tasks__card[data-overdue='true'] { border-color: #fdba74; box-shadow: inset 3px 0 0 #f97316; }
+.platform-tenant-tasks__card[data-closed='true'] { background: #f8fafc; }
+.platform-tenant-tasks__card-header { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.platform-tenant-tasks__card-title { display: grid; gap: 6px; min-width: 0; }
+.platform-tenant-tasks__card-title h4 { margin: 0; color: #0f172a; font-size: 14px; overflow-wrap: anywhere; }
+.platform-tenant-tasks__tenant-label { display: grid; gap: 4px; min-width: 200px; text-align: right; }
+.platform-tenant-tasks__tenant-label strong { color: #334155; font-size: 11.5px; }
+.platform-tenant-tasks__tenant-label span { color: #94a3b8; font-size: 10px; overflow-wrap: anywhere; }
+.platform-tenant-tasks__badge { display: inline-flex; min-height: 23px; align-items: center; padding: 3px 8px; border: 1px solid #e2e8f0; border-radius: 999px; background: #f8fafc; color: #475569; font-size: 10px; font-weight: 800; }
+.platform-tenant-tasks__badge[data-tone='platform'] { border-color: var(--io-primary-border); background: var(--io-primary-soft); color: var(--io-primary-dark); }
+.platform-tenant-tasks__badge[data-tone='good'] { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.platform-tenant-tasks__badge[data-tone='warn'] { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.platform-tenant-tasks__evidence-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.platform-tenant-tasks__evidence-grid > div { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #eef2f7; border-radius: 8px; background: #f8fafc; min-width: 0; }
+.platform-tenant-tasks__evidence-grid span { color: #94a3b8; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.platform-tenant-tasks__evidence-grid strong { color: #334155; font-size: 10.5px; overflow-wrap: anywhere; }
+.platform-tenant-tasks__link-row a { display: inline-flex; align-items: center; min-height: 31px; padding: 6px 9px; border: 1px solid var(--io-primary-border); border-radius: 8px; background: var(--io-primary-soft); color: var(--io-primary-dark); font-size: 10.5px; font-weight: 800; text-decoration: none; overflow-wrap: anywhere; }
+.platform-tenant-tasks__link-row a:hover { background: var(--io-primary-soft-strong); }
+.platform-tenant-tasks__notes { margin: 0; color: #334155; font-size: 11.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.platform-tenant-tasks__provenance { padding-top: 9px; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 10.5px; }
+.platform-tenant-tasks__blocking-error { display: grid; gap: 7px; padding: 14px; border: 1px solid #fecaca; border-radius: 11px; background: #fef2f2; color: #991b1b; }
+.platform-tenant-tasks__blocking-error strong { font-size: 12px; }
+.platform-tenant-tasks__blocking-error span { font-size: 11px; line-height: 1.45; }
+.platform-tenant-tasks__blocking-error .app-button { width: fit-content; }
+.platform-tenant-tasks__loading { padding: 14px; color: #64748b; font-size: 12px; }
+.platform-tenant-tasks__empty { display: grid; gap: 5px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; color: #64748b; }
+.platform-tenant-tasks__empty strong { color: #334155; font-size: 12px; }
+.platform-tenant-tasks__empty span { font-size: 11px; line-height: 1.45; }
+.platform-tenant-tasks__card .app-button { min-height: 31px; padding: 6px 9px; font-size: 10.5px; }
+.platform-tenant-tasks__warning .app-button { margin-left: 8px; min-height: 28px; padding: 5px 8px; }
+
+@media (max-width: 1200px) {
+  .platform-tenant-tasks__form-grid, .platform-tenant-tasks__form-grid--filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .platform-tenant-tasks__evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .platform-tenant-tasks__hero-aside { justify-content: flex-start; width: 100%; }
+  .platform-tenant-tasks__refresh-block { justify-items: start; min-width: 0; }
+  .platform-tenant-tasks__refresh-block > span { text-align: left; }
+  .platform-tenant-tasks__form-grid, .platform-tenant-tasks__form-grid--filters, .platform-tenant-tasks__evidence-grid { grid-template-columns: 1fr; }
+  .platform-tenant-tasks__title-field { grid-column: auto; }
+  .platform-tenant-tasks__tenant-label { min-width: 0; text-align: left; }
+  .platform-tenant-tasks__pagination { justify-content: flex-start; }
+}
