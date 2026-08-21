@@ -1,11 +1,23 @@
-import type { CSSProperties } from 'react';
-import { Link } from 'react-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformRunbooksPage.css';
 
 type Tenant = { id: string; name: string };
+type Pagination = { limit: number; offset: number; has_more: boolean };
+type EvidenceAccess = { tenant: boolean; incident: boolean; tenant_task: boolean; platform_user_identity: boolean };
 type Runbook = {
   id: string;
   title: string;
@@ -15,11 +27,20 @@ type Runbook = {
   is_active: boolean;
   owner_role?: string | null;
   step_count: number;
+  execution_count?: number;
   active_execution_count?: number;
+  created_by_platform_user_email?: string | null;
+  updated_by_platform_user_email?: string | null;
+  actor_identity_restricted?: boolean;
 };
 type RunbookStep = { id: string; step_order: number; title: string; instructions?: string | null; expected_result?: string | null; is_required: boolean };
 type RunbookDetail = Runbook & { steps: RunbookStep[] };
-type ExecutionStep = RunbookStep & { id: string; status: 'pending' | 'done' | 'skipped'; notes?: string | null; completed_by_platform_user_email?: string | null };
+type ExecutionStep = RunbookStep & {
+  status: 'pending' | 'done' | 'skipped';
+  notes?: string | null;
+  completed_at?: string | null;
+  completed_by_platform_user_email?: string | null;
+};
 type Execution = {
   id: string;
   runbook_id: string;
@@ -28,324 +49,437 @@ type Execution = {
   runbook_severity: string;
   tenant_id?: string | null;
   tenant_name?: string | null;
+  incident_id?: string | null;
+  task_id?: string | null;
   status: 'in_progress' | 'completed' | 'cancelled';
   reason: string;
   notes?: string | null;
   started_at: string;
+  completed_at?: string | null;
+  started_by_platform_user_email?: string | null;
+  completed_by_platform_user_email?: string | null;
   done_steps?: number;
   total_steps?: number;
+  evidence_access?: EvidenceAccess;
   steps?: ExecutionStep[];
 };
-
-type RunbooksResponse = { runbooks: Runbook[] };
-type ExecutionsResponse = { executions: Execution[] };
-type SummaryResponse = { active_executions: number; active_critical_runbooks: number; by_category: Array<{ category: string; count: number }> };
-
+type RunbooksResponse = { runbooks: Runbook[]; pagination: Pagination };
+type ExecutionsResponse = { executions: Execution[]; evidence_access: EvidenceAccess; pagination: Pagination };
+type SummaryResponse = { active_executions: number; active_critical_runbooks: number; active_runbooks: number; by_category: Array<{ category: string; count: number }> };
 type StepDraft = { title: string; instructions: string; expected_result: string; is_required: boolean };
+type RunbookDraft = { title: string; description: string; category: string; severity: string; owner_role: string; is_active: boolean; steps: StepDraft[] };
 
-const categories = ['general', 'support', 'incident', 'billing', 'security', 'maintenance', 'offboarding'];
-const severities = ['low', 'medium', 'high', 'critical'];
+const categories = ['general', 'support', 'incident', 'billing', 'security', 'maintenance', 'offboarding'] as const;
+const severities = ['low', 'medium', 'high', 'critical'] as const;
+const executionStatuses = ['in_progress', 'completed', 'cancelled'] as const;
+const PAGE_SIZE = 50;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const defaultStep: StepDraft = { title: '', instructions: '', expected_result: '', is_required: true };
+const emptyRunbookDraft = (): RunbookDraft => ({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', is_active: true, steps: [{ ...defaultStep }] });
+
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
+}
+function humanize(value: string | null | undefined) {
+  const text = String(value || '').replaceAll('_', ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Not recorded';
+}
+function dateTime(value: string | null | undefined) {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString();
+}
+function severityTone(value: string) {
+  if (value === 'critical') return 'danger';
+  if (value === 'high') return 'warn';
+  return 'neutral';
+}
+function executionTone(value: Execution['status']) {
+  if (value === 'completed') return 'good';
+  if (value === 'cancelled') return 'danger';
+  return 'warn';
+}
 
 export default function PlatformRunbooksPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_WRITE);
   const canExecute = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_EXECUTE);
-  const [category, setCategory] = useState(() => new URLSearchParams(window.location.search).get('category') || '');
-  const [severity, setSeverity] = useState(() => new URLSearchParams(window.location.search).get('severity') || '');
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadIncidents = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadMaintenance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_READ);
+
+  const requestedCategory = searchParams.get('category') || '';
+  const requestedSeverity = searchParams.get('severity') || '';
+  const requestedActive = searchParams.get('active') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const requestedExecutionStatus = searchParams.get('execution_status') || '';
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const category = categories.includes(requestedCategory as typeof categories[number]) ? requestedCategory : '';
+  const severity = severities.includes(requestedSeverity as typeof severities[number]) ? requestedSeverity : '';
+  const active = requestedActive === 'true' || requestedActive === 'false' ? requestedActive : '';
+  const executionStatus = executionStatuses.includes(requestedExecutionStatus as typeof executionStatuses[number]) ? requestedExecutionStatus : '';
+  const tenantId = canReadTenants && uuidPattern.test(requestedTenantId) ? requestedTenantId : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const invalidFilters = Boolean(
+    (requestedCategory && !category) ||
+    (requestedSeverity && !severity) ||
+    (requestedActive && !active) ||
+    (requestedExecutionStatus && !executionStatus) ||
+    (requestedTenantId && (!canReadTenants || !tenantId)) ||
+    (requestedSearch && !search)
+  );
+
+  const [runbookOffset, setRunbookOffset] = useState(0);
+  const [executionOffset, setExecutionOffset] = useState(0);
   const [selectedRunbookId, setSelectedRunbookId] = useState('');
   const [selectedExecutionId, setSelectedExecutionId] = useState('');
-  const [draft, setDraft] = useState({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] });
-  const [executionDraft, setExecutionDraft] = useState({ runbook_id: '', tenant_id: '', reason: '', notes: '' });
+  const [createDraft, setCreateDraft] = useState<RunbookDraft>(() => emptyRunbookDraft());
+  const [editDraft, setEditDraft] = useState<RunbookDraft>(() => emptyRunbookDraft());
+  const [executionDraft, setExecutionDraft] = useState({ runbook_id: '', tenant_id: '', incident_id: '', task_id: '', reason: '', notes: '' });
+  const [stepNotes, setStepNotes] = useState<Record<string, string>>({});
+  const [closeNotes, setCloseNotes] = useState('');
   const [message, setMessage] = useState('');
 
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (severity) params.set('severity', severity);
-    params.set('limit', '200');
-    return params.toString();
-  }, [category, severity]);
+  useEffect(() => { setRunbookOffset(0); }, [category, severity, active, search, invalidFilters]);
+  useEffect(() => { setExecutionOffset(0); }, [executionStatus, tenantId, invalidFilters]);
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants', 'runbooks'], queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants') });
-  const summary = useQuery({ queryKey: ['platform', 'runbooks', 'summary'], queryFn: () => platformApiRequest<SummaryResponse>('/platform/runbooks/summary') });
-  const runbooks = useQuery({ queryKey: ['platform', 'runbooks', category, severity], queryFn: () => platformApiRequest<RunbooksResponse>(`/platform/runbooks?${queryString}`) });
-  const executions = useQuery({ queryKey: ['platform', 'runbooks', 'executions'], queryFn: () => platformApiRequest<ExecutionsResponse>('/platform/runbooks/executions?limit=100') });
-  const selectedRunbook = useQuery({ queryKey: ['platform', 'runbooks', selectedRunbookId], enabled: Boolean(selectedRunbookId), queryFn: () => platformApiRequest<RunbookDetail>(`/platform/runbooks/${selectedRunbookId}`) });
-  const selectedExecution = useQuery({ queryKey: ['platform', 'runbooks', 'execution', selectedExecutionId], enabled: Boolean(selectedExecutionId), queryFn: () => platformApiRequest<Execution>(`/platform/runbooks/executions/${selectedExecutionId}`) });
+  const tenants = useQuery({
+    queryKey: ['platform', 'tenants', 'runbooks-selector'],
+    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
+    enabled: canExecute && canReadTenants,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+  const summary = useQuery({
+    queryKey: ['platform', 'runbooks', 'summary'],
+    queryFn: () => platformApiRequest<SummaryResponse>('/platform/runbooks/summary'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+  const runbooks = useQuery({
+    queryKey: ['platform', 'runbooks', 'list', category, severity, active, search, runbookOffset],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(runbookOffset) });
+      if (category) params.set('category', category);
+      if (severity) params.set('severity', severity);
+      if (active) params.set('active', active);
+      if (search.trim()) params.set('search', search.trim());
+      return platformApiRequest<RunbooksResponse>(`/platform/runbooks?${params.toString()}`);
+    },
+    enabled: !invalidFilters,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+  const executions = useQuery({
+    queryKey: ['platform', 'runbooks', 'executions', executionStatus, tenantId, executionOffset],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(executionOffset) });
+      if (executionStatus) params.set('status', executionStatus);
+      if (tenantId) params.set('tenant_id', tenantId);
+      return platformApiRequest<ExecutionsResponse>(`/platform/runbooks/executions?${params.toString()}`);
+    },
+    enabled: !invalidFilters,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+  const selectedRunbook = useQuery({
+    queryKey: ['platform', 'runbooks', 'detail', selectedRunbookId],
+    enabled: Boolean(selectedRunbookId),
+    queryFn: () => platformApiRequest<RunbookDetail>(`/platform/runbooks/${selectedRunbookId}`),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
+  const selectedExecution = useQuery({
+    queryKey: ['platform', 'runbooks', 'execution-detail', selectedExecutionId],
+    enabled: Boolean(selectedExecutionId),
+    queryFn: () => platformApiRequest<Execution>(`/platform/runbooks/executions/${selectedExecutionId}`),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
+  });
 
-  const refreshAll = () => {
-    void queryClient.invalidateQueries({ queryKey: ['platform', 'runbooks'] });
+  useEffect(() => {
+    if (!selectedRunbook.data) return;
+    setEditDraft({
+      title: selectedRunbook.data.title,
+      description: selectedRunbook.data.description || '',
+      category: selectedRunbook.data.category,
+      severity: selectedRunbook.data.severity,
+      owner_role: selectedRunbook.data.owner_role || '',
+      is_active: selectedRunbook.data.is_active,
+      steps: selectedRunbook.data.steps.map((step) => ({ title: step.title, instructions: step.instructions || '', expected_result: step.expected_result || '', is_required: step.is_required }))
+    });
+  }, [selectedRunbook.data]);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const step of selectedExecution.data?.steps || []) next[step.id] = step.notes || '';
+    setStepNotes(next);
+    setCloseNotes(selectedExecution.data?.notes || '');
+  }, [selectedExecution.data]);
+
+  const runbookPage = Math.floor(runbookOffset / PAGE_SIZE) + 1;
+  const executionPage = Math.floor(executionOffset / PAGE_SIZE) + 1;
+  const initialError = (summary.isError && summary.data === undefined) || (runbooks.isError && runbooks.data === undefined) || (executions.isError && executions.data === undefined);
+  const staleError = (summary.isError && summary.data !== undefined) || (runbooks.isError && runbooks.data !== undefined) || (executions.isError && executions.data !== undefined);
+  const refreshing = summary.isFetching || runbooks.isFetching || executions.isFetching || tenants.isFetching;
+  const structuralLocked = Boolean((selectedRunbook.data?.execution_count || 0) > 0);
+  const mutationError = createRunbook.error || updateRunbook.error || replaceSteps.error || startExecution.error || updateStep.error || closeExecution.error;
+
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value); else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+  const clearInvalidFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    for (const key of ['category', 'severity', 'active', 'search', 'execution_status', 'tenant_id']) next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+  const refreshAll = async () => {
+    const work: Array<Promise<unknown>> = [summary.refetch()];
+    if (!invalidFilters) work.push(runbooks.refetch(), executions.refetch());
+    if (canExecute && canReadTenants) work.push(tenants.refetch());
+    if (selectedRunbookId) work.push(selectedRunbook.refetch());
+    if (selectedExecutionId) work.push(selectedExecution.refetch());
+    await Promise.all(work);
+  };
+  const invalidateRunbooks = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['platform', 'runbooks'] });
   };
 
-  const runbookPayload = () => ({
-    ...draft,
+  const normalizeDraftPayload = (draft: RunbookDraft) => ({
     title: draft.title.trim(),
     description: draft.description.trim() || null,
+    category: draft.category,
+    severity: draft.severity,
     owner_role: draft.owner_role.trim() || null,
-    steps: draft.steps.map((step) => ({
-      ...step,
-      title: step.title.trim(),
-      instructions: step.instructions.trim() || null,
-      expected_result: step.expected_result.trim() || null
-    }))
+    is_active: draft.is_active,
+    steps: draft.steps.map((step) => ({ title: step.title.trim(), instructions: step.instructions.trim() || null, expected_result: step.expected_result.trim() || null, is_required: step.is_required }))
   });
-
-  const executionPayload = () => ({
-    ...executionDraft,
-    runbook_id: executionDraft.runbook_id,
-    tenant_id: executionDraft.tenant_id || null,
-    reason: executionDraft.reason.trim(),
-    notes: executionDraft.notes.trim() || null
-  });
-
-  const canCreateRunbook = draft.title.trim().length > 0 && draft.steps.every((step) => step.title.trim().length > 0);
-  const canStartExecution = Boolean(executionDraft.runbook_id) && executionDraft.reason.trim().length > 0;
 
   const createRunbook = useMutation({
-    mutationFn: () => platformApiRequest('/platform/runbooks', { method: 'POST', body: JSON.stringify(runbookPayload()) }),
-    onSuccess: () => { setDraft({ title: '', description: '', category: 'general', severity: 'medium', owner_role: '', steps: [{ ...defaultStep }] }); setMessage('Runbook created successfully.'); refreshAll(); }
+    mutationFn: () => platformApiRequest<RunbookDetail>('/platform/runbooks', { method: 'POST', body: JSON.stringify(normalizeDraftPayload(createDraft)) }),
+    onSuccess: async (data) => {
+      setCreateDraft(emptyRunbookDraft());
+      setSelectedRunbookId(data.id);
+      setMessage('Runbook created. The application record does not prove any external operational outcome.');
+      await invalidateRunbooks();
+    }
   });
-
+  const updateRunbook = useMutation({
+    mutationFn: () => {
+      if (!selectedRunbookId) throw new Error('Select a runbook first.');
+      const payload = structuralLocked
+        ? { description: editDraft.description.trim() || null, owner_role: editDraft.owner_role.trim() || null, is_active: editDraft.is_active }
+        : { title: editDraft.title.trim(), description: editDraft.description.trim() || null, category: editDraft.category, severity: editDraft.severity, owner_role: editDraft.owner_role.trim() || null, is_active: editDraft.is_active };
+      return platformApiRequest<RunbookDetail>(`/platform/runbooks/${selectedRunbookId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+    },
+    onSuccess: async () => { setMessage('Runbook definition saved.'); await invalidateRunbooks(); }
+  });
+  const replaceSteps = useMutation({
+    mutationFn: () => {
+      if (!selectedRunbookId) throw new Error('Select a runbook first.');
+      return platformApiRequest<RunbookDetail>(`/platform/runbooks/${selectedRunbookId}/steps`, {
+        method: 'PUT',
+        body: JSON.stringify({ steps: normalizeDraftPayload(editDraft).steps })
+      });
+    },
+    onSuccess: async () => { setMessage('Runbook steps saved.'); await invalidateRunbooks(); }
+  });
   const startExecution = useMutation({
-    mutationFn: () => platformApiRequest('/platform/runbooks/executions', { method: 'POST', body: JSON.stringify(executionPayload()) }),
-    onSuccess: () => { setExecutionDraft({ runbook_id: '', tenant_id: '', reason: '', notes: '' }); setMessage('Runbook execution started successfully.'); refreshAll(); }
+    mutationFn: () => platformApiRequest<Execution>('/platform/runbooks/executions', {
+      method: 'POST',
+      body: JSON.stringify({
+        runbook_id: executionDraft.runbook_id,
+        tenant_id: canReadTenants ? executionDraft.tenant_id || null : null,
+        incident_id: canReadIncidents ? executionDraft.incident_id.trim() || null : null,
+        task_id: canReadTenants ? executionDraft.task_id.trim() || null : null,
+        reason: executionDraft.reason.trim(),
+        notes: executionDraft.notes.trim() || null
+      })
+    }),
+    onSuccess: async (data) => {
+      setExecutionDraft({ runbook_id: '', tenant_id: '', incident_id: '', task_id: '', reason: '', notes: '' });
+      setSelectedExecutionId(data.id);
+      setMessage('Runbook execution started. This records application checklist work; it does not prove an external action succeeded.');
+      await invalidateRunbooks();
+    }
   });
-
   const updateStep = useMutation({
-    mutationFn: ({ executionId, stepId, status }: { executionId: string; stepId: string; status: 'done' | 'skipped' | 'pending' }) => platformApiRequest(`/platform/runbooks/executions/${executionId}/steps/${stepId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-    onSuccess: () => { setMessage('Execution step updated successfully.'); refreshAll(); }
+    mutationFn: ({ executionId, stepId, status, notes }: { executionId: string; stepId: string; status: ExecutionStep['status']; notes: string }) => platformApiRequest<Execution>(`/platform/runbooks/executions/${executionId}/steps/${stepId}`, { method: 'PATCH', body: JSON.stringify({ status, notes: notes.trim() || null }) }),
+    onSuccess: async () => { setMessage('Execution step saved.'); await invalidateRunbooks(); }
   });
-
   const closeExecution = useMutation({
-    mutationFn: ({ executionId, action }: { executionId: string; action: 'complete' | 'cancel' }) => platformApiRequest(`/platform/runbooks/executions/${executionId}/${action}`, { method: 'POST' }),
-    onSuccess: (_data, variables) => { setMessage(variables.action === 'complete' ? 'Runbook execution completed successfully.' : 'Runbook execution cancelled successfully.'); refreshAll(); }
+    mutationFn: ({ executionId, action }: { executionId: string; action: 'complete' | 'cancel' }) => platformApiRequest<Execution>(`/platform/runbooks/executions/${executionId}/${action}`, { method: 'POST', body: JSON.stringify({ notes: closeNotes.trim() || null }) }),
+    onSuccess: async (_data, variables) => { setMessage(variables.action === 'complete' ? 'Execution marked complete in the application.' : 'Execution cancelled in the application.'); await invalidateRunbooks(); }
   });
 
-  function updateDraftStep(index: number, patch: Partial<StepDraft>) {
-    setDraft((current) => ({ ...current, steps: current.steps.map((step, stepIndex) => stepIndex === index ? { ...step, ...patch } : step) }));
-  }
+  const canCreate = createDraft.title.trim().length > 0 && createDraft.steps.length > 0 && createDraft.steps.every((step) => step.title.trim().length > 0);
+  const canSaveDefinition = selectedRunbookId && editDraft.title.trim().length > 0;
+  const canSaveSteps = selectedRunbookId && !structuralLocked && editDraft.steps.length > 0 && editDraft.steps.every((step) => step.title.trim().length > 0);
+  const linkedIdsValid = (!executionDraft.incident_id.trim() || uuidPattern.test(executionDraft.incident_id.trim())) && (!executionDraft.task_id.trim() || uuidPattern.test(executionDraft.task_id.trim()));
+  const canStart = executionDraft.runbook_id && executionDraft.reason.trim().length > 0 && linkedIdsValid;
+  const selectedTenantName = useMemo(() => (tenants.data || []).find((tenant) => tenant.id === tenantId)?.name, [tenants.data, tenantId]);
 
-  function addStep() { setDraft((current) => ({ ...current, steps: [...current.steps, { ...defaultStep }] })); }
-  function removeStep(index: number) {
-    if (!window.confirm('Remove this runbook step?')) return;
-    setDraft((current) => ({ ...current, steps: current.steps.filter((_, stepIndex) => stepIndex !== index) }));
-  }
-
-  function closeSelectedExecution(action: 'complete' | 'cancel') {
-    if (!selectedExecution.data) return;
-    const label = action === 'complete' ? 'complete' : 'cancel';
-    if (!window.confirm(`Are you sure you want to ${label} this runbook execution?`)) return;
-    closeExecution.mutate({ executionId: selectedExecution.data.id, action });
-  }
+  const heroStatus = invalidFilters ? 'Filter invalid' : initialError ? 'Unavailable' : staleError ? 'Stale snapshot' : refreshing && !runbooks.data ? 'Loading' : 'Operational';
+  const heroLabel = invalidFilters ? 'Clear invalid URL filters' : initialError ? 'Retry required' : staleError ? 'Last successful data retained' : 'Runbook registry and execution evidence';
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Platform runbooks</h1>
-          <p style={styles.muted}>Operational checklists for real HLA work: incidents, billing issues, security events, maintenance, support, offboarding, and tenant recovery. Executions create an auditable record of who followed which steps.</p>
-          <p style={styles.metaText}>Source: platform runbooks API · Snapshot: live query · Filters: category {category || 'all'}, severity {severity || 'all'}</p>
+    <div className="platform-runbooks">
+      <OperationalWorkspaceHero
+        iconPath="/platform/runbooks"
+        eyebrow="Platform operations"
+        title="Runbooks"
+        description="Operational checklist definitions and auditable application execution records. Runbook completion means required steps were marked done in this application; it does not prove an external recovery, customer action, vendor response, incident resolution, security outcome, maintenance result, billing settlement, or offboarding completion."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Read · PLATFORM_RUNBOOKS_READ</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Write · PLATFORM_RUNBOOKS_WRITE</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Execute · PLATFORM_RUNBOOKS_EXECUTE</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Page size · {PAGE_SIZE}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Evidence · permission scoped</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div className="platform-runbooks__hero-aside"><OperationalWorkspaceStatus value={heroStatus} label={heroLabel} /><div className="platform-runbooks__refresh-block"><button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button><span>Runbook page {runbookPage} · execution page {executionPage}</span></div></div>}
+      />
+
+      {invalidFilters ? <section className="platform-runbooks__blocking-error"><strong>Invalid Runbooks URL filter</strong><span>Category, severity, active state, execution status, search length and tenant filter must match supported values and your permissions.</span><button type="button" className="app-button app-button--secondary" onClick={clearInvalidFilters}>Clear invalid filters</button></section> : null}
+      {initialError ? <section className="platform-runbooks__blocking-error"><strong>Runbook data is unavailable</strong><span>{readableError(summary.error || runbooks.error || executions.error)}</span><button type="button" className="app-button app-button--secondary" onClick={refreshAll}>Retry</button></section> : null}
+      {staleError ? <div className="platform-runbooks__warning">Showing the last successful Runbooks snapshot. Refresh failed: {readableError(summary.error || runbooks.error || executions.error)}</div> : null}
+      {tenants.isError && tenants.data === undefined ? <div className="platform-runbooks__warning">Tenant selector is unavailable. Platform-wide executions remain available: {readableError(tenants.error)}</div> : null}
+      {message ? <div className="platform-runbooks__success">{message}</div> : null}
+      {mutationError ? <div className="platform-runbooks__warning">Mutation failed: {readableError(mutationError)}</div> : null}
+
+      {summary.data ? <OperationalWorkspaceStats ariaLabel="Runbook registry summary">
+        <OperationalWorkspaceStatCard label="Active runbooks" value={summary.data.active_runbooks} helper="Global registry count" tone="neutral" />
+        <OperationalWorkspaceStatCard label="Critical runbooks" value={summary.data.active_critical_runbooks} helper="Active critical definitions" tone="danger" />
+        <OperationalWorkspaceStatCard label="Active executions" value={summary.data.active_executions} helper="Global in-application executions" tone="warn" />
+        <OperationalWorkspaceStatCard label="Loaded runbooks" value={runbooks.data?.runbooks.length ?? 0} helper="Current page only" tone="neutral" />
+        <OperationalWorkspaceStatCard label="Loaded executions" value={executions.data?.executions.length ?? 0} helper="Current page only" tone="neutral" />
+      </OperationalWorkspaceStats> : null}
+
+      <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Evidence boundary" description="Runbook definitions are governed by Runbooks permissions. Linked tenant, incident, tenant-task and Platform-user identity evidence is independently restricted by its source permission." />
+        <div className="platform-runbooks__evidence-grid">
+          <div data-state={canReadTenants ? 'available' : 'restricted'}><span>Tenant evidence</span><strong>{canReadTenants ? 'Available' : 'Restricted'}</strong><small>TENANTS_READ</small></div>
+          <div data-state={canReadIncidents ? 'available' : 'restricted'}><span>Incident evidence</span><strong>{canReadIncidents ? 'Available' : 'Restricted'}</strong><small>PLATFORM_INCIDENTS_READ</small></div>
+          <div data-state={canReadTenants ? 'available' : 'restricted'}><span>Tenant-task evidence</span><strong>{canReadTenants ? 'Available' : 'Restricted'}</strong><small>TENANTS_READ</small></div>
+          <div data-state={canReadPlatformUsers ? 'available' : 'restricted'}><span>Operator identity</span><strong>{canReadPlatformUsers ? 'Available' : 'Redacted'}</strong><small>PLATFORM_USERS_READ</small></div>
         </div>
-        <button type="button" style={styles.button} onClick={refreshAll}>Refresh</button>
-      </header>
-
-      {message ? <div style={styles.successMessage}>{message}</div> : null}
-
-      <section style={styles.linkPanel}>
-        <strong>Supporting platform pages</strong>
-        <div style={styles.linkRow}>
-          <Link style={styles.quickLink} to="/platform/incidents">Incidents</Link>
-          <Link style={styles.quickLink} to="/platform/maintenance">Maintenance</Link>
-          <Link style={styles.quickLink} to="/platform/tenant-tasks">Tenant tasks</Link>
-          <Link style={styles.quickLink} to="/platform/audit">Platform audit</Link>
-        </div>
-      </section>
-
-      {(summary.isError || runbooks.isError || executions.isError || tenants.isError) ? (
-        <section style={styles.errorPanel}>
-          <strong>Runbook data could not be loaded.</strong>
-          <span style={styles.muted}>Retry reloads summary, filters, tenant options, and recent executions.</span>
-          <button type="button" style={styles.secondaryButton} onClick={refreshAll}>Retry</button>
-        </section>
-      ) : null}
-
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Summary</h2>
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}><strong>{summary.data?.active_executions ?? 0}</strong><span>Active executions</span></div>
-          <div style={styles.summaryCard}><strong>{summary.data?.active_critical_runbooks ?? 0}</strong><span>Critical runbooks</span></div>
-          <div style={styles.summaryCard}><strong>{runbooks.data?.runbooks.length ?? 0}</strong><span>Visible runbooks</span></div>
-        </div>
-        <div style={styles.filterGrid}>
-          <select style={styles.input} value={category} onChange={(event) => setCategory(event.target.value)}><option value="">All categories</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <select style={styles.input} value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="">All severities</option>{severities.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <button type="button" style={styles.button} onClick={refreshAll}>Refresh</button>
-        </div>
-      </section>
-
-      {canWrite ? (
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Create runbook</h2>
-          <div style={styles.formGrid}>
-            <label style={styles.fieldLabel}>Title<input style={styles.input} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Title" /></label>
-            <label style={styles.fieldLabel}>Category<select style={styles.input} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Severity<select style={styles.input} value={draft.severity} onChange={(event) => setDraft((current) => ({ ...current, severity: event.target.value }))}>{severities.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Owner role<input style={styles.input} value={draft.owner_role} onChange={(event) => setDraft((current) => ({ ...current, owner_role: event.target.value }))} placeholder="Owner role, optional" /></label>
-            <label style={{ ...styles.fieldLabel, gridColumn: '1 / -1' }}>Description<textarea style={{ ...styles.input, minHeight: 70 }} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Description" /></label>
-          </div>
-          <h3 style={styles.smallHeading}>Steps</h3>
-          <div style={styles.stepsList}>
-            {draft.steps.map((step, index) => (
-              <div key={index} style={styles.stepEditor}>
-                <label style={styles.fieldLabel}>Step title<input style={styles.input} value={step.title} onChange={(event) => updateDraftStep(index, { title: event.target.value })} placeholder={`Step ${index + 1} title`} /></label>
-                <label style={styles.fieldLabel}>Instructions<textarea style={styles.input} value={step.instructions} onChange={(event) => updateDraftStep(index, { instructions: event.target.value })} placeholder="Instructions" /></label>
-                <label style={styles.fieldLabel}>Expected result<input style={styles.input} value={step.expected_result} onChange={(event) => updateDraftStep(index, { expected_result: event.target.value })} placeholder="Expected result" /></label>
-                <label style={styles.checkboxLabel}><input type="checkbox" checked={step.is_required} onChange={(event) => updateDraftStep(index, { is_required: event.target.checked })} /> Required</label>
-                {draft.steps.length > 1 ? <button type="button" style={styles.dangerButton} onClick={() => removeStep(index)}>Remove</button> : null}
-              </div>
-            ))}
-          </div>
-          <div style={styles.actionRow}>
-            <button type="button" style={styles.secondaryButton} onClick={addStep}>Add step</button>
-            <button type="button" style={styles.button} disabled={!canCreateRunbook || createRunbook.isPending} onClick={() => createRunbook.mutate()}>{createRunbook.isPending ? 'Creating...' : 'Create runbook'}</button>
-          </div>
-        </section>
-      ) : null}
-
-      {canExecute ? (
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Start runbook execution</h2>
-          <div style={styles.formGrid}>
-            <label style={styles.fieldLabel}>Runbook<select style={styles.input} value={executionDraft.runbook_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, runbook_id: event.target.value }))}><option value="">Select runbook</option>{(runbooks.data?.runbooks || []).filter((runbook) => runbook.is_active).map((runbook) => <option key={runbook.id} value={runbook.id}>{runbook.title}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Tenant<select style={styles.input} value={executionDraft.tenant_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">No tenant / platform-wide</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label>
-            <label style={styles.fieldLabel}>Reason / ticket / incident context<input style={styles.input} value={executionDraft.reason} onChange={(event) => setExecutionDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason / ticket / incident context" /></label>
-            <label style={styles.fieldLabel}>Notes<input style={styles.input} value={executionDraft.notes} onChange={(event) => setExecutionDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes, optional" /></label>
-            <button type="button" style={styles.button} disabled={!canStartExecution || startExecution.isPending} onClick={() => startExecution.mutate()}>{startExecution.isPending ? 'Starting...' : 'Start execution'}</button>
-          </div>
-        </section>
-      ) : null}
-
-      <section style={styles.columns}>
-        <div style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Runbooks</h2>
-          <div style={styles.cardList}>
-            {(runbooks.data?.runbooks || []).map((runbook) => (
-              <button type="button" key={runbook.id} style={selectedRunbookId === runbook.id ? styles.selectedCard : styles.cardButton} onClick={() => setSelectedRunbookId(runbook.id)}>
-                <strong>{runbook.title}</strong>
-                <span>{runbook.category} · {runbook.severity} · {runbook.step_count} steps</span>
-                <span>{runbook.is_active ? 'Active' : 'Inactive'} · {runbook.active_execution_count || 0} active executions</span>
-              </button>
-            ))}
-            {!runbooks.isLoading && (runbooks.data?.runbooks || []).length === 0 ? <p style={styles.muted}>No runbooks match the filters.</p> : null}
-          </div>
-        </div>
-
-        <div style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Runbook detail</h2>
-          {selectedRunbook.data ? (
-            <div style={styles.detailBlock}>
-              <h3 style={styles.detailTitle}>{selectedRunbook.data.title}</h3>
-              <p style={styles.muted}>{selectedRunbook.data.description || 'No description.'}</p>
-              <ol style={styles.orderedList}>{selectedRunbook.data.steps.map((step) => <li key={step.id}><strong>{step.title}</strong><br /><span style={styles.muted}>{step.instructions || 'No instructions.'}</span><br /><span style={styles.muted}>Expected: {step.expected_result || 'not specified'} · {step.is_required ? 'required' : 'optional'}</span></li>)}</ol>
-            </div>
-          ) : <p style={styles.muted}>Select a runbook to inspect steps.</p>}
+        <div className="platform-runbooks__truth-note"><strong>Application execution ≠ external outcome.</strong> A completed runbook only proves that required checklist steps were marked done in this application. Any external result still requires its own authoritative evidence.</div>
+        <div className="platform-runbooks__supporting-grid">
+          {canReadIncidents ? <Link to="/platform/incidents">Incidents</Link> : <span>Incidents restricted</span>}
+          {canReadMaintenance ? <Link to="/platform/maintenance">Maintenance</Link> : <span>Maintenance restricted</span>}
+          {canReadTenants ? <Link to="/platform/tenant-tasks">Tenant tasks</Link> : <span>Tenant tasks restricted</span>}
+          {canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : <span>Audit restricted</span>}
         </div>
       </section>
 
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Recent executions</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead><tr><th>Runbook</th><th>Status</th><th>Tenant</th><th>Progress</th><th>Started</th><th>Actions</th></tr></thead>
-            <tbody>
-              {(executions.data?.executions || []).map((execution) => (
-                <tr key={execution.id}>
-                  <td><strong>{execution.runbook_title}</strong><br /><span style={styles.muted}>{execution.reason}</span></td>
-                  <td><span style={execution.status === 'in_progress' ? styles.warnBadge : styles.okBadge}>{execution.status}</span></td>
-                  <td>{execution.tenant_name || 'Platform-wide'}</td>
-                  <td>{execution.done_steps ?? 0}/{execution.total_steps ?? 0}</td>
-                  <td>{new Date(execution.started_at).toLocaleString()}</td>
-                  <td><div style={styles.actionRow}><button type="button" style={styles.smallButton} onClick={() => setSelectedExecutionId(execution.id)}>Open</button><Link style={styles.tableLink} to="/platform/audit">Audit evidence</Link></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Registry controls" description="Filters are URL-backed. Runbook and execution lists use deterministic server pagination." />
+        <div className="platform-runbooks__filter-grid">
+          <label>Category<select value={category} onChange={(event) => updateFilter('category', event.target.value)}><option value="">All categories</option>{categories.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}</select></label>
+          <label>Severity<select value={severity} onChange={(event) => updateFilter('severity', event.target.value)}><option value="">All severities</option>{severities.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}</select></label>
+          <label>Active state<select value={active} onChange={(event) => updateFilter('active', event.target.value)}><option value="">All</option><option value="true">Active</option><option value="false">Inactive</option></select></label>
+          <label>Search<input value={search} onChange={(event) => updateFilter('search', event.target.value)} maxLength={200} placeholder="Title, description, owner" /></label>
+          <div className="platform-runbooks__filter-summary"><span>Runbook page</span><strong>{runbookPage}</strong></div>
+        </div>
+        <div className="platform-runbooks__filter-grid platform-runbooks__filter-grid--executions">
+          <label>Execution status<select value={executionStatus} onChange={(event) => updateFilter('execution_status', event.target.value)}><option value="">All statuses</option>{executionStatuses.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}</select></label>
+          {canReadTenants ? <label>Execution tenant<select value={tenantId} onChange={(event) => updateFilter('tenant_id', event.target.value)} disabled={tenants.isLoading && !tenants.data}><option value="">All tenants</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : <div className="platform-runbooks__restricted-filter">Tenant execution filtering requires TENANTS_READ.</div>}
+          <div className="platform-runbooks__filter-summary"><span>Execution page</span><strong>{executionPage}</strong></div>
+          <div className="platform-runbooks__filter-summary"><span>Execution scope</span><strong>{tenantId ? selectedTenantName || 'Selected tenant' : 'All authorized evidence'}</strong></div>
         </div>
       </section>
 
-      {selectedExecution.data ? (
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Execution detail: {selectedExecution.data.runbook_title}</h2>
-          <p style={styles.muted}>{selectedExecution.data.reason} · {selectedExecution.data.tenant_name || 'Platform-wide'} · {selectedExecution.data.status}</p>
-          <div style={styles.stepsList}>
-            {(selectedExecution.data.steps || []).map((step) => (
-              <div key={step.id} style={styles.executionStep}>
-                <div><strong>{step.step_order}. {step.title}</strong><br /><span style={styles.muted}>{step.instructions || 'No instructions.'}</span></div>
-                <span style={step.status === 'done' ? styles.okBadge : step.status === 'skipped' ? styles.neutralBadge : styles.warnBadge}>{step.status}</span>
-                {canExecute && selectedExecution.data.status === 'in_progress' ? (
-                  <div style={styles.actionRow}>
-                    <button type="button" style={styles.smallButton} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'done' })}>Done</button>
-                    <button type="button" style={styles.secondarySmallButton} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'skipped' })}>Skip</button>
-                    <button type="button" style={styles.secondarySmallButton} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'pending' })}>Reset</button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          {canExecute && selectedExecution.data.status === 'in_progress' ? (
-            <div style={styles.actionRow}>
-              <button type="button" style={styles.button} onClick={() => closeSelectedExecution('complete')}>Complete execution</button>
-              <button type="button" style={styles.dangerButton} onClick={() => closeSelectedExecution('cancel')}>Cancel execution</button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+      {canWrite ? <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Create runbook" description="Create an operational checklist. Step order is normalized by the server. Once execution history exists, title/category/severity/steps become structurally locked to protect historical evidence." />
+        <RunbookEditor draft={createDraft} setDraft={setCreateDraft} allowStructuralEdit submitting={createRunbook.isPending} />
+        <div className="platform-runbooks__actions"><button type="button" className="app-button" disabled={!canCreate || createRunbook.isPending} onClick={() => createRunbook.mutate()}>{createRunbook.isPending ? 'Creating…' : 'Create runbook'}</button></div>
+      </section> : null}
+
+      <section className="platform-runbooks__columns">
+        <div className="io-workspace-panel platform-runbooks__section">
+          <OperationalSectionHeader iconPath="/platform/runbooks" title="Runbook registry" description="Counts are corrected for step/execution join multiplication. Loaded rows are the current page only." />
+          {runbooks.isLoading && !runbooks.data ? <div className="platform-runbooks__loading">Loading runbooks…</div> : null}
+          {!runbooks.isLoading && runbooks.data?.runbooks.length === 0 ? <div className="platform-runbooks__empty"><strong>No runbooks match this view.</strong><span>This only describes the current application registry/filter; it does not prove no external procedures exist.</span></div> : null}
+          <div className="platform-runbooks__card-list">{(runbooks.data?.runbooks || []).map((runbook) => <button type="button" key={runbook.id} className={`platform-runbooks__runbook-card${selectedRunbookId === runbook.id ? ' is-selected' : ''}`} onClick={() => setSelectedRunbookId(runbook.id)}><div><strong>{runbook.title}</strong><span>{humanize(runbook.category)} · {humanize(runbook.severity)}</span></div><div className="platform-runbooks__card-meta"><span>{runbook.step_count} steps</span><span>{runbook.execution_count || 0} executions</span><span>{runbook.active_execution_count || 0} active</span><span>{runbook.is_active ? 'Active' : 'Inactive'}</span></div></button>)}</div>
+          <div className="platform-runbooks__pagination"><button type="button" className="app-button app-button--secondary" disabled={runbookOffset === 0 || runbooks.isFetching} onClick={() => setRunbookOffset((value) => Math.max(0, value - PAGE_SIZE))}>Previous</button><span>Page {runbookPage}</span><button type="button" className="app-button app-button--secondary" disabled={!runbooks.data?.pagination.has_more || runbooks.isFetching} onClick={() => setRunbookOffset((value) => value + PAGE_SIZE)}>Next</button></div>
+        </div>
+
+        <div className="io-workspace-panel platform-runbooks__section">
+          <OperationalSectionHeader iconPath="/platform/runbooks" title="Runbook detail" description="Execution history locks structural fields so previously executed checklist evidence cannot be rewritten." />
+          {selectedRunbook.isLoading && !selectedRunbook.data ? <div className="platform-runbooks__loading">Loading runbook detail…</div> : null}
+          {selectedRunbook.isError && selectedRunbook.data === undefined ? <div className="platform-runbooks__blocking-error"><strong>Runbook detail unavailable</strong><span>{readableError(selectedRunbook.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => selectedRunbook.refetch()}>Retry</button></div> : null}
+          {selectedRunbook.isError && selectedRunbook.data !== undefined ? <div className="platform-runbooks__warning">Showing the last successful runbook detail snapshot. Refresh failed: {readableError(selectedRunbook.error)}</div> : null}
+          {!selectedRunbookId ? <div className="platform-runbooks__empty"><strong>Select a runbook.</strong><span>Its definition, steps and execution-history lock state will appear here.</span></div> : null}
+          {selectedRunbook.data ? <>
+            <div className="platform-runbooks__detail-head"><div><h4>{selectedRunbook.data.title}</h4><span>{humanize(selectedRunbook.data.category)} · {humanize(selectedRunbook.data.severity)} · {selectedRunbook.data.is_active ? 'Active' : 'Inactive'}</span></div><span className="platform-runbooks__posture" data-tone={severityTone(selectedRunbook.data.severity)}>{humanize(selectedRunbook.data.severity)}</span></div>
+            <p className="platform-runbooks__description">{selectedRunbook.data.description || 'No description recorded.'}</p>
+            <div className="platform-runbooks__detail-metrics"><div><span>Steps</span><strong>{selectedRunbook.data.step_count}</strong></div><div><span>Execution history</span><strong>{selectedRunbook.data.execution_count || 0}</strong></div><div><span>Active executions</span><strong>{selectedRunbook.data.active_execution_count || 0}</strong></div><div><span>Owner role</span><strong>{selectedRunbook.data.owner_role || 'Not assigned'}</strong></div></div>
+            {structuralLocked ? <div className="platform-runbooks__warning">Structural history lock is active. Title, category, severity and steps cannot be changed after execution history exists; description, owner role and active state remain maintainable.</div> : null}
+            <ol className="platform-runbooks__ordered-list">{selectedRunbook.data.steps.map((step) => <li key={step.id}><strong>{step.step_order}. {step.title}</strong><span>{step.instructions || 'No instructions recorded.'}</span><small>Expected: {step.expected_result || 'Not specified'} · {step.is_required ? 'Required' : 'Optional'}</small></li>)}</ol>
+            {canWrite ? <div className="platform-runbooks__maintenance"><h4>Maintain selected runbook</h4><RunbookEditor draft={editDraft} setDraft={setEditDraft} allowStructuralEdit={!structuralLocked} submitting={updateRunbook.isPending || replaceSteps.isPending} /><div className="platform-runbooks__actions"><button type="button" className="app-button" disabled={!canSaveDefinition || updateRunbook.isPending} onClick={() => updateRunbook.mutate()}>{updateRunbook.isPending ? 'Saving…' : 'Save definition'}</button><button type="button" className="app-button app-button--secondary" disabled={!canSaveSteps || replaceSteps.isPending} onClick={() => replaceSteps.mutate()}>{replaceSteps.isPending ? 'Saving steps…' : 'Save steps'}</button></div></div> : null}
+          </> : null}
+        </div>
+      </section>
+
+      {canExecute ? <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Start runbook execution" description="Optional tenant/incident/task references are accepted only when you hold the matching source read permission. Cross-tenant linked references are rejected by the server." />
+        <div className="platform-runbooks__execution-form">
+          <label>Runbook<select value={executionDraft.runbook_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, runbook_id: event.target.value }))}><option value="">Select active runbook</option>{(runbooks.data?.runbooks || []).filter((runbook) => runbook.is_active).map((runbook) => <option key={runbook.id} value={runbook.id}>{runbook.title}</option>)}</select></label>
+          {canReadTenants ? <label>Tenant<select value={executionDraft.tenant_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Platform-wide / infer from linked evidence</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : <div className="platform-runbooks__restricted-filter">Tenant linking requires TENANTS_READ.</div>}
+          {canReadIncidents ? <label>Incident ID<input value={executionDraft.incident_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, incident_id: event.target.value }))} placeholder="Optional incident UUID" /></label> : null}
+          {canReadTenants ? <label>Tenant task ID<input value={executionDraft.task_id} onChange={(event) => setExecutionDraft((current) => ({ ...current, task_id: event.target.value }))} placeholder="Optional tenant-task UUID" /></label> : null}
+          <label className="platform-runbooks__span-two">Reason / ticket context<input value={executionDraft.reason} onChange={(event) => setExecutionDraft((current) => ({ ...current, reason: event.target.value }))} maxLength={1000} placeholder="Why this execution is being started" /></label>
+          <label className="platform-runbooks__span-two">Notes<textarea value={executionDraft.notes} onChange={(event) => setExecutionDraft((current) => ({ ...current, notes: event.target.value }))} maxLength={4000} placeholder="Optional application notes" /></label>
+        </div>
+        {!linkedIdsValid ? <div className="platform-runbooks__warning">Incident/task references must be valid UUIDs.</div> : null}
+        <div className="platform-runbooks__actions"><button type="button" className="app-button" disabled={!canStart || startExecution.isPending} onClick={() => startExecution.mutate()}>{startExecution.isPending ? 'Starting…' : 'Start execution'}</button></div>
+      </section> : null}
+
+      <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Execution registry" description="Linked source fields are redacted server-side when their source permission is unavailable. Loaded rows are the current page only." />
+        {executions.isLoading && !executions.data ? <div className="platform-runbooks__loading">Loading executions…</div> : null}
+        {!executions.isLoading && executions.data?.executions.length === 0 ? <div className="platform-runbooks__empty"><strong>No execution records match this view.</strong><span>This does not prove no external procedure was performed.</span></div> : null}
+        <div className="platform-runbooks__execution-list">{(executions.data?.executions || []).map((execution) => <article key={execution.id} className="platform-runbooks__execution-card"><div className="platform-runbooks__execution-head"><div><h4>{execution.runbook_title}</h4><span>{humanize(execution.runbook_category)} · {humanize(execution.runbook_severity)} · started {dateTime(execution.started_at)}</span></div><span className="platform-runbooks__posture" data-tone={executionTone(execution.status)}>{humanize(execution.status)}</span></div><p>{execution.reason}</p><div className="platform-runbooks__detail-metrics"><div><span>Tenant</span><strong>{canReadTenants ? execution.tenant_name || 'Platform-wide / not linked' : 'Restricted'}</strong></div><div><span>Progress</span><strong>{execution.done_steps ?? 0}/{execution.total_steps ?? 0}</strong></div><div><span>Started by</span><strong>{canReadPlatformUsers ? execution.started_by_platform_user_email || 'Not recorded' : 'Redacted'}</strong></div><div><span>Incident</span><strong>{canReadIncidents ? execution.incident_id || 'Not linked' : 'Restricted'}</strong></div></div><div className="platform-runbooks__actions"><button type="button" className="app-button app-button--secondary" onClick={() => setSelectedExecutionId(execution.id)}>Open execution</button>{canReadAudit ? <Link to="/platform/audit">Audit evidence</Link> : null}{canReadTenants && execution.tenant_id ? <Link to={`/platform/tenant-timeline?tenant_id=${encodeURIComponent(execution.tenant_id)}`}>Tenant timeline</Link> : null}</div></article>)}</div>
+        <div className="platform-runbooks__pagination"><button type="button" className="app-button app-button--secondary" disabled={executionOffset === 0 || executions.isFetching} onClick={() => setExecutionOffset((value) => Math.max(0, value - PAGE_SIZE))}>Previous</button><span>Page {executionPage}</span><button type="button" className="app-button app-button--secondary" disabled={!executions.data?.pagination.has_more || executions.isFetching} onClick={() => setExecutionOffset((value) => value + PAGE_SIZE)}>Next</button></div>
+      </section>
+
+      {selectedExecutionId ? <section className="io-workspace-panel platform-runbooks__section">
+        <OperationalSectionHeader iconPath="/platform/runbooks" title="Execution detail" description="Step status and notes are application evidence. Required steps must be done before application completion." />
+        {selectedExecution.isLoading && !selectedExecution.data ? <div className="platform-runbooks__loading">Loading execution detail…</div> : null}
+        {selectedExecution.isError && selectedExecution.data === undefined ? <div className="platform-runbooks__blocking-error"><strong>Execution detail unavailable</strong><span>{readableError(selectedExecution.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => selectedExecution.refetch()}>Retry</button></div> : null}
+        {selectedExecution.isError && selectedExecution.data !== undefined ? <div className="platform-runbooks__warning">Showing the last successful execution detail snapshot. Refresh failed: {readableError(selectedExecution.error)}</div> : null}
+        {selectedExecution.data ? <>
+          <div className="platform-runbooks__execution-head"><div><h4>{selectedExecution.data.runbook_title}</h4><span>{selectedExecution.data.reason} · {dateTime(selectedExecution.data.started_at)}</span></div><span className="platform-runbooks__posture" data-tone={executionTone(selectedExecution.data.status)}>{humanize(selectedExecution.data.status)}</span></div>
+          <div className="platform-runbooks__detail-metrics"><div><span>Tenant evidence</span><strong>{canReadTenants ? selectedExecution.data.tenant_name || 'Not linked' : 'Restricted'}</strong></div><div><span>Incident evidence</span><strong>{canReadIncidents ? selectedExecution.data.incident_id || 'Not linked' : 'Restricted'}</strong></div><div><span>Tenant task</span><strong>{canReadTenants ? selectedExecution.data.task_id || 'Not linked' : 'Restricted'}</strong></div><div><span>Operator identity</span><strong>{canReadPlatformUsers ? selectedExecution.data.started_by_platform_user_email || 'Not recorded' : 'Redacted'}</strong></div></div>
+          <div className="platform-runbooks__step-list">{(selectedExecution.data.steps || []).map((step) => <div key={step.id} className="platform-runbooks__execution-step"><div className="platform-runbooks__step-copy"><strong>{step.step_order}. {step.title}</strong><span>{step.instructions || 'No instructions recorded.'}</span><small>Expected: {step.expected_result || 'Not specified'} · {step.is_required ? 'Required' : 'Optional'} · completed {dateTime(step.completed_at)}</small></div><span className="platform-runbooks__posture" data-tone={step.status === 'done' ? 'good' : step.status === 'skipped' ? 'neutral' : 'warn'}>{humanize(step.status)}</span>{canExecute && selectedExecution.data?.status === 'in_progress' ? <div className="platform-runbooks__step-actions"><input value={stepNotes[step.id] ?? ''} onChange={(event) => setStepNotes((current) => ({ ...current, [step.id]: event.target.value }))} maxLength={4000} placeholder="Step note" /><button type="button" className="app-button app-button--secondary" disabled={updateStep.isPending} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'done', notes: stepNotes[step.id] || '' })}>Done</button><button type="button" className="app-button app-button--secondary" disabled={updateStep.isPending} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'skipped', notes: stepNotes[step.id] || '' })}>Skip</button><button type="button" className="app-button app-button--secondary" disabled={updateStep.isPending} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: 'pending', notes: stepNotes[step.id] || '' })}>Reset</button><button type="button" className="app-button app-button--secondary" disabled={updateStep.isPending} onClick={() => updateStep.mutate({ executionId: selectedExecution.data!.id, stepId: step.id, status: step.status, notes: stepNotes[step.id] || '' })}>Save note</button></div> : null}</div>)}</div>
+          {canExecute && selectedExecution.data.status === 'in_progress' ? <div className="platform-runbooks__close-panel"><label>Execution close notes<textarea value={closeNotes} onChange={(event) => setCloseNotes(event.target.value)} maxLength={4000} placeholder="Optional completion/cancellation notes" /></label><div className="platform-runbooks__actions"><button type="button" className="app-button" disabled={closeExecution.isPending} onClick={() => { if (window.confirm('Complete this execution in the application? Required steps must already be done.')) closeExecution.mutate({ executionId: selectedExecution.data!.id, action: 'complete' }); }}>Complete execution</button><button type="button" className="app-button app-button--danger" disabled={closeExecution.isPending} onClick={() => { if (window.confirm('Cancel this execution in the application?')) closeExecution.mutate({ executionId: selectedExecution.data!.id, action: 'cancel' }); }}>Cancel execution</button></div></div> : null}
+        </> : null}
+      </section> : null}
     </div>
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  muted: { color: '#64748b', fontSize: 13, lineHeight: 1.5 },
-  metaText: { color: '#64748b', fontSize: 12, marginTop: 8 },
-  successMessage: { border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 12, padding: 12 },
-  errorPanel: { background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
-  linkPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 },
-  linkRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  quickLink: { border: '1px solid #cbd5e1', borderRadius: 999, padding: '7px 10px', color: 'var(--io-primary-dark)', textDecoration: 'none', background: '#fff', fontSize: 13, fontWeight: 700 },
-  tableLink: { color: 'var(--io-primary-dark)', fontSize: 12, textDecoration: 'none', fontWeight: 700 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  sectionTitle: { marginTop: 0, fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  smallHeading: { marginBottom: 8, fontSize: 15, color: '#0f172a' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 },
-  summaryCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 4, background: '#f8fafc', color: '#334155' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) minmax(160px, 1fr) auto', gap: 12, alignItems: 'center' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, alignItems: 'start' },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', color: '#0f172a', width: '100%', boxSizing: 'border-box', minWidth: 0 },
-  fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontSize: 13, fontWeight: 700 },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  button: { border: '1px solid var(--io-primary)', borderRadius: 9, padding: '9px 13px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '9px 13px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  dangerButton: { border: '1px solid #fecaca', borderRadius: 9, padding: '9px 13px', background: '#fff', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 },
-  smallButton: { border: '1px solid var(--io-primary)', borderRadius: 8, padding: '7px 10px', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  secondarySmallButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 10px', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  actionRow: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 },
-  stepsList: { display: 'flex', flexDirection: 'column', gap: 10 },
-  stepEditor: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc' },
-  columns: { display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(320px, 1.1fr)', gap: 16 },
-  cardList: { display: 'flex', flexDirection: 'column', gap: 10 },
-  cardButton: { textAlign: 'left', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#fff', color: '#334155', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 },
-  selectedCard: { textAlign: 'left', border: '1px solid var(--io-primary-light)', borderRadius: 12, padding: 12, background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 },
-  detailBlock: { display: 'flex', flexDirection: 'column', gap: 8 },
-  detailTitle: { margin: 0, fontSize: 18, color: '#0f172a' },
-  orderedList: { display: 'flex', flexDirection: 'column', gap: 10, paddingLeft: 22, color: '#334155' },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  warnBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontSize: 12, fontWeight: 700 },
-  okBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 700 },
-  neutralBadge: { display: 'inline-block', borderRadius: 999, padding: '4px 9px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 700 },
-  executionStep: { display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#fff' }
-};
+function RunbookEditor({ draft, setDraft, allowStructuralEdit, submitting }: { draft: RunbookDraft; setDraft: Dispatch<SetStateAction<RunbookDraft>>; allowStructuralEdit: boolean; submitting: boolean }) {
+  const updateStep = (index: number, patch: Partial<StepDraft>) => setDraft((current) => ({ ...current, steps: current.steps.map((step, stepIndex) => stepIndex === index ? { ...step, ...patch } : step) }));
+  const addStep = () => setDraft((current) => ({ ...current, steps: [...current.steps, { ...defaultStep }] }));
+  const removeStep = (index: number) => {
+    if (!window.confirm('Remove this runbook step from the draft?')) return;
+    setDraft((current) => ({ ...current, steps: current.steps.filter((_, stepIndex) => stepIndex !== index) }));
+  };
+  return <div className="platform-runbooks__editor">
+    <div className="platform-runbooks__editor-grid">
+      <label>Title<input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} maxLength={200} disabled={!allowStructuralEdit || submitting} /></label>
+      <label>Category<select value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} disabled={!allowStructuralEdit || submitting}>{categories.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}</select></label>
+      <label>Severity<select value={draft.severity} onChange={(event) => setDraft((current) => ({ ...current, severity: event.target.value }))} disabled={!allowStructuralEdit || submitting}>{severities.map((item) => <option key={item} value={item}>{humanize(item)}</option>)}</select></label>
+      <label>Owner role<input value={draft.owner_role} onChange={(event) => setDraft((current) => ({ ...current, owner_role: event.target.value }))} maxLength={120} disabled={submitting} /></label>
+      <label className="platform-runbooks__span-two">Description<textarea value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} maxLength={5000} disabled={submitting} /></label>
+      <label className="platform-runbooks__checkbox"><input type="checkbox" checked={draft.is_active} onChange={(event) => setDraft((current) => ({ ...current, is_active: event.target.checked }))} disabled={submitting} /> Active definition</label>
+    </div>
+    <div className="platform-runbooks__step-editor-list">{draft.steps.map((step, index) => <div key={`${index}-${step.title}`} className="platform-runbooks__step-editor"><label>Step {index + 1} title<input value={step.title} onChange={(event) => updateStep(index, { title: event.target.value })} maxLength={200} disabled={!allowStructuralEdit || submitting} /></label><label>Instructions<textarea value={step.instructions} onChange={(event) => updateStep(index, { instructions: event.target.value })} maxLength={8000} disabled={!allowStructuralEdit || submitting} /></label><label>Expected result<input value={step.expected_result} onChange={(event) => updateStep(index, { expected_result: event.target.value })} maxLength={2000} disabled={!allowStructuralEdit || submitting} /></label><label className="platform-runbooks__checkbox"><input type="checkbox" checked={step.is_required} onChange={(event) => updateStep(index, { is_required: event.target.checked })} disabled={!allowStructuralEdit || submitting} /> Required</label>{allowStructuralEdit && draft.steps.length > 1 ? <button type="button" className="app-button app-button--danger" disabled={submitting} onClick={() => removeStep(index)}>Remove step</button> : null}</div>)}</div>
+    {allowStructuralEdit ? <button type="button" className="app-button app-button--secondary" disabled={submitting} onClick={addStep}>Add step</button> : null}
+  </div>;
+}
