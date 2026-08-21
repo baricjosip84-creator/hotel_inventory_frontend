@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+const page=fs.readFileSync(path.join(root,'src/pages/PlatformComplianceDocumentsPage.tsx'),'utf8');
+const css=fs.readFileSync(path.join(root,'src/pages/PlatformComplianceDocumentsPage.css'),'utf8');
+const router=fs.readFileSync(path.join(root,'src/app/router.tsx'),'utf8');
+const layout=fs.readFileSync(path.join(root,'src/layouts/PlatformLayout.tsx'),'utf8');
+const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+const required=['OperationalWorkspaceHero','OperationalWorkspaceStats','OperationalSectionHeader','useSearchParams','PAGE_SIZE = 50','PLATFORM_USERS_READ','TENANTS_READ','enabled:canWrite && canReadTenants','enabled:canWrite && canReadUsers','Showing the last successful snapshot','Registry-wide filtered summary','subprocessor','active_status_does_not_prove_external_document_validity_or_acceptance','External document URL','Record reviewed · Active','Archived history is immutable','placeholderData:(previousData)=>previousData'];
+for(const token of required) if(!page.includes(token)) throw new Error(`Compliance documents page hardening missing: ${token}`);
+if(page.includes('status:form.status') || page.includes('status: form.status')) throw new Error('Compliance document ordinary edit must not submit lifecycle status.');
+if(!css.includes('--io-primary:#d14343') || !css.includes('--io-primary-dark:#b93636')) throw new Error('Compliance documents Platform red workspace identity missing.');
+if(!router.includes("path: 'compliance-documents'") || !router.includes('PLATFORM_COMPLIANCE_READ')) throw new Error('Compliance documents route permission guard missing.');
+if(!layout.includes('to="/platform/compliance-documents"') || !layout.includes('PLATFORM_COMPLIANCE_READ')) throw new Error('Compliance documents sidebar permission visibility missing.');
+if(!pkg.scripts?.['check:platform-compliance-documents-page-hardening']) throw new Error('Compliance documents checker script missing from package.json.');
+if(!pkg.scripts?.['check:ci']?.includes('check:platform-compliance-documents-page-hardening')) throw new Error('Compliance documents checker is not wired into check:ci.');
+console.log('Platform Compliance documents page hardening check: PASS');
