@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = path.resolve(import.meta.dirname, '..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const page = read('src/pages/PlatformAccessReviewsPage.tsx');
+const css = read('src/pages/PlatformAccessReviewsPage.css');
+const layout = read('src/layouts/PlatformLayout.tsx');
+const permissions = read('src/lib/platformPermissions.ts');
+function assert(condition, message) { if (!condition) throw new Error(message); }
+assert(page.includes('OperationalWorkspaceHero') && page.includes('OperationalWorkspaceStats') && page.includes('OperationalSectionHeader'), 'Access Reviews must use the shared Operational Workspace');
+assert(css.includes('--io-primary:#d14343') && css.includes('--io-primary-dark:#b93636'), 'Access Reviews must preserve Platform red identity');
+assert(page.includes('useSearchParams') && page.includes("searchParams.get('status')") && page.includes("searchParams.get('scope')") && page.includes("searchParams.get('search')"), 'Filters must be URL-backed');
+assert(page.includes('PAGE_SIZE = 50') && page.includes('response.pagination.has_more') && page.includes('filtered total'), 'Access Reviews must use real UI pagination');
+assert(page.includes('placeholderData: (previousData) => previousData') && page.includes('Showing the last successful snapshot'), 'Background refresh must preserve stale data');
+assert(page.includes('PLATFORM_USERS_READ') && page.includes('TENANTS_READ') && page.includes('PLATFORM_API_KEYS_READ') && page.includes('PLATFORM_WEBHOOKS_READ'), 'Source evidence must be permission-aware');
+assert(page.includes('source_available===false') && page.includes('Decision controls are unavailable for this item'), 'Restricted source items must not expose decision controls');
+assert(page.includes('Mixed reviews capture only the source families') && page.includes('external access was removed'), 'Truthfulness and partial-evidence messaging must remain explicit');
+assert(page.includes('toIsoOrNull(form.due_at)'), 'datetime-local values must be converted to ISO before submission');
+assert(page.includes('canReadUsers?<Link to="/platform/users"') && page.includes('canReadApiKeys?<Link to="/platform/api-keys"') && page.includes('canReadWebhooks?<Link to="/platform/webhooks"'), 'Supporting links must be permission-aware');
+assert(layout.includes('to="/platform/access-reviews"') && permissions.includes("PLATFORM_ACCESS_REVIEWS_READ: 'platform.access_reviews.read'"), 'Access Reviews navigation permission contract missing');
+assert(!page.includes('style={styles.'), 'Legacy inline-style Access Reviews shell must not return');
+console.log('Platform Access Reviews page hardening check: PASS');
