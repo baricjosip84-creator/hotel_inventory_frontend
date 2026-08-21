@@ -145,6 +145,7 @@ export default function PlatformTenantProvisioningHardeningPage() {
   const errorMessage = hardening.error instanceof Error ? hardening.error.message : 'The platform request failed.';
   const controlCoverage = `${summary.controls_with_evidence ?? 0}/${summary.total_controls ?? 0}`;
   const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadProvisioningPresets = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ);
 
   const updateSearchParam = (key: 'tenant_id' | 'limit', value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -429,9 +430,11 @@ export default function PlatformTenantProvisioningHardeningPage() {
                     <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/tenants">
                       Open tenants
                     </Link>
-                    <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/provisioning">
-                      Open provisioning
-                    </Link>
+                    {canReadProvisioningPresets ? (
+                      <Link className="app-button app-button--secondary platform-provisioning-hardening__link-button" to="/platform/provisioning">
+                        Open provisioning
+                      </Link>
+                    ) : null}
                     <Link
                       className="app-button app-button--secondary platform-provisioning-hardening__link-button"
                       to={`/platform/tenant-tasks?tenant_id=${tenant.tenant_id}&category=onboarding`}

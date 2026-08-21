@@ -153,7 +153,7 @@ export default function PlatformLayout() {
               <span>Onboarding checklist</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
             <NavLink to="/platform/tenant-provisioning-hardening" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-provisioning-hardening" />
               <span>Provisioning hardening</span>
@@ -873,7 +873,7 @@ export default function PlatformLayout() {
               <span>Tenant offboarding</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
             <NavLink to="/platform/provisioning" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/provisioning" />
               <span>Provisioning</span>

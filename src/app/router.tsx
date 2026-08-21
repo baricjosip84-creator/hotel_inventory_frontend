@@ -249,7 +249,7 @@ const router = createBrowserRouter([
       {
         path: 'tenant-provisioning-hardening',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ, PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ]}>
             <PlatformTenantProvisioningHardeningPage />
           </PlatformProtectedRoute>
         )
@@ -1000,7 +1000,7 @@ const router = createBrowserRouter([
       {
         path: 'provisioning',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ, PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ]}>
             <PlatformProvisioningPage />
           </PlatformProtectedRoute>
         )

@@ -62,9 +62,13 @@ for (const anchor of requiredCssAnchors) {
 if (!router.includes("path: 'tenant-provisioning-hardening'")) {
   throw new Error('Platform Provisioning Hardening check failed: route missing.');
 }
-if (!router.includes('<PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ]}>')) {
-  throw new Error('Platform Provisioning Hardening check failed: tenant-read permission guard missing.');
+if (!router.includes('<PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ, PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ]}>')) {
+  throw new Error('Platform Provisioning Hardening check failed: tenant-read + provisioning-preset-read permission guard missing.');
 }
+if (!page.includes('PLATFORM_PROVISIONING_PRESETS_READ')) {
+  throw new Error('Platform Provisioning Hardening check failed: provisioning supporting link is not preset-permission aware.');
+}
+
 if (!layout.includes('<NavLink to="/platform/tenant-provisioning-hardening"')) {
   throw new Error('Platform Provisioning Hardening check failed: navigation entry missing.');
 }
