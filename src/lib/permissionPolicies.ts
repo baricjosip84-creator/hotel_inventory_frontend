@@ -46,6 +46,7 @@ export type RolePermissionPolicy<Role extends string, Permission extends string>
   can_delete?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
+  revision?: string;
 };
 
 export const RESERVED_TENANT_CUSTOM_ROLE_NAMES = Object.freeze(['admin', 'manager', 'staff'] as const);
@@ -96,6 +97,15 @@ export type PlatformPermissionPolicyMatrix = {
     role_model: string;
     superadmin_immutable: boolean;
     superadmin_only_management: boolean;
+    stale_write_protection?: boolean;
+    active_requests_reauthorize_against_current_policy?: boolean;
+    support_sessions_closed_when_start_permission_removed?: boolean;
+  };
+  generated_at?: string;
+  evidence_contract?: {
+    application_authorization_policy_only?: boolean;
+    effective_permissions_apply_on_each_platform_request?: boolean;
+    permission_assignment_does_not_prove_external_system_access?: boolean;
   };
 };
 
@@ -277,13 +287,14 @@ export function fetchPlatformPermissionPolicyMatrix(): Promise<PlatformPermissio
 
 export async function savePlatformRolePermissionPolicy(
   role: PlatformRole,
-  permissions: PlatformPermission[]
+  permissions: PlatformPermission[],
+  expectedRevision: string
 ): Promise<RolePermissionPolicy<PlatformRole, PlatformPermission>> {
   const result = await platformApiRequest<RolePermissionPolicy<PlatformRole, PlatformPermission>>(
     `/platform/permissions/${role}`,
     {
       method: 'PUT',
-      body: JSON.stringify({ permissions }),
+      body: JSON.stringify({ permissions, expected_revision: expectedRevision }),
       skipMutationFeedback: true
     }
   );
@@ -292,12 +303,14 @@ export async function savePlatformRolePermissionPolicy(
 }
 
 export async function resetPlatformRolePermissionPolicy(
-  role: PlatformRole
+  role: PlatformRole,
+  expectedRevision: string
 ): Promise<RolePermissionPolicy<PlatformRole, PlatformPermission>> {
   const result = await platformApiRequest<RolePermissionPolicy<PlatformRole, PlatformPermission>>(
     `/platform/permissions/${role}`,
     {
       method: 'DELETE',
+      body: JSON.stringify({ expected_revision: expectedRevision }),
       skipMutationFeedback: true
     }
   );

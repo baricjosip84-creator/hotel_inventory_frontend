@@ -35,6 +35,10 @@ export type RolePermissionEditorProps<Role extends string, Permission extends st
   operationalWorkspace?: boolean;
   workspaceIconPath?: string;
   workspaceEyebrow?: string;
+  refreshing?: boolean;
+  onRefresh?: () => Promise<void> | void;
+  warningMessage?: string | null;
+  footerAddon?: ReactNode;
 };
 
 type WorkspaceView = 'role-permissions' | 'custom-roles';
@@ -75,7 +79,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   headerAddon,
   operationalWorkspace = false,
   workspaceIconPath = '/permissions',
-  workspaceEyebrow
+  workspaceEyebrow,
+  refreshing = false,
+  onRefresh,
+  warningMessage,
+  footerAddon
 }: RolePermissionEditorProps<Role, Permission>) {
   const [search, setSearch] = useState('');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('role-permissions');
@@ -113,6 +121,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     ? draftSet.size !== effectiveSet.size || [...draftSet].some((permission) => !effectiveSet.has(permission))
     : false;
   const isCustomRole = activeRole?.role_kind === 'custom';
+  const isPlatformScope = scopeLabel.toLowerCase() === 'platform';
   const resetLabel = isCustomRole ? 'Reset to starting template' : 'Reset to defaults';
   const baselineStatus = isCustomRole ? 'Using starting template' : 'Using hardcoded defaults';
   const baselineHelp = isCustomRole
@@ -331,6 +340,17 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                     </button>
                   </>
                 ) : null}
+                {onRefresh ? (
+                  <button
+                    type="button"
+                    className={operationalWorkspace ? 'app-button app-button--secondary' : undefined}
+                    style={operationalWorkspace ? undefined : { ...styles.secondaryButton, ...((refreshing || saving || resetting) ? styles.buttonDisabled : {}) }}
+                    disabled={refreshing || saving || resetting}
+                    onClick={() => void onRefresh()}
+                  >
+                    {refreshing ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   style={operationalWorkspace ? undefined : {
@@ -535,14 +555,14 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
           <OperationalWorkspaceStats ariaLabel={`${scopeLabel} permission overview`}>
             <OperationalWorkspaceStatCard label="Permissions" value={catalog.length} helper={`${allGroupNames.length} permission groups`} tone="blue" iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label="Built-in roles" value={builtInRoles.length} helper="Protected Admin, Manager and Staff baselines" tone="neutral" iconPath="/users" />
-            <OperationalWorkspaceStatCard label="Custom roles" value={customRoles.length} helper="Tenant-specific job access profiles" tone={customRoles.length ? 'blue' : 'neutral'} iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label="Built-in roles" value={builtInRoles.length} helper={isPlatformScope ? "Fixed Platform role catalog" : "Protected Admin, Manager and Staff baselines"} tone="neutral" iconPath="/users" />
+            <OperationalWorkspaceStatCard label={isPlatformScope ? "Editable roles" : "Custom roles"} value={isPlatformScope ? roles.filter((role) => role.editable).length : customRoles.length} helper={isPlatformScope ? "Superadmin remains immutable" : "Tenant-specific job access profiles"} tone={(isPlatformScope ? roles.some((role) => role.editable) : customRoles.length) ? 'blue' : 'neutral'} iconPath="/permissions" />
             <OperationalWorkspaceStatCard label="Selected enabled" value={draftSet.size} helper={activeRole ? `${activeRole.display_name || roleLabel(activeRole.role)}${dirty ? ' · unsaved draft' : ''}` : 'No role selected'} tone={dirty ? 'warn' : 'good'} iconPath="/permissions" />
             <OperationalWorkspaceStatCard label="Locked" value={lockedSet.size} helper="Safety permissions that cannot be removed" tone="warn" iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label={isCustomRole ? 'Template changes' : 'Saved overrides'} value={activeRole?.override_count || 0} helper={activeRole?.is_default ? 'Using baseline permissions' : 'Tenant-specific permission changes'} tone={(activeRole?.override_count || 0) > 0 ? 'warn' : 'neutral'} iconPath="/audit" />
+            <OperationalWorkspaceStatCard label={isCustomRole ? 'Template changes' : 'Saved overrides'} value={activeRole?.override_count || 0} helper={activeRole?.is_default ? 'Using baseline permissions' : isPlatformScope ? 'Platform-wide permission changes' : 'Tenant-specific permission changes'} tone={(activeRole?.override_count || 0) > 0 ? 'warn' : 'neutral'} iconPath="/audit" />
           </OperationalWorkspaceStats>
 
-          <OperationalWorkspaceTabs ariaLabel={`${scopeLabel} permission work areas`} hint="Edit role access or manage tenant custom roles.">
+          <OperationalWorkspaceTabs ariaLabel={`${scopeLabel} permission work areas`} hint={isPlatformScope ? "Edit fixed Platform role access. Changes apply to active requests immediately." : "Edit role access or manage tenant custom roles."}>
             <OperationalWorkspaceTab
               active={workspaceView === 'role-permissions'}
               iconPath="/permissions"
@@ -580,6 +600,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
           {successMessage}
         </div>
       ) : null}
+      {warningMessage ? (
+        <div className={operationalWorkspace ? 'app-warning-state role-permission-editor__message' : undefined} role="status">
+          {warningMessage}
+        </div>
+      ) : null}
       {errorMessage ? (
         <div style={operationalWorkspace ? undefined : styles.error} className={operationalWorkspace ? 'app-error-state role-permission-editor__message' : undefined} role="alert">
           {errorMessage}
@@ -594,6 +619,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
           {editorContent}
         </>
       )}
+      {footerAddon}
     </section>
   );
 }

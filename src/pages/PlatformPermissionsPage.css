@@ -1,0 +1,51 @@
+.platform-permissions-load-error {
+  display: grid;
+  gap: 8px;
+  margin: 20px;
+  padding: 18px;
+}
+
+.platform-permissions-load-error .app-button {
+  justify-self: start;
+}
+
+.platform-permissions__evidence {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  border-left: 4px solid #d14343;
+  padding: 18px;
+}
+
+.platform-permissions__evidence strong {
+  color: #b93636;
+}
+
+.platform-permissions__evidence p {
+  max-width: 900px;
+  margin: 6px 0 0;
+  color: #5b6472;
+  line-height: 1.55;
+}
+
+.platform-permissions__evidence nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.platform-permissions__evidence a {
+  white-space: nowrap;
+}
+
+@media (max-width: 780px) {
+  .platform-permissions__evidence {
+    display: grid;
+  }
+
+  .platform-permissions__evidence nav {
+    justify-content: flex-start;
+  }
+}
