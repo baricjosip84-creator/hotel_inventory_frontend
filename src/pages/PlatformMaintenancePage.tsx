@@ -1,10 +1,21 @@
-import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformMaintenancePage.css';
 
-type Tenant = { id: string; name: string; status?: string | null; plan_code?: string | null };
+type Tenant = { id: string; name: string; status?: string | null };
+type MaintenanceStatus = 'scheduled' | 'active' | 'completed' | 'cancelled';
 type MaintenanceWindow = {
   id: string;
   title: string;
@@ -12,59 +23,160 @@ type MaintenanceWindow = {
   scope: 'platform' | 'tenant';
   tenant_id?: string | null;
   tenant_name?: string | null;
+  tenant_status?: string | null;
+  tenant_present?: boolean;
   starts_at: string;
   ends_at: string;
-  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  status: MaintenanceStatus;
   lock_writes: boolean;
+  created_by_platform_user_id?: string | null;
   created_by_email?: string | null;
+  created_by_present?: boolean;
+  cancelled_by_platform_user_id?: string | null;
   cancelled_by_email?: string | null;
+  cancelled_by_present?: boolean;
+  cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  completed_at?: string | null;
+  is_current?: boolean;
+  is_terminal?: boolean;
 };
+type MaintenanceResponse = {
+  windows: MaintenanceWindow[];
+  summary: {
+    total: number;
+    scheduled: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    platform_scoped: number;
+    tenant_scoped: number;
+    active_write_locks: number;
+  };
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_access: { tenant_identity: boolean; platform_user_identity: boolean };
+  evidence_complete: boolean;
+  evidence_contract: {
+    application_maintenance_records_only: boolean;
+    effective_phase_is_derived_from_application_time_and_terminal_state: boolean;
+    lock_writes_is_an_application_request_guard_not_proof_of_external_downtime: boolean;
+    tenant_message_is_tenant_visible_during_current_or_upcoming_non_terminal_windows: boolean;
+    maintenance_completion_does_not_prove_external_work_or_customer_acceptance: boolean;
+    maintenance_records_do_not_prove_customer_notification_delivery: boolean;
+    maintenance_records_do_not_replace_external_service_health_or_change_execution_evidence: boolean;
+  };
+  generated_at: string;
+};
+type MaintenanceForm = {
+  title: string;
+  message: string;
+  scope: 'platform' | 'tenant';
+  tenant_id: string;
+  starts_at: string;
+  ends_at: string;
+  lock_writes: boolean;
+};
+type MaintenanceEditForm = Pick<MaintenanceForm, 'title' | 'message' | 'starts_at' | 'ends_at' | 'lock_writes'>;
 
-function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
-}
-
-function localDateTimeValue(date: Date): string {
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-export default function PlatformMaintenancePage() {
-  const qc = useQueryClient();
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_WRITE);
-  const [filters, setFilters] = useState({ status: '', scope: '', include_past: 'false' });
-  const [form, setForm] = useState({
+const PAGE_SIZE = 50;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function localDateTimeValue(value: Date | string) { const date = value instanceof Date ? value : new Date(value); const offset = date.getTimezoneOffset() * 60000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
+function formatDateTime(value?: string | null) { if (!value) return 'Not recorded'; const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString(); }
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
+function identityLabel(email: string | null | undefined, present: boolean | undefined, allowed: boolean) { if (!allowed && present) return 'Restricted'; return email || 'Not recorded'; }
+function statusTone(status: MaintenanceStatus) { if (status === 'active') return 'warn'; if (status === 'cancelled') return 'danger'; if (status === 'completed') return 'good'; return 'neutral'; }
+function createInitialForm(): MaintenanceForm {
+  return {
     title: '',
     message: '',
     scope: 'platform',
     tenant_id: '',
-    starts_at: localDateTimeValue(new Date(Date.now() + 60 * 60 * 1000)),
-    ends_at: localDateTimeValue(new Date(Date.now() + 2 * 60 * 60 * 1000)),
+    starts_at: localDateTimeValue(new Date(Date.now() + 60 * 60_000)),
+    ends_at: localDateTimeValue(new Date(Date.now() + 2 * 60 * 60_000)),
     lock_writes: false
-  });
+  };
+}
+function editFormFromWindow(window: MaintenanceWindow): MaintenanceEditForm {
+  return { title: window.title, message: window.message || '', starts_at: localDateTimeValue(window.starts_at), ends_at: localDateTimeValue(window.ends_at), lock_writes: window.lock_writes };
+}
+
+export default function PlatformMaintenancePage() {
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_WRITE);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadIncidents = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
+  const canReadReleases = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RELEASES_READ);
+  const canReadAnnouncements = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_READ);
+  const canReadJobs = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ);
+
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const tenantId = canReadTenants && uuidPattern.test(requestedTenantId) ? requestedTenantId : '';
+  const status = searchParams.get('status') || '';
+  const scope = searchParams.get('scope') || '';
+  const includePast = searchParams.get('include_past') === 'true';
+  const search = searchParams.get('search') || '';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+
+  const [form, setForm] = useState<MaintenanceForm>(() => createInitialForm());
+  const [editing, setEditing] = useState<MaintenanceWindow | null>(null);
+  const [editForm, setEditForm] = useState<MaintenanceEditForm | null>(null);
   const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
-  const [statusMessage, setStatusMessage] = useState('');
+  const [completionNoteById, setCompletionNoteById] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState('');
 
-  const query = new URLSearchParams({ limit: '200', include_past: filters.include_past });
-  if (filters.status) query.set('status', filters.status);
-  if (filters.scope) query.set('scope', filters.scope);
-
-  const maintenance = useQuery({
-    queryKey: ['platform', 'maintenance', filters],
-    queryFn: () => platformApiRequest<MaintenanceWindow[]>(`/platform/maintenance?${query.toString()}`)
+  const tenantsQuery = useQuery({
+    queryKey: ['platform', 'tenants', 'maintenance-directory'],
+    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
+    enabled: canReadTenants,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
-  const tenants = useQuery({
-    queryKey: ['platform', 'tenants', 'for-maintenance'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+  const listParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scope) params.set('scope', scope);
+    if (tenantId) params.set('tenant_id', tenantId);
+    if (search.trim()) params.set('search', search.trim());
+    params.set('include_past', includePast ? 'true' : 'false');
+    params.set('limit', String(PAGE_SIZE));
+    params.set('offset', String(offset));
+    return params.toString();
+  }, [status, scope, tenantId, search, includePast, offset]);
+
+  const maintenanceQuery = useQuery({
+    queryKey: ['platform', 'maintenance', 'registry', listParams],
+    queryFn: () => platformApiRequest<MaintenanceResponse>(`/platform/maintenance?${listParams}`),
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    placeholderData: (previous) => previous
   });
 
-  const create = useMutation({
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) { if (value) next.set(key, value); else next.delete(key); }
+    if (!Object.prototype.hasOwnProperty.call(patch, 'offset')) next.delete('offset');
+    setSearchParams(next, { replace: true });
+    setMessage('');
+  };
+  const invalidateMaintenance = async () => { await queryClient.invalidateQueries({ queryKey: ['platform', 'maintenance'] }); };
+  const refresh = async () => {
+    const jobs: Promise<unknown>[] = [maintenanceQuery.refetch()];
+    if (canReadTenants) jobs.push(tenantsQuery.refetch());
+    await Promise.allSettled(jobs);
+  };
+
+  const createMutation = useMutation({
     mutationFn: () => platformApiRequest<MaintenanceWindow>('/platform/maintenance', {
       method: 'POST',
       body: JSON.stringify({
-        title: trimmedTitle,
+        title: form.title.trim(),
         message: form.message.trim() || null,
         scope: form.scope,
         tenant_id: form.scope === 'tenant' ? form.tenant_id : null,
@@ -73,203 +185,220 @@ export default function PlatformMaintenancePage() {
         lock_writes: form.lock_writes
       })
     }),
-    onSuccess: async (createdWindow) => {
-      setStatusMessage(`Maintenance window created: ${createdWindow.title}`);
-      setForm({ ...form, title: '', message: '' });
-      await qc.invalidateQueries({ queryKey: ['platform', 'maintenance'] });
+    onSuccess: async (created) => {
+      setForm(createInitialForm());
+      setMessage(`Maintenance window created: ${created.title}.`);
+      await invalidateMaintenance();
     }
   });
-
-  const cancel = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/maintenance/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
-    onSuccess: async (_result, variables) => {
-      setStatusMessage('Maintenance window cancelled.');
+  const editMutation = useMutation({
+    mutationFn: () => {
+      if (!editing || !editForm) throw new Error('Select a maintenance window to edit.');
+      const body: Record<string, unknown> = {
+        title: editForm.title.trim(),
+        message: editForm.message.trim() || null,
+        ends_at: new Date(editForm.ends_at).toISOString(),
+        lock_writes: editForm.lock_writes
+      };
+      if (editing.status === 'scheduled') body.starts_at = new Date(editForm.starts_at).toISOString();
+      return platformApiRequest<MaintenanceWindow>(`/platform/maintenance/${encodeURIComponent(editing.id)}`, { method: 'PATCH', body: JSON.stringify(body) });
+    },
+    onSuccess: async () => { setEditing(null); setEditForm(null); setMessage('Maintenance window details updated.'); await invalidateMaintenance(); }
+  });
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest<MaintenanceWindow>(`/platform/maintenance/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
+    onSuccess: async (_window, variables) => {
       setCancelReasonById((current) => ({ ...current, [variables.id]: '' }));
-      await qc.invalidateQueries({ queryKey: ['platform', 'maintenance'] });
+      setMessage('Maintenance window cancelled. Active write-lock enforcement stops immediately.');
+      await invalidateMaintenance();
+    }
+  });
+  const completeMutation = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => platformApiRequest<MaintenanceWindow>(`/platform/maintenance/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify({ note: note.trim() || null }) }),
+    onSuccess: async (_window, variables) => {
+      setCompletionNoteById((current) => ({ ...current, [variables.id]: '' }));
+      setMessage('Active maintenance marked completed. Active write-lock enforcement stops immediately.');
+      await invalidateMaintenance();
     }
   });
 
-  const windows = useMemo(() => maintenance.data ?? [], [maintenance.data]);
-  const activeOrUpcoming = useMemo(() => windows.filter((w) => w.status !== 'completed' && w.status !== 'cancelled'), [windows]);
-  const trimmedTitle = form.title.trim();
-  const startsAtTime = form.starts_at ? new Date(form.starts_at).getTime() : Number.NaN;
-  const endsAtTime = form.ends_at ? new Date(form.ends_at).getTime() : Number.NaN;
-  const isTenantScoped = form.scope === 'tenant';
-  const createValidationMessage = !trimmedTitle
-    ? 'Enter a maintenance title before creating.'
-    : isTenantScoped && !form.tenant_id
-      ? 'Select a tenant for tenant-specific maintenance.'
-      : Number.isNaN(startsAtTime) || Number.isNaN(endsAtTime)
-        ? 'Select valid start and end times.'
-        : endsAtTime <= startsAtTime
-          ? 'End time must be after start time.'
+  const data = maintenanceQuery.data;
+  const windows = data?.windows || [];
+  const summary = data?.summary;
+  const pagination = data?.pagination;
+  const requestedTenantInvalid = Boolean(requestedTenantId && (!canReadTenants || !uuidPattern.test(requestedTenantId)));
+  const creatingTenantScope = form.scope === 'tenant';
+  const createStart = new Date(form.starts_at).getTime();
+  const createEnd = new Date(form.ends_at).getTime();
+  const createValidation = !form.title.trim()
+    ? 'Enter a maintenance title.'
+    : creatingTenantScope && !canReadTenants
+      ? 'TENANTS_READ is required for tenant-specific maintenance.'
+      : creatingTenantScope && !form.tenant_id
+        ? 'Select a tenant for tenant-specific maintenance.'
+        : Number.isNaN(createStart) || Number.isNaN(createEnd)
+          ? 'Choose valid start and end times.'
+          : createEnd <= createStart
+            ? 'End time must be after start time.'
+            : createEnd <= Date.now()
+              ? 'End time must still be in the future.'
+              : '';
+  const editStart = editForm ? new Date(editForm.starts_at).getTime() : Number.NaN;
+  const editEnd = editForm ? new Date(editForm.ends_at).getTime() : Number.NaN;
+  const editValidation = !editForm?.title.trim()
+    ? 'Title is required.'
+    : Number.isNaN(editStart) || Number.isNaN(editEnd)
+      ? 'Choose valid start and end times.'
+      : editEnd <= editStart
+        ? 'End time must be after start time.'
+        : editEnd <= Date.now()
+          ? 'End time must still be in the future.'
           : '';
-  const canCreateWindow = !createValidationMessage && !create.isPending;
-  const refreshAll = async () => {
-    setStatusMessage('');
-    await Promise.all([maintenance.refetch(), tenants.refetch()]);
-  };
-  const filteredScopeLabel = filters.scope || 'all scopes';
-  const filteredStatusLabel = filters.status || 'all statuses';
-  const visibleFilterLabel = filters.include_past === 'true' ? 'including past windows' : 'upcoming/current only';
+  const staleWarning = maintenanceQuery.isError && Boolean(maintenanceQuery.data);
+  const blockingError = maintenanceQuery.isError && !maintenanceQuery.data;
+  const snapshotLabel = data?.generated_at ? formatDateTime(data.generated_at) : 'Not loaded';
+  const visibleStart = pagination && pagination.total ? pagination.offset + 1 : 0;
+  const visibleEnd = pagination ? Math.min(pagination.offset + windows.length, pagination.total) : windows.length;
 
-  return <div style={styles.page}>
-    <header style={styles.headerRow}>
-      <div>
-        <h1 style={styles.title}>Maintenance windows</h1>
-        <p style={styles.muted}>Schedule platform-wide or tenant-specific maintenance that is visible inside tenant accounts.</p>
-      </div>
-      <button style={styles.secondaryButton} onClick={() => void refreshAll()} disabled={maintenance.isFetching || tenants.isFetching}>Refresh</button>
-    </header>
+  return (
+    <div className="platform-maintenance">
+      <OperationalWorkspaceHero
+        iconPath="/platform/maintenance"
+        eyebrow="Platform operations"
+        title="Maintenance"
+        description="Schedule planned application maintenance, publish tenant-visible notices, and optionally enforce real application write locks during active windows. Window records describe application control-plane state; they do not prove external maintenance work or customer receipt."
+        meta={<>
+          <OperationalWorkspaceMetaPill>Snapshot {snapshotLabel}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{data?.evidence_complete ? 'Full identity evidence' : 'Partial identity evidence'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{includePast ? 'History included' : 'Current + upcoming'}</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div className="platform-maintenance__hero-aside">
+          <OperationalWorkspaceStatus value={maintenanceQuery.isLoading ? 'Loading' : `${summary?.active || 0} active`} label={`${summary?.active_write_locks || 0} active write-lock window${(summary?.active_write_locks || 0) === 1 ? '' : 's'}`} />
+          <button type="button" className="app-button app-button--secondary" onClick={() => void refresh()} disabled={maintenanceQuery.isFetching || tenantsQuery.isFetching}>{maintenanceQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
+        </div>}
+      />
 
-    <section style={styles.metadataPanel}>
-      <span><b>Snapshot:</b> {maintenance.isFetching ? 'Refreshing' : 'Loaded'} · {new Date().toLocaleString()}</span>
-      <span><b>Source:</b> /platform/maintenance, /platform/tenants, /incident-context/current</span>
-      <span><b>Filters:</b> {filteredStatusLabel} · {filteredScopeLabel} · {visibleFilterLabel}</span>
-      <span><b>Rows:</b> {windows.length} listed · {activeOrUpcoming.length} visible</span>
-    </section>
+      {requestedTenantInvalid ? <div className="platform-maintenance__warning">Invalid or unauthorized URL filter: tenant targeting requires a valid tenant id and TENANTS_READ.</div> : null}
+      {staleWarning ? <div className="platform-maintenance__warning">Showing the last successful maintenance snapshot. Refresh failed: {readableError(maintenanceQuery.error)}</div> : null}
+      {message ? <div className="platform-maintenance__success"><span>{message}</span><button type="button" className="app-button app-button--secondary" onClick={() => setMessage('')}>Dismiss</button></div> : null}
 
-    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-      <a style={styles.supportLink} href="/platform/incidents">Incidents</a>
-      <a style={styles.supportLink} href="/platform/releases">Releases</a>
-      <a style={styles.supportLink} href="/platform/announcements">Announcements</a>
-      <a style={styles.supportLink} href="/platform/audit">Audit</a>
-    </nav>
+      <OperationalWorkspaceStats ariaLabel="Maintenance registry summary">
+        <OperationalWorkspaceStatCard label="Matched windows" value={summary?.total ?? 0} helper="Registry-wide under current filters" loading={maintenanceQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Active" value={summary?.active ?? 0} helper="Time-derived current phase" tone={(summary?.active || 0) > 0 ? 'warn' : 'neutral'} loading={maintenanceQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Scheduled" value={summary?.scheduled ?? 0} helper="Upcoming non-terminal windows" loading={maintenanceQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Write locks" value={summary?.active_write_locks ?? 0} helper="Active windows enforcing app writes" tone={(summary?.active_write_locks || 0) > 0 ? 'danger' : 'good'} loading={maintenanceQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Completed" value={summary?.completed ?? 0} helper="Elapsed or explicitly completed" tone="good" loading={maintenanceQuery.isLoading} />
+        <OperationalWorkspaceStatCard label="Cancelled" value={summary?.cancelled ?? 0} helper="Cancelled application windows" tone="neutral" loading={maintenanceQuery.isLoading} />
+      </OperationalWorkspaceStats>
 
-    {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
-
-    <section style={styles.summaryGrid}>
-      <div style={styles.summaryCard}><b>Visible windows</b><span>{activeOrUpcoming.length}</span></div>
-      <div style={styles.summaryCard}><b>Total listed</b><span>{windows.length}</span></div>
-      <div style={styles.summaryCard}><b>Platform-wide</b><span>{windows.filter((w) => w.scope === 'platform').length}</span></div>
-      <div style={styles.summaryCard}><b>Tenant-specific</b><span>{windows.filter((w) => w.scope === 'tenant').length}</span></div>
-    </section>
-
-    {canWrite ? <section style={styles.panel}>
-      <h2>Create maintenance window</h2>
-      <div style={styles.formGrid}>
-        <label style={styles.fieldLabel}>Title
-          <input style={styles.input} placeholder="Maintenance title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        </label>
-        <label style={styles.fieldLabel}>Scope
-          <select style={styles.input} value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, tenant_id: '' })}>
-            <option value="platform">Platform-wide</option>
-            <option value="tenant">Tenant-specific</option>
-          </select>
-        </label>
-        {isTenantScoped ? <label style={styles.fieldLabel}>Tenant
-          <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
-            <option value="">Select tenant</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status ? ` (${tenant.status})` : ''}</option>)}
-          </select>
-        </label> : null}
-        <label style={styles.fieldLabel}>Starts at
-          <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-        </label>
-        <label style={styles.fieldLabel}>Ends at
-          <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
-        </label>
-        <label style={styles.checkboxLabel}><input type="checkbox" checked={form.lock_writes} onChange={(e) => setForm({ ...form, lock_writes: e.target.checked })} /> Lock writes during window</label>
-      </div>
-      <label style={styles.fieldLabel}>Tenant message
-        <textarea style={styles.textarea} placeholder="Message shown to tenant users" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-      </label>
-      {createValidationMessage ? <div style={styles.warning}>{createValidationMessage}</div> : null}
-      <button style={{ ...styles.button, ...(canCreateWindow ? {} : styles.disabledButton) }} onClick={() => create.mutate()} disabled={!canCreateWindow}>Create window</button>
-      {create.error ? <div style={styles.error}>{readableError(create.error)}</div> : null}
-    </section> : null}
-
-    <section style={styles.panel}>
-      <h2>Filters</h2>
-      <div style={styles.filters}>
-        <label style={styles.fieldLabel}>Status
-          <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">All statuses</option><option value="scheduled">scheduled</option><option value="active">active</option><option value="completed">completed</option><option value="cancelled">cancelled</option>
-          </select>
-        </label>
-        <label style={styles.fieldLabel}>Scope
-          <select style={styles.input} value={filters.scope} onChange={(e) => setFilters({ ...filters, scope: e.target.value })}>
-            <option value="">All scopes</option><option value="platform">platform</option><option value="tenant">tenant</option>
-          </select>
-        </label>
-        <label style={styles.fieldLabel}>Visibility
-          <select style={styles.input} value={filters.include_past} onChange={(e) => setFilters({ ...filters, include_past: e.target.value })}>
-            <option value="false">Upcoming/current only</option><option value="true">Include past</option>
-          </select>
-        </label>
-      </div>
-    </section>
-
-    {maintenance.error ? <div style={styles.error}>Maintenance load failed: {readableError(maintenance.error)} <button style={styles.inlineButton} onClick={() => void maintenance.refetch()}>Retry</button></div> : null}
-    {tenants.error ? <div style={styles.error}>Tenant list load failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => void tenants.refetch()}>Retry</button></div> : null}
-
-    <section style={styles.list}>
-      {windows.map((window) => <article key={window.id} style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h3 style={styles.cardTitle}>{window.title}</h3>
-            <p style={styles.muted}>{window.scope === 'platform' ? 'Platform-wide' : `Tenant: ${window.tenant_name || window.tenant_id}`}</p>
-          </div>
-          <span style={styles.badge}>{window.status}</span>
+      <section className="io-workspace-section platform-maintenance__section">
+        <OperationalSectionHeader iconPath="/platform/maintenance" title="Evidence and truth boundary" description="Maintenance records, tenant visibility and write-lock enforcement are application evidence only." />
+        <div className="platform-maintenance__truth-note">
+          <strong>What this workspace proves</strong>
+          <span>The application recorded a planned window, derives its current phase from the scheduled times, and—when <b>Lock writes</b> is enabled—guards tenant application write requests while that window is active.</span>
+          <strong>What this workspace does not prove</strong>
+          <span>It does not prove infrastructure work occurred, an external service was unavailable or recovered, a customer received or accepted the notice, or a linked release/change actually executed successfully.</span>
         </div>
-        {window.message ? <p>{window.message}</p> : null}
-        <p style={styles.muted}>Starts: {new Date(window.starts_at).toLocaleString()} · Ends: {new Date(window.ends_at).toLocaleString()}</p>
-        <p style={styles.muted}>Lock writes: {window.lock_writes ? 'yes' : 'no'} · Created by: {window.created_by_email || '-'}</p>
-        <p style={styles.muted}>Evidence: window {window.id} · Tenant context source: /incident-context/current</p>
-        <div style={styles.evidenceLinks}>
-          <a style={styles.evidenceLink} href={`/platform/audit?target=${encodeURIComponent(window.id)}`}>Audit evidence</a>
-          {window.scope === 'tenant' && window.tenant_id ? <a style={styles.evidenceLink} href={`/platform/tenants?tenant=${encodeURIComponent(window.tenant_id)}`}>Tenant record</a> : null}
+        {!data?.evidence_complete && data ? <div className="platform-maintenance__warning">Some identity evidence is restricted. Tenant identity requires TENANTS_READ and Platform operator identity requires PLATFORM_USERS_READ. Restricted identity is shown as Restricted rather than a fake blank value.</div> : null}
+      </section>
+
+      <section className="io-workspace-section platform-maintenance__section">
+        <OperationalSectionHeader iconPath="/platform/maintenance" title="Filters" description="Search and paginate the server-side maintenance registry. Status is the effective phase, not a stale stored label." />
+        <div className="platform-maintenance__filters">
+          <label className="platform-maintenance__search">Search<input value={search} onChange={(event) => updateParams({ search: event.target.value || null })} placeholder="Title, tenant-visible message, cancellation reason…" /></label>
+          <label>Status<select value={status} onChange={(event) => { const nextStatus = event.target.value; updateParams({ status: nextStatus || null, include_past: ['completed', 'cancelled'].includes(nextStatus) ? 'true' : includePast ? 'true' : null }); }}><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
+          <label>Scope<select value={scope} onChange={(event) => updateParams({ scope: event.target.value || null })}><option value="">All scopes</option><option value="platform">Platform-wide</option><option value="tenant">Tenant-specific</option></select></label>
+          {canReadTenants ? <label>Tenant<select value={tenantId} onChange={(event) => updateParams({ tenant_id: event.target.value || null })}><option value="">All tenants</option>{(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status ? ` (${pretty(tenant.status)})` : ''}</option>)}</select></label> : null}
+          <label className="platform-maintenance__checkbox"><input type="checkbox" checked={includePast} onChange={(event) => updateParams({ include_past: event.target.checked ? 'true' : null })} />Include completed/cancelled history</label>
         </div>
-        {window.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {window.cancelled_by_email || '-'} · Reason: {window.cancellation_reason || '-'}</p> : null}
-        {canWrite && window.status !== 'cancelled' && window.status !== 'completed' ? <div style={styles.cancelRow}>
-          <label style={styles.fieldLabel}>Cancellation reason
-            <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[window.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [window.id]: e.target.value })} />
-          </label>
-          <button
-            style={{ ...styles.dangerButton, ...(cancel.isPending || !cancelReasonById[window.id]?.trim() ? styles.disabledDangerButton : {}) }}
-            onClick={() => { const reason = cancelReasonById[window.id]?.trim() || ''; if (globalThis.confirm(`Cancel maintenance window "${window.title}"?`)) cancel.mutate({ id: window.id, reason }); }}
-            disabled={cancel.isPending || !cancelReasonById[window.id]?.trim()}
-          >Cancel</button>
-        </div> : null}
-      </article>)}
-      {!maintenance.isLoading && windows.length === 0 ? <div style={styles.empty}>No maintenance windows match the current filters.</div> : null}
-    </section>
-  </div>;
+        {canReadTenants && tenantsQuery.isError ? <div className="platform-maintenance__warning">Tenant directory unavailable. Platform-wide maintenance remains usable; tenant selection is temporarily unavailable. <button type="button" className="app-button app-button--secondary" onClick={() => void tenantsQuery.refetch()}>Retry tenant directory</button></div> : null}
+      </section>
+
+      {canWrite ? <section className="io-workspace-section platform-maintenance__section">
+        <OperationalSectionHeader iconPath="/platform/maintenance" title="Create maintenance window" description="New windows begin as Scheduled unless their start time has already arrived. Tenant targeting is allowed only with TENANTS_READ." />
+        <div className="platform-maintenance__form-grid">
+          <label className="platform-maintenance__span-2">Title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={200} placeholder="Planned database maintenance" /></label>
+          <label>Scope<select value={form.scope} onChange={(event) => setForm({ ...form, scope: event.target.value as 'platform' | 'tenant', tenant_id: '' })}><option value="platform">Platform-wide</option>{canReadTenants ? <option value="tenant">Tenant-specific</option> : null}</select><small>{canReadTenants ? 'Tenant-specific targeting is available.' : 'TENANTS_READ is required to target a tenant.'}</small></label>
+          {creatingTenantScope ? <label>Tenant<select value={form.tenant_id} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}><option value="">Select tenant</option>{(tenantsQuery.data || []).filter((tenant) => tenant.status !== 'archived').map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status ? ` (${pretty(tenant.status)})` : ''}</option>)}</select></label> : null}
+          <label>Starts at<input type="datetime-local" value={form.starts_at} onChange={(event) => setForm({ ...form, starts_at: event.target.value })} /></label>
+          <label>Ends at<input type="datetime-local" value={form.ends_at} onChange={(event) => setForm({ ...form, ends_at: event.target.value })} /></label>
+          <label className="platform-maintenance__checkbox"><input type="checkbox" checked={form.lock_writes} onChange={(event) => setForm({ ...form, lock_writes: event.target.checked })} />Lock application writes while active</label>
+          <label className="platform-maintenance__span-all">Tenant-visible message<textarea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} maxLength={5000} placeholder="Message shown to affected tenant users while this window is current or upcoming." /></label>
+          {createValidation ? <div className="platform-maintenance__validation">{createValidation}</div> : null}
+        </div>
+        <div className="platform-maintenance__actions"><button type="button" className="app-button" disabled={Boolean(createValidation) || createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? 'Creating…' : 'Create window'}</button></div>
+        {createMutation.isError ? <div className="platform-maintenance__warning">Create failed: {readableError(createMutation.error)}</div> : null}
+      </section> : null}
+
+      <section className="io-workspace-section platform-maintenance__section">
+        <OperationalSectionHeader
+          iconPath="/platform/maintenance"
+          title="Maintenance registry"
+          description={pagination ? `Showing ${visibleStart}–${visibleEnd} of ${pagination.total} matching windows.` : 'Current maintenance registry.'}
+          actions={<div className="platform-maintenance__supporting-links">
+            {canReadIncidents ? <Link to="/platform/incidents">Incidents</Link> : null}
+            {canReadReleases ? <Link to="/platform/releases">Releases</Link> : null}
+            {canReadAnnouncements ? <Link to="/platform/announcements">Announcements</Link> : null}
+            {canReadJobs ? <Link to="/platform/operational-jobs?category=maintenance">Operational jobs</Link> : null}
+            {canReadAudit ? <Link to="/platform/audit">Audit</Link> : null}
+          </div>}
+        />
+
+        {blockingError ? <div className="platform-maintenance__blocking-error"><strong>Maintenance registry could not be loaded.</strong><span>{readableError(maintenanceQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void maintenanceQuery.refetch()}>Retry</button></div> : null}
+        {maintenanceQuery.isLoading && !data ? <div className="platform-maintenance__loading">Loading maintenance registry…</div> : null}
+        {!blockingError && !maintenanceQuery.isLoading && windows.length === 0 ? <div className="platform-maintenance__empty"><strong>No application maintenance evidence matched.</strong><span>This does not prove that no external maintenance work exists; it means no records matched this application registry/filter.</span></div> : null}
+
+        <div className="platform-maintenance__list">
+          {windows.map((window) => {
+            const tenantLabel = window.scope === 'platform' ? 'Platform-wide' : canReadTenants ? (window.tenant_name || 'Tenant record') : 'Tenant-specific · Restricted identity';
+            const canEditWindow = canWrite && !window.is_terminal;
+            const isEditing = editing?.id === window.id && editForm;
+            const cancelReason = cancelReasonById[window.id] || '';
+            const completionNote = completionNoteById[window.id] || '';
+            return <article key={window.id} className="platform-maintenance__card">
+              <div className="platform-maintenance__card-header">
+                <div><h4>{window.title}</h4><p>{tenantLabel}</p></div>
+                <div className="platform-maintenance__badges"><span data-tone={statusTone(window.status)}>{pretty(window.status)}</span>{window.lock_writes ? <span data-tone={window.status === 'active' ? 'danger' : 'warn'}>Write lock</span> : <span>No write lock</span>}</div>
+              </div>
+              {window.message ? <div className="platform-maintenance__public-note"><strong>Tenant-visible message</strong><span>{window.message}</span></div> : <div className="platform-maintenance__public-note"><strong>Tenant-visible message</strong><span>No message recorded.</span></div>}
+              <div className="platform-maintenance__metrics-grid">
+                <div><span>Starts</span><strong>{formatDateTime(window.starts_at)}</strong></div>
+                <div><span>Ends</span><strong>{formatDateTime(window.ends_at)}</strong></div>
+                <div><span>Current phase</span><strong>{pretty(window.status)}</strong></div>
+                <div><span>Created by</span><strong>{identityLabel(window.created_by_email, window.created_by_present, canReadPlatformUsers)}</strong></div>
+                <div><span>Tenant identity</span><strong>{window.scope === 'platform' ? 'Not applicable' : canReadTenants ? (window.tenant_name || 'Not recorded') : window.tenant_present ? 'Restricted' : 'Not recorded'}</strong></div>
+                <div><span>Application write guard</span><strong>{window.lock_writes ? (window.status === 'active' ? 'Enforcing now' : window.status === 'scheduled' ? 'Will enforce when active' : 'Not active') : 'Not requested'}</strong></div>
+              </div>
+              {window.status === 'cancelled' ? <div className="platform-maintenance__cancelled"><strong>Cancellation evidence</strong><span>{window.cancellation_reason || 'No reason recorded'} · {formatDateTime(window.cancelled_at)} · {identityLabel(window.cancelled_by_email, window.cancelled_by_present, canReadPlatformUsers)}</span></div> : null}
+              {window.status === 'completed' ? <div className="platform-maintenance__completed"><strong>Completion evidence</strong><span>{formatDateTime(window.completed_at)}. This application state does not prove external maintenance work completed successfully.</span></div> : null}
+
+              {isEditing ? <div className="platform-maintenance__edit-panel">
+                <strong>Edit ordinary window details</strong>
+                <div className="platform-maintenance__form-grid">
+                  <label className="platform-maintenance__span-2">Title<input value={editForm.title} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} /></label>
+                  {window.status === 'scheduled' ? <label>Starts at<input type="datetime-local" value={editForm.starts_at} onChange={(event) => setEditForm({ ...editForm, starts_at: event.target.value })} /></label> : <label>Starts at<input type="datetime-local" value={editForm.starts_at} disabled /><small>Active-window start history is immutable.</small></label>}
+                  <label>Ends at<input type="datetime-local" value={editForm.ends_at} onChange={(event) => setEditForm({ ...editForm, ends_at: event.target.value })} /></label>
+                  <label className="platform-maintenance__checkbox"><input type="checkbox" checked={editForm.lock_writes} onChange={(event) => setEditForm({ ...editForm, lock_writes: event.target.checked })} />Lock application writes while active</label>
+                  <label className="platform-maintenance__span-all">Tenant-visible message<textarea value={editForm.message} onChange={(event) => setEditForm({ ...editForm, message: event.target.value })} /></label>
+                  {editValidation ? <div className="platform-maintenance__validation">{editValidation}</div> : null}
+                </div>
+                <div className="platform-maintenance__actions"><button type="button" className="app-button" disabled={Boolean(editValidation) || editMutation.isPending} onClick={() => editMutation.mutate()}>{editMutation.isPending ? 'Saving…' : 'Save details'}</button><button type="button" className="app-button app-button--secondary" onClick={() => { setEditing(null); setEditForm(null); }}>Close editor</button></div>
+                {editMutation.isError ? <div className="platform-maintenance__warning">Edit failed: {readableError(editMutation.error)}</div> : null}
+              </div> : null}
+
+              {canEditWindow ? <div className="platform-maintenance__lifecycle-box">
+                <div className="platform-maintenance__actions"><button type="button" className="app-button app-button--secondary" onClick={() => { setEditing(window); setEditForm(editFormFromWindow(window)); setMessage(''); }}>Edit details</button>{canReadAudit ? <Link className="app-button app-button--secondary" to={`/platform/audit?target=${encodeURIComponent(window.id)}`}>Audit evidence</Link> : null}{window.scope === 'tenant' && window.tenant_id && canReadTenants ? <Link className="app-button app-button--secondary" to={`/platform/tenants?tenant=${encodeURIComponent(window.tenant_id)}`}>Tenant record</Link> : null}</div>
+                {window.status === 'active' ? <div className="platform-maintenance__complete-box"><label>Completion note<input value={completionNote} onChange={(event) => setCompletionNoteById((current) => ({ ...current, [window.id]: event.target.value }))} maxLength={1000} placeholder="Optional application completion note" /></label><button type="button" className="app-button" disabled={completeMutation.isPending} onClick={() => { if (globalThis.confirm(`Mark maintenance window “${window.title}” completed now?`)) completeMutation.mutate({ id: window.id, note: completionNote }); }}>{completeMutation.isPending ? 'Completing…' : 'Complete now'}</button></div> : null}
+                <div className="platform-maintenance__cancel-box"><label>Cancellation reason<input value={cancelReason} onChange={(event) => setCancelReasonById((current) => ({ ...current, [window.id]: event.target.value }))} maxLength={1000} placeholder="Reason required" /></label><button type="button" className="app-button app-button--danger" disabled={!cancelReason.trim() || cancelMutation.isPending} onClick={() => { if (globalThis.confirm(`Cancel maintenance window “${window.title}”?`)) cancelMutation.mutate({ id: window.id, reason: cancelReason }); }}>{cancelMutation.isPending ? 'Cancelling…' : 'Cancel window'}</button></div>
+                {completeMutation.isError ? <div className="platform-maintenance__warning">Completion failed: {readableError(completeMutation.error)}</div> : null}
+                {cancelMutation.isError ? <div className="platform-maintenance__warning">Cancellation failed: {readableError(cancelMutation.error)}</div> : null}
+              </div> : null}
+            </article>;
+          })}
+        </div>
+
+        {pagination ? <div className="platform-maintenance__pagination"><button type="button" className="app-button app-button--secondary" disabled={pagination.offset <= 0 || maintenanceQuery.isFetching} onClick={() => updateParams({ offset: String(Math.max(0, pagination.offset - PAGE_SIZE)) })}>Previous</button><span>{visibleStart}–{visibleEnd} of {pagination.total}</span><button type="button" className="app-button app-button--secondary" disabled={!pagination.has_more || maintenanceQuery.isFetching} onClick={() => updateParams({ offset: String(pagination.offset + PAGE_SIZE) })}>Next</button></div> : null}
+      </section>
+    </div>
+  );
 }
-
-const styles: Record<string, CSSProperties> = {
-  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  metadataPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, color: '#475569' },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '6px 10px', fontWeight: 700, fontSize: 12 },
-  evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  evidenceLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700 },
-  secondaryButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', cursor: 'pointer', width: 'fit-content', fontWeight: 700 },
-  inlineButton: { marginLeft: 8, padding: '4px 8px', border: '1px solid #fecaca', borderRadius: 8, background: '#fff', color: '#991b1b', cursor: 'pointer', fontWeight: 700 },
-  success: { color: '#166534', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  muted: { color: '#64748b', margin: '4px 0', fontSize: 13, lineHeight: 1.5 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
-  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', color: '#334155' },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 12, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  filters: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  fieldLabel: { display: 'grid', gap: 6, fontWeight: 700, color: '#334155', fontSize: 13 },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, font: 'inherit', fontWeight: 400, background: '#fff', color: '#0f172a' },
-  textarea: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, minHeight: 80, font: 'inherit', fontWeight: 400, background: '#fff', color: '#0f172a' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#334155' },
-  button: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', width: 'fit-content', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { background: '#e2e8f0', color: '#64748b', borderColor: '#cbd5e1', cursor: 'not-allowed' },
-  dangerButton: { padding: '9px 13px', border: '1px solid #dc2626', borderRadius: 9, background: '#dc2626', color: '#fff', cursor: 'pointer', height: 'fit-content', alignSelf: 'end', fontWeight: 700 },
-  disabledDangerButton: { background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca', cursor: 'not-allowed', opacity: 0.55 },
-  warning: { color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 10 },
-  error: { color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
-  list: { display: 'grid', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.02)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12 },
-  cardTitle: { margin: 0, color: '#0f172a' },
-  badge: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', padding: '4px 9px', borderRadius: 999, height: 'fit-content', fontSize: 12, fontWeight: 700 },
-  cancelRow: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 },
-  empty: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, color: '#64748b' }
-};

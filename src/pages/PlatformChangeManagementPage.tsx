@@ -16,6 +16,7 @@ import './PlatformChangeManagementPage.css';
 
 type Tenant = { id: string; name: string };
 type MaintenanceWindow = { id: string; title: string; scope: 'platform' | 'tenant'; tenant_id?: string | null; status: string };
+type MaintenanceRegistryResponse = { windows: MaintenanceWindow[] };
 type Runbook = { id: string; title: string; is_active: boolean };
 type EvidenceAccess = { tenant: boolean; maintenance: boolean; runbook: boolean; platform_user_identity: boolean };
 type ChangeRequest = {
@@ -170,7 +171,7 @@ export default function PlatformChangeManagementPage() {
   });
   const maintenance = useQuery({
     queryKey: ['platform', 'maintenance', 'change-management-selector'],
-    queryFn: () => platformApiRequest<MaintenanceWindow[]>('/platform/maintenance?limit=200&include_past=true'),
+    queryFn: () => platformApiRequest<MaintenanceRegistryResponse>('/platform/maintenance?limit=200&include_past=true'),
     enabled: canWrite && canReadMaintenance,
     refetchOnWindowFocus: false,
     staleTime: 30_000
@@ -204,7 +205,7 @@ export default function PlatformChangeManagementPage() {
     staleTime: 30_000
   });
 
-  const maintenanceOptions = useMemo(() => (maintenance.data || []).filter((window) => window.scope === 'platform' || Boolean(draft.tenant_id && window.tenant_id === draft.tenant_id)), [maintenance.data, draft.tenant_id]);
+  const maintenanceOptions = useMemo(() => (maintenance.data?.windows || []).filter((window) => (window.status === 'scheduled' || window.status === 'active') && (window.scope === 'platform' || Boolean(draft.tenant_id && window.tenant_id === draft.tenant_id))), [maintenance.data, draft.tenant_id]);
   const executedCount = summary.data?.by_status.find((item) => item.status === 'executed')?.count || 0;
   const openCount = (summary.data?.by_status || []).filter((item) => ['draft', 'pending_approval', 'approved'].includes(item.status)).reduce((sum, item) => sum + item.count, 0);
   const initialChangesError = changes.isError && changes.data === undefined;
