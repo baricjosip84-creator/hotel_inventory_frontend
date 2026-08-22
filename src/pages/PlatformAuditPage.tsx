@@ -260,7 +260,7 @@ export default function PlatformAuditPage() {
   }
 
   const supportingLinks = [
-    { label: 'Audit retention', to: '/platform/audit-retention', allowed: true },
+    { label: 'Audit retention', to: '/platform/audit-retention', allowed: canReadTenants },
     { label: 'Security Center', to: '/platform/security-center', allowed: hasPlatformPermission(P.PLATFORM_SECURITY_READ) },
     { label: 'Support Sessions', to: '/platform/support-sessions', allowed: hasPlatformPermission(P.SUPPORT_SESSION_READ) },
     { label: 'Tenant Exports', to: '/platform/tenant-exports', allowed: canReadTenants && hasPlatformPermission(P.TENANTS_EXPORT) },

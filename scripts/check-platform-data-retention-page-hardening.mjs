@@ -19,7 +19,7 @@ const required = [
   'Restricted values are not converted to zero or “healthy”.'
 ];
 for (const token of required) if (!page.includes(token)) throw new Error(`Data Retention page hardening missing: ${token}`);
-if (!auditRetention.includes('evidence_complete') || !auditRetention.includes('Export evidence restricted') || !auditRetention.includes('Restricted values are not treated as zero')) {
+if (!auditRetention.includes('evidence_complete') || !auditRetention.includes('Summary evidence restricted') || !auditRetention.includes('Restricted values remain Restricted/null and are not treated as zero')) {
   throw new Error('Audit Retention downstream restricted-evidence UX is missing.');
 }
 if (!css.includes('--io-primary:#d14343') || !css.includes('--io-primary-dark:#b93636')) throw new Error('Data Retention Platform red workspace identity missing.');

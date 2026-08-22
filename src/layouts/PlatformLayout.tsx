@@ -942,7 +942,8 @@ export default function PlatformLayout() {
               <span>Audit</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/audit-retention" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/audit-retention" />
               <span>Audit retention</span>

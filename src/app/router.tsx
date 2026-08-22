@@ -1294,7 +1294,10 @@ const router = createBrowserRouter([
       {
         path: 'audit-retention',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.AUDIT_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.AUDIT_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ
+          ]}>
             <PlatformAuditRetentionPage />
           </PlatformProtectedRoute>
         )

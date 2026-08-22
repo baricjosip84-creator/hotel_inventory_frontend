@@ -96,7 +96,7 @@ export default function PlatformComplianceExportPage(){
         <Link to="/platform/compliance-documents">Compliance docs</Link>
         {canReadPrivacy?<Link to="/platform/privacy-requests">Privacy requests</Link>:null}
         {canReadTenantExports?<Link to="/platform/tenant-exports">Tenant exports</Link>:null}
-        {canReadAudit?<Link to="/platform/audit-retention">Audit retention</Link>:null}
+        {canReadAudit&&canReadTenants?<Link to="/platform/audit-retention">Audit retention</Link>:null}
         {canReadRetention?<Link to="/platform/data-retention">Data retention</Link>:null}
         {canReadPermissionAudit?<Link to="/platform/permission-audit">Permission audit</Link>:null}
         {canReadPermissionAudit?<Link to="/platform/access-reviews">Access reviews</Link>:null}
