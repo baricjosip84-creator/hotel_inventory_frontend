@@ -27,32 +27,37 @@ type SecurityUser = {
   last_login_at?: string | null;
   password_changed_at?: string | null;
   mfa_enabled: boolean;
-  active_sessions: number;
+  active_sessions: number | null;
   risk_flags: string[];
 };
 
 type SecurityAdminOverview = {
   summary: {
-    total_users: number;
-    active_users: number;
-    locked_users: number;
-    users_without_mfa: number;
-    users_with_failed_logins: number;
-    active_sessions: number;
+    total_users: number | null;
+    active_users: number | null;
+    locked_users: number | null;
+    users_without_mfa: number | null;
+    users_with_failed_logins: number | null;
+    active_sessions: number | null;
   };
   users: SecurityUser[];
   active_sessions: Array<{
     id: string;
-    platform_user_id: string;
-    email: string;
-    name: string;
-    role: string;
+    platform_user_id: string | null;
+    email: string | null;
+    name: string | null;
+    role: string | null;
+    platform_user_identity_restricted: boolean;
     ip_address?: string | null;
     user_agent?: string | null;
     created_at: string;
     last_used_at?: string | null;
     expires_at: string;
   }>;
+  evidence_access: { platform_users: boolean; platform_sessions: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
 };
 
 function formatDate(value?: string | null) {
@@ -76,6 +81,8 @@ export default function PlatformSecurityPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const canReadAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ);
   const canWriteAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_WRITE);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadPlatformSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ);
 
   const q = useQuery({
     queryKey: ['platform', 'security', 'me'],
@@ -195,7 +202,7 @@ export default function PlatformSecurityPage() {
         <h2>Supporting Platform pages</h2>
         <p style={styles.muted}>Use these pages to investigate session, audit, permission, and access-review evidence. This page manages account security only.</p>
         <div style={styles.linkGrid}>
-          <SourceLink href="/platform/sessions">Platform Sessions</SourceLink>
+          {canReadPlatformSessions ? <SourceLink href="/platform/sessions">Platform Sessions</SourceLink> : null}
           <SourceLink href="/platform/system-audit">System Audit</SourceLink>
           <SourceLink href="/platform/permission-audit">Permission Audit</SourceLink>
           <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
@@ -208,8 +215,8 @@ export default function PlatformSecurityPage() {
         <div style={styles.flags}>
           <span style={styles.flag}>current account: {q.data ? 'loaded' : q.isLoading ? 'loading' : 'not loaded'}</span>
           <span style={styles.flag}>staff review: {admin.data ? 'loaded' : canReadAdminSecurity ? admin.isLoading ? 'loading' : 'not loaded' : 'not permitted'}</span>
-          <span style={styles.flag}>staff users: {adminUsers.length}</span>
-          <span style={styles.flag}>active staff sessions: {adminSessions.length}</span>
+          <span style={styles.flag}>staff users: {canReadPlatformUsers ? adminUsers.length : 'Restricted'}</span>
+          <span style={styles.flag}>active staff sessions: {canReadPlatformSessions ? adminSessions.length : 'Restricted'}</span>
           <span style={styles.flag}>MFA state: {q.data?.mfa_enabled ? 'enabled' : 'disabled or unknown'}</span>
         </div>
       </section>
@@ -252,7 +259,9 @@ export default function PlatformSecurityPage() {
         {disable.error ? <p style={styles.error}>{disable.error instanceof Error ? disable.error.message : 'MFA disable failed'}</p> : null}
       </section>
 
-      {canReadAdminSecurity ? (
+      {canReadAdminSecurity && admin.data && !admin.data.evidence_complete ? <p style={styles.notice}>Security review evidence is permission-scoped. Restricted sources: {admin.data.omitted_sources.join(', ')}. Hidden user/session evidence is not replaced with zero.</p> : null}
+
+      {canReadAdminSecurity && canReadPlatformUsers ? (
         <section style={styles.panel}>
           <h2>Platform staff security review</h2>
           {!canWriteAdminSecurity ? <p style={styles.notice}>Write actions are disabled because your role does not have platform.security.write.</p> : null}
@@ -289,7 +298,7 @@ export default function PlatformSecurityPage() {
         </section>
       ) : null}
 
-      {canReadAdminSecurity ? (
+      {canReadAdminSecurity && canReadPlatformSessions ? (
         <section style={styles.panel}>
           <h2>Active staff session evidence</h2>
           <p style={styles.muted}>Session details returned by the admin security endpoint. Use the Platform Sessions page for revocation workflows.</p>
@@ -298,7 +307,7 @@ export default function PlatformSecurityPage() {
             <tbody>
               {adminSessions.map((session) => (
                 <tr key={session.id}>
-                  <td style={styles.td}><b>{session.name || session.email}</b><br /><span style={styles.muted}>{session.email} · {session.role}</span></td>
+                  <td style={styles.td}>{session.platform_user_identity_restricted ? <b>Restricted Platform user</b> : <><b>{session.name || session.email}</b><br /><span style={styles.muted}>{session.email} · {session.role}</span></>}</td>
                   <td style={styles.td}>{session.ip_address || '—'}</td>
                   <td style={styles.td}>{formatDate(session.last_used_at || session.created_at)}</td>
                   <td style={styles.td}>{formatDate(session.expires_at)}</td>
