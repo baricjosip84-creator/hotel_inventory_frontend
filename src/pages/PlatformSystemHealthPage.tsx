@@ -443,7 +443,7 @@ export default function PlatformSystemHealthPage() {
                       <td><code>{row.path}</code></td>
                       <td>{formatDateTime(row.created_at)}</td>
                       <td>{formatDateTime(row.expires_at)}</td>
-                      <td>{canReadAudit ? <Link to={`/platform/audit?entity_type=idempotency_key&entity_id=${encodeURIComponent(row.id)}`}>Audit evidence</Link> : <span className="platform-system-health__quiet">ID {row.id.slice(0, 8)}…</span>}</td>
+                      <td>{canReadAudit ? <Link to={`/platform/audit?target_type=idempotency_key&target_id=${encodeURIComponent(row.id)}`}>Audit evidence</Link> : <span className="platform-system-health__quiet">ID {row.id.slice(0, 8)}…</span>}</td>
                     </tr>
                   ))}
                   {!diagnosticsQuery.data.length ? <tr><td colSpan={5} className="platform-system-health__empty">No stuck idempotency records in the bounded diagnostic result.</td></tr> : null}

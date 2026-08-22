@@ -1,10 +1,20 @@
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ApiError } from '../lib/api';
 import { platformApiRequest, platformDownload } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import type { PlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformAuditPage.css';
 
 type PlatformAuditRow = {
   id: string;
@@ -12,6 +22,7 @@ type PlatformAuditRow = {
   platform_user_email: string | null;
   platform_user_name: string | null;
   action: string;
+  source: string;
   target_type: string | null;
   target_id: string | null;
   tenant_id: string | null;
@@ -21,383 +32,331 @@ type PlatformAuditRow = {
   user_agent: string | null;
   created_at: string;
 };
-
 type AuditCountRow = { count: number };
 type AuditActionCount = AuditCountRow & { action: string };
 type AuditActorCount = AuditCountRow & { platform_user_id: string | null; actor: string };
 type AuditTenantCount = AuditCountRow & { tenant_id: string | null; tenant_name: string };
-type AuditCategoryCount = AuditCountRow & { category: string };
-
+type AuditSourceCount = AuditCountRow & { source: string };
 type AuditSummary = {
   total: { total_events: number; first_event_at: string | null; last_event_at: string | null };
   top_actions: AuditActionCount[];
-  top_actors: AuditActorCount[];
-  top_tenants: AuditTenantCount[];
-  categories: AuditCategoryCount[];
+  top_actors: AuditActorCount[] | null;
+  top_tenants: AuditTenantCount[] | null;
+  sources: AuditSourceCount[];
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_access: Record<string, boolean> & { platform_user_identity: boolean; tenant_identity: boolean };
+  evidence_complete: boolean;
+  required_permissions_by_source: Record<string, string[]>;
+  generated_at: string;
+};
+type PlatformAuditResponse = {
+  events: PlatformAuditRow[];
+  summary: AuditSummary;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_access: AuditSummary['evidence_access'];
+  evidence_complete: boolean;
+  required_permissions_by_source: Record<string, string[]>;
+  evidence_contract: {
+    audit_events_are_application_control_plane_evidence: boolean;
+    event_presence_does_not_prove_external_business_or_infrastructure_outcome: boolean;
+    restricted_source_events_are_not_queried_or_counted_as_zero: boolean;
+    actor_and_tenant_identity_require_independent_read_permissions: boolean;
+    csv_export_obeys_the_same_source_and_identity_permissions: boolean;
+  };
+  generated_at: string;
 };
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'All categories' },
-  { value: 'tenant', label: 'Tenant' },
-  { value: 'support', label: 'Support' },
-  { value: 'user', label: 'Platform users' },
-  { value: 'session', label: 'Sessions' },
-  { value: 'notification', label: 'Notifications' },
-  { value: 'billing', label: 'Billing' },
-  { value: 'security', label: 'Security' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'announcement', label: 'Announcements' },
-  { value: 'provisioning', label: 'Provisioning' },
-  { value: 'export', label: 'Exports' }
+type SourceOption = { value: string; label: string; permissions: PlatformPermission[] };
+const P = PLATFORM_PERMISSIONS;
+const PAGE_SIZE = 50;
+const EXPORT_LIMIT = 10000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SOURCE_OPTIONS: SourceOption[] = [
+  { value: 'audit', label: 'Audit native', permissions: [P.AUDIT_READ] },
+  { value: 'tenants', label: 'Tenants', permissions: [P.TENANTS_READ] },
+  { value: 'tenant_exports', label: 'Tenant exports', permissions: [P.TENANTS_READ, P.TENANTS_EXPORT] },
+  { value: 'platform_users', label: 'Platform users', permissions: [P.PLATFORM_USERS_READ] },
+  { value: 'platform_sessions', label: 'Platform sessions', permissions: [P.PLATFORM_SESSIONS_READ] },
+  { value: 'support_sessions', label: 'Support sessions', permissions: [P.SUPPORT_SESSION_READ] },
+  { value: 'notifications', label: 'Notifications', permissions: [P.PLATFORM_NOTIFICATIONS_READ] },
+  { value: 'billing', label: 'Billing', permissions: [P.PLATFORM_BILLING_READ] },
+  { value: 'security', label: 'Security', permissions: [P.PLATFORM_SECURITY_READ] },
+  { value: 'maintenance', label: 'Maintenance', permissions: [P.PLATFORM_MAINTENANCE_READ] },
+  { value: 'announcements', label: 'Announcements', permissions: [P.PLATFORM_ANNOUNCEMENTS_READ] },
+  { value: 'incidents', label: 'Incidents', permissions: [P.PLATFORM_INCIDENTS_READ] },
+  { value: 'data_retention', label: 'Data retention', permissions: [P.PLATFORM_DATA_RETENTION_READ] },
+  { value: 'sla', label: 'Tenant SLA', permissions: [P.PLATFORM_SLA_READ] },
+  { value: 'runbooks', label: 'Runbooks', permissions: [P.PLATFORM_RUNBOOKS_READ] },
+  { value: 'changes', label: 'Change management', permissions: [P.PLATFORM_CHANGES_READ] },
+  { value: 'api_keys', label: 'API keys', permissions: [P.PLATFORM_API_KEYS_READ] },
+  { value: 'webhooks', label: 'Webhooks', permissions: [P.PLATFORM_WEBHOOKS_READ] },
+  { value: 'access_reviews', label: 'Access reviews', permissions: [P.PLATFORM_ACCESS_REVIEWS_READ] },
+  { value: 'compliance', label: 'Compliance', permissions: [P.PLATFORM_COMPLIANCE_READ] },
+  { value: 'privacy', label: 'Privacy requests', permissions: [P.PLATFORM_PRIVACY_READ] },
+  { value: 'vendors', label: 'Vendors', permissions: [P.PLATFORM_VENDORS_READ] },
+  { value: 'dependencies', label: 'Service dependencies', permissions: [P.PLATFORM_DEPENDENCIES_READ] },
+  { value: 'releases', label: 'Releases', permissions: [P.PLATFORM_RELEASES_READ] },
+  { value: 'risks', label: 'Risk register', permissions: [P.PLATFORM_RISKS_READ] },
+  { value: 'capacity', label: 'Capacity planning', permissions: [P.PLATFORM_CAPACITY_READ] },
+  { value: 'jobs', label: 'Operational jobs', permissions: [P.PLATFORM_JOBS_READ] },
+  { value: 'role_permissions', label: 'Role permissions', permissions: [P.PLATFORM_ROLE_PERMISSIONS_READ] },
+  { value: 'provisioning_presets', label: 'Provisioning presets', permissions: [P.PLATFORM_PROVISIONING_PRESETS_READ] },
+  { value: 'provisioning', label: 'Provisioning', permissions: [P.TENANTS_READ, P.PLATFORM_PROVISIONING_PRESETS_READ] },
+  { value: 'system_health', label: 'System health', permissions: [P.SYSTEM_HEALTH_READ, P.TENANTS_READ] }
 ];
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return 'Unknown error';
 }
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
+function formatDateTime(value?: string | null): string {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString();
 }
-
+function localInputValue(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function toIso(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 function metadataPreview(metadata: Record<string, unknown> | null): string {
-  if (!metadata || !Object.keys(metadata).length) return '-';
-
-  try {
-    return JSON.stringify(metadata);
-  } catch {
-    return '[unreadable metadata]';
-  }
+  if (!metadata || !Object.keys(metadata).length) return 'No metadata recorded';
+  try { return JSON.stringify(metadata); } catch { return '[unreadable metadata]'; }
 }
+function pretty(value: string): string { return value.replaceAll('_', ' '); }
 
 export default function PlatformAuditPage() {
-  const [limit, setLimit] = useState('100');
-  const [action, setAction] = useState('');
-  const [category, setCategory] = useState('');
-  const [tenantId, setTenantId] = useState('');
-  const [platformUserId, setPlatformUserId] = useState('');
-  const [targetType, setTargetType] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const source = searchParams.get('source') || '';
+  const category = searchParams.get('category') || '';
+  const action = searchParams.get('action') || '';
+  const targetType = searchParams.get('target_type') || searchParams.get('entity_type') || '';
+  const targetId = searchParams.get('target_id') || searchParams.get('entity_id') || '';
+  const tenantId = searchParams.get('tenant_id') || '';
+  const platformUserId = searchParams.get('platform_user_id') || '';
+  const from = searchParams.get('from') || '';
+  const to = searchParams.get('to') || '';
+  const search = searchParams.get('search') || '';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+
+  const [draft, setDraft] = useState({ source, action, targetType, targetId, tenantId, platformUserId, from: localInputValue(from), to: localInputValue(to), search });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
-  const canReadTenantExports = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
+
+  const canReadTenants = hasPlatformPermission(P.TENANTS_READ);
+  const canReadUsers = hasPlatformPermission(P.PLATFORM_USERS_READ);
+  const allowedSourceOptions = SOURCE_OPTIONS.filter((item) => item.permissions.every((permission) => hasPlatformPermission(permission)));
+
+  useEffect(() => {
+    setDraft({ source, action, targetType, targetId, tenantId, platformUserId, from: localInputValue(from), to: localInputValue(to), search });
+  }, [source, action, targetType, targetId, tenantId, platformUserId, from, to, search]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('limit', limit.trim() || '100');
-    if (action.trim()) params.set('action', action.trim());
-    if (category.trim()) params.set('category', category.trim());
-    if (tenantId.trim()) params.set('tenant_id', tenantId.trim());
-    if (platformUserId.trim()) params.set('platform_user_id', platformUserId.trim());
-    if (targetType.trim()) params.set('target_type', targetType.trim());
-    if (from.trim()) params.set('from', from.trim());
-    if (to.trim()) params.set('to', to.trim());
-    if (search.trim()) params.set('search', search.trim());
+    if (source) params.set('source', source);
+    if (category) params.set('category', category);
+    if (action) params.set('action', action);
+    if (targetType) params.set('target_type', targetType);
+    if (targetId) params.set('target_id', targetId);
+    if (tenantId) params.set('tenant_id', tenantId);
+    if (platformUserId) params.set('platform_user_id', platformUserId);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (search) params.set('search', search);
+    params.set('limit', String(PAGE_SIZE));
+    params.set('offset', String(offset));
     return params.toString();
-  }, [action, category, from, limit, platformUserId, search, targetType, tenantId, to]);
+  }, [source, category, action, targetType, targetId, tenantId, platformUserId, from, to, search, offset]);
 
   const auditQuery = useQuery({
     queryKey: ['platform', 'audit', queryString],
-    queryFn: () => platformApiRequest<PlatformAuditRow[]>(`/platform/audit?${queryString}`)
+    queryFn: () => platformApiRequest<PlatformAuditResponse>(`/platform/audit?${queryString}`),
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    placeholderData: (previous) => previous
   });
 
-  const summaryQuery = useQuery({
-    queryKey: ['platform', 'audit-summary', queryString],
-    queryFn: () => platformApiRequest<AuditSummary>(`/platform/audit/summary?${queryString}`)
-  });
+  const data = auditQuery.data;
+  const rows = data?.events || [];
+  const summary = data?.summary;
+  const pagination = data?.pagination;
+  const initialLoadError = auditQuery.isError && !data;
+  const refreshError = auditQuery.isError && Boolean(data);
+  const targetIdInvalid = Boolean(draft.targetId) && !UUID_PATTERN.test(draft.targetId);
+  const tenantIdInvalid = Boolean(draft.tenantId) && !UUID_PATTERN.test(draft.tenantId);
+  const userIdInvalid = Boolean(draft.platformUserId) && !UUID_PATTERN.test(draft.platformUserId);
+  const fromIso = toIso(draft.from);
+  const toIsoValue = toIso(draft.to);
+  const dateInvalid = (Boolean(draft.from) && !fromIso) || (Boolean(draft.to) && !toIsoValue) || Boolean(fromIso && toIsoValue && new Date(fromIso).getTime() > new Date(toIsoValue).getTime());
+  const identityFilterForbidden = (!canReadTenants && Boolean(draft.tenantId)) || (!canReadUsers && Boolean(draft.platformUserId));
+  const filtersInvalid = targetIdInvalid || tenantIdInvalid || userIdInvalid || dateInvalid || identityFilterForbidden;
+  const exportWouldTruncate = Number(summary?.total.total_events || 0) > EXPORT_LIMIT;
 
-  const rows = auditQuery.data || [];
-  const summary = summaryQuery.data;
-  const parsedLimit = Number(limit);
-  const limitIsValid = Number.isInteger(parsedLimit) && parsedLimit >= 1 && parsedLimit <= 500;
-  const fromDate = from ? new Date(from) : null;
-  const toDate = to ? new Date(to) : null;
-  const fromIsValid = !from || !Number.isNaN(fromDate?.getTime());
-  const toIsValid = !to || !Number.isNaN(toDate?.getTime());
-  const dateRangeIsValid = !fromDate || !toDate || fromDate.getTime() <= toDate.getTime();
-  const filtersAreValid = limitIsValid && fromIsValid && toIsValid && dateRangeIsValid;
-  const activeFilterLabels = [
-    category ? `Category: ${category}` : '',
-    action.trim() ? `Action: ${action.trim()}` : '',
-    targetType.trim() ? `Target type: ${targetType.trim()}` : '',
-    tenantId.trim() ? `Tenant ID: ${tenantId.trim()}` : '',
-    platformUserId.trim() ? `Platform User ID: ${platformUserId.trim()}` : '',
-    from.trim() ? `From: ${from.trim()}` : '',
-    to.trim() ? `To: ${to.trim()}` : '',
-    search.trim() ? `Search: ${search.trim()}` : ''
-  ].filter(Boolean);
-
-  async function refreshAll() {
-    setStatusMessage('');
-    setExportError('');
-    await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
+  function updateParams(patch: Record<string, string | null>, resetOffset = true) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) next.set(key, value); else next.delete(key);
+    }
+    next.delete('entity_type'); next.delete('entity_id');
+    if (resetOffset) next.delete('offset');
+    setSearchParams(next, { replace: true });
   }
 
-  const handleExportCsv = async () => {
-    setStatusMessage('');
-    setExportError('');
-    if (!filtersAreValid) {
-      setExportError('Fix invalid filters before exporting audit evidence.');
-      return;
-    }
-    const confirmed = window.confirm('Export the currently filtered platform audit evidence to CSV? This export is itself written to platform audit.');
-    if (!confirmed) return;
+  function applyFilters(event: FormEvent) {
+    event.preventDefault();
+    if (filtersInvalid) return;
+    updateParams({
+      source: draft.source || null,
+      category: null,
+      action: draft.action.trim() || null,
+      target_type: draft.targetType.trim() || null,
+      target_id: draft.targetId.trim() || null,
+      tenant_id: canReadTenants ? (draft.tenantId.trim() || null) : null,
+      platform_user_id: canReadUsers ? (draft.platformUserId.trim() || null) : null,
+      from: fromIso,
+      to: toIsoValue,
+      search: draft.search.trim() || null
+    });
+  }
+
+  function clearFilters() {
+    setSearchParams({}, { replace: true });
+    setStatusMessage(''); setExportError('');
+  }
+
+  async function refresh() {
+    setStatusMessage(''); setExportError('');
+    await auditQuery.refetch();
+  }
+
+  async function exportCsv() {
+    if (!data || filtersInvalid) return;
+    setStatusMessage(''); setExportError('');
+    const message = exportWouldTruncate
+      ? `This filtered view contains ${summary?.total.total_events ?? 0} visible events. CSV export is capped at ${EXPORT_LIMIT.toLocaleString()} rows and will be explicitly partial. Continue?`
+      : `Export ${summary?.total.total_events ?? 0} visible filtered audit event(s) to CSV? The export action itself will be written to Platform Audit.`;
+    if (!window.confirm(message)) return;
     setExporting(true);
     try {
       const params = new URLSearchParams(queryString);
-      if (!params.get('limit') || Number(params.get('limit')) < 1000) {
-        params.set('limit', '1000');
-      }
+      params.delete('offset');
+      params.set('limit', String(EXPORT_LIMIT));
       await platformDownload(`/platform/audit/export.csv?${params.toString()}`, 'platform-audit.csv');
-      setStatusMessage('Audit CSV export prepared. The export action is recorded in platform audit.');
-    } catch (error) {
-      setExportError(readableError(error));
-    } finally {
-      setExporting(false);
-    }
-  };
+      setStatusMessage(exportWouldTruncate
+        ? `CSV prepared with the newest ${EXPORT_LIMIT.toLocaleString()} visible events. The filtered evidence set is larger, so this export is partial.`
+        : 'Audit CSV prepared. The export action is recorded in Platform Audit.');
+    } catch (error) { setExportError(readableError(error)); } finally { setExporting(false); }
+  }
+
+  const supportingLinks = [
+    { label: 'Audit retention', to: '/platform/audit-retention', allowed: true },
+    { label: 'Security Center', to: '/platform/security-center', allowed: hasPlatformPermission(P.PLATFORM_SECURITY_READ) },
+    { label: 'Support Sessions', to: '/platform/support-sessions', allowed: hasPlatformPermission(P.SUPPORT_SESSION_READ) },
+    { label: 'Tenant Exports', to: '/platform/tenant-exports', allowed: canReadTenants && hasPlatformPermission(P.TENANTS_EXPORT) },
+    { label: 'Incidents', to: '/platform/incidents', allowed: hasPlatformPermission(P.PLATFORM_INCIDENTS_READ) },
+    { label: 'Platform Users', to: '/platform/users', allowed: canReadUsers }
+  ].filter((item) => item.allowed);
 
   return (
-    <div style={styles.page}>
-      <header style={styles.headerRow}>
-        <div>
-          <h1 style={styles.title}>Platform Audit</h1>
-          <p style={styles.subtitle}>Superadmin and platform-support actions across the SaaS control plane.</p>
-        </div>
-        <div style={styles.headerActions}>
-          <button type="button" onClick={refreshAll} disabled={auditQuery.isFetching || summaryQuery.isFetching} style={styles.secondaryButton}>
-            {auditQuery.isFetching || summaryQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-          <button type="button" onClick={handleExportCsv} disabled={exporting || !filtersAreValid} style={styles.primaryButton}>
-            {exporting ? 'Exporting…' : 'Export CSV'}
-          </button>
-        </div>
-      </header>
+    <div className="io-operational-page io-workspace-page platform-audit">
+      <OperationalWorkspaceHero
+        iconPath="/platform/audit"
+        eyebrow="Platform Governance"
+        title="Platform Audit"
+        description="Immutable control-plane application evidence, scoped to the source families and identities the current Platform permission snapshot is allowed to inspect. Audit records do not prove external business, infrastructure, delivery, or customer outcomes."
+        meta={<>
+          <OperationalWorkspaceMetaPill>AUDIT_READ base permission</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{data?.evidence_complete ? 'Complete source visibility' : 'Permission-scoped evidence'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>Read only</OperationalWorkspaceMetaPill>
+        </>}
+        aside={<div className="platform-audit__hero-aside">
+          <OperationalWorkspaceStatus value={summary ? summary.total.total_events : '—'} label="visible filtered events" />
+          <div className="platform-audit__refresh-block">
+            <span>Last refreshed: {formatDateTime(data?.generated_at)}</span>
+            <button type="button" className="app-button app-button--secondary" onClick={() => void refresh()} disabled={auditQuery.isFetching}>{auditQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
+          </div>
+        </div>}
+      />
 
-      {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
-      {exportError ? <div style={styles.error}>{exportError}</div> : null}
-      {!filtersAreValid ? <div style={styles.error}>Limit must be 1-500 and date filters must be valid with From before To.</div> : null}
+      {refreshError ? <div className="platform-audit__warning">Showing the last successful snapshot. Refresh failed: {readableError(auditQuery.error)} <button type="button" onClick={() => void refresh()}>Retry</button></div> : null}
+      {statusMessage ? <div className="platform-audit__success">{statusMessage}</div> : null}
+      {exportError ? <div className="platform-audit__error-text">{exportError}</div> : null}
+      {data && !data.evidence_complete ? <div className="platform-audit__warning"><strong>Partial evidence:</strong> restricted source families are omitted rather than counted as zero. Omitted: {data.omitted_sources.map(pretty).join(', ') || 'none'}.</div> : null}
+      {category ? <div className="platform-audit__warning">Legacy category filter active: <strong>{pretty(category)}</strong>. Applying the filter form will replace it with the exact source filter where selected. <button type="button" onClick={() => updateParams({ category: null })}>Clear category</button></div> : null}
+      {exportWouldTruncate ? <div className="platform-audit__warning">The filtered visible evidence set exceeds {EXPORT_LIMIT.toLocaleString()} rows. CSV export is capped and will be partial.</div> : null}
 
-      <section style={styles.metaPanel}>
-        <div><strong>Audit source:</strong> GET /platform/audit</div>
-        <div><strong>Summary source:</strong> GET /platform/audit/summary</div>
-        <div><strong>Export source:</strong> GET /platform/audit/export.csv</div>
-        <div><strong>Displayed rows:</strong> {rows.length}</div>
-        <div><strong>Current limit:</strong> {limit.trim() || '100'}</div>
-        <div><strong>Latest event:</strong> {formatDateTime(summary?.total.last_event_at)}</div>
-        <div><strong>Active filters:</strong> {activeFilterLabels.length ? activeFilterLabels.join(' | ') : 'None'}</div>
+      <OperationalWorkspaceStats ariaLabel="Platform Audit evidence summary">
+        <OperationalWorkspaceStatCard label="Visible events" value={summary?.total.total_events ?? '—'} helper={`First: ${formatDateTime(summary?.total.first_event_at)}`} iconPath="/platform/audit" />
+        <OperationalWorkspaceStatCard label="Visible sources" value={summary?.sources.length ?? '—'} helper={`${data?.omitted_sources.length ?? 0} source families restricted`} tone={data?.evidence_complete ? 'good' : 'warn'} iconPath="/platform/audit" />
+        <OperationalWorkspaceStatCard label="Top action" value={summary?.top_actions[0]?.action || '—'} helper={summary?.top_actions[0] ? `${summary.top_actions[0].count} events` : 'No visible evidence'} iconPath="/platform/audit" />
+        <OperationalWorkspaceStatCard label="Actor identity" value={data?.evidence_access.platform_user_identity ? 'Available' : 'Restricted'} helper="PLATFORM_USERS_READ" tone={data?.evidence_access.platform_user_identity ? 'good' : 'neutral'} iconPath="/platform/users" />
+        <OperationalWorkspaceStatCard label="Tenant identity" value={data?.evidence_access.tenant_identity ? 'Available' : 'Restricted'} helper="TENANTS_READ" tone={data?.evidence_access.tenant_identity ? 'good' : 'neutral'} iconPath="/platform/tenants" />
+      </OperationalWorkspaceStats>
+
+      <section className="io-workspace-panel platform-audit__section">
+        <OperationalSectionHeader iconPath="/platform/audit" title="Evidence filters" description="Deep links use exact target filters. Restricted identity/source filters fail closed instead of returning a misleading empty result." actions={<button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button>} />
+        <form className="platform-audit__filters" onSubmit={applyFilters}>
+          <label>Source<select value={draft.source} onChange={(e) => setDraft((current) => ({ ...current, source: e.target.value }))}><option value="">All authorized sources</option>{allowedSourceOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          <label>Action<input value={draft.action} onChange={(e) => setDraft((current) => ({ ...current, action: e.target.value }))} placeholder="platform_incident.update" /></label>
+          <label>Target type<input value={draft.targetType} onChange={(e) => setDraft((current) => ({ ...current, targetType: e.target.value }))} placeholder="platform_vendor" /></label>
+          <label>Target ID<input className={targetIdInvalid ? 'is-invalid' : ''} value={draft.targetId} onChange={(e) => setDraft((current) => ({ ...current, targetId: e.target.value }))} placeholder="UUID" /></label>
+          {canReadTenants ? <label>Tenant ID<input className={tenantIdInvalid ? 'is-invalid' : ''} value={draft.tenantId} onChange={(e) => setDraft((current) => ({ ...current, tenantId: e.target.value }))} placeholder="UUID" /></label> : <div className="platform-audit__restricted-filter"><strong>Tenant filter restricted</strong><span>TENANTS_READ required.</span></div>}
+          {canReadUsers ? <label>Platform user ID<input className={userIdInvalid ? 'is-invalid' : ''} value={draft.platformUserId} onChange={(e) => setDraft((current) => ({ ...current, platformUserId: e.target.value }))} placeholder="UUID" /></label> : <div className="platform-audit__restricted-filter"><strong>Actor filter restricted</strong><span>PLATFORM_USERS_READ required.</span></div>}
+          <label>From<input type="datetime-local" value={draft.from} onChange={(e) => setDraft((current) => ({ ...current, from: e.target.value }))} /></label>
+          <label>To<input type="datetime-local" value={draft.to} onChange={(e) => setDraft((current) => ({ ...current, to: e.target.value }))} /></label>
+          <label className="platform-audit__search">Search<input value={draft.search} onChange={(e) => setDraft((current) => ({ ...current, search: e.target.value }))} placeholder="action, target or authorized metadata/identity" /></label>
+          {filtersInvalid ? <div className="platform-audit__validation">Use valid UUIDs and an ordered date range. Identity filters also require their independent read permissions.</div> : null}
+          <div className="platform-audit__filter-actions"><button type="submit" className="app-button app-button--primary" disabled={filtersInvalid}>Apply filters</button><button type="button" className="app-button app-button--secondary" disabled={!data || exporting || filtersInvalid} onClick={() => void exportCsv()}>{exporting ? 'Exporting…' : 'Export CSV'}</button></div>
+        </form>
       </section>
 
-      <nav style={styles.supportLinks} aria-label="Supporting platform pages">
-        <Link style={styles.supportLink} to="/platform/security-center">Security Center</Link>
-        <Link style={styles.supportLink} to="/platform/support-sessions">Support Sessions</Link>
-        {canReadTenantExports ? <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant Exports</Link> : null}
-        <Link style={styles.supportLink} to="/platform/incidents">Incidents</Link>
-      </nav>
+      {initialLoadError ? <section className="io-workspace-panel platform-audit__blocking-error"><strong>Platform Audit failed to load.</strong><span>{readableError(auditQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void refresh()}>Retry</button></section> : null}
+      {!data && auditQuery.isLoading ? <section className="io-workspace-panel platform-audit__loading">Loading authorized Platform audit evidence…</section> : null}
 
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Filters</h2>
-        <div style={styles.filters}>
-          <label style={styles.label}>
-            Limit
-            <input type="number" min="1" max="500" value={limit} onChange={(event) => setLimit(event.target.value)} style={limitIsValid ? styles.input : styles.inputInvalid} />
-          </label>
-          <label style={styles.label}>
-            Category
-            <select value={category} onChange={(event) => setCategory(event.target.value)} style={styles.input}>
-              {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>
-            Action
-            <input value={action} onChange={(event) => setAction(event.target.value)} placeholder="tenant.lock" style={styles.input} />
-          </label>
-          <label style={styles.label}>
-            Target type
-            <input value={targetType} onChange={(event) => setTargetType(event.target.value)} placeholder="tenant" style={styles.input} />
-          </label>
-          <label style={styles.label}>
-            Tenant ID
-            <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="UUID" style={styles.input} />
-          </label>
-          <label style={styles.label}>
-            Platform User ID
-            <input value={platformUserId} onChange={(event) => setPlatformUserId(event.target.value)} placeholder="UUID" style={styles.input} />
-          </label>
-          <label style={styles.label}>
-            From
-            <input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} style={fromIsValid && dateRangeIsValid ? styles.input : styles.inputInvalid} />
-          </label>
-          <label style={styles.label}>
-            To
-            <input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} style={toIsValid && dateRangeIsValid ? styles.input : styles.inputInvalid} />
-          </label>
-          <label style={styles.labelWide}>
-            Search
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="actor, tenant, action, target, metadata" style={styles.input} />
-          </label>
+      {data ? <section className="io-workspace-panel platform-audit__section">
+        <OperationalSectionHeader iconPath="/platform/audit" title="Audit evidence" description={`${pagination?.total ?? 0} visible event(s) across the current authorized/filter scope. Restricted source events are not included in this count.`} />
+        {rows.length ? <div className="platform-audit__table-wrap"><table><thead><tr><th>Time</th><th>Source / action</th><th>Actor</th><th>Tenant</th><th>Target</th><th>Request evidence</th><th>Metadata</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}>
+          <td>{formatDateTime(row.created_at)}</td>
+          <td><strong>{pretty(row.source)}</strong><code>{row.action}</code></td>
+          <td>{data.evidence_access.platform_user_identity ? <>{row.platform_user_name || row.platform_user_email || row.platform_user_id || 'System / unavailable'}{row.platform_user_name && row.platform_user_email ? <small>{row.platform_user_email}</small> : null}</> : <span className="platform-audit__restricted">Restricted</span>}</td>
+          <td>{data.evidence_access.tenant_identity ? <>{row.tenant_name || row.tenant_id || 'No tenant'}{row.tenant_name && row.tenant_id ? <small>{row.tenant_id}</small> : null}</> : <span className="platform-audit__restricted">Restricted</span>}</td>
+          <td>{row.target_type || 'Not recorded'}{row.target_id ? <small>{row.target_id}</small> : null}</td>
+          <td>{row.ip_address || 'Not recorded'}{row.user_agent ? <small>{row.user_agent}</small> : null}</td>
+          <td><code className="platform-audit__metadata">{metadataPreview(row.metadata)}</code>{row.target_id ? <Link className="platform-audit__evidence-link" to={`/platform/audit?action=${encodeURIComponent(row.action)}&target_type=${encodeURIComponent(row.target_type || '')}&target_id=${encodeURIComponent(row.target_id)}`}>Exact evidence query</Link> : null}</td>
+        </tr>)}</tbody></table></div> : <div className="platform-audit__empty"><strong>No authorized audit events match these filters.</strong><span>This is not evidence that restricted source families contain zero events.</span></div>}
+        <div className="platform-audit__pagination"><button type="button" className="app-button app-button--secondary" disabled={!pagination || pagination.offset <= 0} onClick={() => updateParams({ offset: String(Math.max(0, (pagination?.offset || 0) - PAGE_SIZE)) }, false)}>Previous</button><span>{pagination ? `${pagination.offset + (rows.length ? 1 : 0)}–${pagination.offset + rows.length} of ${pagination.total}` : '—'}</span><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more} onClick={() => updateParams({ offset: String((pagination?.offset || 0) + PAGE_SIZE) }, false)}>Next</button></div>
+      </section> : null}
+
+      {summary ? <section className="io-workspace-panel platform-audit__section">
+        <OperationalSectionHeader iconPath="/platform/audit" title="Visible evidence profile" description="These aggregates describe only source families available under the current permission snapshot; restricted aggregates remain Restricted rather than zero." />
+        <div className="platform-audit__summary-grid">
+          <SummaryList title="Sources" rows={summary.sources.map((row) => ({ label: pretty(row.source), count: row.count }))} />
+          <SummaryList title="Top actions" rows={summary.top_actions.map((row) => ({ label: row.action, count: row.count }))} />
+          <SummaryList title="Top actors" rows={summary.top_actors?.map((row) => ({ label: row.actor, count: row.count })) ?? null} restrictedLabel="PLATFORM_USERS_READ required" />
+          <SummaryList title="Top tenants" rows={summary.top_tenants?.map((row) => ({ label: row.tenant_name, count: row.count })) ?? null} restrictedLabel="TENANTS_READ required" />
         </div>
-      </section>
+        <div className="platform-audit__truth-note"><strong>Evidence boundary</strong><span>An audit row proves that this application recorded the event. It does not prove that an external system processed it, a customer received it, infrastructure actually changed, a deployment succeeded, or a legal/business obligation was satisfied.</span></div>
+      </section> : null}
 
-      {summary ? (
-        <section style={styles.summaryGrid}>
-          <div style={styles.metricCard}>
-            <div style={styles.metricLabel}>Events</div>
-            <div style={styles.metricValue}>{summary.total.total_events}</div>
-            <div style={styles.muted}>Latest: {formatDateTime(summary.total.last_event_at)}</div>
-          </div>
-          <div style={styles.metricCard}>
-            <div style={styles.metricLabel}>Top category</div>
-            <div style={styles.metricValueSmall}>{summary.categories[0]?.category || '-'}</div>
-            <div style={styles.muted}>{summary.categories[0]?.count || 0} events</div>
-          </div>
-          <div style={styles.metricCard}>
-            <div style={styles.metricLabel}>Top actor</div>
-            <div style={styles.metricValueSmall}>{summary.top_actors[0]?.actor || '-'}</div>
-            <div style={styles.muted}>{summary.top_actors[0]?.count || 0} events</div>
-          </div>
-          <div style={styles.metricCard}>
-            <div style={styles.metricLabel}>Top tenant</div>
-            <div style={styles.metricValueSmall}>{summary.top_tenants[0]?.tenant_name || '-'}</div>
-            <div style={styles.muted}>{summary.top_tenants[0]?.count || 0} events</div>
-          </div>
-        </section>
-      ) : null}
-
-      {summary ? (
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Audit Summary</h2>
-          <div style={styles.summaryColumns}>
-            <SummaryList title="Categories" rows={summary.categories.map((row) => ({ label: row.category, count: row.count }))} />
-            <SummaryList title="Top actions" rows={summary.top_actions.map((row) => ({ label: row.action, count: row.count }))} />
-            <SummaryList title="Top actors" rows={summary.top_actors.map((row) => ({ label: row.actor, count: row.count }))} />
-            <SummaryList title="Top tenants" rows={summary.top_tenants.map((row) => ({ label: row.tenant_name, count: row.count }))} />
-          </div>
-        </section>
-      ) : null}
-
-      {auditQuery.isLoading ? <div style={styles.panel}>Loading platform audit…</div> : null}
-      {auditQuery.error ? (
-        <div style={styles.errorPanel}>
-          <strong>Audit events failed to load.</strong>
-          <span>{readableError(auditQuery.error)}</span>
-          <button type="button" style={styles.retryButton} onClick={() => auditQuery.refetch()}>Retry audit events</button>
-        </div>
-      ) : null}
-      {summaryQuery.error ? (
-        <div style={styles.errorPanel}>
-          <strong>Audit summary failed to load.</strong>
-          <span>{readableError(summaryQuery.error)}</span>
-          <button type="button" style={styles.retryButton} onClick={() => summaryQuery.refetch()}>Retry audit summary</button>
-        </div>
-      ) : null}
-
-      <section style={styles.panel}>
-        <h2 style={styles.sectionTitle}>Audit Events</h2>
-        {rows.length ? (
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Time</th>
-                <th style={styles.th}>Action</th>
-                <th style={styles.th}>Actor</th>
-                <th style={styles.th}>Tenant</th>
-                <th style={styles.th}>Target</th>
-                <th style={styles.th}>IP</th>
-                <th style={styles.th}>Metadata</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td style={styles.td}>{formatDateTime(row.created_at)}</td>
-                  <td style={styles.tdMono}>{row.action}</td>
-                  <td style={styles.td}>
-                    {row.platform_user_name || row.platform_user_email || row.platform_user_id || '-'}
-                    {row.platform_user_email && row.platform_user_name ? <div style={styles.muted}>{row.platform_user_email}</div> : null}
-                  </td>
-                  <td style={styles.td}>
-                    {row.tenant_name || row.tenant_id || '-'}
-                    {row.tenant_name && row.tenant_id ? <div style={styles.muted}>{row.tenant_id}</div> : null}
-                  </td>
-                  <td style={styles.td}>
-                    {row.target_type || '-'}
-                    {row.target_id ? <div style={styles.muted}>{row.target_id}</div> : null}
-                  </td>
-                  <td style={styles.td}>{row.ip_address || '-'}</td>
-                  <td style={styles.tdMonoSmall}>
-                    {metadataPreview(row.metadata)}
-                    <div style={styles.evidenceLinks}>
-                      <Link style={styles.evidenceLink} to={`/platform/audit?action=${encodeURIComponent(row.action)}&target_type=${encodeURIComponent(row.target_type || '')}&search=${encodeURIComponent(row.target_id || row.id)}`}>Evidence query</Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : !auditQuery.isLoading ? <div>No platform audit events found.</div> : null}
+      <section className="io-workspace-panel platform-audit__section">
+        <OperationalSectionHeader iconPath="/platform/audit" title="Supporting governance" description="Only destinations allowed by the current Platform permission snapshot are shown." />
+        <div className="platform-audit__supporting-links">{supportingLinks.map((item) => <Link key={item.to} to={item.to}>{item.label}</Link>)}</div>
       </section>
     </div>
   );
 }
 
-function SummaryList({ title, rows }: { title: string; rows: { label: string; count: number }[] }) {
-  return (
-    <div style={styles.summaryList}>
-      <h3 style={styles.summaryTitle}>{title}</h3>
-      {rows.length ? rows.map((row) => (
-        <div key={`${title}-${row.label}`} style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>{row.label || '-'}</span>
-          <strong>{row.count}</strong>
-        </div>
-      )) : <div style={styles.muted}>No data.</div>}
-    </div>
-  );
+function SummaryList({ title, rows, restrictedLabel }: { title: string; rows: { label: string; count: number }[] | null; restrictedLabel?: string }) {
+  return <div className="platform-audit__summary-list"><h4>{title}</h4>{rows === null ? <div className="platform-audit__restricted-summary">Restricted · {restrictedLabel}</div> : rows.length ? rows.map((row) => <div key={`${title}-${row.label}`}><span>{row.label || 'Not recorded'}</span><strong>{row.count}</strong></div>) : <span className="platform-audit__quiet">No visible evidence.</span>}</div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  headerActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
-  sectionTitle: { margin: '0 0 14px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  filters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155' },
-  labelWide: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 700, color: '#334155', gridColumn: 'span 2' },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff', color: '#0f172a', minWidth: 0 },
-  inputInvalid: { border: '1px solid #dc2626', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fef2f2', color: '#0f172a', minWidth: 0 },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 12 },
-  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 12 },
-  errorPanel: { display: 'flex', flexDirection: 'column', gap: 10, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 14 },
-  retryButton: { alignSelf: 'flex-start', border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '8px 11px', fontWeight: 700, cursor: 'pointer' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer' },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155' },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { background: '#fff', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '7px 11px', fontWeight: 700, fontSize: 13, textDecoration: 'none' },
-  primaryButton: { border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', borderRadius: 9, padding: '9px 13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 },
-  metricCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)' },
-  metricLabel: { color: '#64748b', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em' },
-  metricValue: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  metricValueSmall: { fontSize: 18, fontWeight: 800, marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', color: '#0f172a' },
-  summaryColumns: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  summaryList: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' },
-  summaryTitle: { margin: '0 0 10px', fontSize: 15, color: '#0f172a' },
-  summaryItem: { display: 'flex', justifyContent: 'space-between', gap: 10, borderTop: '1px solid #e2e8f0', padding: '8px 0', color: '#334155' },
-  summaryLabel: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' },
-  tdMono: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', fontFamily: 'monospace', verticalAlign: 'top', whiteSpace: 'nowrap', color: '#334155' },
-  tdMonoSmall: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', fontFamily: 'monospace', fontSize: 12, verticalAlign: 'top', maxWidth: 320, wordBreak: 'break-word', color: '#334155' },
-  evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 },
-  evidenceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none', fontFamily: 'system-ui, sans-serif' },
-  muted: { color: '#64748b', fontSize: 12, marginTop: 4, wordBreak: 'break-all' }
-};
